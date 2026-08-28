@@ -12,10 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
+import { SupplyTracker } from '@/components/supply-tracker';
 
 type Mode = 'Block-0' | 'Organic' | 'Manual';
 type Preset = 'Quick' | 'Clean' | 'Full' | 'Custom';
-type View = 'launch' | 'pulse';
+type View = 'launch' | 'pulse' | 'tracker';
 type Strategy = 'Balanced' | 'Liquidity' | 'Discovery';
 const projects = [
   { ticker: '$xD', name: 'xD', state: 'Draft', color: '#8577ff' },
@@ -206,18 +207,19 @@ export default function Home() {
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand-zone"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle navigation"><Menu /></button><div className="brand-mark"><i /><i /><i /><i /></div><strong>PulseForge <span>v1.0</span></strong><PanelLeftClose className="ml-auto size-4 text-[#717789]" /></div>
-      <nav className="steps" aria-label="Product sections"><button>CHAIN &amp; LAUNCHPAD</button><button>TOKEN DETAILS</button><button onClick={() => setView('launch')} className={view === 'launch' ? 'active' : ''}>LAUNCH SETTINGS</button><button onClick={() => setView('pulse')} className={view === 'pulse' ? 'active pulse-nav' : 'pulse-nav'}>PULSE ENGINE</button></nav>
+      <nav className="steps" aria-label="Product sections"><button>CHAIN &amp; LAUNCHPAD</button><button>TOKEN DETAILS</button><button onClick={() => setView('launch')} className={view === 'launch' ? 'active' : ''}>LAUNCH SETTINGS</button><button onClick={() => setView('pulse')} className={view === 'pulse' ? 'active pulse-nav' : 'pulse-nav'}>PULSE ENGINE</button><button onClick={() => setView('tracker')} className={view === 'tracker' ? 'active tracker-nav' : 'tracker-nav'}>SUPPLY TRACKER</button></nav>
       <div className="token-zone"><div className="token-avatar">xD<span /></div><div><strong>$xD <small>xD</small></strong><p>6pFG2n...Npump</p></div><Button variant="outline" className="archive-button"><Archive /> Archive</Button></div>
     </header>
 
     <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
       <div className="project-search"><Search /><input placeholder="Search" /><kbd>⌘K</kbd></div>
       <div className="project-list">{projects.map((project, index) => <button key={project.ticker} className={`project ${index === 0 ? 'selected' : ''}`}><span className="project-avatar" style={{ background: `linear-gradient(145deg, ${project.color}, #16171d)` }}>{project.name.slice(0, 2)}</span><span><strong>{project.ticker}</strong><small>{project.name}</small></span><em>{project.state}</em></button>)}</div>
-      <div className="sidebar-section"><p>Features <ChevronDown /></p><a onClick={() => setView('pulse')} className={view === 'pulse' ? 'feature-active' : ''}><Bot /> Pulse Engine <b>LAB</b></a><a><WalletCards /> My Wallets</a><a><Grid2X2 /> Marketplace <b>NEW</b></a><a><Activity /> Tracker</a><a><Archive /> Archived</a><a><Boxes /> Dashboard</a></div>
+      <div className="sidebar-section"><p>Features <ChevronDown /></p><a onClick={() => setView('pulse')} className={view === 'pulse' ? 'feature-active' : ''}><Bot /> Pulse Engine <b>LAB</b></a><a><WalletCards /> My Wallets</a><a><Grid2X2 /> Marketplace <b>NEW</b></a><a onClick={() => setView('tracker')} className={view === 'tracker' ? 'feature-active tracker-active' : ''}><Activity /> Supply Tracker</a><a><Archive /> Archived</a><a><Boxes /> Dashboard</a></div>
       <div className="sidebar-bottom"><button className="funder"><Database /> Funder <ChevronDown /></button><div><Button variant="outline"><Clipboard /> Import</Button><Button><Sparkles /> Create Launch</Button></div></div>
     </aside>
 
-    <main className="workspace">
+    <main className={`workspace ${view === 'tracker' ? 'tracker-workspace' : ''}`}>
+      {view === 'tracker' ? <SupplyTracker /> : <>
       <section className="settings-panel">{view === 'launch' ? <div className="settings-scroll">
         <div className="page-title"><h1>Launch Settings</h1><p>Define how your launch behaves on-chain.<br />These settings control execution patterns.</p></div>
         <div className="form-body">
@@ -243,7 +245,7 @@ export default function Home() {
         <section className="build-analysis"><h2><Gauge /> {preset} Build <ChevronDown /></h2><div className="metric-grid"><div><label><Users /> Bubble Maps <Help /><b>Likely Clean</b></label><Meter value={mev + 12} left="Uncertain" right="Likely clean" /></div><div><label><CircleGauge /> Supply Cost <Help /><b>{(Number(figures.cost) / 1.88).toFixed(1)}%</b></label><Meter value={Math.min(94, Number(figures.cost) * 9)} left="Low" right="High" /></div><div><label><Target /> Detection Mode <Help /></label><Meter value={mev} left="Less Sniper" right="Less Top Traders" /></div><div><label><Activity /> Cleanup Time <Help /><b>{Math.round(64 - mev / 5)}m {Math.round(mev % 60)}s</b></label><Meter value={Math.min(96, holderCount / 2)} left="Fastest" right="Longest" /></div></div></section>
         <section className="estimate-card"><div className="est-row muted"><span>Est. Market Cap <Help /></span><b>$2.91K → $4.83K–<strong>${(figures.market / 1000).toFixed(2)}K</strong> / $42.7K</b></div><div className="est-row"><span>Expected Supply <Help /></span><b>{figures.supply}%→<strong>{Math.round(developer + holders)}%</strong></b></div><div className="sub-row"><span>Deployer <Help /></span><b>{developer}%</b></div><div className="sub-row"><span>Holders <Help /></span><b>{figures.supply}%→{holders}%</b></div></section>
         <section className="estimate-card funding-card"><div className="est-row"><span>Funding Estimation</span><b>{figures.funding} SOL</b></div><div className="sub-row"><span>Supply Cost <Help /></span><b>{figures.cost} SOL</b></div><div className="sub-row"><span>Extra Funding <Help /></span><b>{figures.extra} SOL</b></div><div className="sub-row danger"><span>Maximum Loss <Help /></span><b>{figures.lossLow} SOL / {figures.lossHigh} SOL</b></div></section><Button className="create-side"><Sparkles /> Create</Button>
-      </div> : <PulseInsights {...pulseProps} />}</aside>
+      </div> : <PulseInsights {...pulseProps} />}</aside></>}
     </main>
     <footer className="statusbar"><span className="live"><i /> All Services are Live • 167ms</span><div className="prices"><span>◎ <b>$103</b> ↗</span><span>⬡ <b>$688</b> ↗</span><span>◆ <b>$2,431</b> ↘</span></div><nav><a>𝕏</a><a><MessageCircle /></a><a>News</a><a>Documentation</a><a>Activity</a><a><CircleHelp /></a><a><Settings /> Settings</a></nav></footer>
   </div>;
