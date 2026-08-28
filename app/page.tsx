@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity, Archive, Boxes, ChevronDown, CircleGauge, CircleHelp, Clipboard, Crosshair,
   Database, ExternalLink, Flame, Gauge, Gem, Grid2X2, Hand, Leaf, Menu,
@@ -53,6 +53,77 @@ type PulseProps = {
   plan: { orders: number; turnover: string; runway: string; risk: number; fees: string; utilization: number };
 };
 
+type RpcNetworkStatus = { network: string; status: string; slot?: number; latencyMs?: number; error?: string };
+type BackendCycle = { id: string; slot: number; blockhash: string; rpcLatencyMs: number; plannedOrders: number; projectedTurnover: number; riskScore: number; status: string; createdAt: string };
+type SavedStrategy = { strategy?: Strategy; agents?: number; budget?: number; cadence?: number; orderSize?: number; spread?: number; inventory?: number };
+
+function PulseBackendControls(props: PulseProps) {
+  const [networks, setNetworks] = useState<RpcNetworkStatus[]>([]);
+  const [cycles, setCycles] = useState<BackendCycle[]>([]);
+  const [state, setState] = useState<'loading' | 'ready' | 'working' | 'auth' | 'error'>('loading');
+  const [message, setMessage] = useState('Connecting to PulseForge control plane…');
+
+  const payload = () => ({ strategy: props.strategy, agents: props.agents, budget: props.budget, cadence: props.cadence, orderSize: props.orderSize, spread: props.spread, inventory: props.inventory });
+
+  const loadBackend = async () => {
+    try {
+      const statusResponse = await fetch('/api/pulse/status', { cache: 'no-store' });
+      const status = await statusResponse.json() as { networks?: RpcNetworkStatus[] };
+      setNetworks(status.networks ?? []);
+      const strategyResponse = await fetch('/api/pulse/strategy', { cache: 'no-store' });
+      if (strategyResponse.status === 401) { setState('auth'); setMessage('Sign in to save strategies and run backend cycles.'); return; }
+      if (!strategyResponse.ok) throw new Error('Strategy service unavailable');
+      const saved = await strategyResponse.json() as { strategy?: SavedStrategy | null };
+      if (saved.strategy) {
+        const strategy = saved.strategy;
+        if (strategy.strategy) props.setStrategy(strategy.strategy);
+        if (strategy.agents) props.setAgents(Number(strategy.agents));
+        if (strategy.budget) props.setBudget(Number(strategy.budget));
+        if (strategy.cadence) props.setCadence(Number(strategy.cadence));
+        if (strategy.orderSize) props.setOrderSize(Number(strategy.orderSize));
+        if (strategy.spread) props.setSpread(Number(strategy.spread));
+        if (strategy.inventory) props.setInventory(Number(strategy.inventory));
+      }
+      const cyclesResponse = await fetch('/api/pulse/cycles', { cache: 'no-store' });
+      if (cyclesResponse.ok) setCycles(((await cyclesResponse.json()) as { cycles: BackendCycle[] }).cycles);
+      setState('ready'); setMessage(saved.strategy ? 'Saved strategy loaded from D1.' : 'Backend online. Save this strategy to begin.');
+    } catch (error) {
+      setState('error'); setMessage(error instanceof Error ? error.message : 'Backend unavailable');
+    }
+  };
+
+  useEffect(() => { void loadBackend(); }, []);
+
+  const saveStrategy = async () => {
+    setState('working'); setMessage('Saving strategy…');
+    const response = await fetch('/api/pulse/strategy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload()) });
+    if (response.status === 401) { setState('auth'); setMessage('Sign in to control the backend.'); return false; }
+    const result = await response.json() as { error?: string };
+    if (!response.ok) { setState('error'); setMessage(result.error ?? 'Save failed'); return false; }
+    setState('ready'); setMessage('Strategy persisted to D1.'); return true;
+  };
+
+  const runCycle = async () => {
+    const saved = await saveStrategy();
+    if (!saved) return;
+    setState('working'); props.setRunning(true); setMessage('Reading a live Solana slot and building a read-only shadow cycle…');
+    const response = await fetch('/api/pulse/cycles', { method: 'POST' });
+    const result = await response.json() as { cycle?: BackendCycle; error?: string };
+    props.setRunning(false);
+    if (!response.ok || !result.cycle) { setState('error'); setMessage(result.error ?? 'Cycle failed'); return; }
+    setCycles((current) => [result.cycle!, ...current].slice(0, 12));
+    setState('ready'); setMessage(`Read-only cycle recorded at slot ${result.cycle.slot.toLocaleString()}. No transaction submitted.`);
+  };
+
+  return <section className="backend-console">
+    <div className="backend-heading"><span><Database /> Backend control plane</span><b className={`backend-state ${state}`}>{state.toUpperCase()}</b></div>
+    <div className="rpc-grid">{networks.map((network) => <div key={network.network}><span className={network.status === 'online' ? 'rpc-dot online' : 'rpc-dot'} /><span><strong>{network.network}</strong><small>{network.slot ? `slot ${network.slot.toLocaleString()}` : network.error ?? 'checking'}</small></span><em>{network.latencyMs ? `${network.latencyMs}ms` : '—'}</em></div>)}</div>
+    <p className="backend-message">{message}</p>
+    {state === 'auth' ? <a className="backend-signin" href="/signin-with-chatgpt?return_to=/" target="_top">Sign in with ChatGPT</a> : <div className="backend-actions"><Button variant="outline" onClick={() => void saveStrategy()} disabled={state === 'working'}><Database /> Save strategy</Button><Button className={`pulse-action ${props.running ? 'is-running' : ''}`} onClick={() => void runCycle()} disabled={state === 'working'}>{props.running ? <><RefreshCw className="animate-spin" /> Running live-data cycle</> : <><Play /> Run live-data cycle</>}</Button></div>}
+    {cycles.length > 0 && <div className="cycle-log"><div className="cycle-log-title"><Activity /> Recent audit cycles</div>{cycles.slice(0, 3).map((cycle) => <div className="cycle-row" key={cycle.id}><span><b>{cycle.status}</b><small>slot {cycle.slot.toLocaleString()}</small></span><span><b>{cycle.plannedOrders} plans/hr</b><small>{cycle.projectedTurnover} SOL scenario</small></span><em>{cycle.rpcLatencyMs}ms</em></div>)}</div>}
+  </section>;
+}
+
 function PulseForm(props: PulseProps) {
   const strategies: Array<{ name: Strategy; copy: string; icon: typeof Waves }> = [
     { name: 'Balanced', copy: 'Two-sided inventory control', icon: Waves },
@@ -76,7 +147,7 @@ function PulseForm(props: PulseProps) {
       </div>
       <div className="safety-grid"><div><Shield /><span><strong>Self-trade prevention</strong><small>Wallet and route collision checks</small></span><b>ON</b></div><div><TriangleAlert /><span><strong>Volatility brake</strong><small>Pause above 8% / 5m movement</small></span><b>ON</b></div><div><Activity /><span><strong>Organic throttle</strong><small>Reduce quotes when real flow rises</small></span><b>ON</b></div><div><Target /><span><strong>Daily loss limit</strong><small>Hard stop at 8% of budget</small></span><b>ON</b></div></div>
       <label className="simulation-row"><Checkbox checked={props.simulated} onCheckedChange={(v) => props.setSimulated(Boolean(v))} /><span><strong>Simulation mode</strong><small>No transactions are signed or submitted. Review the projected behavior before connecting execution.</small></span></label>
-      <Button className={`pulse-action ${props.running ? 'is-running' : ''}`} onClick={() => props.setRunning(!props.running)}>{props.running ? <><Pause /> Pause simulation</> : <><Play /> Run simulation</>}</Button>
+      <PulseBackendControls {...props} />
     </div>
   </div>;
 }
