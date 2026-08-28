@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Proxima Launch Console',
-  description: 'Interactive token launch configuration and funding console.',
+  title: 'PulseForge Launch & Market Console',
+  description: 'Interactive token launch planning and simulation-first market-making controls.',
 };
 
 export default function RootLayout({
