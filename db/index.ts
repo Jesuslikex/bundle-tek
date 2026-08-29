@@ -49,6 +49,51 @@ const schemaStatements = [
     ON pulse_cycle_requests(owner_id, idempotency_key)`,
   `CREATE INDEX IF NOT EXISTS idx_pulse_cycle_requests_claimed
     ON pulse_cycle_requests(claimed_at)`,
+  `CREATE TABLE IF NOT EXISTS launch_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id TEXT NOT NULL,
+    chain TEXT NOT NULL,
+    launchpad TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    token_name TEXT NOT NULL,
+    ticker TEXT NOT NULL,
+    description TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    preset TEXT NOT NULL,
+    developer_buy REAL NOT NULL,
+    holders_buy REAL NOT NULL,
+    holder_count INTEGER NOT NULL,
+    routing_emphasis INTEGER NOT NULL,
+    use_husher INTEGER NOT NULL DEFAULT 0,
+    scheduled INTEGER NOT NULL DEFAULT 0,
+    simulation_safety TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_launch_plans_owner
+    ON launch_plans(owner_id)`,
+  `CREATE TABLE IF NOT EXISTS wallet_challenges (
+    id TEXT PRIMARY KEY,
+    wallet_address TEXT NOT NULL,
+    message TEXT NOT NULL,
+    issued_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_wallet_challenges_address_expires
+    ON wallet_challenges(wallet_address, expires_at)`,
+  `CREATE TABLE IF NOT EXISTS wallet_audit_events (
+    id TEXT PRIMARY KEY,
+    wallet_address TEXT NOT NULL,
+    network TEXT NOT NULL DEFAULT 'devnet',
+    event_type TEXT NOT NULL,
+    transaction_signature TEXT,
+    details TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_wallet_audit_address_created
+    ON wallet_audit_events(wallet_address, created_at DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_audit_transaction
+    ON wallet_audit_events(transaction_signature)`,
 ];
 
 export function getD1(): D1Database {

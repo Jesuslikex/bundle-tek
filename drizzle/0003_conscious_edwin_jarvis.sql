@@ -1,0 +1,1 @@
+ALTER TABLE `launch_plans` ADD `simulation_safety` text NOT NULL DEFAULT '{"maxIllustrativeTurnover":250,"maxScenarioExposure":50,"minimumInventoryReservePercent":20,"stopLossPercent":8,"maximumDurationMinutes":60,"executionEnabled":false,"artificialVolumeProhibited":true,"holderFarmingProhibited":true}';

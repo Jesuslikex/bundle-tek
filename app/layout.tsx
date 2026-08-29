@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { SolanaProvider } from '@/components/solana-provider';
 import './globals.css';
 
 const geistSans = Geist({
@@ -15,6 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'PulseForge Launch & Market Console',
   description: 'Interactive token launch planning and simulation-first market-making controls.',
+  icons: { icon: '/favicon.svg' },
 };
 
 export default function RootLayout({
@@ -27,7 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <SolanaProvider>{children}</SolanaProvider>
       </body>
     </html>
   );

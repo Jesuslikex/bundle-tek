@@ -2,7 +2,8 @@ import { sites } from '@openai/sites-vite-plugin';
 import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
 import { defineConfig } from 'vite';
-import hostingConfig from './.openai/hosting.json';
+import { fileURLToPath } from 'node:url';
+import hostingConfig from './.openai/hosting.json' with { type: 'json' };
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -45,6 +46,26 @@ export default defineConfig(async () => {
   const { cloudflare } = await import('@cloudflare/vite-plugin');
 
   return {
+    resolve: {
+      alias: [
+        {
+          find: /^@solana\/kit-plugin-wallet\/react$/,
+          replacement: fileURLToPath(new URL('./node_modules/@solana/kit-plugin-wallet/dist/react/index.browser.mjs', import.meta.url)),
+        },
+        {
+          find: /^@solana\/kit-plugin-wallet$/,
+          replacement: fileURLToPath(new URL('./node_modules/@solana/kit-plugin-wallet/dist/index.browser.mjs', import.meta.url)),
+        },
+        {
+          find: /^@solana\/kit-plugin-rpc$/,
+          replacement: fileURLToPath(new URL('./node_modules/@solana/kit-plugin-rpc/dist/index.browser.mjs', import.meta.url)),
+        },
+        {
+          find: /^@solana\/kit-plugin-instruction-plan$/,
+          replacement: fileURLToPath(new URL('./node_modules/@solana/kit-plugin-instruction-plan/dist/index.browser.mjs', import.meta.url)),
+        },
+      ],
+    },
     css: { postcss: { plugins: [tailwindcss()] } },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }

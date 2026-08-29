@@ -15,6 +15,27 @@
       "when": 1787962056062,
       "tag": "0001_nice_blob",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787964049062,
+      "tag": "0002_absent_wasp",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787965398507,
+      "tag": "0003_conscious_edwin_jarvis",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787966587186,
+      "tag": "0004_sudden_wendigo",
+      "breakpoints": true
     }
   ]
 }

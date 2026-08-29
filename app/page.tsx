@@ -1,22 +1,34 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, Archive, Boxes, ChevronDown, CircleGauge, CircleHelp, Clipboard, Crosshair,
-  Database, ExternalLink, Flame, Gauge, Gem, Grid2X2, Hand, Leaf, Menu,
+  Activity, Archive, Boxes, ChevronDown, CircleGauge, CircleHelp, Crosshair,
+  Database, ExternalLink, Flame, Gauge, Gem, Hand, Landmark, Leaf, Menu,
   MessageCircle, PanelLeftClose, Pencil, Search, Settings, Shield, Sparkles,
   BarChart3, Bot, CircleDollarSign, Play, Radio, RefreshCw, SlidersHorizontal,
   Target, TimerReset, TrendingUp, TriangleAlert, Users, WalletCards, Waves, Zap,
 } from 'lucide-react';
+import { ChainLaunchForm } from '@/components/launch/chain-launch-form';
+import { FundingForm } from '@/components/launch/funding-form';
+import { LiveOperationsForm } from '@/components/launch/live-operations-form';
+import { PlanRail } from '@/components/launch/plan-rail';
+import { TokenDetailsForm } from '@/components/launch/token-details-form';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { SupplyTracker } from '@/components/supply-tracker';
+import {
+  DEFAULT_LAUNCH_PLAN,
+  deriveIllustrativeLaunchEstimate,
+  validateLaunchPlan,
+  type LaunchMode as Mode,
+  type LaunchPlanInput,
+  type LaunchPreset as Preset,
+  type SavedLaunchPlan,
+} from '@/lib/launch-plan';
 
-type Mode = 'Block-0' | 'Organic' | 'Manual';
-type Preset = 'Quick' | 'Clean' | 'Full' | 'Custom';
-type View = 'launch' | 'pulse' | 'tracker';
+type View = 'chain' | 'token' | 'launch' | 'funding' | 'live' | 'pulse' | 'tracker';
 type Strategy = 'Balanced' | 'Liquidity' | 'Discovery';
 const projects = [
   { ticker: '$xD', name: 'xD', state: 'Draft', color: '#8577ff' },
@@ -169,17 +181,16 @@ function PulseInsights({ strategy, agents, budget, cadence, orderSize, spread, i
 }
 
 export default function Home() {
-  const [view, setView] = useState<View>('launch');
-  const [mode, setMode] = useState<Mode>('Block-0');
-  const [preset, setPreset] = useState<Preset>('Clean');
-  const [developer, setDeveloper] = useState(5);
-  const [holders, setHolders] = useState(20);
-  const [holderCount, setHolderCount] = useState(190);
-  const [mev, setMev] = useState(46);
+  const [view, setView] = useState<View>('chain');
+  const [launchPlan, setLaunchPlan] = useState<LaunchPlanInput>(DEFAULT_LAUNCH_PLAN);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [persistenceState, setPersistenceState] = useState<'loading' | 'ready' | 'saving' | 'auth' | 'error'>('loading');
+  const [planMessage, setPlanMessage] = useState('Loading saved launch plan…');
+  const [runtimeStatus, setRuntimeStatus] = useState('Checking mainnet RPC · Execution locked');
   const [advanced, setAdvanced] = useState(true);
-  const [cex, setCex] = useState(false);
-  const [scheduled, setScheduled] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [projectQuery, setProjectQuery] = useState('');
+  const projectSearchRef = useRef<HTMLInputElement>(null);
   const [strategy, setStrategy] = useState<Strategy>('Balanced');
   const [agents, setAgents] = useState(6);
   const [budget, setBudget] = useState(4);
@@ -189,13 +200,101 @@ export default function Home() {
   const [inventory, setInventory] = useState(50);
   const [simulated, setSimulated] = useState(true);
   const [running, setRunning] = useState(false);
-  const figures = useMemo(() => {
-    const supply = Math.min(100, developer + holders - (mev / 100) * 0.98);
-    const cost = supply * 0.369 + holderCount * 0.0015;
-    const extra = holderCount * 0.171 + holders * 0.109;
-    const funding = cost + extra;
-    return { supply: supply.toFixed(2), cost: cost.toFixed(2), extra: extra.toFixed(2), funding: funding.toFixed(2), lossLow: (cost * 0.283).toFixed(2), lossHigh: (cost * 0.59).toFixed(2), market: Math.round(2910 + holders * 96) };
-  }, [developer, holders, holderCount, mev]);
+  const updateLaunchPlan = (change: Partial<LaunchPlanInput>) => {
+    setLaunchPlan((current) => ({ ...current, ...change }));
+    setSavedAt(null);
+    setPlanMessage('Unsaved launch-plan changes.');
+    setPersistenceState((current) => current === 'auth' ? 'auth' : 'ready');
+  };
+  const { chain, launchpad, currency, tokenName, ticker, mode, preset, holderCount } = launchPlan;
+  const developer = launchPlan.developerBuy;
+  const holders = launchPlan.holdersBuy;
+  const mev = launchPlan.routingEmphasis;
+  const cex = launchPlan.useHusher;
+  const scheduled = launchPlan.scheduled;
+  const setMode = (value: Mode) => updateLaunchPlan({ mode: value });
+  const setPreset = (value: Preset) => updateLaunchPlan({ preset: value });
+  const setDeveloper = (value: number) => updateLaunchPlan({ developerBuy: value });
+  const setHolders = (value: number) => updateLaunchPlan({ holdersBuy: value });
+  const setHolderCount = (value: number) => updateLaunchPlan({ holderCount: value });
+  const setMev = (value: number) => updateLaunchPlan({ routingEmphasis: value });
+  const planValidation = useMemo(() => {
+    try {
+      return { plan: validateLaunchPlan(launchPlan), error: null as string | null };
+    } catch (error) {
+      return { plan: null, error: error instanceof Error ? error.message : 'Invalid launch plan' };
+    }
+  }, [launchPlan]);
+  const figures = useMemo(() => planValidation.plan
+    ? deriveIllustrativeLaunchEstimate(planValidation.plan)
+    : { allocation: 0, supplyCost: '0.00', walletReserve: '0.00', scenarioTotal: '0.00', maximumExposure: '0.00' },
+  [planValidation.plan]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [planResponse, statusResponse] = await Promise.all([
+          fetch('/api/launch/plans', { cache: 'no-store' }),
+          fetch('/api/pulse/status', { cache: 'no-store' }),
+        ]);
+        if (statusResponse.ok) {
+          const status = await statusResponse.json() as { networks?: RpcNetworkStatus[] };
+          const mainnet = status.networks?.find((network) => network.network === 'mainnet');
+          setRuntimeStatus(mainnet?.status === 'online' ? 'Mainnet RPC online · Execution locked' : 'Mainnet RPC degraded · Execution locked');
+        } else {
+          setRuntimeStatus('Mainnet RPC unavailable · Execution locked');
+        }
+        if (planResponse.status === 401) {
+          setPersistenceState('auth');
+          setPlanMessage('Sign in with ChatGPT to save and reload this plan.');
+          return;
+        }
+        if (!planResponse.ok) throw new Error('Launch-plan service unavailable');
+        const payload = await planResponse.json() as { plan: SavedLaunchPlan | null };
+        if (payload.plan) {
+          const { updatedAt, ...plan } = payload.plan;
+          setLaunchPlan(validateLaunchPlan(plan));
+          setSavedAt(updatedAt);
+          setPlanMessage('Saved launch plan loaded from D1.');
+        } else {
+          setPlanMessage('No saved plan yet. Configure and save this draft.');
+        }
+        setPersistenceState('ready');
+      } catch (error) {
+        setPersistenceState('error');
+        setPlanMessage(error instanceof Error ? error.message : 'Launch-plan service unavailable');
+        setRuntimeStatus('Mainnet RPC unavailable · Execution locked');
+      }
+    };
+    void load();
+  }, []);
+
+  const saveLaunchPlan = async () => {
+    try {
+      const validated = validateLaunchPlan(launchPlan);
+      setPersistenceState('saving');
+      setPlanMessage('Saving validated launch plan…');
+      const response = await fetch('/api/launch/plans', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(validated),
+      });
+      if (response.status === 401) {
+        setPersistenceState('auth');
+        setPlanMessage('Sign in with ChatGPT to save this plan.');
+        return;
+      }
+      const payload = await response.json() as { plan?: SavedLaunchPlan; error?: string };
+      if (!response.ok || !payload.plan) throw new Error(payload.error ?? 'Plan save failed');
+      setLaunchPlan(validateLaunchPlan(payload.plan));
+      setSavedAt(payload.plan.updatedAt);
+      setPersistenceState('ready');
+      setPlanMessage('Validated launch plan saved to D1.');
+    } catch (error) {
+      setPersistenceState('error');
+      setPlanMessage(error instanceof Error ? error.message : 'Plan save failed');
+    }
+  };
   const pulsePlan = useMemo(() => {
     const orders = Math.max(1, Math.round((3600 / cadence) * agents * (strategy === 'Liquidity' ? 1.12 : strategy === 'Discovery' ? 0.72 : 0.9)));
     const turnover = (orders * orderSize * 0.58).toFixed(1);
@@ -206,24 +305,51 @@ export default function Home() {
   }, [agents, budget, cadence, orderSize, spread, strategy]);
   const pulseProps: PulseProps = { strategy, setStrategy, agents, setAgents, budget, setBudget, cadence, setCadence, orderSize, setOrderSize, spread, setSpread, inventory, setInventory, simulated, setSimulated, running, setRunning, plan: pulsePlan };
   const pickPreset = (name: Preset, presetMev: number) => { setPreset(name); setMev(presetMev); };
+  const filteredProjects = useMemo(() => {
+    const query = projectQuery.trim().toLowerCase();
+    if (!query) return projects;
+    return projects.filter((project) => `${project.ticker} ${project.name} ${project.state}`.toLowerCase().includes(query));
+  }, [projectQuery]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setMobileNav(true);
+        window.setTimeout(() => projectSearchRef.current?.focus(), 0);
+      }
+      if (event.key === 'Escape') {
+        setMobileNav(false);
+        projectSearchRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const changeView = (nextView: View) => {
+    setView(nextView);
+    setMobileNav(false);
+  };
 
   return <div className="app-shell">
     <header className="topbar">
-      <div className="brand-zone"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle navigation"><Menu /></button><div className="brand-mark"><i /><i /><i /><i /></div><strong>PulseForge <span>v1.0</span></strong><PanelLeftClose className="ml-auto size-4 text-[#717789]" /></div>
-      <nav className="steps" aria-label="Product sections"><button>CHAIN &amp; LAUNCHPAD</button><button>TOKEN DETAILS</button><button onClick={() => setView('launch')} className={view === 'launch' ? 'active' : ''}>LAUNCH SETTINGS</button><button onClick={() => setView('pulse')} className={view === 'pulse' ? 'active pulse-nav' : 'pulse-nav'}>PULSE ENGINE</button><button onClick={() => setView('tracker')} className={view === 'tracker' ? 'active tracker-nav' : 'tracker-nav'}>SUPPLY TRACKER</button></nav>
-      <div className="token-zone"><div className="token-avatar">xD<span /></div><div><strong>$xD <small>xD</small></strong><p>6pFG2n...Npump</p></div><Button variant="outline" className="archive-button"><Archive /> Archive</Button></div>
+      <div className="brand-zone"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle navigation" aria-expanded={mobileNav} aria-controls="project-navigation"><Menu /></button><div className="brand-mark"><i /><i /><i /><i /></div><strong>PulseForge <span>v1.1</span></strong><PanelLeftClose className="ml-auto size-4 text-[#717789]" /></div>
+      <nav className="steps" aria-label="Product sections"><button onClick={() => setView('chain')} className={view === 'chain' ? 'active' : ''}>01 VENUE</button><button onClick={() => setView('token')} className={view === 'token' ? 'active' : ''}>02 TOKEN</button><button onClick={() => setView('launch')} className={view === 'launch' ? 'active' : ''}>03 EXECUTION</button><button onClick={() => setView('funding')} className={view === 'funding' ? 'active' : ''}>04 FUNDING</button><button onClick={() => setView('live')} className={view === 'live' ? 'active' : ''}>05 LIVE OPS</button><button onClick={() => setView('pulse')} className={view === 'pulse' ? 'active pulse-nav' : 'pulse-nav'}>PULSE</button><button onClick={() => setView('tracker')} className={view === 'tracker' ? 'active tracker-nav' : 'tracker-nav'}>SUPPLY</button></nav>
+      <div className="token-zone"><div className="token-avatar">{ticker.slice(0, 2) || 'PF'}<span /></div><div><strong>${ticker || 'TOKEN'} <small>{tokenName || 'Untitled'}</small></strong><p>{chain} · {launchpad} · {currency}</p></div><Button variant="outline" className="archive-button" onClick={() => void saveLaunchPlan()} disabled={persistenceState === 'saving' || Boolean(planValidation.error)}><Database /> {persistenceState === 'saving' ? 'Saving' : savedAt ? 'Saved' : 'Save plan'}</Button></div>
     </header>
 
-    <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
-      <div className="project-search"><Search /><input placeholder="Search" /><kbd>⌘K</kbd></div>
-      <div className="project-list">{projects.map((project, index) => <button key={project.ticker} className={`project ${index === 0 ? 'selected' : ''}`}><span className="project-avatar" style={{ background: `linear-gradient(145deg, ${project.color}, #16171d)` }}>{project.name.slice(0, 2)}</span><span><strong>{project.ticker}</strong><small>{project.name}</small></span><em>{project.state}</em></button>)}</div>
-      <div className="sidebar-section"><p>Features <ChevronDown /></p><a onClick={() => setView('pulse')} className={view === 'pulse' ? 'feature-active' : ''}><Bot /> Pulse Engine <b>LAB</b></a><a><WalletCards /> My Wallets</a><a><Grid2X2 /> Marketplace <b>NEW</b></a><a onClick={() => setView('tracker')} className={view === 'tracker' ? 'feature-active tracker-active' : ''}><Activity /> Supply Tracker</a><a><Archive /> Archived</a><a><Boxes /> Dashboard</a></div>
-      <div className="sidebar-bottom"><button className="funder"><Database /> Funder <ChevronDown /></button><div><Button variant="outline"><Clipboard /> Import</Button><Button><Sparkles /> Create Launch</Button></div></div>
+    {mobileNav && <button className="sidebar-backdrop" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
+    <aside id="project-navigation" className={`sidebar ${mobileNav ? 'open' : ''}`} aria-label="Project navigation">
+      <div className="project-search"><Search /><input ref={projectSearchRef} value={projectQuery} onChange={(event) => setProjectQuery(event.target.value)} placeholder="Search projects" aria-label="Search projects" /><kbd aria-hidden="true">⌘K</kbd></div>
+      <div className="project-list">{filteredProjects.map((project) => <button key={project.ticker} className={`project ${project.ticker === '$xD' ? 'selected' : ''}`}><span className="project-avatar" style={{ background: `linear-gradient(145deg, ${project.color}, #16171d)` }}>{project.name.slice(0, 2)}</span><span><strong>{project.ticker}</strong><small>{project.name}</small></span><em>{project.state}</em></button>)}{filteredProjects.length === 0 && <p className="project-empty">No projects match “{projectQuery}”.</p>}</div>
+      <div className="sidebar-section"><p>Workflow <ChevronDown /></p><button onClick={() => changeView('funding')} className={view === 'funding' ? 'feature-active' : ''}><WalletCards /> Wallet roles</button><button onClick={() => changeView('live')} className={view === 'live' ? 'feature-active' : ''}><Activity /> Live operations <b>PLAN</b></button><button onClick={() => changeView('pulse')} className={view === 'pulse' ? 'feature-active' : ''}><Bot /> Pulse Engine <b>LAB</b></button><button onClick={() => changeView('tracker')} className={view === 'tracker' ? 'feature-active tracker-active' : ''}><Crosshair /> Supply Tracker</button><button disabled><Archive /> Archived</button><button disabled><Boxes /> Dashboard</button></div>
+      <div className="sidebar-bottom"><button className="funder" onClick={() => setView('funding')}><Landmark /> Husher integration <b>DESIGN</b></button><div><Button variant="outline" onClick={() => void saveLaunchPlan()} disabled={persistenceState === 'saving' || Boolean(planValidation.error)}><Database /> Save plan</Button><Button onClick={() => { setLaunchPlan(DEFAULT_LAUNCH_PLAN); setSavedAt(null); setPlanMessage('New unsaved launch plan.'); setView('chain'); }}><Sparkles /> New plan</Button></div></div>
     </aside>
 
     <main className={`workspace ${view === 'tracker' ? 'tracker-workspace' : ''}`}>
       {view === 'tracker' ? <SupplyTracker /> : <>
-      <section className="settings-panel">{view === 'launch' ? <div className="settings-scroll">
+      <section className="settings-panel">{view === 'chain' ? <ChainLaunchForm plan={launchPlan} onChange={updateLaunchPlan} onNext={() => setView('token')} /> : view === 'token' ? <TokenDetailsForm plan={launchPlan} onChange={updateLaunchPlan} onNext={() => setView('launch')} /> : view === 'funding' ? <FundingForm plan={launchPlan} estimate={figures} validationError={planValidation.error} onChange={updateLaunchPlan} onNext={() => setView('live')} /> : view === 'live' ? <LiveOperationsForm plan={launchPlan} onOpenSimulation={() => setView('pulse')} /> : view === 'launch' ? <div className="settings-scroll">
         <div className="page-title"><h1>Launch Settings</h1><p>Define how your launch behaves on-chain.<br />These settings control execution patterns.</p></div>
         <div className="form-body">
           <div className="mode-tabs">{([['Block-0', CircleGauge], ['Organic', Leaf], ['Manual', Hand]] as Array<[Mode, typeof Leaf]>).map(([name, Icon]) => <button key={name} onClick={() => setMode(name)} className={mode === name ? 'active' : ''}><Icon /> {name} Mode</button>)}</div>
@@ -235,21 +361,21 @@ export default function Home() {
           <div className="section-label"><Boxes /> Block-0 Preset</div>
           <div className="preset-grid">{presets.map(({ name, blurb, icon: Icon, mev: presetMev }) => <button key={name} onClick={() => pickPreset(name, presetMev)} className={preset === name ? 'active' : ''}><span><Icon />{name} <b>Build</b></span><small>{blurb}</small></button>)}</div>
           <div className="section-label"><Crosshair /> Back MEV Tuning</div><Slider value={[mev]} onValueChange={(v) => { setMev(typeof v === 'number' ? v : v[0]); setPreset('Custom'); }} min={0} max={100} step={1} className="mev-slider" /><div className="range-labels"><span>Less Sniper</span><span>Less Top Trader</span></div>
-          <div className="wallet-card"><div className="wallet-head"><span><WalletCards /></span><div><strong>Import Wallets</strong><p>Connect a supported wallet or add public addresses</p></div></div><div className="wallet-types"><button><Gem /> Deployer <b>0/1</b></button><button className="selected"><Users /> Holders <b>{holderCount}/190</b></button><button><Flame /> Front MEV <b>0/5</b></button><button><Target /> Back MEV <b>0/17</b></button></div><button className="edit-selection"><Pencil /> Edit Selection</button></div>
-          <label className="check-row"><Checkbox checked={cex} onCheckedChange={(v) => setCex(Boolean(v))} /><span>🛫🟡 <strong>CEX Funding</strong><small>Fund wallets through CEXs. Service fees may vary from .25% to 2%.</small></span></label>
-          <button className="advanced-toggle" onClick={() => setAdvanced(!advanced)}><Settings /> ADVANCED SETTINGS (OPTIONAL)<i /><ChevronDown className={advanced ? 'rotate' : ''} /></button>
-          {advanced && <div className="advanced-grid"><div><FieldLabel optional note="(0-100)">Slippage</FieldLabel><div className="number-wrap"><Input defaultValue="100" /><span>%</span></div></div><div><FieldLabel optional>Funding Delay</FieldLabel><div className="delay"><span>MIN</span><b>:</b><span>SEC</span></div></div><div><FieldLabel optional note="(0-100)">Alternative Routing</FieldLabel><div className="number-wrap"><Input placeholder="0" /><span>%</span></div></div><div><FieldLabel optional note="(0-200)">Empty Holders</FieldLabel><Input defaultValue="0" /></div><div className="wide"><FieldLabel optional>Fee Target</FieldLabel><div className="number-wrap"><Input defaultValue="0" /><span className="sol">◎</span></div></div></div>}
-          <label className="scheduled"><span><strong>Scheduled Mode</strong><small>Deploy and dev buy execute at launch. Holder buys wait until you click Snipe on the live page.</small></span><input type="checkbox" checked={scheduled} onChange={(e) => setScheduled(e.target.checked)} /><i /></label><Button className="create-main"><Sparkles /> Create</Button>
+          <div className="wallet-card"><div className="wallet-head"><span><WalletCards /></span><div><strong>Wallet role plan</strong><p>Counts are planning inputs; wallet custody is not connected</p></div></div><div className="wallet-types"><button type="button" disabled><Gem /> Deployer <b>0/1</b></button><button type="button" disabled className="selected"><Users /> Holders <b>{holderCount}/{holderCount}</b></button><button type="button" disabled><Flame /> Front route <b>0/5</b></button><button type="button" disabled><Target /> Back route <b>0/17</b></button></div><button type="button" disabled className="edit-selection"><Pencil /> Custody locked</button></div>
+          <label className="check-row"><Checkbox checked={cex} onCheckedChange={(value) => updateLaunchPlan({ useHusher: Boolean(value) })} /><span>◈ <strong>Include Husher integration design</strong><small>Future non-custodial provider route. API access and execution contract are not connected.</small></span></label>
+          <button className="advanced-toggle" onClick={() => setAdvanced(!advanced)}><Settings /> ADVANCED INTEGRATION PARAMETERS · LOCKED<i /><ChevronDown className={advanced ? 'rotate' : ''} /></button>
+          {advanced && <fieldset disabled className="advanced-grid" aria-label="Advanced integration parameters are unavailable"><div><FieldLabel optional note="(0-100)">Slippage</FieldLabel><div className="number-wrap"><Input defaultValue="100" /><span>%</span></div></div><div><FieldLabel optional>Funding Delay</FieldLabel><div className="delay"><span>MIN</span><b>:</b><span>SEC</span></div></div><div><FieldLabel optional note="(0-100)">Alternative Routing</FieldLabel><div className="number-wrap"><Input placeholder="0" /><span>%</span></div></div><div><FieldLabel optional note="(0-200)">Empty Holders</FieldLabel><Input defaultValue="0" /></div><div className="wide"><FieldLabel optional>Fee Target</FieldLabel><div className="number-wrap"><Input defaultValue="0" /><span className="sol">◎</span></div></div></fieldset>}
+          <label className="scheduled"><span><strong>Scheduled simulation</strong><small>Record the deployment and holder phases separately for review. No transaction is scheduled.</small></span><input type="checkbox" checked={scheduled} onChange={(event) => updateLaunchPlan({ scheduled: event.target.checked })} /><i /></label><Button className="create-main" onClick={() => setView('funding')}><Landmark /> Review funding plan</Button>
         </div>
       </div> : <PulseForm {...pulseProps} />}</section>
 
-      <aside className="insights">{view === 'launch' ? <div className="insights-scroll">
-        <section className="mode-summary"><div className="summary-title"><CircleGauge /><strong>{mode} Mode</strong><a>View in documentation <ExternalLink /></a></div><p>{mode === 'Block-0' ? 'Prioritizes execution certainty and sniper resistance over organic price action, making it ideal for competitive launches.' : mode === 'Organic' ? 'Uses staggered buys to create a more natural early market profile.' : 'Gives you direct control of every execution input.'}</p><div className="pros"><span>+++ &nbsp; High Pressure Launches</span><span>--- &nbsp; Less natural price action</span><span>+++ &nbsp; Guaranteed supply</span><span>-- &nbsp; More Expensive</span><span>+++ &nbsp; Can’t Get Frontrun</span><span>- &nbsp; Overkill for Small Launch</span></div></section>
-        <section className="build-analysis"><h2><Gauge /> {preset} Build <ChevronDown /></h2><div className="metric-grid"><div><label><Users /> Bubble Maps <Help /><b>Likely Clean</b></label><Meter value={mev + 12} left="Uncertain" right="Likely clean" /></div><div><label><CircleGauge /> Supply Cost <Help /><b>{(Number(figures.cost) / 1.88).toFixed(1)}%</b></label><Meter value={Math.min(94, Number(figures.cost) * 9)} left="Low" right="High" /></div><div><label><Target /> Detection Mode <Help /></label><Meter value={mev} left="Less Sniper" right="Less Top Traders" /></div><div><label><Activity /> Cleanup Time <Help /><b>{Math.round(64 - mev / 5)}m {Math.round(mev % 60)}s</b></label><Meter value={Math.min(96, holderCount / 2)} left="Fastest" right="Longest" /></div></div></section>
-        <section className="estimate-card"><div className="est-row muted"><span>Est. Market Cap <Help /></span><b>$2.91K → $4.83K–<strong>${(figures.market / 1000).toFixed(2)}K</strong> / $42.7K</b></div><div className="est-row"><span>Expected Supply <Help /></span><b>{figures.supply}%→<strong>{Math.round(developer + holders)}%</strong></b></div><div className="sub-row"><span>Deployer <Help /></span><b>{developer}%</b></div><div className="sub-row"><span>Holders <Help /></span><b>{figures.supply}%→{holders}%</b></div></section>
-        <section className="estimate-card funding-card"><div className="est-row"><span>Funding Estimation</span><b>{figures.funding} SOL</b></div><div className="sub-row"><span>Supply Cost <Help /></span><b>{figures.cost} SOL</b></div><div className="sub-row"><span>Extra Funding <Help /></span><b>{figures.extra} SOL</b></div><div className="sub-row danger"><span>Maximum Loss <Help /></span><b>{figures.lossLow} SOL / {figures.lossHigh} SOL</b></div></section><Button className="create-side"><Sparkles /> Create</Button>
+      <aside className="insights">{view === 'chain' || view === 'token' || view === 'funding' || view === 'live' ? <PlanRail plan={launchPlan} savedAt={savedAt} persistenceState={persistenceState} validationError={planValidation.error} /> : view === 'launch' ? <div className="insights-scroll">
+        <section className="mode-summary"><div className="summary-title"><CircleGauge /><strong>{mode} Mode</strong><a>Architecture reference <ExternalLink /></a></div><p>{mode === 'Block-0' ? 'Plans coordinated same-slot stages with explicit role and funding boundaries.' : mode === 'Organic' ? 'Models staggered buys across slots with configurable pacing and exposure.' : 'Distributes funding while leaving every buy under manual control.'}</p><div className="pros"><span>+++ &nbsp; Deterministic planning</span><span>--- &nbsp; External flow remains</span><span>+++ &nbsp; Auditable stages</span><span>-- &nbsp; Higher complexity</span><span>+++ &nbsp; Explicit wallet roles</span><span>- &nbsp; Execution unavailable</span></div></section>
+        <section className="build-analysis"><h2><Gauge /> {preset} Build <ChevronDown /></h2><div className="metric-grid"><div><label><Users /> Cluster outcome <Help /><b>UNVERIFIED</b></label><Meter value={mev + 12} left="Unknown" right="Needs live proof" /></div><div><label><CircleGauge /> Scenario cost <Help /><b>{figures.supplyCost}</b></label><Meter value={Math.min(94, Number(figures.supplyCost) * 9)} left="Lower" right="Higher" /></div><div><label><Target /> Routing emphasis <Help /></label><Meter value={mev} left="Earlier" right="Distributed" /></div><div><label><Activity /> Planned duration <Help /><b>{Math.round(64 - mev / 5)}m {Math.round(mev % 60)}s</b></label><Meter value={Math.min(96, holderCount / 2)} left="Fastest" right="Longest" /></div></div></section>
+        <section className="estimate-card"><div className="est-row muted"><span>Estimate source <Help /></span><b>{planValidation.error ? 'PLAN INVALID · ESTIMATES PAUSED' : 'VALIDATED PLAN · NO LIVE QUOTE'}</b></div><div className="est-row"><span>Illustrative allocation <Help /></span><b><strong>{planValidation.error ? '—' : `${figures.allocation}%`}</strong></b></div><div className="sub-row"><span>Deployer <Help /></span><b>{developer}%</b></div><div className="sub-row"><span>Holders <Help /></span><b>{holders}%</b></div></section>
+        <section className="estimate-card funding-card"><div className="est-row"><span>Illustrative funding scenario</span><b>{figures.scenarioTotal} {chain === 'Solana' ? 'SOL' : currency}</b></div><div className="sub-row"><span>Allocation scenario <Help /></span><b>{figures.supplyCost}</b></div><div className="sub-row"><span>Wallet reserve <Help /></span><b>{figures.walletReserve}</b></div><div className="sub-row danger"><span>Maximum modeled exposure <Help /></span><b>{figures.maximumExposure}</b></div></section><Button className="create-side" onClick={() => setView('funding')}><Landmark /> Review funding</Button>
       </div> : <PulseInsights {...pulseProps} />}</aside></>}
     </main>
-    <footer className="statusbar"><span className="live"><i /> All Services are Live • 167ms</span><div className="prices"><span>◎ <b>$103</b> ↗</span><span>⬡ <b>$688</b> ↗</span><span>◆ <b>$2,431</b> ↘</span></div><nav><a>𝕏</a><a><MessageCircle /></a><a>News</a><a>Documentation</a><a>Activity</a><a><CircleHelp /></a><a><Settings /> Settings</a></nav></footer>
+    <footer className="statusbar"><span className="live"><i /> {runtimeStatus}</span><span className={`plan-save-state ${planValidation.error ? 'error' : persistenceState}`}>{planValidation.error ?? planMessage}</span><nav><a>𝕏</a><a><MessageCircle /></a><a>Documentation</a><a>Audit</a><a><Settings /> Settings</a></nav></footer>
   </div>;
 }
