@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Activity, Archive, Boxes, ChevronDown, CircleGauge, CircleHelp, Crosshair,
+  Activity, Boxes, ChevronDown, CircleGauge, CircleHelp, Crosshair,
   Database, ExternalLink, Flame, Gauge, Gem, Hand, Landmark, Leaf, Menu,
-  MessageCircle, PanelLeftClose, Pencil, Search, Settings, Shield, Sparkles,
+  MessageCircle, PanelLeftClose, Pencil, Settings, Shield, Sparkles,
   BarChart3, Bot, CircleDollarSign, Play, Radio, RefreshCw, SlidersHorizontal,
   Target, TimerReset, TrendingUp, TriangleAlert, Users, WalletCards, Waves, Zap,
 } from 'lucide-react';
@@ -31,14 +31,6 @@ import {
 
 type View = 'chain' | 'token' | 'launch' | 'funding' | 'distribution' | 'live' | 'pulse' | 'tracker';
 type Strategy = 'Balanced' | 'Liquidity' | 'Discovery';
-const projects = [
-  { ticker: '$xD', name: 'xD', state: 'Draft', color: '#8577ff' },
-  { ticker: '$CLICK', name: 'One Click Can Change', state: 'Import', color: '#f43f9d' },
-  { ticker: '$FRONG', name: 'frong', state: 'Import', color: '#f59e0b' },
-  { ticker: '$MUMU', name: 'Mumu The Bull', state: 'Import', color: '#22c55e' },
-  { ticker: '$NINEHOOD', name: 'NINEHOOD', state: 'Import', color: '#b5f231' },
-  { ticker: '$test', name: 'Test', state: 'Draft', color: '#fb7185' },
-];
 const presets: Array<{ name: Preset; blurb: string; icon: typeof Zap; mev: number }> = [
   { name: 'Quick', blurb: 'Fast, low cost', icon: Zap, mev: 35 },
   { name: 'Clean', blurb: 'Balanced stealth', icon: CircleGauge, mev: 46 },
@@ -190,8 +182,6 @@ export default function Home() {
   const [runtimeStatus, setRuntimeStatus] = useState('Checking mainnet RPC · Execution locked');
   const [advanced, setAdvanced] = useState(true);
   const [mobileNav, setMobileNav] = useState(false);
-  const [projectQuery, setProjectQuery] = useState('');
-  const projectSearchRef = useRef<HTMLInputElement>(null);
   const [strategy, setStrategy] = useState<Strategy>('Balanced');
   const [agents, setAgents] = useState(6);
   const [budget, setBudget] = useState(4);
@@ -211,7 +201,6 @@ export default function Home() {
   const developer = launchPlan.developerBuy;
   const holders = launchPlan.holdersBuy;
   const mev = launchPlan.routingEmphasis;
-  const cex = launchPlan.useHusher;
   const scheduled = launchPlan.scheduled;
   const setMode = (value: Mode) => updateLaunchPlan({ mode: value });
   const setPreset = (value: Preset) => updateLaunchPlan({ preset: value });
@@ -306,23 +295,9 @@ export default function Home() {
   }, [agents, budget, cadence, orderSize, spread, strategy]);
   const pulseProps: PulseProps = { strategy, setStrategy, agents, setAgents, budget, setBudget, cadence, setCadence, orderSize, setOrderSize, spread, setSpread, inventory, setInventory, simulated, setSimulated, running, setRunning, plan: pulsePlan };
   const pickPreset = (name: Preset, presetMev: number) => { setPreset(name); setMev(presetMev); };
-  const filteredProjects = useMemo(() => {
-    const query = projectQuery.trim().toLowerCase();
-    if (!query) return projects;
-    return projects.filter((project) => `${project.ticker} ${project.name} ${project.state}`.toLowerCase().includes(query));
-  }, [projectQuery]);
-
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setMobileNav(true);
-        window.setTimeout(() => projectSearchRef.current?.focus(), 0);
-      }
-      if (event.key === 'Escape') {
-        setMobileNav(false);
-        projectSearchRef.current?.blur();
-      }
+      if (event.key === 'Escape') setMobileNav(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -342,10 +317,9 @@ export default function Home() {
 
     {mobileNav && <button className="sidebar-backdrop" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <aside id="project-navigation" className={`sidebar ${mobileNav ? 'open' : ''}`} aria-label="Project navigation">
-      <div className="project-search"><Search /><input ref={projectSearchRef} value={projectQuery} onChange={(event) => setProjectQuery(event.target.value)} placeholder="Search projects" aria-label="Search projects" /><kbd aria-hidden="true">⌘K</kbd></div>
-      <div className="project-list">{filteredProjects.map((project) => <button key={project.ticker} className={`project ${project.ticker === '$xD' ? 'selected' : ''}`}><span className="project-avatar" style={{ background: `linear-gradient(145deg, ${project.color}, #16171d)` }}>{project.name.slice(0, 2)}</span><span><strong>{project.ticker}</strong><small>{project.name}</small></span><em>{project.state}</em></button>)}{filteredProjects.length === 0 && <p className="project-empty">No projects match “{projectQuery}”.</p>}</div>
-      <div className="sidebar-section"><p>Workflow <ChevronDown /></p><button onClick={() => changeView('funding')} className={view === 'funding' ? 'feature-active' : ''}><WalletCards /> Wallet roles</button><button onClick={() => changeView('distribution')} className={view === 'distribution' ? 'feature-active distro-active' : ''}><Boxes /> Distribution <b>NEW</b></button><button onClick={() => changeView('live')} className={view === 'live' ? 'feature-active' : ''}><Activity /> Live operations <b>PLAN</b></button><button onClick={() => changeView('pulse')} className={view === 'pulse' ? 'feature-active' : ''}><Bot /> Pulse Engine <b>LAB</b></button><button onClick={() => changeView('tracker')} className={view === 'tracker' ? 'feature-active tracker-active' : ''}><Crosshair /> Supply Tracker</button><button disabled><Archive /> Archived</button><button disabled><Boxes /> Dashboard</button></div>
-      <div className="sidebar-bottom"><button className="funder" onClick={() => setView('funding')}><Landmark /> Husher integration <b>DESIGN</b></button><div><Button variant="outline" onClick={() => void saveLaunchPlan()} disabled={persistenceState === 'saving' || Boolean(planValidation.error)}><Database /> Save plan</Button><Button onClick={() => { setLaunchPlan(DEFAULT_LAUNCH_PLAN); setSavedAt(null); setPlanMessage('New unsaved launch plan.'); setView('chain'); }}><Sparkles /> New plan</Button></div></div>
+      <section className="workspace-card" aria-label="Current workspace"><span>CURRENT WORKSPACE</span><div><span className="workspace-mark">PF</span><span><strong>PulseForge Console</strong><small>Live product workspace</small></span><em>ACTIVE</em></div><p>Launch planning, wallet verification, devnet distribution, simulation, and supply analysis.</p></section>
+      <div className="sidebar-section"><p>Available tools</p><button onClick={() => changeView('funding')} className={view === 'funding' ? 'feature-active' : ''}><WalletCards /> Wallet & funding</button><button onClick={() => changeView('distribution')} className={view === 'distribution' ? 'feature-active distro-active' : ''}><Boxes /> Devnet distribution <b>LIVE</b></button><button onClick={() => changeView('pulse')} className={view === 'pulse' ? 'feature-active' : ''}><Bot /> Pulse simulation</button><button onClick={() => changeView('tracker')} className={view === 'tracker' ? 'feature-active tracker-active' : ''}><Crosshair /> Supply analysis</button></div>
+      <div className="sidebar-bottom"><div><Button variant="outline" onClick={() => void saveLaunchPlan()} disabled={persistenceState === 'saving' || Boolean(planValidation.error)}><Database /> Save plan</Button><Button onClick={() => { setLaunchPlan(DEFAULT_LAUNCH_PLAN); setSavedAt(null); setPlanMessage('New unsaved launch plan.'); setView('chain'); }}><Sparkles /> New plan</Button></div></div>
     </aside>
 
     <main className={`workspace ${view === 'tracker' || view === 'distribution' ? 'tracker-workspace' : ''}`}>
@@ -363,7 +337,6 @@ export default function Home() {
           <div className="preset-grid">{presets.map(({ name, blurb, icon: Icon, mev: presetMev }) => <button key={name} onClick={() => pickPreset(name, presetMev)} className={preset === name ? 'active' : ''}><span><Icon />{name} <b>Build</b></span><small>{blurb}</small></button>)}</div>
           <div className="section-label"><Crosshair /> Back MEV Tuning</div><Slider value={[mev]} onValueChange={(v) => { setMev(typeof v === 'number' ? v : v[0]); setPreset('Custom'); }} min={0} max={100} step={1} className="mev-slider" /><div className="range-labels"><span>Less Sniper</span><span>Less Top Trader</span></div>
           <div className="wallet-card"><div className="wallet-head"><span><WalletCards /></span><div><strong>Wallet role plan</strong><p>Counts are planning inputs; wallet custody is not connected</p></div></div><div className="wallet-types"><button type="button" disabled><Gem /> Deployer <b>0/1</b></button><button type="button" disabled className="selected"><Users /> Holders <b>{holderCount}/{holderCount}</b></button><button type="button" disabled><Flame /> Front route <b>0/5</b></button><button type="button" disabled><Target /> Back route <b>0/17</b></button></div><button type="button" disabled className="edit-selection"><Pencil /> Custody locked</button></div>
-          <label className="check-row"><Checkbox checked={cex} onCheckedChange={(value) => updateLaunchPlan({ useHusher: Boolean(value) })} /><span>◈ <strong>Include Husher integration design</strong><small>Future non-custodial provider route. API access and execution contract are not connected.</small></span></label>
           <button className="advanced-toggle" onClick={() => setAdvanced(!advanced)}><Settings /> ADVANCED INTEGRATION PARAMETERS · LOCKED<i /><ChevronDown className={advanced ? 'rotate' : ''} /></button>
           {advanced && <fieldset disabled className="advanced-grid" aria-label="Advanced integration parameters are unavailable"><div><FieldLabel optional note="(0-100)">Slippage</FieldLabel><div className="number-wrap"><Input defaultValue="100" /><span>%</span></div></div><div><FieldLabel optional>Funding Delay</FieldLabel><div className="delay"><span>MIN</span><b>:</b><span>SEC</span></div></div><div><FieldLabel optional note="(0-100)">Alternative Routing</FieldLabel><div className="number-wrap"><Input placeholder="0" /><span>%</span></div></div><div><FieldLabel optional note="(0-200)">Empty Holders</FieldLabel><Input defaultValue="0" /></div><div className="wide"><FieldLabel optional>Fee Target</FieldLabel><div className="number-wrap"><Input defaultValue="0" /><span className="sol">◎</span></div></div></fieldset>}
           <label className="scheduled"><span><strong>Scheduled simulation</strong><small>Record the deployment and holder phases separately for review. No transaction is scheduled.</small></span><input type="checkbox" checked={scheduled} onChange={(event) => updateLaunchPlan({ scheduled: event.target.checked })} /><i /></label><Button className="create-main" onClick={() => setView('funding')}><Landmark /> Review funding plan</Button>
