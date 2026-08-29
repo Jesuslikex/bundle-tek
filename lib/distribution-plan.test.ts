@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDistributionPlan, isSolanaAddress } from './distribution-plan';
+import { buildDistributionPlan, isSolanaAddress, toBaseUnits } from './distribution-plan';
 
 const SYSTEM = '11111111111111111111111111111111';
 const WRAPPED_SOL = 'So11111111111111111111111111111111111111112';
@@ -28,5 +28,9 @@ describe('distribution plan', () => {
     expect(() => buildDistributionPlan({ manifest: `${SYSTEM}, 81`, tokenSupply: 100, reservePercent: 20, batchSize: 8 }))
       .toThrow('exceeds');
   });
-});
 
+  it('converts UI token amounts without losing base-unit precision', () => {
+    expect(toBaseUnits(12.345, 3)).toBe(12_345n);
+    expect(() => toBaseUnits(0.0001, 3)).toThrow('precision');
+  });
+});

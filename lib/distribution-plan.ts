@@ -24,6 +24,14 @@ export function isSolanaAddress(value: string) {
   }
 }
 
+export function toBaseUnits(amount: number, decimals: number) {
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Transfer amount must be greater than zero.');
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 9) throw new Error('Mint decimals must be between 0 and 9.');
+  const scaled = amount * 10 ** decimals;
+  if (!Number.isSafeInteger(scaled)) throw new Error('Transfer amount exceeds safe precision for this mint.');
+  return BigInt(scaled);
+}
+
 export function buildDistributionPlan(input: {
   manifest: string;
   tokenSupply: number;
@@ -75,4 +83,3 @@ export function buildDistributionPlan(input: {
     warnings,
   };
 }
-
