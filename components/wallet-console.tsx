@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { address, lamportsToSol } from '@solana/kit';
+import { address } from '@solana/kit';
 import { useConnect, useConnectedWallet, useDisconnect, useSignMessage, useWalletStatus, useWallets } from '@solana/kit-plugin-wallet/react';
 import bs58 from 'bs58';
 import { CheckCircle2, ExternalLink, FileSignature, RefreshCw, Shield, WalletCards } from 'lucide-react';
 import { useAppClient } from '@/components/solana-provider';
 import { Button } from '@/components/ui/button';
+import { lamportsToSolNumber } from '@/lib/solana-format';
 
 type ConsoleState = 'idle' | 'working' | 'ready' | 'error';
 type AuditEvent = { id: string; eventType: string; transactionSignature?: string | null; createdAt: string };
@@ -39,7 +40,7 @@ export function WalletConsole() {
   const refreshBalance = useCallback(async () => {
     if (!walletAddress) return;
     const result = await client.rpc.getBalance(address(walletAddress), { commitment: 'confirmed' }).send();
-    setBalance(Number(lamportsToSol(result.value)));
+    setBalance(lamportsToSolNumber(result.value));
   }, [client, walletAddress]);
 
   useEffect(() => {
