@@ -18,6 +18,8 @@ export function validatePulseStrategy(value: unknown): PulseStrategyInput {
     agents: Number(body.agents), budget: Number(body.budget), cadence: Number(body.cadence),
     orderSize: Number(body.orderSize), spread: Number(body.spread), inventory: Number(body.inventory),
   };
+  const numericValues = [input.agents, input.budget, input.cadence, input.orderSize, input.spread, input.inventory];
+  if (!numericValues.every(Number.isFinite)) throw new Error("Strategy values must be finite numbers");
   if (!Number.isInteger(input.agents) || input.agents < 1 || input.agents > 20) throw new Error('Agents must be 1-20');
   if (input.budget < 0.5 || input.budget > 100) throw new Error('Budget must be 0.5-100 SOL');
   if (!Number.isInteger(input.cadence) || input.cadence < 5 || input.cadence > 180) throw new Error('Cadence must be 5-180 seconds');

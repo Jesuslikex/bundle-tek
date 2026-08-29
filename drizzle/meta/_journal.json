@@ -8,6 +8,13 @@
       "when": 1787944592775,
       "tag": "0000_daffy_lightspeed",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787962056062,
+      "tag": "0001_nice_blob",
+      "breakpoints": true
     }
   ]
 }

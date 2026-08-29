@@ -80,7 +80,7 @@ export function SupplyTracker() {
           <div className="tracker-kpis">
             <article className="primary"><small>Everyone else holds</small><strong>{result.external.supplyPercent.toFixed(2)}%</strong><span>{compact(result.external.amount)} tokens</span></article>
             <article><small>Your bundle holds</small><strong>{result.bundle.supplyPercent.toFixed(2)}%</strong><span>{compact(result.bundle.amount)} tokens · {result.bundle.walletCount} wallets</span></article>
-            <article><small>Top 10 external</small><strong>{result.external.topTenPercent.toFixed(2)}%</strong><span className={`risk-${externalRisk === 'HIGH CONCENTRATION' ? 'high' : externalRisk === 'WATCH' ? 'watch' : 'safe'}`}>{externalRisk}</span></article>
+            <article><small>Sampled top 10</small><strong>{result.external.topTenPercent.toFixed(2)}%</strong><span className={`risk-${externalRisk === 'HIGH CONCENTRATION' ? 'high' : externalRisk === 'WATCH' ? 'watch' : 'safe'}`}>{externalRisk}</span></article>
             <article><small>Total supply</small><strong>{compact(result.totalSupply)}</strong><span>Mainnet · slot {result.slot.toLocaleString()}</span></article>
           </div>
 
@@ -90,7 +90,7 @@ export function SupplyTracker() {
           </section>
 
           <section className="holders-table">
-            <header><span><Users /> Top external holders</span><small>Bundle wallets excluded</small></header>
+            <header><span><Users /> Sampled largest external owners</span><small>Largest token accounts · bundle excluded</small></header>
             <div className="holder-columns"><span># / OWNER</span><span>BALANCE</span><span>SUPPLY</span></div>
             {result.topExternal.map((holder) => <div className="holder-row" key={holder.owner}>
               <span><b>{holder.rank}</b><code title={holder.owner}>{short(holder.owner)}</code><button onClick={() => void navigator.clipboard.writeText(holder.owner)} aria-label={`Copy holder ${holder.rank} address`}><Copy /></button></span>

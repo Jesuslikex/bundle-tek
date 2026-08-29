@@ -33,6 +33,22 @@ const schemaStatements = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_pulse_cycles_owner_created
     ON pulse_cycles(owner_id, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS pulse_cycle_gates (
+    owner_id TEXT PRIMARY KEY,
+    idempotency_key TEXT NOT NULL,
+    claimed_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS pulse_cycle_requests (
+    owner_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    cycle_id TEXT,
+    claimed_at TEXT NOT NULL,
+    completed_at TEXT
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_pulse_cycle_requests_owner_key
+    ON pulse_cycle_requests(owner_id, idempotency_key)`,
+  `CREATE INDEX IF NOT EXISTS idx_pulse_cycle_requests_claimed
+    ON pulse_cycle_requests(claimed_at)`,
 ];
 
 export function getD1(): D1Database {

@@ -2,6 +2,20 @@ import { env } from 'cloudflare:workers';
 
 type RpcEnvelope<T> = { result?: T; error?: { code: number; message: string } };
 
+export const MAX_SOLANA_SLOT_DRIFT = 32;
+
+export function requireConsistentSolanaSlots(slots: number[]) {
+  if (!slots.length || slots.some((slot) => !Number.isSafeInteger(slot) || slot < 0)) {
+    throw new Error('Solana RPC returned an invalid context slot');
+  }
+  const oldest = Math.min(...slots);
+  const newest = Math.max(...slots);
+  if (newest - oldest > MAX_SOLANA_SLOT_DRIFT) {
+    throw new Error(`Solana RPC snapshot crossed too many slots (${oldest}-${newest})`);
+  }
+  return newest;
+}
+
 export async function rpcCall<T>(endpoint: string, method: string, params: unknown[] = []): Promise<T> {
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -10,6 +24,7 @@ export async function rpcCall<T>(endpoint: string, method: string, params: unkno
       'content-type': 'application/json',
     },
     cache: 'no-store',
+    signal: AbortSignal.timeout(12_000),
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
   if (!response.ok) throw new Error(`RPC ${method} returned ${response.status}`);

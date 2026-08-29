@@ -37,3 +37,24 @@ export const pulseCycles = sqliteTable(
   },
   (table) => [index('idx_pulse_cycles_owner_created').on(table.ownerId, table.createdAt)],
 );
+
+export const pulseCycleGates = sqliteTable('pulse_cycle_gates', {
+  ownerId: text('owner_id').primaryKey(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  claimedAt: text('claimed_at').notNull(),
+});
+
+export const pulseCycleRequests = sqliteTable(
+  'pulse_cycle_requests',
+  {
+    ownerId: text('owner_id').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    cycleId: text('cycle_id'),
+    claimedAt: text('claimed_at').notNull(),
+    completedAt: text('completed_at'),
+  },
+  (table) => [
+    uniqueIndex('idx_pulse_cycle_requests_owner_key').on(table.ownerId, table.idempotencyKey),
+    index('idx_pulse_cycle_requests_claimed').on(table.claimedAt),
+  ],
+);

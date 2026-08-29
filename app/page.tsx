@@ -5,7 +5,7 @@ import {
   Activity, Archive, Boxes, ChevronDown, CircleGauge, CircleHelp, Clipboard, Crosshair,
   Database, ExternalLink, Flame, Gauge, Gem, Grid2X2, Hand, Leaf, Menu,
   MessageCircle, PanelLeftClose, Pencil, Search, Settings, Shield, Sparkles,
-  BarChart3, Bot, CircleDollarSign, Pause, Play, Radio, RefreshCw, SlidersHorizontal,
+  BarChart3, Bot, CircleDollarSign, Play, Radio, RefreshCw, SlidersHorizontal,
   Target, TimerReset, TrendingUp, TriangleAlert, Users, WalletCards, Waves, Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -108,7 +108,10 @@ function PulseBackendControls(props: PulseProps) {
     const saved = await saveStrategy();
     if (!saved) return;
     setState('working'); props.setRunning(true); setMessage('Reading a live Solana slot and building a read-only shadow cycle…');
-    const response = await fetch('/api/pulse/cycles', { method: 'POST' });
+    const response = await fetch('/api/pulse/cycles', {
+      method: 'POST',
+      headers: { 'idempotency-key': crypto.randomUUID() },
+    });
     const result = await response.json() as { cycle?: BackendCycle; error?: string };
     props.setRunning(false);
     if (!response.ok || !result.cycle) { setState('error'); setMessage(result.error ?? 'Cycle failed'); return; }
@@ -141,10 +144,10 @@ function PulseForm(props: PulseProps) {
         <div><FieldLabel>Budget per agent</FieldLabel><div className="number-wrap"><Input value={props.budget} onChange={(e) => props.setBudget(Number(e.target.value))} type="number" min={0.5} step={0.5} /><span>◎</span></div></div>
       </div>
       <div className="control-card">
-        <div className="control-row"><label><TimerReset /> Quote cadence <b>{props.cadence}s</b></label><Slider value={[props.cadence]} onValueChange={(v) => props.setCadence(v[0])} min={5} max={180} step={5} /></div>
-        <div className="control-row"><label><SlidersHorizontal /> Maximum order <b>{props.orderSize.toFixed(2)} SOL</b></label><Slider value={[props.orderSize]} onValueChange={(v) => props.setOrderSize(v[0])} min={0.1} max={3} step={0.05} /></div>
-        <div className="control-row"><label><Waves /> Minimum spread <b>{props.spread} bps</b></label><Slider value={[props.spread]} onValueChange={(v) => props.setSpread(v[0])} min={20} max={300} step={5} /></div>
-        <div className="control-row"><label><CircleGauge /> Target base inventory <b>{props.inventory}%</b></label><Slider value={[props.inventory]} onValueChange={(v) => props.setInventory(v[0])} min={20} max={80} step={1} /></div>
+        <div className="control-row"><label><TimerReset /> Quote cadence <b>{props.cadence}s</b></label><Slider value={[props.cadence]} onValueChange={(v) => props.setCadence(typeof v === 'number' ? v : v[0])} min={5} max={180} step={5} /></div>
+        <div className="control-row"><label><SlidersHorizontal /> Maximum order <b>{props.orderSize.toFixed(2)} SOL</b></label><Slider value={[props.orderSize]} onValueChange={(v) => props.setOrderSize(typeof v === 'number' ? v : v[0])} min={0.1} max={3} step={0.05} /></div>
+        <div className="control-row"><label><Waves /> Minimum spread <b>{props.spread} bps</b></label><Slider value={[props.spread]} onValueChange={(v) => props.setSpread(typeof v === 'number' ? v : v[0])} min={20} max={300} step={5} /></div>
+        <div className="control-row"><label><CircleGauge /> Target base inventory <b>{props.inventory}%</b></label><Slider value={[props.inventory]} onValueChange={(v) => props.setInventory(typeof v === 'number' ? v : v[0])} min={20} max={80} step={1} /></div>
       </div>
       <div className="safety-grid"><div><Shield /><span><strong>Self-trade prevention</strong><small>Wallet and route collision checks</small></span><b>ON</b></div><div><TriangleAlert /><span><strong>Volatility brake</strong><small>Pause above 8% / 5m movement</small></span><b>ON</b></div><div><Activity /><span><strong>Organic throttle</strong><small>Reduce quotes when real flow rises</small></span><b>ON</b></div><div><Target /><span><strong>Daily loss limit</strong><small>Hard stop at 8% of budget</small></span><b>ON</b></div></div>
       <label className="simulation-row"><Checkbox checked={props.simulated} onCheckedChange={(v) => props.setSimulated(Boolean(v))} /><span><strong>Simulation mode</strong><small>No transactions are signed or submitted. Review the projected behavior before connecting execution.</small></span></label>
@@ -231,8 +234,8 @@ export default function Home() {
           <div className="mt-4"><FieldLabel note="(1-200)"><Users className="size-3.5 text-[#43efc1]" />Holders Count</FieldLabel><Input value={holderCount} onChange={(e) => setHolderCount(Number(e.target.value))} type="number" min={1} max={200} /></div>
           <div className="section-label"><Boxes /> Block-0 Preset</div>
           <div className="preset-grid">{presets.map(({ name, blurb, icon: Icon, mev: presetMev }) => <button key={name} onClick={() => pickPreset(name, presetMev)} className={preset === name ? 'active' : ''}><span><Icon />{name} <b>Build</b></span><small>{blurb}</small></button>)}</div>
-          <div className="section-label"><Crosshair /> Back MEV Tuning</div><Slider value={[mev]} onValueChange={(v) => { setMev(v[0]); setPreset('Custom'); }} min={0} max={100} step={1} className="mev-slider" /><div className="range-labels"><span>Less Sniper</span><span>Less Top Trader</span></div>
-          <div className="wallet-card"><div className="wallet-head"><span><WalletCards /></span><div><strong>Import Wallets</strong><p>Paste private keys or import from your wallets</p></div></div><div className="wallet-types"><button><Gem /> Deployer <b>0/1</b></button><button className="selected"><Users /> Holders <b>{holderCount}/190</b></button><button><Flame /> Front MEV <b>0/5</b></button><button><Target /> Back MEV <b>0/17</b></button></div><button className="edit-selection"><Pencil /> Edit Selection</button></div>
+          <div className="section-label"><Crosshair /> Back MEV Tuning</div><Slider value={[mev]} onValueChange={(v) => { setMev(typeof v === 'number' ? v : v[0]); setPreset('Custom'); }} min={0} max={100} step={1} className="mev-slider" /><div className="range-labels"><span>Less Sniper</span><span>Less Top Trader</span></div>
+          <div className="wallet-card"><div className="wallet-head"><span><WalletCards /></span><div><strong>Import Wallets</strong><p>Connect a supported wallet or add public addresses</p></div></div><div className="wallet-types"><button><Gem /> Deployer <b>0/1</b></button><button className="selected"><Users /> Holders <b>{holderCount}/190</b></button><button><Flame /> Front MEV <b>0/5</b></button><button><Target /> Back MEV <b>0/17</b></button></div><button className="edit-selection"><Pencil /> Edit Selection</button></div>
           <label className="check-row"><Checkbox checked={cex} onCheckedChange={(v) => setCex(Boolean(v))} /><span>🛫🟡 <strong>CEX Funding</strong><small>Fund wallets through CEXs. Service fees may vary from .25% to 2%.</small></span></label>
           <button className="advanced-toggle" onClick={() => setAdvanced(!advanced)}><Settings /> ADVANCED SETTINGS (OPTIONAL)<i /><ChevronDown className={advanced ? 'rotate' : ''} /></button>
           {advanced && <div className="advanced-grid"><div><FieldLabel optional note="(0-100)">Slippage</FieldLabel><div className="number-wrap"><Input defaultValue="100" /><span>%</span></div></div><div><FieldLabel optional>Funding Delay</FieldLabel><div className="delay"><span>MIN</span><b>:</b><span>SEC</span></div></div><div><FieldLabel optional note="(0-100)">Alternative Routing</FieldLabel><div className="number-wrap"><Input placeholder="0" /><span>%</span></div></div><div><FieldLabel optional note="(0-200)">Empty Holders</FieldLabel><Input defaultValue="0" /></div><div className="wide"><FieldLabel optional>Fee Target</FieldLabel><div className="number-wrap"><Input defaultValue="0" /><span className="sol">◎</span></div></div></div>}
