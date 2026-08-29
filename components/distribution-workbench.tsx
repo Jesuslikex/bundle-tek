@@ -3,16 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { address } from '@solana/kit';
 import { useConnect, useConnectedWallet, useDisconnect, useWalletStatus, useWallets } from '@solana/kit-plugin-wallet/react';
-import { CheckCircle2, Download, ExternalLink, FileSignature, FileWarning, Layers3, LockKeyhole, Play, RefreshCw, Shield, Users, WalletCards, Boxes } from 'lucide-react';
+import { CheckCircle2, Download, ExternalLink, FileSignature, FileWarning, Layers3, LockKeyhole, RefreshCw, Shield, Users, WalletCards, Boxes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppClient } from '@/components/solana-provider';
 import { buildDistributionPlan, toBaseUnits, type DistributionPlan } from '@/lib/distribution-plan';
 
-const SAMPLE = `# address, amount, optional label
-11111111111111111111111111111111, 125000, Treasury reserve
-So11111111111111111111111111111111111111112, 50000, Community rewards
-Vote111111111111111111111111111111111111111, 25000, Liquidity allocation`;
+const EMPTY_MANIFEST = `# Paste real Solana devnet recipients below.
+# address, amount, optional label`;
 
 type TransferReceipt = { address: string; amount: number; signature: string; confirmedAt: string };
 
@@ -91,7 +89,7 @@ function DistributionExecution({ plan }: { plan: DistributionPlan | null }) {
     <label className="execution-mint"><span>Devnet SPL token mint</span><Input value={mintAddress} onChange={(event) => setMintAddress(event.target.value.trim())} placeholder="Enter mint address" /></label>
     <div className="execution-status"><span><small>Mint decimals</small><strong>{decimals ?? '—'}</strong></span><span><small>Source balance</small><strong>{sourceBalance === null || decimals === null ? '—' : (Number(sourceBalance) / 10 ** decimals).toLocaleString()}</strong></span><span><small>Confirmed</small><strong>{receipts.length} / {plan?.recipients.length ?? 0}</strong></span></div>
     <p className="execution-message">{message}</p>
-    <div className="execution-actions"><Button variant="outline" onClick={() => void prepare()} disabled={!connected?.signer || !mintAddress || !plan || working}><RefreshCw /> Run preflight</Button><Button onClick={() => void sendNext()} disabled={!prepared || !pending || working}>{pending ? <><FileSignature /> Approve next transfer</> : <><CheckCircle2 /> Distribution complete</>}</Button></div>
+    <div className="execution-actions"><Button variant="outline" onClick={() => void prepare()} disabled={!connected?.signer || !mintAddress || !plan || working}><RefreshCw /> Run preflight</Button><Button onClick={() => void sendNext()} disabled={!prepared || !pending || working}>{pending || !plan ? <><FileSignature /> Approve next transfer</> : <><CheckCircle2 /> Distribution complete</>}</Button></div>
     {pending && prepared && <div className="next-transfer"><span><small>NEXT RECIPIENT</small><strong>{pending.label || `${pending.address.slice(0, 8)}…${pending.address.slice(-8)}`}</strong></span><b>{pending.amount.toLocaleString()} tokens</b></div>}
     {receipts.length > 0 && <div className="execution-receipts"><strong>Confirmed receipts</strong>{receipts.slice(-4).reverse().map((receipt) => <a key={receipt.signature} href={`https://explorer.solana.com/tx/${receipt.signature}?cluster=devnet`} target="_blank" rel="noreferrer"><span>{receipt.address.slice(0, 6)}…{receipt.address.slice(-6)}</span><b>{receipt.amount.toLocaleString()}</b><ExternalLink /></a>)}</div>}
     <small className="execution-boundary"><Shield /> Mainnet is unavailable. Each transaction creates the recipient ATA if needed, preflight-simulates, requests wallet approval, and waits for devnet confirmation.</small>
@@ -99,7 +97,7 @@ function DistributionExecution({ plan }: { plan: DistributionPlan | null }) {
 }
 
 export function DistributionWorkbench() {
-  const [manifest, setManifest] = useState(SAMPLE);
+  const [manifest, setManifest] = useState(EMPTY_MANIFEST);
   const [tokenSupply, setTokenSupply] = useState(1_000_000);
   const [reservePercent, setReservePercent] = useState(70);
   const [batchSize, setBatchSize] = useState(8);
@@ -116,7 +114,7 @@ export function DistributionWorkbench() {
     const payload = {
       version: 1,
       network: 'solana-devnet',
-      execution: 'locked',
+      execution: 'devnet-wallet-approved',
       createdAt: new Date().toISOString(),
       tokenSupply,
       reservePercent,
@@ -135,17 +133,17 @@ export function DistributionWorkbench() {
     <header className="distribution-head"><div><span className="eyebrow"><Boxes /> DISTRIBUTION / DEVNET WORKBENCH</span><h1>Recipient Manifest</h1><p>Turn a raw allocation list into validated, wallet-approved token delivery.</p></div><span className="read-only-badge"><LockKeyhole /> MAINNET LOCKED</span></header>
     <div className="distribution-layout">
       <section className="distribution-editor">
-        <div className="distribution-fields"><label><span>Token supply</span><Input type="number" min={1} value={tokenSupply} onChange={(event) => setTokenSupply(Number(event.target.value))} /></label><label><span>Protected reserve</span><span className="number-wrap"><Input type="number" min={0} max={99.99} value={reservePercent} onChange={(event) => setReservePercent(Number(event.target.value))} /><b>%</b></span></label><label><span>Recipients per batch</span><Input type="number" min={1} max={12} value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value))} /></label></div>
+        <div className="distribution-fields"><label><span>Token supply</span><Input type="number" min={1} value={tokenSupply} onChange={(event) => setTokenSupply(Number(event.target.value))} /></label><label><span>Protected reserve</span><span className="number-wrap"><Input type="number" min={0} max={99.99} value={reservePercent} onChange={(event) => setReservePercent(Number(event.target.value))} /><b>%</b></span></label><label><span>Recipients per review group</span><Input type="number" min={1} max={12} value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value))} /></label></div>
         <label className="manifest-field"><span>Recipient manifest <small>ADDRESS, AMOUNT, OPTIONAL LABEL</small></span><textarea value={manifest} onChange={(event) => setManifest(event.target.value)} spellCheck={false} aria-label="Recipient manifest" /></label>
         <div className={`manifest-state ${result.error ? 'error' : 'ready'}`}>{result.error ? <><FileWarning /> <span><strong>Manifest blocked</strong><small>{result.error}</small></span></> : <><CheckCircle2 /> <span><strong>Manifest validated</strong><small>Addresses, amounts, reserve, duplicates, and batch limits passed.</small></span></>}</div>
         <div className="distribution-actions"><Button variant="outline" onClick={() => setManifest('')}>Clear manifest</Button><Button onClick={exportManifest} disabled={!result.plan}><Download /> Export audit manifest</Button></div>
         <DistributionExecution plan={result.plan} />
       </section>
       <aside className="distribution-review">
-        <div className="distribution-kpis"><article><Users /><span><small>Recipients</small><strong>{result.plan?.recipients.length ?? '—'}</strong></span></article><article><Layers3 /><span><small>Transaction batches</small><strong>{result.plan?.batches.length ?? '—'}</strong></span></article><article><Shield /><span><small>Protected reserve</small><strong>{reservePercent}%</strong></span></article></div>
+        <div className="distribution-kpis"><article><Users /><span><small>Recipients</small><strong>{result.plan?.recipients.length ?? '—'}</strong></span></article><article><Layers3 /><span><small>Review groups</small><strong>{result.plan?.batches.length ?? '—'}</strong></span></article><article><Shield /><span><small>Protected reserve</small><strong>{reservePercent}%</strong></span></article></div>
         <section className="allocation-card"><header><span>Allocation review</span><b>{result.plan ? `${result.plan.allocationPercent.toFixed(2)}%` : 'BLOCKED'}</b></header><div className="allocation-track"><i style={{ width: `${Math.min(100, result.plan?.allocationPercent ?? 0)}%` }} /></div><p><span>Planned distribution</span><b>{result.plan?.totalAmount.toLocaleString() ?? '—'}</b></p><p><span>Maximum distributable</span><b>{result.plan?.distributableAmount.toLocaleString() ?? '—'}</b></p></section>
         {result.plan?.warnings.length ? <section className="distribution-warnings"><strong>Automatic corrections</strong>{result.plan.warnings.map((warning) => <p key={warning}>{warning}</p>)}</section> : null}
-        <section className="batch-preview"><header><span>Batch preview</span><b>MAX {Math.max(1, Math.min(12, batchSize))} / TX</b></header>{result.plan?.batches.slice(0, 4).map((batch, index) => <div key={index}><span><b>Batch {String(index + 1).padStart(2, '0')}</b><small>{batch.length} recipient{batch.length === 1 ? '' : 's'}</small></span><em>{batch.reduce((sum, recipient) => sum + recipient.amount, 0).toLocaleString()} tokens</em></div>)}{result.plan && result.plan.batches.length > 4 && <p>+ {result.plan.batches.length - 4} more batches in exported manifest</p>}</section>
+        <section className="batch-preview"><header><span>Review-group preview</span><b>MAX {Math.max(1, Math.min(12, batchSize))} RECIPIENTS</b></header>{result.plan?.batches.slice(0, 4).map((batch, index) => <div key={index}><span><b>Group {String(index + 1).padStart(2, '0')}</b><small>{batch.length} recipient{batch.length === 1 ? '' : 's'}</small></span><em>{batch.reduce((sum, recipient) => sum + recipient.amount, 0).toLocaleString()} tokens</em></div>)}{result.plan && result.plan.batches.length > 4 && <p>+ {result.plan.batches.length - 4} more groups in the exported manifest</p>}</section>
         <div className="distribution-boundary"><LockKeyhole /><p><strong>Execution is approval-gated.</strong> Only the blue devnet console can move tokens, one confirmed wallet-approved transfer at a time. Exporting a manifest never sends funds.</p></div>
       </aside>
     </div>

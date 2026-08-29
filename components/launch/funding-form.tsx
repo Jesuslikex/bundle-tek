@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, Database, Landmark, Shield, WalletCards } from 'lucide-react';
+import { ChevronDown, Landmark, Shield, WalletCards } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { LaunchPlanInput, SimulationSafetyPolicy } from '@/lib/launch-plan';
@@ -48,13 +48,10 @@ export function FundingForm({
       <section className="safety-policy-card">
         <header><span><Shield /> Simulation Safety Policy</span><b>ENFORCED ON SAVE</b></header>
         <div className="safety-policy-grid">{safetyFields.map(({ key, label, suffix, min, max }) => <label key={key}><span>{label}</span><span className="number-wrap"><Input type="number" min={min} max={max} value={plan.simulationSafety[key]} onChange={(event) => updateSafety({ [key]: Number(event.target.value) })} /><b>{suffix}</b></span></label>)}</div>
-        <div className="safety-invariants"><span><i>✓</i> Execution permanently disabled</span><span><i>✓</i> Artificial volume prohibited</span><span><i>✓</i> Holder farming prohibited</span></div>
+        <div className="safety-invariants"><span><i>✓</i> Mainnet execution disabled</span><span><i>✓</i> Artificial volume prohibited</span><span><i>✓</i> Holder farming prohibited</span></div>
       </section>
       {plan.chain === 'Solana' ? <WalletConsole /> : <div className="boundary-card"><WalletCards /><span><strong>{plan.chain} wallet integration is planned</strong><small>The first reviewed wallet and transaction pipeline is restricted to Solana devnet.</small></span></div>}
       <div className="role-table"><header><span>ROLE</span><span>WALLETS</span><span>STATE</span></header>{roles.map(([role, count, state]) => <div key={role}><span><WalletCards />{role}</span><b>{count}</b><em className={state === 'unused' ? 'muted' : ''}>{state}</em></div>)}</div>
-      <div className="funding-options"><button type="button" disabled><Database /><span><strong>Direct funder</strong><small>One audited funding source</small></span><b>NOT CONNECTED</b></button><button type="button" disabled><Landmark /><span><strong>Husher integration design</strong><small>Quote → one-time deposit → settlement</small></span><b>ACCESS REQUIRED</b></button></div>
-      <div className="provider-contract"><header><span><Landmark /> Husher integration contract</span><b>DESIGN</b></header><div><span>Quote</span><small>Provider, route, fees, minimum, expiry</small></div><div><span>Order</span><small>One-time deposit address and destination set</small></div><div><span>Status</span><small>Awaiting deposit → exchanging → settled / failed</small></div><div><span>Reconcile</span><small>Input amount, output amount, transaction evidence</small></div><p>Husher documents selective partner API access; technical endpoints are not public yet.</p></div>
-      <div className="guard-card"><Shield /><span><strong>External-flow guard</strong><small>Planned control: pause simulated buys when outside activity exceeds a reviewed threshold.</small></span><em>DESIGN ONLY</em></div>
       <Button className="flow-next" onClick={onNext}>Build distribution manifest <ChevronDown /></Button>
     </div>
   </div>;
