@@ -55,7 +55,7 @@ export function FundingForm({
       <div className="funding-options"><button type="button" disabled><Database /><span><strong>Direct funder</strong><small>One audited funding source</small></span><b>NOT CONNECTED</b></button><button type="button" disabled><Landmark /><span><strong>Husher integration design</strong><small>Quote → one-time deposit → settlement</small></span><b>ACCESS REQUIRED</b></button></div>
       <div className="provider-contract"><header><span><Landmark /> Husher integration contract</span><b>DESIGN</b></header><div><span>Quote</span><small>Provider, route, fees, minimum, expiry</small></div><div><span>Order</span><small>One-time deposit address and destination set</small></div><div><span>Status</span><small>Awaiting deposit → exchanging → settled / failed</small></div><div><span>Reconcile</span><small>Input amount, output amount, transaction evidence</small></div><p>Husher documents selective partner API access; technical endpoints are not public yet.</p></div>
       <div className="guard-card"><Shield /><span><strong>External-flow guard</strong><small>Planned control: pause simulated buys when outside activity exceeds a reviewed threshold.</small></span><em>DESIGN ONLY</em></div>
-      <Button className="flow-next" onClick={onNext}>Preview live operations <ChevronDown /></Button>
+      <Button className="flow-next" onClick={onNext}>Build distribution manifest <ChevronDown /></Button>
     </div>
   </div>;
 }
