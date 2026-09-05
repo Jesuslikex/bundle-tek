@@ -94,16 +94,17 @@ export function WalletConsole() {
   };
 
   return <section className="wallet-console">
-    <header><span><WalletCards /> Connected wallet</span><b>SOLANA KIT · DEVNET</b></header>
+    <header><span><WalletCards /> Your wallet</span><b>DEVNET</b></header>
+    <div className="wallet-next-step"><strong>{signature ? 'Test complete' : !connected ? '1. Connect your wallet' : !verified ? '2. Verify ownership' : !prepared ? '3. Prepare the test' : '4. Review and sign'}</strong><p>{signature ? 'Your memo transaction is recorded. Open the receipt below to inspect it.' : !connected ? 'Select the wallet holding your devnet SOL.' : !verified ? 'Sign a message to prove this wallet is yours. This step has no network fee.' : !prepared ? 'Check the devnet connection before requesting a transaction signature.' : 'The test writes a memo and uses a small devnet network fee.'}</p></div>
     <div className="wallet-connect-row">
       <div className="kit-wallet-picker">{connected ? <Button onClick={() => void disconnectAction.dispatchAsync()} disabled={disconnectAction.isRunning}>Disconnect</Button> : <Button onClick={() => setPickerOpen((open) => !open)} disabled={walletStatus === 'pending' || walletStatus === 'connecting'}>{walletStatus === 'connecting' ? 'Connecting…' : 'Select wallet'}</Button>}{pickerOpen && !connected && <div className="kit-wallet-menu">{wallets.length ? wallets.map((wallet) => <button key={wallet.name} onClick={() => { setPickerOpen(false); void connectAction.dispatchAsync(wallet); }}>{wallet.name}</button>) : <span>No compatible wallet extension detected.</span>}</div>}</div>
       <span><small>{connected?.wallet.name ?? 'No wallet'}</small><strong>{shortAddress}</strong></span>
-      <Button variant="outline" onClick={() => void refreshBalance()} disabled={!connected || state === 'working'} aria-label="Refresh wallet balance"><RefreshCw /></Button>
+      <Button variant="outline" onClick={() => void refreshBalance().catch(() => { setState('error'); setMessage('Could not refresh the balance. Try again.'); })} disabled={!connected || state === 'working'} aria-label="Refresh wallet balance"><RefreshCw /></Button>
     </div>
     <div className="wallet-kpis"><span><small>Network</small><strong>Solana devnet</strong></span><span><small>Balance</small><strong>{balance === null ? '—' : `${balance.toFixed(4)} SOL`}</strong></span><span><small>Ownership</small><strong className={verified ? 'safe' : ''}>{verified ? 'SERVER VERIFIED' : 'UNVERIFIED'}</strong></span></div>
     <div className="wallet-actions"><Button variant="outline" onClick={() => void verifyOwnership()} disabled={!connected?.signer || state === 'working'}><FileSignature /> Verify ownership</Button><Button variant="outline" onClick={() => void prepare()} disabled={!verified || state === 'working'}><Shield /> Prepare preflight</Button><Button onClick={() => void submit()} disabled={!prepared || !verified || state === 'working'}><CheckCircle2 /> Sign &amp; submit</Button></div>
     {prepared && <div className="wallet-review"><span>Instruction <b>Memo only</b></span><span>SOL transfer <b>0 SOL</b></span><span>Resource estimate <b>ENABLED</b></span><span>RPC preflight <b>ENABLED</b></span></div>}
-    <p className={`wallet-message ${state}`}>{message}</p>
+    <output aria-live="polite" className={`wallet-message ${state}`}>{message}</output>
     {signature && <a className="wallet-explorer" href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`} target="_blank" rel="noreferrer">View confirmed transaction <ExternalLink /></a>}
     {events.length > 0 && <div className="wallet-audit"><strong>Persistent audit trail</strong>{events.slice(0, 3).map((event) => <span key={event.id}><b>{event.eventType.replaceAll('_', ' ')}</b><small>{new Date(event.createdAt).toLocaleString()}</small></span>)}</div>}
     <small className="wallet-boundary">Challenges expire after five minutes and can be used once. PulseForge never receives or stores private keys.</small>

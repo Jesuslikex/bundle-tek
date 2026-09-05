@@ -1,0 +1,76 @@
+import {it,expect} from 'vitest';
+import {createPublicClient,http,parseAbi,type Hex} from 'viem';
+import {writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {simulateIntent} from '../lib/pons/simulation';
+import {validateIntent} from '../lib/pons/intent';
+import {buildLaunch} from '../lib/pons/chain';
+import {observeReceipt} from '../lib/pons/receipt';
+import {PonsStore} from '../lib/pons/store';
+import {handlePons} from '../lib/pons/api';
+import {sqliteD1} from '../lib/pons/testing';
+
+it('executes production Pons planner and proves purchase rollback on a guarded local fork',async()=>{
+ const endpoint=process.env.PONS_PROOF_LOCAL_RPC;
+ if(!endpoint||new URL(endpoint).hostname!=='127.0.0.1'||new URL(endpoint).protocol!=='http:')throw new Error('Loopback proof endpoint required');
+ const readMethods=new Set(['eth_chainId','eth_blockNumber','eth_getBlockByNumber','eth_getCode','eth_call','eth_getBalance','eth_getTransactionCount','eth_gasPrice','eth_estimateGas','eth_getTransactionReceipt','eth_getTransactionByHash']);
+ const client=createPublicClient({transport:http(endpoint,{retryCount:0,timeout:90000,fetchFn:async(input,init)=>{
+  const requestUrl=typeof input==='string'?input:input instanceof URL?input.href:input.url;const requestBody=typeof init?.body==='string'?init.body:'';
+  if(new URL(requestUrl).href!==new URL(endpoint).href||!readMethods.has(JSON.parse(requestBody).method))throw new Error('Proof production-client write refused');
+  return fetch(input,{...init,redirect:'error'});
+ }})});
+ const localRpc=async(method:string,params:unknown[]=[])=>{const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},redirect:'error',body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})});const j=await response.json() as {error?:unknown;result:unknown};if(j.error)throw new Error(JSON.stringify(j.error));return j.result;};
+ const mutate=async(method:string,params:unknown[])=>{
+  if(Number(await localRpc('eth_chainId'))!==4663||!String(await localRpc('web3_clientVersion')).toLowerCase().includes('anvil'))throw new Error('Not an isolated Anvil fork');
+  if(!['eth_sendTransaction','evm_mine','evm_snapshot','evm_revert'].includes(method))throw new Error('Mutation not approved for proof');
+  return localRpc(method,params);
+ };
+ const wallet='0x4EAb299482FC2a4606626B56601718F2a346C49F';
+ const intent=validateIntent({chainId:4663,mode:'single-recipient-atomic',wallet,recipient:wallet,creatorFeeRecipient:wallet,name:'PULSEFORGE LOCAL PROOF',symbol:'PFTEST',logo:'',description:'Synthetic fork test only, no real launch.',socials:{twitter:'',telegram:'',discord:'',website:'',farcaster:''},creatorTaxBps:0,buybackEnabled:false,launchConfigId:'0',quoteInWei:'1000000000000000',minTokensOut:'1',maxTotalValueWei:'10000000000000000',maxGasCostWei:'1000000000000000000',salt:('0x'+'a1'.repeat(32)),snipeTaxExemptions:[]});
+ const store=new PonsStore(sqliteD1());await store.ensure();
+ const created=await store.create('local-fork-proof','fork-persistent-job',intent);
+ const deps={owner:async()=> 'local-fork-proof',enabled:true,store,simulate:(i:typeof intent)=>simulateIntent(i,client),observe:(stored:Parameters<typeof observeReceipt>[0],hash:Hex)=>observeReceipt(stored,hash,client)};
+ const invoke=async(action:'simulate'|'handoff'|'receipt'|'get',revision:number,txHash?:Hex)=>{
+  const req=new Request('http://127.0.0.1/proof',{method:action==='get'?'GET':'POST',headers:{'content-type':'application/json'},...(action==='get'?{}:{body:JSON.stringify(txHash?{revision,txHash}:{revision})})});
+  const response=await handlePons(req,action,created.id,deps);
+  const body=await response.json() as {job:{id:string;revision:number;state:string;result:Awaited<ReturnType<typeof simulateIntent>>;handoff:{usable:boolean}};error?:string};
+  return {status:response.status,...body};
+ };
+ const prepared=await invoke('simulate',0);expect(prepared.status).toBe(200);expect(prepared.job.state).toBe('simulated');
+ const handed=await invoke('handoff',prepared.job.revision);expect(handed.status).toBe(200);expect(handed.job.handoff.usable).toBe(true);
+ const first=handed.job.result;
+ const beforeLaunchSnapshot=await mutate('evm_snapshot',[]);
+ expect(first.ok).toBe(true);expect(first.unsignedTransaction.chainId).toBe(4663);expect(BigInt(first.output.tokensOut)).toBeGreaterThan(0n);
+ const tx=first.unsignedTransaction;
+ const h=await mutate('eth_sendTransaction',[{from:tx.from,to:tx.to,data:tx.data,value:'0x'+BigInt(tx.value).toString(16),gas:'0x'+BigInt(tx.gas).toString(16),gasPrice:'0x'+BigInt(tx.gasPrice).toString(16),nonce:'0x'+tx.nonce.toString(16)}]);
+ expect(h).toMatch(/^0x[0-9a-fA-F]{64}$/);const receipt=await client.waitForTransactionReceipt({hash:h as Hex});expect(receipt.status).toBe('success');
+ const tokenAbi=parseAbi(['function balanceOf(address) view returns(uint256)','function totalSupply() view returns(uint256)']);
+ const balance=await client.readContract({address:first.output.token,abi:tokenAbi,functionName:'balanceOf',args:[wallet]});
+ expect(balance.toString()).toBe(first.output.tokensOut);
+ const supply=await client.readContract({address:first.output.token,abi:tokenAbi,functionName:'totalSupply'});
+ const curveBalance=await client.readContract({address:first.output.token,abi:tokenAbi,functionName:'balanceOf',args:[first.output.curve]});
+ expect(balance+curveBalance).toBe(supply);
+ const mined=await invoke('receipt',handed.job.revision,h as Hex);expect(mined.status).toBe(200);expect(mined.job.state).toBe('confirming');expect(mined.job.handoff.usable).toBe(false);
+ for(let n=0;n<11;n++)await mutate('evm_mine',[]);
+ const confirmed=await invoke('receipt',mined.job.revision,h as Hex);expect(confirmed.status).toBe(200);expect(confirmed.job.state).toBe('confirmed');expect(confirmed.job.handoff.usable).toBe(false);
+ expect((await invoke('simulate',confirmed.job.revision)).status).toBe(409);
+ const wrongHash=await invoke('receipt',confirmed.job.revision,('0x'+'f1'.repeat(32)) as Hex);expect(wrongHash.status).toBe(409);expect(wrongHash.error).toBe('TRANSACTION_ALREADY_BOUND');
+ await mutate('evm_revert',[beforeLaunchSnapshot]);for(let n=0;n<12;n++)await mutate('evm_mine',[]);
+ const reorged=await invoke('receipt',confirmed.job.revision,h as Hex);expect(reorged.status).toBe(200);expect(reorged.job.state).toBe('reorged');expect(reorged.job.handoff.usable).toBe(false);
+ const nextIntent=validateIntent({...intent,salt:'0x'+'a2'.repeat(32)});
+ const second=await simulateIntent(nextIntent,client);
+ const min=BigInt(second.output.tokensOut)*2n;
+ const blocked=validateIntent({...nextIntent,minTokensOut:min.toString()});
+ let simulationError='';try{await simulateIntent(blocked,client);}catch(error){simulationError=String(error);}
+ expect(simulationError).not.toBe('');
+ const bad=buildLaunch(blocked,second.expectedEconomics,BigInt(second.launchFeeWei));
+ const before=await client.getBalance({address:wallet});
+ const badHash=await mutate('eth_sendTransaction',[{from:bad.from,to:bad.to,data:bad.data,value:'0x'+bad.value.toString(16),gas:'0x'+BigInt(second.unsignedTransaction.gas).toString(16)}]);
+ expect(badHash).toMatch(/^0x[0-9a-fA-F]{64}$/);const badReceipt=await client.waitForTransactionReceipt({hash:badHash as Hex});expect(badReceipt.status).toBe('reverted');expect(badReceipt.logs).toHaveLength(0);
+ expect(await client.getCode({address:second.output.token})).toBeUndefined();
+ expect(await client.getCode({address:second.output.curve})).toBeUndefined();
+ const after=await client.getBalance({address:wallet});expect(before-after).toBe(badReceipt.gasUsed*badReceipt.effectiveGasPrice);
+ const result={scope:'actual production planner against isolated local Robinhood state fork; artificial ETH; no mainnet signing/broadcast',status:'passed',chainId:4663,localRpc:endpoint,upstreamBlock:process.env.PONS_PROOF_BLOCK,productionFiles:['lib/pons/intent.ts','lib/pons/chain.ts','lib/pons/simulation.ts','lib/pons/store.ts','lib/pons/api.ts','lib/pons/receipt.ts'],coordinator:{store:'real SQLite SQL with D1-shaped test adapter, not Workers runtime',jobId:created.id,states:[prepared.job.state,handed.job.state,mined.job.state,confirmed.job.state,reorged.job.state],events:await store.events('local-fork-proof',created.id),duplicateExecutionBlocked:true,wrongHashBlocked:true},simulation:first,successTransactionHash:h,successReceipt:receipt,recipientBalance:balance,totalSupply:supply,curveBalance,rateBoundTest:{minTokensOut:min,expectedTokensOut:second.output.tokensOut,simulationError,revertTransactionHash:badHash,revertReceipt:badReceipt,noTokenOrCurveCode:true,valueRefundedExceptGas:true},limitations:['State fork EVM proof; not Robinhood sequencer consensus emulation.','Single recipient only; no independent multiwallet bundle.','Cancun empty local block supplies blob environment.']};
+ writeFileSync(resolve('docs/evidence/pons-backend-fork-proof.json'),JSON.stringify(result,(_,v)=>typeof v==='bigint'?v.toString():v,2));
+ console.log(JSON.stringify({status:'passed',successTransactionHash:h,revertTransactionHash:badHash,recipientBalance:balance.toString()}));
+});

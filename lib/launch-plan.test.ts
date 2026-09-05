@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LAUNCH_PLAN,
   deriveIllustrativeLaunchEstimate,
+  launchModeLabel,
   validateLaunchPlan,
 } from '@/lib/launch-plan';
 
@@ -18,6 +19,13 @@ describe('validateLaunchPlan', () => {
   it('rejects allocations above total supply', () => {
     expect(() => validateLaunchPlan({ ...DEFAULT_LAUNCH_PLAN, developerBuy: 60, holdersBuy: 50 }))
       .toThrow(/Combined allocation/);
+  });
+});
+
+describe('public launch-mode labels', () => {
+  it('does not advertise unsupported Block-0 guarantees', () => {
+    expect(launchModeLabel('Block-0')).toBe('Sequenced');
+    expect(launchModeLabel('Organic')).toBe('Organic');
   });
 });
 

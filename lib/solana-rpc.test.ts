@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MAX_SOLANA_SLOT_DRIFT, requireConsistentSolanaSlots, rpcCall } from '@/lib/solana-rpc';
+import { getSolanaRpcEndpoint, MAX_SOLANA_SLOT_DRIFT, requireConsistentSolanaSlots, rpcCall } from '@/lib/solana-rpc';
 
 describe('rpcCall', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -28,4 +28,8 @@ describe('requireConsistentSolanaSlots', () => {
     expect(() => requireConsistentSolanaSlots([100, 100 + MAX_SOLANA_SLOT_DRIFT + 1]))
       .toThrow(/crossed too many slots/);
   });
+});
+
+it('uses the official public devnet endpoint by default, matching the browser client', () => {
+ expect(getSolanaRpcEndpoint('devnet')).toBe('https://api.devnet.solana.com');
 });

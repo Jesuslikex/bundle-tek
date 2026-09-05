@@ -36,7 +36,7 @@ export async function rpcCall<T>(endpoint: string, method: string, params: unkno
 
 export function getSolanaRpcEndpoint(network: 'devnet' | 'mainnet') {
   return network === 'devnet'
-    ? env.SOLANA_DEVNET_RPC_URL || 'https://rpc.ankr.com/solana_devnet'
+    ? env.SOLANA_DEVNET_RPC_URL || 'https://api.devnet.solana.com'
     : env.SOLANA_MAINNET_RPC_URL || 'https://solana-rpc.publicnode.com';
 }
 

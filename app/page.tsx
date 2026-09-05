@@ -1,13 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Activity, Boxes, ChevronDown, CircleGauge, CircleHelp, Crosshair,
-  Database, Flame, Gauge, Gem, Hand, Landmark, Leaf, Menu,
+  Database, Gauge, Gem, Hand, Landmark, Leaf, Menu,
   PanelLeftClose, Pencil, Settings, Shield, Sparkles,
   BarChart3, Bot, CircleDollarSign, Play, Radio, RefreshCw, SlidersHorizontal,
   Target, TimerReset, TrendingUp, TriangleAlert, Users, WalletCards, Waves, Zap,
 } from 'lucide-react';
+import { DraftRevision } from '@/lib/draft-revision';
+import { RobinhoodPlanner } from '@/components/launch/robinhood-planner';
+import { canUseDevnetTools } from '@/lib/workspace-capabilities';
 import { ChainLaunchForm } from '@/components/launch/chain-launch-form';
 import { FundingForm } from '@/components/launch/funding-form';
 import { LiveOperationsForm } from '@/components/launch/live-operations-form';
@@ -22,6 +26,7 @@ import { DistributionWorkbench } from '@/components/distribution-workbench';
 import {
   DEFAULT_LAUNCH_PLAN,
   deriveIllustrativeLaunchEstimate,
+  launchModeLabel,
   validateLaunchPlan,
   type LaunchMode as Mode,
   type LaunchPlanInput,
@@ -32,15 +37,15 @@ import {
 type View = 'chain' | 'token' | 'launch' | 'funding' | 'distribution' | 'live' | 'pulse' | 'tracker';
 type Strategy = 'Balanced' | 'Liquidity' | 'Discovery';
 const presets: Array<{ name: Preset; blurb: string; icon: typeof Zap; mev: number }> = [
-  { name: 'Quick', blurb: 'Fast, low cost', icon: Zap, mev: 35 },
-  { name: 'Clean', blurb: 'Balanced stealth', icon: CircleGauge, mev: 46 },
-  { name: 'Full', blurb: 'Max stealth', icon: Shield, mev: 78 },
+  { name: 'Quick', blurb: 'Simple scenario', icon: Zap, mev: 35 },
+  { name: 'Clean', blurb: 'Balanced scenario', icon: CircleGauge, mev: 46 },
+  { name: 'Full', blurb: 'Detailed scenario', icon: Shield, mev: 78 },
   { name: 'Custom', blurb: 'Manual inputs', icon: Settings, mev: 55 },
 ];
 
 function Help() { return <CircleHelp className="inline size-3 text-[#697083]" aria-hidden="true" />; }
 function FieldLabel({ children, optional, note }: { children: React.ReactNode; optional?: boolean; note?: string }) {
-  return <label className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-[#eaebf0]">{children}{optional && <span className="font-normal text-[#72788a]">(optional)</span>}{note && <span className="font-normal text-[#72788a]">{note}</span>}<Help /></label>;
+  return <div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-[#eaebf0]">{children}{optional && <span className="font-normal text-[#72788a]">(optional)</span>}{note && <span className="font-normal text-[#72788a]">{note}</span>}<Help /></div>;
 }
 function Meter({ value, left, right }: { value: number; left: string; right: string }) {
   return <div><div className="h-[3px] overflow-hidden rounded-full bg-[#2b2d36]"><div className="h-full bg-[#7a77ff]" style={{ width: `${value}%` }} /></div><div className="mt-2 flex justify-between text-[10px] text-[#72788a]"><span>{left}</span><span>{right}</span></div></div>;
@@ -71,7 +76,9 @@ function PulseBackendControls(props: PulseProps) {
 
   const payload = () => ({ strategy: props.strategy, agents: props.agents, budget: props.budget, cadence: props.cadence, orderSize: props.orderSize, spread: props.spread, inventory: props.inventory });
 
-  const loadBackend = async () => {
+  const { setAgents, setBudget, setCadence, setInventory, setOrderSize, setSpread, setStrategy } = props;
+
+  const loadBackend = useCallback(async () => {
     try {
       const statusResponse = await fetch('/api/pulse/status', { cache: 'no-store' });
       const status = await statusResponse.json() as { networks?: RpcNetworkStatus[] };
@@ -82,13 +89,13 @@ function PulseBackendControls(props: PulseProps) {
       const saved = await strategyResponse.json() as { strategy?: SavedStrategy | null };
       if (saved.strategy) {
         const strategy = saved.strategy;
-        if (strategy.strategy) props.setStrategy(strategy.strategy);
-        if (strategy.agents) props.setAgents(Number(strategy.agents));
-        if (strategy.budget) props.setBudget(Number(strategy.budget));
-        if (strategy.cadence) props.setCadence(Number(strategy.cadence));
-        if (strategy.orderSize) props.setOrderSize(Number(strategy.orderSize));
-        if (strategy.spread) props.setSpread(Number(strategy.spread));
-        if (strategy.inventory) props.setInventory(Number(strategy.inventory));
+        if (strategy.strategy) setStrategy(strategy.strategy);
+        if (strategy.agents) setAgents(Number(strategy.agents));
+        if (strategy.budget) setBudget(Number(strategy.budget));
+        if (strategy.cadence) setCadence(Number(strategy.cadence));
+        if (strategy.orderSize) setOrderSize(Number(strategy.orderSize));
+        if (strategy.spread) setSpread(Number(strategy.spread));
+        if (strategy.inventory) setInventory(Number(strategy.inventory));
       }
       const cyclesResponse = await fetch('/api/pulse/cycles', { cache: 'no-store' });
       if (cyclesResponse.ok) setCycles(((await cyclesResponse.json()) as { cycles: BackendCycle[] }).cycles);
@@ -96,9 +103,12 @@ function PulseBackendControls(props: PulseProps) {
     } catch (error) {
       setState('error'); setMessage(error instanceof Error ? error.message : 'Backend unavailable');
     }
-  };
+  }, [setAgents, setBudget, setCadence, setInventory, setOrderSize, setSpread, setStrategy]);
 
-  useEffect(() => { void loadBackend(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => void loadBackend(), 0);
+    return () => clearTimeout(timer);
+  }, [loadBackend]);
 
   const saveStrategy = async () => {
     setState('working'); setMessage('Saving strategy…');
@@ -128,7 +138,7 @@ function PulseBackendControls(props: PulseProps) {
     <div className="backend-heading"><span><Database /> Backend control plane</span><b className={`backend-state ${state}`}>{state.toUpperCase()}</b></div>
     <div className="rpc-grid">{networks.map((network) => <div key={network.network}><span className={network.status === 'online' ? 'rpc-dot online' : 'rpc-dot'} /><span><strong>{network.network}</strong><small>{network.slot ? `slot ${network.slot.toLocaleString()}` : network.error ?? 'checking'}</small></span><em>{network.latencyMs ? `${network.latencyMs}ms` : '—'}</em></div>)}</div>
     <p className="backend-message">{message}</p>
-    {state === 'auth' ? <a className="backend-signin" href="/signin-with-chatgpt?return_to=/" target="_top">Sign in with ChatGPT</a> : <div className="backend-actions"><Button variant="outline" onClick={() => void saveStrategy()} disabled={state === 'working'}><Database /> Save strategy</Button><Button className={`pulse-action ${props.running ? 'is-running' : ''}`} onClick={() => void runCycle()} disabled={state === 'working'}>{props.running ? <><RefreshCw className="animate-spin" /> Running live-data cycle</> : <><Play /> Run live-data cycle</>}</Button></div>}
+    {state === 'auth' ? <Link className="backend-signin" href="/signin-with-chatgpt?return_to=/" target="_top">Sign in with ChatGPT</Link> : <div className="backend-actions"><Button variant="outline" onClick={() => void saveStrategy()} disabled={state === 'working'}><Database /> Save strategy</Button><Button className={`pulse-action ${props.running ? 'is-running' : ''}`} onClick={() => void runCycle()} disabled={state === 'working'}>{props.running ? <><RefreshCw className="animate-spin" /> Running live-data cycle</> : <><Play /> Run live-data cycle</>}</Button></div>}
     {cycles.length > 0 && <div className="cycle-log"><div className="cycle-log-title"><Activity /> Recent audit cycles</div>{cycles.slice(0, 3).map((cycle) => <div className="cycle-row" key={cycle.id}><span><b>{cycle.status}</b><small>slot {cycle.slot.toLocaleString()}</small></span><span><b>{cycle.plannedOrders} plans/hr</b><small>{cycle.projectedTurnover} SOL scenario</small></span><em>{cycle.rpcLatencyMs}ms</em></div>)}</div>}
   </section>;
 }
@@ -140,7 +150,7 @@ function PulseForm(props: PulseProps) {
     { name: 'Discovery', copy: 'Wider adaptive bands', icon: TrendingUp },
   ];
   return <div className="settings-scroll pulse-scroll">
-    <div className="page-title pulse-title"><span className="eyebrow"><Radio /> OUR TECH / PULSE ENGINE</span><h1>Market Maker</h1><p>Inventory-aware liquidity automation with transparent risk controls.<br />Built to support real markets—not fabricate investor activity.</p></div>
+    <div className="page-title pulse-title"><span className="eyebrow"><Radio /> OUR TECH / PULSE ENGINE</span><h1>Market Maker</h1><p>Explore illustrative inventory and liquidity scenarios. No trading engine or execution adapter is connected.</p></div>
     <div className="form-body">
       <div className="pulse-mode-tabs">{strategies.map(({ name, copy, icon: Icon }) => <button key={name} onClick={() => props.setStrategy(name)} className={props.strategy === name ? 'active' : ''}><Icon /><span><strong>{name}</strong><small>{copy}</small></span></button>)}</div>
       <div className="pulse-section-head"><span><Bot /> Agent Fleet</span><em>SIMULATION READY</em></div>
@@ -154,8 +164,8 @@ function PulseForm(props: PulseProps) {
         <div className="control-row"><label><Waves /> Minimum spread <b>{props.spread} bps</b></label><Slider value={[props.spread]} onValueChange={(v) => props.setSpread(typeof v === 'number' ? v : v[0])} min={20} max={300} step={5} /></div>
         <div className="control-row"><label><CircleGauge /> Target base inventory <b>{props.inventory}%</b></label><Slider value={[props.inventory]} onValueChange={(v) => props.setInventory(typeof v === 'number' ? v : v[0])} min={20} max={80} step={1} /></div>
       </div>
-      <div className="safety-grid"><div><Shield /><span><strong>Self-trade prevention</strong><small>Wallet and route collision checks</small></span><b>ON</b></div><div><TriangleAlert /><span><strong>Volatility brake</strong><small>Pause above 8% / 5m movement</small></span><b>ON</b></div><div><Activity /><span><strong>Organic throttle</strong><small>Reduce quotes when real flow rises</small></span><b>ON</b></div><div><Target /><span><strong>Daily loss limit</strong><small>Hard stop at 8% of budget</small></span><b>ON</b></div></div>
-      <label className="simulation-row"><Checkbox checked={props.simulated} onCheckedChange={(v) => props.setSimulated(Boolean(v))} /><span><strong>Simulation mode</strong><small>No transactions are signed or submitted. Review the projected behavior before connecting execution.</small></span></label>
+      <div className="safety-grid"><div><Shield /><span><strong>Self-trade prevention</strong><small>Proposed wallet and route checks</small></span><b>PLANNED</b></div><div><TriangleAlert /><span><strong>Volatility brake</strong><small>Modeled threshold: 8% / 5m</small></span><b>PLANNED</b></div><div><Activity /><span><strong>Organic throttle</strong><small>Illustrative response to external flow</small></span><b>PLANNED</b></div><div><Target /><span><strong>Daily loss limit</strong><small>Modeled limit: 8% of budget</small></span><b>PLANNED</b></div></div>
+      <div className="simulation-row"><Checkbox checked disabled aria-label="Simulation only; execution unavailable" /><span><strong>Simulation mode</strong><small>No transactions are signed or submitted. Review the projected behavior before connecting execution.</small></span></div>
       <PulseBackendControls {...props} />
     </div>
   </div>;
@@ -164,23 +174,27 @@ function PulseForm(props: PulseProps) {
 function PulseInsights({ strategy, agents, budget, cadence, orderSize, spread, inventory, running, plan }: PulseProps) {
   const ticks = [31, 45, 38, 57, 51, 67, 61, 74, 69, 82, 77, 89];
   return <div className="insights-scroll pulse-insights">
-    <section className="pulse-status"><div><span className={running ? 'pulse-dot active' : 'pulse-dot'} /><div><small>ENGINE STATE</small><strong>{running ? 'SIMULATING' : 'READY'}</strong></div></div><em>PX-01</em></section>
+    <section className="pulse-status"><div><span className={running ? 'pulse-dot active' : 'pulse-dot'} /><div><small>ENGINE STATE</small><strong>{running ? 'READING DATA' : 'SCENARIO ONLY'}</strong></div></div><em>PX-01</em></section>
     <section className="pulse-chart"><div className="pulse-chart-head"><span><BarChart3 /> Projected liquidity profile</span><b>{strategy}</b></div><div className="mini-chart">{ticks.map((value, index) => <i key={index} style={{ height: `${Math.min(96, value + agents)}%` }} />)}<span className="midline" /></div><div className="chart-labels"><span>Bid depth</span><span>Mid</span><span>Ask depth</span></div></section>
     <section className="pulse-kpis"><div><small>Projected orders / hr</small><strong>{plan.orders}</strong><em>adaptive</em></div><div><small>Capital deployed</small><strong>{(agents * budget).toFixed(1)} SOL</strong><em>{plan.utilization}% utilized</em></div><div><small>Est. two-sided turnover</small><strong>{plan.turnover} SOL</strong><em>scenario only</em></div><div><small>Budget runway</small><strong>{plan.runway}</strong><em>at current cadence</em></div></section>
     <section className="risk-map"><h2><Shield /> Safety envelope <b>{plan.risk < 45 ? 'CONSERVATIVE' : plan.risk < 70 ? 'MODERATE' : 'AGGRESSIVE'}</b></h2><div className="risk-meter"><i style={{ width: `${plan.risk}%` }} /></div><div className="risk-values"><span>Spread <b>{spread} bps</b></span><span>Order cap <b>{orderSize.toFixed(2)} SOL</b></span><span>Cadence <b>{cadence}s</b></span><span>Inventory <b>{inventory}/{100 - inventory}</b></span></div></section>
-    <section className="estimate-card pulse-estimate"><div className="est-row"><span>Scenario cost</span><b>{plan.fees} SOL / day</b></div><div className="sub-row"><span>Self-trade checks</span><b className="safe">ENFORCED</b></div><div className="sub-row"><span>External execution</span><b>NOT CONNECTED</b></div><div className="sub-row"><span>Mode</span><b>SIMULATION ONLY</b></div></section>
+    <section className="estimate-card pulse-estimate"><div className="est-row"><span>Scenario cost</span><b>{plan.fees} SOL / day</b></div><div className="sub-row"><span>Self-trade checks</span><b className="safe">NOT CONNECTED</b></div><div className="sub-row"><span>External execution</span><b>NOT CONNECTED</b></div><div className="sub-row"><span>Mode</span><b>SIMULATION ONLY</b></div></section>
     <div className="execution-note"><TriangleAlert /><p><strong>Execution remains locked.</strong> Connecting wallets, signing trades, or activating a live strategy requires a separate reviewed integration and explicit approval.</p></div>
   </div>;
 }
 
 export default function Home() {
+  const revision = useRef(new DraftRevision());
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [exploringRobinhood, setExploringRobinhood] = useState(false);
+  const [robinhoodVenue, setRobinhoodVenue] = useState('hood.fun');
   const [view, setView] = useState<View>('chain');
   const [launchPlan, setLaunchPlan] = useState<LaunchPlanInput>(DEFAULT_LAUNCH_PLAN);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [persistenceState, setPersistenceState] = useState<'loading' | 'ready' | 'saving' | 'auth' | 'error'>('loading');
   const [planMessage, setPlanMessage] = useState('Loading saved launch plan…');
   const [runtimeStatus, setRuntimeStatus] = useState('Checking mainnet RPC · Execution locked');
-  const [advanced, setAdvanced] = useState(true);
+  const [advanced, setAdvanced] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [strategy, setStrategy] = useState<Strategy>('Balanced');
   const [agents, setAgents] = useState(6);
@@ -192,6 +206,7 @@ export default function Home() {
   const [simulated, setSimulated] = useState(true);
   const [running, setRunning] = useState(false);
   const updateLaunchPlan = (change: Partial<LaunchPlanInput>) => {
+    revision.current.edit();
     setLaunchPlan((current) => ({ ...current, ...change }));
     setSavedAt(null);
     setPlanMessage('Unsaved launch-plan changes.');
@@ -222,6 +237,7 @@ export default function Home() {
 
   useEffect(() => {
     const load = async () => {
+      const started = revision.current.capture();
       try {
         const [planResponse, statusResponse] = await Promise.all([
           fetch('/api/launch/plans', { cache: 'no-store' }),
@@ -234,6 +250,7 @@ export default function Home() {
         } else {
           setRuntimeStatus('Mainnet RPC unavailable · Execution locked');
         }
+        if (!revision.current.isCurrent(started)) return;
         if (planResponse.status === 401) {
           setPersistenceState('auth');
           setPlanMessage('Sign in with ChatGPT to save and reload this plan.');
@@ -241,6 +258,7 @@ export default function Home() {
         }
         if (!planResponse.ok) throw new Error('Launch-plan service unavailable');
         const payload = await planResponse.json() as { plan: SavedLaunchPlan | null };
+        if (!revision.current.isCurrent(started)) return;
         if (payload.plan) {
           const { updatedAt, ...plan } = payload.plan;
           setLaunchPlan(validateLaunchPlan(plan));
@@ -251,6 +269,7 @@ export default function Home() {
         }
         setPersistenceState('ready');
       } catch (error) {
+        if (!revision.current.isCurrent(started)) return;
         setPersistenceState('error');
         setPlanMessage(error instanceof Error ? error.message : 'Launch-plan service unavailable');
         setRuntimeStatus('Mainnet RPC unavailable · Execution locked');
@@ -260,6 +279,9 @@ export default function Home() {
   }, []);
 
   const saveLaunchPlan = async () => {
+    if (!revision.current.beginSave()) return;
+    setSaveBusy(true);
+    const started = revision.current.capture();
     try {
       const validated = validateLaunchPlan(launchPlan);
       setPersistenceState('saving');
@@ -269,21 +291,24 @@ export default function Home() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(validated),
       });
+      if (!revision.current.isCurrent(started)) return;
       if (response.status === 401) {
         setPersistenceState('auth');
         setPlanMessage('Sign in with ChatGPT to save this plan.');
         return;
       }
       const payload = await response.json() as { plan?: SavedLaunchPlan; error?: string };
+      if (!revision.current.isCurrent(started)) return;
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? 'Plan save failed');
       setLaunchPlan(validateLaunchPlan(payload.plan));
       setSavedAt(payload.plan.updatedAt);
       setPersistenceState('ready');
       setPlanMessage('Validated launch plan saved to D1.');
     } catch (error) {
+      if (!revision.current.isCurrent(started)) return;
       setPersistenceState('error');
       setPlanMessage(error instanceof Error ? error.message : 'Plan save failed');
-    }
+    } finally { revision.current.finishSave(); setSaveBusy(false); }
   };
   const pulsePlan = useMemo(() => {
     const orders = Math.max(1, Math.round((3600 / cadence) * agents * (strategy === 'Liquidity' ? 1.12 : strategy === 'Discovery' ? 0.72 : 0.9)));
@@ -297,13 +322,14 @@ export default function Home() {
   const pickPreset = (name: Preset, presetMev: number) => { setPreset(name); setMev(presetMev); };
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMobileNav(false);
+      if (event.key === 'Escape') { setMobileNav(false); document.querySelector<HTMLButtonElement>('.mobile-menu')?.focus(); }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   const changeView = (nextView: View) => {
+    setExploringRobinhood(false);
     setView(nextView);
     setMobileNav(false);
   };
@@ -311,45 +337,49 @@ export default function Home() {
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand-zone"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle navigation" aria-expanded={mobileNav} aria-controls="project-navigation"><Menu /></button><div className="brand-mark"><i /><i /><i /><i /></div><strong>PulseForge <span>v1.1</span></strong><PanelLeftClose className="ml-auto size-4 text-[#717789]" /></div>
-      <nav className="steps" aria-label="Product sections"><button onClick={() => setView('chain')} className={view === 'chain' ? 'active' : ''}>01 VENUE</button><button onClick={() => setView('token')} className={view === 'token' ? 'active' : ''}>02 TOKEN</button><button onClick={() => setView('launch')} className={view === 'launch' ? 'active' : ''}>03 PLAN</button><button onClick={() => setView('funding')} className={view === 'funding' ? 'active' : ''}>04 FUNDING</button><button onClick={() => setView('distribution')} className={view === 'distribution' ? 'active distro-nav' : 'distro-nav'}>05 DISTRO</button><button onClick={() => setView('live')} className={view === 'live' ? 'active' : ''}>06 OPS PREVIEW</button><button onClick={() => setView('pulse')} className={view === 'pulse' ? 'active pulse-nav' : 'pulse-nav'}>PULSE</button><button onClick={() => setView('tracker')} className={view === 'tracker' ? 'active tracker-nav' : 'tracker-nav'}>SUPPLY</button></nav>
-      <div className="token-zone"><div className="token-avatar">{ticker.slice(0, 2) || 'PF'}<span /></div><div><strong>${ticker || 'TOKEN'} <small>{tokenName || 'Untitled'}</small></strong><p>{chain} · {launchpad} · {currency}</p></div><Button variant="outline" className="archive-button" onClick={() => void saveLaunchPlan()} disabled={persistenceState === 'saving' || Boolean(planValidation.error)}><Database /> {persistenceState === 'saving' ? 'Saving' : savedAt ? 'Saved' : 'Save plan'}</Button></div>
+      <nav className="steps" aria-label="Product sections"><button onClick={() => changeView('chain')} className={view === 'chain' ? 'active' : ''}>01 VENUE</button><button onClick={() => changeView('token')} className={view === 'token' ? 'active' : ''}>02 TOKEN</button><button onClick={() => changeView('launch')} className={view === 'launch' ? 'active' : ''}>03 PLAN</button><button onClick={() => changeView('funding')} className={view === 'funding' ? 'active' : ''}>04 FUNDING</button><button onClick={() => changeView('distribution')} className={view === 'distribution' ? 'active distro-nav' : 'distro-nav'}>05 DISTRO</button><button onClick={() => changeView('live')} className={view === 'live' ? 'active' : ''}>06 OPS PREVIEW</button><button onClick={() => changeView('pulse')} className={view === 'pulse' ? 'active pulse-nav' : 'pulse-nav'}>PULSE</button><button onClick={() => changeView('tracker')} className={view === 'tracker' ? 'active tracker-nav' : 'tracker-nav'}>SUPPLY</button></nav>
+      <div className="token-zone"><div className="token-avatar">{ticker.slice(0, 2) || 'PF'}<span /></div><div><strong>${ticker || 'TOKEN'} <small>{tokenName || 'Untitled'}</small></strong><p>{exploringRobinhood ? `Robinhood · ${robinhoodVenue} · Planning only` : `${chain} · ${launchpad} · ${currency}`}</p></div><Button variant="outline" className="archive-button" onClick={() => void saveLaunchPlan()} disabled={exploringRobinhood || saveBusy || persistenceState === 'saving' || Boolean(planValidation.error)}><Database /> {persistenceState === 'saving' ? 'Saving' : savedAt ? 'Saved' : 'Save plan'}</Button></div>
     </header>
 
     {mobileNav && <button className="sidebar-backdrop" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
     <aside id="project-navigation" className={`sidebar ${mobileNav ? 'open' : ''}`} aria-label="Project navigation">
-      <section className="workspace-card" aria-label="Current workspace"><span>CURRENT WORKSPACE</span><div><span className="workspace-mark">PF</span><span><strong>PulseForge Console</strong><small>Published devnet workspace</small></span><em>ACTIVE</em></div><p>Launch planning, wallet verification, devnet distribution, simulation, and supply analysis.</p></section>
+      <nav className="sidebar-section planning-navigation" aria-label="Launch planning">
+        <p>Launch planning</p>
+        {([['chain', '01', 'Venue'], ['token', '02', 'Token details'], ['launch', '03', 'Launch settings'], ['live', '06', 'Operations preview']] as const).map(([target, step, label]) => <button key={target} aria-current={view === target ? 'page' : undefined} className={view === target ? 'feature-active' : ''} onClick={() => changeView(target)}><span className="nav-step">{step}</span>{label}</button>)}
+      </nav>
+      <section className="workspace-card" aria-label="Current workspace"><span>CURRENT WORKSPACE</span><div><span className="workspace-mark">PF</span><span><strong>PulseForge Console</strong><small>Planning & devnet workspace</small></span><em>ACTIVE</em></div><p>Launch planning, wallet verification, devnet distribution, simulation, and supply analysis.</p></section>
       <div className="sidebar-section"><p>Available tools</p><button onClick={() => changeView('funding')} className={view === 'funding' ? 'feature-active' : ''}><WalletCards /> Wallet & funding</button><button onClick={() => changeView('distribution')} className={view === 'distribution' ? 'feature-active distro-active' : ''}><Boxes /> Devnet distribution <b>DEVNET</b></button><button onClick={() => changeView('pulse')} className={view === 'pulse' ? 'feature-active' : ''}><Bot /> Pulse simulation</button><button onClick={() => changeView('tracker')} className={view === 'tracker' ? 'feature-active tracker-active' : ''}><Crosshair /> Supply analysis</button></div>
-      <div className="sidebar-bottom"><div><Button variant="outline" onClick={() => void saveLaunchPlan()} disabled={persistenceState === 'saving' || Boolean(planValidation.error)}><Database /> Save plan</Button><Button onClick={() => { setLaunchPlan(DEFAULT_LAUNCH_PLAN); setSavedAt(null); setPlanMessage('New unsaved launch plan.'); setView('chain'); }}><Sparkles /> New plan</Button></div></div>
+      <div className="sidebar-bottom"><div><Button variant="outline" onClick={() => void saveLaunchPlan()} disabled={exploringRobinhood || saveBusy || persistenceState === 'saving' || Boolean(planValidation.error)}><Database /> Save plan</Button><Button onClick={() => { revision.current.edit(); setPersistenceState('ready'); setExploringRobinhood(false); setLaunchPlan(DEFAULT_LAUNCH_PLAN); setSavedAt(null); setPlanMessage('New unsaved launch plan.'); setView('chain'); }}><Sparkles /> New plan</Button></div></div>
     </aside>
 
-    <main className={`workspace ${view === 'tracker' || view === 'distribution' ? 'tracker-workspace' : ''}`}>
-      {view === 'tracker' ? <SupplyTracker /> : view === 'distribution' ? <DistributionWorkbench /> : <>
-      <section className="settings-panel">{view === 'chain' ? <ChainLaunchForm plan={launchPlan} onChange={updateLaunchPlan} onNext={() => setView('token')} /> : view === 'token' ? <TokenDetailsForm plan={launchPlan} onChange={updateLaunchPlan} onNext={() => setView('launch')} /> : view === 'funding' ? <FundingForm plan={launchPlan} estimate={figures} validationError={planValidation.error} onChange={updateLaunchPlan} onNext={() => setView('distribution')} /> : view === 'live' ? <LiveOperationsForm plan={launchPlan} onOpenSimulation={() => setView('pulse')} /> : view === 'launch' ? <div className="settings-scroll">
-        <div className="page-title"><h1>Launch Settings</h1><p>Define how your launch behaves on-chain.<br />These settings control execution patterns.</p></div>
+    <main className={`workspace ${!exploringRobinhood && (view === 'tracker' || view === 'distribution') ? 'tracker-workspace' : ''}`}>
+      {exploringRobinhood ? <RobinhoodPlanner venue={robinhoodVenue} onSelect={setRobinhoodVenue} onBack={() => { setExploringRobinhood(false); setView('chain'); }} /> : view === 'tracker' ? <SupplyTracker /> : view === 'distribution' ? (canUseDevnetTools(chain) ? <DistributionWorkbench /> : <section className="settings-panel"><div className="page-title"><span className="eyebrow">SOLANA DEVNET ONLY</span><h1>Distribution unavailable</h1><p>{chain} has no verified wallet or distribution integration. Your plan remains a draft.</p><Button className="flow-next" onClick={() => changeView('chain')}>Review chain selection</Button></div></section>) : <>
+      <section className="settings-panel">{view === 'chain' ? <ChainLaunchForm onExploreRobinhood={() => setExploringRobinhood(true)} plan={launchPlan} onChange={updateLaunchPlan} onNext={() => setView('token')} /> : view === 'token' ? <TokenDetailsForm plan={launchPlan} onChange={updateLaunchPlan} onNext={() => setView('launch')} /> : view === 'funding' ? <FundingForm plan={launchPlan} estimate={figures} validationError={planValidation.error} onChange={updateLaunchPlan} onNext={() => setView('distribution')} /> : view === 'live' ? <LiveOperationsForm plan={launchPlan} onOpenSimulation={() => setView('pulse')} /> : view === 'launch' ? <div className="settings-scroll">
+        <div className="page-title"><h1>Launch Settings</h1><p>Model allocations and compare scenarios. Nothing here submits a launch or schedules a trade.</p></div>
         <div className="form-body">
-          <div className="mode-tabs">{([['Block-0', CircleGauge], ['Organic', Leaf], ['Manual', Hand]] as Array<[Mode, typeof Leaf]>).map(([name, Icon]) => <button key={name} onClick={() => setMode(name)} className={mode === name ? 'active' : ''}><Icon /> {name} Mode</button>)}</div>
+          <div className="mode-tabs">{([['Block-0', CircleGauge], ['Organic', Leaf], ['Manual', Hand]] as Array<[Mode, typeof Leaf]>).map(([name, Icon]) => <button key={name} onClick={() => setMode(name)} className={mode === name ? 'active' : ''}><Icon /> {launchModeLabel(name)} Mode</button>)}</div>
           <div className="input-grid">
             <div><FieldLabel optional><Gem className="size-3.5 text-[#f7cb49]" />Developer Buy %</FieldLabel><div className="number-wrap"><Input value={developer} onChange={(e) => setDeveloper(Number(e.target.value))} type="number" min={0} max={100} /><span>%</span></div></div>
             <div><FieldLabel note="(Excluding Developer)"><Sparkles className="size-3.5 text-[#8e83ff]" />Holders Buy</FieldLabel><div className="number-wrap"><Input value={holders} onChange={(e) => setHolders(Number(e.target.value))} type="number" min={0} max={100} /><span>%</span></div></div>
           </div>
           <div className="mt-4"><FieldLabel note="(1-200)"><Users className="size-3.5 text-[#43efc1]" />Holders Count</FieldLabel><Input value={holderCount} onChange={(e) => setHolderCount(Number(e.target.value))} type="number" min={1} max={200} /></div>
-          <div className="section-label"><Boxes /> Block-0 Preset</div>
+          <div className="section-label"><Boxes /> Scenario preset</div>
           <div className="preset-grid">{presets.map(({ name, blurb, icon: Icon, mev: presetMev }) => <button key={name} onClick={() => pickPreset(name, presetMev)} className={preset === name ? 'active' : ''}><span><Icon />{name} <b>Build</b></span><small>{blurb}</small></button>)}</div>
-          <div className="section-label"><Crosshair /> Back MEV Tuning</div><Slider value={[mev]} onValueChange={(v) => { setMev(typeof v === 'number' ? v : v[0]); setPreset('Custom'); }} min={0} max={100} step={1} className="mev-slider" /><div className="range-labels"><span>Less Sniper</span><span>Less Top Trader</span></div>
-          <div className="wallet-card"><div className="wallet-head"><span><WalletCards /></span><div><strong>Wallet role plan</strong><p>Counts are planning inputs; wallet custody is not connected</p></div></div><div className="wallet-types"><button type="button" disabled><Gem /> Deployer <b>0/1</b></button><button type="button" disabled className="selected"><Users /> Holders <b>{holderCount}/{holderCount}</b></button><button type="button" disabled><Flame /> Front route <b>0/5</b></button><button type="button" disabled><Target /> Back route <b>0/17</b></button></div><button type="button" disabled className="edit-selection"><Pencil /> Custody locked</button></div>
+          <div className="section-label"><Crosshair /> Scenario routing emphasis</div><Slider value={[mev]} onValueChange={(v) => { setMev(typeof v === 'number' ? v : v[0]); setPreset('Custom'); }} min={0} max={100} step={1} className="mev-slider" /><div className="range-labels"><span>Earlier stages</span><span>Distributed stages</span></div>
+          <div className="wallet-card"><div className="wallet-head"><span><WalletCards /></span><div><strong>Wallet role plan</strong><p>Counts are planning inputs; wallet custody is not connected</p></div></div><div className="wallet-types"><button type="button" disabled><Gem /> Deployer <b>0/1</b></button><button type="button" disabled><Users /> Scenario recipients <b>0/{holderCount}</b></button></div><button type="button" disabled className="edit-selection"><Pencil /> Custody locked</button></div>
           <button className="advanced-toggle" onClick={() => setAdvanced(!advanced)}><Settings /> ADVANCED INTEGRATION PARAMETERS · LOCKED<i /><ChevronDown className={advanced ? 'rotate' : ''} /></button>
           {advanced && <fieldset disabled className="advanced-grid" aria-label="Advanced integration parameters are unavailable"><div><FieldLabel optional note="(0-100)">Slippage</FieldLabel><div className="number-wrap"><Input defaultValue="100" /><span>%</span></div></div><div><FieldLabel optional>Funding Delay</FieldLabel><div className="delay"><span>MIN</span><b>:</b><span>SEC</span></div></div><div><FieldLabel optional note="(0-100)">Alternative Routing</FieldLabel><div className="number-wrap"><Input placeholder="0" /><span>%</span></div></div><div><FieldLabel optional note="(0-200)">Empty Holders</FieldLabel><Input defaultValue="0" /></div><div className="wide"><FieldLabel optional>Fee Target</FieldLabel><div className="number-wrap"><Input defaultValue="0" /><span className="sol">◎</span></div></div></fieldset>}
-          <label className="scheduled"><span><strong>Scheduled simulation</strong><small>Record the deployment and holder phases separately for review. No transaction is scheduled.</small></span><input type="checkbox" checked={scheduled} onChange={(event) => updateLaunchPlan({ scheduled: event.target.checked })} /><i /></label><Button className="create-main" onClick={() => setView('funding')}><Landmark /> Review funding plan</Button>
+          <div className="scheduled"><span><strong>Scheduled simulation</strong><small>Record the deployment and holder phases separately for review. No transaction is scheduled.</small></span><input aria-label="Scheduled simulation" type="checkbox" checked={scheduled} onChange={(event) => updateLaunchPlan({ scheduled: event.target.checked })} /><i /></div><Button className="create-main" onClick={() => changeView('funding')}><Landmark /> Review funding plan</Button>
         </div>
       </div> : <PulseForm {...pulseProps} />}</section>
 
       <aside className="insights">{view === 'chain' || view === 'token' || view === 'funding' || view === 'live' ? <PlanRail plan={launchPlan} savedAt={savedAt} persistenceState={persistenceState} validationError={planValidation.error} /> : view === 'launch' ? <div className="insights-scroll">
-        <section className="mode-summary"><div className="summary-title"><CircleGauge /><strong>{mode} Mode</strong><span>Planning model</span></div><p>{mode === 'Block-0' ? 'Plans coordinated same-slot stages with explicit role and funding boundaries.' : mode === 'Organic' ? 'Models staggered buys across slots with configurable pacing and exposure.' : 'Distributes funding while leaving every buy under manual control.'}</p><div className="pros"><span>+++ &nbsp; Deterministic planning</span><span>--- &nbsp; External flow remains</span><span>+++ &nbsp; Auditable stages</span><span>-- &nbsp; Higher complexity</span><span>+++ &nbsp; Explicit wallet roles</span><span>- &nbsp; Mainnet execution unavailable</span></div></section>
-        <section className="build-analysis"><h2><Gauge /> {preset} Build <ChevronDown /></h2><div className="metric-grid"><div><label><Users /> Cluster outcome <Help /><b>UNVERIFIED</b></label><Meter value={mev + 12} left="Unknown" right="Needs live proof" /></div><div><label><CircleGauge /> Scenario cost <Help /><b>{figures.supplyCost}</b></label><Meter value={Math.min(94, Number(figures.supplyCost) * 9)} left="Lower" right="Higher" /></div><div><label><Target /> Routing emphasis <Help /></label><Meter value={mev} left="Earlier" right="Distributed" /></div><div><label><Activity /> Planned duration <Help /><b>{Math.round(64 - mev / 5)}m {Math.round(mev % 60)}s</b></label><Meter value={Math.min(96, holderCount / 2)} left="Fastest" right="Longest" /></div></div></section>
+        <section className="mode-summary"><div className="summary-title"><CircleGauge /><strong>{launchModeLabel(mode)} Mode</strong><span>Planning model</span></div><p>{mode === 'Block-0' ? 'Models an ordered sequence for review. It does not guarantee same-slot or Block-0 inclusion.' : mode === 'Organic' ? 'Models staggered buys across slots with configurable pacing and exposure.' : 'Models funding allocations for manual review. No funds are distributed.'}</p><div className="pros"><span>+++ &nbsp; Deterministic planning</span><span>--- &nbsp; External flow remains</span><span>+++ &nbsp; Auditable stages</span><span>-- &nbsp; Higher complexity</span><span>+++ &nbsp; Explicit scenario roles</span><span>- &nbsp; Mainnet execution unavailable</span></div></section>
+        <section className="build-analysis"><h2><Gauge /> {preset} Build <ChevronDown /></h2><div className="metric-grid"><div><div className="metric-label"><Users /> Cluster outcome <Help /><b>UNVERIFIED</b></div><Meter value={mev + 12} left="Unknown" right="Needs live proof" /></div><div><div className="metric-label"><CircleGauge /> Scenario cost <Help /><b>{figures.supplyCost}</b></div><Meter value={Math.min(94, Number(figures.supplyCost) * 9)} left="Lower" right="Higher" /></div><div><div className="metric-label"><Target /> Routing emphasis <Help /></div><Meter value={mev} left="Earlier" right="Distributed" /></div><div><div className="metric-label"><Activity /> Planned duration <Help /><b>{Math.round(64 - mev / 5)}m {Math.round(mev % 60)}s</b></div><Meter value={Math.min(96, holderCount / 2)} left="Fastest" right="Longest" /></div></div></section>
         <section className="estimate-card"><div className="est-row muted"><span>Estimate source <Help /></span><b>{planValidation.error ? 'PLAN INVALID · ESTIMATES PAUSED' : 'VALIDATED PLAN · NO LIVE QUOTE'}</b></div><div className="est-row"><span>Illustrative allocation <Help /></span><b><strong>{planValidation.error ? '—' : `${figures.allocation}%`}</strong></b></div><div className="sub-row"><span>Deployer <Help /></span><b>{developer}%</b></div><div className="sub-row"><span>Holders <Help /></span><b>{holders}%</b></div></section>
-        <section className="estimate-card funding-card"><div className="est-row"><span>Illustrative funding scenario</span><b>{figures.scenarioTotal} {chain === 'Solana' ? 'SOL' : currency}</b></div><div className="sub-row"><span>Allocation scenario <Help /></span><b>{figures.supplyCost}</b></div><div className="sub-row"><span>Wallet reserve <Help /></span><b>{figures.walletReserve}</b></div><div className="sub-row danger"><span>Maximum modeled exposure <Help /></span><b>{figures.maximumExposure}</b></div></section><Button className="create-side" onClick={() => setView('funding')}><Landmark /> Review funding</Button>
+        <section className="estimate-card funding-card"><div className="est-row"><span>Illustrative funding scenario</span><b>{figures.scenarioTotal} {chain === 'Solana' ? 'SOL' : currency}</b></div><div className="sub-row"><span>Allocation scenario <Help /></span><b>{figures.supplyCost}</b></div><div className="sub-row"><span>Wallet reserve <Help /></span><b>{figures.walletReserve}</b></div><div className="sub-row danger"><span>Maximum modeled exposure <Help /></span><b>{figures.maximumExposure}</b></div></section><Button className="create-side" onClick={() => changeView('funding')}><Landmark /> Review funding</Button>
       </div> : <PulseInsights {...pulseProps} />}</aside></>}
     </main>
-    <footer className="statusbar"><span className="live"><i /> {runtimeStatus}</span><span className={`plan-save-state ${planValidation.error ? 'error' : persistenceState}`}>{planValidation.error ?? planMessage}</span><span className="network-boundary">DEVNET TOOLS · MAINNET LOCKED</span></footer>
+    <footer className="statusbar"><span className="live"><i /> {exploringRobinhood ? 'Robinhood · Read-only research' : chain === 'Solana' ? `Solana · ${runtimeStatus}` : `${chain} · Planning only · Execution locked`}</span><span className={`plan-save-state ${planValidation.error ? 'error' : persistenceState}`}>{planValidation.error ?? planMessage}</span><span className="network-boundary">DEVNET TOOLS · MAINNET LOCKED</span></footer>
   </div>;
 }

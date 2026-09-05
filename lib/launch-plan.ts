@@ -4,6 +4,10 @@ export type LaunchChain = (typeof CHAINS)[number];
 export const LAUNCH_MODES = ['Block-0', 'Organic', 'Manual'] as const;
 export type LaunchMode = (typeof LAUNCH_MODES)[number];
 
+export function launchModeLabel(mode: LaunchMode) {
+  return mode === 'Block-0' ? 'Sequenced' : mode;
+}
+
 export const LAUNCH_PRESETS = ['Quick', 'Clean', 'Full', 'Custom'] as const;
 export type LaunchPreset = (typeof LAUNCH_PRESETS)[number];
 
