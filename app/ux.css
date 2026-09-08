@@ -1171,6 +1171,7 @@ body {
   font-size: 12px;
 }
 .statusbar .plan-save-state {
+  font-size: 12px;
   flex: 1;
   min-width: 0;
   max-width: none;
