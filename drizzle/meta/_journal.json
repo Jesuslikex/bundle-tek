@@ -36,6 +36,13 @@
       "when": 1787966587186,
       "tag": "0004_sudden_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788833661820,
+      "tag": "0005_special_marten_broadcloak",
+      "breakpoints": true
     }
   ]
 }

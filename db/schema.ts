@@ -1,4 +1,25 @@
-import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
+
+export const workspaceProjects = sqliteTable(
+  'workspace_projects',
+  {
+    id: text('id').notNull(),
+    ownerId: text('owner_id').notNull(),
+    document: text('document').notNull(),
+    archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_workspace_projects_owner_id').on(table.ownerId, table.id),
+  ],
+);
 
 export const pulseStrategies = sqliteTable(
   'pulse_strategies',
@@ -35,7 +56,9 @@ export const pulseCycles = sqliteTable(
     status: text('status').notNull(),
     createdAt: text('created_at').notNull(),
   },
-  (table) => [index('idx_pulse_cycles_owner_created').on(table.ownerId, table.createdAt)],
+  (table) => [
+    index('idx_pulse_cycles_owner_created').on(table.ownerId, table.createdAt),
+  ],
 );
 
 export const pulseCycleGates = sqliteTable('pulse_cycle_gates', {
@@ -54,7 +77,10 @@ export const pulseCycleRequests = sqliteTable(
     completedAt: text('completed_at'),
   },
   (table) => [
-    uniqueIndex('idx_pulse_cycle_requests_owner_key').on(table.ownerId, table.idempotencyKey),
+    uniqueIndex('idx_pulse_cycle_requests_owner_key').on(
+      table.ownerId,
+      table.idempotencyKey,
+    ),
     index('idx_pulse_cycle_requests_claimed').on(table.claimedAt),
   ],
 );
@@ -76,8 +102,12 @@ export const launchPlans = sqliteTable(
     holdersBuy: real('holders_buy').notNull(),
     holderCount: integer('holder_count').notNull(),
     routingEmphasis: integer('routing_emphasis').notNull(),
-    useHusher: integer('use_husher', { mode: 'boolean' }).notNull().default(false),
-    scheduled: integer('scheduled', { mode: 'boolean' }).notNull().default(false),
+    useHusher: integer('use_husher', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    scheduled: integer('scheduled', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     simulationSafety: text('simulation_safety').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -94,7 +124,12 @@ export const walletChallenges = sqliteTable(
     expiresAt: text('expires_at').notNull(),
     usedAt: text('used_at'),
   },
-  (table) => [index('idx_wallet_challenges_address_expires').on(table.walletAddress, table.expiresAt)],
+  (table) => [
+    index('idx_wallet_challenges_address_expires').on(
+      table.walletAddress,
+      table.expiresAt,
+    ),
+  ],
 );
 
 export const walletAuditEvents = sqliteTable(
@@ -109,7 +144,10 @@ export const walletAuditEvents = sqliteTable(
     createdAt: text('created_at').notNull(),
   },
   (table) => [
-    index('idx_wallet_audit_address_created').on(table.walletAddress, table.createdAt),
+    index('idx_wallet_audit_address_created').on(
+      table.walletAddress,
+      table.createdAt,
+    ),
     uniqueIndex('idx_wallet_audit_transaction').on(table.transactionSignature),
   ],
 );
