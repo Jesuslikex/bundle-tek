@@ -179,8 +179,9 @@ beforeEach(async () => {
     'isolated-test-only';
   mocks.prepare.mockReset();
   mocks.balance.mockReset();
+  // IF EXISTS: a test that fails after dropping a trigger must not cascade into later tests.
   await mocks.db
-    .prepare('DROP TRIGGER imported_swap_signing_events_immutable_delete')
+    .prepare('DROP TRIGGER IF EXISTS imported_swap_signing_events_immutable_delete')
     .run();
   await mocks.db.prepare('DELETE FROM imported_swap_signing_events').run();
   await mocks.db
@@ -189,7 +190,7 @@ beforeEach(async () => {
     )
     .run();
   await mocks.db
-    .prepare('DROP TRIGGER imported_trade_lot_links_immutable_delete')
+    .prepare('DROP TRIGGER IF EXISTS imported_trade_lot_links_immutable_delete')
     .run();
   await mocks.db.prepare('DELETE FROM imported_trade_lot_links').run();
   await mocks.db

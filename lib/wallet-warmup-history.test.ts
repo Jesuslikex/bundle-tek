@@ -21,9 +21,10 @@ function provider(results: Record<string, unknown>) {
 }
 describe('warmup history observations', () => {
   it('rejects stale, future and missing EVM header times before account reads', async () => {
+    // Offsets clear the 900s/300s limits by a minute, so slow runs cannot cross them.
     for (const seconds of [
-      Math.floor(Date.now() / 1000) - 901,
-      Math.floor(Date.now() / 1000) + 301,
+      Math.floor(Date.now() / 1000) - 960,
+      Math.floor(Date.now() / 1000) + 360,
       null,
     ]) {
       const p = provider({
