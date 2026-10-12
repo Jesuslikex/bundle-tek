@@ -35,6 +35,6 @@ export function PlanRail({
     <section className="plan-score"><span><Rocket /></span><div><small>PLAN CHECKLIST</small><strong>{savedAt ? 'PLAN SAVED' : 'DRAFT PLAN'}</strong></div><em>{passedCount} / {gates.length} complete</em></section>
     <section className="plan-gates"><h2>Readiness checks</h2>{gates.map(([label, value, passed]) => <div key={label}><i className={passed ? 'passed' : ''}>{passed ? '✓' : '—'}</i><span><strong>{label}</strong><small>{value}</small></span></div>)}</section>
     <section className="architecture-map"><h2><GitBranch /> Product flow</h2><div><span>Venue profile</span><b>→</b><span>Role planner</span><b>→</b><span>Funding review</span><b>→</b><span>Devnet distro</span><b>→</b><span>Ops preview</span></div></section>
-    <div className="execution-note"><TriangleAlert /><p><strong>Network boundary.</strong> PulseForge never receives private keys. Wallet-approved verification and SPL transfers are devnet-only; mainnet launch and trading remain locked.</p></div>
+    <div className="execution-note"><TriangleAlert /><p><strong>Network boundary.</strong> Private keys stay in your wallet app or encrypted browser vault. Connected-wallet SPL transfers are devnet-only; mainnet launch and trading remain locked.</p></div>
   </div>;
 }

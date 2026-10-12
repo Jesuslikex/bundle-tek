@@ -30,7 +30,7 @@ describe('venue discovery', () => {
   });
 });
 
-it('renders all thirteen observed venues with no wallet actions or invented estimates', () => {
+it('renders current Robinhood venues with no wallet actions or invented estimates', () => {
   const html = renderToStaticMarkup(
     <RobinhoodPlanner venue="hood.fun" onSelect={() => {}} onBack={() => {}} />,
   );
@@ -38,7 +38,9 @@ it('renders all thirteen observed venues with no wallet actions or invented esti
     'hood.fun',
     'pons.family',
     'o1.exchange',
-    'long.xyz',
+    'Uniswap V4',
+    'Flywheel',
+    'CoinBarrel',
     'flap.sh',
     'stonks.fun',
     'pools.trade',

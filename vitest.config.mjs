@@ -13,5 +13,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Miniflare-backed route suites start local D1 and run many sequential
+    // requests; under full-suite load they exceed Vitest's 5s/10s defaults.
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
   },
 });

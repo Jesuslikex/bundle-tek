@@ -1,0 +1,1 @@
+ALTER TABLE `launch_plans` ADD `quote_address` text;

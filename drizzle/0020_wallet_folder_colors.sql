@@ -1,0 +1,1 @@
+ALTER TABLE wallet_folders ADD COLUMN color text NOT NULL DEFAULT '#A6B1FF';

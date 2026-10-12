@@ -1,8 +1,19 @@
+import { validateHoldersQuoteAmount } from '@/lib/launch-buy';
+import { validateSequencedSupply } from '@/lib/launch-supply';
+import { validateQuoteSelection } from '@/lib/quote-catalog';
+import { validateLaunchMethod } from '@/lib/launch-methods';
+import { validateLaunchTiming } from '@/lib/launch-timing';
+import {
+  assignmentEntries,
+  validateLaunchWalletSelection,
+} from '@/lib/launch-wallets';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
+import { validateVenuePlan } from '@/lib/venue-limits';
 import {
   projectIdValid,
   validateProjectDocument,
+  projectChanges,
 } from '@/lib/workspace-project';
 
 export const dynamic = 'force-dynamic';
@@ -78,38 +89,128 @@ export async function POST(request: Request) {
     ).toISOString();
     storageStarted = true;
     const db = getD1();
-    const result =
+    const previous =
       body.expectedUpdatedAt === null
-        ? await db
-            .prepare(`INSERT OR IGNORE INTO workspace_projects (id, owner_id, document, archived, updated_at)
-          SELECT ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM workspace_projects WHERE owner_id = ?) < 100`)
+        ? null
+        : await db
+            .prepare(
+              'SELECT document,archived FROM workspace_projects WHERE owner_id=? AND id=?',
+            )
+            .bind(user.userId, body.id)
+            .first<{ document: string; archived: number }>();
+    const previousDocument = previous
+      ? validateProjectDocument(JSON.parse(previous.document))
+      : null;
+    storageStarted = false;
+    // Retain readable, archivable legacy drafts. Enforce captured limits when
+    // creating a project or changing its plan; do not silently rewrite history.
+    if (
+      !previousDocument ||
+      JSON.stringify(previousDocument.plan) !== JSON.stringify(document.plan)
+    ) {
+      validateVenuePlan(document.plan);
+      validateSequencedSupply(document.plan);
+      validateHoldersQuoteAmount(document.plan);
+      validateQuoteSelection(document.plan);
+      validateLaunchMethod(document.plan);
+      validateLaunchTiming(document.plan);
+    }
+    storageStarted = true;
+    const changeLabels = projectChanges(previousDocument, document);
+    const validateWallets =
+      !previousDocument ||
+      JSON.stringify(previousDocument.plan) !== JSON.stringify(document.plan) ||
+      JSON.stringify(previousDocument.options.wallets) !==
+        JSON.stringify(document.options.wallets);
+    storageStarted = false;
+    if (validateWallets)
+      validateLaunchWalletSelection(
+        document.options.wallets,
+        document.plan.chain,
+        document.plan.holderCount,
+      );
+    const walletEntries = validateWallets
+      ? assignmentEntries(document.options.wallets)
+      : [];
+    // Eligibility and both revisions are checked inside the project mutation,
+    // preventing a folder/archive/move race between a read and this save.
+    const walletGuard = walletEntries.length
+      ? ` AND (SELECT COUNT(*) FROM json_each(?) wanted
+      JOIN workspace_wallets w ON w.owner_id=? AND w.chain=? AND w.address=json_extract(wanted.value,'$.address')
+      LEFT JOIN wallet_folders f ON f.owner_id=w.owner_id AND f.id=COALESCE(json_extract(wanted.value,'$.folderId'),w.folder_id) AND f.id IN(SELECT value FROM json_each(COALESCE(w.folder_ids,json_array(w.folder_id)))) AND f.chain=w.chain
+      WHERE w.archived=0 AND w.role=json_extract(wanted.value,'$.role')
+      AND w.revision=json_extract(wanted.value,'$.revision') AND ((json_extract(wanted.value,'$.root')=1 AND json_extract(wanted.value,'$.folderRevision')=0 AND json_extract(wanted.value,'$.folderId') IS NULL) OR (json_array_length(COALESCE(w.folder_ids,json_array(w.folder_id)))=0 AND json_extract(wanted.value,'$.folderRevision')=0 AND json_extract(wanted.value,'$.folderId') IS NULL) OR (f.archived=0 AND f.revision=json_extract(wanted.value,'$.folderRevision'))))=?`
+      : '';
+    const walletBindings = walletEntries.length
+      ? [
+          JSON.stringify(walletEntries),
+          user.userId,
+          document.plan.chain,
+          walletEntries.length,
+        ]
+      : [];
+    storageStarted = true;
+    const type =
+      body.expectedUpdatedAt === null
+        ? 'project.created'
+        : body.archived && !previous?.archived
+          ? 'project.archived'
+          : !body.archived && previous?.archived
+            ? 'project.restored'
+            : 'project.saved';
+    const mutationId = crypto.randomUUID();
+    const statement =
+      body.expectedUpdatedAt === null
+        ? db
+            .prepare(`INSERT OR IGNORE INTO workspace_projects (id, owner_id, document, archived, updated_at, mutation_id)
+          SELECT ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM workspace_projects WHERE owner_id = ?) < 100${walletGuard}`)
             .bind(
               body.id,
               user.userId,
               JSON.stringify(document),
               body.archived ? 1 : 0,
               updatedAt,
+              mutationId,
               user.userId,
+              ...walletBindings,
             )
-            .run()
-        : await db
+        : db
             .prepare(
-              `UPDATE workspace_projects SET document = ?, archived = ?, updated_at = ? WHERE owner_id = ? AND id = ? AND updated_at = ?`,
+              `UPDATE workspace_projects SET document = ?, archived = ?, updated_at = ?, mutation_id = ? WHERE owner_id = ? AND id = ? AND updated_at = ?${walletGuard}`,
             )
             .bind(
               JSON.stringify(document),
               body.archived ? 1 : 0,
               updatedAt,
+              mutationId,
               user.userId,
               body.id,
               body.expectedUpdatedAt,
-            )
-            .run();
+              ...walletBindings,
+            );
+    const [result] = await db.batch([
+      statement,
+      db
+        .prepare(`INSERT INTO project_events(owner_id,project_id,name,chain,launchpad,type,changes,revision,created_at)
+      SELECT owner_id,id,?,?,?,?,?,?,? FROM workspace_projects WHERE owner_id=? AND id=? AND mutation_id=?`)
+        .bind(
+          document.plan.tokenName,
+          document.plan.chain,
+          document.plan.launchpad,
+          type,
+          JSON.stringify(changeLabels),
+          updatedAt,
+          new Date().toISOString(),
+          user.userId,
+          body.id,
+          mutationId,
+        ),
+    ]);
     if (!result.meta.changes)
       return json(
         {
           error:
-            'Project changed in another tab or the 100-project limit was reached. Refresh the project list and reopen the latest saved project before editing.',
+            'Project or selected wallets changed, or the 100-project limit was reached. Refresh the project and wallet lists before saving again.',
         },
         409,
       );

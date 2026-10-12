@@ -1,13 +1,27 @@
+import {
+  parseHolderDistribution,
+  type HolderDistribution,
+} from './launch-distribution';
+import { holdersBuyUnit, parseHoldersQuoteAmount } from './launch-buy';
+import { quoteCatalog, quoteAsset } from './quote-catalog';
+import { parseLaunchTiming, type LaunchTiming } from './launch-timing';
 export const CHAINS = [
   'Solana',
   'Robinhood',
   'BNB',
+  'Arc',
   'Ethereum',
   'Base',
 ] as const;
 export type LaunchChain = (typeof CHAINS)[number];
 
-export const LAUNCH_MODES = ['Block-0', 'Organic', 'Manual'] as const;
+export const LAUNCH_MODES = [
+  'Block-0',
+  'Quick',
+  'Stagger',
+  'Organic',
+  'Manual',
+] as const;
 export type LaunchMode = (typeof LAUNCH_MODES)[number];
 
 export function launchModeLabel(mode: LaunchMode) {
@@ -27,6 +41,9 @@ export const VENUES_BY_CHAIN: Record<LaunchChain, readonly string[]> = {
     'Printr',
     'Meteora DBC',
     'StonkFun',
+    'Stoxes',
+    'Lesgo',
+    'meme.fun',
   ],
   Robinhood: [
     'pons.family',
@@ -42,10 +59,21 @@ export const VENUES_BY_CHAIN: Record<LaunchChain, readonly string[]> = {
     'meme.bid',
     'Uniswap V2',
     'Uniswap V3',
+    'Uniswap V4',
+    'Flywheel',
+    'CoinBarrel',
   ],
   Ethereum: ['Uniswap V2'],
   Base: ['Clanker', 'Bankr'],
-  BNB: ['FourMeme', 'Flap'],
+  BNB: ['FourMeme', 'Flap', 'knot.fun'],
+  Arc: ['Argus', 'Foci', 'LIFT', 'Znipe', 'Uniswap V4'],
+};
+
+// Current UI inventory verified 9 October 2026. Keep retired venues valid for
+// existing saved documents without offering them for a new launch.
+export const CURRENT_VENUES_BY_CHAIN: Record<LaunchChain, readonly string[]> = {
+  ...VENUES_BY_CHAIN,
+  Robinhood: VENUES_BY_CHAIN.Robinhood.filter((v) => v !== 'long.xyz'),
 };
 
 export const CURRENCIES_BY_CHAIN: Record<LaunchChain, readonly string[]> = {
@@ -54,11 +82,12 @@ export const CURRENCIES_BY_CHAIN: Record<LaunchChain, readonly string[]> = {
   Ethereum: ['ETH'],
   Base: ['ETH'],
   BNB: ['BNB'],
+  Arc: ['USDC'],
 };
 
 // Reference catalog observed in signed-in Proxima on 2026-09-08.
 // These are planning choices, not verified trading pairs or launch adapters.
-export function currenciesForVenue(
+function legacyCurrenciesForVenue(
   chain: LaunchChain,
   venue: string,
 ): readonly string[] {
@@ -132,6 +161,16 @@ export function currenciesForVenue(
   return CURRENCIES_BY_CHAIN[chain];
 }
 
+export function currenciesForVenue(
+  chain: LaunchChain,
+  venue: string,
+): readonly string[] {
+  const catalog = quoteCatalog(chain, venue);
+  return catalog.captured
+    ? [...new Set(catalog.assets.map((a) => a.symbol))]
+    : legacyCurrenciesForVenue(chain, venue);
+}
+
 export type SimulationSafetyPolicy = {
   maxIllustrativeTurnover: number;
   maxScenarioExposure: number;
@@ -147,6 +186,8 @@ export type LaunchPlanInput = {
   chain: LaunchChain;
   launchpad: string;
   currency: string;
+  quoteAddress?: string;
+  timing?: LaunchTiming;
   tokenName: string;
   ticker: string;
   description: string;
@@ -154,6 +195,8 @@ export type LaunchPlanInput = {
   preset: LaunchPreset;
   developerBuy: number;
   holdersBuy: number;
+  holdersBuyQuote?: string;
+  holdersDistribution?: HolderDistribution;
   holderCount: number;
   routingEmphasis: number;
   useHusher: boolean;
@@ -279,14 +322,28 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
   const rawCurrency = requireString(body, 'currency');
   const currency =
     chain === 'Base' && rawCurrency === 'Base' ? 'ETH' : rawCurrency;
-  if (!currenciesForVenue(chain, launchpad).includes(currency))
+  if (
+    !currenciesForVenue(chain, launchpad).includes(currency) &&
+    !legacyCurrenciesForVenue(chain, launchpad).includes(currency)
+  )
     throw new Error('Currency does not match venue profile');
+  let quoteAddress: string | undefined;
+  if (body.quoteAddress !== undefined && body.quoteAddress !== null) {
+    if (typeof body.quoteAddress !== 'string' || body.quoteAddress.length > 44)
+      throw new Error('Invalid quote token address.');
+    const asset = quoteAsset(chain, launchpad, body.quoteAddress);
+    if (!asset || asset.symbol !== currency)
+      throw new Error(
+        'Quote token address does not match the launchpad and symbol.',
+      );
+    quoteAddress = asset.address;
+  }
   const tokenName = requireString(body, 'tokenName').trim();
-  if (tokenName.length < 2 || tokenName.length > 32)
-    throw new Error('Token name must be 2-32 characters');
+  if (tokenName.length < 2 || tokenName.length > 64)
+    throw new Error('Token name must be 2-64 characters');
   const ticker = requireString(body, 'ticker').trim().toUpperCase();
-  if (!/^[A-Z0-9]{1,13}$/.test(ticker))
-    throw new Error('Ticker must be 1-13 letters or numbers');
+  if (!/^[A-Z0-9]{1,16}$/.test(ticker))
+    throw new Error('Ticker must be 1-16 letters or numbers');
   const description = requireString(body, 'description').trim();
   if (description.length > 280)
     throw new Error('Description must be at most 280 characters');
@@ -304,7 +361,11 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     throw new Error('Developer buy must be 0-100%');
   if (holdersBuy < 0 || holdersBuy > 100)
     throw new Error('Holders buy must be 0-100%');
-  if (developerBuy + holdersBuy > 100)
+  if (
+    holdersBuyUnit({ mode, launchpad, scheduled: body.scheduled === true }) ===
+      'supply' &&
+    developerBuy + holdersBuy > 100
+  )
     throw new Error('Combined allocation cannot exceed 100%');
   if (!Number.isInteger(holderCount) || holderCount < 1 || holderCount > 200)
     throw new Error('Holder count must be 1-200');
@@ -319,10 +380,22 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
   if (typeof body.scheduled !== 'boolean')
     throw new Error('scheduled must be boolean');
   const simulationSafety = validateSimulationSafety(body.simulationSafety);
+  const timing = parseLaunchTiming(body.timing);
+  const holdersBuyQuote = parseHoldersQuoteAmount(body.holdersBuyQuote);
+  const holdersDistribution = parseHolderDistribution(body.holdersDistribution);
+  if (
+    holdersDistribution?.kind === 'custom' &&
+    holdersDistribution.weights?.length !== holderCount
+  )
+    throw new Error(
+      'Custom weights must match the holder count. Update the list explicitly.',
+    );
   return {
     chain,
     launchpad,
     currency,
+    ...(quoteAddress ? { quoteAddress } : {}),
+    ...(timing ? { timing } : {}),
     tokenName,
     ticker,
     description,
@@ -330,6 +403,8 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     preset,
     developerBuy,
     holdersBuy,
+    ...(holdersBuyQuote !== undefined ? { holdersBuyQuote } : {}),
+    ...(holdersDistribution ? { holdersDistribution } : {}),
     holderCount,
     routingEmphasis,
     useHusher: body.useHusher,
@@ -339,8 +414,17 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
 }
 
 export function deriveIllustrativeLaunchEstimate(plan: LaunchPlanInput) {
-  const allocation = plan.developerBuy + plan.holdersBuy;
-  if (plan.chain === 'Robinhood' || plan.chain === 'Ethereum')
+  const quoteMode = holdersBuyUnit(plan) === 'quote';
+  const allocation = quoteMode ? null : plan.developerBuy + plan.holdersBuy;
+  if (
+    allocation === null ||
+    plan.chain === 'Robinhood' ||
+    plan.chain === 'Ethereum' ||
+    plan.chain === 'Arc' ||
+    plan.mode === 'Quick' ||
+    plan.mode === 'Stagger' ||
+    plan.currency !== CURRENCIES_BY_CHAIN[plan.chain][0]
+  )
     return {
       allocation,
       supplyCost: '—',

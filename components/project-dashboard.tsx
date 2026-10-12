@@ -6,16 +6,20 @@ import {
   ArrowRight,
   Copy,
   FolderOpen,
+  LogIn,
   Plus,
   RefreshCw,
   Search,
   WalletCards,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CHAINS } from '@/lib/launch-plan';
+import { CHAINS, CURRENT_VENUES_BY_CHAIN } from '@/lib/launch-plan';
 import type { WorkspaceProject } from '@/lib/workspace-project';
+import type { ImportedTokenProject } from '@/lib/imported-token-project';
+import { AccountCostsPanel } from '@/components/account-costs';
+import { AccountPerformancePanel } from '@/components/account-performance';
 
 export function ProjectDashboard({
   projects,
@@ -28,6 +32,11 @@ export function ProjectDashboard({
   onDuplicate,
   onReload,
   onWallet,
+  imports = [],
+  importsLoading = false,
+  importsError = '',
+  onOpenImport,
+  signedOut = false,
 }: {
   projects: WorkspaceProject[];
   archived?: boolean;
@@ -39,6 +48,12 @@ export function ProjectDashboard({
   onDuplicate: (project: WorkspaceProject) => void;
   onReload: () => void;
   onWallet: () => void;
+  imports?: ImportedTokenProject[];
+  importsLoading?: boolean;
+  importsError?: string;
+  onOpenImport?: (id: string) => void;
+  /** Saved drafts and imports cannot be read; counts and empty states would mislead. */
+  signedOut?: boolean;
 }) {
   const [chain, setChain] = useState('All');
   const [search, setSearch] = useState('');
@@ -50,6 +65,14 @@ export function ProjectDashboard({
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+  const filteredImports = imports.filter(
+    (p) =>
+      p.archived === archived &&
+      (chain === 'All' || p.document.token.chain === chain) &&
+      `${p.document.token.name} ${p.document.token.symbol} ${p.document.token.chain} ${p.document.token.address}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()),
+  );
   return (
     <section className="project-dashboard">
       <header className="dashboard-heading">
@@ -59,7 +82,7 @@ export function ProjectDashboard({
           <p>
             {archived
               ? 'Restore a project whenever you want to continue.'
-              : 'Your launch drafts, networks, and next steps in one place.'}
+              : 'Your launch drafts, imported tokens and next steps in one place.'}
           </p>
         </div>
         <Button onClick={onNew} disabled={busy}>
@@ -70,25 +93,29 @@ export function ProjectDashboard({
         <div className="dashboard-stats">
           <article>
             <span>Active drafts</span>
-            <strong>{projects.filter((p) => !p.archived).length}</strong>
-            <small>Saved projects</small>
+            <strong>
+              {signedOut ? '—' : projects.filter((p) => !p.archived).length}
+            </strong>
+            <small>{signedOut ? 'Sign in to load' : 'Saved projects'}</small>
           </article>
           <article>
             <span>Networks in your drafts</span>
             <strong>
-              {
-                new Set(
-                  projects.filter((p) => !p.archived).map((p) => p.plan.chain),
-                ).size
-              }
+              {signedOut
+                ? '—'
+                : new Set(
+                    projects
+                      .filter((p) => !p.archived)
+                      .map((p) => p.plan.chain),
+                  ).size}
             </strong>
-            <small>Across 5 planning profiles</small>
+            <small>Across {CHAINS.length} planning profiles</small>
           </article>
           <article>
             <span>Wallet workspace</span>
-            <strong>Devnet</strong>
+            <strong>{CHAINS.length} networks</strong>
             <button onClick={onWallet}>
-              Open wallet <ArrowRight size={14} />
+              Open wallets <ArrowRight size={14} />
             </button>
           </article>
           <article>
@@ -98,6 +125,8 @@ export function ProjectDashboard({
           </article>
         </div>
       )}
+      {!archived && <AccountPerformancePanel />}
+      {!archived && <AccountCostsPanel />}
       <div className="project-toolbar">
         <Tabs value={chain} onValueChange={(v) => setChain(String(v))}>
           <TabsList aria-label="Filter projects by chain">
@@ -120,12 +149,13 @@ export function ProjectDashboard({
         <Button
           variant="outline"
           onClick={onReload}
-          disabled={loading || busy}
+          disabled={loading || importsLoading || busy}
           aria-label="Reload projects"
         >
           <RefreshCw />
         </Button>
       </div>
+      <h2 className="library-section-title">Launch drafts</h2>
       <div className="project-table-wrap">
         <table className="project-table">
           <thead>
@@ -196,33 +226,145 @@ export function ProjectDashboard({
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && (
+        {signedOut && !archived && (
           <div className="project-empty">
-            <FolderOpen />
-            <h2>
-              {loading
-                ? 'Loading projects…'
-                : search || chain !== 'All'
-                  ? 'No matching projects'
-                  : archived
-                    ? 'No archived projects'
-                    : 'Your next launch starts here'}
-            </h2>
+            <LogIn />
+            <h2>Sign in to open your workspace</h2>
             <p>
-              {search || chain !== 'All'
-                ? 'Try a different chain or search term.'
-                : archived
-                  ? 'Archived drafts will appear here.'
-                  : 'Choose a chain, set up your token, and save a draft to your workspace.'}
+              Launch drafts and imported tokens are saved to your account. You
+              can still plan a launch, but it will not be saved until you sign
+              in.
             </p>
-            {!loading && !archived && !search && chain === 'All' && (
-              <Button onClick={onNew}>
-                <Plus /> Create launch
-              </Button>
+            {/* oxlint-disable-next-line next/no-html-link-for-pages -- Sites sign-in must use a top-level document navigation. */}
+            <a
+              className={buttonVariants()}
+              href="/signin-with-chatgpt?return_to=/"
+              target="_top"
+            >
+              <LogIn /> Sign in with ChatGPT
+            </a>
+          </div>
+        )}
+        {!(signedOut && !archived) &&
+          filtered.length === 0 &&
+          filteredImports.length === 0 && (
+            <div className="project-empty">
+              <FolderOpen />
+              <h2>
+                {loading
+                  ? 'Loading projects…'
+                  : search || chain !== 'All'
+                    ? 'No matching launch drafts'
+                    : archived
+                      ? 'No archived launch drafts'
+                      : 'Your next launch starts here'}
+              </h2>
+              <p>
+                {search || chain !== 'All'
+                  ? 'Try a different chain or search term.'
+                  : archived
+                    ? 'Archived drafts will appear here.'
+                    : 'Choose a chain, set up your token, and save a draft to your workspace.'}
+              </p>
+              {!loading && !archived && !search && chain === 'All' && (
+                <Button onClick={onNew}>
+                  <Plus /> Create launch
+                </Button>
+              )}
+            </div>
+          )}
+        {filtered.length === 0 && filteredImports.length > 0 && (
+          <p className="library-empty-note">
+            No launch drafts match this view.
+          </p>
+        )}
+      </div>
+      <section
+        aria-label="Imported token library"
+        className="imported-token-library"
+      >
+        <h2>Imported tokens</h2>
+        {signedOut ? (
+          <p>Sign in to load your imported tokens.</p>
+        ) : (
+          <>
+            <p>
+              {importsLoading
+                ? 'Loading saved imports…'
+                : `${imports.filter((p) => p.archived === archived).length} ${archived ? 'archived' : 'active'} imports. Opening an import shows its latest saved identity and settings.`}
+            </p>
+            {importsError && (
+              <p role="alert">
+                {importsError} Previously loaded imports may be stale.
+              </p>
+            )}
+          </>
+        )}
+        {!signedOut && (
+          <div className="project-table-wrap">
+            <table className="project-table">
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Network / address</th>
+                  <th>Status</th>
+                  <th>Last saved</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredImports.map((project) => (
+                  <tr key={project.id}>
+                    <td>
+                      <button
+                        className="project-title-button"
+                        aria-label={`Open imported ${project.document.token.name}`}
+                        disabled={busy || !onOpenImport}
+                        onClick={() => onOpenImport?.(project.id)}
+                      >
+                        <span className="project-avatar">
+                          {project.document.token.symbol.slice(0, 2)}
+                        </span>
+                        <span>
+                          <strong>{project.document.token.name}</strong>
+                          <small>
+                            ${project.document.token.symbol} · r
+                            {project.revision}
+                          </small>
+                        </span>
+                      </button>
+                    </td>
+                    <td>
+                      <strong>{project.document.token.chain}</strong>
+                      <small className="warmup-address">
+                        {project.document.token.address}
+                      </small>
+                    </td>
+                    <td>
+                      <span className="draft-badge">
+                        {project.archived ? 'Archived import' : 'Import'}
+                      </span>
+                    </td>
+                    <td>
+                      <time dateTime={project.updatedAt}>
+                        {new Date(project.updatedAt).toLocaleDateString()}
+                      </time>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!filteredImports.length && !importsLoading && (
+              <p className="library-empty-note">
+                {importsError
+                  ? 'Reload projects to check saved imports.'
+                  : search || chain !== 'All'
+                    ? 'No imports match this search and network.'
+                    : `No ${archived ? 'archived' : 'active'} imports.`}
+              </p>
             )}
           </div>
         )}
-      </div>
+      </section>
       {!archived && (
         <section className="workspace-coverage">
           <h2>Workspace capabilities</h2>
@@ -230,12 +372,16 @@ export function ProjectDashboard({
             <span>
               <FolderOpen />
               <strong>Launch planning</strong>
-              <small>5 chains · 26 venue profiles · saved drafts</small>
+              <small>
+                {CHAINS.length} chains ·{' '}
+                {Object.values(CURRENT_VENUES_BY_CHAIN).flat().length} venue
+                profiles · saved drafts
+              </small>
             </span>
             <span>
               <WalletCards />
               <strong>Wallet verification</strong>
-              <small>Solana devnet · message signing and memo test</small>
+              <small>EVM ownership messages · Solana devnet tools</small>
             </span>
             <span>
               <Search />

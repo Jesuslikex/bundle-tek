@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { LaunchPlanInput } from '@/lib/launch-plan';
 import { EMPTY_IDENTITY, type TokenIdentity } from '@/lib/workspace-project';
+import { TokenCloneLookup } from './token-clone-lookup';
+import { ArtworkUpload } from './artwork-upload';
+import { ArtworkLibrary } from './artwork-library';
+import { isUploadedArtwork } from '@/lib/artwork';
+import { venueLimits, validateVenuePlan } from '@/lib/venue-limits';
 
 export function TokenDetailsForm({
   plan,
@@ -23,12 +28,22 @@ export function TokenDetailsForm({
   validationError?: string | null;
 }) {
   const [failedImage, setFailedImage] = useState('');
+  const limits = venueLimits(plan.chain, plan.launchpad);
+  let venueError = '';
+  try {
+    validateVenuePlan(plan, true);
+  } catch (error) {
+    venueError =
+      error instanceof Error ? error.message : 'Check venue requirements.';
+  }
   const ready =
     plan.tokenName.trim().length > 1 &&
-    /^[A-Z0-9]{1,13}$/.test(plan.ticker) &&
+    /^[A-Z0-9]{1,16}$/.test(plan.ticker) &&
+    !venueError &&
     !(plan.tokenName === 'Untitled Plan' && plan.ticker === 'TOKEN');
   const artwork =
-    /^https?:\/\//.test(identity.artworkUrl) &&
+    (/^https?:\/\//.test(identity.artworkUrl) ||
+      isUploadedArtwork(identity.artworkUrl)) &&
     identity.artworkUrl !== failedImage;
   return (
     <div className="settings-scroll launch-flow-scroll">
@@ -38,6 +53,79 @@ export function TokenDetailsForm({
         <p>Define your token’s identity and preview how it will appear.</p>
       </div>
       <div className="form-body token-form">
+        <TokenCloneLookup
+          onApply={(token) => {
+            onChange({
+              tokenName: token.name,
+              ticker: token.symbol.toUpperCase(),
+            });
+            onIdentityChange?.({
+              clonedFrom: { chain: token.chain, address: token.address },
+              clonedMetadata:
+                identity.clonedFrom?.chain === token.chain &&
+                identity.clonedFrom.address === token.address
+                  ? identity.clonedMetadata
+                  : undefined,
+            });
+          }}
+          onApplyMetadata={(token, fields, metadata) => {
+            const { description, ...links } = fields;
+            if (description !== undefined) onChange({ description });
+            onIdentityChange?.({
+              ...links,
+              clonedFrom: { chain: token.chain, address: token.address },
+              clonedMetadata: {
+                uri: metadata.uri,
+                sourceUrl: metadata.sourceUrl,
+                sha256: metadata.sha256,
+                observedAt: metadata.observedAt,
+              },
+            });
+          }}
+        />
+        {identity.clonedFrom && (
+          <div className="token-clone-source">
+            <span>Cloned from {identity.clonedFrom.chain}</span>
+            <code>{identity.clonedFrom.address}</code>
+            {identity.clonedMetadata && (
+              <details>
+                <summary>Linked metadata source</summary>
+                <p>
+                  Read{' '}
+                  {new Date(
+                    identity.clonedMetadata.observedAt,
+                  ).toLocaleString()}{' '}
+                  from{' '}
+                  <a
+                    href={identity.clonedMetadata.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {new URL(identity.clonedMetadata.sourceUrl).hostname}
+                  </a>
+                  . Hosted content can change after this read.
+                </p>
+                <code
+                  style={{ overflowWrap: 'anywhere', whiteSpace: 'normal' }}
+                >
+                  {identity.clonedMetadata.sha256}
+                </code>
+              </details>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                onIdentityChange?.({
+                  clonedFrom: undefined,
+                  clonedMetadata: undefined,
+                })
+              }
+            >
+              Remove source reference
+            </Button>
+          </div>
+        )}
         {validationError && (
           <p role="alert" className="draft-error">
             {validationError}
@@ -46,11 +134,14 @@ export function TokenDetailsForm({
         <div className="input-grid">
           <div>
             <label htmlFor="project-name">
-              Project name <small>{plan.tokenName.length}/32</small>
+              Project name{' '}
+              <small>
+                {plan.tokenName.length}/{limits.maxName}
+              </small>
             </label>
             <Input
               id="project-name"
-              maxLength={32}
+              maxLength={limits.maxName}
               value={plan.tokenName}
               onChange={(e) => onChange({ tokenName: e.target.value })}
               placeholder="Project name"
@@ -58,26 +149,51 @@ export function TokenDetailsForm({
           </div>
           <div>
             <label htmlFor="project-symbol">
-              Symbol <small>{plan.ticker.length}/13</small>
+              Symbol{' '}
+              <small>
+                {plan.ticker.length}/{limits.maxSymbol}
+              </small>
             </label>
             <Input
               id="project-symbol"
+              maxLength={limits.maxSymbol}
               value={plan.ticker}
               onChange={(e) =>
                 onChange({
                   ticker: e.target.value
                     .toUpperCase()
-                    .replace(/[^A-Z0-9]/g, '')
-                    .slice(0, 13),
+                    .replace(/[^A-Z0-9]/g, ''),
                 })
               }
               placeholder="TOKEN"
             />
           </div>
         </div>
+        {limits.maxCombined < 99999 ? (
+          <p className="venue-identity-limits">
+            Name and symbol combined:{' '}
+            {plan.tokenName.trim().length + plan.ticker.trim().length}/
+            {limits.maxCombined} characters.
+          </p>
+        ) : null}
+        {!limits.verified ? (
+          <p className="source-note">
+            Venue-specific limits for this profile are not yet verified. General
+            draft limits apply.
+          </p>
+        ) : null}
+        {venueError && venueError !== validationError ? (
+          <p role="alert" className="draft-error">
+            {venueError}
+          </p>
+        ) : null}
         <div>
           <label htmlFor="project-description">
-            Description <small>{plan.description.length}/280</small>
+            Description{' '}
+            {limits.descriptionOptional
+              ? '(optional)'
+              : '(required before continuing)'}{' '}
+            <small>{plan.description.length}/280</small>
           </label>
           <textarea
             id="project-description"
@@ -94,14 +210,40 @@ export function TokenDetailsForm({
           <Input
             id="artwork-url"
             type="url"
-            value={identity.artworkUrl}
+            value={
+              isUploadedArtwork(identity.artworkUrl) ? '' : identity.artworkUrl
+            }
             onChange={(e) => onIdentityChange?.({ artworkUrl: e.target.value })}
             placeholder="https://…/token.png"
           />
           <p className="source-note">
-            Use a publicly hosted image. File upload is not connected yet.
+            {isUploadedArtwork(identity.artworkUrl)
+              ? 'Uploaded image selected. Enter a hosted URL to replace it.'
+              : 'Use a hosted image URL or upload an image below.'}
           </p>
         </div>
+        <ArtworkUpload
+          onUploaded={(url) => {
+            setFailedImage('');
+            onIdentityChange?.({ artworkUrl: url });
+          }}
+        />
+        <ArtworkLibrary
+          selectedUrl={identity.artworkUrl}
+          onSelected={(url) => {
+            setFailedImage('');
+            onIdentityChange?.({ artworkUrl: url });
+          }}
+        />
+        {identity.artworkUrl && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onIdentityChange?.({ artworkUrl: '' })}
+          >
+            Remove artwork from draft
+          </Button>
+        )}
         <section className="identity-preview" aria-label="Token preview">
           <div className="identity-art">
             {artwork ? (
@@ -132,7 +274,7 @@ export function TokenDetailsForm({
         </section>
         {identity.artworkUrl && failedImage === identity.artworkUrl && (
           <output className="inspection-error">
-            Image could not load. Check the public URL.
+            Image could not load. Check the URL or upload the image again.
           </output>
         )}
         <div className="social-fields">
@@ -162,7 +304,7 @@ export function TokenDetailsForm({
         </Button>
         {!ready && (
           <p className="next-action-note">
-            Enter your project name and symbol to continue.
+            {venueError || 'Enter your project name and symbol to continue.'}
           </p>
         )}
       </div>

@@ -5,6 +5,7 @@ import {
   deriveIllustrativeLaunchEstimate,
   validateLaunchPlan,
   VENUES_BY_CHAIN,
+  CURRENT_VENUES_BY_CHAIN,
 } from './launch-plan';
 import {
   DEFAULT_VENUE_OPTIONS,
@@ -62,10 +63,12 @@ describe('workspace documents', () => {
 });
 
 describe('reference venue profiles', () => {
-  it('contains 26 venues over five chains with 13 on Robinhood', () => {
-    expect(Object.keys(VENUES_BY_CHAIN)).toHaveLength(5);
-    expect(Object.values(VENUES_BY_CHAIN).flat()).toHaveLength(26);
-    expect(VENUES_BY_CHAIN.Robinhood).toHaveLength(13);
+  it('offers 37 current venues over six chains and preserves retired saved profiles', () => {
+    expect(Object.keys(VENUES_BY_CHAIN)).toHaveLength(6);
+    expect(Object.values(CURRENT_VENUES_BY_CHAIN).flat()).toHaveLength(37);
+    expect(CURRENT_VENUES_BY_CHAIN.Robinhood).toHaveLength(15);
+    expect(VENUES_BY_CHAIN.Robinhood).toContain('long.xyz');
+    expect(CURRENT_VENUES_BY_CHAIN.Robinhood).not.toContain('long.xyz');
   });
   it('enforces venue-specific quote currencies without enabling execution', () => {
     const plan = {
@@ -77,12 +80,14 @@ describe('reference venue profiles', () => {
     expect(validateLaunchPlan(plan).simulationSafety.executionEnabled).toBe(
       false,
     );
-    expect(() => validateLaunchPlan({ ...plan, currency: 'AAPL' })).toThrow();
+    expect(() =>
+      validateLaunchPlan({ ...plan, currency: 'NONEXISTENT' }),
+    ).toThrow();
     expect(
       validateLaunchPlan({ ...plan, launchpad: 'long.xyz', currency: 'AAPL' })
         .currency,
     ).toBe('AAPL');
-    expect(currenciesForVenue('Robinhood', 'long.xyz')).toHaveLength(63);
+    expect(currenciesForVenue('Robinhood', 'long.xyz')).toHaveLength(71);
     expect(
       deriveIllustrativeLaunchEstimate(validateLaunchPlan(plan)).scenarioTotal,
     ).toBe('—');

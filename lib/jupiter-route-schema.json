@@ -1,0 +1,904 @@
+{
+  "variants": [
+    {
+      "name": "Saber",
+      "fields": []
+    },
+    {
+      "name": "SaberAddDecimalsDeposit",
+      "fields": []
+    },
+    {
+      "name": "SaberAddDecimalsWithdraw",
+      "fields": []
+    },
+    {
+      "name": "TokenSwap",
+      "fields": []
+    },
+    {
+      "name": "Sencha",
+      "fields": []
+    },
+    {
+      "name": "Step",
+      "fields": []
+    },
+    {
+      "name": "Cropper",
+      "fields": []
+    },
+    {
+      "name": "Raydium",
+      "fields": []
+    },
+    {
+      "name": "Crema",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Lifinity",
+      "fields": []
+    },
+    {
+      "name": "Mercurial",
+      "fields": []
+    },
+    {
+      "name": "Cykura",
+      "fields": []
+    },
+    {
+      "name": "Serum",
+      "fields": ["Side"]
+    },
+    {
+      "name": "MarinadeDeposit",
+      "fields": []
+    },
+    {
+      "name": "MarinadeUnstake",
+      "fields": []
+    },
+    {
+      "name": "Aldrin",
+      "fields": ["Side"]
+    },
+    {
+      "name": "AldrinV2",
+      "fields": ["Side"]
+    },
+    {
+      "name": "Whirlpool",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Invariant",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Meteora",
+      "fields": []
+    },
+    {
+      "name": "GooseFX",
+      "fields": []
+    },
+    {
+      "name": "DeltaFi",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Balansol",
+      "fields": []
+    },
+    {
+      "name": "MarcoPolo",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Dradex",
+      "fields": ["Side"]
+    },
+    {
+      "name": "LifinityV2",
+      "fields": []
+    },
+    {
+      "name": "RaydiumClmm",
+      "fields": []
+    },
+    {
+      "name": "Openbook",
+      "fields": ["Side"]
+    },
+    {
+      "name": "Phoenix",
+      "fields": ["Side"]
+    },
+    {
+      "name": "Symmetry",
+      "fields": ["u64", "u64"]
+    },
+    {
+      "name": "TokenSwapV2",
+      "fields": []
+    },
+    {
+      "name": "HeliumTreasuryManagementRedeemV0",
+      "fields": []
+    },
+    {
+      "name": "StakeDexStakeWrappedSol",
+      "fields": []
+    },
+    {
+      "name": "StakeDexSwapViaStake",
+      "fields": ["u32"]
+    },
+    {
+      "name": "GooseFXV2",
+      "fields": []
+    },
+    {
+      "name": "Perps",
+      "fields": []
+    },
+    {
+      "name": "PerpsAddLiquidity",
+      "fields": []
+    },
+    {
+      "name": "PerpsRemoveLiquidity",
+      "fields": []
+    },
+    {
+      "name": "MeteoraDlmm",
+      "fields": []
+    },
+    {
+      "name": "OpenBookV2",
+      "fields": ["Side"]
+    },
+    {
+      "name": "RaydiumClmmV2",
+      "fields": []
+    },
+    {
+      "name": "StakeDexPrefundWithdrawStakeAndDepositStake",
+      "fields": ["u32"]
+    },
+    {
+      "name": "Clone",
+      "fields": ["u8", "bool", "bool"]
+    },
+    {
+      "name": "SanctumS",
+      "fields": ["u8", "u8", "u32", "u32"]
+    },
+    {
+      "name": "SanctumSAddLiquidity",
+      "fields": ["u8", "u32"]
+    },
+    {
+      "name": "SanctumSRemoveLiquidity",
+      "fields": ["u8", "u32"]
+    },
+    {
+      "name": "RaydiumCP",
+      "fields": []
+    },
+    {
+      "name": "WhirlpoolSwapV2",
+      "fields": ["bool", "OptionRemainingAccountsInfo"]
+    },
+    {
+      "name": "OneIntro",
+      "fields": []
+    },
+    {
+      "name": "PumpWrappedBuy",
+      "fields": []
+    },
+    {
+      "name": "PumpWrappedSell",
+      "fields": []
+    },
+    {
+      "name": "PerpsV2",
+      "fields": []
+    },
+    {
+      "name": "PerpsV2AddLiquidity",
+      "fields": []
+    },
+    {
+      "name": "PerpsV2RemoveLiquidity",
+      "fields": []
+    },
+    {
+      "name": "MoonshotWrappedBuy",
+      "fields": []
+    },
+    {
+      "name": "MoonshotWrappedSell",
+      "fields": []
+    },
+    {
+      "name": "StabbleStableSwap",
+      "fields": []
+    },
+    {
+      "name": "StabbleWeightedSwap",
+      "fields": []
+    },
+    {
+      "name": "Obric",
+      "fields": ["bool"]
+    },
+    {
+      "name": "FoxBuyFromEstimatedCost",
+      "fields": []
+    },
+    {
+      "name": "FoxClaimPartial",
+      "fields": ["bool"]
+    },
+    {
+      "name": "SolFi",
+      "fields": ["bool"]
+    },
+    {
+      "name": "SolayerDelegateNoInit",
+      "fields": []
+    },
+    {
+      "name": "SolayerUndelegateNoInit",
+      "fields": []
+    },
+    {
+      "name": "TokenMill",
+      "fields": ["Side"]
+    },
+    {
+      "name": "DaosFunBuy",
+      "fields": []
+    },
+    {
+      "name": "DaosFunSell",
+      "fields": []
+    },
+    {
+      "name": "ZeroFi",
+      "fields": []
+    },
+    {
+      "name": "StakeDexWithdrawWrappedSol",
+      "fields": []
+    },
+    {
+      "name": "VirtualsBuy",
+      "fields": []
+    },
+    {
+      "name": "VirtualsSell",
+      "fields": []
+    },
+    {
+      "name": "Perena",
+      "fields": ["u8", "u8"]
+    },
+    {
+      "name": "PumpSwapBuy",
+      "fields": []
+    },
+    {
+      "name": "PumpSwapSell",
+      "fields": []
+    },
+    {
+      "name": "Gamma",
+      "fields": []
+    },
+    {
+      "name": "MeteoraDlmmSwapV2",
+      "fields": ["RemainingAccountsInfo"]
+    },
+    {
+      "name": "Woofi",
+      "fields": []
+    },
+    {
+      "name": "MeteoraDammV2",
+      "fields": []
+    },
+    {
+      "name": "MeteoraDynamicBondingCurveSwap",
+      "fields": []
+    },
+    {
+      "name": "StabbleStableSwapV2",
+      "fields": []
+    },
+    {
+      "name": "StabbleWeightedSwapV2",
+      "fields": []
+    },
+    {
+      "name": "RaydiumLaunchlabBuy",
+      "fields": ["u64"]
+    },
+    {
+      "name": "RaydiumLaunchlabSell",
+      "fields": ["u64"]
+    },
+    {
+      "name": "BoopdotfunWrappedBuy",
+      "fields": []
+    },
+    {
+      "name": "BoopdotfunWrappedSell",
+      "fields": []
+    },
+    {
+      "name": "Plasma",
+      "fields": ["Side"]
+    },
+    {
+      "name": "GoonFi",
+      "fields": ["bool", "u8"]
+    },
+    {
+      "name": "HumidiFi",
+      "fields": ["u64", "bool"]
+    },
+    {
+      "name": "MeteoraDynamicBondingCurveSwapWithRemainingAccounts",
+      "fields": []
+    },
+    {
+      "name": "TesseraV",
+      "fields": ["Side"]
+    },
+    {
+      "name": "PumpWrappedBuyV2",
+      "fields": []
+    },
+    {
+      "name": "PumpWrappedSellV2",
+      "fields": []
+    },
+    {
+      "name": "PumpSwapBuyV2",
+      "fields": []
+    },
+    {
+      "name": "PumpSwapSellV2",
+      "fields": []
+    },
+    {
+      "name": "Heaven",
+      "fields": ["bool"]
+    },
+    {
+      "name": "SolFiV2",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Aquifer",
+      "fields": []
+    },
+    {
+      "name": "PumpWrappedBuyV3",
+      "fields": []
+    },
+    {
+      "name": "PumpWrappedSellV3",
+      "fields": []
+    },
+    {
+      "name": "PumpSwapBuyV3",
+      "fields": []
+    },
+    {
+      "name": "PumpSwapSellV3",
+      "fields": []
+    },
+    {
+      "name": "JupiterLendDeposit",
+      "fields": []
+    },
+    {
+      "name": "JupiterLendRedeem",
+      "fields": []
+    },
+    {
+      "name": "DefiTuna",
+      "fields": ["bool", "OptionRemainingAccountsInfo"]
+    },
+    {
+      "name": "AlphaQ",
+      "fields": ["bool"]
+    },
+    {
+      "name": "RaydiumV2",
+      "fields": []
+    },
+    {
+      "name": "SarosDlmm",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Futarchy",
+      "fields": ["Side"]
+    },
+    {
+      "name": "MeteoraDammV2WithRemainingAccounts",
+      "fields": []
+    },
+    {
+      "name": "Obsidian",
+      "fields": []
+    },
+    {
+      "name": "WhaleStreet",
+      "fields": ["Side"]
+    },
+    {
+      "name": "DynamicV1",
+      "fields": ["VecCandidateSwap", "Optionu8"]
+    },
+    {
+      "name": "PumpWrappedBuyV4",
+      "fields": []
+    },
+    {
+      "name": "PumpWrappedSellV4",
+      "fields": []
+    },
+    {
+      "name": "CarrotIssue",
+      "fields": []
+    },
+    {
+      "name": "CarrotRedeem",
+      "fields": []
+    },
+    {
+      "name": "Manifest",
+      "fields": ["Side"]
+    },
+    {
+      "name": "BisonFi",
+      "fields": ["bool"]
+    },
+    {
+      "name": "HumidiFiV2",
+      "fields": ["u64", "bool"]
+    },
+    {
+      "name": "PerenaStar",
+      "fields": ["bool"]
+    },
+    {
+      "name": "JupiterRfqV2",
+      "fields": ["Side", "bytes"]
+    },
+    {
+      "name": "GoonFiV2",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Scorch",
+      "fields": ["u128"]
+    },
+    {
+      "name": "VaultLiquidUnstake",
+      "fields": ["Array:u64:5", "u64"]
+    },
+    {
+      "name": "XOrca",
+      "fields": []
+    },
+    {
+      "name": "Quantum",
+      "fields": ["Side"]
+    },
+    {
+      "name": "WhaleStreetV2",
+      "fields": ["Side", "u64", "u64"]
+    },
+    {
+      "name": "Riptide",
+      "fields": ["bool"]
+    },
+    {
+      "name": "RunnerRodeo",
+      "fields": []
+    },
+    {
+      "name": "TaurusFi",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Omnipair",
+      "fields": []
+    },
+    {
+      "name": "MSwap",
+      "fields": []
+    },
+    {
+      "name": "Hylo",
+      "fields": ["HyloSwapType"]
+    },
+    {
+      "name": "VoltrDeposit",
+      "fields": []
+    },
+    {
+      "name": "VoltrWithdraw",
+      "fields": []
+    },
+    {
+      "name": "SanctumSV2",
+      "fields": ["u8", "u8", "u32", "u32"]
+    },
+    {
+      "name": "LemmingsFi",
+      "fields": ["bool"]
+    },
+    {
+      "name": "ScaleVmmBuy",
+      "fields": []
+    },
+    {
+      "name": "ScaleVmmSell",
+      "fields": []
+    },
+    {
+      "name": "ScaleAmmBuy",
+      "fields": []
+    },
+    {
+      "name": "ScaleAmmSell",
+      "fields": []
+    },
+    {
+      "name": "BisonFiV2",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Trends",
+      "fields": []
+    },
+    {
+      "name": "HumaDeposit",
+      "fields": []
+    },
+    {
+      "name": "HumaInstantWithdraw",
+      "fields": []
+    },
+    {
+      "name": "Kipseli",
+      "fields": ["bool"]
+    },
+    {
+      "name": "DynamicV2",
+      "fields": ["VecCandidateSwapWithBps", "u8", "u8"]
+    },
+    {
+      "name": "PumpSwapBuyV3WithCashbackClaim",
+      "fields": []
+    },
+    {
+      "name": "PumpSwapSellV3WithCashbackClaim",
+      "fields": []
+    },
+    {
+      "name": "PumpWrappedBuyV4WithCashbackClaim",
+      "fields": []
+    },
+    {
+      "name": "PumpWrappedSellV4WithCashbackClaim",
+      "fields": []
+    },
+    {
+      "name": "GoonFiV3",
+      "fields": ["bool"]
+    },
+    {
+      "name": "PumpWrappedBuyV5",
+      "fields": ["bool"]
+    },
+    {
+      "name": "PumpWrappedSellV5",
+      "fields": ["bool"]
+    },
+    {
+      "name": "ZeroFiSwapV2",
+      "fields": []
+    },
+    {
+      "name": "BisonFiPredict",
+      "fields": ["BisonFiPredictSide", "bool"]
+    },
+    {
+      "name": "ByrealDynamicV3",
+      "fields": []
+    },
+    {
+      "name": "Flux",
+      "fields": ["u64", "bool"]
+    },
+    {
+      "name": "VaultLiquidSellLst",
+      "fields": []
+    },
+    {
+      "name": "VaultLiquidBuyLst",
+      "fields": ["u64"]
+    },
+    {
+      "name": "KipseliV2",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Deriverse",
+      "fields": ["Side", "u32"]
+    },
+    {
+      "name": "Hadron",
+      "fields": ["bool"]
+    },
+    {
+      "name": "BinaryFi",
+      "fields": []
+    },
+    {
+      "name": "Metric",
+      "fields": ["bool"]
+    },
+    {
+      "name": "JupiterLendDexSwap",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Gatorswap",
+      "fields": ["bool"]
+    },
+    {
+      "name": "Flint",
+      "fields": ["bool", "bool"]
+    },
+    {
+      "name": "Denali",
+      "fields": ["bool"]
+    },
+    {
+      "name": "PerenaStarV2Deposit",
+      "fields": []
+    },
+    {
+      "name": "PerenaStarV2WithdrawFromExternal",
+      "fields": ["u8"]
+    },
+    {
+      "name": "SanctumSols",
+      "fields": ["SanctumSolsSwapType"]
+    },
+    {
+      "name": "HyloV2",
+      "fields": ["HyloSwapType"]
+    },
+    {
+      "name": "SanctumPamm",
+      "fields": []
+    },
+    {
+      "name": "Archer",
+      "fields": ["Side"]
+    },
+    {
+      "name": "TrenchWrappedBuy",
+      "fields": []
+    },
+    {
+      "name": "TrenchWrappedSell",
+      "fields": []
+    },
+    {
+      "name": "BisonFiMarketBacked",
+      "fields": ["bool"]
+    },
+    {
+      "name": "TesseraVV2",
+      "fields": ["Side"]
+    },
+    {
+      "name": "Stableswap",
+      "fields": []
+    },
+    {
+      "name": "BinaryFiV2",
+      "fields": []
+    },
+    {
+      "name": "KipseliV3",
+      "fields": ["bool"]
+    },
+    {
+      "name": "PerenaStarV2TrancheDeposit",
+      "fields": ["PerenaTrancheKind"]
+    },
+    {
+      "name": "PerenaStarV2TrancheWithdrawFromExternal",
+      "fields": ["PerenaTrancheKind", "Optionu8"]
+    },
+    {
+      "name": "Quay",
+      "fields": ["bool"]
+    },
+    {
+      "name": "HumidiFiRouter",
+      "fields": ["u64", "Array:u8:32", "Array:u8:16", "bool"]
+    },
+    {
+      "name": "HumidiFiRouterV2",
+      "fields": ["u64", "u64", "Array:u8:32", "Array:u8:16", "bool"]
+    },
+    {
+      "name": "PumpWrappedBuyV6",
+      "fields": ["bool", "bool"]
+    },
+    {
+      "name": "HyloRouter",
+      "fields": []
+    },
+    {
+      "name": "Memefun",
+      "fields": ["bool"]
+    },
+    {
+      "name": "HumidiFiRouterV3",
+      "fields": [
+        "u64",
+        "u64",
+        "u64",
+        "u64",
+        "Array:u8:32",
+        "Array:u8:16",
+        "bool"
+      ]
+    },
+    {
+      "name": "PumpWrappedBuyV7",
+      "fields": ["bool", "bool"]
+    },
+    {
+      "name": "PumpWrappedSellV6",
+      "fields": ["bool"]
+    },
+    {
+      "name": "PumpSwapBuyV4",
+      "fields": ["bool"]
+    },
+    {
+      "name": "PumpSwapSellV4",
+      "fields": ["bool"]
+    },
+    {
+      "name": "ZeroFiSwapV3",
+      "fields": []
+    },
+    {
+      "name": "DenaliV2",
+      "fields": ["bool"]
+    }
+  ],
+  "candidates": [
+    {
+      "name": "HumidiFi",
+      "fields": ["u64", "bool"]
+    },
+    {
+      "name": "TesseraV",
+      "fields": ["Side"]
+    },
+    {
+      "name": "HumidiFiV2",
+      "fields": ["u64", "bool"]
+    },
+    {
+      "name": "RaydiumV2",
+      "fields": []
+    },
+    {
+      "name": "RaydiumClmm",
+      "fields": []
+    },
+    {
+      "name": "Whirlpool",
+      "fields": ["bool"]
+    },
+    {
+      "name": "ZeroFi",
+      "fields": []
+    },
+    {
+      "name": "BisonFiV2",
+      "fields": ["bool"]
+    },
+    {
+      "name": "GoonFiV2",
+      "fields": ["bool"]
+    },
+    {
+      "name": "GoonFiV3",
+      "fields": ["bool"]
+    },
+    {
+      "name": "WhirlpoolV2",
+      "fields": ["bool", "OptionRemainingAccountsInfo"]
+    },
+    {
+      "name": "ZeroFiSwapV2",
+      "fields": []
+    },
+    {
+      "name": "BisonFiMarketBacked",
+      "fields": ["bool"]
+    },
+    {
+      "name": "RaydiumClmmV2",
+      "fields": []
+    },
+    {
+      "name": "TesseraVV2",
+      "fields": ["Side"]
+    },
+    {
+      "name": "HumidiFiRouter",
+      "fields": ["u64", "Array:u8:32", "Array:u8:16", "bool"]
+    },
+    {
+      "name": "HumidiFiRouterV2",
+      "fields": ["u64", "u64", "Array:u8:32", "Array:u8:16", "bool"]
+    },
+    {
+      "name": "HumidiFiRouterV3",
+      "fields": [
+        "u64",
+        "u64",
+        "u64",
+        "u64",
+        "Array:u8:32",
+        "Array:u8:16",
+        "bool"
+      ]
+    },
+    {
+      "name": "ZeroFiSwapV3",
+      "fields": []
+    }
+  ],
+  "enums": {
+    "AccountsType": 9,
+    "DefiTunaAccountsType": 8,
+    "Side": 2,
+    "BisonFiPredictSide": 2,
+    "PerenaTrancheKind": 2,
+    "SanctumSolsSwapType": 3,
+    "HyloSwapType": 8
+  },
+  "source": "Jupiter published program IDL at slot 454222193, SHA-256 82a3907455712fa9c2104d1b8fb8a2649cc4d96789d4c16a572ed343981b9f4e, https://solscan.io/account/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4#programIdl",
+  "idlProvenance": {
+    "repository": "jup-ag/jupiter-amm-implementation",
+    "url": "https://solscan.io/account/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4#programIdl",
+    "idlSlot": 454222193,
+    "sha256": "82a3907455712fa9c2104d1b8fb8a2649cc4d96789d4c16a572ed343981b9f4e",
+    "capturedAt": "2026-10-11",
+    "program": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+  }
+}

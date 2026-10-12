@@ -1,4 +1,5 @@
 'use client';
+import { quoteCatalog } from '@/lib/quote-catalog';
 
 import { useState } from 'react';
 import { ArrowRight, ExternalLink, Network } from 'lucide-react';
@@ -9,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   CHAINS,
   VENUES_BY_CHAIN,
+  CURRENT_VENUES_BY_CHAIN,
   currenciesForVenue,
   type LaunchChain,
   type LaunchPlanInput,
@@ -17,6 +19,8 @@ import {
   DEFAULT_VENUE_OPTIONS,
   type VenueOptions,
 } from '@/lib/workspace-project';
+import { DEFAULT_VENUE_SETTINGS } from '@/lib/venue-settings';
+import { VenueSettingsForm } from './venue-settings-form';
 
 export function ChainLaunchForm({
   plan,
@@ -36,26 +40,49 @@ export function ChainLaunchForm({
   validationError?: string | null;
 }) {
   const [quoteSearch, setQuoteSearch] = useState('');
+  const [quoteLimit, setQuoteLimit] = useState(40);
   const chooseChain = (chain: LaunchChain) => {
     setQuoteSearch('');
-    const launchpad = VENUES_BY_CHAIN[chain][0];
+    setQuoteLimit(40);
+    const launchpad = CURRENT_VENUES_BY_CHAIN[chain][0];
+    onOptionsChange?.({
+      settings: structuredClone(DEFAULT_VENUE_SETTINGS),
+      wallets: undefined,
+    });
     onChange({
       chain,
       launchpad,
       currency: currenciesForVenue(chain, launchpad)[0],
+      quoteAddress: quoteCatalog(chain, launchpad).assets[0]?.address,
     });
   };
   const chooseVenue = (launchpad: string) => {
+    onOptionsChange?.({ settings: structuredClone(DEFAULT_VENUE_SETTINGS) });
     setQuoteSearch('');
+    setQuoteLimit(40);
     onChange({
       launchpad,
       currency: currenciesForVenue(plan.chain, launchpad)[0],
+      quoteAddress: quoteCatalog(plan.chain, launchpad).assets[0]?.address,
     });
   };
   const currencies = currenciesForVenue(plan.chain, plan.launchpad);
-  const filteredCurrencies = currencies.filter((c) =>
-    c.toLowerCase().includes(quoteSearch.toLowerCase()),
+  const catalog = quoteCatalog(plan.chain, plan.launchpad);
+  const choices = catalog.captured
+    ? catalog.assets
+    : currencies.map((symbol) => ({ symbol, address: '', decimals: null }));
+  const selected = plan.quoteAddress
+    ? choices.find((a) => a.address === plan.quoteAddress)
+    : choices.filter((a) => a.symbol === plan.currency).length === 1
+      ? choices.find((a) => a.symbol === plan.currency)
+      : undefined;
+  const filtered = choices.filter((a) =>
+    (a.symbol + ' ' + a.address)
+      .toLowerCase()
+      .includes(quoteSearch.toLowerCase()),
   );
+  const shortAddress = (address: string) =>
+    address ? address.slice(0, 6) + '…' + address.slice(-4) : 'Symbol only';
   return (
     <div className="settings-scroll launch-flow-scroll">
       <div className="page-title">
@@ -100,7 +127,9 @@ export function ChainLaunchForm({
               </span>
               <span>
                 <strong>{chain === 'BNB' ? 'BNB Smart Chain' : chain}</strong>
-                <small>{VENUES_BY_CHAIN[chain].length} launchpads</small>
+                <small>
+                  {CURRENT_VENUES_BY_CHAIN[chain].length} launchpads
+                </small>
               </span>
             </label>
           ))}
@@ -114,7 +143,13 @@ export function ChainLaunchForm({
           aria-label="Launchpad"
           className="reference-venue-grid"
         >
-          {VENUES_BY_CHAIN[plan.chain].map((venue) => (
+          {[
+            ...CURRENT_VENUES_BY_CHAIN[plan.chain],
+            ...(!CURRENT_VENUES_BY_CHAIN[plan.chain].includes(plan.launchpad) &&
+            VENUES_BY_CHAIN[plan.chain].includes(plan.launchpad)
+              ? [plan.launchpad]
+              : []),
+          ].map((venue) => (
             <label
               className={`selection-card venue-choice ${plan.launchpad === venue ? 'selected' : ''}`}
               key={venue}
@@ -127,46 +162,112 @@ export function ChainLaunchForm({
             </label>
           ))}
         </RadioGroup>
+        {!CURRENT_VENUES_BY_CHAIN[plan.chain].includes(plan.launchpad) && (
+          <p className="source-note">
+            {plan.launchpad} is a legacy saved profile. It remains available for
+            this draft.
+          </p>
+        )}
+        <VenueSettingsForm
+          plan={plan}
+          settings={options.settings ?? DEFAULT_VENUE_SETTINGS}
+          onChange={(settings) => onOptionsChange?.({ settings })}
+        />
         <h2 className="flow-section-title">
           {plan.launchpad === 'long.xyz'
             ? 'Stock-token quote'
             : 'Quote currency'}{' '}
           <span className="section-note">Draft selection</span>
         </h2>
-        {currencies.length > 8 && (
+        {choices.length > 8 && (
           <Input
             aria-label="Search quote currencies"
-            placeholder="Search symbol…"
+            placeholder="Search symbol or address…"
             value={quoteSearch}
-            onChange={(e) => setQuoteSearch(e.target.value)}
+            onChange={(e) => {
+              setQuoteSearch(e.target.value);
+              setQuoteLimit(40);
+            }}
           />
         )}
         <RadioGroup
           className="reference-currencies"
-          value={plan.currency}
-          onValueChange={(value) => onChange({ currency: String(value) })}
+          value={selected ? selected.address || selected.symbol : ''}
+          onValueChange={(value) => {
+            const asset = choices.find(
+              (a) => (a.address || a.symbol) === value,
+            );
+            if (!asset) return;
+            onOptionsChange?.({
+              settings: {
+                ...options.settings,
+                pumpfun: {
+                  ...options.settings.pumpfun,
+                  creatorFeePercent: undefined,
+                },
+              },
+            });
+            onChange({
+              currency: asset.symbol,
+              quoteAddress: asset.address || undefined,
+            });
+          }}
           aria-label="Quote currency"
         >
-          {filteredCurrencies.map((currency) => (
+          {filtered.slice(0, quoteLimit).map((asset) => (
             <label
-              className={`selection-card ${plan.currency === currency ? 'selected' : ''}`}
-              key={currency}
+              className={`selection-card ${selected === asset ? 'selected' : ''}`}
+              key={asset.address || asset.symbol}
+              htmlFor={'quote-' + (asset.address || asset.symbol)}
             >
-              <RadioGroupItem value={currency} aria-label={currency} />
-              <strong>{currency}</strong>
+              <RadioGroupItem
+                value={asset.address || asset.symbol}
+                id={'quote-' + (asset.address || asset.symbol)}
+                aria-label={
+                  asset.symbol + (asset.address ? ' ' + asset.address : '')
+                }
+              />
+              <span>
+                <strong>{asset.symbol}</strong>
+                <small style={{ display: 'block' }}>
+                  {shortAddress(asset.address)}
+                </small>
+              </span>
             </label>
           ))}
         </RadioGroup>
-        {!filteredCurrencies.length && (
+        {!filtered.length && (
           <output className="source-note">
-            No matching symbols. Clear the search to see all choices.
+            No matching tokens. Clear the search to see all choices.
           </output>
         )}
-        {currencies.length > 8 && (
+        {filtered.length > quoteLimit && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setQuoteLimit((n) => n + 40)}
+          >
+            Show more tokens ({filtered.length - quoteLimit} remaining)
+          </Button>
+        )}
+        <p className="source-note" style={{ overflowWrap: 'anywhere' }}>
+          Selected: {plan.currency}
+          {selected?.address
+            ? ` · ${selected.decimals} decimals · ${selected.address}`
+            : ' · exact token address not selected'}
+          . Captured catalog choices are planning references. Funding drafts use
+          their own currency selection.
+        </p>
+        {!catalog.captured && (
           <p className="source-note">
-            Selected: {plan.currency}. Symbols reflect the reference catalog;
-            contract identity and trading availability need integration
-            verification.
+            This launchpad has no captured quote-token profile. The currency
+            choice is unverified.
+          </p>
+        )}
+        {catalog.unresolved.length > 0 && (
+          <p className="source-note">
+            {catalog.unresolved.length} catalog address has no token metadata
+            and is unavailable for selection.
           </p>
         )}
         {plan.chain === 'Robinhood' &&

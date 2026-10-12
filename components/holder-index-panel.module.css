@@ -1,0 +1,59 @@
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  min-width: 0;
+}
+.panel p {
+  font-size: 0.8rem;
+}
+.panel label {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  margin-block: 0.75rem;
+  font-size: 0.8rem;
+}
+.panel select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--background);
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+.context {
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0.75rem;
+}
+.tableWrap {
+  overflow-x: auto;
+}
+.tableWrap table {
+  width: 100%;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+}
+.tableWrap caption {
+  text-align: left;
+  margin-block: 0.75rem;
+}
+.tableWrap th,
+.tableWrap td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.tableWrap code {
+  overflow-wrap: anywhere;
+  font-size: 0.7rem;
+}

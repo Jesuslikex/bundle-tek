@@ -1,0 +1,56 @@
+import type { SwapPreparationSummary } from '../lib/imported-swap-preparation-history';
+export function preparationHistoryFixture(): SwapPreparationSummary {
+  const now = new Date().toISOString();
+  return {
+    executionAllowed: false,
+    instructionsVerified: false,
+    chain: 'Solana',
+    side: 'Sell',
+    wallet: '11111111111111111111111111111111',
+    inputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    outputMint: 'So11111111111111111111111111111111111111112',
+    inAmountRaw: '1',
+    quotedOutRaw: '1000',
+    minimumOutRaw: '995',
+    slippageBps: 50,
+    router: 'metis',
+    quoteSource: 'fixture.example',
+    quotedAt: now,
+    expiresAt: new Date(Date.now() + 30000).toISOString(),
+    transaction: {
+      sha256: 'b'.repeat(64),
+      bytes: 300,
+      instructionCount: 2,
+      lookupTableCount: 0,
+      lastValidBlockHeight: '200',
+      estimatedFeesLamports: '5000',
+    },
+    balance: {
+      source: 'fixture.example',
+      observedAt: now,
+      requestedRaw: '1',
+      amountCovered: true,
+      nativeSlot: 101,
+    },
+    simulation: {
+      succeeded: true,
+      source: 'fixture.example',
+      observedAt: now,
+      feeSlot: 102,
+      simulationSlot: 103,
+      networkFeeLamports: '5000',
+      unitsConsumed: '1000',
+      nativeChangeRaw: '-5000',
+      tokensComplete: false,
+      inputAmountMatches: null,
+      minimumOutputCovered: null,
+      routeStatus: 'Unavailable',
+      bindingStatus: 'Unavailable',
+      authorityActionCount: null,
+      unrecognizedInstructionCount: null,
+      unresolvedAccountCount: null,
+    },
+    limitations:
+      'Component test fixture. No live provider order, signature or execution. Raw transaction bytes are not retained.',
+  };
+}

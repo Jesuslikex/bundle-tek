@@ -11,9 +11,9 @@ import {
   Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { VENUES_BY_CHAIN } from '@/lib/launch-plan';
+import { CURRENT_VENUES_BY_CHAIN } from '@/lib/launch-plan';
 
-export const ROBINHOOD_VENUES = VENUES_BY_CHAIN.Robinhood;
+export const ROBINHOOD_VENUES = CURRENT_VENUES_BY_CHAIN.Robinhood;
 
 export function RobinhoodPlanner({
   venue,

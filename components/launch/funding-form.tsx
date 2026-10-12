@@ -8,6 +8,8 @@ import type {
   SimulationSafetyPolicy,
 } from '@/lib/launch-plan';
 import { WalletConsole } from '@/components/wallet-console';
+import { FundingPlanner } from './funding-planner';
+import type { LaunchWalletAssignments } from '@/lib/launch-wallets';
 
 type Estimate = {
   scenarioTotal: string;
@@ -22,12 +24,14 @@ export function FundingForm({
   validationError,
   onChange,
   onNext,
+  launchWallets,
 }: {
   plan: LaunchPlanInput;
   estimate: Estimate;
   validationError: string | null;
   onChange: (change: Partial<LaunchPlanInput>) => void;
   onNext: () => void;
+  launchWallets?: LaunchWalletAssignments;
 }) {
   const updateSafety = (change: Partial<SimulationSafetyPolicy>) =>
     onChange({
@@ -84,8 +88,16 @@ export function FundingForm({
     },
   ];
   const roles = [
-    ['Deployer', '0 / 1', 'not connected'],
-    ['Scenario recipients', '0 / ' + plan.holderCount, 'input only'],
+    [
+      'Deployer',
+      `${launchWallets?.deployer ? 1 : 0} / 1`,
+      'public-address selection',
+    ],
+    [
+      'Scenario recipients',
+      `${launchWallets?.recipients.length ?? 0} / ${plan.holderCount}`,
+      'public-address selection',
+    ],
   ] as const;
   return (
     <div className="settings-scroll launch-flow-scroll">
@@ -101,6 +113,7 @@ export function FundingForm({
         </p>
       </div>
       <div className="form-body">
+        <FundingPlanner plan={plan} launchWallets={launchWallets} />
         {plan.chain === 'Solana' ? (
           <WalletConsole />
         ) : (
@@ -181,7 +194,7 @@ export function FundingForm({
                   {role}
                 </span>
                 <b>{count}</b>
-                <em className={state === 'not connected' ? 'muted' : ''}>
+                <em className="muted">
                   {state}
                 </em>
               </div>

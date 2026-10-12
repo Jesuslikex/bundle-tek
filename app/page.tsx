@@ -1,4 +1,31 @@
 'use client';
+import {
+  validateHoldersQuoteAmount,
+  holdersBuyUnit,
+  holdersQuoteAfterPlanChange,
+} from '@/lib/launch-buy';
+import {
+  validateSequencedSupply,
+  developerBuyAfterPlanChange,
+} from '@/lib/launch-supply';
+
+import { validateQuoteSelection } from '@/lib/quote-catalog';
+import {
+  timingAfterPlanChange,
+  validateLaunchTiming,
+} from '@/lib/launch-timing';
+import { HolderDistributionForm } from '@/components/launch/holder-distribution-form';
+import { LaunchBuyForm } from '@/components/launch/launch-buy-form';
+import { LaunchTimingForm } from '@/components/launch/launch-timing-form';
+import { LaunchWalletPicker } from '@/components/launch/launch-wallet-picker';
+import { validateLaunchWalletSelection } from '@/lib/launch-wallets';
+import {
+  modeAfterVenueChange,
+  venueLaunchMethods,
+  validateLaunchMethod,
+} from '@/lib/launch-methods';
+
+import { venueLimits, validateVenuePlan } from '@/lib/venue-limits';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -11,16 +38,13 @@ import {
   Crosshair,
   Database,
   Gauge,
-  Gem,
   Hand,
   Landmark,
   Leaf,
   Menu,
   PanelLeftClose,
-  Pencil,
   Settings,
   Shield,
-  Sparkles,
   Search,
   LayoutDashboard,
   Archive,
@@ -57,7 +81,11 @@ import { Switch } from '@/components/ui/switch';
 import { SupplyTracker } from '@/components/supply-tracker';
 import { DistributionWorkbench } from '@/components/distribution-workbench';
 import { ProjectDashboard } from '@/components/project-dashboard';
-import { WalletConsole } from '@/components/wallet-console';
+import { WalletWorkspace } from '@/components/wallet-workspace';
+import { WalletTracker } from '@/components/wallet-tracker';
+import { WorkspaceActivity } from '@/components/workspace-activity';
+import { ImportedTokenProjects } from '@/components/imported-token-projects';
+import { useImportedProjects } from '@/components/use-imported-projects';
 import {
   DEFAULT_VENUE_OPTIONS,
   EMPTY_IDENTITY,
@@ -91,6 +119,9 @@ type View =
   | 'dashboard'
   | 'archived'
   | 'wallets'
+  | 'watchlist'
+  | 'activity'
+  | 'imports'
   | 'chain'
   | 'token'
   | 'launch'
@@ -777,6 +808,10 @@ export default function Home() {
   const [exploringRobinhood, setExploringRobinhood] = useState(false);
   const [robinhoodVenue, setRobinhoodVenue] = useState('hood.fun');
   const [view, setView] = useState<View>('dashboard');
+  const [activityImportId, setActivityImportId] = useState('');
+  const [activityWarmupId, setActivityWarmupId] = useState('');
+  const [activityWithdrawalWallet, setActivityWithdrawalWallet] = useState('');
+  const importedProjects = useImportedProjects();
   const [projects, setProjects] = useState<WorkspaceProject[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectVersion, setProjectVersion] = useState<string | null>(null);
@@ -797,7 +832,7 @@ export default function Home() {
   >('loading');
   const [planMessage, setPlanMessage] = useState('Loading saved launch plan…');
   const [runtimeStatus, setRuntimeStatus] = useState(
-    'Checking mainnet RPC · Execution locked',
+    'Checking mainnet RPC · Swap approval required',
   );
   const [advanced, setAdvanced] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
@@ -813,7 +848,28 @@ export default function Home() {
   const updateLaunchPlan = (change: Partial<LaunchPlanInput>) => {
     revision.current.edit();
     setHasEdits(true);
-    setLaunchPlan((current) => ({ ...current, ...change }));
+    setLaunchPlan((current) => ({
+      ...current,
+      ...((change.chain !== undefined ||
+        change.launchpad !== undefined ||
+        change.currency !== undefined) &&
+      !('quoteAddress' in change)
+        ? { quoteAddress: undefined }
+        : {}),
+      ...change,
+      holdersBuyQuote: holdersQuoteAfterPlanChange(current, change),
+      mode: modeAfterVenueChange(current, change),
+      developerBuy: developerBuyAfterPlanChange(
+        current,
+        change,
+        modeAfterVenueChange(current, change),
+      ),
+      timing: timingAfterPlanChange(
+        current,
+        change,
+        modeAfterVenueChange(current, change),
+      ),
+    }));
     setSavedAt(null);
     setPlanMessage('Unsaved launch-plan changes.');
     setPersistenceState((current) => (current === 'auth' ? 'auth' : 'ready'));
@@ -836,21 +892,34 @@ export default function Home() {
     preset,
     holderCount,
   } = launchPlan;
+  const holdersUnit = holdersBuyUnit(launchPlan);
   const developer = launchPlan.developerBuy;
   const holders = launchPlan.holdersBuy;
   const mev = launchPlan.routingEmphasis;
   const scheduled = launchPlan.scheduled;
+  const methodProfile = venueLaunchMethods(
+    launchPlan.chain,
+    launchPlan.launchpad,
+  );
   const setMode = (value: Mode) => updateLaunchPlan({ mode: value });
   const setPreset = (value: Preset) => updateLaunchPlan({ preset: value });
-  const setDeveloper = (value: number) =>
-    updateLaunchPlan({ developerBuy: value });
-  const setHolders = (value: number) => updateLaunchPlan({ holdersBuy: value });
   const setHolderCount = (value: number) =>
     updateLaunchPlan({ holderCount: value });
   const setMev = (value: number) =>
     updateLaunchPlan({ routingEmphasis: value });
   const planValidation = useMemo(() => {
     try {
+      validateVenuePlan(launchPlan);
+      validateSequencedSupply(launchPlan);
+      validateHoldersQuoteAmount(launchPlan);
+      validateQuoteSelection(launchPlan);
+      validateLaunchMethod(launchPlan);
+      validateLaunchTiming(launchPlan);
+      validateLaunchWalletSelection(
+        venueOptions.wallets,
+        launchPlan.chain,
+        launchPlan.holderCount,
+      );
       return {
         plan: validateProjectDocument({
           plan: launchPlan,
@@ -899,11 +968,11 @@ export default function Home() {
           );
           setRuntimeStatus(
             mainnet?.status === 'online'
-              ? 'Mainnet RPC online · Execution locked'
-              : 'Mainnet RPC degraded · Execution locked',
+              ? 'Mainnet RPC online · Swap approval required'
+              : 'Mainnet RPC degraded · Swap approval required',
           );
         } else {
-          setRuntimeStatus('Mainnet RPC unavailable · Execution locked');
+          setRuntimeStatus('Mainnet RPC unavailable · Swap approval required');
         }
         if (!revision.current.isCurrent(started)) return;
         if (projectsResponse.ok) {
@@ -954,7 +1023,7 @@ export default function Home() {
             ? error.message
             : 'Launch-plan service unavailable',
         );
-        setRuntimeStatus('Mainnet RPC unavailable · Execution locked');
+        setRuntimeStatus('Mainnet RPC unavailable · Swap approval required');
       }
     };
     void load();
@@ -1132,6 +1201,7 @@ export default function Home() {
       changeView('chain');
     });
   const reloadProjects = async () => {
+    void importedProjects.refresh();
     try {
       const response = await fetch('/api/projects', { cache: 'no-store' });
       if (response.status === 401) {
@@ -1197,6 +1267,22 @@ export default function Home() {
         .toLowerCase()
         .includes(projectSearch.toLowerCase()),
   );
+  const visibleImports = importedProjects.projects.filter(
+    (p) =>
+      !p.archived &&
+      `${p.document.token.name} ${p.document.token.symbol} ${p.document.token.chain} ${p.document.token.address}`
+        .toLowerCase()
+        .includes(projectSearch.trim().toLowerCase()),
+  );
+  const openImportedProject = (id: string) => {
+    setActivityImportId(id);
+    changeView('imports');
+  };
+  const openSavedWarmup = (id: string) => {
+    setActivityWithdrawalWallet('');
+    setActivityWarmupId(id);
+    changeView('wallets');
+  };
 
   return (
     <div className={`app-shell ${isLibrary ? 'library-shell' : ''}`}>
@@ -1296,6 +1382,9 @@ export default function Home() {
             onClick={() => void saveLaunchPlan()}
             disabled={
               isLibrary ||
+              view === 'watchlist' ||
+              view === 'activity' ||
+              view === 'imports' ||
               exploringRobinhood ||
               saveBusy ||
               persistenceState === 'loading' ||
@@ -1354,11 +1443,38 @@ export default function Home() {
               <em>Draft</em>
             </button>
           ))}
-          {visibleProjects.length === 0 && (
+          {visibleImports.map((project) => (
+            <button
+              key={`import:${project.id}`}
+              aria-label={`Open imported ${project.document.token.name} from sidebar`}
+              className={
+                view === 'imports' && activityImportId === project.id
+                  ? 'selected'
+                  : ''
+              }
+              onClick={() => openImportedProject(project.id)}
+              disabled={saveBusy}
+            >
+              <span className="project-avatar">
+                {project.document.token.symbol.slice(0, 2)}
+              </span>
+              <span>
+                <strong>${project.document.token.symbol}</strong>
+                <small>{project.document.token.name}</small>
+              </span>
+              <em>Import</em>
+            </button>
+          ))}
+          {importedProjects.error && (
+            <p role="alert">{importedProjects.error}</p>
+          )}
+          {visibleProjects.length === 0 && visibleImports.length === 0 && (
             <p>
               {projectSearch
                 ? 'No matching projects.'
-                : 'Your saved projects appear here.'}
+                : importedProjects.loading
+                  ? 'Loading saved imports…'
+                  : 'Your saved projects appear here.'}
             </p>
           )}
         </div>
@@ -1372,16 +1488,34 @@ export default function Home() {
             <LayoutDashboard /> Dashboard
           </button>
           <button
-            onClick={() => changeView('wallets')}
+            onClick={() => {
+              setActivityWarmupId('');
+              setActivityWithdrawalWallet('');
+              changeView('wallets');
+            }}
             className={view === 'wallets' ? 'feature-active' : ''}
           >
-            <WalletCards /> My wallets <b>DEVNET</b>
+            <WalletCards /> My wallets
           </button>
           <button
             onClick={() => changeView('tracker')}
             className={view === 'tracker' ? 'feature-active' : ''}
           >
             <Crosshair /> Supply tracker
+          </button>
+          <button
+            onClick={() => changeView('watchlist')}
+            className={view === 'watchlist' ? 'feature-active' : ''}
+            aria-current={view === 'watchlist' ? 'page' : undefined}
+          >
+            <Users /> Wallet tracker <b>NEW</b>
+          </button>
+          <button
+            onClick={() => changeView('activity')}
+            className={view === 'activity' ? 'feature-active' : ''}
+            aria-current={view === 'activity' ? 'page' : undefined}
+          >
+            <Activity /> Activity
           </button>
           <button
             onClick={() => {
@@ -1424,6 +1558,18 @@ export default function Home() {
         </nav>
         <div className="sidebar-bottom">
           <div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setActivityImportId('');
+                changeView('imports');
+              }}
+              disabled={saveBusy}
+            >
+              <Plus /> Import token
+            </Button>
+          </div>
+          <div>
             <Button onClick={startProject} disabled={saveBusy}>
               <Plus /> Create launch
             </Button>
@@ -1433,7 +1579,7 @@ export default function Home() {
       </aside>
 
       <main
-        className={`workspace ${!exploringRobinhood && (isLibrary || view === 'wallets' || view === 'tracker' || view === 'distribution') ? 'tracker-workspace' : ''} ${!exploringRobinhood && (view === 'chain' || view === 'token') ? 'creation-workspace' : ''}`}
+        className={`workspace ${!exploringRobinhood && (isLibrary || view === 'wallets' || view === 'tracker' || view === 'watchlist' || view === 'activity' || view === 'imports' || view === 'distribution') ? 'tracker-workspace' : ''} ${!exploringRobinhood && (view === 'chain' || view === 'token') ? 'creation-workspace' : ''}`}
       >
         {exploringRobinhood ? (
           <RobinhoodPlanner
@@ -1455,31 +1601,46 @@ export default function Home() {
             onDuplicate={(p) => openProject(p, true)}
             onArchive={(p) => void archiveProject(p)}
             onReload={() => void reloadProjects()}
-            onWallet={() => changeView('wallets')}
+            onWallet={() => {
+              setActivityWarmupId('');
+              setActivityWithdrawalWallet('');
+              changeView('wallets');
+            }}
+            imports={importedProjects.projects}
+            importsLoading={importedProjects.loading}
+            importsError={importedProjects.error}
+            onOpenImport={openImportedProject}
+            signedOut={persistenceState === 'auth'}
           />
         ) : view === 'wallets' ? (
-          <section className="standalone-wallet">
-            <div className="page-title">
-              <span className="eyebrow">WALLET WORKSPACE</span>
-              <h1>My wallets</h1>
-              <p>
-                Connect a Solana wallet to verify ownership and inspect devnet
-                activity.
-              </p>
-            </div>
-            <div className="form-body">
-              <WalletConsole />
-              <Button
-                variant="outline"
-                className="flow-next"
-                onClick={() => changeView('funding')}
-              >
-                Open funding review
-              </Button>
-            </div>
-          </section>
+          <WalletWorkspace
+            key={activityWarmupId + '/' + activityWithdrawalWallet}
+            initialWarmupId={activityWarmupId}
+            initialWithdrawalWallet={activityWithdrawalWallet}
+            onFunding={() => changeView('funding')}
+          />
         ) : view === 'tracker' ? (
           <SupplyTracker />
+        ) : view === 'watchlist' ? (
+          <WalletTracker onSupply={() => changeView('tracker')} />
+        ) : view === 'imports' ? (
+          <ImportedTokenProjects
+            key={activityImportId}
+            initialId={activityImportId}
+            onProjectsChange={importedProjects.accept}
+          />
+        ) : view === 'activity' ? (
+          <WorkspaceActivity
+            projects={projects}
+            onOpen={openProject}
+            onOpenImport={openImportedProject}
+            onOpenWarmup={openSavedWarmup}
+            onOpenWithdrawal={(wallet) => {
+              setActivityWarmupId('');
+              setActivityWithdrawalWallet(wallet);
+              changeView('wallets');
+            }}
+          />
         ) : view === 'distribution' ? (
           canUseDevnetTools(chain) ? (
             <DistributionWorkbench />
@@ -1519,6 +1680,7 @@ export default function Home() {
                 />
               ) : view === 'token' ? (
                 <TokenDetailsForm
+                  key={projectId ?? 'new-project'}
                   validationError={planValidation.error}
                   identity={identity}
                   onIdentityChange={updateIdentity}
@@ -1529,6 +1691,7 @@ export default function Home() {
               ) : view === 'funding' ? (
                 <FundingForm
                   plan={launchPlan}
+                  launchWallets={venueOptions.wallets}
                   estimate={figures}
                   validationError={planValidation.error}
                   onChange={updateLaunchPlan}
@@ -1550,62 +1713,56 @@ export default function Home() {
                   </div>
                   <div className="form-body">
                     <div className="mode-tabs">
-                      {(
-                        [
-                          ['Block-0', CircleGauge],
-                          ['Organic', Leaf],
-                          ['Manual', Hand],
-                        ] as Array<[Mode, typeof Leaf]>
-                      ).map(([name, Icon]) => (
-                        <button
-                          key={name}
-                          onClick={() => setMode(name)}
-                          className={mode === name ? 'active' : ''}
-                        >
-                          <Icon /> {launchModeLabel(name)} Mode
-                        </button>
-                      ))}
+                      {methodProfile.methods.map((name) => {
+                        const Icon =
+                          name === 'Manual'
+                            ? Hand
+                            : name === 'Stagger'
+                              ? Leaf
+                              : name === 'Quick'
+                                ? Zap
+                                : CircleGauge;
+                        return (
+                          <button
+                            key={name}
+                            aria-pressed={mode === name}
+                            onClick={() => setMode(name)}
+                            className={mode === name ? 'active' : ''}
+                          >
+                            <Icon /> {launchModeLabel(name)} Mode
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="input-grid">
-                      <div>
-                        <FieldLabel optional>
-                          <Gem className="size-3.5 text-[#f7cb49]" />
-                          Developer Buy %
-                        </FieldLabel>
-                        <div className="number-wrap">
-                          <Input
-                            aria-label="Developer Buy percent"
-                            value={developer}
-                            onChange={(e) =>
-                              setDeveloper(Number(e.target.value))
-                            }
-                            type="number"
-                            min={0}
-                            max={100}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
-                      <div>
-                        <FieldLabel note="(Excluding Developer)">
-                          <Sparkles className="size-3.5 text-[#8e83ff]" />
-                          Holders Buy
-                        </FieldLabel>
-                        <div className="number-wrap">
-                          <Input
-                            aria-label="Holders Buy percent"
-                            value={holders}
-                            onChange={(e) => setHolders(Number(e.target.value))}
-                            type="number"
-                            min={0}
-                            max={100}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
-                    </div>
+                    {!methodProfile.methods.includes(mode) && (
+                      <p role="alert" className="draft-error">
+                        This saved draft uses {launchModeLabel(mode)}. Select an
+                        available method before saving plan changes.
+                      </p>
+                    )}
+                    <p className="source-note">
+                      {methodProfile.captured
+                        ? `Available planning methods for ${launchPlan.launchpad}.`
+                        : 'Launch methods for this venue are unverified. Only a manual review draft is available.'}{' '}
+                      Saving does not submit transactions or schedule trades.
+                    </p>
+                    <LaunchTimingForm
+                      plan={launchPlan}
+                      onChange={updateLaunchPlan}
+                    />
+                    {planValidation.error && (
+                      <p role="alert" className="draft-error">
+                        {planValidation.error}
+                      </p>
+                    )}
+                    <LaunchBuyForm
+                      plan={launchPlan}
+                      onChange={updateLaunchPlan}
+                    />
                     <div className="mt-4">
-                      <FieldLabel note="(1-200)">
+                      <FieldLabel
+                        note={`(1-${venueLimits(chain, launchpad).maxRecipients})`}
+                      >
                         <Users className="size-3.5 text-[#43efc1]" />
                         Holders Count
                       </FieldLabel>
@@ -1615,9 +1772,14 @@ export default function Home() {
                         onChange={(e) => setHolderCount(Number(e.target.value))}
                         type="number"
                         min={1}
-                        max={200}
+                        max={venueLimits(chain, launchpad).maxRecipients}
                       />
                     </div>
+                    <HolderDistributionForm
+                      plan={launchPlan}
+                      selection={venueOptions.wallets}
+                      onChange={updateLaunchPlan}
+                    />
                     <div className="section-label">
                       <Boxes /> Scenario preset
                     </div>
@@ -1657,31 +1819,13 @@ export default function Home() {
                       <span>Earlier stages</span>
                       <span>Distributed stages</span>
                     </div>
-                    <div className="wallet-card">
-                      <div className="wallet-head">
-                        <span>
-                          <WalletCards />
-                        </span>
-                        <div>
-                          <strong>Wallet role plan</strong>
-                          <p>
-                            Counts are planning inputs; wallet custody is not
-                            connected
-                          </p>
-                        </div>
-                      </div>
-                      <div className="wallet-types">
-                        <button type="button" disabled>
-                          <Gem /> Deployer <b>0/1</b>
-                        </button>
-                        <button type="button" disabled>
-                          <Users /> Scenario recipients <b>0/{holderCount}</b>
-                        </button>
-                      </div>
-                      <button type="button" disabled className="edit-selection">
-                        <Pencil /> Custody locked
-                      </button>
-                    </div>
+                    <LaunchWalletPicker
+                      key={`${projectId ?? 'new'}/${launchPlan.chain}`}
+                      plan={launchPlan}
+                      selection={venueOptions.wallets}
+                      onChange={(wallets) => updateOptions({ wallets })}
+                      onOpenWallets={() => setView('wallets')}
+                    />
                     <button
                       className="advanced-toggle"
                       onClick={() => setAdvanced(!advanced)}
@@ -1788,9 +1932,11 @@ export default function Home() {
                     <p>
                       {mode === 'Block-0'
                         ? 'Models an ordered sequence for review. It does not guarantee same-slot or Block-0 inclusion.'
-                        : mode === 'Organic'
-                          ? 'Models staggered buys across slots with configurable pacing and exposure.'
-                          : 'Models funding allocations for manual review. No funds are distributed.'}
+                        : mode === 'Stagger' || mode === 'Organic'
+                          ? 'Records staggered buying for review. Pacing and transaction submission are not connected.'
+                          : mode === 'Quick'
+                            ? 'Records a quick launch method for this venue. Submission speed and transaction ordering are not verified.'
+                            : 'Models funding allocations for manual review. No funds are distributed.'}
                     </p>
                     <div className="pros">
                       <span>+++ &nbsp; Deterministic planning</span>
@@ -1830,7 +1976,7 @@ export default function Home() {
                           />
                         ) : (
                           <p className="source-note">
-                            No verified estimate for this network.
+                            No verified estimate for this network and method.
                           </p>
                         )}
                       </div>
@@ -1868,13 +2014,20 @@ export default function Home() {
                     </div>
                     <div className="est-row">
                       <span>
-                        Illustrative allocation <Help />
+                        {holdersUnit === 'supply'
+                          ? 'Supply allocation'
+                          : 'Holders quote amount'}{' '}
+                        <Help />
                       </span>
                       <b>
                         <strong>
                           {planValidation.error
                             ? '—'
-                            : `${figures.allocation}%`}
+                            : holdersUnit === 'supply'
+                              ? `${figures.allocation}%`
+                              : launchPlan.holdersBuyQuote !== undefined
+                                ? `${launchPlan.holdersBuyQuote} ${currency}`
+                                : '—'}
                         </strong>
                       </b>
                     </div>
@@ -1888,7 +2041,13 @@ export default function Home() {
                       <span>
                         Holders <Help />
                       </span>
-                      <b>{holders}%</b>
+                      <b>
+                        {holdersUnit === 'supply'
+                          ? `${holders}%`
+                          : launchPlan.holdersBuyQuote !== undefined
+                            ? `${launchPlan.holdersBuyQuote} ${currency}`
+                            : '—'}
+                      </b>
                     </div>
                   </section>
                   <section className="estimate-card funding-card">
@@ -1953,7 +2112,9 @@ export default function Home() {
             Sign in to save
           </a>
         )}
-        <span className="network-boundary">DEVNET TOOLS · MAINNET LOCKED</span>
+        <span className="network-boundary">
+          DEVNET TOOLS · SWAP APPROVAL REQUIRED
+        </span>
       </footer>
     </div>
   );
