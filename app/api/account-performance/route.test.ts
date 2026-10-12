@@ -9,6 +9,10 @@ import {
   acquisitionWallet as wallet,
 } from '../../../test/imported-sell-acquisition-fixture';
 import type { AccountPerformance } from '@/lib/account-performance';
+import {
+  validatedTimelineData,
+  type PerformanceTimelineData,
+} from '@/lib/performance-timeline';
 const mocks = vi.hoisted(() => ({
   user: null as { userId: string } | null,
   db: null as unknown as D1Database,
@@ -308,6 +312,96 @@ it('rejects an over-capacity account snapshot before displaying any subset', asy
     error:
       'Recorded trading performance unavailable. No partial totals are shown.',
   });
+});
+const timelineRequest = (query = 'view=timeline') =>
+  new Request(`http://localhost/api/account-performance?${query}`);
+it('returns per-sale results from the same snapshot that reconcile exactly with the summary', async () => {
+  await importedFixture();
+  await importedFixture('other');
+  await warmupFixture();
+  await mocks.db
+    .prepare(
+      "UPDATE warmup_sell_receipts SET document=json_set(document,'$.blockTime',1791000000)",
+    )
+    .run();
+  const response = await GET(timelineRequest());
+  expect(response.status).toBe(200);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  const body = (await response.json()) as {
+    summary: AccountPerformance;
+    timeline: PerformanceTimelineData;
+  };
+  const timeline = validatedTimelineData(body.timeline, body.summary);
+  expect(body.summary.linkedResultLamports).toBe('-145');
+  expect(
+    timeline.sales
+      .map((s) => [s.kind, s.costLamports, s.resultLamports, s.blockTime])
+      .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+  ).toEqual([
+    ['Imported trades', '202', '-153', null],
+    ['Warmup', '35', '8', 1791000000],
+  ]);
+  expect(timeline.unlinkedSaleCount).toBe(0);
+});
+it('splits one lot across sequential sales exactly, matching the aggregate allocation', async () => {
+  await warmupFixture();
+  // Buy cost is 105 for 3 units; two 1-unit sales take 35 then 35 (floor(105*2/3) - 35).
+  await mocks.db
+    .prepare("UPDATE warmup_buy_receipts SET remaining_raw='1'")
+    .run();
+  const first = JSON.parse(
+    (await mocks.db
+      .prepare('SELECT document FROM warmup_sell_receipts')
+      .first<{ document: string }>())!.document,
+  );
+  const second = {
+    ...first,
+    signature: signature(112),
+    slot: 102,
+    nativeSettlementRaw: '20',
+    networkFeeLamports: '5',
+  };
+  await mocks.db
+    .prepare('INSERT INTO warmup_sell_receipts VALUES(?,?,?,?,?,?,?)')
+    .bind(
+      'one',
+      id(112),
+      id(10),
+      second.signature,
+      JSON.stringify(second),
+      id(110),
+      '1',
+    )
+    .run();
+  const body = (await (await GET(timelineRequest())).json()) as {
+    summary: AccountPerformance;
+    timeline: PerformanceTimelineData;
+  };
+  const timeline = validatedTimelineData(body.timeline, body.summary);
+  const bySlot = [...timeline.sales].sort((a, b) => a.slot - b.slot);
+  expect(bySlot.map((s) => [s.costLamports, s.resultLamports])).toEqual([
+    ['35', '8'],
+    ['35', '-20'],
+  ]);
+  expect(body.summary.linkedResultLamports).toBe('-12');
+});
+it('rejects unsupported timeline query combinations and withholds damaged snapshots', async () => {
+  for (const query of [
+    'view=chart',
+    'view=timeline&view=timeline',
+    'view=timeline&format=csv',
+    'view=timeline&owner=other',
+  ])
+    expect((await GET(timelineRequest(query))).status).toBe(400);
+  mocks.user = null;
+  expect((await GET(timelineRequest())).status).toBe(401);
+  mocks.user = { userId: 'one' };
+  await importedFixture();
+  await mocks.db
+    .prepare('DELETE FROM imported_trade_lot_links WHERE owner_id=? AND id=?')
+    .bind('one', id(501))
+    .run();
+  expect((await GET(timelineRequest())).status).toBe(503);
 });
 it('exports a fresh complete owned snapshot as a downloadable CSV and rejects unsupported query contexts', async () => {
   const request = () =>

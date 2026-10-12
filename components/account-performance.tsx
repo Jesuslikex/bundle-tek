@@ -10,6 +10,11 @@ import {
   formatNativeBalance,
   signedBalanceAmount,
 } from '@/lib/wallet-balance-format';
+import {
+  validatedTimelineData,
+  type PerformanceTimelineData,
+} from '@/lib/performance-timeline';
+import { PerformanceTimeline } from '@/components/performance-timeline';
 
 export function AccountPerformanceSummary({
   value,
@@ -175,6 +180,7 @@ export function AccountPerformanceSummary({
 }
 export function AccountPerformancePanel() {
   const [value, setValue] = useState<AccountPerformance | null>(null),
+    [timeline, setTimeline] = useState<PerformanceTimelineData | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const controller = useRef<AbortController | null>(null);
@@ -186,18 +192,27 @@ export function AccountPerformancePanel() {
     setBusy(true);
     setError('');
     setValue(null);
+    setTimeline(null);
     try {
-      const response = await fetch('/api/account-performance', {
+      const response = await fetch('/api/account-performance?view=timeline', {
         cache: 'no-store',
         signal: current.signal,
       });
-      const body: unknown = await response.json();
+      const body = (await response.json()) as {
+        summary?: unknown;
+        timeline?: unknown;
+      } | null;
       if (!response.ok)
         throw new Error(
           'Recorded trading performance unavailable. No partial totals are shown.',
         );
-      const summary = validatedAccountPerformance(body);
-      if (!current.signal.aborted) setValue(summary);
+      const summary = validatedAccountPerformance(body?.summary);
+      // The timeline must reconcile with the same snapshot's totals or neither is shown.
+      const sales = validatedTimelineData(body?.timeline, summary);
+      if (!current.signal.aborted) {
+        setValue(summary);
+        setTimeline(sales);
+      }
     } catch (e) {
       if (!current.signal.aborted)
         setError(
@@ -225,6 +240,9 @@ export function AccountPerformancePanel() {
             : 'Review recorded performance'}
       </Button>
       {error && <p role="alert">{error}</p>}
+      {timeline && (
+        <PerformanceTimeline key={timeline.observedAt} data={timeline} />
+      )}
       {value && (
         <AccountPerformanceSummary key={value.observedAt} value={value} />
       )}

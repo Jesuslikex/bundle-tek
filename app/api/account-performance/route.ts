@@ -6,7 +6,10 @@ import {
   type ImportedPerformanceSource,
   type WarmupPerformanceSource,
 } from '@/lib/account-performance';
-import { summarizeAccountPerformance } from '@/lib/account-performance-server';
+import {
+  summarizeAccountPerformance,
+  summarizeAccountTimeline,
+} from '@/lib/account-performance-server';
 import {
   IMPORTED_LOT_LINK_LIMIT,
   type ImportedLotLink,
@@ -36,9 +39,12 @@ export async function GET(request?: Request) {
     ? new URL(request.url).searchParams
     : new URLSearchParams();
   if (
-    [...params.keys()].some((k) => k !== 'format') ||
+    [...params.keys()].some((k) => k !== 'format' && k !== 'view') ||
     params.getAll('format').length > 1 ||
-    (params.has('format') && params.get('format') !== 'csv')
+    params.getAll('view').length > 1 ||
+    (params.has('format') && params.get('format') !== 'csv') ||
+    (params.has('view') && params.get('view') !== 'timeline') ||
+    (params.has('format') && params.has('view'))
   )
     return json({ error: 'Unsupported performance export format.' }, 400);
   try {
@@ -119,6 +125,14 @@ export async function GET(request?: Request) {
         warmups.set(row.scopeId, source);
       }
     }
+    if (params.get('view') === 'timeline')
+      return json(
+        summarizeAccountTimeline(
+          [...imports.values()],
+          [...warmups.values()],
+          new Date().toISOString(),
+        ),
+      );
     const summary = summarizeAccountPerformance(
       [...imports.values()],
       [...warmups.values()],
