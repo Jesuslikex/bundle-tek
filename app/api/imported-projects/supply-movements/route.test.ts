@@ -31,6 +31,8 @@ vi.mock('@/lib/supply-movement-evidence', async (original) => ({
   observeSupplyMovementEvidence: mocks.observe,
 }));
 import { GET, POST } from './route';
+import { directMovementFixture } from '../../../../test/direct-movement-fixture';
+import { classifyWalletMovement } from '@/lib/wallet-movement-classification';
 let mf: Miniflare;
 let current: SupplyHistoryRow;
 const wallet = supplyScope.wallets[0].address;
@@ -77,17 +79,15 @@ afterAll(async () => mf?.dispose());
 beforeEach(async () => {
   mocks.user = { userId: 'one' };
   mocks.observe.mockReset();
-  mocks.accounts
-    .mockReset()
-    .mockResolvedValue({
-      wallet,
-      mint: supplyScope.mint,
-      decimals: 6,
-      slot: 200,
-      accounts: [supplyWallet(5)],
-      source: 'fixture.test',
-      observedAt: new Date().toISOString(),
-    });
+  mocks.accounts.mockReset().mockResolvedValue({
+    wallet,
+    mint: supplyScope.mint,
+    decimals: 6,
+    slot: 200,
+    accounts: [supplyWallet(5)],
+    source: 'fixture.test',
+    observedAt: new Date().toISOString(),
+  });
   for (const table of [
     'supply_movement_evidence',
     'imported_supply_observations',
@@ -207,6 +207,13 @@ it('binds retained cursors to their original signature index and reloads account
   );
   await mocks.db.prepare('DELETE FROM imported_supply_read_gates').run();
   expect((await POST(post({ cursor }))).status).toBe(400);
+  mocks.observe.mockResolvedValue({
+    ...value,
+    indexedAddress: supplyWallet(5),
+    accountObservedSlot: 200,
+    requestedCursor: cursor,
+    nextCursor: null,
+  });
   expect(
     (await POST(post({ cursor, indexedAddress: supplyWallet(5) }))).status,
   ).toBe(200);
@@ -217,6 +224,32 @@ it('binds retained cursors to their original signature index and reloads account
   ).items;
   expect(items).toHaveLength(2);
   expect(items[0].document.indexedAddress).toBe(supplyWallet(5));
+});
+it('reuses an exact saved continuation page without provider reads or duplicate writes, while manual inspection stays fresh', async () => {
+  const original = (await (await POST(post())).json()) as { item: unknown };
+  mocks.observe.mockClear();
+  const cached = await POST(post({ reuseSaved: true }));
+  expect(cached.status).toBe(200);
+  expect(((await cached.json()) as { item: unknown }).item).toEqual(
+    original.item,
+  );
+  expect(mocks.observe).not.toHaveBeenCalled();
+  expect(
+    ((await (await GET(get())).json()) as { items: unknown[] }).items,
+  ).toHaveLength(1);
+  expect((await POST(post({ reuseSaved: 'yes' }))).status).toBe(400);
+  expect(
+    (await POST(post({ reuseSaved: true, indexedAddress: supplyWallet(8) })))
+      .status,
+  ).toBe(429);
+  await mocks.db.prepare('DELETE FROM imported_supply_read_gates').run();
+  expect((await POST(post())).status).toBe(200);
+  expect(mocks.observe).toHaveBeenCalledTimes(1);
+  expect(
+    ((await (await GET(get())).json()) as { items: unknown[] }).items,
+  ).toHaveLength(2);
+  await mocks.db.prepare('UPDATE imported_token_projects SET revision=2').run();
+  expect((await POST(post({ reuseSaved: true }))).status).toBe(409);
 });
 it('retains immutable evidence and reloads it without another provider call', async () => {
   const response = await POST(post());
@@ -286,3 +319,53 @@ it('retains saved evidence after a provider failure', async () => {
     ((await (await GET(get())).json()) as { items: unknown[] }).items,
   ).toHaveLength(1);
 });
+it.each(['PumpSwap', 'Raydium CPMM', 'Pump.fun'])(
+  'persists and restores a decoded %s classification through the authenticated real route',
+  async (protocol) => {
+    const tx =
+      protocol === 'Pump.fun'
+        ? (
+            await import('../../../../test/pump-native-fixture')
+          ).nativePumpFixture()
+        : directMovementFixture(protocol === 'PumpSwap' ? 0 : 2, 0);
+    if (protocol === 'Pump.fun') {
+      tx.tokenChanges[0].mint = supplyScope.mint;
+      tx.movementInstructions![0].accounts![2] = supplyScope.mint;
+    } else {
+      tx.tokenChanges[1].mint = supplyScope.mint;
+      tx.movementInstructions![0].accounts![protocol === 'PumpSwap' ? 3 : 11] =
+        supplyScope.mint;
+      tx.movementInstructions![2].info!.mint = supplyScope.mint;
+    }
+    const classification = classifyWalletMovement(tx, supplyScope.mint);
+    expect(classification).toMatchObject({ kind: 'buy', protocol });
+    const evidence = await mocks.observe();
+    mocks.observe.mockResolvedValue({
+      ...evidence,
+      transactions: [
+        {
+          signature: bs58.encode(new Uint8Array(64).fill(3)),
+          slot: 120,
+          blockTime: null,
+          beforeRaw: '100000',
+          afterRaw: '101000',
+          changeRaw: '1000',
+          decimals: 6,
+          source: 'fixture.test',
+          classification,
+        },
+      ],
+    });
+    expect((await POST(post())).status).toBe(200);
+    const response = await GET(get());
+    expect(response.status).toBe(200);
+    const stored = (await response.json()) as {
+      items: Array<{
+        document: { transactions: Array<{ classification: unknown }> };
+      }>;
+    };
+    expect(stored.items[0].document.transactions[0].classification).toEqual(
+      classification,
+    );
+  },
+);

@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from './ui/button';
-import type { PoolTrades } from '@/lib/pool-trades';
+import type { PoolTrade, PoolTrades } from '@/lib/pool-trades';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
+import { PoolTradeMovementPanel } from './pool-trade-movement';
 type Result = {
   id: string;
   revision: number;
@@ -23,6 +24,10 @@ export function ImportedPoolTrades({
     [busy, setBusy] = useState(true),
     [error, setError] = useState('');
   const pending = useRef<AbortController | null>(null);
+  const [selectedMovement, setSelectedMovement] = useState<{
+    trade: PoolTrade;
+    observedAt: string;
+  } | null>(null);
   const accept = (data: Result) => {
     if (
       data.id !== project.id ||
@@ -115,6 +120,29 @@ export function ImportedPoolTrades({
     }
   }
   const snapshot = saved.find((s) => s.pool === pool);
+  const movementContext = useMemo(
+    () =>
+      selectedMovement && selectedMovement.observedAt === snapshot?.observedAt
+        ? {
+            projectId: project.id,
+            revision: project.revision,
+            pool,
+            mint: project.document.token.address,
+            decimals: project.document.token.decimals,
+            tapeObservedAt: selectedMovement.observedAt,
+            trade: selectedMovement.trade,
+          }
+        : null,
+    [
+      selectedMovement,
+      snapshot?.observedAt,
+      project.id,
+      project.revision,
+      pool,
+      project.document.token.address,
+      project.document.token.decimals,
+    ],
+  );
   const explorer =
     project.document.token.chain === 'Solana'
       ? 'https://solscan.io/tx/'
@@ -227,6 +255,26 @@ export function ImportedPoolTrades({
                             <code className="warmup-address">{t.sender}</code>
                           </p>
                         </details>
+                        {project.document.token.chain === 'Solana' && (
+                          <Button
+                            variant="outline"
+                            disabled={
+                              busy ||
+                              feedRunning ||
+                              project.archived ||
+                              snapshot.projectRevision !== project.revision
+                            }
+                            aria-label={`Inspect wallet movement ${t.transaction}`}
+                            onClick={() =>
+                              setSelectedMovement({
+                                trade: t,
+                                observedAt: snapshot.observedAt,
+                              })
+                            }
+                          >
+                            Inspect wallet movement
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -238,6 +286,13 @@ export function ImportedPoolTrades({
               No trades returned. This does not establish that the pool has
               never traded.
             </p>
+          )}
+          {movementContext && (
+            <PoolTradeMovementPanel
+              key={`${project.id}:${project.revision}:${pool}:${snapshot.observedAt}:${movementContext.trade.id}`}
+              context={movementContext}
+              onClose={() => setSelectedMovement(null)}
+            />
           )}
         </>
       ) : (

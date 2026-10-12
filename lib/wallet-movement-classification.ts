@@ -4,6 +4,13 @@ import type {
 } from './tracked-wallet-transaction';
 import { decodeJupiterRoute } from './jupiter-route-assessment';
 import { walletAddress } from './wallet-workspace';
+import { classifyNativePumpMovement } from './pump-native-movement';
+import { classifyPumpQuoteMovement } from './pump-quote-movement';
+import {
+  DIRECT_MOVEMENT_PROGRAMS,
+  decodeDirectMovementRoute,
+  directMovementAmountsMatch,
+} from './direct-movement-route';
 
 const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
@@ -14,10 +21,28 @@ const JUPITER = 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4';
 const WSOL = 'So11111111111111111111111111111111111111112';
 export type WalletMovementClassification = {
   kind: 'buy' | 'sell' | 'transfer' | 'unknown';
-  basis: 'jupiter-route-and-transfers' | 'spl-token-transfer' | 'unresolved';
+  basis:
+    | 'jupiter-route-and-transfers'
+    | 'protocol-route-and-transfers'
+    | 'pump-native-and-token-transfers'
+    | 'pump-quote-and-token-transfers'
+    | 'spl-token-transfer'
+    | 'unresolved';
+  protocol?:
+    | 'Jupiter'
+    | 'PumpSwap'
+    | 'Raydium AMM v4'
+    | 'Raydium CPMM'
+    | 'Pump.fun';
   reason: string;
   counterpartyAccounts: string[];
-  quote?: { mint: string; raw: string; decimals: number };
+  quote?: {
+    mint: string;
+    raw: string;
+    decimals: number;
+    asset?: 'native-sol';
+    scope?: 'venue-transfer';
+  };
 };
 const unknown = (reason: string): WalletMovementClassification => ({
   kind: 'unknown',
@@ -48,14 +73,48 @@ export function requireMovementClassification(
       ? value.basis !== 'unresolved' || value.quote !== undefined
       : value.kind === 'transfer'
         ? value.basis !== 'spl-token-transfer' || value.quote !== undefined
-        : value.basis !== 'jupiter-route-and-transfers' ||
+        : ![
+            'jupiter-route-and-transfers',
+            'protocol-route-and-transfers',
+            'pump-native-and-token-transfers',
+            'pump-quote-and-token-transfers',
+          ].includes(value.basis) ||
           !value.quote ||
           (value.kind === 'buy'
             ? BigInt(changeRaw) <= 0n
             : BigInt(changeRaw) >= 0n)
   )
     throw new Error('Movement classification does not match its token change.');
+  if (
+    value.basis === 'protocol-route-and-transfers'
+      ? !['PumpSwap', 'Raydium AMM v4', 'Raydium CPMM'].includes(
+          value.protocol ?? '',
+        )
+      : value.basis === 'pump-native-and-token-transfers'
+        ? value.protocol !== 'Pump.fun' ||
+          value.quote?.asset !== 'native-sol' ||
+          value.quote?.mint !== WSOL ||
+          value.quote?.decimals !== 9
+        : value.basis === 'pump-quote-and-token-transfers'
+          ? value.protocol !== 'Pump.fun' ||
+            value.quote?.scope !== 'venue-transfer' ||
+            value.quote?.asset !== undefined
+          : value.basis === 'jupiter-route-and-transfers'
+            ? value.protocol !== undefined && value.protocol !== 'Jupiter'
+            : value.protocol !== undefined
+  )
+    throw new Error('Movement protocol does not match its evidence basis.');
   if (value.quote) {
+    if (
+      value.quote.scope !== undefined &&
+      value.basis !== 'pump-quote-and-token-transfers'
+    )
+      throw new Error('Venue quote evidence basis differs.');
+    if (
+      value.quote.asset !== undefined &&
+      value.basis !== 'pump-native-and-token-transfers'
+    )
+      throw new Error('Native quote evidence basis differs.');
     walletAddress(value.quote.mint, 'Solana');
     if (
       amount(value.quote.raw) === 0n ||
@@ -109,34 +168,53 @@ export function classifyWalletMovement(
     const target = tx.tokenChanges.filter((change) => change.mint === mint);
     if (target.length !== 1 || BigInt(target[0].changeRaw) === 0n)
       return unknown('No unique nonzero wallet token change.');
+    const quotePump = classifyPumpQuoteMovement(tx, mint);
+    if (quotePump) return quotePump;
+    const nativePump = classifyNativePumpMovement(tx, mint);
+    if (nativePump) return nativePump;
     const changed = target[0],
       delta = BigInt(changed.changeRaw),
       facts = tx.movementInstructions;
     const legs = transfers(facts);
     const known = new Set([SYSTEM, TOKEN, TOKEN2022, ATA, COMPUTE]);
-    const routes = facts.filter((i) => i.topLevel && i.program === JUPITER);
+    const routes = facts.filter(
+      (i) =>
+        i.topLevel &&
+        (i.program === JUPITER || DIRECT_MOVEMENT_PROGRAMS.has(i.program)),
+    );
     if (routes.length) {
       if (
         routes.length !== 1 ||
         !tx.walletSigner ||
         facts.some(
-          (i) => i.topLevel && !known.has(i.program) && i.program !== JUPITER,
+          (i) =>
+            i.topLevel &&
+            !known.has(i.program) &&
+            i.program !== routes[0].program,
         )
       )
         return unknown(
           'Multiple or unrecognized top-level operations prevent swap attribution.',
         );
       const route = routes[0],
-        value = route.dataHex ? decodeJupiterRoute(route.dataHex) : null;
-      if (!value || !route.accounts)
-        return unknown('Jupiter route layout is not decoded.');
+        direct =
+          route.program === JUPITER ? null : decodeDirectMovementRoute(route),
+        value =
+          route.program === JUPITER && route.dataHex
+            ? decodeJupiterRoute(route.dataHex)
+            : null;
+      if ((!value && !direct) || !route.accounts)
+        return unknown('Swap route layout is not decoded.');
       const a = route.accounts;
       const authority =
-        a[value.v2 ? (value.shared ? 1 : 0) : value.shared ? 2 : 1];
+        direct?.authority ??
+        a[value!.v2 ? (value!.shared ? 1 : 0) : value!.shared ? 2 : 1];
       const source =
-        a[value.v2 ? (value.shared ? 2 : 1) : value.shared ? 3 : 2];
+        direct?.source ??
+        a[value!.v2 ? (value!.shared ? 2 : 1) : value!.shared ? 3 : 2];
       const destination =
-        a[value.v2 ? (value.shared ? 5 : 2) : value.shared ? 6 : 3];
+        direct?.destination ??
+        a[value!.v2 ? (value!.shared ? 5 : 2) : value!.shared ? 6 : 3];
       if (
         authority !== tx.address ||
         !source ||
@@ -178,6 +256,14 @@ export function classifyWalletMovement(
         return unknown(
           'Swap source and destination ownership/mints are incomplete.',
         );
+      if (
+        direct &&
+        ((direct.inputMint && direct.inputMint !== input.mint) ||
+          (direct.outputMint && direct.outputMint !== output.mint))
+      )
+        return unknown(
+          'Protocol mint roles disagree with wallet account ownership.',
+        );
       const outgoing = legs.filter((t) => t.source === source),
         incoming = legs.filter((t) => t.destination === destination);
       if (
@@ -185,9 +271,21 @@ export function classifyWalletMovement(
         incoming.some((t) => t.mint && t.mint !== output.mint)
       )
         return unknown('Decoded swap transfer mints disagree.');
+      if (
+        direct &&
+        (outgoing.some((t) => !direct.outgoing.includes(t.destination)) ||
+          incoming.some((t) => !direct.incoming.includes(t.source)))
+      )
+        return unknown(
+          'Actual transfers do not use the decoded protocol vault or fee accounts.',
+        );
       const inputRaw = outgoing.reduce((s, t) => s + t.raw, 0n),
         outputRaw = incoming.reduce((s, t) => s + t.raw, 0n);
-      if (inputRaw !== BigInt(value.inAmountRaw) || !outputRaw)
+      if (
+        direct
+          ? !directMovementAmountsMatch(direct, inputRaw, outputRaw)
+          : inputRaw !== BigInt(value!.inAmountRaw) || !outputRaw
+      )
         return unknown(
           'Swap transfers do not reconcile with the decoded route amount.',
         );
@@ -214,9 +312,11 @@ export function classifyWalletMovement(
         return unknown('The opposite asset change is missing.');
       return {
         kind: buy ? 'buy' : 'sell',
-        basis: 'jupiter-route-and-transfers',
-        reason:
-          'Decoded wallet-authorized Jupiter route and actual SPL transfer legs reconcile with the target change.',
+        basis: direct
+          ? 'protocol-route-and-transfers'
+          : 'jupiter-route-and-transfers',
+        protocol: direct?.protocol ?? 'Jupiter',
+        reason: `Decoded wallet-authorized ${direct?.protocol ?? 'Jupiter'} route and actual SPL transfer legs reconcile with the target change.`,
         counterpartyAccounts: [
           ...new Set(
             buy

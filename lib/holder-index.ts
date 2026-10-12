@@ -20,8 +20,13 @@ export type HolderIndexAccount = {
   owner: string;
   raw: string;
   frozen: boolean;
+  withheldRaw?: string;
 };
 export type HolderIndexPage = {
+  enumeration?: 'program-accounts-v2' | 'das-cursor';
+  requestedCursor?: string | null;
+  nextCursor?: string | null;
+  tokenProgram?: string;
   mint: string;
   page: number;
   decimals: number;
@@ -48,6 +53,7 @@ export function decodeHolderIndexPage(
       mint?: unknown;
       amount?: unknown;
       frozen?: unknown;
+      withheldRaw?: unknown;
     }>;
   };
   const token = supply as {
@@ -77,6 +83,9 @@ export function decodeHolderIndexPage(
       owner,
       raw: uint(account.amount),
       frozen: account.frozen,
+      ...(account.withheldRaw !== undefined
+        ? { withheldRaw: uint(account.withheldRaw) }
+        : {}),
     };
   });
   return {
@@ -93,6 +102,9 @@ export function decodeHolderIndexPage(
 }
 
 export type HolderIndexScan = {
+  enumeration?: 'program-accounts-v2' | 'das-cursor';
+  nextCursor?: string | null;
+  tokenProgram?: string;
   mint: string;
   decimals: number;
   totalSupplyRaw: string;
@@ -103,6 +115,8 @@ export type HolderIndexScan = {
   indexedRaw: bigint;
   minIndexedSlot: number;
   maxIndexedSlot: number;
+  minSupplySlot: number;
+  maxSupplySlot: number;
   firstObservedAt: string;
   lastObservedAt: string;
   status: 'partial' | 'enumerated' | 'limit';
@@ -115,6 +129,24 @@ export function appendHolderIndexPage(
   mint: string,
   decimals: number,
 ): HolderIndexScan {
+  if (page.enumeration) {
+    if (
+      typeof page.tokenProgram !== 'string' ||
+      page.requestedCursor !== (previous?.nextCursor ?? null) ||
+      (page.nextCursor !== null &&
+        (typeof page.nextCursor !== 'string' ||
+          !page.nextCursor ||
+          page.nextCursor.length > 512 ||
+          page.nextCursor === page.requestedCursor)) ||
+      (previous &&
+        (previous.enumeration !== page.enumeration ||
+          previous.tokenProgram !== page.tokenProgram))
+    )
+      throw new Error(
+        'Holder cursor or token program changed. Start a fresh scan.',
+      );
+  } else if (previous?.enumeration)
+    throw new Error('Holder enumeration method changed.');
   if (
     page.mint !== mint ||
     page.decimals !== decimals ||
@@ -156,6 +188,14 @@ export function appendHolderIndexPage(
       );
     seen.add(account.address);
     addition += BigInt(uint(account.raw));
+    if (account.withheldRaw !== undefined) {
+      uint(account.withheldRaw);
+      if (
+        page.tokenProgram !== 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' ||
+        page.enumeration !== 'program-accounts-v2'
+      )
+        throw new Error('Withheld fee account provenance differs.');
+    }
   }
   const indexedRaw = (previous?.indexedRaw ?? 0n) + addition;
   if (indexedRaw > BigInt(page.totalSupplyRaw))
@@ -174,6 +214,13 @@ export function appendHolderIndexPage(
   return {
     mint,
     decimals,
+    ...(page.enumeration
+      ? {
+          enumeration: page.enumeration,
+          nextCursor: page.nextCursor,
+          tokenProgram: page.tokenProgram,
+        }
+      : {}),
     totalSupplyRaw: page.totalSupplyRaw,
     source: page.source,
     pages: page.page,
@@ -188,14 +235,23 @@ export function appendHolderIndexPage(
       previous?.maxIndexedSlot ?? page.indexedSlot,
       page.indexedSlot,
     ),
+    minSupplySlot: Math.min(
+      previous?.minSupplySlot ?? page.supplySlot,
+      page.supplySlot,
+    ),
+    maxSupplySlot: Math.max(
+      previous?.maxSupplySlot ?? page.supplySlot,
+      page.supplySlot,
+    ),
     firstObservedAt: previous?.firstObservedAt ?? page.observedAt,
     lastObservedAt: page.observedAt,
-    status:
-      page.accounts.length === 0
-        ? 'enumerated'
-        : page.page === HOLDER_INDEX_MAX_PAGES
-          ? 'limit'
-          : 'partial',
+    status: (
+      page.enumeration ? page.nextCursor === null : page.accounts.length === 0
+    )
+      ? 'enumerated'
+      : page.page === HOLDER_INDEX_MAX_PAGES
+        ? 'limit'
+        : 'partial',
   };
 }
 

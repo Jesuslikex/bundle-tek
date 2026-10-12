@@ -44,6 +44,45 @@ const request = (
     body: JSON.stringify(body),
   });
 const project = { revision: 1, archived: 0, chain: 'Solana', address: 'mint' };
+it('rejects unknown scan modes before provider access', async () => {
+  expect(
+    (
+      await POST(
+        request({
+          id: 'project-1',
+          revision: 1,
+          page: 1,
+          runId: '00000000-0000-4000-8000-000000000001',
+          enumeration: 'unbounded',
+        }),
+      )
+    ).status,
+  ).toBe(400);
+  expect(observe).not.toHaveBeenCalled();
+});
+it('forwards an explicitly selected parsed-account scan mode', async () => {
+  expect(
+    (
+      await POST(
+        request({
+          id: 'project-1',
+          revision: 1,
+          page: 1,
+          runId: '00000000-0000-4000-8000-000000000001',
+          enumeration: 'program-accounts-v2',
+        }),
+      )
+    ).status,
+  ).toBe(200);
+  expect(observe).toHaveBeenCalledWith(
+    'mint',
+    1,
+    expect.any(AbortSignal),
+    fetch,
+    null,
+    'program-accounts-v2',
+  );
+});
 beforeEach(() => {
   vi.resetAllMocks();
   auth.mockResolvedValue({ userId: 'owner' });
@@ -83,7 +122,13 @@ it('rejects archived, foreign-chain, changed and invalid page requests before re
 });
 it('binds the mint to the saved project and revalidates it after the provider read', async () => {
   expect((await POST(request())).status).toBe(200);
-  expect(observe).toHaveBeenCalledWith('mint', 1, expect.any(AbortSignal));
+  expect(observe).toHaveBeenCalledWith(
+    'mint',
+    1,
+    expect.any(AbortSignal),
+    fetch,
+    null,
+  );
   first
     .mockResolvedValueOnce(project)
     .mockResolvedValueOnce({ ...project, revision: 2 });

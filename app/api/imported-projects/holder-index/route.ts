@@ -2,6 +2,7 @@ import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { observeHolderIndexPage } from '@/lib/holder-index-provider';
 import { HOLDER_INDEX_MAX_PAGES } from '@/lib/holder-index';
+import type { HolderIndexPage } from '@/lib/holder-index';
 import { WalletRpcError } from '@/lib/wallet-balances';
 import {
   holderRun,
@@ -37,13 +38,21 @@ export async function POST(request: Request) {
       .startsWith('application/json')
   )
     return json({ error: 'JSON required.' }, 415);
-  let query: { id: string; revision: number; page: number; runId: string };
+  let query: {
+    id: string;
+    revision: number;
+    page: number;
+    runId: string;
+    enumeration?: 'das-cursor' | 'program-accounts-v2';
+  };
   try {
     const text = await request.text();
     if (text.length > 256) return json({ error: 'Request too large.' }, 413);
     query = JSON.parse(text);
     if (
       !query ||
+      (query.enumeration !== undefined &&
+        !['das-cursor', 'program-accounts-v2'].includes(query.enumeration)) ||
       typeof query.id !== 'string' ||
       !/^[a-zA-Z0-9_-]{1,64}$/.test(query.id) ||
       !Number.isSafeInteger(query.revision) ||
@@ -112,6 +121,15 @@ export async function POST(request: Request) {
       )
       .bind(user.userId, query.id, query.runId, query.page)
       .first<{ document: string }>();
+    if (
+      existing &&
+      query.enumeration &&
+      JSON.parse(existing.document).enumeration !== query.enumeration
+    )
+      return json(
+        { error: 'Saved scan enumeration method differs. Reload saved scans.' },
+        409,
+      );
     if (existing)
       return json({
         id: query.id,
@@ -133,10 +151,32 @@ export async function POST(request: Request) {
         },
         409,
       );
+    const previous = run
+      ? (JSON.parse(
+          (await db
+            .prepare(
+              'SELECT document FROM holder_index_pages WHERE owner_id=? AND project_id=? AND run_id=? AND page=?',
+            )
+            .bind(user.userId, query.id, query.runId, run.last_page)
+            .first<{ document: string }>())!.document,
+        ) as HolderIndexPage)
+      : null;
+    if (
+      previous &&
+      query.enumeration &&
+      previous.enumeration !== query.enumeration
+    )
+      return json(
+        { error: 'Saved scan enumeration method differs. Reload saved scans.' },
+        409,
+      );
     const page = await observeHolderIndexPage(
       project.address,
       query.page,
       AbortSignal.any([request.signal, AbortSignal.timeout(25000)]),
+      fetch,
+      previous,
+      ...(query.enumeration ? ([query.enumeration] as const) : ([] as const)),
     );
     const current = await readProject();
     if (
@@ -178,7 +218,7 @@ export async function POST(request: Request) {
     return json(
       {
         error:
-          'Holder index unavailable. The indexer RPC must support mint-filtered getTokenAccounts with indexed slot metadata. Retry or check provider configuration.',
+          'Holder index unavailable. The configured indexer must support mint-filtered cursor pagination and valid slot metadata. Retry or check provider configuration.',
       },
       error instanceof WalletRpcError && error.status === 429 ? 429 : 502,
     );

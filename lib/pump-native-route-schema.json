@@ -1,0 +1,135 @@
+{
+  "format": "pump-native-route-schema-v1",
+  "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+  "source": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump.json",
+  "sha256": "6a19bad7758fb822cee79a91575e51a7bd60391c670200408676643e00a79a6d",
+  "capturedAt": "2026-10-12T16:49:58.775Z",
+  "instructions": [
+    {
+      "name": "buy",
+      "discriminator": "66063d1201daebea",
+      "accounts": [
+        "global",
+        "fee_recipient",
+        "mint",
+        "bonding_curve",
+        "associated_bonding_curve",
+        "associated_user",
+        "user",
+        "system_program",
+        "token_program",
+        "creator_vault",
+        "event_authority",
+        "program",
+        "global_volume_accumulator",
+        "user_volume_accumulator",
+        "fee_config",
+        "fee_program"
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "max_sol_cost",
+          "type": "u64"
+        },
+        {
+          "name": "track_volume",
+          "type": {
+            "defined": {
+              "name": "OptionBool"
+            }
+          }
+        },
+        {
+          "name": "partial_fill",
+          "type": {
+            "defined": {
+              "name": "OptionBool"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "buy_exact_sol_in",
+      "discriminator": "38fc74089edfcd5f",
+      "accounts": [
+        "global",
+        "fee_recipient",
+        "mint",
+        "bonding_curve",
+        "associated_bonding_curve",
+        "associated_user",
+        "user",
+        "system_program",
+        "token_program",
+        "creator_vault",
+        "event_authority",
+        "program",
+        "global_volume_accumulator",
+        "user_volume_accumulator",
+        "fee_config",
+        "fee_program"
+      ],
+      "args": [
+        {
+          "name": "spendable_sol_in",
+          "type": "u64"
+        },
+        {
+          "name": "min_tokens_out",
+          "type": "u64"
+        },
+        {
+          "name": "track_volume",
+          "type": {
+            "defined": {
+              "name": "OptionBool"
+            }
+          }
+        },
+        {
+          "name": "partial_fill",
+          "type": {
+            "defined": {
+              "name": "OptionBool"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "sell",
+      "discriminator": "33e685a4017f83ad",
+      "accounts": [
+        "global",
+        "fee_recipient",
+        "mint",
+        "bonding_curve",
+        "associated_bonding_curve",
+        "associated_user",
+        "user",
+        "system_program",
+        "creator_vault",
+        "token_program",
+        "event_authority",
+        "program",
+        "fee_config",
+        "fee_program"
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_sol_output",
+          "type": "u64"
+        }
+      ]
+    }
+  ]
+}

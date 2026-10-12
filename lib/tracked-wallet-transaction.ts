@@ -6,6 +6,19 @@ import { getSolanaRpcEndpoint } from './solana-rpc';
 import { walletAddress } from './wallet-workspace';
 
 export type TrackedTransaction = {
+  transactionVersion?: 'legacy' | 0 | 1;
+  transactionConfig?: {
+    priorityFeeRaw: string | null;
+    computeUnitLimit: number | null;
+    loadedAccountsDataSizeLimit: number | null;
+    heapSize: number | null;
+  };
+  nativeAccountChanges?: {
+    address: string;
+    beforeRaw: string;
+    afterRaw: string;
+    changeRaw: string;
+  }[];
   movementInstructions?: MovementInstruction[];
   address: string;
   network: 'mainnet' | 'devnet';
@@ -36,6 +49,10 @@ export type TrackedTransaction = {
 export type MovementInstruction = {
   program: string;
   topLevel: boolean;
+  outerInstructionIndex?: number;
+  innerInstructionIndex?: number;
+  // Absent when the provider did not report depth. Never infer it from program names.
+  stackHeight?: number;
   accounts?: string[];
   dataHex?: string;
   type?: string;
@@ -87,14 +104,63 @@ export function decodeTrackedTransaction(
     !(
       result.version === undefined ||
       result.version === 'legacy' ||
-      result.version === '0'
+      result.version === '0' ||
+      result.version === '1'
     )
   )
     throw new Error('Transaction identity or version mismatch.');
-  const keys = array(message.accountKeys, 256).map((v) => {
+  const isV1 = result.version === '1';
+  let transactionConfig: TrackedTransaction['transactionConfig'];
+  if (isV1) {
+    const config = record(message.transactionConfig);
+    if (
+      Object.keys(config).some(
+        (k) =>
+          ![
+            'priorityFee',
+            'computeUnitLimit',
+            'loadedAccountsDataSizeLimit',
+            'heapSize',
+          ].includes(k),
+      )
+    )
+      throw new Error('Unknown v1 transaction configuration.');
+    const limit = (value: unknown) =>
+      value === null || value === undefined
+        ? null
+        : Number(uint(value, (1n << 32n) - 1n));
+    transactionConfig = {
+      priorityFeeRaw:
+        config.priorityFee === null || config.priorityFee === undefined
+          ? null
+          : uint(config.priorityFee).toString(),
+      computeUnitLimit: limit(config.computeUnitLimit),
+      loadedAccountsDataSizeLimit: limit(config.loadedAccountsDataSizeLimit),
+      heapSize: limit(config.heapSize),
+    };
+    if (
+      message.addressTableLookups !== undefined &&
+      array(message.addressTableLookups, 0).length
+    )
+      throw new Error('V1 lookup tables are unsupported.');
+    if (meta.loadedAddresses !== undefined && meta.loadedAddresses !== null) {
+      const loaded = record(meta.loadedAddresses);
+      if (
+        Object.keys(loaded).some((k) => !['readonly', 'writable'].includes(k))
+      )
+        throw new Error('Invalid v1 loaded addresses.');
+      array(loaded.readonly ?? [], 0);
+      array(loaded.writable ?? [], 0);
+    }
+    array(message.instructions, 64);
+  } else if (message.transactionConfig !== undefined)
+    throw new Error('Configuration does not match transaction version.');
+  const keys = array(message.accountKeys, isV1 ? 64 : 256).map((v) => {
     const k = record(v);
     if (typeof k.signer !== 'boolean' || typeof k.writable !== 'boolean')
       throw new Error('Invalid account flags.');
+    if (isV1 && k.source !== undefined && k.source !== 'transaction')
+      throw new Error('V1 account must be inline.');
     return { address: key(k.pubkey), signer: k.signer };
   });
   if (
@@ -103,6 +169,12 @@ export function decodeTrackedTransaction(
     new Set(keys.map((k) => k.address)).size !== keys.length
   )
     throw new Error('Invalid transaction account keys.');
+  if (isV1) {
+    const signatures = array(tx.signatures, 64);
+    if (signatures.length !== keys.filter((k) => k.signer).length)
+      throw new Error('V1 signer count differs.');
+    signatures.forEach(transactionSignature);
+  }
   const before = array(meta.preBalances, 256).map((v) => uint(v)),
     after = array(meta.postBalances, 256).map((v) => uint(v));
   if (before.length !== keys.length || after.length !== keys.length)
@@ -118,19 +190,44 @@ export function decodeTrackedTransaction(
     throw new Error('Transaction does not include the tracked wallet.');
   const programs = new Set<string>();
   const movementInstructions: MovementInstruction[] = [];
-  const instructions = (value: unknown, topLevel: boolean) => {
-    for (const item of array(value, 1024)) {
+  const instructions = (
+    value: unknown,
+    topLevel: boolean,
+    outerIndex?: number,
+  ) => {
+    for (const [ordinal, item] of array(value, 1024).entries()) {
       const program = key(record(item).programId);
       if (!keys.some((k) => k.address === program))
         throw new Error('Program missing from transaction accounts.');
       programs.add(program);
       const raw = record(item),
-        fact: MovementInstruction = { program, topLevel };
-      if (Array.isArray(raw.accounts) && raw.accounts.length <= 256)
+        fact: MovementInstruction = {
+          program,
+          topLevel,
+          outerInstructionIndex: topLevel ? ordinal : outerIndex,
+          ...(!topLevel ? { innerInstructionIndex: ordinal } : {}),
+        };
+      if (raw.stackHeight !== undefined && raw.stackHeight !== null) {
+        const height = Number(uint(raw.stackHeight, 255n));
+        if (topLevel ? height !== 1 : height < 2)
+          throw new Error('Invalid instruction stack height.');
+        fact.stackHeight = height;
+      }
+      if (Array.isArray(raw.accounts) && raw.accounts.length <= 256) {
         fact.accounts = raw.accounts.map(key);
-      if (typeof raw.data === 'string' && raw.data.length <= 1800) {
+        if (fact.accounts.some((a) => !keys.some((k) => k.address === a)))
+          throw new Error('Instruction account missing from transaction keys.');
+      }
+      if (isV1 && typeof raw.data === 'string' && raw.data.length > 5600)
+        throw new Error('V1 instruction data exceeds read bounds.');
+      if (
+        typeof raw.data === 'string' &&
+        raw.data.length <= (isV1 ? 5600 : 1800)
+      ) {
         const bytes = bs58.decode(raw.data);
-        if (bytes.length <= 1232)
+        if (isV1 && bytes.length > 4096)
+          throw new Error('V1 instruction data exceeds read bounds.');
+        if (bytes.length <= (isV1 ? 4096 : 1232))
           fact.dataHex = Array.from(bytes, (b) =>
             b.toString(16).padStart(2, '0'),
           ).join('');
@@ -144,6 +241,7 @@ export function decodeTrackedTransaction(
           fact.info = {};
           for (const name of [
             'source',
+            'newAccount',
             'destination',
             'mint',
             'account',
@@ -151,10 +249,25 @@ export function decodeTrackedTransaction(
             'wallet',
             'authority',
             'amount',
+            'lamports',
             'decimals',
           ])
-            if (typeof info[name] === 'string' && info[name].length <= 100)
-              fact.info[name] = info[name];
+            if (typeof info[name] === 'string' && info[name].length <= 100) {
+              const value =
+                name === 'amount' || name === 'decimals' || name === 'lamports'
+                  ? info[name]
+                  : key(info[name]);
+              if (
+                ['source', 'destination', 'account', 'newAccount'].includes(
+                  name,
+                ) &&
+                !keys.some((k) => k.address === value)
+              )
+                throw new Error(
+                  'Parsed instruction account missing from transaction keys.',
+                );
+              fact.info[name] = value;
+            }
           if (info.tokenAmount && typeof info.tokenAmount === 'object') {
             const amount = record(info.tokenAmount);
             for (const name of ['amount', 'decimals'])
@@ -170,17 +283,30 @@ export function decodeTrackedTransaction(
     }
   };
   instructions(message.instructions, true);
-  if (meta.innerInstructions != null)
+  if (meta.innerInstructions != null) {
+    const indexes = new Set<number>();
     for (const item of array(meta.innerInstructions, 256)) {
       const inner = record(item);
+      const index = Number(uint(inner.index, 255n));
       if (
-        Number(uint(inner.index, 255n)) >=
-        array(message.instructions, 1024).length
+        index >= array(message.instructions, 1024).length ||
+        indexes.has(index)
       )
         throw new Error('Invalid inner instruction index.');
-      instructions(inner.instructions, false);
+      indexes.add(index);
+      instructions(inner.instructions, false, index);
     }
+  }
   return {
+    transactionVersion:
+      result.version === undefined
+        ? undefined
+        : result.version === 'legacy'
+          ? ('legacy' as const)
+          : result.version === '1'
+            ? (1 as const)
+            : (0 as const),
+    ...(transactionConfig ? { transactionConfig } : {}),
     slot: Number(uint(result.slot, BigInt(Number.MAX_SAFE_INTEGER))),
     blockTime:
       result.blockTime === null
@@ -194,6 +320,12 @@ export function decodeTrackedTransaction(
       walletIndex === -1
         ? null
         : (after[walletIndex] - before[walletIndex]).toString(),
+    nativeAccountChanges: keys.map((k, i) => ({
+      address: k.address,
+      beforeRaw: before[i].toString(),
+      afterRaw: after[i].toString(),
+      changeRaw: (after[i] - before[i]).toString(),
+    })),
     tokensComplete: tokens.complete,
     tokenChanges: tokens.changes,
     programs: [...programs],
@@ -223,7 +355,7 @@ export async function observeTrackedTransaction(
     {
       encoding: 'jsonParsed',
       commitment: 'confirmed',
-      maxSupportedTransactionVersion: 0,
+      maxSupportedTransactionVersion: 1,
     },
   ]);
   if (raw === null) return null;

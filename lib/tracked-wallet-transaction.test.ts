@@ -76,6 +76,75 @@ it('preserves exact amounts, lookup account ordering and signed subunit deltas',
   expect(signedBalanceAmount('123', 0)).toBe('+123');
   expect(signedBalanceAmount('0', 9)).toBe('0');
 });
+it('retains caller group, CPI ordinal and reported depth without fabricating missing depth', () => {
+  const raw = transaction();
+  raw.transaction.message.instructions.push({ programId: other });
+  Object.assign(raw.meta, {
+    innerInstructions: [
+      {
+        index: '1',
+        instructions: [
+          { programId: program, stackHeight: '2' },
+          { programId: program, stackHeight: '3' },
+          { programId: other, stackHeight: '2' },
+        ],
+      },
+      { index: '0', instructions: [{ programId: program, stackHeight: null }] },
+    ],
+  });
+  expect(
+    decodeTrackedTransaction(raw, wallet, signature).movementInstructions,
+  ).toEqual([
+    { program, topLevel: true, outerInstructionIndex: 0 },
+    { program: other, topLevel: true, outerInstructionIndex: 1 },
+    {
+      program,
+      topLevel: false,
+      outerInstructionIndex: 1,
+      innerInstructionIndex: 0,
+      stackHeight: 2,
+    },
+    {
+      program,
+      topLevel: false,
+      outerInstructionIndex: 1,
+      innerInstructionIndex: 1,
+      stackHeight: 3,
+    },
+    {
+      program: other,
+      topLevel: false,
+      outerInstructionIndex: 1,
+      innerInstructionIndex: 2,
+      stackHeight: 2,
+    },
+    {
+      program,
+      topLevel: false,
+      outerInstructionIndex: 0,
+      innerInstructionIndex: 0,
+    },
+  ]);
+});
+it('rejects duplicate caller groups and malformed reported stack depths', () => {
+  const duplicate = transaction();
+  duplicate.meta.innerInstructions.push(duplicate.meta.innerInstructions[0]);
+  expect(() => decodeTrackedTransaction(duplicate, wallet, signature)).toThrow(
+    'inner instruction index',
+  );
+  for (const height of ['0', '1', '-1', '2.5', '256']) {
+    const raw = transaction();
+    Object.assign(raw.meta.innerInstructions[0].instructions[0], {
+      stackHeight: height,
+    });
+    expect(() => decodeTrackedTransaction(raw, wallet, signature)).toThrow();
+  }
+  const raw = transaction();
+  Object.assign(raw.transaction.message.instructions[0], { stackHeight: '2' });
+  expect(() => decodeTrackedTransaction(raw, wallet, signature)).toThrow(
+    'stack height',
+  );
+});
 it('handles token creation, closure and ownership changes without counting other owners', () => {
   const tx = transaction();
   tx.meta.preTokenBalances = [balance('10'), balance('100', other, '3')];
@@ -214,7 +283,7 @@ it.each(['mainnet', 'devnet'] as const)(
       {
         encoding: 'jsonParsed',
         commitment: 'confirmed',
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
       },
     ]);
   },

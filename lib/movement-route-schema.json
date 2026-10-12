@@ -1,0 +1,305 @@
+{
+  "format": "movement-route-schema-v1",
+  "capturedAt": "2026-10-12T16:33:56.150Z",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump_amm.json",
+      "sha256": "b7d8c57a4d9c4dd0109a9ab893052352333252d4eedced10ac091d4d66cab89b"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-sdk-V2/master/src/raydium/liquidity/instruction.ts",
+      "sha256": "2488efa940f50201e870f8572f693dd6cc118755ba5173282a80ffb8e81feddf"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-sdk-V2/master/src/common/programId.ts",
+      "sha256": "ded5ae021aa50ee17cc36441d5fcb4d1a242676fe77fd4308b066f688f9b23b4"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-amm/master/program/src/processor.rs",
+      "sha256": "31eed8ed2736fa2d2ee3a2ad072a4025766ef828bc2ddfbf26a1ec8669c91fe6"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-sdk-V2/master/src/raydium/cpmm/instruction.ts",
+      "sha256": "33fd5bb534c000ac710ff630e29c1c95e0c847dc4fc72a6547c181a927d50b38"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/master/programs/cp-swap/src/instructions/swap_base_input.rs",
+      "sha256": "5878ed09654745b5725030c5d84a8794a07088e836330890cbae2b0d7d7b1349"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/raydium-io/raydium-cp-swap/master/programs/cp-swap/src/lib.rs",
+      "sha256": "d4151c3959d5b066d459e02f8ffcb45c842944231d68aaff659909c232639f7b"
+    }
+  ],
+  "programs": [
+    {
+      "name": "PumpSwap",
+      "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "variants": [
+        {
+          "name": "buy",
+          "discriminator": "66063d1201daebea",
+          "bytes": 25,
+          "accountCount": 23,
+          "authority": 1,
+          "source": 6,
+          "destination": 5,
+          "inputMint": 4,
+          "outputMint": 3,
+          "outgoing": [
+            8,
+            10,
+            17
+          ],
+          "incoming": [
+            7
+          ],
+          "first": "output-exact",
+          "second": "input-maximum",
+          "tokenPrograms": [
+            11,
+            12
+          ]
+        },
+        {
+          "name": "buy_exact_quote_in",
+          "discriminator": "c62e1552b4d9e870",
+          "bytes": 25,
+          "accountCount": 23,
+          "authority": 1,
+          "source": 6,
+          "destination": 5,
+          "inputMint": 4,
+          "outputMint": 3,
+          "outgoing": [
+            8,
+            10,
+            17
+          ],
+          "incoming": [
+            7
+          ],
+          "first": "input-maximum",
+          "second": "output-minimum",
+          "tokenPrograms": [
+            11,
+            12
+          ]
+        },
+        {
+          "name": "sell",
+          "discriminator": "33e685a4017f83ad",
+          "bytes": 24,
+          "accountCount": 21,
+          "authority": 1,
+          "source": 5,
+          "destination": 6,
+          "inputMint": 3,
+          "outputMint": 4,
+          "outgoing": [
+            7
+          ],
+          "incoming": [
+            8
+          ],
+          "first": "input-exact",
+          "second": "output-minimum",
+          "tokenPrograms": [
+            11,
+            12
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Raydium AMM v4",
+      "program": "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+      "variants": [
+        {
+          "name": "swap-9",
+          "discriminator": "09",
+          "bytes": 17,
+          "accountCount": 18,
+          "authority": 17,
+          "source": 15,
+          "destination": 16,
+          "outgoing": [
+            5,
+            6
+          ],
+          "incoming": [
+            5,
+            6
+          ],
+          "first": "input-exact",
+          "second": "output-minimum",
+          "tokenPrograms": [
+            0
+          ]
+        },
+        {
+          "name": "swap-11",
+          "discriminator": "0b",
+          "bytes": 17,
+          "accountCount": 18,
+          "authority": 17,
+          "source": 15,
+          "destination": 16,
+          "outgoing": [
+            5,
+            6
+          ],
+          "incoming": [
+            5,
+            6
+          ],
+          "first": "input-maximum",
+          "second": "output-exact",
+          "tokenPrograms": [
+            0
+          ]
+        },
+        {
+          "name": "swap-16",
+          "discriminator": "10",
+          "bytes": 17,
+          "accountCount": 8,
+          "authority": 7,
+          "source": 5,
+          "destination": 6,
+          "outgoing": [
+            3,
+            4
+          ],
+          "incoming": [
+            3,
+            4
+          ],
+          "first": "input-exact",
+          "second": "output-minimum",
+          "tokenPrograms": [
+            0
+          ]
+        },
+        {
+          "name": "swap-17",
+          "discriminator": "11",
+          "bytes": 17,
+          "accountCount": 8,
+          "authority": 7,
+          "source": 5,
+          "destination": 6,
+          "outgoing": [
+            3,
+            4
+          ],
+          "incoming": [
+            3,
+            4
+          ],
+          "first": "input-maximum",
+          "second": "output-exact",
+          "tokenPrograms": [
+            0
+          ]
+        },
+        {
+          "name": "swap-9-without-target-orders",
+          "discriminator": "09",
+          "bytes": 17,
+          "accountCount": 17,
+          "authority": 16,
+          "source": 14,
+          "destination": 15,
+          "outgoing": [
+            4,
+            5
+          ],
+          "incoming": [
+            4,
+            5
+          ],
+          "first": "input-exact",
+          "second": "output-minimum",
+          "tokenPrograms": [
+            0
+          ]
+        },
+        {
+          "name": "swap-11-without-target-orders",
+          "discriminator": "0b",
+          "bytes": 17,
+          "accountCount": 17,
+          "authority": 16,
+          "source": 14,
+          "destination": 15,
+          "outgoing": [
+            4,
+            5
+          ],
+          "incoming": [
+            4,
+            5
+          ],
+          "first": "input-maximum",
+          "second": "output-exact",
+          "tokenPrograms": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Raydium CPMM",
+      "program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+      "variants": [
+        {
+          "name": "swap_base_input",
+          "discriminator": "8fbe5adac41e33de",
+          "bytes": 24,
+          "accountCount": 13,
+          "authority": 0,
+          "source": 4,
+          "destination": 5,
+          "incoming": [
+            7
+          ],
+          "outgoing": [
+            6
+          ],
+          "inputMint": 10,
+          "outputMint": 11,
+          "first": "input-exact",
+          "second": "output-minimum",
+          "tokenPrograms": [
+            8,
+            9
+          ]
+        },
+        {
+          "name": "swap_base_output",
+          "discriminator": "37d96256a34ab4ad",
+          "bytes": 24,
+          "accountCount": 13,
+          "authority": 0,
+          "source": 4,
+          "destination": 5,
+          "incoming": [
+            7
+          ],
+          "outgoing": [
+            6
+          ],
+          "inputMint": 10,
+          "outputMint": 11,
+          "first": "input-maximum",
+          "second": "output-exact",
+          "tokenPrograms": [
+            8,
+            9
+          ]
+        }
+      ]
+    }
+  ]
+}

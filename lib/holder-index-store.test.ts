@@ -14,6 +14,32 @@ const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
 });
+it('persists withheld metadata in page JSON without adding it to owner-balance totals', async () => {
+  const { db, sqlite } = database();
+  const saved = {
+    ...page(),
+    enumeration: 'program-accounts-v2' as const,
+    requestedCursor: null,
+    nextCursor: null,
+    tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+  };
+  saved.accounts = saved.accounts.map((account) => ({
+    ...account,
+    withheldRaw: '3',
+  }));
+  await saveHolderRunPage(db, 'owner', 'project', 1, 'fees', null, saved);
+  const stored = sqlite
+    .prepare('SELECT document FROM holder_index_pages WHERE run_id=?')
+    .get('fees');
+  if (typeof stored?.document !== 'string')
+    throw new Error('Saved page missing.');
+  expect(JSON.parse(stored.document).accounts[0].withheldRaw).toBe('3');
+  expect((await holderRun(db, 'owner', 'project', 'fees'))?.indexed_raw).toBe(
+    saved.accounts
+      .reduce((total, account) => total + BigInt(account.raw), 0n)
+      .toString(),
+  );
+});
 it('removes only the selected owned run and preserves history on a stale revision', async () => {
   const { db, sqlite } = database();
   await saveHolderRunPage(db, 'owner', 'project', 1, 'run', null, page());

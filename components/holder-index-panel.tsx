@@ -1,23 +1,62 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import {
   appendHolderIndexPage,
   holderIndexSummary,
-  type HolderIndexPage,
   type HolderIndexScan,
 } from '@/lib/holder-index';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { Button } from './ui/button';
 import styles from './holder-index-panel.module.css';
+import { holderIndexWithheldFees } from '@/lib/holder-index-withheld';
 import {
   readHolderIndexHistory,
   type SavedHolderRun,
 } from '@/lib/holder-index-history-client';
 import { HOLDER_RUN_RESUME_MS } from '@/lib/holder-index';
+import {
+  selectIndexedHolders,
+  indexedHolderSupplyShare,
+  type HolderSort,
+} from '@/lib/holder-index-view';
+import {
+  readHolderIndexPageWithRetry,
+  HOLDER_READ_MAX_RETRIES,
+  type HolderReadRetry,
+} from '@/lib/holder-index-retry';
 
 export function HolderIndexResults({ scan }: { scan: HolderIndexScan }) {
-  const summary = holderIndexSummary(scan);
+  const summary = useMemo(() => holderIndexSummary(scan), [scan]);
+  const fees = useMemo(() => {
+    try {
+      return { value: holderIndexWithheldFees(scan), error: '' };
+    } catch (failure) {
+      return {
+        value: null,
+        error:
+          failure instanceof Error
+            ? failure.message
+            : 'Withheld fee reconciliation unavailable.',
+      };
+    }
+  }, [scan]);
+  const [search, setSearch] = useState(''),
+    [pageIndex, setPageIndex] = useState(0);
+  const [sort, setSort] = useState<HolderSort>('largest');
+  const matching = useMemo(
+    () => selectIndexedHolders(summary.holders, search, sort),
+    [summary.holders, search, sort],
+  );
+  const pageSize = 50,
+    pages = Math.max(1, Math.ceil(matching.length / pageSize)),
+    selectedPage = Math.min(pageIndex, pages - 1);
+  if (fees.error)
+    return (
+      <p role="alert">
+        {fees.error} Holder totals need a fresh scan before review.
+      </p>
+    );
   return (
     <div>
       <output>
@@ -34,43 +73,126 @@ export function HolderIndexResults({ scan }: { scan: HolderIndexScan }) {
         accounts. Unreconciled remainder:{' '}
         {formatNativeBalance(summary.remainderRaw, scan.decimals)} tokens.
       </p>
+      {scan.status === 'enumerated' && (
+        <p>
+          {summary.remainderRaw === '0'
+            ? 'All reference supply units reconcile with the enumerated provider account set.'
+            : 'Enumeration ended with unreconciled supply. Full supply coverage is not established.'}
+        </p>
+      )}
       <p>
         Top 10 scanned owners: {summary.top10Percent.toFixed(4)}% of reference
         supply. Includes pool and team accounts; owner roles have not been
         inferred.
       </p>
       <p className={styles.context}>
+        {fees.error ? (
+          <span role="alert">{fees.error} </span>
+        ) : fees.value && fees.value.reportedAccounts > 0 ? (
+          <span>
+            Observed account-withheld fees:{' '}
+            {formatNativeBalance(fees.value.raw, scan.decimals)} tokens in{' '}
+            {fees.value.reportedAccounts} accounts. These are not spendable by
+            the listed owners and are excluded from holdings and concentration.
+            Unexplained remainder after these observed fees:{' '}
+            {formatNativeBalance(
+              fees.value.remainderAfterObservedFeesRaw,
+              scan.decimals,
+            )}{' '}
+            tokens. Mint-harvested fees and missing account extensions remain
+            unmeasured.{' '}
+          </span>
+        ) : scan.tokenProgram ===
+          'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' ? (
+          <span>
+            Account-withheld and mint-harvested fees have not been measured for
+            this Token-2022 scan.{' '}
+          </span>
+        ) : null}
         Index slots {scan.minIndexedSlot} to {scan.maxIndexedSlot} ·{' '}
         {scan.pages} pages · {scan.source}. Pages are live index reads, not an
-        atomic on-chain snapshot. Exhaustion means the provider returned an
-        empty page, not proof of globally complete or current chain coverage.
-        Read from {new Date(scan.firstObservedAt).toLocaleString()} to{' '}
-        {new Date(scan.lastObservedAt).toLocaleString()}.
+        atomic on-chain snapshot. Exhaustion means the provider returned a{' '}
+        {scan.enumeration ? 'terminal cursor' : 'empty page'}, not proof of
+        globally complete or current chain coverage. Read from{' '}
+        {new Date(scan.firstObservedAt).toLocaleString()} to{' '}
+        {new Date(scan.lastObservedAt).toLocaleString()}. Reference supply slots{' '}
+        {scan.minSupplySlot} to {scan.maxSupplySlot}.
       </p>
+      <label>
+        Search indexed owners
+        <input
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPageIndex(0);
+          }}
+          placeholder="Wallet address or fragment"
+        />
+      </label>
+      <label>
+        Sort indexed owners
+        <select
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value as HolderSort);
+            setPageIndex(0);
+          }}
+        >
+          <option value="largest">Largest holdings</option>
+          <option value="smallest">Smallest holdings</option>
+          <option value="owner">Wallet address</option>
+          <option value="accounts">Most token accounts</option>
+        </select>
+      </label>
       <div className={styles.tableWrap}>
         <table>
-          <caption>Largest owners in scanned accounts (up to 20)</caption>
+          <caption>
+            {matching.length.toLocaleString()} matching owners in scanned
+            accounts · page {selectedPage + 1} of {pages}
+          </caption>
           <thead>
             <tr>
               <th scope="col">Owner</th>
               <th scope="col">Tokens</th>
+              <th scope="col">Reference supply</th>
               <th scope="col">Accounts</th>
             </tr>
           </thead>
           <tbody>
-            {summary.holders.slice(0, 20).map((holder) => (
-              <tr key={holder.owner}>
-                <th scope="row">
-                  <code>{holder.owner}</code>
-                </th>
-                <td>
-                  {formatNativeBalance(holder.raw.toString(), scan.decimals)}
-                </td>
-                <td>{holder.accountCount}</td>
-              </tr>
-            ))}
+            {matching
+              .slice(selectedPage * pageSize, (selectedPage + 1) * pageSize)
+              .map((holder) => (
+                <tr key={holder.owner}>
+                  <th scope="row">
+                    <code>{holder.owner}</code>
+                  </th>
+                  <td>
+                    {formatNativeBalance(holder.raw.toString(), scan.decimals)}
+                  </td>
+                  <td>
+                    {indexedHolderSupplyShare(holder.raw, scan.totalSupplyRaw)}
+                  </td>
+                  <td>{holder.accountCount}</td>
+                </tr>
+              ))}
           </tbody>
         </table>
+      </div>
+      <div className={styles.actions}>
+        <Button
+          variant="outline"
+          disabled={selectedPage === 0}
+          onClick={() => setPageIndex(selectedPage - 1)}
+        >
+          Previous owners
+        </Button>
+        <Button
+          variant="outline"
+          disabled={selectedPage >= pages - 1}
+          onClick={() => setPageIndex(selectedPage + 1)}
+        >
+          Next owners
+        </Button>
       </div>
     </div>
   );
@@ -87,6 +209,9 @@ export function HolderIndexPanel({
   const [runId, setRunId] = useState<string | null>(null),
     [runs, setRuns] = useState<SavedHolderRun[]>([]);
   const [historyReady, setHistoryReady] = useState(false);
+  const [enumeration, setEnumeration] = useState<
+    'das-cursor' | 'program-accounts-v2'
+  >('das-cursor');
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10_000);
@@ -94,6 +219,7 @@ export function HolderIndexPanel({
   }, []);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const [retry, setRetry] = useState<HolderReadRetry | null>(null);
   const pending = useRef<AbortController | null>(null);
   const loadHistory = useCallback(
     async (selected: string | null = null) => {
@@ -190,30 +316,26 @@ export function HolderIndexPanel({
     if (restart) setScan(null);
     try {
       do {
-        const response = await fetch('/api/imported-projects/holder-index', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
+        setRetry(null);
+        const data = await readHolderIndexPageWithRetry(
+          {
             id: project.id,
             revision: project.revision,
             runId: activeRun,
             page: (accumulated?.pages ?? 0) + 1,
-          }),
-          signal: controller.signal,
-        });
-        const data = (await response.json()) as {
-          id?: string;
-          revision?: number;
-          runId?: string;
-          page?: HolderIndexPage;
-          error?: string;
-        };
-        if (!response.ok)
-          throw new Error(
-            data.error ||
-              'Holder page unavailable. Resume or start a fresh scan.',
-          );
+            ...(restart
+              ? { enumeration }
+              : accumulated?.enumeration
+                ? { enumeration: accumulated.enumeration }
+                : {}),
+          },
+          controller.signal,
+          setRetry,
+          accumulated
+            ? Date.parse(accumulated.lastObservedAt) + HOLDER_RUN_RESUME_MS
+            : undefined,
+        );
+        setRetry(null);
         if (
           data.id !== project.id ||
           data.revision !== project.revision ||
@@ -269,6 +391,7 @@ export function HolderIndexPanel({
       if (pending.current === controller) {
         pending.current = null;
         setBusy(false);
+        setRetry(null);
       }
     }
   }
@@ -334,6 +457,26 @@ export function HolderIndexPanel({
           mint supply.
         </p>
       )}
+      <label>
+        New holder scan mode
+        <select
+          value={enumeration}
+          disabled={busy}
+          onChange={(event) =>
+            setEnumeration(event.target.value as typeof enumeration)
+          }
+        >
+          <option value="das-cursor">DAS cursor index</option>
+          <option value="program-accounts-v2">
+            Parsed program accounts with extension data
+          </option>
+        </select>
+      </label>
+      <p>
+        Parsed scans require provider support for getProgramAccountsV2. Saved
+        scans resume using their original mode. Changing this selection affects
+        only a new scan.
+      </p>
       <div className={styles.actions}>
         <Button
           variant="outline"
@@ -430,6 +573,9 @@ export function HolderIndexPanel({
         )}
       {busy && (
         <output>
+          {retry
+            ? `Page ${retry.page}: ${retry.reason} Retrying the same saved run in ${Math.ceil(retry.delayMs / 1000)} seconds (retry ${retry.attempt} of ${HOLDER_READ_MAX_RETRIES}). `
+            : ''}
           {historyReady
             ? 'Reading holder pages. Stop or leave this page to pause.'
             : 'Loading saved holder pages.'}

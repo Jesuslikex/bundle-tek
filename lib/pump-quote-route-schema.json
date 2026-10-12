@@ -1,0 +1,171 @@
+{
+  "format": "pump-quote-route-schema-v1",
+  "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+  "source": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump.json",
+  "sha256": "6a19bad7758fb822cee79a91575e51a7bd60391c670200408676643e00a79a6d",
+  "capturedAt": "2026-10-12T19:07:36.364Z",
+  "name": "sell_v2",
+  "discriminator": "5df6823ce7e940b2",
+  "accounts": [
+    "global",
+    "base_mint",
+    "quote_mint",
+    "base_token_program",
+    "quote_token_program",
+    "associated_token_program",
+    "fee_recipient",
+    "associated_quote_fee_recipient",
+    "buyback_fee_recipient",
+    "associated_quote_buyback_fee_recipient",
+    "bonding_curve",
+    "associated_base_bonding_curve",
+    "associated_quote_bonding_curve",
+    "user",
+    "associated_base_user",
+    "associated_quote_user",
+    "creator_vault",
+    "associated_creator_vault",
+    "sharing_config",
+    "user_volume_accumulator",
+    "associated_user_volume_accumulator",
+    "fee_config",
+    "fee_program",
+    "system_program",
+    "event_authority",
+    "program"
+  ],
+  "fixedAccounts": {
+    "associated_token_program": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+    "fee_program": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+    "system_program": "11111111111111111111111111111111",
+    "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+  },
+  "args": [
+    {
+      "name": "amount",
+      "type": "u64"
+    },
+    {
+      "name": "min_sol_output",
+      "type": "u64"
+    }
+  ],
+  "buy": {
+    "name": "buy_v2",
+    "discriminator": "b817ee6167c5d33d",
+    "accounts": [
+      "global",
+      "base_mint",
+      "quote_mint",
+      "base_token_program",
+      "quote_token_program",
+      "associated_token_program",
+      "fee_recipient",
+      "associated_quote_fee_recipient",
+      "buyback_fee_recipient",
+      "associated_quote_buyback_fee_recipient",
+      "bonding_curve",
+      "associated_base_bonding_curve",
+      "associated_quote_bonding_curve",
+      "user",
+      "associated_base_user",
+      "associated_quote_user",
+      "creator_vault",
+      "associated_creator_vault",
+      "sharing_config",
+      "global_volume_accumulator",
+      "user_volume_accumulator",
+      "associated_user_volume_accumulator",
+      "fee_config",
+      "fee_program",
+      "system_program",
+      "event_authority",
+      "program"
+    ],
+    "fixedAccounts": {
+      "associated_token_program": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "fee_program": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "system_program": "11111111111111111111111111111111",
+      "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+    },
+    "args": [
+      {
+        "name": "amount",
+        "type": "u64"
+      },
+      {
+        "name": "max_sol_cost",
+        "type": "u64"
+      },
+      {
+        "name": "partial_fill",
+        "type": {
+          "defined": {
+            "name": "OptionBool"
+          }
+        }
+      }
+    ],
+    "source": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump.json",
+    "sha256": "6a19bad7758fb822cee79a91575e51a7bd60391c670200408676643e00a79a6d"
+  },
+  "exactQuote": {
+    "name": "buy_exact_quote_in_v2",
+    "discriminator": "c2ab1c46684d5b2f",
+    "accounts": [
+      "global",
+      "base_mint",
+      "quote_mint",
+      "base_token_program",
+      "quote_token_program",
+      "associated_token_program",
+      "fee_recipient",
+      "associated_quote_fee_recipient",
+      "buyback_fee_recipient",
+      "associated_quote_buyback_fee_recipient",
+      "bonding_curve",
+      "associated_base_bonding_curve",
+      "associated_quote_bonding_curve",
+      "user",
+      "associated_base_user",
+      "associated_quote_user",
+      "creator_vault",
+      "associated_creator_vault",
+      "sharing_config",
+      "global_volume_accumulator",
+      "user_volume_accumulator",
+      "associated_user_volume_accumulator",
+      "fee_config",
+      "fee_program",
+      "system_program",
+      "event_authority",
+      "program"
+    ],
+    "fixedAccounts": {
+      "associated_token_program": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "fee_program": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "system_program": "11111111111111111111111111111111",
+      "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+    },
+    "args": [
+      {
+        "name": "spendable_quote_in",
+        "type": "u64"
+      },
+      {
+        "name": "min_tokens_out",
+        "type": "u64"
+      },
+      {
+        "name": "partial_fill",
+        "type": {
+          "defined": {
+            "name": "OptionBool"
+          }
+        }
+      }
+    ],
+    "source": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump.json",
+    "sha256": "6a19bad7758fb822cee79a91575e51a7bd60391c670200408676643e00a79a6d"
+  }
+}

@@ -14,7 +14,8 @@
   margin-block: 0.75rem;
   font-size: 0.8rem;
 }
-.panel select {
+.panel select,
+.panel input {
   width: 100%;
   min-width: 0;
   max-width: 100%;

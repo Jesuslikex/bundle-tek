@@ -30,7 +30,16 @@ export function requireHolderRunPage(
   now = Date.now(),
 ) {
   // Validate the independently read page before it becomes durable.
-  appendHolderIndexPage(null, { ...page, page: 1 }, page.mint, page.decimals);
+  appendHolderIndexPage(
+    null,
+    {
+      ...page,
+      page: 1,
+      requestedCursor: page.enumeration ? null : page.requestedCursor,
+    },
+    page.mint,
+    page.decimals,
+  );
   if (!run) {
     if (page.page !== 1)
       throw new HolderIndexConflict(
@@ -85,12 +94,13 @@ export async function saveHolderRunPage(
     throw new HolderIndexConflict(
       'Indexed balances exceed supply. Start a fresh scan.',
     );
-  const status =
-    page.accounts.length === 0
-      ? 'enumerated'
-      : page.page === HOLDER_INDEX_MAX_PAGES
-        ? 'limit'
-        : 'partial';
+  const status = (
+    page.enumeration ? page.nextCursor === null : page.accounts.length === 0
+  )
+    ? 'enumerated'
+    : page.page === HOLDER_INDEX_MAX_PAGES
+      ? 'limit'
+      : 'partial';
   const stamp = new Date().toISOString();
   const context: HolderIndexRunContext = {
     mint: page.mint,

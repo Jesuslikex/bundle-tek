@@ -29,6 +29,7 @@ function input(value: unknown) {
           'cursor',
           'indexedAddress',
           'mode',
+          'reuseSaved',
         ].includes(k),
     ) ||
     typeof b.id !== 'string' ||
@@ -40,6 +41,8 @@ function input(value: unknown) {
   )
     throw new Error();
   const cursor = b.cursor ?? null;
+  if (b.reuseSaved !== undefined && typeof b.reuseSaved !== 'boolean')
+    throw new Error();
   if (cursor !== null && typeof cursor !== 'string') throw new Error();
   signatureCursor(cursor as string | null);
   if (b.mode !== undefined && b.mode !== 'inspect' && b.mode !== 'accounts')
@@ -56,6 +59,7 @@ function input(value: unknown) {
     wallet: walletAddress(b.wallet, 'Solana'),
     cursor: cursor as string | null,
     mode: b.mode ?? 'inspect',
+    reuseSaved: b.reuseSaved === true,
     indexedAddress: walletAddress(b.indexedAddress ?? b.wallet, 'Solana'),
   };
 }
@@ -258,6 +262,42 @@ export async function POST(request: Request) {
         { error: 'Movement cursor is not retained for this alert.' },
         400,
       );
+    if (q.mode === 'inspect' && q.reuseSaved) {
+      const saved = await db
+        .prepare(
+          "SELECT id,document FROM supply_movement_evidence WHERE owner_id=? AND project_id=? AND observation_id=? AND wallet_address=? AND COALESCE(json_extract(document,'$.indexedAddress'),wallet_address)=? AND json_extract(document,'$.requestedCursor') IS ? ORDER BY sequence DESC LIMIT 1",
+        )
+        .bind(
+          user.userId,
+          q.id,
+          q.observationId,
+          q.wallet,
+          q.indexedAddress,
+          q.cursor,
+        )
+        .first<{ id: string; document: string }>();
+      if (saved) {
+        const evidence = checkedEvidence(
+          JSON.parse(saved.document),
+          c,
+          q.wallet,
+        );
+        if (
+          (evidence.indexedAddress ?? q.wallet) !== q.indexedAddress ||
+          evidence.requestedCursor !== q.cursor ||
+          (q.cursor !== null &&
+            evidence.anchor !== signatureCursor(q.cursor)!.anchor)
+        )
+          throw new Error('Saved page context differs.');
+        return json({
+          id: q.id,
+          revision: q.revision,
+          observationId: q.observationId,
+          wallet: q.wallet,
+          item: { id: saved.id, document: evidence },
+        });
+      }
+    }
     const now = Date.now(),
       gate = await db
         .prepare(
@@ -313,6 +353,10 @@ export async function POST(request: Request) {
       checkedEvidence(evidence, c, q.wallet);
       if ((evidence.indexedAddress ?? q.wallet) !== q.indexedAddress)
         throw new Error('Indexed address differs.');
+      if (evidence.requestedCursor !== q.cursor)
+        throw new Error('Requested cursor differs.');
+      if (q.cursor && evidence.anchor !== signatureCursor(q.cursor)!.anchor)
+        throw new Error('Requested anchor differs.');
     } catch {
       return json(
         {

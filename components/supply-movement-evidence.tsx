@@ -3,7 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import type { SupplyHistoryRow } from '@/lib/supply-history';
 import type { SupplyMovementEvidence } from '@/lib/supply-movement-evidence';
-import { signedBalanceAmount } from '@/lib/wallet-balance-format';
+import { WalletMovementLabel } from './wallet-movement-label';
+import { SupplyMovementSummary } from './supply-movement-summary';
+import {
+  createForegroundMovementInspection,
+  type MovementInspectionState,
+} from '@/lib/foreground-movement-inspection';
+import { fetchSupplyMonitorJson } from '@/lib/supply-monitor-read';
 import { walletAddress } from '@/lib/wallet-workspace';
 import type { SupplyTokenAccounts } from '@/lib/supply-token-accounts';
 import {
@@ -29,7 +35,29 @@ export function SupplyMovementEvidencePanel({
   const [chartError, setChartError] = useState('');
   const [indexedAddress, setIndexedAddress] = useState(wallet);
   const pending = useRef<AbortController | null>(null);
-  useEffect(() => () => pending.current?.abort(), []);
+  const inspector = useRef<ReturnType<
+    typeof createForegroundMovementInspection
+  > | null>(null);
+  const [inspection, setInspection] = useState<MovementInspectionState>({
+    status: 'off',
+    reason: '',
+    pages: 0,
+  });
+  const continuing = inspection.status === 'running';
+  useEffect(() => {
+    const pause = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine)
+        inspector.current?.pause();
+    };
+    document.addEventListener('visibilitychange', pause);
+    window.addEventListener('offline', pause);
+    return () => {
+      pending.current?.abort();
+      inspector.current?.destroy();
+      document.removeEventListener('visibilitychange', pause);
+      window.removeEventListener('offline', pause);
+    };
+  }, []);
   function check(r: EvidenceRow) {
     const d = r?.document;
     walletAddress(d?.indexedAddress ?? wallet, 'Solana');
@@ -74,16 +102,31 @@ export function SupplyMovementEvidencePanel({
     scan = false,
     cursor: string | null = null,
     discover = false,
+    continuationSignal?: AbortSignal,
   ) {
     pending.current?.abort();
     const c = new AbortController();
+    const abortContinuation = () => c.abort();
+    continuationSignal?.addEventListener('abort', abortContinuation, {
+      once: true,
+    });
+    if (continuationSignal?.aborted) c.abort();
     pending.current = c;
     setBusy(true);
     setError('');
     const terms = { id: projectId, revision, observationId: row.id, wallet };
     try {
       let url = '/api/imported-projects/supply-movements',
-        init: RequestInit = { signal: c.signal, cache: 'no-store' };
+        init: RequestInit = {
+          signal: continuationSignal
+            ? AbortSignal.any([
+                c.signal,
+                continuationSignal,
+                AbortSignal.timeout(28000),
+              ])
+            : c.signal,
+          cache: 'no-store',
+        };
       if (scan || discover)
         init = {
           ...init,
@@ -92,25 +135,27 @@ export function SupplyMovementEvidencePanel({
           body: JSON.stringify(
             discover
               ? { ...terms, mode: 'accounts' }
-              : { ...terms, cursor, indexedAddress },
+              : {
+                  ...terms,
+                  cursor,
+                  indexedAddress,
+                  ...(continuationSignal ? { reuseSaved: true } : {}),
+                },
           ),
         };
       else
         url +=
           '?' + new URLSearchParams({ ...terms, revision: String(revision) });
-      const response = await fetch(url, init),
-        data = (await response.json()) as {
-          id: string;
-          revision: number;
-          observationId: string;
-          wallet: string;
-          items?: EvidenceRow[];
-          item?: EvidenceRow;
-          error?: string;
-          accounts?: SupplyTokenAccounts;
-        };
-      if (!response.ok)
-        throw new Error(data.error || 'Movement inspection unavailable.');
+      const data = await fetchSupplyMonitorJson<{
+        id: string;
+        revision: number;
+        observationId: string;
+        wallet: string;
+        items?: EvidenceRow[];
+        item?: EvidenceRow;
+        error?: string;
+        accounts?: SupplyTokenAccounts;
+      }>(url, init, 'Movement inspection unavailable.');
       if (
         data.id !== projectId ||
         data.revision !== revision ||
@@ -141,10 +186,13 @@ export function SupplyMovementEvidencePanel({
         const checked = check(data.item);
         if ((checked.document.indexedAddress ?? wallet) !== indexedAddress)
           throw new Error('Movement index context differs.');
+        if (checked.document.requestedCursor !== cursor)
+          throw new Error('Movement cursor context differs.');
         if (!c.signal.aborted)
           setRecords((old) =>
             [checked, ...old.filter((r) => r.id !== checked.id)].slice(0, 20),
           );
+        return checked.document;
       } else {
         if (!Array.isArray(data.items) || data.items.length > 20)
           throw new Error('Invalid movement history.');
@@ -156,7 +204,9 @@ export function SupplyMovementEvidencePanel({
         setError(
           e instanceof Error ? e.message : 'Movement evidence unavailable.',
         );
+      if (continuationSignal) throw e;
     } finally {
+      continuationSignal?.removeEventListener('abort', abortContinuation);
       if (!c.signal.aborted) setBusy(false);
     }
   }
@@ -190,7 +240,7 @@ export function SupplyMovementEvidencePanel({
           Signature index
           <select
             value={indexedAddress}
-            disabled={busy}
+            disabled={busy || continuing}
             onChange={(e) => setIndexedAddress(e.target.value)}
           >
             {indexes.map((address) => (
@@ -205,17 +255,21 @@ export function SupplyMovementEvidencePanel({
         <div className="wallet-roster-actions">
           <Button
             variant="outline"
-            disabled={busy}
+            disabled={busy || continuing}
             onClick={() => void run(false, null, true)}
           >
             Find token accounts
           </Button>
-          <Button variant="outline" disabled={busy} onClick={() => void run()}>
+          <Button
+            variant="outline"
+            disabled={busy || continuing}
+            onClick={() => void run()}
+          >
             Load saved transaction evidence
           </Button>
           <Button
             variant="outline"
-            disabled={busy}
+            disabled={busy || continuing}
             onClick={() => void run(true)}
           >
             Inspect alert transactions
@@ -223,13 +277,60 @@ export function SupplyMovementEvidencePanel({
           {latest?.nextCursor && (
             <Button
               variant="outline"
-              disabled={busy}
+              disabled={busy || continuing}
               onClick={() => void run(true, latest.nextCursor)}
             >
               Inspect older signatures
             </Button>
           )}
         </div>
+        <div className="wallet-roster-actions">
+          <Button
+            variant="outline"
+            disabled={
+              busy || continuing || latest?.completeThroughBoundary === true
+            }
+            onClick={() => {
+              inspector.current?.destroy();
+              const next = createForegroundMovementInspection({
+                available: () =>
+                  document.visibilityState === 'visible' && navigator.onLine,
+                read: async (cursor, signal) => {
+                  const page = await run(true, cursor, false, signal);
+                  if (!page) throw new Error('Missing inspected page.');
+                  return page;
+                },
+                onState: (state) => {
+                  setInspection(state);
+                  if (state.status !== 'running') setBusy(false);
+                },
+              });
+              inspector.current = next;
+              next.start(latest?.nextCursor ?? null);
+            }}
+          >
+            Continue index inspection
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!continuing}
+            onClick={() => inspector.current?.stop()}
+          >
+            Stop index inspection
+          </Button>
+        </div>
+        <output>
+          {inspection.status} · {inspection.pages} continuation pages.{' '}
+          {inspection.reason}
+        </output>
+        <p>
+          Continues this selected address index, up to 20 pages per start, with
+          30 seconds between pages. Temporary failures retry the same saved
+          cursor; five consecutive retries are allowed. Hiding the tab, going
+          offline or stopping pauses reads. Continue explicitly to resume.
+          Saved-page reuse retains its original observation time; use manual
+          inspection to refresh classifications.
+        </p>
         {accounts && (
           <p>
             {accounts.accounts.length} current token accounts found at finalized
@@ -248,22 +349,48 @@ export function SupplyMovementEvidencePanel({
             decodes; {latest.failedSignatures} failed signatures omitted.
           </p>
         )}
+        {records.length > 0 &&
+          row.document.alerts.find((a) => a.address === wallet) && (
+            <SupplyMovementSummary
+              records={records.map((r) => r.document)}
+              scope={{
+                observationId: row.id,
+                wallet,
+                mint: row.document.snapshot.mint,
+                decimals: row.document.snapshot.decimals,
+                toSlot: row.document.snapshot.wallets.find(
+                  (w) => w.address === wallet,
+                )!.slot,
+                previousRaw: row.document.alerts.find(
+                  (a) => a.address === wallet,
+                )!.previousRaw,
+                currentRaw: row.document.alerts.find(
+                  (a) => a.address === wallet,
+                )!.currentRaw,
+              }}
+            />
+          )}
         {transactions.map((t) => (
-          <p key={t.signature}>
-            <a
-              href={`https://solscan.io/tx/${t.signature}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Transaction {t.signature.slice(0, 10)}…
-            </a>{' '}
-            · slot {t.slot} · {t.classification?.kind ?? 'unknown'} · token
-            change {signedBalanceAmount(t.changeRaw, t.decimals)}
-            {t.classification && <span> · {t.classification.reason}</span>}
-            {' · '}
-            {t.blockTime === null
-              ? 'Block time unavailable'
-              : new Date(t.blockTime * 1000).toLocaleString()}{' '}
+          <article key={t.signature} className="min-w-0 space-y-2 break-words">
+            <p>
+              <a
+                href={`https://solscan.io/tx/${t.signature}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Transaction {t.signature.slice(0, 10)}…
+              </a>{' '}
+              · slot {t.slot}
+              {' · '}
+              {t.blockTime === null
+                ? 'Block time unavailable'
+                : new Date(t.blockTime * 1000).toLocaleString()}{' '}
+            </p>
+            <WalletMovementLabel
+              classification={t.classification}
+              changeRaw={t.changeRaw}
+              decimals={t.decimals}
+            />
             <Button
               variant="outline"
               disabled={t.blockTime === null}
@@ -289,7 +416,7 @@ export function SupplyMovementEvidencePanel({
             >
               Inspect transaction on chart
             </Button>
-          </p>
+          </article>
         ))}
         {latest && !transactions.length && (
           <p>

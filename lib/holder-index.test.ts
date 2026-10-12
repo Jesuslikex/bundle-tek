@@ -124,7 +124,7 @@ it('fails reconciliation when accumulated balances exceed mint supply', () => {
   ).toThrow('exceed supply');
 });
 
-it('sends named DAS params, validates mainnet and preserves numeric amount spelling', async () => {
+it('requests finalized mint-filtered cursor accounts and preserves numeric amount spelling', async () => {
   env.SOLANA_INDEXER_RPC_URL = 'https://index.test';
   const calls: Array<{ method: string; params: unknown }> = [];
   const fetcher = vi.fn(async (_: RequestInfo | URL, init?: RequestInit) => {
@@ -139,14 +139,23 @@ it('sends named DAS params, validates mainnet and preserves numeric amount spell
       });
     if (body.method === 'getTokenSupply')
       return Response.json({ jsonrpc: '2.0', id: 1, result: supply });
+    const program = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+    if (body.method === 'getAccountInfo')
+      return Response.json({
+        jsonrpc: '2.0',
+        id: 1,
+        result: { value: { owner: program, executable: false } },
+      });
     return new Response(
-      '{"jsonrpc":"2.0","id":1,"result":{"last_indexed_slot":190,"token_accounts":[{"address":"' +
+      '{"jsonrpc":"2.0","id":1,"result":{"context":{"slot":200},"value":{"paginationKey":null,"accounts":[{"pubkey":"' +
         address(1) +
-        '","owner":"' +
+        '","account":{"owner":"' +
+        program +
+        '","executable":false,"data":{"parsed":{"type":"account","info":{"owner":"' +
         address(7) +
         '","mint":"' +
         mint +
-        '","amount":9007199254740993,"frozen":false}]}}',
+        '","state":"initialized","tokenAmount":{"amount":9007199254740993,"decimals":6}}}}}}]}}}',
     );
   });
   try {
@@ -155,14 +164,21 @@ it('sends named DAS params, validates mainnet and preserves numeric amount spell
       1,
       new AbortController().signal,
       fetcher,
+      null,
+      'program-accounts-v2',
     );
     expect(result.accounts[0].raw).toBe('9007199254740993');
-    expect(calls.at(-1)?.params).toEqual({
-      mint,
-      page: 1,
-      limit: 1000,
-      options: { showZeroBalance: false },
+    expect(calls.at(-1)).toMatchObject({
+      method: 'getProgramAccountsV2',
+      params: [
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+        {
+          commitment: 'finalized',
+          filters: [{ memcmp: { offset: 0, bytes: mint } }],
+        },
+      ],
     });
+    expect(result.nextCursor).toBeNull();
   } finally {
     delete env.SOLANA_INDEXER_RPC_URL;
   }
