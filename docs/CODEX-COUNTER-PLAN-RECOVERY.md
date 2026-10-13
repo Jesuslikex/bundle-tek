@@ -1,0 +1,9 @@
+# Counter plan recovery API
+
+13 October 2026. Authenticated `GET /api/imported-projects/counter-trades?projectId=<uuid>` now returns the owner's complete saved plan roster for that project. The existing two-parameter GET still retrieves one exact plan. Recovery does not depend on browser-local plan IDs or fresh provider requests.
+
+Plans are ordered by saved creation time descending, then id ascending. Active, paused and ended history remains readable after project archival. Every plan goes through the full ledger/rules validator and must match its stored id/revision/state/project. Corrupt or over-capacity history rejects the entire response with the existing sanitized 503; it is not silently filtered or truncated. The existing capacity is 20 total plans per project. Requests with duplicate, unknown or malformed query fields are rejected. Owner scoping applies directly in SQL; a different owner sees an empty roster. No signing authority is granted by listing a plan.
+
+Verification: **27 tests in three main files passed**, including real-route disposable D1 owner isolation, archived/ended recovery, exact-plan compatibility, corrupt-list rejection and malformed query fields alongside the Counter evaluation/replay regressions. Actual-source TypeScript, three-file typed lint and production build passed. All checks exited 0. Reports: work/release-qa/counter-list-*-20261013.*. The 1065-file source snapshot stayed unchanged at digest 27035d7792833e63cda71eb465d19b6d4efeed4ea13ff5cc270a83b344c61a5a.
+
+Files: lib/counter-trade-store.ts and app/api/imported-projects/counter-trades/route.ts plus its test. No UI source, historical migration, provider call, hosted SQL, credential, push, version save, deployment or transaction changed. This backend checkpoint supports the separately planned Counter UI; it does not claim that the UI, worker, shared limits or transaction review/signing are integrated.

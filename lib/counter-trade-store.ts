@@ -70,3 +70,30 @@ export async function readCounterPlan(
     throw new Error('Stored Counter identity differs.');
   return p;
 }
+
+/** Owner-scoped recovery. Reject corrupt or over-capacity history rather than hiding it. */
+export async function listCounterPlans(
+  db: D1Database,
+  owner: string,
+  project: string,
+) {
+  const rows = await db
+    .prepare(
+      "SELECT id,revision,state,document FROM counter_trade_plans WHERE owner_id=? AND project_id=? ORDER BY json_extract(document,'$.createdAt') DESC,id ASC LIMIT 21",
+    )
+    .bind(owner, project)
+    .all<{ id: string; revision: number; state: string; document: string }>();
+  if (rows.results.length > 20)
+    throw new Error('Counter history capacity differs.');
+  return rows.results.map((row) => {
+    const plan = decodeCounterPlan(JSON.parse(row.document));
+    if (
+      plan.id !== row.id ||
+      plan.projectId !== project ||
+      plan.revision !== row.revision ||
+      plan.state !== row.state
+    )
+      throw new Error('Stored Counter identity differs.');
+    return plan;
+  });
+}

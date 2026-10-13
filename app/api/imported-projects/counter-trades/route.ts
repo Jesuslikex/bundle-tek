@@ -6,7 +6,11 @@ import {
   evaluateCounterTrade,
   type CounterRules,
 } from '@/lib/counter-trade';
-import { readCounterPlan, type CounterPlan } from '@/lib/counter-trade-store';
+import {
+  readCounterPlan,
+  listCounterPlans,
+  type CounterPlan,
+} from '@/lib/counter-trade-store';
 import {
   readPoolTradeContext,
   selectedPoolTradeContext,
@@ -36,14 +40,16 @@ export async function GET(request: Request) {
     projectId = q.get('projectId'),
     id = q.get('id');
   if (
-    q.size !== 2 ||
     !projectId ||
-    !id ||
     !UUID.test(projectId) ||
-    !UUID.test(id)
+    (id === null ? q.size !== 1 : q.size !== 2 || !UUID.test(id))
   )
-    return json({ error: 'Choose one saved Counter plan.' }, 400);
+    return json({ error: 'Choose a project or one saved Counter plan.' }, 400);
   try {
+    if (id === null) {
+      const plans = await listCounterPlans(getD1(), user.userId, projectId);
+      return json({ projectId, plans, executionAllowed: false });
+    }
     const plan = await readCounterPlan(getD1(), user.userId, projectId, id);
     return plan
       ? json({ plan, executionAllowed: false })

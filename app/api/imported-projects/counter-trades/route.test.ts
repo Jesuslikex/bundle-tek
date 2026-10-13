@@ -545,3 +545,76 @@ it('uses database time to reject stale evidence even when the application clock 
     clock.mockRestore();
   }
 });
+
+const list = (suffix = '') =>
+  GET(
+    new Request(
+      `https://bundle.test/api/imported-projects/counter-trades?projectId=${id(1)}${suffix}`,
+    ),
+  );
+it('recovers the complete owner-scoped plan list after archival without provider reads', async () => {
+  await create();
+  await post({
+    action: 'create',
+    id: id(3),
+    projectId: id(1),
+    projectRevision: 1,
+    rules,
+  });
+  await post({
+    action: 'control',
+    id: id(2),
+    projectId: id(1),
+    revision: 1,
+    state: 'ended',
+  });
+  await db.prepare('UPDATE imported_token_projects SET archived=1').run();
+  const response = await list();
+  expect(response.status).toBe(200);
+  const data = (await response.json()) as {
+    projectId: string;
+    plans: unknown[];
+    executionAllowed: boolean;
+  };
+  expect(data.projectId).toBe(id(1));
+  expect(data.executionAllowed).toBe(false);
+  const plans = data.plans.map(decodeCounterPlan);
+  expect(plans).toHaveLength(2);
+  expect(plans.find((p) => p.id === id(2))?.state).toBe('ended');
+  expect(plans.find((p) => p.id === id(3))?.state).toBe('active');
+  mocks.user = { userId: 'bob' };
+  expect((await list()).status).toBe(200);
+  expect(await (await list()).json()).toEqual({
+    projectId: id(1),
+    plans: [],
+    executionAllowed: false,
+  });
+  mocks.user = null;
+  expect((await list()).status).toBe(401);
+  expect(mocks.observe).not.toHaveBeenCalled();
+});
+it('rejects malformed, repeated and extra plan-list query fields', async () => {
+  for (const suffix of [
+    '&id=',
+    '&extra=1',
+    `&projectId=${id(1)}`,
+    '&id=not-a-plan',
+  ])
+    expect((await list(suffix)).status).toBe(400);
+});
+it('rejects corrupt list history instead of presenting a partially valid roster', async () => {
+  const plan = (await planBody(await create())).plan;
+  const corrupt = structuredClone(plan);
+  corrupt.id = id(3);
+  corrupt.rules.replicationPercent = 'bad';
+  await db
+    .prepare("INSERT INTO counter_trade_plans VALUES(?,?,?,1,'active',?)")
+    .bind('alice', id(1), id(3), JSON.stringify(corrupt))
+    .run();
+  const response = await list();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({
+    error: 'Counter history unavailable.',
+  });
+  expect(mocks.observe).not.toHaveBeenCalled();
+});
