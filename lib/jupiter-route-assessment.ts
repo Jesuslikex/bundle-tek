@@ -31,12 +31,36 @@ type Order = Pick<
   platformFee?: { bps: number; mint: string };
 };
 export function decodeJupiterRoute(hex: string) {
+  return decodeRouteLayout(hex, false);
+}
+/** Shared ExactOut v1 has output then quoted input in its trailer. */
+export function decodeJupiterExactOutRoute(hex: string) {
+  const value = decodeRouteLayout(hex, true);
+  if (!value) return null;
+  return {
+    kind: 'sharedAccountsExactOutRoute' as const,
+    id: value.id,
+    outputTargetRaw: value.quotedOutRaw,
+    quotedInputRaw: value.inAmountRaw,
+    maximumInputUpperBoundRaw: (
+      (BigInt(value.inAmountRaw) * BigInt(10000 + value.slippageBps) + 9999n) /
+      10000n
+    ).toString(),
+    slippageBps: value.slippageBps,
+    platformFeeBps: value.platformFeeBps,
+    steps: value.steps,
+  };
+}
+function decodeRouteLayout(hex: string, exactOut: boolean) {
   if (!/^(?:[0-9a-f]{2}){8,1232}$/.test(hex))
     throw new Error('Malformed route bytes.');
+  if (exactOut && !hex.startsWith('b0d169a89a7d453e')) return null;
   const v2 =
     hex.startsWith('bb64facc31c4af14') || hex.startsWith('d19853937cfed8e9');
   const shared =
-    hex.startsWith('c1209b3341d69c81') || hex.startsWith('d19853937cfed8e9');
+    exactOut ||
+    hex.startsWith('c1209b3341d69c81') ||
+    hex.startsWith('d19853937cfed8e9');
   if (!shared && !v2 && !hex.startsWith('e517cb977ae3ad2a')) return null;
   const bytes = Uint8Array.from(hex.match(/../g)!, (v) => parseInt(v, 16)),
     view = new DataView(bytes.buffer);
@@ -52,13 +76,17 @@ export function decodeJupiterRoute(hex: string) {
     u32 = () => view.getUint32(read(4), true),
     u64 = () => view.getBigUint64(read(8), true);
   const id = shared ? u8() : null;
-  const header = () => ({
-    inAmountRaw: u64().toString(),
-    quotedOutRaw: u64().toString(),
-    slippageBps: u16(),
-    platformFeeBps: v2 ? u16() : u8(),
-    positiveSlippageBps: v2 ? u16() : 0,
-  });
+  const header = () => {
+    const first = u64().toString(),
+      second = u64().toString();
+    return {
+      inAmountRaw: exactOut ? second : first,
+      quotedOutRaw: exactOut ? first : second,
+      slippageBps: u16(),
+      platformFeeBps: v2 ? u16() : u8(),
+      positiveSlippageBps: v2 ? u16() : 0,
+    };
+  };
   const amounts = v2 ? header() : null;
   const count = u32();
   if (!count || count > 256) throw new Error('Invalid route step count.');
