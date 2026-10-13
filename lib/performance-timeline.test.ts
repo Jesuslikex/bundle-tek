@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  axisSol,
+  bucketTitle,
   buildTimeline,
   calendarMonth,
   dailyResults,
+  initialCalendarMonth,
   positiveStreaks,
   validatedTimelineData,
   windowChange,
@@ -220,5 +223,42 @@ describe('validatedTimelineData', () => {
         summary,
       ),
     ).toThrow('sale differs');
+  });
+});
+
+describe('display helpers', () => {
+  it('names 1D hours with their date so repeated hour labels stay distinct', () => {
+    const t = buildTimeline([], '1d', 'UTC', NOW);
+    const noon = t.buckets.filter((b) => b.label === '12:00');
+    expect(noon.map((b) => b.title)).toEqual([
+      'Oct 11, 2026, 12:00–12:59',
+      'Oct 12, 2026, 12:00–12:59',
+    ]);
+    expect(bucketTitle('2026-10', 'month')).toBe('Oct 2026');
+    expect(bucketTitle('2026-10-05', 'day')).toBe('Oct 5, 2026');
+  });
+
+  it('formats axis ticks without floating-point noise', () => {
+    expect(axisSol(0.1 + 0.2)).toBe('0.3 SOL');
+    expect(axisSol(-0)).toBe('0 SOL');
+    expect(axisSol(-1.23456)).toBe('-1.235 SOL');
+    expect(axisSol(Number.NaN)).toBe('');
+  });
+
+  it('opens the calendar on the latest month with sales, never a future one', () => {
+    const today = { year: 2026, month: 10, day: 12 };
+    expect(initialCalendarMonth(new Map(), today)).toEqual({
+      year: 2026,
+      month: 10,
+    });
+    const days = dailyResults(
+      [
+        sale('5', Date.UTC(2026, 7, 3) / 1000),
+        sale('5', Date.UTC(2026, 8, 20) / 1000),
+        sale('5', Date.UTC(2026, 11, 1) / 1000),
+      ],
+      'UTC',
+    );
+    expect(initialCalendarMonth(days, today)).toEqual({ year: 2026, month: 9 });
   });
 });

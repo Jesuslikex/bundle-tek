@@ -22,9 +22,11 @@ import { Button } from '@/components/ui/button';
 import { signedBalanceAmount } from '@/lib/wallet-balance-format';
 import {
   TIMEFRAMES,
+  axisSol,
   buildTimeline,
   calendarMonth,
   dailyResults,
+  initialCalendarMonth,
   isValidTimeZone,
   positiveStreaks,
   windowChange,
@@ -135,7 +137,7 @@ function BucketTooltip({
   const b = payload[0].payload;
   return (
     <div className="rounded-md border border-[#343846] bg-[#151720] px-3 py-2 text-xs">
-      <p className="font-medium">{b.label}</p>
+      <p className="font-medium">{b.title}</p>
       <p>
         Period:{' '}
         <span className={tone(b.resultLamports)}>{sol(b.resultLamports)}</span>
@@ -362,10 +364,10 @@ export function PerformanceTimeline({
                     minTickGap={24}
                   />
                   <YAxis
-                    width={64}
+                    width={72}
                     tick={{ fill: MUTED, fontSize: 12 }}
                     tickLine={false}
-                    tickFormatter={(v: number) => `${v} SOL`}
+                    tickFormatter={axisSol}
                   />
                   <Tooltip content={<BucketTooltip />} />
                   <Area
@@ -386,10 +388,10 @@ export function PerformanceTimeline({
                     minTickGap={24}
                   />
                   <YAxis
-                    width={64}
+                    width={72}
                     tick={{ fill: MUTED, fontSize: 12 }}
                     tickLine={false}
-                    tickFormatter={(v: number) => `${v} SOL`}
+                    tickFormatter={axisSol}
                   />
                   <Tooltip content={<BucketTooltip />} />
                   <Bar
@@ -434,7 +436,7 @@ export function PerformanceTimeline({
                     .filter((b) => b.saleCount > 0)
                     .map((b) => (
                       <tr key={b.key}>
-                        <td>{b.key.replace('T', ' ')}</td>
+                        <td>{b.title}</td>
                         <td className={tone(b.resultLamports)}>
                           {sol(b.resultLamports)}
                         </td>
@@ -554,7 +556,7 @@ export function PerformanceCalendar({
   const days = useMemo(() => dailyResults(sales, timeZone), [sales, timeZone]);
   const today = zonedParts(nowSeconds, timeZone);
   const earliest = [...days.keys()].sort()[0];
-  const [view, setView] = useState({ year: today.year, month: today.month });
+  const [view, setView] = useState(() => initialCalendarMonth(days, today));
   const [selected, setSelected] = useState<CalendarDay | null>(null);
   const month = calendarMonth(days, view.year, view.month);
   const monthKey = `${view.year}-${String(view.month).padStart(2, '0')}`;

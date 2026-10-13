@@ -228,17 +228,27 @@ export function AccountPerformancePanel() {
         cache: 'no-store',
         signal: current.signal,
       });
-      const body = (await response.json()) as {
+      // Proxy or gateway errors may return HTML; never surface parser text.
+      const body = (await response.json().catch(() => null)) as {
         summary?: unknown;
         timeline?: unknown;
       } | null;
-      if (!response.ok)
+      if (!response.ok || !body)
         throw new Error(
-          'Recorded trading performance unavailable. No partial totals are shown.',
+          response.status === 401
+            ? 'Sign in to view recorded trading performance.'
+            : 'Recorded trading performance unavailable. No partial totals are shown.',
         );
-      const summary = validatedAccountPerformance(body?.summary);
-      // The timeline must reconcile with the same snapshot's totals or neither is shown.
-      const sales = validatedTimelineData(body?.timeline, summary);
+      let summary: AccountPerformance, sales: PerformanceTimelineData;
+      try {
+        summary = validatedAccountPerformance(body.summary);
+        // The timeline must reconcile with the same snapshot's totals or neither is shown.
+        sales = validatedTimelineData(body.timeline, summary);
+      } catch {
+        throw new Error(
+          'Recorded performance failed its consistency checks. No partial totals are shown.',
+        );
+      }
       if (!current.signal.aborted) {
         setValue(summary);
         setTimeline(sales);

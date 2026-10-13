@@ -179,10 +179,25 @@ export function bucketLabel(key: string, g: Granularity) {
   if (g === 'day') return `${MONTHS[month - 1]} ${day}`;
   return `${MONTHS[month - 1]} ${year}`;
 }
+/** Unambiguous period name: a 1D window repeats hour labels across two dates. */
+export function bucketTitle(key: string, g: Granularity) {
+  const [date, hour] = key.split('T');
+  const [year, month, day] = date.split('-').map(Number);
+  if (g === 'month') return `${MONTHS[month - 1]} ${year}`;
+  const name = `${MONTHS[month - 1]} ${day}, ${year}`;
+  return g === 'hour' ? `${name}, ${hour}:00–${hour}:59` : name;
+}
+/** Axis ticks are approximate; trims floating-point noise like 0.30000000000000004. */
+export function axisSol(value: number) {
+  if (!Number.isFinite(value)) return '';
+  const text = Number(value.toPrecision(4)).toString();
+  return `${text === '-0' ? '0' : text} SOL`;
+}
 
 export type TimelineBucket = {
   key: string;
   label: string;
+  title: string;
   resultLamports: bigint;
   cumulativeLamports: bigint;
   saleCount: number;
@@ -248,6 +263,7 @@ export function buildTimeline(
         const bucket = {
           key,
           label: bucketLabel(key, granularity),
+          title: bucketTitle(key, granularity),
           resultLamports: 0n,
           cumulativeLamports: 0n,
           saleCount: 0,
@@ -390,4 +406,18 @@ export function positiveStreaks(
     best = Math.max(best, run);
   }
   return { current, best };
+}
+/** Month the calendar opens on: the latest month with sales up to today, else today. */
+export function initialCalendarMonth(
+  days: Map<string, CalendarDay>,
+  today: { year: number; month: number; day: number },
+) {
+  const todayKey = dayKey(today);
+  const latest = [...days.keys()]
+    .filter((k) => k <= todayKey)
+    .sort()
+    .pop();
+  if (!latest) return { year: today.year, month: today.month };
+  const [year, month] = latest.split('-').map(Number);
+  return { year, month };
 }
