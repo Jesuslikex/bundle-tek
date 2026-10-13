@@ -4327,3 +4327,13 @@ body {
     font-size: 11px;
   }
 }
+/* Market toolbar: pair, refresh and feed controls share one row above the chart. */
+.imported-market-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.imported-market-toolbar select {
+  max-width: 320px;
+}

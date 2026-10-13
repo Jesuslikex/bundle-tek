@@ -347,149 +347,6 @@ export function PoolCandleChart({
             )}
           </output>
         )}
-      <div className="wallet-roster-actions">
-        <label>
-          Visible candles{' '}
-          <select
-            aria-label="Visible candles"
-            value={size}
-            onChange={(e) => zoom(Number(e.target.value))}
-          >
-            {![24, 100, 500].includes(size) && (
-              <option value={size}>{size} candles</option>
-            )}
-            <option value={24}>24 candles</option>
-            <option value={100}>100 candles</option>
-            <option value={500}>All loaded candles</option>
-          </select>
-        </label>
-        <Button
-          variant="outline"
-          disabled={size <= 12}
-          onClick={() => zoom(Math.max(12, Math.floor(size / 1.5)))}
-        >
-          Zoom chart in
-        </Button>
-        <Button
-          variant="outline"
-          disabled={size >= snapshot.candles.length || size >= 500}
-          onClick={() => zoom(Math.min(500, Math.ceil(size * 1.5)))}
-        >
-          Zoom chart out
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!window.earlier}
-          onClick={() =>
-            setView({
-              context,
-              size,
-              end: moveCandleWindow(snapshot.candles, size, endTime, -1),
-            })
-          }
-        >
-          Earlier chart window
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!window.later}
-          onClick={() =>
-            setView({
-              context,
-              size,
-              end: moveCandleWindow(snapshot.candles, size, endTime, 1),
-            })
-          }
-        >
-          Later chart window
-        </Button>
-        <Button
-          variant="outline"
-          disabled={endTime === null}
-          onClick={() => setView({ context, size, end: null })}
-        >
-          Latest chart window
-        </Button>
-      </div>
-      <div
-        className="flex flex-wrap items-center gap-2"
-        aria-label="Chart value scale"
-      >
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={!showCap}
-          onClick={() => setCapMode(false)}
-        >
-          Token price
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={showCap}
-          disabled={capSupply === null}
-          onClick={() => setCapMode(true)}
-        >
-          Market cap
-        </Button>
-      </div>
-      {showCap && supplyToken && (
-        <p className="text-xs text-muted-foreground">
-          Estimated market cap: candle price × saved total supply (
-          {capSupply!.toLocaleString()} tokens, observed{' '}
-          {new Date(supplyToken.observedAt).toLocaleString()}). The same supply
-          applies to all candles; this does not reconstruct historical
-          circulating supply. Drawing inputs use token-price {unit}; plotted
-          guide labels use the selected scale.
-        </p>
-      )}
-      {projectId && (
-        <div
-          className="flex flex-wrap items-center gap-2"
-          aria-label="Drawing storage"
-        >
-          <Button type="button" variant="outline" onClick={saveDrawings}>
-            Save chart drawings
-          </Button>
-          <Button type="button" variant="outline" onClick={restoreDrawings}>
-            Restore chart drawings
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Stored in this browser only. Restore replaces current drawings. Save
-            again after editing; clearing browser data removes saved drawings.
-          </p>
-        </div>
-      )}
-      {drawingStorageMessage && (
-        <output className="block">{drawingStorageMessage}</output>
-      )}
-      <label>
-        Inspect candle{' '}
-        <select
-          aria-label="Inspect candle"
-          value={selected?.time ?? ''}
-          onChange={(e) =>
-            setSelection({ context, time: Number(e.target.value) })
-          }
-        >
-          {rows.map((c) => (
-            <option key={c.time} value={c.time}>
-              {new Date(c.time * 1000).toLocaleString()}
-            </option>
-          ))}
-        </select>
-      </label>
-      {selected && (
-        <p aria-live="polite">
-          {new Date(selected.time * 1000).toLocaleString()} ·{' '}
-          {showCap ? 'Estimated market cap' : 'Token price'} · Open {prefix}
-          {displayed(selected.open).toPrecision(6)} · High {prefix}
-          {displayed(selected.high).toPrecision(6)} · Low {prefix}
-          {displayed(selected.low).toPrecision(6)} · Close {prefix}
-          {displayed(selected.close).toPrecision(6)} · Volume {volumeUnit}{' '}
-          {selected.volume.toLocaleString()}
-        </p>
-      )}
       {/* oxlint-disable jsx-a11y/prefer-tag-over-role -- SVG candle plot uses an accessible image role. */}
       <details className="candle-chart-help">
         <summary>Explore the chart</summary>
@@ -500,73 +357,6 @@ export function PoolCandleChart({
           window. Use +/− to zoom around the inspected candle.
         </p>
       </details>
-      <div
-        className="flex flex-wrap items-center gap-2"
-        aria-label="Chart drawings"
-      >
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={guideTool}
-          disabled={guides.length >= 8}
-          onClick={() => {
-            drag.current = null;
-            setTrendTool(false);
-            setTrendStart(null);
-            setTrendMessage('');
-            setGuideTool(!guideTool);
-          }}
-        >
-          {guideTool ? 'Cancel price guide' : 'Draw price guide'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={trendTool}
-          disabled={trendLines.length >= 8}
-          onClick={() => {
-            drag.current = null;
-            setGuideTool(false);
-            setTrendStart(null);
-            setTrendMessage('');
-            setTrendTool(!trendTool);
-          }}
-        >
-          {trendTool ? 'Cancel trend line' : 'Draw trend line'}
-        </Button>
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            addGuide(Number(guideInput));
-          }}
-        >
-          <label>
-            Guide {unit}{' '}
-            <input
-              type="number"
-              step="any"
-              min="0"
-              required
-              aria-label={`Price guide ${unit}`}
-              value={guideInput}
-              onChange={(e) => setGuideInput(e.target.value)}
-              style={{ width: 110 }}
-            />
-          </label>
-          <Button
-            type="submit"
-            variant="outline"
-            disabled={
-              guides.length >= 8 ||
-              !Number.isFinite(Number(guideInput)) ||
-              Number(guideInput) <= 0
-            }
-          >
-            Add guide
-          </Button>
-        </form>
-      </div>
       {trendTool && (
         <p role="status">
           {trendStart ? 'Place the second point' : 'Place the first point'} by
@@ -1018,6 +808,216 @@ export function PoolCandleChart({
         {markers &&
           `${visibleMarkers?.reduce((n, g) => n + g.receipts.length, 0) ?? 0} recorded trades visible.`}
       </figcaption>
+      <div className="wallet-roster-actions">
+        <label>
+          Visible candles{' '}
+          <select
+            aria-label="Visible candles"
+            value={size}
+            onChange={(e) => zoom(Number(e.target.value))}
+          >
+            {![24, 100, 500].includes(size) && (
+              <option value={size}>{size} candles</option>
+            )}
+            <option value={24}>24 candles</option>
+            <option value={100}>100 candles</option>
+            <option value={500}>All loaded candles</option>
+          </select>
+        </label>
+        <Button
+          variant="outline"
+          disabled={size <= 12}
+          onClick={() => zoom(Math.max(12, Math.floor(size / 1.5)))}
+        >
+          Zoom chart in
+        </Button>
+        <Button
+          variant="outline"
+          disabled={size >= snapshot.candles.length || size >= 500}
+          onClick={() => zoom(Math.min(500, Math.ceil(size * 1.5)))}
+        >
+          Zoom chart out
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!window.earlier}
+          onClick={() =>
+            setView({
+              context,
+              size,
+              end: moveCandleWindow(snapshot.candles, size, endTime, -1),
+            })
+          }
+        >
+          Earlier chart window
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!window.later}
+          onClick={() =>
+            setView({
+              context,
+              size,
+              end: moveCandleWindow(snapshot.candles, size, endTime, 1),
+            })
+          }
+        >
+          Later chart window
+        </Button>
+        <Button
+          variant="outline"
+          disabled={endTime === null}
+          onClick={() => setView({ context, size, end: null })}
+        >
+          Latest chart window
+        </Button>
+      </div>
+      <div
+        className="flex flex-wrap items-center gap-2"
+        aria-label="Chart value scale"
+      >
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={!showCap}
+          onClick={() => setCapMode(false)}
+        >
+          Token price
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={showCap}
+          disabled={capSupply === null}
+          onClick={() => setCapMode(true)}
+        >
+          Market cap
+        </Button>
+      </div>
+      {showCap && supplyToken && (
+        <p className="text-xs text-muted-foreground">
+          Estimated market cap: candle price × saved total supply (
+          {capSupply!.toLocaleString()} tokens, observed{' '}
+          {new Date(supplyToken.observedAt).toLocaleString()}). The same supply
+          applies to all candles; this does not reconstruct historical
+          circulating supply. Drawing inputs use token-price {unit}; plotted
+          guide labels use the selected scale.
+        </p>
+      )}
+      {projectId && (
+        <div
+          className="flex flex-wrap items-center gap-2"
+          aria-label="Drawing storage"
+        >
+          <Button type="button" variant="outline" onClick={saveDrawings}>
+            Save chart drawings
+          </Button>
+          <Button type="button" variant="outline" onClick={restoreDrawings}>
+            Restore chart drawings
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Stored in this browser only. Restore replaces current drawings. Save
+            again after editing; clearing browser data removes saved drawings.
+          </p>
+        </div>
+      )}
+      {drawingStorageMessage && (
+        <output className="block">{drawingStorageMessage}</output>
+      )}
+      <label>
+        Inspect candle{' '}
+        <select
+          aria-label="Inspect candle"
+          value={selected?.time ?? ''}
+          onChange={(e) =>
+            setSelection({ context, time: Number(e.target.value) })
+          }
+        >
+          {rows.map((c) => (
+            <option key={c.time} value={c.time}>
+              {new Date(c.time * 1000).toLocaleString()}
+            </option>
+          ))}
+        </select>
+      </label>
+      {selected && (
+        <p aria-live="polite">
+          {new Date(selected.time * 1000).toLocaleString()} ·{' '}
+          {showCap ? 'Estimated market cap' : 'Token price'} · Open {prefix}
+          {displayed(selected.open).toPrecision(6)} · High {prefix}
+          {displayed(selected.high).toPrecision(6)} · Low {prefix}
+          {displayed(selected.low).toPrecision(6)} · Close {prefix}
+          {displayed(selected.close).toPrecision(6)} · Volume {volumeUnit}{' '}
+          {selected.volume.toLocaleString()}
+        </p>
+      )}
+      <div
+        className="flex flex-wrap items-center gap-2"
+        aria-label="Chart drawings"
+      >
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={guideTool}
+          disabled={guides.length >= 8}
+          onClick={() => {
+            drag.current = null;
+            setTrendTool(false);
+            setTrendStart(null);
+            setTrendMessage('');
+            setGuideTool(!guideTool);
+          }}
+        >
+          {guideTool ? 'Cancel price guide' : 'Draw price guide'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={trendTool}
+          disabled={trendLines.length >= 8}
+          onClick={() => {
+            drag.current = null;
+            setGuideTool(false);
+            setTrendStart(null);
+            setTrendMessage('');
+            setTrendTool(!trendTool);
+          }}
+        >
+          {trendTool ? 'Cancel trend line' : 'Draw trend line'}
+        </Button>
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            addGuide(Number(guideInput));
+          }}
+        >
+          <label>
+            Guide {unit}{' '}
+            <input
+              type="number"
+              step="any"
+              min="0"
+              required
+              aria-label={`Price guide ${unit}`}
+              value={guideInput}
+              onChange={(e) => setGuideInput(e.target.value)}
+              style={{ width: 110 }}
+            />
+          </label>
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={
+              guides.length >= 8 ||
+              !Number.isFinite(Number(guideInput)) ||
+              Number(guideInput) <= 0
+            }
+          >
+            Add guide
+          </Button>
+        </form>
+      </div>
       {averageLevels.some((a) => !a.inRange) && (
         <output>
           Recorded averages outside the current candle price range are not
@@ -1332,26 +1332,23 @@ export function ImportedPoolCandles({
             : 'Start candle updates'}
         </Button>
       </div>
-      <details className="candle-data-coverage">
-        <summary>Candle data coverage</summary>
-        <p>
-          GeckoTerminal {currency.toUpperCase()} candles for this pool&apos;s
-          base token. Read 100 intervals at a time and retain up to 500, with no
-          invented gaps. Refresh latest replaces the saved history for this
-          selection. Candle updates retain older loaded candles up to 500 and
-          replace the refreshed time range. Stop the market feed before starting
-          candle updates. Latest candle sets for up to 20 pool/interval
-          selections are retained.
-        </p>
-        <output style={{ display: 'block' }}>
-          Candle updates {followState.status}. {followState.reads} successful
-          reads. {followState.reason} Refresh repeats 30 seconds after
-          completion while visible and online. No background or tick stream.
-        </output>
-      </details>
       {error && <p role="alert">{error}</p>}
       {snapshot ? (
         <>
+          {project.document.token.chain === 'Solana' ? (
+            <ImportedChartTrades
+              key={`${project.id}:${project.revision}:${pool}`}
+              project={project}
+              snapshot={snapshot}
+            />
+          ) : (
+            <PoolCandleChart
+              snapshot={snapshot}
+              projectId={project.id}
+              revision={project.revision}
+              supplyToken={project.document.token}
+            />
+          )}
           <p>
             Observed {new Date(snapshot.observedAt).toLocaleString()} ·{' '}
             {snapshot.source} · captured project r{snapshot.projectRevision}
@@ -1381,20 +1378,24 @@ export function ImportedPoolCandles({
               historical provider observations for the saved token and pool.
             </p>
           )}
-          {project.document.token.chain === 'Solana' ? (
-            <ImportedChartTrades
-              key={`${project.id}:${project.revision}:${pool}`}
-              project={project}
-              snapshot={snapshot}
-            />
-          ) : (
-            <PoolCandleChart
-              snapshot={snapshot}
-              projectId={project.id}
-              revision={project.revision}
-              supplyToken={project.document.token}
-            />
-          )}
+          <details className="candle-data-coverage">
+            <summary>Candle data coverage</summary>
+            <p>
+              GeckoTerminal {currency.toUpperCase()} candles for this
+              pool&apos;s base token. Read 100 intervals at a time and retain up
+              to 500, with no invented gaps. Refresh latest replaces the saved
+              history for this selection. Candle updates retain older loaded
+              candles up to 500 and replace the refreshed time range. Stop the
+              market feed before starting candle updates. Latest candle sets for
+              up to 20 pool/interval selections are retained.
+            </p>
+            <output style={{ display: 'block' }}>
+              Candle updates {followState.status}. {followState.reads}{' '}
+              successful reads. {followState.reason} Refresh repeats 30 seconds
+              after completion while visible and online. No background or tick
+              stream.
+            </output>
+          </details>
         </>
       ) : (
         !busy && <p>No saved candles for this pool and interval.</p>
@@ -1519,40 +1520,42 @@ function ImportedChartTrades({
         project.document.token.decimals,
       )
     : undefined;
+  const tradeControls = (
+    <div className="wallet-roster-actions">
+      <Button variant="outline" disabled={busy} onClick={() => void load()}>
+        {busy
+          ? 'Loading recorded trades…'
+          : visible
+            ? 'Reload recorded chart trades'
+            : 'Show recorded trades on chart'}
+      </Button>
+      {visible && (
+        <Button
+          variant="outline"
+          onClick={() => {
+            visibleRef.current = false;
+            pending.current?.abort();
+            pending.current = null;
+            setBusy(false);
+            setVisible(false);
+          }}
+        >
+          Hide trade markers
+        </Button>
+      )}
+      {visible && cursor && rows.length < 500 && (
+        <Button
+          variant="outline"
+          disabled={busy}
+          onClick={() => void load('older')}
+        >
+          Load older chart trades
+        </Button>
+      )}
+    </div>
+  );
   return (
     <>
-      <div className="wallet-roster-actions">
-        <Button variant="outline" disabled={busy} onClick={() => void load()}>
-          {busy
-            ? 'Loading recorded trades…'
-            : visible
-              ? 'Reload recorded chart trades'
-              : 'Show recorded trades on chart'}
-        </Button>
-        {visible && (
-          <Button
-            variant="outline"
-            onClick={() => {
-              visibleRef.current = false;
-              pending.current?.abort();
-              pending.current = null;
-              setBusy(false);
-              setVisible(false);
-            }}
-          >
-            Hide trade markers
-          </Button>
-        )}
-        {visible && cursor && rows.length < 500 && (
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={() => void load('older')}
-          >
-            Load older chart trades
-          </Button>
-        )}
-      </div>
       {changed && (
         <output>
           A new trade finalized.{' '}
@@ -1570,6 +1573,7 @@ function ImportedChartTrades({
         supplyToken={project.document.token}
         executionAverages={executionAverages}
       />
+      {tradeControls}
       {markers && (
         <>
           <ChartExecutionAverages

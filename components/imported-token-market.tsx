@@ -256,7 +256,23 @@ export function ImportedTokenMarket({
           metrics and prices; it is not a tick or candle stream.
         </p>
       </details>
-      <div className="wallet-roster-actions">
+      <div className="wallet-roster-actions imported-market-toolbar">
+        {latest && latest.pairs.length > 0 && (
+          <label>
+            Market pair{' '}
+            <select
+              aria-label="Market pair"
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+            >
+              {latest.pairs.map((p) => (
+                <option key={p.address} value={p.address}>
+                  {p.dex} / {p.quoteSymbol} · {p.address.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <Button
           variant="outline"
           disabled={
@@ -324,22 +340,6 @@ export function ImportedTokenMarket({
               No base-token pairs returned by the provider. This does not prove
               absence of trading or liquidity elsewhere.
             </p>
-          )}
-          {latest.pairs.length > 0 && (
-            <label>
-              Market pair{' '}
-              <select
-                aria-label="Market pair"
-                value={selected}
-                onChange={(e) => setSelected(e.target.value)}
-              >
-                {latest.pairs.map((p) => (
-                  <option key={p.address} value={p.address}>
-                    {p.dex} / {p.quoteSymbol} · {p.address.slice(0, 8)}
-                  </option>
-                ))}
-              </select>
-            </label>
           )}
           {pair && (
             <>
