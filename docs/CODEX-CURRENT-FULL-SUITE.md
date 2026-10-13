@@ -1,5 +1,9 @@
 # Latest source verification, 13 October 2026
 
+## Finite user-approved DCA sessions
+
+The latest continuation adds persisted single-wallet Buy/Sell DCA with exact budget splitting, cycle preview and per-cycle eligibility enforced in append-only 0074. Fifty-seven tests across seven files passed; thirteen affected UI/model tests passed again after the final UI locking change, with unchanged backend/model/migration inputs. Final 1,045-file snapshot digest: 25029c4d2a8c1c442e6849b7974405c8a704b8bf7d448420e6664faab02b20c5. Actual-source TypeScript, typed lint and production build passed. The actual Wrangler migration command applied all 75 whole files on disposable local D1. See CODEX-DCA-TRADE-SESSIONS.md for exact artifacts and scope. No deployment, worker activation or funded/live/browser verification occurred; this does not replace the earlier full-suite result.
+
 ## Retained conditional notice following
 
 The latest continuation adds explicit visible/online following, bounded read retries, retained-error disclosure, context cancellation and manual settings race protection to the conditional monitoring panel. Nineteen tests across three files, actual-source TypeScript, three-file typed lint and production build passed on the final unchanged 1,040-file snapshot, digest 8becf128e119adf11e7d9488b00d1320e2fd075bd0166289f757400a4ba49b95. See CODEX-MONITOR-NOTICE-FOLLOW.md for exact artifacts and scope. No worker activation, deployment or live/funded/browser proof is included. These targeted checks do not replace the earlier full-suite result.

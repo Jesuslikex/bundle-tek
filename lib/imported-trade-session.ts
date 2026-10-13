@@ -3,7 +3,11 @@ import { walletAddress } from './wallet-workspace';
 import { solanaTokenAtoms } from './solana-token-amount';
 import { formatNativeBalance } from './wallet-balance-format';
 export type TradeSessionTerms = {
-  format: 'imported-trade-session-v1' | 'imported-trade-session-v2';
+  format:
+    | 'imported-trade-session-v1'
+    | 'imported-trade-session-v2'
+    | 'imported-trade-session-v3';
+  strategy?: 'DCA';
   schedule?: TradeSessionSchedule;
   projectId: string;
   projectRevision: number;
@@ -113,6 +117,7 @@ export function tradeSessionTerms(
     side: 'Buy' | 'Sell';
     entries: { wallet: string; walletRevision: number; amount: string }[];
     schedule?: unknown;
+    strategy?: unknown;
   };
   if (
     !v ||
@@ -130,11 +135,18 @@ export function tradeSessionTerms(
     throw new Error(
       'Choose 1 to 25 distinct Solana wallets and exact amounts.',
     );
+  const dca = v.strategy === 'DCA';
+  if (v.strategy !== undefined && !dca)
+    throw new Error('Choose a supported session strategy.');
+  const schedule =
+    v.schedule === undefined ? undefined : tradeSessionSchedule(v.schedule);
+  if (dca && (!schedule || schedule.spacingSeconds < 1 || v.entries.length < 2))
+    throw new Error('DCA needs 2 to 25 cycles and a positive saved interval.');
   const seen = new Set<string>();
   const decimals = v.side === 'Buy' ? 9 : token.decimals;
   const entries = v.entries.map((e, i) => {
     const wallet = walletAddress(e.wallet, 'Solana');
-    if (seen.has(wallet) || !revision(e.walletRevision))
+    if ((!dca && seen.has(wallet)) || !revision(e.walletRevision))
       throw new Error('Distinct current wallet revisions required.');
     seen.add(wallet);
     const raw = solanaTokenAtoms(e.amount, decimals);
@@ -146,13 +158,32 @@ export function tradeSessionTerms(
       amount: formatNativeBalance(raw.toString(), decimals),
     };
   });
-  const schedule =
-    v.schedule === undefined ? undefined : tradeSessionSchedule(v.schedule);
+  if (dca) {
+    const first = entries[0],
+      total = entries.reduce((sum, e) => sum + BigInt(e.unitsRaw), 0n);
+    if (
+      total > 18446744073709551615n ||
+      entries.some(
+        (e) =>
+          e.wallet !== first.wallet ||
+          e.walletRevision !== first.walletRevision ||
+          BigInt(e.unitsRaw) !==
+            total / BigInt(entries.length) +
+              (BigInt(e.entry - 1) < total % BigInt(entries.length) ? 1n : 0n),
+      )
+    )
+      throw new Error(
+        'DCA must conserve an evenly split exact budget for one current wallet.',
+      );
+  }
   if (schedule) sessionEntryNotBefore({ schedule }, entries.length);
   return {
-    format: schedule
-      ? 'imported-trade-session-v2'
-      : 'imported-trade-session-v1',
+    format: dca
+      ? 'imported-trade-session-v3'
+      : schedule
+        ? 'imported-trade-session-v2'
+        : 'imported-trade-session-v1',
+    ...(dca ? { strategy: 'DCA' as const } : {}),
     projectId: v.projectId,
     projectRevision: v.projectRevision,
     mint: walletAddress(token.address, 'Solana'),
@@ -175,9 +206,11 @@ export function decodeTradeSession(value: unknown): TradeSession {
     !Number.isFinite(Date.parse(v.createdAt)) ||
     !Number.isFinite(Date.parse(v.updatedAt)) ||
     Date.parse(v.updatedAt) < Date.parse(v.createdAt) ||
-    !['imported-trade-session-v1', 'imported-trade-session-v2'].includes(
-      v.terms?.format,
-    )
+    ![
+      'imported-trade-session-v1',
+      'imported-trade-session-v2',
+      'imported-trade-session-v3',
+    ].includes(v.terms?.format)
   )
     throw new Error('Trade session history differs.');
   const terms = tradeSessionTerms(v.terms, {

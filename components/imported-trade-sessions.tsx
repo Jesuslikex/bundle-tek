@@ -29,6 +29,7 @@ import type { WorkspaceWallet, WalletFolder } from '@/lib/wallet-workspace';
 import { ImportedSwapPreparation } from './imported-swap-preparation';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
 import { SessionEntryOutcomesPanel } from './session-entry-outcomes';
+import { DcaTradeSession } from './dca-trade-session';
 type Activity = {
   sessionId: string;
   entry: number;
@@ -325,6 +326,24 @@ export function ImportedTradeSessions({
       aria-label="Multi-wallet trade sessions"
     >
       <h4>Multi-wallet trade sessions</h4>
+      <DcaTradeSession
+        key={`${project.id}:${project.revision}:${project.archived}`}
+        project={project}
+        wallets={wallets}
+        locked={locked || busy}
+        onBusyChange={setBusy}
+        onSaved={(session, control) => {
+          setSessions((old) => [
+            session,
+            ...old.filter((s) => s.id !== session.id),
+          ]);
+          setControls((old) => [
+            control,
+            ...old.filter((c) => c.sessionId !== session.id),
+          ]);
+          setHistoryRevision((value) => value + 1);
+        }}
+      />
       <p>
         Save exact Buy or Sell amounts for up to 25 wallets. Each entry uses
         fresh balances, a reviewed packet, your signature and a separate submit
@@ -556,19 +575,22 @@ export function ImportedTradeSessions({
       {error && <p role="alert">{error}</p>}
       {sessions.map((s) => (
         <article key={s.id} className="space-y-2 rounded-md border p-3">
-          <JitoAtomicBundle
-            projectId={project.id}
-            session={s}
-            locked={
-              locked ||
-              controls.find((c) => c.sessionId === s.id)?.state !== 'ready'
-            }
-          />
+          {s.terms.strategy !== 'DCA' && (
+            <JitoAtomicBundle
+              projectId={project.id}
+              session={s}
+              locked={
+                locked ||
+                controls.find((c) => c.sessionId === s.id)?.state !== 'ready'
+              }
+            />
+          )}
           <h5>
             {s.terms.side} session · {s.state}
           </h5>
           <p>
-            Session {s.id}. {s.terms.entries.length} wallets; total input{' '}
+            Session {s.id}. {new Set(s.terms.entries.map((e) => e.wallet)).size}{' '}
+            wallets; {s.terms.entries.length} entries; total input{' '}
             {s.terms.totalRaw} atomic units. Fees and wallet reserves are
             additional.
           </p>
@@ -608,6 +630,8 @@ export function ImportedTradeSessions({
           </Button>
           {s.terms.schedule && (
             <p>
+              {s.terms.strategy === 'DCA' &&
+                `DCA ${s.terms.side}: ${s.terms.entries.length} cycles for one wallet. `}
               Scheduled start (UTC): {s.terms.schedule.startAt}. Spacing:{' '}
               {s.terms.schedule.spacingSeconds} seconds. Saving does not start
               background execution.
@@ -634,7 +658,8 @@ export function ImportedTradeSessions({
             return (
               <div key={e.entry}>
                 <p>
-                  Entry {e.entry}: {e.wallet} · {e.amount}{' '}
+                  {s.terms.strategy === 'DCA' ? 'Cycle' : 'Entry'} {e.entry}:{' '}
+                  {e.wallet} · {e.amount}{' '}
                   {s.terms.side === 'Buy' ? 'SOL' : `tokens (${s.terms.mint})`}{' '}
                   · {state?.state || 'Not approved'}
                   {state && (

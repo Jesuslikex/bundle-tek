@@ -133,6 +133,7 @@ beforeAll(async () => {
     '0061_imported_trade_session_controls',
     '0062_session_preparation_jobs',
     '0068_remarkable_frightful_four',
+    '0074_dca_trade_session_timing',
   ]) {
     if (name === '0061_imported_trade_session_controls') {
       const now = new Date().toISOString(),
@@ -298,6 +299,143 @@ async function create() {
   expect(response.status).toBe(200);
   return response.json();
 }
+const dcaBody = () => ({
+  ...body(),
+  strategy: 'DCA',
+  schedule: {
+    startAt: new Date(Date.now() - 30000).toISOString(),
+    spacingSeconds: 60,
+  },
+  entries: Array.from({ length: 2 }, () => ({
+    wallet: f.wallet,
+    walletRevision: 1,
+    amount: '0.001',
+  })),
+});
+it('saves repeated-wallet DCA terms idempotently and binds each cycle to its own due time before provider reads', async () => {
+  const input = dcaBody();
+  const first = await sessionPost(request(input));
+  expect(first.status).toBe(200);
+  const saved = (await first.json()) as {
+    session: { terms: { strategy: string; format: string } };
+  };
+  expect(saved.session.terms).toMatchObject({
+    strategy: 'DCA',
+    format: 'imported-trade-session-v3',
+  });
+  expect((await sessionPost(request(input))).status).toBe(200);
+  expect(
+    (
+      await sessionPost(
+        request({
+          ...input,
+          schedule: { ...input.schedule, spacingSeconds: 61 },
+        }),
+      )
+    ).status,
+  ).toBe(409);
+  const prepareCycle = (entry: number) =>
+    prepareImported(
+      new Request('http://localhost/api/imported-projects/prepare', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: projectId,
+          revision: 1,
+          wallet: f.wallet,
+          walletRevision: 1,
+          side: 'Buy',
+          amount: '0.001',
+          session: { sessionId, revision: 1, entry },
+        }),
+      }),
+    );
+  expect((await prepareCycle(2)).status).toBe(409);
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  const prepared = await prepareCycle(1);
+  expect(prepared.status).toBe(200);
+  const data = (await prepared.json()) as {
+    history: {
+      id: string;
+      document: { session: { notBefore: string; entry: number } };
+    };
+  };
+  expect(data.history.document.session).toMatchObject({
+    entry: 1,
+    notBefore: input.schedule.startAt,
+  });
+  preparationId = data.history.id;
+  // Preparation and approval share the real owner's balance-read gate.
+  expect(
+    (
+      await post({
+        action: 'review',
+        preparationId,
+        transaction: f.order.preparation.transaction,
+      })
+    ).status,
+  ).toBe(429);
+  await mocks.db
+    .prepare(
+      'UPDATE wallet_balance_gates SET next_allowed_at=0 WHERE owner_id=?',
+    )
+    .bind(owner)
+    .run();
+  const approval = await reviewed();
+  expect(approval.session?.entry).toBe(1);
+  expect(await count('imported_swap_signing_intents')).toBe(1);
+  expect(
+    mocks.rpc.mock.calls.some((call) => call[1] === 'sendTransaction'),
+  ).toBe(false);
+  expect(
+    (
+      await post({
+        action: 'register',
+        id: approval.id,
+        transaction: f.signed.transaction,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await post({
+        action: 'submit',
+        id: approval.id,
+        transaction: f.signed.transaction,
+      })
+    ).status,
+  ).toBe(200);
+  expect((await post({ action: 'recover', id: approval.id })).status).toBe(200);
+  const history = await sessionGet(
+    new Request(
+      `http://localhost/api/imported-projects/trade-sessions?projectId=${projectId}`,
+    ),
+  );
+  const state = (await history.json()) as {
+    activity: { entry: number; state: string; receiptId: string }[];
+  };
+  expect(state.activity).toHaveLength(1);
+  expect(state.activity[0]).toMatchObject({ entry: 1, state: 'finalized' });
+  expect(state.activity[0].receiptId).toBeTruthy();
+});
+it('rejects mixed-wallet DCA and refuses saving when a database timing guard is missing', async () => {
+  const input = dcaBody();
+  expect(
+    (await sessionPost(request({ ...input, entries: body().entries }))).status,
+  ).toBe(400);
+  const guard = await mocks.db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE name='trade_session_preparation_due'",
+    )
+    .first<{ sql: string }>();
+  await mocks.db.prepare('DROP TRIGGER trade_session_preparation_due').run();
+  try {
+    expect((await sessionPost(request(input))).status).toBe(503);
+    expect(await count('imported_trade_sessions')).toBe(0);
+  } finally {
+    await mocks.db.prepare(guard!.sql).run();
+  }
+});
 async function captured() {
   await create();
   const guard = await captureTradeSession(

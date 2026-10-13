@@ -119,7 +119,10 @@ export async function POST(request: Request) {
     )
       throw new Error();
     if (
-      Object.keys(body).sort().join(',') !==
+      Object.keys(body)
+        .filter((key) => key !== 'strategy' || body.action !== 'create')
+        .sort()
+        .join(',') !==
       (body.action === 'create'
         ? Object.hasOwn(body, 'schedule')
           ? 'action,entries,id,projectId,projectRevision,schedule,side'
@@ -236,11 +239,28 @@ export async function POST(request: Request) {
       terms = tradeSessionTerms(body, token);
     } catch {
       return json(
-        { error: 'Choose exact amounts for 1 to 25 distinct current wallets.' },
+        { error: 'Choose exact session amounts and current wallet revisions.' },
         400,
       );
     }
     const text = JSON.stringify(terms);
+    if (terms.strategy === 'DCA') {
+      const installed = await db
+        .prepare(
+          "SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN ('trade_session_preparation_due','trade_session_approval_due','trade_session_submission_due')",
+        )
+        .all<{ name: string; sql: string }>();
+      if (
+        installed.results.length !== 3 ||
+        installed.results.some(
+          (row) => !row.sql.includes('imported-trade-session-v3'),
+        )
+      )
+        return json(
+          { error: 'DCA timing storage is not installed. No session saved.' },
+          503,
+        );
+    }
     if (old)
       return old.document === text
         ? json({
