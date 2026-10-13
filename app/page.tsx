@@ -55,6 +55,7 @@ import {
   Play,
   Radio,
   RefreshCw,
+  Rocket,
   SlidersHorizontal,
   Target,
   TimerReset,
@@ -130,6 +131,17 @@ type View =
   | 'live'
   | 'pulse'
   | 'tracker';
+// Workspace pages are not part of the launch draft, so the topbar and status bar
+// drop draft-editing chrome there and show the page location instead.
+const WORKSPACE_TITLES: Partial<Record<View, string>> = {
+  dashboard: 'Dashboard',
+  archived: 'Archived',
+  wallets: 'My wallets',
+  tracker: 'Supply tracker',
+  watchlist: 'Wallet tracker',
+  activity: 'Activity',
+  imports: 'Imported token',
+};
 type Strategy = 'Balanced' | 'Liquidity' | 'Discovery';
 const presets: Array<{
   name: Preset;
@@ -1260,6 +1272,9 @@ export default function Home() {
     }
   };
   const isLibrary = view === 'dashboard' || view === 'archived';
+  const workspaceTitle = exploringRobinhood
+    ? undefined
+    : WORKSPACE_TITLES[view];
   const visibleProjects = projects.filter(
     (p) =>
       !p.archived &&
@@ -1338,29 +1353,37 @@ export default function Home() {
           </strong>
           <PanelLeftClose className="ml-auto size-4 text-[#717789]" />
         </div>
-        <nav className="steps" aria-label="Product sections">
-          <button
-            onClick={() => changeView('chain')}
-            aria-current={view === 'chain' ? 'step' : undefined}
-            className={view === 'chain' ? 'active' : ''}
-          >
-            CHAIN &amp; LAUNCHPAD
-          </button>
-          <button
-            onClick={() => changeView('token')}
-            aria-current={view === 'token' ? 'step' : undefined}
-            className={view === 'token' ? 'active' : ''}
-          >
-            TOKEN DETAILS
-          </button>
-          <button
-            onClick={() => changeView('launch')}
-            aria-current={view === 'launch' ? 'step' : undefined}
-            className={view === 'launch' ? 'active' : ''}
-          >
-            LAUNCH SETTINGS
-          </button>
-        </nav>
+        {workspaceTitle ? (
+          <nav className="steps workspace-crumb" aria-label="Location">
+            <span>Workspace</span>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">{workspaceTitle}</span>
+          </nav>
+        ) : (
+          <nav className="steps" aria-label="Product sections">
+            <button
+              onClick={() => changeView('chain')}
+              aria-current={view === 'chain' ? 'step' : undefined}
+              className={view === 'chain' ? 'active' : ''}
+            >
+              CHAIN &amp; LAUNCHPAD
+            </button>
+            <button
+              onClick={() => changeView('token')}
+              aria-current={view === 'token' ? 'step' : undefined}
+              className={view === 'token' ? 'active' : ''}
+            >
+              TOKEN DETAILS
+            </button>
+            <button
+              onClick={() => changeView('launch')}
+              aria-current={view === 'launch' ? 'step' : undefined}
+              className={view === 'launch' ? 'active' : ''}
+            >
+              LAUNCH SETTINGS
+            </button>
+          </nav>
+        )}
         <div className="token-zone">
           <div className="token-avatar">
             {ticker.slice(0, 2) || 'PF'}
@@ -1376,29 +1399,40 @@ export default function Home() {
                 : `${chain} · ${launchpad} · ${currency}`}
             </p>
           </div>
-          <Button
-            variant="outline"
-            className="archive-button"
-            onClick={() => void saveLaunchPlan()}
-            disabled={
-              isLibrary ||
-              view === 'watchlist' ||
-              view === 'activity' ||
-              view === 'imports' ||
-              exploringRobinhood ||
-              saveBusy ||
-              persistenceState === 'loading' ||
-              persistenceState === 'saving' ||
-              Boolean(planValidation.error)
-            }
-          >
-            <Database />{' '}
-            {persistenceState === 'saving'
-              ? 'Saving'
-              : savedAt
-                ? 'Saved'
-                : 'Save plan'}
-          </Button>
+          {workspaceTitle ? (
+            <Button
+              variant="outline"
+              className="archive-button"
+              onClick={() => changeView('chain')}
+              disabled={saveBusy}
+            >
+              <Rocket /> Open draft
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="archive-button"
+              onClick={() => void saveLaunchPlan()}
+              disabled={
+                isLibrary ||
+                view === 'watchlist' ||
+                view === 'activity' ||
+                view === 'imports' ||
+                exploringRobinhood ||
+                saveBusy ||
+                persistenceState === 'loading' ||
+                persistenceState === 'saving' ||
+                Boolean(planValidation.error)
+              }
+            >
+              <Database />{' '}
+              {persistenceState === 'saving'
+                ? 'Saving'
+                : savedAt
+                  ? 'Saved'
+                  : 'Save plan'}
+            </Button>
+          )}
         </div>
       </header>
 
@@ -1494,12 +1528,14 @@ export default function Home() {
               changeView('wallets');
             }}
             className={view === 'wallets' ? 'feature-active' : ''}
+            aria-current={view === 'wallets' ? 'page' : undefined}
           >
             <WalletCards /> My wallets
           </button>
           <button
             onClick={() => changeView('tracker')}
             className={view === 'tracker' ? 'feature-active' : ''}
+            aria-current={view === 'tracker' ? 'page' : undefined}
           >
             <Crosshair /> Supply tracker
           </button>
@@ -1529,6 +1565,7 @@ export default function Home() {
           <button
             onClick={() => changeView('archived')}
             className={view === 'archived' ? 'feature-active' : ''}
+            aria-current={view === 'archived' ? 'page' : undefined}
           >
             <Archive /> Archived
           </button>
@@ -1601,6 +1638,10 @@ export default function Home() {
             onDuplicate={(p) => openProject(p, true)}
             onArchive={(p) => void archiveProject(p)}
             onReload={() => void reloadProjects()}
+            onImport={() => {
+              setActivityImportId('');
+              changeView('imports');
+            }}
             onWallet={() => {
               setActivityWarmupId('');
               setActivityWithdrawalWallet('');
@@ -2100,12 +2141,16 @@ export default function Home() {
               ? `Solana · ${runtimeStatus}`
               : `${chain} · Planning only · Execution locked`}
         </span>
-        <output
-          title={planValidation.error ?? planMessage}
-          className={`plan-save-state ${planValidation.error ? 'error' : persistenceState}`}
-        >
-          {planValidation.error ?? planMessage}
-        </output>
+        {workspaceTitle ? (
+          <span className="plan-save-state" />
+        ) : (
+          <output
+            title={planValidation.error ?? planMessage}
+            className={`plan-save-state ${planValidation.error ? 'error' : persistenceState}`}
+          >
+            {planValidation.error ?? planMessage}
+          </output>
+        )}
         {persistenceState === 'auth' && (
           // oxlint-disable-next-line next/no-html-link-for-pages -- Sites sign-in must use a top-level document navigation.
           <a href="/signin-with-chatgpt?return_to=/" target="_top">

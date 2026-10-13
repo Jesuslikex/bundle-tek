@@ -4249,3 +4249,80 @@ body {
     max-width: 100%;
   }
 }
+
+/* Workspace location in the topbar (replaces draft steps outside the launch editor). */
+.steps.workspace-crumb {
+  justify-content: flex-start;
+  gap: 10px;
+  padding-inline: 28px;
+  font: 500 12px var(--font-geist-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7d8396;
+}
+.steps.workspace-crumb [aria-current='page'] {
+  color: #e2e3ff;
+}
+/* Collapsible coverage notes: one-line summary, full text on demand. */
+.tracker-disclosure.activity-coverage {
+  display: block;
+}
+.activity-coverage summary {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  cursor: pointer;
+  list-style: none;
+}
+.activity-coverage summary::-webkit-details-marker {
+  display: none;
+}
+.activity-coverage summary u {
+  color: #b8bcff;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.activity-coverage[open] summary u {
+  display: none;
+}
+.activity-coverage summary:focus-visible {
+  outline: 2px solid #7775ef;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.activity-coverage > p {
+  margin: 10px 0 0 26px;
+  max-width: 110ch;
+}
+/* Next step under an empty imported-token table. */
+.library-empty-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px 14px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+/* Draft badge text stays on one line beside the topbar action. */
+.token-zone > div:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.token-zone strong,
+.token-zone p {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.token-zone .archive-button {
+  flex-shrink: 0;
+}@media (max-width: 800px) {
+  .steps.workspace-crumb {
+    display: flex;
+    align-items: center;
+    padding-inline: 18px;
+    font-size: 11px;
+  }
+}

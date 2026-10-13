@@ -36,6 +36,7 @@ export function ProjectDashboard({
   importsLoading = false,
   importsError = '',
   onOpenImport,
+  onImport,
   signedOut = false,
 }: {
   projects: WorkspaceProject[];
@@ -52,6 +53,8 @@ export function ProjectDashboard({
   importsLoading?: boolean;
   importsError?: string;
   onOpenImport?: (id: string) => void;
+  /** Starts a new token import. */
+  onImport?: () => void;
   /** Saved drafts and imports cannot be read; counts and empty states would mislead. */
   signedOut?: boolean;
 }) {
@@ -119,9 +122,19 @@ export function ProjectDashboard({
             </button>
           </article>
           <article>
-            <span>Mainnet launches</span>
-            <strong>Unavailable</strong>
-            <small>Execution integration required</small>
+            <span>Imported tokens</span>
+            <strong>
+              {signedOut || importsLoading
+                ? '—'
+                : imports.filter((p) => !p.archived).length}
+            </strong>
+            {onImport && !signedOut ? (
+              <button onClick={onImport} disabled={busy}>
+                Import token <ArrowRight size={14} />
+              </button>
+            ) : (
+              <small>{signedOut ? 'Sign in to load' : 'Saved imports'}</small>
+            )}
           </article>
         </div>
       )}
@@ -362,6 +375,23 @@ export function ProjectDashboard({
                     : `No ${archived ? 'archived' : 'active'} imports.`}
               </p>
             )}
+            {!filteredImports.length &&
+              !importsLoading &&
+              !importsError &&
+              !archived &&
+              !search &&
+              chain === 'All' &&
+              onImport && (
+                <div className="library-empty-action">
+                  <span>
+                    Paste a token address to open its chart, holders and trading
+                    tools.
+                  </span>
+                  <Button variant="outline" onClick={onImport} disabled={busy}>
+                    <Plus /> Import token
+                  </Button>
+                </div>
+              )}
           </div>
         )}
       </section>

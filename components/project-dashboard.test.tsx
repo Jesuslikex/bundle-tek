@@ -40,3 +40,17 @@ it('keeps the signed-in empty state and styled import note', () => {
   expect(html).not.toContain('Sign in to open your workspace');
   expect(html).toContain('class="library-empty-note">No active imports.');
 });
+
+it('counts imported tokens and offers an import as the next step', () => {
+  const html = render({ onImport: () => {} });
+  expect(html).toContain('<span>Imported tokens</span><strong>0</strong>');
+  expect(html).toContain('Paste a token address to open its chart');
+  expect(html).not.toContain('Mainnet launches');
+  // Signed-out and filtered views never show the import prompt or a zero count.
+  const signedOut = render({ onImport: () => {}, signedOut: true });
+  expect(signedOut).toContain('<span>Imported tokens</span><strong>—</strong>');
+  expect(signedOut).not.toContain('Paste a token address');
+  expect(render({ onImport: () => {}, archived: true })).not.toContain(
+    'Paste a token address',
+  );
+});

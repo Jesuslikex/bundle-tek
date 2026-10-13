@@ -576,9 +576,16 @@ export function WorkspaceActivity({
           <RefreshCw /> Refresh records
         </Button>
       </header>
-      <div className="tracker-disclosure">
-        <Activity size={16} />
-        <span>
+      <details className="tracker-disclosure activity-coverage">
+        <summary>
+          <Activity size={16} />
+          <span>
+            Records are retained evidence, not delivery proof. Only a matching
+            finalized receipt establishes completion.{' '}
+            <u>How records are kept</u>
+          </span>
+        </summary>
+        <p>
           Saves, archives and restores are recorded as separate events. Project
           history begins with this update; older changes are not reconstructed.
           Filters apply to loaded records, including up to 12 retained Pulse
@@ -607,8 +614,8 @@ export function WorkspaceActivity({
           state and signature progress at each recorded change. Earlier bundles
           have a retained-state baseline; transitions before that baseline are
           not reconstructed.
-        </span>
-      </div>
+        </p>
+      </details>
       <div className="project-toolbar">
         <div className="tracker-tabs" aria-label="Activity categories">
           {[

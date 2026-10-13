@@ -128,7 +128,8 @@ export function ChainLaunchForm({
               <span>
                 <strong>{chain === 'BNB' ? 'BNB Smart Chain' : chain}</strong>
                 <small>
-                  {CURRENT_VENUES_BY_CHAIN[chain].length} launchpads
+                  {CURRENT_VENUES_BY_CHAIN[chain].length} launchpad
+                  {CURRENT_VENUES_BY_CHAIN[chain].length === 1 ? '' : 's'}
                 </small>
               </span>
             </label>
