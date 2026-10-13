@@ -16,6 +16,8 @@ Evidence: work/release-qa/stock-quote-selection-20261013.json. These are capture
 
 ## Required completion
 
+Discovery continuation, source commit 547c512: the three captured stock/ETF examples above are now in StonkFun's first four choices. Default and full asset identity sets remain unchanged across all 37 venue profiles. Fourteen existing tests, typecheck, scoped lint and build passed. See CODEX-STOCK-DISCOVERY-UPDATE-20261013.md for scope and retained before/after evidence. A dedicated stocks filter and issuer verification remain open.
+
 Make stock/ETF quote choices easy to discover in the selector. Retain exact chain/mint/program/precision identity through save, reopen, funding, launch preparation, transaction review and resulting token workspace. Verify issuer identity separately from a ticker label. Reject a stock-labelled impostor and a quote unsupported by the chosen venue.
 
 Before launch preparation, read the venue's current admission/configuration and mint extensions. Derive curve/price units, initial buy and recipient amounts from the selected quote token's precision. Do not substitute SOL or silently route a stock pair into a different pair. A post-launch quote-token price is not automatically the underlying share price; USD valuation requires the correct price/multiplier and freshness handling.
