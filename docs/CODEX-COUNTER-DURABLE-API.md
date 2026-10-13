@@ -22,6 +22,8 @@ Final verification: **24 tests in 3 main files passed**, including real route/lo
 
 ## Remaining integration
 
+Buy target pricing continuation: a separate quote-only v1 ExactOut adapter now derives a target from a validated recorded proposal and enforces an explicit swap-input SOL ceiling. See CODEX-COUNTER-BUY-TARGET-QUOTES.md for 59 fixture/regression tests and the current Jupiter v2 ExactIn-only limitation. API/UI integration, source revalidation, durable proposal consumption and signing are still missing; the existing v2 preparation path remains unchanged.
+
 No Counter UI, automatic worker loop, shared strategy/session budgets or ending conditions, editable running rules, Buy token-target-to-SOL quote conversion, explicit transaction review/signing or submission is wired by this checkpoint. Active means manual evaluation is available, not execution permission. A stored proposal is a token target, not a funded trade or audited P&L. No browser or funded proof was performed here; the older full-suite pass predates this API.
 
 Claude-owned files remain untouched. The local CROP candidate 16d7c7d was built from committed 1f46c54 before this checkpoint and excludes 0076/API work. No candidate refresh, credential access, push, saved version, deployment, hosted SQL or financial action occurred. The hosted partial-migration failure remains unresolved.
