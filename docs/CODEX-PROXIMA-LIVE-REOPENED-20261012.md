@@ -1,5 +1,13 @@
 # Proxima live reference, reopened session
 
+## Connection restored, 13 October 2026
+
+The user reopened the existing approved dedicated Chrome launcher. Windows now answers HTTP 200 on the loopback debugging endpoint, bound to 127.0.0.1:9223. The existing stdio-only WSL relay was restarted with live session handle 51683. It logs readiness, not traffic payloads. No browser launch was automated and no profile, credential, cookie, application or MCP configuration was changed.
+
+REA discovery evidence `ev_10eae1ea7bb5aee403fc3824689407beef27b4f187af865033b0afab442709e0` observed Chrome 155.0.8059.40 and the user's open Proxima account page at https://app.proxima.tools/account. A three-second passive inspection succeeded with evidence `ev_db2e108c5708fb5ecb06043b9a4b2050de4b279090d76960edf9f7022733d9d4`. Scope was app.proxima.tools only; accessibility text, script sources, console text, storage fingerprints/keys and body shapes were disabled. Coverage remains policy-filtered and attach-limited. This verifies the restored connection, not strategy execution or full current feature parity.
+
+Full inline inspection evidence and connection receipt: `C:\Users\Julian\Desktop\REA\results\proxima-connection-restored-20261013.json`. The relay remains running for this session; it is not a scheduled service. If the debugging browser or relay closes, verify the endpoint and restart only the approved components.
+
 ## Passive continuity check, 13 October 2026
 
 The existing approved dedicated CDP browser remained reachable on loopback port 9223. REA browser discovery evidence `ev_f07e11b78acb982e05aa493db88fdd4c8862893f5d3dc2e597b21e4c63ae2967` and passive inspection `ev_c43ce2b4f5314b0ff7ac1e1a5517356330fd777b5f5ce4783b49debe6ef1003e` cover the already-open live token workspace. Inspection ran from 04:23:58.352 to 04:24:01.592 UTC, without clicking, navigation, script execution, cookie/key access or transaction actions. Market, Limit, Grid, Auto Buy configuration and Auto Sell controls were present. No active Auto Buy, Auto Sell, volume or cleanup session appeared in the sampled accessibility state.
