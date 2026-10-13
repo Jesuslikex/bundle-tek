@@ -137,7 +137,9 @@ beforeAll(async () => {
   const journal = JSON.parse(
     readFileSync('drizzle/meta/_journal.json', 'utf8'),
   ) as { entries: { tag: string }[] };
-  expect(journal.entries).toHaveLength(74);
+  expect(journal.entries.map((entry) => entry.tag)).toContain(
+    '0073_conditional_monitoring',
+  );
   for (const e of journal.entries) {
     const sql = readFileSync(`drizzle/${e.tag}.sql`, 'utf8');
     const statements = e.tag.startsWith('0073')

@@ -1,5 +1,13 @@
 # Latest source verification, 13 October 2026
 
+## Full-run result and repaired monitor fixture
+
+Exact handle 84487 is terminal. The full test command reported 302 passing files and one setup-failed file: **2,097 tests passed, zero assertion failures, 16 setup-failure skips**. JSON success=false and one failed suite; this is not a full-suite pass. Duration: 1,624.39 seconds. The wrapper then exited 2 because the five Claude UI files changed from the launch snapshot. Reports remain at work/release-qa/full-suite-dca-deadline-20261013.json and .log.
+
+The single bootstrap error was the conditional-monitor fixture's fixed 74-entry journal assertion. The fixture now requires its monitoring migration by identity and still applies the entire current journal, allowing append-only additions. All **16 actual route/D1 monitor tests passed** against the 76-migration schema in exact handle 78121; scoped typed lint passed. Report: work/release-qa/conditional-monitor-journal-fix-20261013.json. This targeted repair does not turn the earlier changed-source full run into a clean final snapshot result. A fresh full run must cover the repaired fixture and Claude's merged layout together.
+
+Push preflight also confirmed that the main checkout's `sites` remote targets the original friend-owned PulseForge project, matching its preserved manifest. It does not target the approved owned CROP site. Direct terminal login/push advice does not resolve that project mismatch. The separate CROP candidate preserves its own identity and old hosted migration history but is behind current main; refresh and migration reconciliation remain necessary before publication. No remote was changed, no write credential was created, and nothing was pushed or deployed.
+
 ## Current full suite in progress
 
 The real checkout's full suite is running under exact execution handle **84487**, with one test worker, archived `work/**` copies excluded, live-provider flags unset and default/JSON reporters. Log/report prefix: `work/release-qa/full-suite-dca-deadline-20261013`. Launch snapshot: `work/release-qa/source-full-suite-dca-deadline-20261013.json`, 1,046 files, digest b0a16e2d0348c5d93c451b155cb0628e43dcbca29a541ae50945fb6e169872d1.
