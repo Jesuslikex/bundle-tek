@@ -7,6 +7,7 @@ export type TradeSessionTerms = {
     | 'imported-trade-session-v1'
     | 'imported-trade-session-v2'
     | 'imported-trade-session-v3';
+  endsAt?: string;
   strategy?: 'DCA';
   schedule?: TradeSessionSchedule;
   projectId: string;
@@ -118,6 +119,7 @@ export function tradeSessionTerms(
     entries: { wallet: string; walletRevision: number; amount: string }[];
     schedule?: unknown;
     strategy?: unknown;
+    endsAt?: unknown;
   };
   if (
     !v ||
@@ -140,6 +142,8 @@ export function tradeSessionTerms(
     throw new Error('Choose a supported session strategy.');
   const schedule =
     v.schedule === undefined ? undefined : tradeSessionSchedule(v.schedule);
+  if (v.endsAt !== undefined && (!dca || !canonicalScheduleDate(v.endsAt)))
+    throw new Error('Only DCA supports an exact UTC end time.');
   if (dca && (!schedule || schedule.spacingSeconds < 1 || v.entries.length < 2))
     throw new Error('DCA needs 2 to 25 cycles and a positive saved interval.');
   const seen = new Set<string>();
@@ -177,6 +181,13 @@ export function tradeSessionTerms(
       );
   }
   if (schedule) sessionEntryNotBefore({ schedule }, entries.length);
+  if (
+    v.endsAt !== undefined &&
+    schedule &&
+    Date.parse(v.endsAt as string) <=
+      Date.parse(sessionEntryNotBefore({ schedule }, entries.length)!)
+  )
+    throw new Error('DCA must end after its final scheduled cycle.');
   return {
     format: dca
       ? 'imported-trade-session-v3'
@@ -194,6 +205,7 @@ export function tradeSessionTerms(
       .toString(),
     entries,
     ...(schedule ? { schedule } : {}),
+    ...(v.endsAt === undefined ? {} : { endsAt: v.endsAt as string }),
   };
 }
 export function decodeTradeSession(value: unknown): TradeSession {

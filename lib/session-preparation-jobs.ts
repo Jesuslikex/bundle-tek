@@ -95,6 +95,8 @@ export async function queueSessionPreparation(
   entry: number,
 ) {
   const e = session.terms.entries.find((e) => e.entry === entry);
+  if (session.terms.endsAt && Date.now() >= Date.parse(session.terms.endsAt))
+    throw new Error('DCA session end time has been reached.');
   if (!e) throw new Error('Choose a saved entry.');
   const old = await db
     .prepare(

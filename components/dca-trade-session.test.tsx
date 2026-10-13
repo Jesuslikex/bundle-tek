@@ -197,3 +197,15 @@ it('blocks an invalid or locked budget and cancels a pending save on unmount', a
   expect(saved).not.toHaveBeenCalled();
   root = createRoot(container);
 });
+it('includes the reviewed UTC deadline in immutable saved terms and blocks an end before the final cycle', async () => {
+  await fill();
+  await setField('DCA end', '2026-10-13T12:01');
+  expect(saveButton().disabled).toBe(true);
+  await setField('DCA end', '2026-10-13T12:05');
+  const expectedEnd = new Date('2026-10-13T12:05').toISOString();
+  expect(container.textContent).toContain(`DCA stops at ${expectedEnd}`);
+  await act(async () => saveButton().click());
+  expect(requests[0].body.endsAt).toBe(expectedEnd);
+  await respond(0);
+  expect(saved.mock.calls[0][0].terms.endsAt).toBe(expectedEnd);
+});

@@ -16,6 +16,7 @@ export function dcaTradeSessionInput(
     cycles: number;
     startAt: string;
     intervalSeconds: number;
+    endsAt?: string;
   },
   token: { chain: string; address: string; decimals: number },
 ): {
@@ -25,6 +26,7 @@ export function dcaTradeSessionInput(
     projectRevision: number;
     side: 'Buy' | 'Sell';
     strategy: 'DCA';
+    endsAt?: string;
     schedule: { startAt: string; spacingSeconds: number };
     entries: { wallet: string; walletRevision: number; amount: string }[];
   };
@@ -43,6 +45,7 @@ export function dcaTradeSessionInput(
     projectRevision: input.projectRevision,
     side: input.side,
     strategy: 'DCA' as const,
+    ...(input.endsAt === undefined ? {} : { endsAt: input.endsAt }),
     schedule: { startAt: input.startAt, spacingSeconds: input.intervalSeconds },
     entries: Array.from({ length: input.cycles }, (_, i) => ({
       wallet: input.wallet,

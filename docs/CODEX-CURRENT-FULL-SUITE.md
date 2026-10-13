@@ -1,5 +1,9 @@
 # Latest source verification, 13 October 2026
 
+## DCA end time
+
+Optional DCA deadlines now stop new preparation, approval and submission using both application and database clocks, while preserving signature registration and receipt recovery. Fifty-eight tests across five files plus a separately selected direct database test passed; actual-source TypeScript, final typed lint and build passed at the scope described in CODEX-DCA-END-TIME.md. Final 1,046-file snapshot digest: b0a16e2d0348c5d93c451b155cb0628e43dcbca29a541ae50945fb6e169872d1. Append-only 0075 preserves prior SQL/journal entries and the actual Wrangler command applies all 76 whole files locally. No hosted, live-browser, funded or scheduler proof is implied; the earlier full-suite result remains tied to its earlier snapshot.
+
 ## Finite user-approved DCA sessions
 
 The latest continuation adds persisted single-wallet Buy/Sell DCA with exact budget splitting, cycle preview and per-cycle eligibility enforced in append-only 0074. Fifty-seven tests across seven files passed; thirteen affected UI/model tests passed again after the final UI locking change, with unchanged backend/model/migration inputs. Final 1,045-file snapshot digest: 25029c4d2a8c1c442e6849b7974405c8a704b8bf7d448420e6664faab02b20c5. Actual-source TypeScript, typed lint and production build passed. The actual Wrangler migration command applied all 75 whole files on disposable local D1. See CODEX-DCA-TRADE-SESSIONS.md for exact artifacts and scope. No deployment, worker activation or funded/live/browser verification occurred; this does not replace the earlier full-suite result.

@@ -120,7 +120,10 @@ export async function POST(request: Request) {
       throw new Error();
     if (
       Object.keys(body)
-        .filter((key) => key !== 'strategy' || body.action !== 'create')
+        .filter(
+          (key) =>
+            !['strategy', 'endsAt'].includes(key) || body.action !== 'create',
+        )
         .sort()
         .join(',') !==
       (body.action === 'create'
@@ -260,6 +263,14 @@ export async function POST(request: Request) {
           { error: 'DCA timing storage is not installed. No session saved.' },
           503,
         );
+      if (
+        terms.endsAt &&
+        installed.results.some((row) => !row.sql.includes('$.endsAt'))
+      )
+        return json(
+          { error: 'DCA end-time storage is not installed. No session saved.' },
+          503,
+        );
     }
     if (old)
       return old.document === text
@@ -284,6 +295,8 @@ export async function POST(request: Request) {
         },
         400,
       );
+    if (terms.endsAt && Date.parse(terms.endsAt) <= Date.now())
+      return json({ error: 'Choose a DCA end time in the future.' }, 400);
     if (project.archived || project.revision !== body.projectRevision)
       return json({ error: 'Project changed.' }, 409);
     const entries = JSON.stringify(terms.entries),
@@ -291,7 +304,7 @@ export async function POST(request: Request) {
     // A single INSERT SELECT checks every owned wallet and the project atomically.
     const write = await db
       .prepare(
-        "INSERT OR IGNORE INTO imported_trade_sessions SELECT ?,?,?,?,'active',1,?,? WHERE EXISTS(SELECT 1 FROM imported_token_projects WHERE owner_id=? AND id=? AND revision=? AND archived=0 AND chain='Solana' AND document=?) AND (? IS NULL OR (julianday(?)>=julianday('now','-1 minute') AND julianday(?)<=julianday('now','+365 days'))) AND NOT EXISTS(SELECT 1 FROM json_each(?) e WHERE NOT EXISTS(SELECT 1 FROM workspace_wallets w WHERE w.owner_id=? AND w.chain='Solana' AND w.archived=0 AND w.address=json_extract(e.value,'$.wallet') AND w.revision=json_extract(e.value,'$.walletRevision')))",
+        "INSERT OR IGNORE INTO imported_trade_sessions SELECT ?,?,?,?,'active',1,?,? WHERE EXISTS(SELECT 1 FROM imported_token_projects WHERE owner_id=? AND id=? AND revision=? AND archived=0 AND chain='Solana' AND document=?) AND (? IS NULL OR (julianday(?)>=julianday('now','-1 minute') AND julianday(?)<=julianday('now','+365 days'))) AND (? IS NULL OR julianday('now')<julianday(?)) AND NOT EXISTS(SELECT 1 FROM json_each(?) e WHERE NOT EXISTS(SELECT 1 FROM workspace_wallets w WHERE w.owner_id=? AND w.chain='Solana' AND w.archived=0 AND w.address=json_extract(e.value,'$.wallet') AND w.revision=json_extract(e.value,'$.walletRevision')))",
       )
       .bind(
         owner,
@@ -307,6 +320,8 @@ export async function POST(request: Request) {
         terms.schedule?.startAt ?? null,
         terms.schedule?.startAt ?? null,
         terms.schedule?.startAt ?? null,
+        terms.endsAt ?? null,
+        terms.endsAt ?? null,
         entries,
         owner,
       )

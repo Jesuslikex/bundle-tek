@@ -71,6 +71,8 @@ export async function captureTradeSession(
   )
     throw new Error('Trade differs from the saved session entry.');
   const notBefore = sessionEntryNotBefore(session.terms, entry.entry);
+  if (session.terms.endsAt && Date.now() >= Date.parse(session.terms.endsAt))
+    throw new Error('DCA session has reached its saved end time.');
   if (notBefore && Date.parse(notBefore) > Date.now())
     throw new Error('Trade session entry is not due yet.');
   const busy = await db
@@ -110,7 +112,7 @@ export function tradeSessionWriteGuard(
 ) {
   return guard
     ? {
-        sql: " AND EXISTS(SELECT 1 FROM imported_trade_sessions t WHERE t.owner_id=? AND t.id=? AND t.revision=? AND t.state='active' AND t.document=? AND EXISTS(SELECT 1 FROM imported_trade_session_controls c WHERE c.owner_id=t.owner_id AND c.session_id=t.id AND c.state='ready' AND c.revision=?) AND (? IS NULL OR julianday(?)<=julianday('now'))) AND NOT EXISTS(SELECT 1 FROM imported_swap_signing_intents i JOIN imported_swap_preparations p ON p.owner_id=i.owner_id AND p.id=i.preparation_id WHERE i.owner_id=? AND json_extract(p.document,'$.session.sessionId')=? AND json_extract(p.document,'$.session.entry')=? AND i.state IN ('awaiting_signature','signed','submitted','finalized') AND (? IS NULL OR i.id<>?))",
+        sql: " AND EXISTS(SELECT 1 FROM imported_trade_sessions t WHERE t.owner_id=? AND t.id=? AND t.revision=? AND t.state='active' AND t.document=? AND EXISTS(SELECT 1 FROM imported_trade_session_controls c WHERE c.owner_id=t.owner_id AND c.session_id=t.id AND c.state='ready' AND c.revision=?) AND (? IS NULL OR julianday(?)<=julianday('now')) AND (json_type(t.document,'$.endsAt') IS NULL OR julianday('now')<julianday(json_extract(t.document,'$.endsAt')))) AND NOT EXISTS(SELECT 1 FROM imported_swap_signing_intents i JOIN imported_swap_preparations p ON p.owner_id=i.owner_id AND p.id=i.preparation_id WHERE i.owner_id=? AND json_extract(p.document,'$.session.sessionId')=? AND json_extract(p.document,'$.session.entry')=? AND i.state IN ('awaiting_signature','signed','submitted','finalized') AND (? IS NULL OR i.id<>?))",
         bindings: [
           owner,
           guard.selection.sessionId,

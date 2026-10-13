@@ -80,8 +80,10 @@ export function ImportedTradeSessions({
   const needsClock = sessions.some(
     (s) =>
       s.state === 'active' &&
-      s.terms.schedule &&
-      Date.parse(sessionEntryNotBefore(s.terms, s.terms.entries.length)!) > now,
+      ((s.terms.schedule &&
+        Date.parse(sessionEntryNotBefore(s.terms, s.terms.entries.length)!) >
+          now) ||
+        (s.terms.endsAt && Date.parse(s.terms.endsAt) > now)),
   );
   useEffect(() => {
     if (!needsClock) return;
@@ -630,6 +632,7 @@ export function ImportedTradeSessions({
           </Button>
           {s.terms.schedule && (
             <p>
+              {s.terms.endsAt && `DCA end time (UTC): ${s.terms.endsAt}. `}
               {s.terms.strategy === 'DCA' &&
                 `DCA ${s.terms.side}: ${s.terms.entries.length} cycles for one wallet. `}
               Scheduled start (UTC): {s.terms.schedule.startAt}. Spacing:{' '}
@@ -639,7 +642,10 @@ export function ImportedTradeSessions({
           )}
           {s.terms.entries.map((e) => {
             const notBefore = sessionEntryNotBefore(s.terms, e.entry),
-              waiting = notBefore !== undefined && Date.parse(notBefore) > now;
+              waiting = notBefore !== undefined && Date.parse(notBefore) > now,
+              ended =
+                s.terms.endsAt !== undefined &&
+                Date.parse(s.terms.endsAt) <= now;
             const state = activity.find(
                 (a) => a.sessionId === s.id && a.entry === e.entry,
               ),
@@ -697,9 +703,11 @@ export function ImportedTradeSessions({
                 {notBefore && (
                   <p>
                     Entry start (UTC): {notBefore}.{' '}
-                    {waiting
-                      ? `Waiting ${Math.ceil((Date.parse(notBefore) - now) / 1000)} seconds before review.`
-                      : 'Due for review; the server checks timing before preparation and submission.'}
+                    {ended
+                      ? 'DCA end time reached. New preparation and submission are closed; retained approvals remain recoverable.'
+                      : waiting
+                        ? `Waiting ${Math.ceil((Date.parse(notBefore) - now) / 1000)} seconds before review.`
+                        : 'Due for review; the server checks timing before preparation and submission.'}
                   </p>
                 )}
                 <Button
@@ -714,7 +722,8 @@ export function ImportedTradeSessions({
                     !!blocked ||
                     controls.find((c) => c.sessionId === s.id)?.state !==
                       'ready' ||
-                    waiting
+                    waiting ||
+                    ended
                   }
                   onClick={() =>
                     setPreparing({
@@ -737,6 +746,8 @@ export function ImportedTradeSessions({
               project.archived ||
               s.state !== 'active' ||
               s.terms.projectRevision !== project.revision ||
+              (s.terms.endsAt !== undefined &&
+                Date.parse(s.terms.endsAt) <= now) ||
               controls.find((c) => c.sessionId === s.id)?.state !== 'ready'
             }
             onReview={(job) => {
@@ -819,7 +830,12 @@ export function ImportedTradeSessions({
               (e) => e.entry === preparing.entry,
             )!.amount
           }
-          locked={busy || locked}
+          locked={
+            busy ||
+            locked ||
+            (preparing.session.terms.endsAt !== undefined &&
+              Date.parse(preparing.session.terms.endsAt) <= now)
+          }
           sessionNotBefore={sessionEntryNotBefore(
             preparing.session.terms,
             preparing.entry,

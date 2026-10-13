@@ -134,6 +134,7 @@ beforeAll(async () => {
     '0062_session_preparation_jobs',
     '0068_remarkable_frightful_four',
     '0074_dca_trade_session_timing',
+    '0075_dca_session_end_time',
   ]) {
     if (name === '0061_imported_trade_session_controls') {
       const now = new Date().toISOString(),
@@ -311,6 +312,164 @@ const dcaBody = () => ({
     walletRevision: 1,
     amount: '0.001',
   })),
+});
+it('closes DCA at its saved deadline before providers while preserving exact signature registration and receipt recovery', async () => {
+  const endsAt = new Date(Date.now() + 60000).toISOString();
+  const input = {
+    ...dcaBody(),
+    endsAt,
+    schedule: {
+      startAt: new Date(Date.now() - 30000).toISOString(),
+      spacingSeconds: 1,
+    },
+  };
+  expect((await sessionPost(request(input))).status).toBe(200);
+  const guard = await captureTradeSession(
+    mocks.db,
+    owner,
+    { sessionId, revision: 1, entry: 1 },
+    {
+      projectId,
+      projectRevision: 1,
+      wallet: f.wallet,
+      walletRevision: 1,
+      side: 'Buy',
+      unitsRaw: '1000000',
+      mint: f.mint,
+      decimals: 6,
+    },
+  );
+  await mocks.db
+    .prepare(
+      "UPDATE imported_swap_preparations SET document=json_set(document,'$.session',json(?)) WHERE owner_id=? AND id=?",
+    )
+    .bind(JSON.stringify(guard.selection), owner, preparationId)
+    .run();
+  const approval = await reviewed();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse(endsAt));
+  try {
+    const earlyCalls = mocks.prepare.mock.calls.length;
+    const prepared = await prepareImported(
+      new Request('http://localhost/api/imported-projects/prepare', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: projectId,
+          revision: 1,
+          wallet: f.wallet,
+          walletRevision: 1,
+          side: 'Buy',
+          amount: '0.001',
+          session: { sessionId, revision: 1, entry: 2 },
+        }),
+      }),
+    );
+    expect(prepared.status).toBe(409);
+    expect(mocks.prepare.mock.calls.length).toBe(earlyCalls);
+    expect(
+      (
+        await post({
+          action: 'register',
+          id: approval.id,
+          transaction: f.signed.transaction,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await post({
+          action: 'submit',
+          id: approval.id,
+          transaction: f.signed.transaction,
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      mocks.rpc.mock.calls.some((call) => call[1] === 'sendTransaction'),
+    ).toBe(false);
+    expect((await post({ action: 'recover', id: approval.id })).status).toBe(
+      200,
+    );
+  } finally {
+    clock.mockRestore();
+  }
+});
+it('enforces DCA expiry using the database clock even when the application clock is behind', async () => {
+  const actual = Date.now();
+  const input = {
+    ...dcaBody(),
+    endsAt: new Date(actual - 1000).toISOString(),
+    schedule: {
+      startAt: new Date(actual - 30000).toISOString(),
+      spacingSeconds: 1,
+    },
+  };
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(actual - 5000);
+  try {
+    expect((await sessionPost(request(input))).status).toBe(409);
+    expect(await count('imported_trade_sessions')).toBe(0);
+  } finally {
+    clock.mockRestore();
+  }
+  expect((await sessionPost(request(input))).status).toBe(400);
+});
+it('the database rejects an expired DCA preparation and stale write guard independently of the application clock', async () => {
+  const actual = Date.now(),
+    startAt = new Date(actual - 30000).toISOString(),
+    endsAt = new Date(actual - 1000).toISOString();
+  const terms = tradeSessionTerms(
+    { ...dcaBody(), endsAt, schedule: { startAt, spacingSeconds: 1 } },
+    { chain: 'Solana', address: f.mint, decimals: 6 },
+  );
+  // Retained historical session whose deadline has already passed.
+  await mocks.db
+    .prepare(
+      "INSERT INTO imported_trade_sessions VALUES(?,?,?,?,'active',1,?,?)",
+    )
+    .bind(owner, sessionId, projectId, JSON.stringify(terms), startAt, startAt)
+    .run();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(actual - 2000);
+  let guard;
+  try {
+    guard = await captureTradeSession(
+      mocks.db,
+      owner,
+      { sessionId, revision: 1, entry: 1 },
+      {
+        projectId,
+        projectRevision: 1,
+        wallet: f.wallet,
+        walletRevision: 1,
+        side: 'Buy',
+        unitsRaw: '1000000',
+        mint: f.mint,
+        decimals: 6,
+      },
+    );
+  } finally {
+    clock.mockRestore();
+  }
+  const write = tradeSessionWriteGuard(owner, guard);
+  expect(
+    await mocks.db
+      .prepare('SELECT 1 AS ready WHERE 1=1' + write.sql)
+      .bind(...write.bindings)
+      .first(),
+  ).toBeNull();
+  await expect(
+    mocks.db
+      .prepare(
+        "INSERT INTO imported_swap_preparations SELECT ?,owner_id,project_id,project_revision,wallet_address,wallet_revision,json_set(document,'$.session',json(?)),created_at FROM imported_swap_preparations WHERE owner_id=? AND id=?",
+      )
+      .bind(
+        crypto.randomUUID(),
+        JSON.stringify(guard.selection),
+        owner,
+        preparationId,
+      )
+      .run(),
+  ).rejects.toThrow(/timing differs/);
+  expect(await count('imported_swap_preparations')).toBe(1);
 });
 it('saves repeated-wallet DCA terms idempotently and binds each cycle to its own due time before provider reads', async () => {
   const input = dcaBody();

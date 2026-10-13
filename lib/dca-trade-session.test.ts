@@ -115,3 +115,22 @@ it('handles the maximum input atom budget without floating-point rounding', () =
     18446744073709551615n,
   );
 });
+it('retains an optional canonical deadline strictly after the final cycle and rejects deadlines on legacy sessions', () => {
+  const endsAt = '2026-10-13T12:03:00.000Z';
+  const { terms, request } = dcaTradeSessionInput({ ...input, endsAt }, token);
+  expect(terms.endsAt).toBe(endsAt);
+  for (const end of [
+    '2026-10-13T12:02:00.000Z',
+    '2026-10-13T12:01:00.000Z',
+    'invalid',
+  ])
+    expect(() =>
+      dcaTradeSessionInput({ ...input, endsAt: end }, token),
+    ).toThrow();
+  expect(() =>
+    tradeSessionTerms(
+      { ...request, strategy: undefined, entries: [request.entries[0]] },
+      token,
+    ),
+  ).toThrow();
+});

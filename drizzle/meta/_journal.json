@@ -526,6 +526,13 @@
       "when": 1791877514266,
       "tag": "0074_dca_trade_session_timing",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1791903024371,
+      "tag": "0075_dca_session_end_time",
+      "breakpoints": true
     }
   ]
 }

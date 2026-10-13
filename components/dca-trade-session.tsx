@@ -32,6 +32,7 @@ export function DcaTradeSession({
     [cycles, setCycles] = useState('5'),
     [interval, setInterval] = useState('60'),
     [start, setStart] = useState(''),
+    [end, setEnd] = useState(''),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
   const pending = useRef<AbortController | null>(null);
@@ -39,6 +40,7 @@ export function DcaTradeSession({
     cyclesId = useId(),
     intervalId = useId(),
     startId = useId();
+  const endId = useId();
   const retry = useRef<{ key: string; id: string } | null>(null);
   useEffect(
     () => () => {
@@ -73,13 +75,14 @@ export function DcaTradeSession({
           cycles: Number(cycles),
           startAt: new Date(start).toISOString(),
           intervalSeconds: Number(interval),
+          ...(end ? { endsAt: new Date(end).toISOString() } : {}),
         },
         project.document.token,
       );
     } catch {
       return null;
     }
-  }, [wallets, wallet, start, cycles, interval, project, side, amount]);
+  }, [wallets, wallet, start, end, cycles, interval, project, side, amount]);
   const disabled = locked || busy || project.archived;
   async function save() {
     if (!preview || disabled || pending.current) return;
@@ -228,6 +231,25 @@ export function DcaTradeSession({
         every cycle rereads available funds. Remainder atoms go to the earliest
         cycles. Pause or cancel remaining cycles in saved session controls.
       </p>
+      <label htmlFor={endId}>
+        DCA end in your local timezone (optional)
+        <Input
+          id={endId}
+          type="datetime-local"
+          value={end}
+          disabled={disabled}
+          onChange={(e) => setEnd(e.target.value)}
+          onInput={(e) => setEnd(e.currentTarget.value)}
+        />
+      </label>
+      <p>
+        An end time must follow the final scheduled cycle. At that time new
+        preparation, approval and submission stop; retained signatures and
+        receipts remain recoverable.
+      </p>
+      {preview?.terms.endsAt && (
+        <p>DCA stops at {preview.terms.endsAt} (UTC).</p>
+      )}
       {preview ? (
         <ol aria-label="DCA cycle preview">
           {preview.terms.entries.map((e) => (
