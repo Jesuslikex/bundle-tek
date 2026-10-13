@@ -23,6 +23,58 @@ const input = {
   startAt: '2026-10-13T12:00:00.000Z',
   intervalSeconds: 60,
 };
+it('anchors a duration to the scheduled start and persists only the enforced UTC deadline', () => {
+  const result = dcaTradeSessionInput(
+    { ...input, durationSeconds: 180 },
+    token,
+  );
+  expect(result.request.endsAt).toBe('2026-10-13T12:03:00.000Z');
+  expect(result.terms.endsAt).toBe(result.request.endsAt);
+  expect(result.request).not.toHaveProperty('durationSeconds');
+  expect(tradeSessionTerms(result.request, token)).toEqual(result.terms);
+  const moved = dcaTradeSessionInput(
+    {
+      ...input,
+      startAt: '2026-10-14T12:00:00.000Z',
+      durationSeconds: 180,
+    },
+    token,
+  );
+  expect(moved.terms.endsAt).toBe('2026-10-14T12:03:00.000Z');
+});
+it('rejects ambiguous, unsafe or too-short duration limits before producing a request', () => {
+  for (const durationSeconds of [
+    0,
+    -1,
+    1.5,
+    NaN,
+    Infinity,
+    Number.MAX_SAFE_INTEGER,
+  ]) {
+    expect(() =>
+      dcaTradeSessionInput({ ...input, durationSeconds }, token),
+    ).toThrow();
+  }
+  expect(() =>
+    dcaTradeSessionInput(
+      {
+        ...input,
+        durationSeconds: 180,
+        endsAt: '2026-10-13T12:05:00.000Z',
+      },
+      token,
+    ),
+  ).toThrow('not both');
+  for (const durationSeconds of [119, 120]) {
+    expect(() =>
+      dcaTradeSessionInput({ ...input, durationSeconds }, token),
+    ).toThrow('final scheduled cycle');
+  }
+  expect(
+    dcaTradeSessionInput({ ...input, durationSeconds: 121 }, token).terms
+      .endsAt,
+  ).toBe('2026-10-13T12:02:01.000Z');
+});
 it('saves exact Sell supply intent and rejects altered atoms, random bounds or forged captures', () => {
   const supplyToken = {
     ...token,

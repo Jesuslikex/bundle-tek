@@ -1,0 +1,16 @@
+# Scheduled-start DCA duration
+
+13 October 2026. The retained REA form capture in CODEX-PROXIMA-DCA-LIVE-CONTROLS.md shows duration ending controls, but does not establish Proxima's clock anchor or backend behavior.
+
+Bundle's DCA composer now offers a calendar deadline or a duration in whole seconds. Duration is anchored to the explicitly reviewed scheduled start, including paused time and time waiting for a market condition. It resolves to a displayed UTC deadline before save and uses the existing immutable endsAt API/session terms. Changing the start recalculates the preview; retrying the same saved request keeps its exact deadline. Switching rules clears hidden inputs. No independent relative timer, API field or migration was introduced.
+
+Zero, negative, fractional, unsafe and out-of-range durations are rejected. A duration cannot be combined with a calendar deadline. Under the current finite-session contract, the deadline must be strictly after the final scheduled cycle; it cannot silently truncate the reviewed allocation. Existing server/database-time checks close preparation, approval and submission at expiry, while retained signature registration and receipt recovery remain available. Every cycle still requires explicit approval/signing/submission.
+
+## Verification
+
+- Model/composer: 19 tests in two files passed, exit 0. Added cases cover schedule anchoring, moving the start, exact saved deadline, rule switching, invalid/ambiguous duration and final-cycle boundaries. Report: work/release-qa/dca-duration-tests-20261013.json.
+- Actual signing/session route and disposable local D1: 54 tests passed, zero failures/skips, handle 71188 exit 0. This includes existing deadline enforcement before providers, independent database-clock enforcement and post-expiry signature/receipt recovery. Report: work/release-qa/dca-duration-route-20261013.json. These regressions validate compatibility with the existing deadline contract; no new backend behavior is claimed.
+- Actual-source TypeScript: handle 52038 exit 0. Scoped typed lint: all four changed TypeScript files passed. Production build: handle 28882 exit 0. Logs: work/release-qa/dca-duration-types-20261013.log, dca-duration-lint-20261013.log and dca-duration-build-final-20261013.log. An initial build invocation used an incorrect CLI path; it failed before building and is superseded by the actual package-declared entry point's successful run.
+- Frozen source: 1,054 files, digest a2de676362c4149b7528d0f79c1d4569bd8bee71f55902d430d7c11001c97ec8, post-run unchanged=true. Snapshot: work/release-qa/source-dca-duration-20261013.json. Full lint/full suite and browser rendering were not rerun. The previously reported inherited full-lint findings remain open.
+
+This is a duration option for the current single-strategy session. Separate strategy/session endings, multiple strategies, Proxima's exact duration/accounting semantics and rendered/funded/hosted proof remain incomplete. No fresh REA capture, live transaction, scheduler, provider credential, historical migration, Claude-owned component, hosting source or deployment changed. The two pre-existing dirty files remain unstaged. Local CROP candidate 6e75c7e still represents source 60e6fa1 and does not include this continuation. Hosted partial migration recovery is unresolved.

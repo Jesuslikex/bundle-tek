@@ -24,6 +24,7 @@ export function dcaTradeSessionInput(
     startAt: string;
     intervalSeconds: number;
     endsAt?: string;
+    durationSeconds?: number;
     marketCapRange?: DcaMarketCapRange;
     randomization?: DcaRandomization;
     cycleAmountsRaw?: string[];
@@ -53,6 +54,27 @@ export function dcaTradeSessionInput(
     count = BigInt(input.cycles);
   if (total < count)
     throw new Error('Each DCA cycle needs at least one input atom.');
+  let endsAt = input.endsAt;
+  if (input.durationSeconds !== undefined) {
+    if (endsAt !== undefined)
+      throw new Error(
+        'Choose a DCA duration or a calendar deadline, not both.',
+      );
+    if (
+      !Number.isSafeInteger(input.durationSeconds) ||
+      input.durationSeconds <= 0
+    )
+      throw new Error(
+        'DCA duration must be a positive whole number of seconds.',
+      );
+    const endTime = Date.parse(input.startAt) + input.durationSeconds * 1000;
+    if (
+      !Number.isSafeInteger(endTime) ||
+      !Number.isFinite(new Date(endTime).getTime())
+    )
+      throw new Error('DCA duration exceeds the supported date range.');
+    endsAt = new Date(endTime).toISOString();
+  }
   const randomization =
     input.randomization === undefined
       ? undefined
@@ -75,7 +97,7 @@ export function dcaTradeSessionInput(
     strategy: 'DCA' as const,
     ...(randomization ? { randomization } : {}),
     ...(input.supplySizing ? { supplySizing: input.supplySizing } : {}),
-    ...(input.endsAt === undefined ? {} : { endsAt: input.endsAt }),
+    ...(endsAt === undefined ? {} : { endsAt }),
     ...(input.marketCapRange === undefined
       ? {}
       : { marketCapRange: dcaMarketCapRange(input.marketCapRange) }),

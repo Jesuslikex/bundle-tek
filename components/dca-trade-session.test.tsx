@@ -404,3 +404,37 @@ it('includes the reviewed UTC deadline in immutable saved terms and blocks an en
   await respond(0);
   expect(saved.mock.calls[0][0].terms.endsAt).toBe(expectedEnd);
 });
+it('reviews a duration from scheduled start and saves the exact existing deadline contract', async () => {
+  await fill();
+  await setField('DCA stop rule', 'duration');
+  expect(saveButton().disabled).toBe(true);
+  for (const value of ['0', '120', '180.5', '1e3']) {
+    await setField('DCA duration', value);
+    expect(saveButton().disabled).toBe(true);
+  }
+  await setField('DCA duration', '180');
+  await setField('DCA start', '2026-10-14T12:00');
+  const expectedEnd = new Date(
+    new Date('2026-10-14T12:00').getTime() + 180000,
+  ).toISOString();
+  expect(container.textContent).toContain(`DCA stops at ${expectedEnd}`);
+  expect(container.textContent).toContain('including time spent paused');
+  await act(async () => saveButton().click());
+  expect(requests[0].body.endsAt).toBe(expectedEnd);
+  expect(requests[0].body).not.toHaveProperty('durationSeconds');
+  await respond(0);
+  expect(saved.mock.calls[0][0].terms.endsAt).toBe(expectedEnd);
+});
+it('clears hidden ending inputs on a rule switch rather than saving a stale deadline', async () => {
+  await fill();
+  await setField('DCA end', '2026-10-13T12:05');
+  await setField('DCA stop rule', 'duration');
+  expect(saveButton().disabled).toBe(true);
+  await setField('DCA duration', '180');
+  expect(saveButton().disabled).toBe(false);
+  await setField('DCA stop rule', 'deadline');
+  expect(container.textContent).not.toContain('DCA stops at');
+  await act(async () => saveButton().click());
+  expect(requests[0].body).not.toHaveProperty('endsAt');
+  await respond(0);
+});

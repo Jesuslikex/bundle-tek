@@ -46,6 +46,8 @@ export function DcaTradeSession({
     [interval, setInterval] = useState('60'),
     [start, setStart] = useState(''),
     [end, setEnd] = useState(''),
+    [ending, setEnding] = useState<'deadline' | 'duration'>('deadline'),
+    [duration, setDuration] = useState(''),
     [sizing, setSizing] = useState<'even' | 'randomized'>('even'),
     [cycleMinimum, setCycleMinimum] = useState(''),
     [cycleMaximum, setCycleMaximum] = useState(''),
@@ -65,6 +67,7 @@ export function DcaTradeSession({
     intervalId = useId(),
     startId = useId();
   const endId = useId();
+  const durationId = useId();
   const minimumId = useId(),
     maximumId = useId();
   const cycleMinimumId = useId(),
@@ -234,7 +237,15 @@ export function DcaTradeSession({
                 cycleAmountsRaw: allocation!.amountsRaw,
               }
             : {}),
-          ...(end ? { endsAt: new Date(end).toISOString() } : {}),
+          ...(ending === 'duration'
+            ? {
+                durationSeconds: /^\d+$/.test(duration)
+                  ? Number(duration)
+                  : NaN,
+              }
+            : end
+              ? { endsAt: new Date(end).toISOString() }
+              : {}),
           ...(rangeEnabled
             ? {
                 marketCapRange: {
@@ -255,6 +266,8 @@ export function DcaTradeSession({
     wallet,
     start,
     end,
+    ending,
+    duration,
     cycles,
     interval,
     project,
@@ -498,17 +511,50 @@ export function DcaTradeSession({
         the earliest cycles. Pause or cancel remaining cycles in saved session
         controls.
       </p>
-      <label htmlFor={endId}>
-        DCA end in your local timezone (optional)
-        <Input
-          id={endId}
-          type="datetime-local"
-          value={end}
+      <label>
+        DCA stop rule
+        <select
+          value={ending}
           disabled={disabled}
-          onChange={(e) => setEnd(e.target.value)}
-          onInput={(e) => setEnd(e.currentTarget.value)}
-        />
+          onChange={(e) => {
+            setEnding(e.target.value as 'deadline' | 'duration');
+            setEnd('');
+            setDuration('');
+          }}
+        >
+          <option value="deadline">Calendar deadline (optional)</option>
+          <option value="duration">Duration from scheduled start</option>
+        </select>
       </label>
+      {ending === 'duration' ? (
+        <label htmlFor={durationId}>
+          DCA duration in seconds
+          <Input
+            id={durationId}
+            inputMode="numeric"
+            value={duration}
+            disabled={disabled}
+            onChange={(e) => setDuration(e.target.value)}
+          />
+        </label>
+      ) : (
+        <label htmlFor={endId}>
+          DCA end in your local timezone (optional)
+          <Input
+            id={endId}
+            type="datetime-local"
+            value={end}
+            disabled={disabled}
+            onChange={(e) => setEnd(e.target.value)}
+            onInput={(e) => setEnd(e.currentTarget.value)}
+          />
+        </label>
+      )}
+      <p>
+        Duration is measured from the saved scheduled start, including time
+        spent paused or waiting for an eligible market. It does not restart when
+        the first cycle executes.
+      </p>
       <p>
         An end time must follow the final scheduled cycle. At that time new
         preparation, approval and submission stop; retained signatures and
