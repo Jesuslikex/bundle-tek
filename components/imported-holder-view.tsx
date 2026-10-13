@@ -6,6 +6,7 @@ import { importedHolderSummary } from '@/lib/imported-holder-summary';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { percentOfSupply } from '@/lib/supply-analysis';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
+import { MAX_WATCHED_WALLETS } from '@/lib/supply-watch-wallet';
 export function ImportedHolderView({
   project,
   excludedWallets,
@@ -21,6 +22,10 @@ export function ImportedHolderView({
   pendingWatchWallets?: string[];
   onWatch?: (owner: string) => void | Promise<void>;
 }) {
+  // Saves still in flight count toward the cap, matching the tracker's guard.
+  const watchlistFull =
+    new Set([...watchedWallets, ...pendingWatchWallets]).size >=
+    MAX_WATCHED_WALLETS;
   const [result, setResult] = useState<ReturnType<
       typeof importedHolderSummary
     > | null>(null),
@@ -67,7 +72,8 @@ export function ImportedHolderView({
           AbortSignal.timeout(45000),
         ]),
       });
-      const value = await response.json();
+      // Gateway errors may return HTML; never surface parser text.
+      const value = await response.json().catch(() => null);
       const responseError = (value as { error?: unknown } | null)?.error;
       if (!response.ok)
         throw new Error(
@@ -155,6 +161,8 @@ export function ImportedHolderView({
               Watching saves the public address to your wallet roster as a
               watch-only Recipient. It does not prove ownership or signing
               ability.
+              {watchlistFull &&
+                ` Your watchlist is full (${MAX_WATCHED_WALLETS} wallets). Remove one in Manage supply watchlist to watch another.`}
             </p>
           )}
           <div className="overflow-x-auto">
@@ -200,7 +208,7 @@ export function ImportedHolderView({
                           disabled={
                             watchedWallets.includes(holder.owner) ||
                             pendingWatchWallets.includes(holder.owner) ||
-                            watchedWallets.length >= 12 ||
+                            watchlistFull ||
                             project.archived
                           }
                           onClick={() => void onWatch(holder.owner)}
