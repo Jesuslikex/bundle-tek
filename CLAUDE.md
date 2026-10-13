@@ -30,6 +30,8 @@ Keep claims tied to the code or captured evidence you inspected. State when prov
 
 ## Commit checkpoints and current handoff
 
+Wrangler migration continuation: main 0058 now has the one-space `= CASE` correction Claude reported. The actual Wrangler 4.127.1 migration command failed on an original disposable copy, then applied all 74 files on a fresh corrected copy with exact ledger verification. Run `npm run db:check-migrations`; see `docs/CODEX-WRANGLER-MIGRATIONS.md`. Prior breakpoint-based D1 tests did not cover whole-file splitting. CROP candidate 0065 already had this spacing and remains unchanged; no hosted ledger was reconciled and no deployment occurred. Claude's 070ad61 files were left untouched.
+
 Latest Codex continuation adds read-only conditional monitoring: new jobs/notices/heartbeat storage in unapplied migration 0073, authenticated request/history API, a separate disabled worker with no cron, and a panel in conditional orders for request/pause and explicit review of retained matches. Ninety targeted tests across nine files, TypeScript, typed lint and production build passed on an unchanged 1,038-file snapshot. It never prepares or signs transactions. Deployment/activation and live after-close/browser QA remain outstanding. Check the latest local commit before editing these files; source/tests do not touch Claude's holder-view or timeline implementations.
 
 The user requires Codex to commit completed, verified work locally so Claude can follow progress. Both agents should inspect the latest commit, index and remaining working-tree changes before editing. Commit only owned files or hunks, leave concurrent work separate, and report the local commit hash. This does not authorize pushing or deploying.

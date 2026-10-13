@@ -12,6 +12,7 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "db:generate": "drizzle-kit generate",
+    "db:check-migrations": "node scripts/check-wrangler-migrations.mjs",
     "test": "vitest run --config vitest.config.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run test && npm run typecheck && npm run build"
