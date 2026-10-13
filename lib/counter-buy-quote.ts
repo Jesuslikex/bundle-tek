@@ -1,3 +1,4 @@
+import { readCounterProviderResponse } from './counter-provider-response';
 import { decodeCounterPlan, type CounterPlan } from './counter-trade-store';
 import { WRAPPED_SOL, WarmupQuoteError } from './warmup-swap-quote';
 import { walletAddress } from './wallet-workspace';
@@ -14,8 +15,8 @@ function amount(value: unknown) {
     );
   return BigInt(value);
 }
-/** Quote a persisted Buy token target. Never return transaction or signing material. */
-export async function quoteCounterBuyProposal(
+/** Server-side quote request. Provider payload stays private to preparation. */
+export async function requestCounterBuyQuote(
   value: CounterPlan,
   decisionIdentity: string,
   maximumSolInputRaw: string,
@@ -55,14 +56,17 @@ export async function quoteCounterBuyProposal(
     swapMode: 'ExactOut',
     slippageBps: '50',
     restrictIntermediateTokens: 'true',
+    instructionVersion: 'V1',
+    asLegacyTransaction: 'false',
   }).toString();
   if (signal.aborted)
     throw new WarmupQuoteError('Counter quote was cancelled.');
+  const providerSignal = AbortSignal.any([signal, AbortSignal.timeout(20000)]);
   let response: Response;
   try {
     response = await fetcher(url, {
       headers: { 'x-api-key': apiKey },
-      signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+      signal: providerSignal,
       redirect: 'manual',
       cache: 'no-store',
     });
@@ -83,51 +87,12 @@ export async function quoteCounterBuyProposal(
           ? 'Jupiter quote service rate limit reached. Retry later.'
           : 'Exact-output quote unavailable. This route may not support the recorded target.',
     );
-  const reader = response.body?.getReader();
-  if (!reader)
-    throw new WarmupQuoteError(
-      'Empty Counter quote response.',
-      'INVALID_RESPONSE',
-    );
-  let text = '',
-    size = 0;
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  try {
-    for (;;) {
-      const { done, value: chunk } = await reader.read();
-      if (done) break;
-      size += chunk.length;
-      if (size > 262144) {
-        await reader.cancel();
-        throw new WarmupQuoteError(
-          'Counter quote response exceeds its size limit.',
-          'INVALID_RESPONSE',
-        );
-      }
-      text += decoder.decode(chunk, { stream: true });
-    }
-    text += decoder.decode();
-  } catch (e) {
-    if (e instanceof WarmupQuoteError) throw e;
-    throw new WarmupQuoteError(
-      'Counter quote response could not be read.',
-      'INVALID_RESPONSE',
-    );
-  } finally {
-    reader.releaseLock();
-  }
-  let data: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
-      throw new Error();
-    data = parsed as Record<string, unknown>;
-  } catch {
-    throw new WarmupQuoteError(
-      'Counter quote service returned invalid data.',
-      'INVALID_RESPONSE',
-    );
-  }
+  const data = await readCounterProviderResponse(
+    response,
+    providerSignal,
+    'Counter quote',
+    262144,
+  );
   if (data.error !== undefined || data.errorCode !== undefined)
     throw new WarmupQuoteError(
       'Counter quote provider rejected the target.',
@@ -223,7 +188,7 @@ export async function quoteCounterBuyProposal(
   if (signal.aborted)
     throw new WarmupQuoteError('Counter quote was cancelled.');
   const observedAt = new Date().toISOString();
-  return {
+  const quote = {
     format: 'counter-buy-target-quote-v1' as const,
     executionAllowed: false as const,
     projectId: plan.projectId,
@@ -247,6 +212,13 @@ export async function quoteCounterBuyProposal(
     limitations:
       'Quote-only pricing of a retained proposal. No wallet, transaction, signing or submission. Fresh source eligibility, mint extensions, balance, network/rent fees and durable proposal consumption must be verified independently before transaction review.',
   };
+  return { quote, providerQuote: data };
+}
+/** Public pricing result excludes provider transaction and request material. */
+export async function quoteCounterBuyProposal(
+  ...args: Parameters<typeof requestCounterBuyQuote>
+) {
+  return (await requestCounterBuyQuote(...args)).quote;
 }
 export type CounterBuyTargetQuote = Awaited<
   ReturnType<typeof quoteCounterBuyProposal>
