@@ -17,6 +17,7 @@ import type { ImportedSwapReceipt } from '@/lib/imported-approval-history';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import { UUID } from '@/lib/wallet-operation';
+import { SessionOutcomeSummary } from './session-outcome-summary';
 
 type Props = {
   session: TradeSession;
@@ -288,6 +289,7 @@ function OutcomeSnapshot({
               ? `Incomplete source coverage. Unavailable sources: ${snapshot.missingSources.join(', ')}. Outcomes in those sources remain unknown.`
               : 'Preparation, approval and receipt sources were available for this snapshot. Absence of a retained record does not prove no attempt.'}
           </p>
+          <SessionOutcomeSummary snapshot={snapshot} />
         </>
       )}
       {error && (

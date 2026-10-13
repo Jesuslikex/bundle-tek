@@ -18,6 +18,7 @@ import type {
   SessionEntryApproval,
   SessionEntryOutcomes,
 } from '@/lib/session-entry-outcomes';
+import { sessionOutcomeSummary } from '@/lib/session-outcome-summary';
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -170,6 +171,100 @@ function mixed(s = session()): SessionEntryOutcomes {
   p.entries[5].receiptEvidence = 'contradictory';
   return p;
 }
+it('reconciles exact allocation progress only from matching receipts and separates unresolved states', () => {
+  const p = mixed();
+  const summary = sessionOutcomeSummary(p);
+  expect(summary.counts).toEqual({
+    verified: 1,
+    awaitingSignature: 1,
+    awaitingSettlement: 0,
+    finalizedWithoutReceipt: 1,
+    failedOrCancelled: 1,
+    noApprovalRecord: 2,
+    unknownApproval: 0,
+  });
+  expect(summary.verifiedInputRaw).toBe(p.entries[2].unitsRaw);
+  expect(
+    BigInt(summary.verifiedInputRaw) + BigInt(summary.unverifiedInputRaw),
+  ).toBe(BigInt(p.session.terms.totalRaw));
+  expect(summary.verifiedBudgetBasisPoints).toBe(
+    Number(
+      (BigInt(p.entries[2].unitsRaw) * 10000n) /
+        BigInt(p.session.terms.totalRaw),
+    ),
+  );
+  const missing = page();
+  missing.missingSources = ['approval', 'receipts'];
+  expect(sessionOutcomeSummary(missing).counts.unknownApproval).toBe(6);
+  expect(sessionOutcomeSummary(missing).counts.noApprovalRecord).toBe(0);
+});
+it('does not count signed, submitted or missing finalized receipt allocations as verified', () => {
+  const p = page();
+  p.entries[0].approval = approval(1, 'signed');
+  p.entries[1].approval = approval(2, 'submitted');
+  p.entries[2].approval = approval(3, 'finalized');
+  p.entries[2].receiptEvidence = 'unavailable';
+  const summary = sessionOutcomeSummary(p);
+  expect(summary.counts.awaitingSettlement).toBe(2);
+  expect(summary.counts.finalizedWithoutReceipt).toBe(1);
+  expect(summary.verifiedInputRaw).toBe('0');
+  expect(summary.unverifiedInputRaw).toBe(p.session.terms.totalRaw);
+});
+it('keeps Sell allocation sums exact above the safe-number range and floors the weighted budget percentage', () => {
+  const s = session();
+  s.terms = tradeSessionTerms(
+    {
+      projectId: s.terms.projectId,
+      projectRevision: 1,
+      side: 'Sell',
+      entries: [
+        { wallet: wallet(1), walletRevision: 1, amount: '9007199254.740993' },
+        { wallet: wallet(2), walletRevision: 1, amount: '0.000001' },
+      ],
+    },
+    { chain: 'Solana', address: wallet(7), decimals: 6 },
+  );
+  const p = page(s);
+  p.entries[0].approval = approval(1, 'finalized');
+  p.entries[0].receipt = receipt(s, 1);
+  p.entries[0].receiptEvidence = 'matching';
+  const summary = sessionOutcomeSummary(p);
+  expect(summary.verifiedInputRaw).toBe('9007199254740993');
+  expect(summary.unverifiedInputRaw).toBe('1');
+  expect(summary.totalInputRaw).toBe('9007199254740994');
+  expect(summary.verifiedBudgetBasisPoints).toBe(9999);
+});
+it('rejects duplicate finalized signatures and altered receipt identities before showing aggregate progress', () => {
+  const p = page();
+  for (const entry of [1, 2]) {
+    p.entries[entry - 1].approval = approval(entry, 'finalized');
+    p.entries[entry - 1].receipt = receipt(p.session, entry);
+    p.entries[entry - 1].receiptEvidence = 'matching';
+  }
+  expect(() => sessionOutcomeSummary(p)).toThrow('Repeated receipt');
+  p.entries[1].receipt!.document.signature = bs58.encode(
+    new Uint8Array(64).fill(13),
+  );
+  expect(() => sessionOutcomeSummary(p)).toThrow('Matching session receipt');
+});
+it('renders aggregate verified allocation alongside recovery evidence without calling it spend or P&L', async () => {
+  await click('Open session wallet outcomes');
+  await respond(0, mixed());
+  const summary = container.querySelector(
+    'section[aria-label="Session progress"]',
+  )!;
+  expect(summary.textContent).toContain(
+    '1 of 6 entries have matching finalized receipts',
+  );
+  expect(summary.textContent).toContain('0.03 SOL');
+  expect(summary.textContent).toContain('not actual all-in spend');
+  expect(summary.textContent).toContain(
+    'Finalized approval without matching receipt: 1',
+  );
+  const progress = summary.querySelector('progress')!;
+  expect(progress.value).toBe(1);
+  expect(progress.max).toBe(6);
+});
 
 let container: HTMLDivElement;
 let root: Root;
