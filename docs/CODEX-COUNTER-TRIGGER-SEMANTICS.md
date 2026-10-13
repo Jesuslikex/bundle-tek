@@ -1,5 +1,7 @@
 # Counter trigger semantics and implementation requirements
 
+Subsequent verification: the full-suite handle referenced below is now terminal, with 2153 tests across 307 files passing and unchanged source hashes. The source freeze has ended; see CODEX-CURRENT-FULL-SUITE.md. Counter remains unimplemented. The following capture/checkpoint notes retain their original scope.
+
 13 October 2026. Fresh REA menu inspection adds **Rate (%), Min. SOL and Min. Token** to the observed Counter Trading choices. The menu was opened without selecting an option or filling any input. Escape left it visible; the actual Close button removed the form, and a separate completed scenario restored the account route.
 
 ## Documented intended behavior

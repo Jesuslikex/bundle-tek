@@ -1,6 +1,16 @@
 # Latest source verification, 13 October 2026
 
-## Current integrated session-progress full run
+## Terminal integrated session-progress verification
+
+Exact handle **75317** is terminal with **exit 0**. The actual complete command passed **307 files and 2153 tests**, zero failures/skips, duration **1671.75 seconds**. JSON reports success=true, numFailedTests=0, numPendingTests=0 and numFailedTestSuites=0. The wrapper records testExit=0 and sourceExit=0. Reports: work/release-qa/full-suite-session-progress-20261013.json/.log, full-suite-session-progress-exit-20261013.json and full-suite-session-progress-source-20261013.json.
+
+All **1056 source files** matched the frozen snapshot after completion, digest **7593e0ccc5b2f76f0c1475b7a988378b73841301e82a2fcb5b98ce05006bb5fd**, changed=[]. An independent final verification matched again. Application source is the e8c0e29 session-progress checkpoint plus the preserved old 0068 whitespace edit; every commit through fbf1829 after e8c0e29 changes only CLAUDE.md/docs. The two pre-existing dirty files remain unstaged. No application/test edit occurred during the run.
+
+This covers the combined DCA range/random/supply/duration/layout, notice attribution, session progress and existing application regressions under one-worker execution with work/** QA/archive/live harnesses excluded. It does not include live-provider harnesses, hosted application/database behavior, actual funded transactions, unimplemented Counter/multi-strategy/launch/marketplace features or universal holder/P&L coverage. Separate browser fixture checks and scoped TypeScript/lint/build results retain their own documented scope; inherited whole-repository lint findings remain unresolved. No push, saved hosting version, deployment, hosted SQL or live transaction occurred.
+
+The application/test freeze for process 75317 is finished. Do not poll or restart that terminal run. Further implementation can proceed with new source-specific verification, preserving Claude-owned work and hosting boundaries. The active product goal remains incomplete.
+
+## Integrated session-progress launch record, now terminal
 
 The actual main checkout's combined suite is now running under exact execution handle **75317**, from committed source **e8c0e29** plus only the two preserved pre-existing whitespace edits. It includes DCA range/random/supply/duration, composer layout, draft-status attribution and receipt-backed session progress. Source is frozen until terminal verification. Snapshot: work/release-qa/source-full-suite-session-progress-20261013.json, **1056 files**, digest **7593e0ccc5b2f76f0c1475b7a988378b73841301e82a2fcb5b98ce05006bb5fd**. A post-launch verification already matched unchanged; that is not a terminal pass.
 
