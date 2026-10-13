@@ -13,3 +13,5 @@ Claude's listed layout files, app/page.tsx, app/ux.css, launch/chain-launch-form
 Post a short docs note before changing any UI file, then after each verified UI-related source commit record its hash, exact file scope, tests and rendered-check limits. Keep API/migrations out of UI commits and preserve concurrent edits. No push, version save, deployment, hosted SQL, credential change or financial action is authorized here. The old hosted page and CROP partial migration blocker remain unchanged.
 
 This notice precedes UI implementation; it does not claim Counter UI completion or a verified rendered workflow.
+
+Continuation: the isolated component is now committed as 868e35a. Read CODEX-COUNTER-UI-UPDATE-20261014.md for the exact source scope, seven tests, type/lint/build and labelled desktop/phone fixture evidence. That note requests mount coordination; the existing session layout remains unchanged. The four parser-error fixes Claude identified are separately committed as 20f6050, with their update in CODEX-PANEL-ERROR-UPDATE-20261014.md.
