@@ -1,0 +1,21 @@
+# Compact DCA composer
+
+13 October 2026. Retained Proxima REA accessibility evidence ev_e2e81d9c1d0ced5c001e59b21a2542d4eefb31c2bb75cd65a15a94dcd50e36d2 shows primary DCA amount/interval inputs with separate End Conditions and Advanced Options controls. Complete record: C:/Users/Julian/Desktop/REA/results/proxima-random-dca-20261013/open-form.json. Its screenshot state is not_requested. This supports the observed form grouping, not a pixel-layout comparison or Proxima backend/timer semantics. No fresh live capture was performed.
+
+The actual Bundle composer now groups Trade setup and Timing in responsive grids. The two-column breakpoint depends on its containing panel reaching 520 pixels, so a narrow panel can retain one column even on a large screen. End conditions and the market-cap filter have separate expandable sections. A reviewed UTC deadline and saved market range remain outside their sections, visible beside the cycle review. Closing a section does not clear or bypass any saved constraint. Exact amounts, random allocation, supply capture, timing, messages, request construction and per-cycle approval rules are unchanged.
+
+## Actual browser verification
+
+Chrome rendered the real composer and production globals/UX styles in the existing labelled local fixture. Base archive 15dc8a2 already included the notice repair matching 397a3fa; the owned layout-patched component was then copied for the comparison. Its SHA-256 exactly matched main: 95c993e6d846cc53b8d2a259ca962b059113a291f07ed22f1bfa44b6012f4ae3. The fixture used synthetic wallet/supply and in-memory request saves, with application network access intercepted. This is component verification, not authenticated integrated workspace, database persistence or funded execution.
+
+For the same three-cycle 0.03 SOL Buy schedule and 180-second duration at a 1440×1000 viewport, the panel height decreased from **954 to 874 pixels**. The preview's offset within the panel decreased from **837 to 719 pixels**, moving it up by **118 pixels**. The cycle review and Save button were visible together within the desktop viewport. These are measured fixture results, not a claim about the complete token workspace.
+
+After End conditions was closed, a browser save retained the exact UTC deadline 2026-10-14T11:03:00.000Z. At 390×844, document/client width both measured 375 pixels after the scrollbar, there were eleven visible controls and zero overflowing input/select/button bounds. The main fields rendered in an implicit single grid column. Temporary Chrome viewport overrides were reset, only the created QA tab was closed and the fixture server was stopped; no listener remains on port 8063.
+
+Browser evidence: C:/Users/Julian/Documents/Codex/2026-10-09/https-github-com-morluto-rea-https/work/dca-browser-15dc8a2/evidence/layout-comparison.json, layout-before-geometry.json, layout-saved-closed-deadline.json, layout-phone-dom.txt, layout-desktop.jpg and layout-phone.jpg. The harness had a transient createRoot warning when its own banner changed during HMR; final checks explicitly reloaded the page before measuring the patched component. No console-clean claim is made for that development harness.
+
+## Regression scope
+
+**21 tests in two model/composer files passed**, zero failures, JSON success=true. The new interaction regression closes the optional ending section and verifies that the visible deadline and saved request retain the reviewed value. Existing duration, random/supply, concurrency, drifted-reply and notice-context cases still pass. Actual-source TypeScript handle 38605, two-file typed lint and production build handle 55033 all exited 0. Reports/logs: work/release-qa/dca-layout-*. Source snapshot: 1054 files, digest 3b5c223a5eaccd2d2c15516ec03366c0c92b03abb0ba07164d49a3804c4cf807, post-run unchanged=true. The full suite, full lint and real-D1 suite were not rerun for this markup-only change.
+
+Only the owned composer/test and handoff notes changed. No app/ux.css, Claude-owned file, backend, migration, provider, signing behavior, CROP candidate or hosting source changed. The two earlier dirty files remain unstaged. Nothing pushed, saved as a hosting version, deployed or transacted. Full token-page integration, monitoring browser coverage, multiple-strategy/session ending semantics, funded proof and hosted migration recovery remain open.

@@ -457,3 +457,20 @@ it('attributes saved status to its exact draft rather than a changed amount, tim
   expect(container.textContent).not.toContain('DCA session saved.');
   expect(saveButton().disabled).toBe(true);
 });
+it('keeps a reviewed deadline enforced and visible when its optional section is closed', async () => {
+  await fill();
+  const section = Array.from(container.querySelectorAll('details')).find(
+    (d) => d.querySelector('summary')?.textContent === 'End conditions',
+  )!;
+  expect(section.open).toBe(false);
+  await act(async () => section.querySelector('summary')!.click());
+  expect(section.open).toBe(true);
+  await setField('DCA end', '2026-10-13T12:05');
+  const deadline = new Date('2026-10-13T12:05').toISOString();
+  await act(async () => section.querySelector('summary')!.click());
+  expect(section.open).toBe(false);
+  expect(container.textContent).toContain(`DCA stops at ${deadline}`);
+  await act(async () => saveButton().click());
+  expect(requests[0].body.endsAt).toBe(deadline);
+  await respond(0);
+});
