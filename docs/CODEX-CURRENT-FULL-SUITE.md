@@ -1,5 +1,11 @@
 # Latest source verification, 13 October 2026
 
+## Current full suite in progress
+
+The real checkout's full suite is running under exact execution handle **84487**, with one test worker, archived `work/**` copies excluded, live-provider flags unset and default/JSON reporters. Log/report prefix: `work/release-qa/full-suite-dca-deadline-20261013`. Launch snapshot: `work/release-qa/source-full-suite-dca-deadline-20261013.json`, 1,046 files, digest b0a16e2d0348c5d93c451b155cb0628e43dcbca29a541ae50945fb6e169872d1.
+
+An authoritative mid-run comparison detected a concurrent change to `app/ux.css`, then committed by Claude as `9edeb38`, giving the chart more width on wide screens. It changes only three stylesheet lines; application/test/SQL logic hashes remain unchanged. Do not call this an unchanged launch snapshot or claim a terminal full-suite pass yet. The active process is allowed to finish; its final tests, exit status and exact source comparison must be inspected. A source-freeze coordination question is pending with the user. Codex has not changed application source during this run or touched Claude's stylesheet. No duplicate full suite, push, deployment, live provider activation or funded transaction was started.
+
 ## DCA end time
 
 Optional DCA deadlines now stop new preparation, approval and submission using both application and database clocks, while preserving signature registration and receipt recovery. Fifty-eight tests across five files plus a separately selected direct database test passed; actual-source TypeScript, final typed lint and build passed at the scope described in CODEX-DCA-END-TIME.md. Final 1,046-file snapshot digest: b0a16e2d0348c5d93c451b155cb0628e43dcbca29a541ae50945fb6e169872d1. Append-only 0075 preserves prior SQL/journal entries and the actual Wrangler command applies all 76 whole files locally. No hosted, live-browser, funded or scheduler proof is implied; the earlier full-suite result remains tied to its earlier snapshot.
