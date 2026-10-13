@@ -128,17 +128,11 @@ export function counterProbabilityDraw() {
   } while (words[0] >= cutoff);
   return words[0] % bound;
 }
-/** Evaluation only: callers must persist the returned decision/queue atomically before exposing a proposal. */
-export function evaluateCounterTrade(
+export function validateCounterLedger(
   rules: CounterRules,
   ledger: CounterLedger,
-  movement: PoolTradeMovement,
-  context: PoolTradeMovementContext,
-  draw: () => number = counterProbabilityDraw,
 ) {
-  requirePoolTradeMovement(movement, context);
-  if (!movement.classification)
-    throw new Error('Counter classification is unavailable.');
+  initialCounterLedger(rules, ledger.scope);
   if (
     ledger.format !== 'counter-evaluation-ledger-v1' ||
     ledger.rulesKey !== rulesKey(rules) ||
@@ -147,13 +141,6 @@ export function evaluateCounterTrade(
     throw new Error(
       'Counter rules changed. Start a separately reviewed ledger.',
     );
-  if (
-    ledger.scope.projectId !== context.projectId ||
-    ledger.scope.revision !== context.revision ||
-    ledger.scope.mint !== context.mint ||
-    ledger.scope.decimals !== context.decimals
-  )
-    throw new Error('Counter ledger project scope differs.');
   const queued = raw(ledger.queuedTokenRaw);
   let reconciled = 0n;
   const identities = new Set<string>();
@@ -223,6 +210,29 @@ export function evaluateCounterTrade(
   }
   if (reconciled !== queued)
     throw new Error('Counter queue does not reconcile with its decisions.');
+  return ledger;
+}
+
+/** Evaluation only: callers must persist the returned decision/queue atomically before exposing a proposal. */
+export function evaluateCounterTrade(
+  rules: CounterRules,
+  ledger: CounterLedger,
+  movement: PoolTradeMovement,
+  context: PoolTradeMovementContext,
+  draw: () => number = counterProbabilityDraw,
+) {
+  requirePoolTradeMovement(movement, context);
+  if (!movement.classification)
+    throw new Error('Counter classification is unavailable.');
+  validateCounterLedger(rules, ledger);
+  if (
+    ledger.scope.projectId !== context.projectId ||
+    ledger.scope.revision !== context.revision ||
+    ledger.scope.mint !== context.mint ||
+    ledger.scope.decimals !== context.decimals
+  )
+    throw new Error('Counter ledger project scope differs.');
+  const queued = raw(ledger.queuedTokenRaw);
   const identity = JSON.stringify([
     movement.projectId,
     movement.mint,
@@ -239,6 +249,7 @@ export function evaluateCounterTrade(
     movement.sideAgrees,
     movement.tokenChange,
     movement.classification,
+    movement.providerBlock,
   ]);
   const matches = ledger.decisions.filter((d) => d.identity === identity);
   if (matches.length > 1)
