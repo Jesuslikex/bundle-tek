@@ -1,5 +1,13 @@
 # Latest source verification, 13 October 2026
 
+## Combined Claude UI and monitor-fixture verification
+
+A fresh full-suite run covers Claude's merged layout and the repaired monitor fixture together. Exact execution handle **86907** was polled and remains running. Command: `node node_modules/vitest/vitest.mjs run --maxWorkers=1 --exclude 'work/**' --reporter=default --reporter=json --outputFile=work/release-qa/full-suite-combined-ui-20261013.json`. The sibling `.log` records output. Do not duplicate this run or infer success from partial output.
+
+Launch snapshot: `work/release-qa/source-full-suite-combined-ui-20261013.json`, **1,046 files**, digest `60f5df53b7fedee6872e04dca13ad1c3ce46b79cfaaa9b974deedc0f13f163ee`. It includes Claude's five UI files and the test-fixture correction committed as **ffe6494**. The wrapper verifies source hashes after the test command and rejects drift. Terminal JSON, exit status and that comparison remain pending.
+
+Actual-source TypeScript completed with exit 0 in handle **78637**. Production build completed with exit 0 in handle **9876**, log `work/release-qa/combined-ui-build-20261013.log`. These checks do not establish hosted publication, funded execution or independently rendered UI coverage. Nothing was pushed or deployed. The main `sites` remote still targets the friend-owned original project; CROP's stale candidate and uncertain hosted migration state remain release blockers.
+
 ## Full-run result and repaired monitor fixture
 
 Exact handle 84487 is terminal. The full test command reported 302 passing files and one setup-failed file: **2,097 tests passed, zero assertion failures, 16 setup-failure skips**. JSON success=false and one failed suite; this is not a full-suite pass. Duration: 1,624.39 seconds. The wrapper then exited 2 because the five Claude UI files changed from the launch snapshot. Reports remain at work/release-qa/full-suite-dca-deadline-20261013.json and .log.
@@ -8,7 +16,9 @@ The single bootstrap error was the conditional-monitor fixture's fixed 74-entry 
 
 Push preflight also confirmed that the main checkout's `sites` remote targets the original friend-owned PulseForge project, matching its preserved manifest. It does not target the approved owned CROP site. Direct terminal login/push advice does not resolve that project mismatch. The separate CROP candidate preserves its own identity and old hosted migration history but is behind current main; refresh and migration reconciliation remain necessary before publication. No remote was changed, no write credential was created, and nothing was pushed or deployed.
 
-## Current full suite in progress
+## Earlier full run, now terminal
+
+The following progress notes are retained history. Handle 84487 has terminated; its final result and repair are recorded above. Handle 86907 is the newer verification run.
 
 The real checkout's full suite is running under exact execution handle **84487**, with one test worker, archived `work/**` copies excluded, live-provider flags unset and default/JSON reporters. Log/report prefix: `work/release-qa/full-suite-dca-deadline-20261013`. Launch snapshot: `work/release-qa/source-full-suite-dca-deadline-20261013.json`, 1,046 files, digest b0a16e2d0348c5d93c451b155cb0628e43dcbca29a541ae50945fb6e169872d1.
 
