@@ -11,6 +11,7 @@ import type { PoolTrades } from '@/lib/pool-trades';
 import type { PoolTradeSelection } from '@/lib/pool-trade-context';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { CounterBuyPrice } from './counter-buy-price';
 import styles from './counter-trade-panel.module.css';
 
 const endpoint = '/api/imported-projects/counter-trades';
@@ -552,6 +553,7 @@ function CounterWorkspace({
           >
             Evaluate selected trade
           </Button>
+          <CounterBuyPrice plan={active} locked={busy || blocked || !current} />
           <ol aria-label="Recorded Counter decisions">
             {active.ledger.decisions.slice(-20).map((d) => (
               <li key={d.identity}>
