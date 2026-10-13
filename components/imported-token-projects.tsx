@@ -10,7 +10,11 @@ import { TokenOperationHistory } from './token-operation-history';
 import { ImportedPreparationHistory } from './imported-preparation-history';
 import { ImportedApprovalHistory } from './imported-approval-history';
 import { ImportedTradeHistory } from './imported-trade-history';
-import { ImportedTokenQuote } from './imported-token-quote';
+import {
+  ImportedSwapDesk,
+  ImportedSwapWalletPanel,
+  ImportedTokenQuote,
+} from './imported-token-quote';
 import { ImportedTokenMarket } from './imported-token-market';
 import { ImportedSupplyTracker } from './imported-supply-tracker';
 import { HolderIndexPanel } from './holder-index-panel';
@@ -418,52 +422,63 @@ export function ImportedTokenProjects({
                 onReviewBuy={reviewBuy}
               />
             </section>
-            <section
-              className="imported-workspace-trading"
-              ref={swapReview}
-              tabIndex={-1}
-              aria-label="Imported transaction review"
+            <ImportedSwapDesk
+              key={`quote:${current.id}:${current.revision}:${selectedHandoff?.sequence ?? 0}`}
+              project={current}
+              handoff={selectedHandoff?.handoff}
             >
-              <ImportedTokenQuote
-                key={`quote:${current.id}:${current.revision}:${selectedHandoff?.sequence ?? 0}`}
-                project={current}
-                handoff={selectedHandoff?.handoff}
-                onReviewBuy={reviewBuy}
-                onSaved={(saved) => {
-                  onProjectsChange?.([saved]);
-                  setProjects((items) =>
-                    items.map((item) =>
-                      item.id === saved.id && item.revision < saved.revision
-                        ? saved
-                        : item,
-                    ),
-                  );
-                }}
-              />
-            </section>
-            <section
-              className="imported-workspace-wallets"
-              aria-label="Token wallet and holder views"
-            >
-              <ImportedSupplyTracker
-                key={`supply:${current.id}:${current.revision}`}
-                project={current}
-                onOpenChart={openChart}
-              />
-              {current.document.token.chain === 'Solana' && (
-                <HolderIndexPanel
-                  key={`holder-index:${current.id}:${current.revision}`}
-                  project={current}
-                  onOpenChart={openChart}
-                />
+              {(swap) => (
+                <>
+                  <section
+                    className="imported-workspace-trading"
+                    ref={swapReview}
+                    tabIndex={-1}
+                    aria-label="Imported transaction review"
+                  >
+                    <ImportedTokenQuote project={current} state={swap} />
+                  </section>
+                  <section
+                    className="imported-workspace-wallets"
+                    aria-label="Token wallet and holder views"
+                  >
+                    <ImportedSwapWalletPanel
+                      project={current}
+                      state={swap}
+                      onReviewBuy={reviewBuy}
+                      onSaved={(saved) => {
+                        onProjectsChange?.([saved]);
+                        setProjects((items) =>
+                          items.map((item) =>
+                            item.id === saved.id &&
+                            item.revision < saved.revision
+                              ? saved
+                              : item,
+                          ),
+                        );
+                      }}
+                    />
+                    <ImportedSupplyTracker
+                      key={`supply:${current.id}:${current.revision}`}
+                      project={current}
+                      onOpenChart={openChart}
+                    />
+                    {current.document.token.chain === 'Solana' && (
+                      <HolderIndexPanel
+                        key={`holder-index:${current.id}:${current.revision}`}
+                        project={current}
+                        onOpenChart={openChart}
+                      />
+                    )}
+                    <TokenOperationHistory
+                      projectId={current.id}
+                      revision={current.revision}
+                      project={current}
+                      onReviewBuy={reviewBuy}
+                    />
+                  </section>
+                </>
               )}
-              <TokenOperationHistory
-                projectId={current.id}
-                revision={current.revision}
-                project={current}
-                onReviewBuy={reviewBuy}
-              />
-            </section>
+            </ImportedSwapDesk>
           </div>
           {current.document.token.chain !== 'Solana' && (
             <ImportedEvmWalletBalances

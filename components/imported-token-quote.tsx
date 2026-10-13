@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,18 +13,15 @@ import {
   currentImportedSellHandoff,
   type ImportedSellHandoff,
 } from '@/lib/imported-sell-handoff';
-export function ImportedTokenQuote({
-  project,
-  onSaved,
-  handoff,
-  onReviewBuy,
-}: {
-  project: ImportedTokenProject;
-  onSaved: (project: ImportedTokenProject) => void;
-  handoff?: ImportedSellHandoff;
-  onReviewBuy?: (receipt: ImportedSwapReceipt) => void;
-}) {
-  const label = useId();
+
+/**
+ * Quote state shared by the quote form and the wallet panel. The two render in
+ * different columns, so the state lives above both in ImportedSwapDesk.
+ */
+function useImportedSwapState(
+  project: ImportedTokenProject,
+  handoff?: ImportedSellHandoff,
+) {
   const reviewHeading = useRef<HTMLHeadingElement | null>(null);
   const selectedHandoff = handoff
     ? currentImportedSellHandoff(handoff, project)
@@ -67,6 +64,35 @@ export function ImportedTokenQuote({
     );
     return () => clearTimeout(timer);
   }, [quote]);
+  function cancelQuote() {
+    pending.current?.abort();
+    setQuote(null);
+    setError('');
+    setBusy(false);
+    setExpired(false);
+  }
+  function onAmountChange(value: string) {
+    cancelQuote();
+    setAmount(value);
+  }
+  function onWalletTradeReview(
+    direction: 'Buy' | 'Sell',
+    reviewedAmount?: string,
+  ) {
+    pending.current?.abort();
+    if (reviewedAmount !== undefined) setAmount(reviewedAmount);
+    else if (direction !== side) setAmount(direction === 'Buy' ? '0.01' : '1');
+    setSide(direction);
+    reviewHeading.current?.focus({ preventScroll: true });
+    reviewHeading.current?.scrollIntoView({
+      block: 'start',
+      behavior: 'instant',
+    });
+    setQuote(null);
+    setError('');
+    setBusy(false);
+    setExpired(false);
+  }
   async function inspect() {
     pending.current?.abort();
     const controller = new AbortController();
@@ -131,6 +157,68 @@ export function ImportedTokenQuote({
       if (!controller.signal.aborted) setBusy(false);
     }
   }
+  return {
+    amount,
+    setAmount,
+    side,
+    setSide,
+    savingSettings,
+    setSavingSettings,
+    quote,
+    busy,
+    error,
+    expired,
+    tradeNotice,
+    selectedHandoff,
+    reviewHeading,
+    cancelQuote,
+    onAmountChange,
+    onWalletTradeReview,
+    inspect,
+  };
+}
+
+export type ImportedSwapState = ReturnType<typeof useImportedSwapState>;
+
+/** Owns the quote state for one project revision and handoff; renders its children in place. */
+export function ImportedSwapDesk({
+  project,
+  handoff,
+  children,
+}: {
+  project: ImportedTokenProject;
+  handoff?: ImportedSellHandoff;
+  children: (state: ImportedSwapState) => ReactNode;
+}) {
+  const state = useImportedSwapState(project, handoff);
+  return <>{children(state)}</>;
+}
+
+export function ImportedTokenQuote({
+  project,
+  state,
+}: {
+  project: ImportedTokenProject;
+  state: ImportedSwapState;
+}) {
+  const label = useId();
+  const {
+    amount,
+    side,
+    setSide,
+    setAmount,
+    savingSettings,
+    quote,
+    busy,
+    error,
+    expired,
+    tradeNotice,
+    selectedHandoff,
+    reviewHeading,
+    cancelQuote,
+    onAmountChange,
+    inspect,
+  } = state;
   if (project.archived) return null;
   return (
     <section aria-label="Imported token swap quote">
@@ -152,8 +240,8 @@ export function ImportedTokenQuote({
               project revision {selectedHandoff.sourceProjectRevision}. Its{' '}
               {selectedHandoff.tokenUnitsRaw} acquired atomic units were copied
               for sell review. Current holdings and transferability must be
-              checked again. Review recorded acquisitions below to see remaining
-              accounting capacity before preparation.
+              checked again. Review recorded acquisitions in the wallet panel to
+              see remaining accounting capacity before preparation.
             </p>
           )}
           <label>
@@ -163,13 +251,9 @@ export function ImportedTokenQuote({
               value={side}
               disabled={savingSettings}
               onChange={(e) => {
-                pending.current?.abort();
+                cancelQuote();
                 setSide(e.target.value as 'Buy' | 'Sell');
                 setAmount(e.target.value === 'Buy' ? '0.01' : '1');
-                setQuote(null);
-                setError('');
-                setBusy(false);
-                setExpired(false);
               }}
             >
               <option>Buy</option>
@@ -184,8 +268,8 @@ export function ImportedTokenQuote({
           {side === 'Sell' && (
             <p>
               Enter token units using {project.document.token.decimals}{' '}
-              decimals. Review observed holdings below. Transferability remains
-              unverified.
+              decimals. Review observed holdings in the wallet panel.
+              Transferability remains unverified.
             </p>
           )}
           <Input
@@ -193,14 +277,7 @@ export function ImportedTokenQuote({
             inputMode="decimal"
             value={amount}
             disabled={savingSettings}
-            onChange={(e) => {
-              pending.current?.abort();
-              setAmount(e.target.value);
-              setQuote(null);
-              setError('');
-              setBusy(false);
-              setExpired(false);
-            }}
+            onChange={(e) => onAmountChange(e.target.value)}
           />
           <Button
             variant="outline"
@@ -237,42 +314,38 @@ export function ImportedTokenQuote({
               <p>{quote.limitations}</p>
             </section>
           )}
-          <ImportedSwapWallet
-            onWalletTradeReview={(direction, reviewedAmount) => {
-              pending.current?.abort();
-              if (reviewedAmount !== undefined) setAmount(reviewedAmount);
-              else if (direction !== side)
-                setAmount(direction === 'Buy' ? '0.01' : '1');
-              setSide(direction);
-              reviewHeading.current?.focus({ preventScroll: true });
-              reviewHeading.current?.scrollIntoView({
-                block: 'start',
-                behavior: 'instant',
-              });
-              setQuote(null);
-              setError('');
-              setBusy(false);
-              setExpired(false);
-            }}
-            onAmountChange={(value) => {
-              pending.current?.abort();
-              setAmount(value);
-              setQuote(null);
-              setError('');
-              setBusy(false);
-              setExpired(false);
-            }}
-            project={project}
-            side={side}
-            amount={amount}
-            locked={busy}
-            onSaved={onSaved}
-            onSavingChange={setSavingSettings}
-            handoff={selectedHandoff}
-            onReviewBuy={onReviewBuy}
-          />
         </>
       )}
     </section>
+  );
+}
+
+/** Wallet selection and sessions for the quote; placed beside the chart, not in the trading column. */
+export function ImportedSwapWalletPanel({
+  project,
+  state,
+  onSaved,
+  onReviewBuy,
+}: {
+  project: ImportedTokenProject;
+  state: ImportedSwapState;
+  onSaved: (project: ImportedTokenProject) => void;
+  onReviewBuy?: (receipt: ImportedSwapReceipt) => void;
+}) {
+  if (project.archived || project.document.token.chain !== 'Solana')
+    return null;
+  return (
+    <ImportedSwapWallet
+      onWalletTradeReview={state.onWalletTradeReview}
+      onAmountChange={state.onAmountChange}
+      project={project}
+      side={state.side}
+      amount={state.amount}
+      locked={state.busy}
+      onSaved={onSaved}
+      onSavingChange={state.setSavingSettings}
+      handoff={state.selectedHandoff}
+      onReviewBuy={onReviewBuy}
+    />
   );
 }
