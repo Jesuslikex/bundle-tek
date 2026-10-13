@@ -36,3 +36,28 @@ it('shows partial linked results with unavailable complete realized result and c
   expect(html).toContain('not total account return');
   expect(html).toContain('Export all recorded performance');
 });
+it('discloses bundle cost gaps and prevents a complete realized-result claim', () => {
+  const p = acquisitionFixture(1);
+  const value = summarizeAccountPerformance(
+    [
+      {
+        id: p.projectId,
+        name: 'Bundle',
+        archived: false,
+        receipts: p.receipts,
+        links: p.links,
+        missingBundleCostCount: 1,
+      },
+    ],
+    [],
+    p.observedAt,
+  );
+  const html = renderToStaticMarkup(
+    <AccountPerformanceSummary value={value} />,
+  );
+  expect(html).toContain('Unavailable');
+  expect(html).toContain('1 bundles have incomplete cost evidence');
+  expect(html).toContain('Linked results include known costs only');
+  expect(html).toContain('Retained bundle tips');
+  expect(html).toContain('Tip transaction fees');
+});

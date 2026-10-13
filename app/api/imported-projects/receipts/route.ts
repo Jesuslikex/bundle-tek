@@ -10,6 +10,13 @@ import {
   type ImportedTradeReceipt,
 } from '@/lib/imported-trade-ledger';
 import { importedTradePerformance } from '@/lib/imported-trade-performance';
+import {
+  jitoPerformanceStatement,
+  jitoCostStorageAvailable,
+  jitoPerformanceCosts,
+  type JitoPerformanceRow,
+} from '@/lib/jito-performance-costs';
+import { emptyBundleExpenses } from '@/lib/bundle-expenses';
 export const dynamic = 'force-dynamic';
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
@@ -57,13 +64,21 @@ export async function GET(request: Request) {
       token.decimals > 255
     )
       throw new Error();
-    const result = await db
+    const receiptQuery = db
       .prepare(`SELECT r.id,r.project_id AS projectId,r.preparation_id AS preparationId,r.project_revision AS projectRevision,r.wallet_revision AS walletRevision,r.created_at AS createdAt,
    json_object('network',json_extract(r.document,'$.network'),'mint',json_extract(r.document,'$.mint'),'decimals',json_extract(r.document,'$.decimals'),'preparationSha256',json_extract(r.document,'$.preparationSha256'),'signature',json_extract(r.document,'$.signature'),'wallet',json_extract(r.document,'$.wallet'),'signatureVerified',json_extract(r.document,'$.signatureVerified'),'commitment',json_extract(r.document,'$.commitment'),'side',json_extract(r.document,'$.side'),'tokenUnitsRaw',json_extract(r.document,'$.tokenUnitsRaw'),'source',json_extract(r.document,'$.source'),'observedAt',json_extract(r.document,'$.observedAt'),'slot',json_extract(r.document,'$.slot'),'blockTime',json_extract(r.document,'$.blockTime'),'networkFeeLamports',json_extract(r.document,'$.networkFeeLamports'),'nativeChangeRaw',json_extract(r.document,'$.nativeChangeRaw'),'rentChangeRaw',json_extract(r.document,'$.rentChangeRaw'),'nativeSettlementRaw',json_extract(r.document,'$.nativeSettlementRaw')) AS document
    FROM imported_swap_receipts r WHERE r.owner_id=? AND r.project_id=? ORDER BY r.created_at DESC,r.id DESC LIMIT ?`)
-      .bind(user.userId, projectId, IMPORTED_LEDGER_LIMIT + 1)
-      .all<Omit<ImportedTradeReceipt, 'document'> & { document: string }>();
-    if (result.results.length > IMPORTED_LEDGER_LIMIT)
+      .bind(user.userId, projectId, IMPORTED_LEDGER_LIMIT + 1);
+    const expenseStorage = await jitoCostStorageAvailable(db);
+    const batch = await db.batch([
+      receiptQuery,
+      ...(expenseStorage
+        ? [jitoPerformanceStatement(db, user.userId, projectId)]
+        : []),
+    ]);
+    if (
+      batch.some((r) => !r.success || r.results.length > IMPORTED_LEDGER_LIMIT)
+    )
       return json(
         {
           error:
@@ -71,7 +86,11 @@ export async function GET(request: Request) {
         },
         503,
       );
-    const receipts = result.results.map((row) => {
+    const receipts = (
+      batch[0].results as Array<
+        Omit<ImportedTradeReceipt, 'document'> & { document: string }
+      >
+    ).map((row) => {
       const document = JSON.parse(row.document);
       document.signatureVerified = document.signatureVerified === 1;
       return importedTradeReceipt(
@@ -82,8 +101,16 @@ export async function GET(request: Request) {
       );
     });
     const summary = summarizeImportedTrades(receipts);
+    const expenses = expenseStorage
+      ? ((
+          await jitoPerformanceCosts(
+            batch[1].results as JitoPerformanceRow[],
+            receipts,
+          )
+        ).get(projectId) ?? emptyBundleExpenses())
+      : { ...emptyBundleExpenses(), storageUnavailable: true };
     if (format === 'csv')
-      return new Response(importedTradeCsv(receipts), {
+      return new Response(importedTradeCsv(receipts, expenses), {
         headers: {
           'content-type': 'text/csv; charset=utf-8',
           'cache-control': 'no-store',
@@ -102,7 +129,7 @@ export async function GET(request: Request) {
       nextCursor:
         anchor + 1 + page.length < receipts.length ? page.at(-1)!.id : null,
       summary,
-      performance: importedTradePerformance(receipts),
+      performance: importedTradePerformance(receipts, expenses),
       observedAt: new Date().toISOString(),
     });
   } catch {

@@ -35,13 +35,32 @@ export function summarizeAccountPerformance(
     throw new Error('Complete unique account trade evidence required.');
   const scopes: PerformanceScope[] = [
     ...imports.map((source) => {
-      const p = importedLinkedPerformance(source.receipts, source.links),
+      const executionTotal = Object.values(source.executionCosts ?? {}).reduce(
+        (n, v) => n + BigInt(v),
+        0n,
+      );
+      if (
+        executionTotal !==
+        BigInt(source.bundleTipLamports ?? '0') +
+          BigInt(source.bundleFeeLamports ?? '0')
+      )
+        throw new Error('Bundle expense allocations do not reconcile.');
+      const p = importedLinkedPerformance(
+          source.receipts,
+          source.links,
+          source.executionCosts,
+        ),
         ledger = summarizeImportedTrades(source.receipts);
       return {
         kind: 'Imported trades' as const,
         id: source.id,
         name: source.name,
         archived: source.archived,
+        bundleTipLamports: source.bundleTipLamports ?? '0',
+        bundleFeeLamports: source.bundleFeeLamports ?? '0',
+        missingBundleCostCount: source.missingBundleCostCount ?? 0,
+        bundleCostStorageUnavailable:
+          source.bundleCostStorageUnavailable ?? false,
         buyCount: ledger.buyCount,
         sellCount: ledger.sellCount,
         linkedSaleCount: p.linkedSaleCount,
@@ -134,7 +153,8 @@ function importedSales(source: ImportedPerformanceSource): RealizedSale[] {
     proceeds.set(
       saleId,
       BigInt(sale.document.nativeSettlementRaw) -
-        BigInt(sale.document.networkFeeLamports),
+        BigInt(sale.document.networkFeeLamports) -
+        BigInt(source.executionCosts?.[sale.id] ?? '0'),
     );
     for (const link of group) {
       const parts = partsByBuy.get(link.buyReceiptId) ?? [];
@@ -150,7 +170,8 @@ function importedSales(source: ImportedPerformanceSource): RealizedSale[] {
     const buy = byId.get(buyId)!;
     const cost =
       -BigInt(buy.document.nativeSettlementRaw) +
-      BigInt(buy.document.networkFeeLamports);
+      BigInt(buy.document.networkFeeLamports) +
+      BigInt(source.executionCosts?.[buy.id] ?? '0');
     for (const [saleId, share] of allocateLotCost(
       cost,
       BigInt(buy.document.tokenUnitsRaw),

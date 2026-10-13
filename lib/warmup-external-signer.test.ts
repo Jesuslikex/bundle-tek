@@ -228,6 +228,67 @@ it('retains explicit rejection and contains untrusted extension error text', asy
     signApprovedExternalWarmupPacket(f.wallet, f.review, () => {}),
   ).rejects.toThrow('Wallet signing did not complete');
 });
+it.each(['account', 'feature', 'expiry', 'scope'] as const)(
+  'retains the verified packet for Jito recovery before rejecting a changed %s',
+  async (kind) => {
+    const f = await fixture();
+    let current = true;
+    f.sign.mockImplementation(async () => {
+      if (kind === 'account') f.wallet.accounts = [{ ...f.account }];
+      if (kind === 'feature')
+        f.wallet.features['solana:signTransaction'] = {
+          ...f.wallet.features['solana:signTransaction'],
+        };
+      if (kind === 'expiry') f.review.expiresAt = new Date(0).toISOString();
+      if (kind === 'scope') current = false;
+      return [{ signedTransaction: f.bytes }];
+    });
+    const retain = vi.fn(async () => {});
+    await expect(
+      signApprovedExternalWarmupPacket(
+        f.wallet,
+        f.review,
+        () => {
+          if (!current) throw new Error('superseded');
+        },
+        retain,
+      ),
+    ).rejects.toThrow();
+    expect(retain).toHaveBeenCalledExactlyOnceWith(f.f.signed);
+    expect(f.sign).toHaveBeenCalledOnce();
+    expect(
+      f.wallet.features['solana:signAndSendTransaction'].signAndSendTransaction,
+    ).not.toHaveBeenCalled();
+  },
+);
+it.each(['message', 'signature'] as const)(
+  'does not retain a changed %s even when the approval expires during signing',
+  async (kind) => {
+    const f = await fixture();
+    f.sign.mockImplementation(async () => {
+      f.review.expiresAt = new Date(0).toISOString();
+      const bytes = Uint8Array.from(f.bytes);
+      bytes[kind === 'message' ? bytes.length - 1 : 1] ^= 1;
+      return [{ signedTransaction: bytes }];
+    });
+    const retain = vi.fn(async () => {});
+    await expect(
+      signApprovedExternalWarmupPacket(f.wallet, f.review, () => {}, retain),
+    ).rejects.toThrow();
+    expect(retain).not.toHaveBeenCalled();
+  },
+);
+it('does not request a second signature when retention fails', async () => {
+  const f = await fixture();
+  const retain = vi.fn(async () => {
+    throw new Error('Registration unavailable');
+  });
+  await expect(
+    signApprovedExternalWarmupPacket(f.wallet, f.review, () => {}, retain),
+  ).rejects.toThrow('Registration unavailable');
+  expect(retain).toHaveBeenCalledExactlyOnceWith(f.f.signed);
+  expect(f.sign).toHaveBeenCalledOnce();
+});
 it('subscribes to account changes and returns the wallet cleanup callback', async () => {
   const f = await fixture(),
     changed = vi.fn(),

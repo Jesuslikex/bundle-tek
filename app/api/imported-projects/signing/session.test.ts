@@ -132,6 +132,7 @@ beforeAll(async () => {
     '0060_imported_trade_session_timing',
     '0061_imported_trade_session_controls',
     '0062_session_preparation_jobs',
+    '0068_remarkable_frightful_four',
   ]) {
     if (name === '0061_imported_trade_session_controls') {
       const now = new Date().toISOString(),

@@ -8,6 +8,10 @@ import {
 
 export const ACCOUNT_PERFORMANCE_LIMIT = 4000;
 export type PerformanceScope = {
+  bundleCostStorageUnavailable?: boolean;
+  bundleTipLamports?: string;
+  bundleFeeLamports?: string;
+  missingBundleCostCount?: number;
   kind: 'Imported trades' | 'Warmup';
   id: string;
   name: string;
@@ -24,6 +28,11 @@ export type PerformanceScope = {
   rentChangeLamports: string;
 };
 export type ImportedPerformanceSource = {
+  bundleCostStorageUnavailable?: boolean;
+  executionCosts?: Record<string, string>;
+  bundleTipLamports?: string;
+  bundleFeeLamports?: string;
+  missingBundleCostCount?: number;
   id: string;
   name: string;
   archived: boolean;
@@ -38,6 +47,10 @@ export type WarmupPerformanceSource = {
   sells: PerformanceSell[];
 };
 export type AccountPerformance = {
+  bundleCostStorageUnavailable?: boolean;
+  bundleTipLamports?: string;
+  bundleFeeLamports?: string;
+  missingBundleCostCount?: number;
   scopes: PerformanceScope[];
   receiptCount: number;
   buyCount: number;
@@ -79,6 +92,7 @@ function exact(value: unknown, signed = false): value is string {
 function total(
   scopes: PerformanceScope[],
   observedAt: string,
+  storageUnavailable = false,
 ): AccountPerformance {
   const sum = (field: (typeof moneyFields)[number]) =>
     scopes.reduce((s, r) => s + BigInt(r[field]), 0n).toString();
@@ -86,8 +100,22 @@ function total(
     scopes.reduce((s, r) => s + r[field], 0);
   const sellCount = count('sellCount'),
     unlinkedSaleCount = count('unlinkedSaleCount');
+  const missingBundleCostCount = scopes.reduce(
+    (n, s) => n + (s.missingBundleCostCount ?? 0),
+    0,
+  );
+  const bundleCostStorageUnavailable =
+    storageUnavailable || scopes.some((s) => s.bundleCostStorageUnavailable);
   return {
     scopes,
+    bundleTipLamports: scopes
+      .reduce((n, s) => n + BigInt(s.bundleTipLamports ?? '0'), 0n)
+      .toString(),
+    bundleFeeLamports: scopes
+      .reduce((n, s) => n + BigInt(s.bundleFeeLamports ?? '0'), 0n)
+      .toString(),
+    missingBundleCostCount,
+    bundleCostStorageUnavailable,
     observedAt,
     receiptCount: count('buyCount') + sellCount,
     buyCount: count('buyCount'),
@@ -99,7 +127,10 @@ function total(
     linkedNetProceedsLamports: sum('linkedNetProceedsLamports'),
     linkedResultLamports: sum('linkedResultLamports'),
     recordedRealizedLamports:
-      sellCount > 0 && unlinkedSaleCount === 0
+      sellCount > 0 &&
+      unlinkedSaleCount === 0 &&
+      missingBundleCostCount === 0 &&
+      !bundleCostStorageUnavailable
         ? sum('linkedResultLamports')
         : null,
     successfulFeeLamports: sum('successfulFeeLamports'),
@@ -153,6 +184,13 @@ export function validatedAccountPerformance(
           ].includes(k),
         ),
       ) ||
+      !exact(row.bundleTipLamports ?? '0') ||
+      !exact(row.bundleFeeLamports ?? '0') ||
+      !Number.isSafeInteger(row.missingBundleCostCount ?? 0) ||
+      (row.missingBundleCostCount ?? 0) < 0 ||
+      (row.missingBundleCostCount ?? 0) > ACCOUNT_PERFORMANCE_LIMIT ||
+      (row.bundleCostStorageUnavailable !== undefined &&
+        typeof row.bundleCostStorageUnavailable !== 'boolean') ||
       BigInt(row.linkedNetProceedsLamports) -
         BigInt(row.allocatedCostLamports) !==
         BigInt(row.linkedResultLamports) ||
@@ -166,7 +204,24 @@ export function validatedAccountPerformance(
       throw new Error('Performance scope differs.');
     seen.add(`${row.kind}:${row.id}`);
   }
-  const expected = total(v.scopes, v.observedAt);
+  if (
+    v.bundleCostStorageUnavailable !== undefined &&
+    typeof v.bundleCostStorageUnavailable !== 'boolean'
+  )
+    throw new Error('Bundle storage coverage differs.');
+  const expected = total(
+    v.scopes,
+    v.observedAt,
+    v.bundleCostStorageUnavailable ?? false,
+  );
+  if (
+    (v.bundleTipLamports ?? '0') !== expected.bundleTipLamports ||
+    (v.bundleFeeLamports ?? '0') !== expected.bundleFeeLamports ||
+    (v.missingBundleCostCount ?? 0) !== expected.missingBundleCostCount ||
+    (v.bundleCostStorageUnavailable ?? false) !==
+      expected.bundleCostStorageUnavailable
+  )
+    throw new Error('Bundle cost totals differ.');
   if (
     expected.receiptCount > ACCOUNT_PERFORMANCE_LIMIT ||
     (
@@ -191,6 +246,10 @@ export function accountPerformanceCsv(value: AccountPerformance) {
     'archived',
     ...countFields,
     ...moneyFields,
+    'bundleTipLamports',
+    'bundleFeeLamports',
+    'missingBundleCostCount',
+    'bundleCostStorageUnavailable',
   ] as const;
   const cell = (value: unknown) => {
     let s = String(value);
@@ -202,7 +261,20 @@ export function accountPerformanceCsv(value: AccountPerformance) {
     [
       'observedAt,' + fields.join(','),
       ...v.scopes.map((row) =>
-        [v.observedAt, ...fields.map((k) => row[k])].map(cell).join(','),
+        [
+          v.observedAt,
+          ...fields.map(
+            (k) =>
+              row[k] ??
+              (k === 'bundleCostStorageUnavailable'
+                ? false
+                : k === 'missingBundleCostCount'
+                  ? 0
+                  : '0'),
+          ),
+        ]
+          .map(cell)
+          .join(','),
       ),
     ].join('\r\n') + '\r\n'
   );

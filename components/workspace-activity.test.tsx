@@ -1,4 +1,43 @@
 import React from 'react';
+vi.mock('@/components/use-jito-bundle-activity', () => ({
+  useJitoBundleActivity: () => ({
+    events: [
+      {
+        id: 'a'.repeat(32),
+        sequence: 1,
+        type: 'bundle.submitting',
+        packet: null,
+        bundleId: '00000000-0000-4000-8000-000000000005',
+        projectId: '00000000-0000-4000-8000-000000000001',
+        sessionId: '00000000-0000-4000-8000-000000000002',
+        createdAt: '2026-10-12T12:01:00Z',
+        document: {
+          format: 'jito-bundle-activity-v1',
+          id: '00000000-0000-4000-8000-000000000005',
+          projectId: '00000000-0000-4000-8000-000000000001',
+          sessionId: '00000000-0000-4000-8000-000000000002',
+          sessionRevision: 4,
+          sha256: 'ab'.repeat(32),
+          state: 'submitting',
+          bundleId: null,
+          swapCount: 2,
+          packetCount: 3,
+          signedCount: 3,
+          tipLamports: '1000',
+          createdAt: '2026-10-12T12:00:00Z',
+          updatedAt: '2026-10-12T12:01:00Z',
+        },
+      },
+    ],
+    cursor: 'a'.repeat(32),
+    loading: false,
+    error: '',
+    baselinePending: true,
+    baseline: () => {},
+    beginRefresh: () => {},
+    older: () => {},
+  }),
+}));
 vi.mock('@/components/use-session-job-activity', () => ({
   useSessionJobActivity: () => ({
     events: [
@@ -312,6 +351,27 @@ vi.mock('@/components/use-wallet-audit', () => ({
   }),
 }));
 import { WorkspaceActivity } from './workspace-activity';
+it('includes uncertain bundle outcomes and public progress without claiming a finalized result', () => {
+  const html = renderToStaticMarkup(
+    <WorkspaceActivity
+      projects={[]}
+      onOpen={() => {}}
+      onOpenImport={() => {}}
+      onOpenWarmup={() => {}}
+    />,
+  );
+  expect(html).toContain('Jito submission reserved; outcome uncertain');
+  expect(html).toContain('3/3 signatures registered');
+  expect(html).toContain('tip 1000 lamports');
+  expect(html).toContain('Load older Jito events');
+  expect(html).toContain('Record earlier bundle baselines');
+  expect(html).toContain('Each click records up to 50 bundles');
+  expect(html).toContain('captured submitting');
+  expect(html).not.toContain(
+    'latest saved state; prior transitions not reconstructed',
+  );
+  expect(html).not.toContain('Jito bundle finalized');
+});
 it('renders failed receipts as failures with unpaid amounts and network fees', () => {
   const html = renderToStaticMarkup(
     <WorkspaceActivity

@@ -9,7 +9,57 @@ import {
   acquisitionId,
 } from '../test/imported-sell-acquisition-fixture';
 import { proposedImportedLotLink } from './imported-lot-links';
+import { summarizeAccountTimeline } from './account-performance-server';
 const date = '2026-10-11T00:00:00Z';
+it('carries bundle buy expenses through partial exits and deducts sell expenses with exact timeline reconciliation', () => {
+  const s = source();
+  const expenseSource = {
+    ...s,
+    executionCosts: { [s.receipts[0].id]: '5', [s.receipts[1].id]: '7' },
+    bundleTipLamports: '10',
+    bundleFeeLamports: '2',
+  };
+  const { summary, timeline } = summarizeAccountTimeline(
+    [expenseSource],
+    [],
+    date,
+  );
+  expect(summary).toMatchObject({
+    allocatedCostLamports: '35',
+    unallocatedCostLamports: '71',
+    linkedNetProceedsLamports: '42',
+    linkedResultLamports: '7',
+    recordedRealizedLamports: '7',
+    bundleTipLamports: '10',
+    bundleFeeLamports: '2',
+  });
+  expect(timeline.sales[0]).toMatchObject({
+    costLamports: '35',
+    netProceedsLamports: '42',
+    resultLamports: '7',
+  });
+  expect(accountPerformanceCsv(summary)).toContain(
+    'bundleTipLamports,bundleFeeLamports,missingBundleCostCount',
+  );
+  expect(s.receipts[0].document.networkFeeLamports).toBe('1');
+  const missing = summarizeAccountPerformance(
+    [{ ...expenseSource, missingBundleCostCount: 1 }],
+    [],
+    date,
+  );
+  expect(missing.recordedRealizedLamports).toBeNull();
+  expect(missing.linkedResultLamports).toBe('7');
+  expect(() =>
+    validatedAccountPerformance({ ...missing, recordedRealizedLamports: '7' }),
+  ).toThrow();
+  expect(() =>
+    summarizeAccountPerformance(
+      [{ ...expenseSource, bundleFeeLamports: '3' }],
+      [],
+      date,
+    ),
+  ).toThrow('reconcile');
+});
 function source() {
   const receipts = [acquisitionReceipt(2), acquisitionReceipt(3, 'Sell', '1')];
   return {

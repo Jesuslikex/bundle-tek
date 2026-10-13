@@ -1,6 +1,8 @@
 import { beforeAll, beforeEach, afterAll, it, expect, vi } from 'vitest';
 import { Miniflare } from 'miniflare';
 import bs58 from 'bs58';
+import { jitoPerformanceFixture } from '../../../test/jito-performance-fixture';
+import { proposedImportedLotLink } from '@/lib/imported-lot-links';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import {
   acquisitionReceipt,
@@ -8,7 +10,10 @@ import {
   acquisitionMint as mint,
   acquisitionWallet as wallet,
 } from '../../../test/imported-sell-acquisition-fixture';
-import type { AccountPerformance } from '@/lib/account-performance';
+import {
+  accountPerformanceCsv,
+  type AccountPerformance,
+} from '@/lib/account-performance';
 import {
   validatedTimelineData,
   type PerformanceTimelineData,
@@ -31,6 +36,9 @@ const tables = [
   'wallet_warmup_plans(owner_id TEXT,id TEXT,document TEXT,archived INTEGER)',
   'warmup_buy_receipts(owner_id TEXT,id TEXT,plan_id TEXT,signature TEXT,document TEXT,plan_revision INTEGER,wallet_revision INTEGER,cycle INTEGER,wallet_address TEXT,remaining_raw TEXT)',
   'warmup_sell_receipts(owner_id TEXT,id TEXT,plan_id TEXT,signature TEXT,document TEXT,buy_receipt_id TEXT,consumed_raw TEXT)',
+  'jito_bundles(owner_id TEXT,id TEXT,document TEXT,state TEXT)',
+  'jito_bundle_packets(owner_id TEXT,bundle_id TEXT,packet INTEGER,signature TEXT)',
+  'jito_bundle_finalizations(owner_id TEXT,bundle_id TEXT,document TEXT)',
 ];
 let mf: Miniflare;
 beforeAll(async () => {
@@ -188,6 +196,151 @@ it('authenticates and returns an explicit empty summary without invented gains',
     recordedRealizedLamports: null,
     scopes: [],
   });
+});
+it('reads owner-bound bundle expenses in the real D1 snapshot and reconciles partial exits, timeline and CSV', async () => {
+  const { f, row, receipts, proof } = await jitoPerformanceFixture();
+  const buy = receipts[0];
+  const sell = acquisitionReceipt(
+    240,
+    'Sell',
+    '1',
+    buy.document.wallet,
+    proof.slot + 1,
+  );
+  sell.projectId = buy.projectId;
+  sell.document.mint = buy.document.mint;
+  const link = proposedImportedLotLink(
+    [...receipts, sell],
+    [],
+    buy.projectId,
+    buy.id,
+    sell.id,
+    id(900),
+    date,
+  );
+  await mocks.db
+    .prepare('INSERT INTO imported_token_projects VALUES(?,?,?,0)')
+    .bind(
+      'one',
+      buy.projectId,
+      JSON.stringify({
+        token: {
+          chain: 'Solana',
+          address: buy.document.mint,
+          decimals: 0,
+          name: 'Bundle cost test',
+        },
+      }),
+    )
+    .run();
+  for (const receipt of [...receipts, sell])
+    await mocks.db
+      .prepare('INSERT INTO imported_swap_receipts VALUES(?,?,?,?,?,?,?,?)')
+      .bind(
+        'one',
+        receipt.projectId,
+        receipt.id,
+        receipt.preparationId,
+        receipt.projectRevision,
+        receipt.walletRevision,
+        receipt.createdAt,
+        JSON.stringify(receipt.document),
+      )
+      .run();
+  await mocks.db
+    .prepare(
+      'INSERT INTO imported_trade_lot_links VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+    )
+    .bind(
+      'one',
+      link.id,
+      link.projectId,
+      link.buyReceiptId,
+      link.sellReceiptId,
+      link.unitsRaw,
+      link.buySignature,
+      link.sellSignature,
+      link.buyPreparationSha256,
+      link.sellPreparationSha256,
+      link.createdAt,
+    )
+    .run();
+  for (const owner of ['one', 'foreign']) {
+    await mocks.db
+      .prepare('INSERT INTO jito_bundles VALUES(?,?,?,?)')
+      .bind(owner, row.id, row.document, row.state)
+      .run();
+    await mocks.db
+      .prepare('INSERT INTO jito_bundle_finalizations VALUES(?,?,?)')
+      .bind(owner, row.id, owner === 'one' ? row.finalizationDocument : '{}')
+      .run();
+    for (const p of JSON.parse(row.packets))
+      await mocks.db
+        .prepare('INSERT INTO jito_bundle_packets VALUES(?,?,?,?)')
+        .bind(owner, row.id, p.packet, p.signature)
+        .run();
+  }
+  const response = await GET();
+  expect(response.status).toBe(200);
+  const summary = (await response.json()) as AccountPerformance;
+  const expense = (BigInt(f.manifest.tip.amountRaw) + 2n) / 2n;
+  const cost = (101n + expense) / 3n;
+  expect(summary).toMatchObject({
+    bundleTipLamports: f.manifest.tip.amountRaw,
+    bundleFeeLamports: '1',
+    missingBundleCostCount: 0,
+    allocatedCostLamports: cost.toString(),
+    recordedRealizedLamports: (49n - cost).toString(),
+  });
+  const view = (await (
+    await GET(
+      new Request('https://bundle.test/api/account-performance?view=timeline'),
+    )
+  ).json()) as {
+    summary: AccountPerformance;
+    timeline: PerformanceTimelineData;
+  };
+  expect(
+    validatedTimelineData(view.timeline, view.summary).sales[0].resultLamports,
+  ).toBe(summary.recordedRealizedLamports);
+  const csv = await (
+    await GET(
+      new Request('https://bundle.test/api/account-performance?format=csv'),
+    )
+  ).text();
+  expect(csv).toContain(
+    'bundleTipLamports,bundleFeeLamports,missingBundleCostCount',
+  );
+  await mocks.db
+    .prepare('DELETE FROM jito_bundle_finalizations WHERE owner_id=?')
+    .bind('one')
+    .run();
+  const missing = (await (await GET()).json()) as AccountPerformance;
+  expect(missing).toMatchObject({
+    missingBundleCostCount: 1,
+    recordedRealizedLamports: null,
+  });
+  // The foreign receipt cannot satisfy the missing owner receipt or supply its costs.
+  expect(missing.bundleTipLamports).toBe('0');
+  await mocks.db.prepare('DROP TABLE jito_bundle_packets').run();
+  try {
+    const legacyResponse = await GET();
+    expect(legacyResponse.status).toBe(200);
+    const legacy = (await legacyResponse.json()) as AccountPerformance;
+    expect(legacy).toMatchObject({
+      bundleCostStorageUnavailable: true,
+      recordedRealizedLamports: null,
+    });
+    expect(accountPerformanceCsv(legacy)).toContain(
+      'bundleCostStorageUnavailable',
+    );
+  } finally {
+    await mocks.db
+      .prepare(
+        'CREATE TABLE jito_bundle_packets(owner_id TEXT,bundle_id TEXT,packet INTEGER,signature TEXT)',
+      )
+      .run();
+  }
 });
 it('aggregates two-source sales and partial warmup exits exactly across archived scopes with owner isolation', async () => {
   await importedFixture();

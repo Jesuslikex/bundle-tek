@@ -1,5 +1,9 @@
 import bs58 from 'bs58';
 import {
+  validatedBundleExpenses,
+  type BundleExpenses,
+} from './bundle-expenses';
+import {
   validatedImportedPerformance,
   type ImportedPerformance,
 } from './imported-performance-format';
@@ -224,8 +228,15 @@ export function importedTradePage(
     throw new Error('Duplicate trade evidence.');
   return page;
 }
-export function importedTradeCsv(rows: ImportedTradeReceipt[]) {
+export function importedTradeCsv(
+  rows: ImportedTradeReceipt[],
+  expenseEvidence?: BundleExpenses,
+) {
   summarizeImportedTrades(rows);
+  const expenses = validatedBundleExpenses(
+    expenseEvidence,
+    rows.map((r) => r.id),
+  );
   const columns = [
     'receipt_id',
     'project_id',
@@ -250,6 +261,8 @@ export function importedTradeCsv(rows: ImportedTradeReceipt[]) {
     'observed_at',
     'source',
   ];
+  if (expenseEvidence)
+    columns.push('allocated_bundle_cost_lamports', 'bundle_cost_coverage');
   const escape = (value: string | number | null | undefined) =>
     '"' + String(value ?? '').replaceAll('"', '""') + '"';
   return (
@@ -280,6 +293,20 @@ export function importedTradeCsv(rows: ImportedTradeReceipt[]) {
           row.createdAt,
           d.observedAt,
           d.source,
+          ...(expenseEvidence
+            ? [
+                expenses.executionCosts[row.id] ??
+                  (expenses.missingBundleCostCount ||
+                  expenses.storageUnavailable
+                    ? ''
+                    : '0'),
+                expenses.storageUnavailable
+                  ? 'storage-unavailable'
+                  : expenses.missingBundleCostCount
+                    ? 'incomplete'
+                    : 'complete',
+              ]
+            : []),
         ]
           .map(escape)
           .join(',');

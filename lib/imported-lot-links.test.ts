@@ -4,11 +4,68 @@ import {
   importedLinkedPerformance,
   importedLotPage,
   proposedImportedLotLink,
+  importedLotAssignmentPreview,
 } from './imported-lot-links';
 import type { ImportedTradeReceipt } from './imported-trade-ledger';
 const id = (n: number) =>
     `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
   key = bs58.encode(new Uint8Array(32).fill(1));
+it('binds expense allocations to receipt identities and includes them in acquisition previews', () => {
+  const rows = [receipt(2, 'Buy', '3'), receipt(3, 'Sell', '1')];
+  const value = {
+    projectId: id(1),
+    mint: key,
+    decimals: 6,
+    revision: 0,
+    receipts: rows,
+    links: [],
+    receiptDocumentHashes: Object.fromEntries(
+      rows.map((r) => [r.id, 'a'.repeat(64)]),
+    ),
+    observedAt: '2026-10-11T00:00:00Z',
+    expenses: {
+      executionCosts: { [rows[0].id]: '5', [rows[1].id]: '7' },
+      bundleTipLamports: '10',
+      bundleFeeLamports: '2',
+      missingBundleCostCount: 0,
+    },
+  };
+  const page = importedLotPage(value, id(1), key, 6);
+  expect(
+    importedLotAssignmentPreview(page, rows[0].id, rows[1].id),
+  ).toMatchObject({
+    cost: '35',
+    proceeds: '42',
+    result: '7',
+    missingBundleCostCount: 0,
+  });
+  const missing = importedLotPage(
+    { ...value, expenses: { ...value.expenses, missingBundleCostCount: 1 } },
+    id(1),
+    key,
+    6,
+  );
+  const preview = importedLotAssignmentPreview(missing, rows[0].id, rows[1].id);
+  const linked = importedLotPage(
+    { ...value, links: [preview.link], expenses: missing.expenses },
+    id(1),
+    key,
+    6,
+  );
+  expect(linked.performance.realizedResultLamports).toBeNull();
+  expect(linked.performance.assignedResultLamports).toBe('7');
+  expect(() =>
+    importedLotPage(
+      {
+        ...value,
+        expenses: { ...value.expenses, executionCosts: { [id(999)]: '12' } },
+      },
+      id(1),
+      key,
+      6,
+    ),
+  ).toThrow('receipt');
+});
 const receipt = (
   n: number,
   side: 'Buy' | 'Sell',

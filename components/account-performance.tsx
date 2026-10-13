@@ -31,6 +31,12 @@ export function AccountPerformanceSummary({
   );
   return (
     <div>
+      {value.bundleCostStorageUnavailable && (
+        <p role="alert">
+          Bundle cost storage is unavailable. Known trade costs remain visible,
+          but complete profit totals are withheld.
+        </p>
+      )}
       <div className="dashboard-stats">
         <article>
           <span>Recorded realized result</span>
@@ -42,9 +48,13 @@ export function AccountPerformanceSummary({
           <small>
             {value.sellCount === 0
               ? 'No recorded sales'
-              : value.unlinkedSaleCount
-                ? `${value.unlinkedSaleCount} sales have unassigned acquisition basis`
-                : 'All recorded sales have linked buy evidence'}
+              : value.bundleCostStorageUnavailable
+                ? 'Bundle cost coverage unavailable'
+                : value.missingBundleCostCount
+                  ? `${value.missingBundleCostCount} bundles have incomplete cost evidence`
+                  : value.unlinkedSaleCount
+                    ? `${value.unlinkedSaleCount} sales have unassigned acquisition basis`
+                    : 'All recorded sales have linked buy evidence'}
           </small>
         </article>
         <article>
@@ -56,7 +66,7 @@ export function AccountPerformanceSummary({
           </strong>
           <small>
             {value.linkedSaleCount} linked sales. After allocated buy and sell
-            network fees.
+            network fees and allocated retained bundle expenses.
           </small>
         </article>
         <article>
@@ -76,6 +86,25 @@ export function AccountPerformanceSummary({
         change, kept separate:{' '}
         {signedBalanceAmount(value.rentChangeLamports, 9)} SOL.
       </p>
+      <p>
+        Retained bundle tips:{' '}
+        {value.bundleCostStorageUnavailable
+          ? 'Unavailable'
+          : formatNativeBalance(value.bundleTipLamports ?? '0', 9) + ' SOL'}
+        . Tip transaction fees:{' '}
+        {value.bundleCostStorageUnavailable
+          ? 'Unavailable'
+          : formatNativeBalance(value.bundleFeeLamports ?? '0', 9) + ' SOL'}
+        . These costs are divided equally across the bundle’s swap packets; buy
+        shares enter acquisition cost and sell shares reduce proceeds.
+      </p>
+      {!!value.missingBundleCostCount && (
+        <p role="alert">
+          {value.missingBundleCostCount} bundles have incomplete settlement or
+          fee evidence. Linked results include known costs only. A complete
+          recorded realized result is unavailable.
+        </p>
+      )}
       <label htmlFor={searchId}>
         Search recorded projects and plans
         <Input
@@ -168,12 +197,13 @@ export function AccountPerformanceSummary({
       <small>
         Checked {new Date(value.observedAt).toLocaleString()}. Saved mainnet
         Solana trades only. Linked results include successful buy and sell
-        network fees. Failed execution fees are reviewed in account transaction
-        costs and are excluded here. Unassigned sales prevent a complete
-        recorded realized result; they are not counted as profit. Unallocated
-        cost can include already sold units awaiting assignment. External
-        activity, withdrawals, funding, launches and market valuation are
-        excluded. This is not total account return or portfolio value.
+        network fees and allocated retained Jito tips and tip transaction fees.
+        Failed execution fees are reviewed in account transaction costs and are
+        excluded here. Unassigned sales prevent a complete recorded realized
+        result; they are not counted as profit. Unallocated cost can include
+        already sold units awaiting assignment. External activity, withdrawals,
+        funding, launches and market valuation are excluded. This is not total
+        account return or portfolio value.
       </small>
     </div>
   );

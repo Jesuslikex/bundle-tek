@@ -6,6 +6,10 @@ import {
   type ImportedTradeReceipt,
 } from './imported-trade-ledger';
 import { UUID } from './wallet-operation';
+import {
+  validatedBundleExpenses,
+  type BundleExpenses,
+} from './bundle-expenses';
 export const IMPORTED_LOT_LINK_LIMIT =
   IMPORTED_LEDGER_LIMIT * IMPORTED_ACQUISITION_MAX_SOURCES;
 export type ImportedLotLink = {
@@ -23,6 +27,7 @@ export type ImportedLotLink = {
 export function importedLinkedPerformance(
   receipts: ImportedTradeReceipt[],
   links: ImportedLotLink[],
+  executionCosts: Record<string, string> = {},
 ) {
   summarizeImportedTrades(receipts);
   if (
@@ -41,6 +46,9 @@ export function importedLinkedPerformance(
       first.document.decimals,
     );
   const byId = new Map(receipts.map((r) => [r.id, r]));
+  for (const [id, cost] of Object.entries(executionCosts))
+    if (!byId.has(id) || !/^(0|[1-9]\d{0,24})$/.test(cost))
+      throw new Error('Execution cost context differs.');
   const totals = new Map<
     string,
     { units: bigint; proceeds: bigint; sells: number }
@@ -79,7 +87,8 @@ export function importedLinkedPerformance(
       total = BigInt(sale.document.tokenUnitsRaw),
       proceeds =
         BigInt(sale.document.nativeSettlementRaw) -
-        BigInt(sale.document.networkFeeLamports);
+        BigInt(sale.document.networkFeeLamports) -
+        BigInt(executionCosts[sale.id] ?? '0');
     if (group.reduce((s, l) => s + BigInt(l.unitsRaw), 0n) !== total)
       throw new Error('Complete sale acquisition allocation required.');
     group.sort((a, b) => (a.buyReceiptId < b.buyReceiptId ? -1 : 1));
@@ -110,7 +119,8 @@ export function importedLinkedPerformance(
       const acquired = BigInt(buy.document.tokenUnitsRaw),
         cost =
           -BigInt(buy.document.nativeSettlementRaw) +
-          BigInt(buy.document.networkFeeLamports),
+          BigInt(buy.document.networkFeeLamports) +
+          BigInt(executionCosts[buy.id] ?? '0'),
         allocated = (cost * assigned.units) / acquired;
       return {
         buyReceiptId: buy.id,
@@ -199,6 +209,7 @@ export function importedLotPage(
     links: ImportedLotLink[];
     receiptDocumentHashes: Record<string, string>;
     observedAt: string;
+    expenses?: BundleExpenses;
   };
   if (
     !p ||
@@ -224,8 +235,18 @@ export function importedLotPage(
     throw new Error('Acquisition history context differs.');
   for (const r of p.receipts)
     importedTradeReceipt(r, projectId, mint, decimals);
-  const performance = importedLinkedPerformance(p.receipts, p.links);
-  return { ...p, performance };
+  const expenses = validatedBundleExpenses(
+    p.expenses,
+    p.receipts.map((r) => r.id),
+  );
+  const performance = importedLinkedPerformance(
+    p.receipts,
+    p.links,
+    expenses.executionCosts,
+  );
+  if (expenses.missingBundleCostCount || expenses.storageUnavailable)
+    performance.realizedResultLamports = null;
+  return { ...p, expenses, performance };
 }
 export type ImportedLotPage = ReturnType<typeof importedLotPage>;
 export function importedLotAssignmentPreview(
@@ -242,9 +263,15 @@ export function importedLotAssignmentPreview(
     crypto.randomUUID(),
     new Date().toISOString(),
   );
-  const after = importedLinkedPerformance(page.receipts, [...page.links, link]);
+  const after = importedLinkedPerformance(
+    page.receipts,
+    [...page.links, link],
+    page.expenses.executionCosts,
+  );
   return {
     link,
+    missingBundleCostCount: page.expenses.missingBundleCostCount,
+    storageUnavailable: page.expenses.storageUnavailable ?? false,
     cost: (
       BigInt(after.assignedCostLamports) -
       BigInt(page.performance.assignedCostLamports)

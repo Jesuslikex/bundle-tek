@@ -8,6 +8,55 @@ import {
 } from './imported-trade-ledger';
 const projectId = crypto.randomUUID(),
   mint = bs58.encode(new Uint8Array(32).fill(2));
+it('includes bundle expenses in FIFO basis and net proceeds without losing partial-sale rounding', () => {
+  const rows = [
+    receipt('Buy', 1, '3'),
+    receipt('Sell', 2, '1'),
+    receipt('Sell', 3, '2', '90'),
+  ];
+  const expenses = {
+    executionCosts: { [rows[0].id]: '5', [rows[1].id]: '7', [rows[2].id]: '1' },
+    bundleTipLamports: '10',
+    bundleFeeLamports: '3',
+    missingBundleCostCount: 0,
+  };
+  const p = importedTradePerformance(rows, expenses);
+  expect(p).toMatchObject({
+    realizedCostLamports: '106',
+    attributedNetProceedsLamports: '130',
+    realizedResultLamports: '24',
+    openCostLamports: '0',
+    bundleTipLamports: '10',
+    bundleFeeLamports: '3',
+  });
+  const partial = importedTradePerformance(rows.slice(0, 2), {
+    ...expenses,
+    executionCosts: { [rows[0].id]: '5', [rows[1].id]: '7' },
+    bundleFeeLamports: '2',
+  });
+  expect(partial).toMatchObject({
+    realizedCostLamports: '35',
+    openCostLamports: '71',
+    realizedResultLamports: '7',
+  });
+  const missing = importedTradePerformance(rows, {
+    ...expenses,
+    missingBundleCostCount: 1,
+  });
+  expect(missing.realizedResultLamports).toBeNull();
+  expect(missing.wallets[0].realizedResultLamports).toBeNull();
+  expect(() =>
+    validatedImportedPerformance(
+      { ...missing, realizedResultLamports: '24' },
+      3,
+      '3',
+      '3',
+    ),
+  ).toThrow();
+  expect(() =>
+    importedTradePerformance(rows, { ...expenses, bundleTipLamports: '11' }),
+  ).toThrow('allocation');
+});
 function receipt(
   side: 'Buy' | 'Sell',
   slot: number,

@@ -14,6 +14,8 @@ vi.mock('@/db', () => ({ getD1: () => mocks.db }));
 import { GET } from './route';
 import { nativeWithdrawalFixture } from '../../../test/native-withdrawal-fixture';
 import { decodeNativeWithdrawalReceipt } from '@/lib/native-withdrawal-server';
+import { jitoPerformanceFixture } from '../../../test/jito-performance-fixture';
+import { jitoPerformanceCosts } from '@/lib/jito-performance-costs';
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const key = (n: number) => bs58.encode(new Uint8Array(32).fill(n));
@@ -21,6 +23,9 @@ const signature = (n: number) => bs58.encode(new Uint8Array(64).fill(n));
 let mf: Miniflare;
 const date = '2026-10-11T00:00:00Z';
 const tables = [
+  'jito_bundles(owner_id TEXT,id TEXT,document TEXT,state TEXT)',
+  'jito_bundle_packets(owner_id TEXT,bundle_id TEXT,packet INTEGER,signature TEXT)',
+  'jito_bundle_finalizations(owner_id TEXT,bundle_id TEXT,document TEXT)',
   'imported_token_projects(owner_id TEXT,id TEXT,document TEXT,archived INTEGER)',
   'imported_swap_receipts(owner_id TEXT,project_id TEXT,id TEXT,preparation_id TEXT,project_revision INTEGER,wallet_revision INTEGER,created_at TEXT,document TEXT)',
   'warmup_buy_receipts(owner_id TEXT,id TEXT,plan_id TEXT,signature TEXT,document TEXT,plan_revision INTEGER,wallet_revision INTEGER,cycle INTEGER,wallet_address TEXT,remaining_raw TEXT)',
@@ -160,6 +165,135 @@ beforeEach(async () => {
       }),
     )
     .run();
+});
+it('reconciles retained bundle fees and tips, deduplicates withdrawal receipts and isolates owners', async () => {
+  const { f, row, receipts, proof } = await jitoPerformanceFixture();
+  const buy = receipts[0];
+  await mocks.db
+    .prepare('INSERT INTO imported_token_projects VALUES(?,?,?,1)')
+    .bind(
+      'one',
+      buy.projectId,
+      JSON.stringify({
+        token: { chain: 'Solana', address: buy.document.mint, decimals: 0 },
+      }),
+    )
+    .run();
+  for (const r of receipts)
+    await mocks.db
+      .prepare('INSERT INTO imported_swap_receipts VALUES(?,?,?,?,?,?,?,?)')
+      .bind(
+        'one',
+        r.projectId,
+        r.id,
+        r.preparationId,
+        r.projectRevision,
+        r.walletRevision,
+        r.createdAt,
+        JSON.stringify(r.document),
+      )
+      .run();
+  for (const owner of ['one', 'foreign']) {
+    await mocks.db
+      .prepare('INSERT INTO jito_bundles VALUES(?,?,?,?)')
+      .bind(owner, row.id, row.document, row.state)
+      .run();
+    await mocks.db
+      .prepare('INSERT INTO jito_bundle_finalizations VALUES(?,?,?)')
+      .bind(owner, row.id, owner === 'one' ? row.finalizationDocument : '{}')
+      .run();
+    for (const p of JSON.parse(row.packets))
+      await mocks.db
+        .prepare('INSERT INTO jito_bundle_packets VALUES(?,?,?,?)')
+        .bind(owner, row.id, p.packet, p.signature)
+        .run();
+  }
+  const response = await GET();
+  expect(response.status).toBe(200);
+  const costs = (await response.json()) as AccountCosts;
+  const performance = (await jitoPerformanceCosts([row], receipts)).get(
+    buy.projectId,
+  )!;
+  expect(costs).toMatchObject({
+    receiptCount: 3,
+    totalFeeLamports: '3',
+    bundleTipLamports: performance.bundleTipLamports,
+    totalRecordedCostLamports: (
+      BigInt(performance.bundleTipLamports) + 3n
+    ).toString(),
+    missingBundleCostCount: 0,
+  });
+  expect(
+    costs.categories.find((c) => c.category === 'Jito tips'),
+  ).toMatchObject({
+    successfulFeeLamports: performance.bundleFeeLamports,
+    bundleTipLamports: performance.bundleTipLamports,
+  });
+  const tip = proof.tipReceipt!;
+  const insertWithdrawal = async (receipt: unknown, phase = 'finalized') => {
+    await mocks.db.prepare('DELETE FROM native_withdrawals').run();
+    await mocks.db
+      .prepare('INSERT INTO native_withdrawals VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(
+        'one',
+        f.manifest.tip.id,
+        f.manifest.tip.wallet,
+        f.manifest.tip.walletRevision,
+        phase,
+        tip.signature,
+        JSON.stringify(f.manifest.tip),
+        receipt ? JSON.stringify(receipt) : null,
+        null,
+        date,
+        date,
+      )
+      .run();
+  };
+  await insertWithdrawal(tip);
+  expect(await (await GET()).json()).toMatchObject({
+    receiptCount: 3,
+    totalFeeLamports: '3',
+    bundleTipLamports: performance.bundleTipLamports,
+  });
+  await insertWithdrawal({
+    ...tip,
+    networkFeeLamports: '2',
+    walletChangeRaw: (-BigInt(tip.amountRaw) - 2n).toString(),
+  });
+  expect((await GET()).status).toBe(503);
+  await insertWithdrawal(null, 'submitted');
+  await mocks.db
+    .prepare("UPDATE jito_bundles SET state='submitted' WHERE owner_id=?")
+    .bind('one')
+    .run();
+  await mocks.db
+    .prepare('DELETE FROM jito_bundle_finalizations WHERE owner_id=?')
+    .bind('one')
+    .run();
+  const pending = (await (await GET()).json()) as AccountCosts;
+  expect(pending).toMatchObject({
+    pendingCount: 1,
+    missingBundleCostCount: 1,
+    totalFeeLamports: '2',
+    bundleTipLamports: '0',
+  });
+  await mocks.db.prepare('DROP TABLE jito_bundle_packets').run();
+  try {
+    const legacyResponse = await GET();
+    expect(legacyResponse.status).toBe(200);
+    expect(await legacyResponse.json()).toMatchObject({
+      bundleCostStorageUnavailable: true,
+      totalFeeLamports: '2',
+      bundleTipLamports: '0',
+      missingBundleCostCount: 0,
+    });
+  } finally {
+    await mocks.db
+      .prepare(
+        'CREATE TABLE jito_bundle_packets(owner_id TEXT,bundle_id TEXT,packet INTEGER,signature TEXT)',
+      )
+      .run();
+  }
 });
 it('isolates owners and includes all receipts beyond one display page, including archived projects', async () => {
   mocks.user = null;

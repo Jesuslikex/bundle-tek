@@ -8,6 +8,13 @@ import {
   importedTradeReceipt,
   type ImportedTradeReceipt,
 } from './imported-trade-ledger';
+import {
+  jitoPerformanceCosts,
+  jitoPerformanceStatement,
+  jitoCostStorageAvailable,
+  type JitoPerformanceRow,
+} from './jito-performance-costs';
+import { emptyBundleExpenses } from './bundle-expenses';
 const fields = [
   'network',
   'mint',
@@ -33,8 +40,11 @@ export async function importedAcquisitionSnapshot(
   db: D1Database,
   owner: string,
   projectId: string,
+  includeExpenses = false,
 ) {
-  const results = await db.batch([
+  const expenseStorage =
+    includeExpenses && (await jitoCostStorageAvailable(db));
+  const statements = [
     db
       .prepare(
         'SELECT document FROM imported_token_projects WHERE owner_id=? AND id=?',
@@ -55,11 +65,15 @@ export async function importedAcquisitionSnapshot(
         'SELECT revision FROM imported_trade_lot_gates WHERE owner_id=? AND project_id=?',
       )
       .bind(owner, projectId),
-  ]);
+  ];
+  if (expenseStorage)
+    statements.push(jitoPerformanceStatement(db, owner, projectId));
+  const results = await db.batch(statements);
   if (
     results.some((r) => !r.success) ||
     results[1].results.length > IMPORTED_LEDGER_LIMIT ||
-    results[2].results.length > IMPORTED_LOT_LINK_LIMIT
+    results[2].results.length > IMPORTED_LOT_LINK_LIMIT ||
+    (expenseStorage && results[4].results.length > IMPORTED_LEDGER_LIMIT)
   )
     throw new Error();
   const project = results[0].results[0] as { document: string } | undefined;
@@ -76,12 +90,23 @@ export async function importedAcquisitionSnapshot(
       token.decimals,
     );
   });
+  const expenses = expenseStorage
+    ? ((
+        await jitoPerformanceCosts(
+          results[4].results as JitoPerformanceRow[],
+          receipts,
+        )
+      ).get(projectId) ?? emptyBundleExpenses())
+    : includeExpenses
+      ? { ...emptyBundleExpenses(), storageUnavailable: true }
+      : undefined;
   const page = importedLotPage(
     {
       projectId,
       mint: token.address,
       decimals: token.decimals,
       receipts,
+      ...(expenses ? { expenses } : {}),
       receiptDocumentHashes: Object.fromEntries(
         await Promise.all(
           stored.map(async (row) => [

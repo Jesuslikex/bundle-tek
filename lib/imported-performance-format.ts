@@ -15,6 +15,10 @@ export type ImportedWalletPerformance = {
   recordedOpenRaw: string | null;
 };
 export type ImportedPerformance = {
+  bundleTipLamports?: string;
+  bundleFeeLamports?: string;
+  missingBundleCostCount?: number;
+  bundleCostStorageUnavailable?: boolean;
   method: 'recorded-fifo';
   receiptCount: number;
   buyCount: number;
@@ -81,6 +85,14 @@ export function validatedImportedPerformance(
   )
     throw new Error('Recorded performance context differs.');
   values(p);
+  if (
+    !raw(p.bundleTipLamports ?? '0') ||
+    !raw(p.bundleFeeLamports ?? '0') ||
+    !count(p.missingBundleCostCount ?? 0) ||
+    (p.bundleCostStorageUnavailable !== undefined &&
+      typeof p.bundleCostStorageUnavailable !== 'boolean')
+  )
+    throw new Error('Recorded bundle expense coverage differs.');
   const seen = new Set<string>();
   for (const w of p.wallets) {
     if (
@@ -112,9 +124,18 @@ export function validatedImportedPerformance(
       w.ordering === 'by-finalized-slot' &&
       w.sellCount > 0 &&
       w.unknownBasisSoldRaw === '0' &&
+      !(p.missingBundleCostCount ?? 0) &&
+      !p.bundleCostStorageUnavailable &&
       w.realizedResultLamports === null
     )
       throw new Error('Missing recorded result.');
+    if (
+      (p.missingBundleCostCount || p.bundleCostStorageUnavailable) &&
+      w.realizedResultLamports !== null
+    )
+      throw new Error(
+        'Incomplete bundle expenses cannot establish a wallet result.',
+      );
   }
   for (const key of ['receiptCount', 'buyCount', 'sellCount'] as const)
     if (p.wallets.reduce((n, w) => n + w[key], 0) !== p[key])
@@ -141,6 +162,8 @@ export function validatedImportedPerformance(
         BigInt(p.recordedOpenRaw)) ||
     p.realizedResultLamports !==
       (p.sellCount > 0 &&
+      !(p.missingBundleCostCount ?? 0) &&
+      !p.bundleCostStorageUnavailable &&
       p.wallets.every(
         (w) =>
           w.ordering === 'by-finalized-slot' && w.unknownBasisSoldRaw === '0',

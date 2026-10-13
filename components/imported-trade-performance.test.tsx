@@ -11,7 +11,27 @@ import {
   type ImportedPerformance,
 } from '@/lib/imported-performance-format';
 import bs58 from 'bs58';
+import { acquisitionFixture } from '../test/imported-sell-acquisition-fixture';
 vi.stubGlobal('React', React);
+it('discloses incomplete bundle expense evidence in FIFO accounting', () => {
+  const page = acquisitionFixture(1);
+  const performance = importedTradePerformance(page.receipts, {
+    executionCosts: {},
+    bundleTipLamports: '0',
+    bundleFeeLamports: '0',
+    missingBundleCostCount: 1,
+  });
+  const html = renderToStaticMarkup(
+    <ImportedPerformanceResults
+      performance={performance}
+      decimals={page.decimals}
+    />,
+  );
+  expect(html).toContain('1 bundles have incomplete cost evidence');
+  expect(html).toContain('complete realized estimates are unavailable');
+  expect(html).toContain('Unavailable');
+  expect(html).toContain('Tip transaction fees');
+});
 it('requires explicit selection before showing an accounting estimate', () => {
   const html = renderToStaticMarkup(
     <ImportedTradePerformance

@@ -85,6 +85,12 @@ beforeAll(async () => {
     'DB',
     'imported-performance',
   )) as unknown as D1Database;
+  for (const table of [
+    'jito_bundles(owner_id TEXT,id TEXT,document TEXT,state TEXT)',
+    'jito_bundle_packets(owner_id TEXT,bundle_id TEXT,packet INTEGER,signature TEXT)',
+    'jito_bundle_finalizations(owner_id TEXT,bundle_id TEXT,document TEXT)',
+  ])
+    await mocks.db.prepare(`CREATE TABLE ${table}`).run();
   await mocks.db
     .prepare(
       'CREATE TABLE imported_token_projects(owner_id TEXT,id TEXT,document TEXT,archived INTEGER)',

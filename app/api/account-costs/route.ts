@@ -15,6 +15,14 @@ import { validatedSwapFailure } from '@/lib/swap-failure';
 import { validatedNativeWithdrawal } from '@/lib/native-withdrawal';
 import { transactionSignature } from '@/lib/tracked-wallet-transaction';
 import type { WarmupSigningReview } from '@/lib/warmup-signing';
+import {
+  jitoPerformanceStatement,
+  jitoCostStorageAvailable,
+  jitoPerformanceCosts,
+  type JitoPerformanceRow,
+} from '@/lib/jito-performance-costs';
+import type { JitoFinalization } from '@/lib/jito-finalization';
+import type { ImportedTradeReceipt } from '@/lib/imported-trade-ledger';
 export const dynamic = 'force-dynamic';
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
@@ -24,6 +32,7 @@ export async function GET() {
   if (!user) return json({ error: 'Sign in to view account costs.' }, 401);
   try {
     const db = getD1();
+    const expenseStorage = await jitoCostStorageAvailable(db);
     const queries = [
       `SELECT r.id,r.project_id AS projectId,r.preparation_id AS preparationId,r.project_revision AS projectRevision,r.wallet_revision AS walletRevision,r.created_at AS createdAt,r.document,p.document AS projectDocument FROM imported_swap_receipts r LEFT JOIN imported_token_projects p ON p.owner_id=r.owner_id AND p.id=r.project_id WHERE r.owner_id=? LIMIT ?`,
       `SELECT id,plan_id AS planId,signature,document,plan_revision AS planRevision,wallet_revision AS walletRevision,cycle,wallet_address AS wallet,json_extract(document,'$.mint') AS mint,json_extract(document,'$.acquiredRaw') AS acquiredRaw,COALESCE(remaining_raw,json_extract(document,'$.acquiredRaw')) AS remainingRaw,json_extract(document,'$.decimals') AS decimals,CASE WHEN json_extract(document,'$.signatureVerified')=1 AND json_extract(document,'$.wallet')=wallet_address AND json_extract(document,'$.signature')=signature THEN 1 ELSE 0 END AS verified,json_extract(document,'$.commitment') AS commitment,json_extract(document,'$.network') AS network FROM warmup_buy_receipts WHERE owner_id=? LIMIT ?`,
@@ -34,11 +43,12 @@ export async function GET() {
       ),
       `SELECT id,wallet_address AS wallet,wallet_revision AS walletRevision,state,signature,document,receipt,failure_receipt AS failureReceipt,created_at AS createdAt,updated_at AS updatedAt FROM native_withdrawals WHERE owner_id=? AND state IN ('signed','submitted','failed','finalized') LIMIT ?`,
     ];
-    const results = await db.batch(
-      queries.map((q) =>
+    const results = await db.batch([
+      ...queries.map((q) =>
         db.prepare(q).bind(user.userId, ACCOUNT_COST_LIMIT + 1),
       ),
-    );
+      ...(expenseStorage ? [jitoPerformanceStatement(db, user.userId)] : []),
+    ]);
     if (
       results.some((r) => !r.success || r.results.length > ACCOUNT_COST_LIMIT)
     )
@@ -48,6 +58,8 @@ export async function GET() {
       pendingCount: 0,
       missingFailureCount: 0,
       missingFinalizedCount: 0,
+      missingBundleCostCount: 0,
+      storageUnavailable: !expenseStorage,
     };
     const add = (
       category: AccountCostEntry['category'],
@@ -58,6 +70,7 @@ export async function GET() {
       transactionSignature(signature);
       entries.push({ category, signature, feeLamports, outcome });
     };
+    const importedReceipts: ImportedTradeReceipt[] = [];
     for (const row of results[0].results as Stored[]) {
       const token = JSON.parse(row.projectDocument as string).token;
       if (token.chain !== 'Solana') throw new Error();
@@ -67,6 +80,7 @@ export async function GET() {
         token.address,
         token.decimals,
       );
+      importedReceipts.push(r);
       add(
         'Imported swaps',
         r.document.signature,
@@ -133,6 +147,7 @@ export async function GET() {
         }
       }
     }
+    const withdrawalSignatures = new Set<string>();
     for (const stored of results[5].results as Stored[]) {
       const row = await validatedNativeWithdrawal({
         ...stored,
@@ -144,6 +159,7 @@ export async function GET() {
             ? null
             : JSON.parse(stored.failureReceipt as string),
       });
+      withdrawalSignatures.add(row.signature!);
       if (row.state === 'finalized')
         add(
           'Withdrawals',
@@ -161,6 +177,53 @@ export async function GET() {
           );
         else coverage.missingFailureCount++;
       } else coverage.pendingCount++;
+    }
+    const bundleRows = expenseStorage
+      ? (results[6].results as JitoPerformanceRow[])
+      : [];
+    const allocations = await jitoPerformanceCosts(
+      bundleRows,
+      importedReceipts,
+    );
+    coverage.missingBundleCostCount = [...allocations.values()].reduce(
+      (n, r) => n + r.missingBundleCostCount,
+      0,
+    );
+    for (const row of bundleRows) {
+      if (row.state === 'finalized' && row.finalizationDocument) {
+        const proof = JSON.parse(row.finalizationDocument) as JitoFinalization;
+        const tip = proof.tipReceipt;
+        if (!tip) continue;
+        const existing = entries.find((e) => e.signature === tip.signature);
+        if (existing) {
+          if (
+            existing.category !== 'Withdrawals' ||
+            existing.outcome !== 'success' ||
+            existing.feeLamports !== tip.networkFeeLamports
+          )
+            throw new Error('Duplicate bundle tip cost evidence differs.');
+          existing.category = 'Jito tips';
+          existing.tipLamports = tip.amountRaw;
+        } else {
+          add('Jito tips', tip.signature, tip.networkFeeLamports, 'success');
+          entries.at(-1)!.tipLamports = tip.amountRaw;
+        }
+      } else if (['reviewed', 'submitting', 'submitted'].includes(row.state)) {
+        const packets = JSON.parse(row.packets) as Array<{
+          packet: number;
+          signature: string;
+        }>;
+        const packetCount = JSON.parse(row.document).swaps.length;
+        const tip = packets.find((p) => p.packet === packetCount);
+        if (tip) {
+          transactionSignature(tip.signature);
+          if (
+            !entries.some((e) => e.signature === tip.signature) &&
+            !withdrawalSignatures.has(tip.signature)
+          )
+            coverage.pendingCount++;
+        }
+      }
     }
     return json(
       summarizeAccountCosts(entries, coverage, new Date().toISOString()),

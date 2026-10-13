@@ -54,6 +54,9 @@ beforeAll(async () => {
     )
     .run();
   for (const sql of [
+    'CREATE TABLE jito_bundles(owner_id TEXT,id TEXT,document TEXT,state TEXT)',
+    'CREATE TABLE jito_bundle_packets(owner_id TEXT,bundle_id TEXT,packet INTEGER,signature TEXT)',
+    'CREATE TABLE jito_bundle_finalizations(owner_id TEXT,bundle_id TEXT,document TEXT)',
     'CREATE TABLE solana_swap_reservations(owner_id TEXT,wallet_address TEXT)',
     'CREATE TABLE solana_execution_reservations(owner_id TEXT,wallet_address TEXT)',
     'CREATE TABLE imported_swap_signing_intents(id TEXT,owner_id TEXT,preparation_id TEXT,state TEXT,signature TEXT,wallet_address TEXT,document TEXT)',
@@ -145,6 +148,9 @@ beforeEach(async () => {
     )
     .run();
   for (const table of [
+    'jito_bundles',
+    'jito_bundle_packets',
+    'jito_bundle_finalizations',
     'solana_execution_reservations',
     'imported_trade_lot_gates',
     'imported_swap_receipts',

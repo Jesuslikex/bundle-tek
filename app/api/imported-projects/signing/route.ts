@@ -358,7 +358,7 @@ export async function POST(request: Request) {
     if (body.action === 'cancel') {
       const write = await db
         .prepare(
-          "UPDATE imported_swap_signing_intents SET state='cancelled',updated_at=? WHERE owner_id=? AND id=? AND state='awaiting_signature' AND signature IS NULL",
+          "UPDATE imported_swap_signing_intents SET state='cancelled',updated_at=? WHERE owner_id=? AND id=? AND state='awaiting_signature' AND signature IS NULL AND NOT EXISTS(SELECT 1 FROM jito_bundle_packets bp WHERE bp.owner_id=imported_swap_signing_intents.owner_id AND bp.intent_id=imported_swap_signing_intents.id)",
         )
         .bind(now, user.userId, row.id)
         .run();
@@ -573,7 +573,7 @@ export async function POST(request: Request) {
         return json({ signature, state: row.state });
       const write = await db
         .prepare(
-          "UPDATE imported_swap_signing_intents SET state='signed',signature=?,updated_at=? WHERE owner_id=? AND id=? AND state='awaiting_signature' AND signature IS NULL",
+          "UPDATE imported_swap_signing_intents SET state='signed',signature=?,updated_at=? WHERE owner_id=? AND id=? AND state='awaiting_signature' AND signature IS NULL AND NOT EXISTS(SELECT 1 FROM jito_bundle_packets bp WHERE bp.owner_id=imported_swap_signing_intents.owner_id AND bp.intent_id=imported_swap_signing_intents.id)",
         )
         .bind(signature, now, user.userId, row.id)
         .run();

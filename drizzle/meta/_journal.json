@@ -477,6 +477,27 @@
       "when": 1791776437523,
       "tag": "0067_petite_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "6",
+      "when": 1791816905846,
+      "tag": "0068_remarkable_frightful_four",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "6",
+      "when": 1791840823934,
+      "tag": "0069_amusing_viper",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "6",
+      "when": 1791842038611,
+      "tag": "0070_overjoyed_betty_ross",
+      "breakpoints": true
     }
   ]
 }

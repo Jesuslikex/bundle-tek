@@ -38,6 +38,7 @@ export async function nativeWarmupFixture(
     keepWrapped?: boolean;
     slot?: number;
     initializer?: 1 | 16 | 18;
+    walletSeed?: number;
     seedRentOnly?: boolean;
   } = {},
 ) {
@@ -45,7 +46,7 @@ export async function nativeWarmupFixture(
   const side = options.side ?? 'Buy',
     seeded = options.seed === true,
     existing = options.existing === true;
-  const pair = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(7)),
+  const pair = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(options.walletSeed ?? 7)),
     wallet = bs58.encode(pair.publicKey),
     mint = key(3);
   const [nativeAta] = await getProgramDerivedAddress({

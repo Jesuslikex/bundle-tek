@@ -54,6 +54,30 @@ export function ImportedPerformanceResults({
   return (
     <>
       <h4>Recorded FIFO estimate</h4>
+      {p.bundleCostStorageUnavailable && (
+        <p role="alert">
+          Bundle cost storage is unavailable. Known trade fees remain visible,
+          but complete profit totals are withheld.
+        </p>
+      )}
+      <p>
+        Retained bundle tips:{' '}
+        {p.bundleCostStorageUnavailable
+          ? 'Unavailable'
+          : formatNativeBalance(p.bundleTipLamports ?? '0', 9) + ' SOL'}
+        . Tip transaction fees:{' '}
+        {p.bundleCostStorageUnavailable
+          ? 'Unavailable'
+          : formatNativeBalance(p.bundleFeeLamports ?? '0', 9) + ' SOL'}
+        .
+      </p>
+      {!!p.missingBundleCostCount && (
+        <p role="alert">
+          {p.missingBundleCostCount} bundles have incomplete cost evidence.
+          Values include known costs only; complete realized estimates are
+          unavailable.
+        </p>
+      )}
       <p>
         This model allocates sells to the earliest saved buys from the same
         wallet, ordered by finalized slot. It is an accounting assumption, not a
@@ -79,8 +103,8 @@ export function ImportedPerformanceResults({
                 {p.sellCount === 0
                   ? 'No recorded sells'
                   : p.realizedResultLamports === null
-                    ? 'Acquisition basis or transaction order is incomplete'
-                    : 'After successful buy and sell network fees'}
+                    ? 'Acquisition basis, transaction order or bundle costs are incomplete'
+                    : 'After successful trade fees and allocated bundle expenses'}
               </small>
             </article>
             <article>
@@ -120,9 +144,11 @@ export function ImportedPerformanceResults({
           <p>
             Buy cost includes successful buy network fees. Net proceeds deduct
             successful sell network fees. Cost is allocated in integer lamports;
-            complete lot exits consume rounding residue. Account rent remains
-            separate in receipt evidence. These estimates are not total account
-            return.
+            Retained Jito tip and tip transaction fees are allocated equally
+            across swap packets and included in buy basis or deducted from sell
+            proceeds. complete lot exits consume rounding residue. Account rent
+            remains separate in receipt evidence. These estimates are not total
+            account return.
           </p>
           <details>
             <summary>Review wallet accounting coverage</summary>

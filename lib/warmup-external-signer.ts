@@ -100,6 +100,10 @@ export async function signApprovedExternalWarmupPacket(
   wallet: WarmupExternalWallet,
   review: WarmupSigningReview,
   assertCurrent: () => void,
+  retainSigned?: (signed: {
+    signature: string;
+    transaction: string;
+  }) => Promise<void>,
 ) {
   const sign = features(wallet).sign,
     account = matchingWarmupExternalAccount(wallet, review.wallet);
@@ -134,7 +138,7 @@ export async function signApprovedExternalWarmupPacket(
       'Wallet signing did not complete. No transaction was submitted by this app.',
     );
   }
-  requireCurrent();
+  if (!retainSigned) requireCurrent();
   if (
     !Array.isArray(outputs) ||
     outputs.length !== 1 ||
@@ -168,9 +172,13 @@ export async function signApprovedExternalWarmupPacket(
     )
   )
     throw new Error('Wallet returned an invalid transaction signature.');
-  requireCurrent();
-  return {
+  const packet = {
     signature: bs58.encode(Uint8Array.from(signature)),
     transaction: getBase64Decoder().decode(returned),
   };
+  // Signing already happened. Retain only the verified exact packet before
+  // rejecting a now-expired UI or changed wallet. Retention must never submit.
+  if (retainSigned) await retainSigned(packet);
+  requireCurrent();
+  return packet;
 }

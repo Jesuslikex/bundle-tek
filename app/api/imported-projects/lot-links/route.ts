@@ -22,6 +22,7 @@ export async function GET(request: Request) {
       getD1(),
       user.userId,
       projectId,
+      true,
     );
     return s
       ? json(s.page)
@@ -83,7 +84,12 @@ export async function POST(request: Request) {
   }
   try {
     const db = getD1(),
-      s = await importedAcquisitionSnapshot(db, user.userId, input.projectId);
+      s = await importedAcquisitionSnapshot(
+        db,
+        user.userId,
+        input.projectId,
+        true,
+      );
     if (!s) return json({ error: 'Imported project unavailable.' }, 404);
     const existing = s.page.links.find(
       (l) => l.sellReceiptId === input.sellReceiptId,
@@ -203,8 +209,12 @@ export async function POST(request: Request) {
         409,
       );
     return json(
-      (await importedAcquisitionSnapshot(db, user.userId, input.projectId))!
-        .page,
+      (await importedAcquisitionSnapshot(
+        db,
+        user.userId,
+        input.projectId,
+        true,
+      ))!.page,
     );
   } catch {
     return json(

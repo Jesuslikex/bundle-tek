@@ -1,6 +1,11 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import {
+  jitoPerformanceCosts,
+  jitoCostStorageAvailable,
+  type JitoPerformanceRow,
+} from '@/lib/jito-performance-costs';
+import {
   ACCOUNT_PERFORMANCE_LIMIT,
   accountPerformanceCsv,
   type ImportedPerformanceSource,
@@ -49,22 +54,27 @@ export async function GET(request?: Request) {
     return json({ error: 'Unsupported performance export format.' }, 400);
   try {
     const db = getD1();
+    const expenseStorage = await jitoCostStorageAvailable(db);
     // One D1 batch provides a coherent owner snapshot, including archived scopes and all revisions.
     const queries = [
       `SELECT r.id,r.project_id AS projectId,r.preparation_id AS preparationId,r.project_revision AS projectRevision,r.wallet_revision AS walletRevision,r.created_at AS createdAt,r.document,p.id AS scopeId,p.document AS scopeDocument,p.archived AS scopeArchived FROM imported_swap_receipts r LEFT JOIN imported_token_projects p ON p.owner_id=r.owner_id AND p.id=r.project_id WHERE r.owner_id=? LIMIT ?`,
       `SELECT l.id,l.project_id AS projectId,l.buy_receipt_id AS buyReceiptId,l.sell_receipt_id AS sellReceiptId,l.units_raw AS unitsRaw,l.buy_signature AS buySignature,l.sell_signature AS sellSignature,l.buy_preparation_sha256 AS buyPreparationSha256,l.sell_preparation_sha256 AS sellPreparationSha256,l.created_at AS createdAt FROM imported_trade_lot_links l WHERE l.owner_id=? LIMIT ?`,
       `SELECT r.id,r.plan_id AS planId,r.signature,r.document,r.plan_revision AS planRevision,r.wallet_revision AS walletRevision,r.cycle,r.wallet_address AS wallet,json_extract(r.document,'$.mint') AS mint,json_extract(r.document,'$.acquiredRaw') AS acquiredRaw,COALESCE(r.remaining_raw,json_extract(r.document,'$.acquiredRaw')) AS remainingRaw,json_extract(r.document,'$.decimals') AS decimals,CASE WHEN json_extract(r.document,'$.signatureVerified')=1 AND json_extract(r.document,'$.wallet')=r.wallet_address AND json_extract(r.document,'$.signature')=r.signature THEN 1 ELSE 0 END AS verified,json_extract(r.document,'$.commitment') AS commitment,json_extract(r.document,'$.network') AS network,p.id AS scopeId,p.document AS scopeDocument,p.archived AS scopeArchived FROM warmup_buy_receipts r LEFT JOIN wallet_warmup_plans p ON p.owner_id=r.owner_id AND p.id=r.plan_id WHERE r.owner_id=? LIMIT ?`,
       `SELECT r.id,r.plan_id AS planId,r.signature,r.document,r.buy_receipt_id AS buyId,r.consumed_raw AS consumedRaw,CASE WHEN json_extract(r.document,'$.signatureVerified')=1 AND json_extract(r.document,'$.signature')=r.signature AND json_extract(r.document,'$.consumedRaw')=r.consumed_raw AND json_extract(r.document,'$.buyReceiptId')=r.buy_receipt_id THEN 1 ELSE 0 END AS verified,json_extract(r.document,'$.commitment') AS commitment,json_extract(r.document,'$.network') AS network,p.id AS scopeId,p.document AS scopeDocument,p.archived AS scopeArchived FROM warmup_sell_receipts r LEFT JOIN wallet_warmup_plans p ON p.owner_id=r.owner_id AND p.id=r.plan_id WHERE r.owner_id=? LIMIT ?`,
+      `SELECT b.id,b.state,b.document,f.document AS finalizationDocument,(SELECT json_group_array(json_object('packet',p.packet,'signature',p.signature)) FROM jito_bundle_packets p WHERE p.owner_id=b.owner_id AND p.bundle_id=b.id AND p.signature IS NOT NULL) AS packets FROM jito_bundles b LEFT JOIN jito_bundle_finalizations f ON f.owner_id=b.owner_id AND f.bundle_id=b.id WHERE b.owner_id=? LIMIT ?`,
     ];
     const results = await db.batch(
-      queries.map((q, i) =>
-        db
-          .prepare(q)
-          .bind(
-            user.userId,
-            (i === 1 ? IMPORTED_LOT_LINK_LIMIT : ACCOUNT_PERFORMANCE_LIMIT) + 1,
-          ),
-      ),
+      queries
+        .filter((_, i) => expenseStorage || i !== 4)
+        .map((q, i) =>
+          db
+            .prepare(q)
+            .bind(
+              user.userId,
+              (i === 1 ? IMPORTED_LOT_LINK_LIMIT : ACCOUNT_PERFORMANCE_LIMIT) +
+                1,
+            ),
+        ),
     );
     if (
       results.some(
@@ -96,6 +106,7 @@ export async function GET(request?: Request) {
         links: [],
       };
       source.receipts.push(receipt);
+      source.bundleCostStorageUnavailable = !expenseStorage;
       imports.set(row.scopeId, source);
     }
     for (const row of results[1].results as ImportedLotLink[]) {
@@ -125,19 +136,38 @@ export async function GET(request?: Request) {
         warmups.set(row.scopeId, source);
       }
     }
-    if (params.get('view') === 'timeline')
-      return json(
-        summarizeAccountTimeline(
-          [...imports.values()],
-          [...warmups.values()],
-          new Date().toISOString(),
-        ),
+    const expenses = expenseStorage
+      ? await jitoPerformanceCosts(
+          results[4].results as JitoPerformanceRow[],
+          [...imports.values()].flatMap((s) => s.receipts),
+        )
+      : new Map();
+    for (const [projectId, allocation] of expenses) {
+      const source = imports.get(projectId);
+      if (!source) throw new Error('Bundle cost project missing.');
+      Object.assign(source, allocation);
+    }
+    if (params.get('view') === 'timeline') {
+      const view = summarizeAccountTimeline(
+        [...imports.values()],
+        [...warmups.values()],
+        new Date().toISOString(),
       );
+      if (!expenseStorage) {
+        view.summary.bundleCostStorageUnavailable = true;
+        view.summary.recordedRealizedLamports = null;
+      }
+      return json(view);
+    }
     const summary = summarizeAccountPerformance(
       [...imports.values()],
       [...warmups.values()],
       new Date().toISOString(),
     );
+    if (!expenseStorage) {
+      summary.bundleCostStorageUnavailable = true;
+      summary.recordedRealizedLamports = null;
+    }
     if (params.get('format') === 'csv')
       return new Response(accountPerformanceCsv(summary), {
         headers: {

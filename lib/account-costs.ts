@@ -3,6 +3,7 @@ export const ACCOUNT_COST_CATEGORIES = [
   'Imported swaps',
   'Warmup swaps',
   'Withdrawals',
+  'Jito tips',
 ] as const;
 export type AccountCostCategory = (typeof ACCOUNT_COST_CATEGORIES)[number];
 export type AccountCostEntry = {
@@ -10,11 +11,14 @@ export type AccountCostEntry = {
   signature: string;
   outcome: 'success' | 'failed';
   feeLamports: string;
+  tipLamports?: string;
 };
 export type AccountCostCoverage = {
   pendingCount: number;
   missingFailureCount: number;
   missingFinalizedCount: number;
+  missingBundleCostCount?: number;
+  storageUnavailable?: boolean;
 };
 export type AccountCosts = ReturnType<typeof summarizeAccountCosts>;
 const uint = (s: unknown): s is string =>
@@ -30,7 +34,7 @@ const total = (s: unknown): s is string =>
   /^(0|[1-9]\d{0,23})$/.test(s) &&
   BigInt(s) <= BigInt(ACCOUNT_COST_LIMIT) * ((1n << 64n) - 1n);
 
-/** Network fees only. Transfers, rent and swap consideration are not losses. */
+/** Network fees and retained bundle tips. Other transfers, rent and swap consideration are not losses. */
 export function summarizeAccountCosts(
   entries: AccountCostEntry[],
   coverage: AccountCostCoverage,
@@ -39,10 +43,27 @@ export function summarizeAccountCosts(
   if (
     entries.length > ACCOUNT_COST_LIMIT ||
     new Set(entries.map((e) => e.signature)).size !== entries.length ||
-    !Object.values(coverage).every(count) ||
+    ![
+      coverage.pendingCount,
+      coverage.missingFailureCount,
+      coverage.missingFinalizedCount,
+      coverage.missingBundleCostCount ?? 0,
+    ].every(count) ||
+    (coverage.storageUnavailable !== undefined &&
+      typeof coverage.storageUnavailable !== 'boolean') ||
     !Number.isFinite(Date.parse(observedAt))
   )
     throw new Error('Complete unique cost evidence required.');
+  if (
+    entries.some(
+      (e) =>
+        !uint(e.tipLamports ?? '0') ||
+        (e.category === 'Jito tips' && e.outcome === 'success'
+          ? BigInt(e.tipLamports ?? '0') === 0n
+          : (e.tipLamports ?? '0') !== '0'),
+    )
+  )
+    throw new Error('Invalid retained bundle tip expense.');
   const categories = ACCOUNT_COST_CATEGORIES.map((category) => {
     const rows = entries.filter((e) => e.category === category);
     const sum = (outcome: AccountCostEntry['outcome']) =>
@@ -59,6 +80,9 @@ export function summarizeAccountCosts(
       failedCount: rows.filter((e) => e.outcome === 'failed').length,
       successfulFeeLamports: sum('success'),
       failedFeeLamports: sum('failed'),
+      bundleTipLamports: rows
+        .reduce((n, e) => n + BigInt(e.tipLamports ?? '0'), 0n)
+        .toString(),
     };
   });
   if (
@@ -76,15 +100,28 @@ export function summarizeAccountCosts(
   const failedFeeLamports = categories
     .reduce((s, row) => s + BigInt(row.failedFeeLamports), 0n)
     .toString();
+  const bundleTipLamports = categories
+    .reduce((n, r) => n + BigInt(r.bundleTipLamports), 0n)
+    .toString();
   return {
     categories,
     receiptCount: entries.length,
     successfulFeeLamports,
     failedFeeLamports,
+    bundleTipLamports,
+    totalRecordedCostLamports: (
+      BigInt(successfulFeeLamports) +
+      BigInt(failedFeeLamports) +
+      BigInt(bundleTipLamports)
+    ).toString(),
     totalFeeLamports: (
       BigInt(successfulFeeLamports) + BigInt(failedFeeLamports)
     ).toString(),
-    ...coverage,
+    pendingCount: coverage.pendingCount,
+    missingFailureCount: coverage.missingFailureCount,
+    missingFinalizedCount: coverage.missingFinalizedCount,
+    bundleCostStorageUnavailable: coverage.storageUnavailable ?? false,
+    missingBundleCostCount: coverage.missingBundleCostCount ?? 0,
     observedAt,
   };
 }
@@ -94,18 +131,22 @@ export function validatedAccountCosts(value: unknown): AccountCosts {
   if (
     !v ||
     !Array.isArray(v.categories) ||
-    v.categories.length !== 3 ||
+    v.categories.length !== ACCOUNT_COST_CATEGORIES.length ||
     ![
       v.receiptCount,
       v.pendingCount,
       v.missingFailureCount,
       v.missingFinalizedCount,
+      v.missingBundleCostCount,
     ].every(count) ||
     !Number.isFinite(Date.parse(v.observedAt))
   )
     throw new Error('Cost summary unavailable.');
+  if (typeof v.bundleCostStorageUnavailable !== 'boolean')
+    throw new Error('Bundle storage coverage differs.');
   let successes = 0n,
     failures = 0n,
+    tips = 0n,
     receipts = 0;
   for (const [index, row] of v.categories.entries()) {
     if (
@@ -113,18 +154,27 @@ export function validatedAccountCosts(value: unknown): AccountCosts {
       ![row.successCount, row.failedCount].every(count) ||
       !total(row.successfulFeeLamports) ||
       !total(row.failedFeeLamports) ||
+      !total(row.bundleTipLamports) ||
+      (row.category !== 'Jito tips' && row.bundleTipLamports !== '0') ||
+      (row.successCount === 0 && row.bundleTipLamports !== '0') ||
+      (row.category === 'Jito tips' &&
+        row.successCount > 0 &&
+        row.bundleTipLamports === '0') ||
       (row.successCount === 0 && row.successfulFeeLamports !== '0') ||
       (row.failedCount === 0 && row.failedFeeLamports !== '0')
     )
       throw new Error('Cost coverage differs.');
     successes += BigInt(row.successfulFeeLamports);
     failures += BigInt(row.failedFeeLamports);
+    tips += BigInt(row.bundleTipLamports);
     receipts += row.successCount + row.failedCount;
   }
   if (
     v.successfulFeeLamports !== successes.toString() ||
     v.failedFeeLamports !== failures.toString() ||
     v.totalFeeLamports !== (successes + failures).toString() ||
+    v.bundleTipLamports !== tips.toString() ||
+    v.totalRecordedCostLamports !== (successes + failures + tips).toString() ||
     v.receiptCount !== receipts
   )
     throw new Error('Cost totals differ.');

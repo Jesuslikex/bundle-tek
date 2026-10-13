@@ -27,6 +27,7 @@ import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import { walletFolderIds } from '@/lib/wallet-workspace';
 import type { WorkspaceWallet, WalletFolder } from '@/lib/wallet-workspace';
 import { ImportedSwapPreparation } from './imported-swap-preparation';
+import { JitoAtomicBundle } from './jito-atomic-bundle';
 type Activity = {
   sessionId: string;
   entry: number;
@@ -554,6 +555,7 @@ export function ImportedTradeSessions({
       {error && <p role="alert">{error}</p>}
       {sessions.map((s) => (
         <article key={s.id} className="space-y-2 rounded-md border p-3">
+          <JitoAtomicBundle projectId={project.id} session={s} locked={locked || controls.find(c => c.sessionId === s.id)?.state !== 'ready'} />
           <h5>
             {s.terms.side} session · {s.state}
           </h5>

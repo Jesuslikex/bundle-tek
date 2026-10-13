@@ -9,8 +9,25 @@ export function AccountCostSummary({ value }: { value: AccountCosts }) {
     value.pendingCount +
     value.missingFailureCount +
     value.missingFinalizedCount;
+  const incompleteBundles = value.missingBundleCostCount;
   return (
     <div>
+      {value.bundleCostStorageUnavailable && (
+        <p role="alert">
+          Bundle cost storage is unavailable. Recorded trade and withdrawal fees
+          remain visible; bundle expenses are unmeasured.
+        </p>
+      )}
+      <p>
+        <strong>
+          {formatNativeBalance(value.totalRecordedCostLamports, 9)} SOL
+        </strong>{' '}
+        recorded network fees and bundle tips. Retained bundle tips:{' '}
+        {value.bundleCostStorageUnavailable
+          ? 'Unavailable'
+          : formatNativeBalance(value.bundleTipLamports, 9) + ' SOL'}
+        . Tips are separate from network fees and counted once.
+      </p>
       <p>
         <strong>{formatNativeBalance(value.totalFeeLamports, 9)} SOL</strong>{' '}
         recorded network fees across {value.receiptCount} finalized receipts.
@@ -31,22 +48,42 @@ export function AccountCostSummary({ value }: { value: AccountCosts }) {
               <th>Successful</th>
               <th>Failed</th>
               <th>Network fees (SOL)</th>
+              <th>Bundle tips (SOL)</th>
             </tr>
           </thead>
           <tbody>
             {value.categories.map((row) => (
               <tr key={row.category}>
                 <td>{row.category}</td>
-                <td>{row.successCount}</td>
-                <td>{row.failedCount}</td>
                 <td>
-                  {formatNativeBalance(
-                    (
-                      BigInt(row.successfulFeeLamports) +
-                      BigInt(row.failedFeeLamports)
-                    ).toString(),
-                    9,
-                  )}
+                  {value.bundleCostStorageUnavailable &&
+                  row.category === 'Jito tips'
+                    ? 'Unavailable'
+                    : row.successCount}
+                </td>
+                <td>
+                  {value.bundleCostStorageUnavailable &&
+                  row.category === 'Jito tips'
+                    ? 'Unavailable'
+                    : row.failedCount}
+                </td>
+                <td>
+                  {value.bundleCostStorageUnavailable &&
+                  row.category === 'Jito tips'
+                    ? 'Unavailable'
+                    : formatNativeBalance(
+                        (
+                          BigInt(row.successfulFeeLamports) +
+                          BigInt(row.failedFeeLamports)
+                        ).toString(),
+                        9,
+                      )}
+                </td>
+                <td>
+                  {value.bundleCostStorageUnavailable &&
+                  row.category === 'Jito tips'
+                    ? 'Unavailable'
+                    : formatNativeBalance(row.bundleTipLamports, 9)}
                 </td>
               </tr>
             ))}
@@ -54,7 +91,7 @@ export function AccountCostSummary({ value }: { value: AccountCosts }) {
         </table>
       </div>
       <p>
-        {incomplete
+        {incomplete || incompleteBundles || value.bundleCostStorageUnavailable
           ? 'Fee coverage is incomplete.'
           : value.receiptCount === 0
             ? 'No finalized receipts are saved in these workflows.'
@@ -62,7 +99,8 @@ export function AccountCostSummary({ value }: { value: AccountCosts }) {
         Signed or submitted transactions awaiting settlement:{' '}
         {value.pendingCount}. Failed transactions without captured fee evidence:{' '}
         {value.missingFailureCount}. Finalized swaps without a saved receipt:{' '}
-        {value.missingFinalizedCount}.
+        {value.missingFinalizedCount}. Bundles with incomplete cost evidence:{' '}
+        {incompleteBundles}.
       </p>
       <small>
         Checked {new Date(value.observedAt).toLocaleString()}. Includes archived
@@ -113,8 +151,8 @@ export function AccountCostsPanel() {
     >
       <h2>Account transaction costs</h2>
       <p>
-        Review saved swap and withdrawal network fees, including failed
-        execution costs.
+        Review saved swap, withdrawal and Jito tip network fees, retained bundle
+        tips and failed execution costs.
       </p>
       <Button variant="outline" onClick={load} disabled={busy}>
         {busy

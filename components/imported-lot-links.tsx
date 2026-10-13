@@ -17,6 +17,29 @@ export function ImportedLinkedResults({ page }: { page: ImportedLotPage }) {
   const p = page.performance;
   return (
     <div>
+      {page.expenses.storageUnavailable && (
+        <p role="alert">
+          Bundle cost storage is unavailable. Known trade fees remain visible,
+          but complete profit totals are withheld.
+        </p>
+      )}
+      <p>
+        Retained bundle tips:{' '}
+        {page.expenses.storageUnavailable
+          ? 'Unavailable'
+          : formatNativeBalance(page.expenses.bundleTipLamports, 9) + ' SOL'}
+        . Tip transaction fees:{' '}
+        {page.expenses.storageUnavailable
+          ? 'Unavailable'
+          : formatNativeBalance(page.expenses.bundleFeeLamports, 9) + ' SOL'}
+        .
+      </p>
+      {!!page.expenses.missingBundleCostCount && (
+        <p role="alert">
+          {page.expenses.missingBundleCostCount} bundles have incomplete cost
+          evidence. Linked results include known costs only.
+        </p>
+      )}
       <p>
         Linked sales: {p.linkedSaleCount}. Sales without an assigned
         acquisition: {p.unlinkedSaleCount}.
@@ -37,17 +60,22 @@ export function ImportedLinkedResults({ page }: { page: ImportedLotPage }) {
           {p.realizedResultLamports === null
             ? p.linkedSaleCount + p.unlinkedSaleCount === 0
               ? 'No finalized sales recorded'
-              : 'Unavailable until every sale has an acquisition link'
+              : page.expenses.missingBundleCostCount ||
+                  page.expenses.storageUnavailable
+                ? 'Unavailable until bundle cost evidence is complete'
+                : 'Unavailable until every sale has an acquisition link'
             : signedBalanceAmount(p.realizedResultLamports, 9) + ' SOL'}
         </dd>
       </dl>
       <p>
         Buy costs are allocated proportionally in exact integer lamports. Full
-        allocation includes any rounding remainder. Rent and failed transaction
-        fees are separate. These user-recorded accounting links do not prove the
-        origin of fungible tokens, current wallet inventory, external cost basis
-        or total account return. Unassigned acquired units are bookkeeping
-        capacity, not permission to sell.
+        allocation includes any rounding remainder. Retained Jito tips and tip
+        transaction fees are included in buy cost or deducted from sell
+        proceeds. Rent and failed transaction fees remain separate. These
+        user-recorded accounting links do not prove the origin of fungible
+        tokens, current wallet inventory, external cost basis or total account
+        return. Unassigned acquired units are bookkeeping capacity, not
+        permission to sell.
       </p>
     </div>
   );
@@ -456,6 +484,13 @@ export function ImportedLotLinks({
           {preview && (
             <section aria-label="Acquisition link review">
               <h4>Review acquisition link</h4>
+              {(!!preview.missingBundleCostCount ||
+                preview.storageUnavailable) && (
+                <p role="alert">
+                  Bundle expenses are incomplete. This preview includes known
+                  costs only.
+                </p>
+              )}
               <p>
                 Buy <code>{buyId}</code> → sell <code>{sellId}</code>. Assign{' '}
                 {formatNativeBalance(preview.link.unitsRaw, token.decimals)}{' '}

@@ -8,12 +8,21 @@ import {
   type ImportedPerformance,
   type ImportedWalletPerformance,
 } from './imported-performance-format';
+import {
+  validatedBundleExpenses,
+  type BundleExpenses,
+} from './bundle-expenses';
 
 /** Accounting model for saved swaps only; never establishes actual wallet inventory or external cost basis. */
 export function importedTradePerformance(
   rows: ImportedTradeReceipt[],
+  expenseEvidence?: BundleExpenses,
 ): ImportedPerformance {
   const summary = summarizeImportedTrades(rows);
+  const expenses = validatedBundleExpenses(
+    expenseEvidence,
+    rows.map((r) => r.id),
+  );
   const groups = new Map<string, ImportedTradeReceipt[]>();
   const first = rows[0];
   for (const row of rows) {
@@ -62,11 +71,13 @@ export function importedTradePerformance(
       unknown = 0n,
       cost = 0n,
       proceeds = 0n;
-    for (const { document: d } of [...group].sort(
+    for (const { id, document: d } of [...group].sort(
       (a, b) => a.document.slot - b.document.slot,
     )) {
       const units = BigInt(d.tokenUnitsRaw),
-        fee = BigInt(d.networkFeeLamports),
+        fee =
+          BigInt(d.networkFeeLamports) +
+          BigInt(expenses.executionCosts[id] ?? '0'),
         settlement = BigInt(d.nativeSettlementRaw);
       if (d.side === 'Buy') {
         lots.push({ units, sold: 0n, cost: -settlement + fee });
@@ -95,7 +106,10 @@ export function importedTradePerformance(
     record.attributedNetProceedsLamports = proceeds.toString();
     record.attributedResultLamports = (proceeds - cost).toString();
     record.realizedResultLamports =
-      sells.length > 0 && unknown === 0n
+      sells.length > 0 &&
+      unknown === 0n &&
+      expenses.missingBundleCostCount === 0 &&
+      !expenses.storageUnavailable
         ? record.attributedResultLamports
         : null;
     record.openCostLamports = lots
@@ -122,6 +136,10 @@ export function importedTradePerformance(
       : wallets.reduce((n, w) => n + BigInt(w[key]!), 0n).toString();
   const p: ImportedPerformance = {
     method: 'recorded-fifo',
+    bundleTipLamports: expenses.bundleTipLamports,
+    bundleFeeLamports: expenses.bundleFeeLamports,
+    missingBundleCostCount: expenses.missingBundleCostCount,
+    bundleCostStorageUnavailable: expenses.storageUnavailable ?? false,
     receiptCount: rows.length,
     buyCount: summary.buyCount,
     sellCount: summary.sellCount,
@@ -134,6 +152,8 @@ export function importedTradePerformance(
     attributedResultLamports: sum('attributedResultLamports'),
     realizedResultLamports:
       summary.sellCount > 0 &&
+      expenses.missingBundleCostCount === 0 &&
+      !expenses.storageUnavailable &&
       wallets.every(
         (w) =>
           w.ordering === 'by-finalized-slot' && w.unknownBasisSoldRaw === '0',

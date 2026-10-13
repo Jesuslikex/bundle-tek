@@ -116,6 +116,7 @@ beforeAll(async () => {
     '0060_imported_trade_session_timing',
     '0061_imported_trade_session_controls',
     '0062_session_preparation_jobs',
+    '0068_remarkable_frightful_four',
   ]) {
     const sql = await readFile(
       new URL(`../../../../drizzle/${name}.sql`, import.meta.url),

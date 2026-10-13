@@ -43,6 +43,11 @@ import {
   type WithdrawalActivityEvent,
 } from '@/lib/withdrawal-activity';
 import { WithdrawalActivityRecord } from './withdrawal-activity-record';
+import { useJitoBundleActivity } from './use-jito-bundle-activity';
+import {
+  jitoBundleEventLabel,
+  jitoBundleEventDetail,
+} from '@/lib/jito-bundle-events';
 
 function receiptFundingId(event: WalletAuditEvent): string | undefined {
   if (
@@ -148,6 +153,7 @@ export function WorkspaceActivity({
   const warmupSigningHistory = useWarmupSigningActivity(revision);
   const importedSigningHistory = useImportedSigningActivity(revision);
   const withdrawalHistory = useWithdrawalActivity(revision);
+  const jitoHistory = useJitoBundleActivity(revision);
   const [withdrawalDetail, setWithdrawalDetail] =
     useState<WithdrawalActivityEvent | null>(null);
   const preparationHistory = useWarmupPreparationActivity(revision);
@@ -272,6 +278,20 @@ export function WorkspaceActivity({
       : observedThrough -
         (period === '1 day' ? 1 : period === '7 days' ? 7 : 30) * 86400000;
   const rows = [
+    ...jitoHistory.events.map((record) => ({
+      id: `jito:${record.id}`,
+      date: record.createdAt,
+      category: 'Bundles',
+      network: 'Solana mainnet',
+      title: jitoBundleEventLabel(record),
+      detail: jitoBundleEventDetail(record),
+      importedId: record.projectId,
+      warmupId: undefined,
+      run: undefined,
+      project: undefined,
+      fundingId: undefined,
+      href: undefined,
+    })),
     ...withdrawalHistory.events.map((event) => ({
       id: `withdrawal:${event.sequence}`,
       date: event.createdAt,
@@ -529,6 +549,7 @@ export function WorkspaceActivity({
             warmupSigningHistory.beginRefresh();
             importedSigningHistory.beginRefresh();
             withdrawalHistory.beginRefresh();
+            jitoHistory.beginRefresh();
             preparationHistory.beginRefresh();
             importedPreparations.beginRefresh();
             setObservedThrough(Date.now());
@@ -546,6 +567,7 @@ export function WorkspaceActivity({
             warmupSigningHistory.loading ||
             importedSigningHistory.loading ||
             withdrawalHistory.loading ||
+            jitoHistory.loading ||
             preparationHistory.loading ||
             importedPreparations.loading ||
             walletHistory.loading
@@ -581,7 +603,10 @@ export function WorkspaceActivity({
           baseline. Withdrawal transitions retain the captured state, wallet
           revision and exact review. A registered signature or submission
           attempt does not establish delivery. Only a verified finalized
-          withdrawal receipt records recipient credit.
+          withdrawal receipt records recipient credit. Jito transitions retain
+          state and signature progress at each recorded change. Earlier bundles
+          have a retained-state baseline; transitions before that baseline are
+          not reconstructed.
         </span>
       </div>
       <div className="project-toolbar">
@@ -594,6 +619,7 @@ export function WorkspaceActivity({
             'Warmup',
             'Wallets',
             'Withdrawals',
+            'Bundles',
             'Simulation',
           ].map((value) => (
             <button
@@ -625,6 +651,7 @@ export function WorkspaceActivity({
               ...warmupSigningHistory.events.map(() => 'Solana mainnet'),
               ...importedSigningHistory.events.map(() => 'Solana mainnet'),
               ...withdrawalHistory.events.map(() => 'Solana mainnet'),
+              ...jitoHistory.events.map(() => 'Solana mainnet'),
               ...preparationHistory.events.map(() => 'Solana'),
               ...importedPreparations.events.map(() => 'Solana'),
               ...walletHistory.events.map(() => 'Solana devnet'),
@@ -681,6 +708,23 @@ export function WorkspaceActivity({
           onClose={() => setFundingDetail(null)}
         />
       )}
+      {jitoHistory.baselinePending && (
+        <div className="tracker-disclosure">
+          <span>
+            Earlier bundles have no recorded timeline. Record their current
+            state as a baseline; past transitions will not be reconstructed.
+            Each click records up to 50 bundles.
+          </span>
+          <Button
+            variant="outline"
+            disabled={jitoHistory.loading}
+            onClick={jitoHistory.baseline}
+          >
+            Record earlier bundle baselines
+          </Button>
+        </div>
+      )}
+      {jitoHistory.error && <p role="alert">{jitoHistory.error}</p>}
       {withdrawalHistory.error && (
         <p role="alert" className="tracker-error">
           {withdrawalHistory.error}
@@ -933,6 +977,7 @@ export function WorkspaceActivity({
               warmupSigningHistory.loading ||
               importedSigningHistory.loading ||
               withdrawalHistory.loading ||
+              jitoHistory.loading ||
               preparationHistory.loading ||
               importedPreparations.loading ||
               walletHistory.loading
@@ -947,6 +992,15 @@ export function WorkspaceActivity({
           </div>
         )}
       </div>
+      {jitoHistory.cursor && (
+        <Button
+          variant="outline"
+          disabled={jitoHistory.loading}
+          onClick={jitoHistory.older}
+        >
+          Load older Jito events
+        </Button>
+      )}
       {cursor && (
         <Button
           variant="outline"
