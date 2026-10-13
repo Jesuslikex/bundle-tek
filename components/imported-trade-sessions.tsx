@@ -30,6 +30,7 @@ import { ImportedSwapPreparation } from './imported-swap-preparation';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
 import { SessionEntryOutcomesPanel } from './session-entry-outcomes';
 import { DcaTradeSession } from './dca-trade-session';
+import { CounterTradePanel } from './counter-trade-panel';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 type Activity = {
   sessionId: string;
@@ -347,6 +348,7 @@ export function ImportedTradeSessions({
           setHistoryRevision((value) => value + 1);
         }}
       />
+      <CounterTradePanel project={project} locked={locked || busy} />
       <p>
         Save exact Buy or Sell amounts for up to 25 wallets. Each entry uses
         fresh balances, a reviewed packet, your signature and a separate submit

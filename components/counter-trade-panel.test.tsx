@@ -109,6 +109,12 @@ async function render(p = project, locked = false) {
   await act(async () =>
     root.render(<CounterTradePanel project={p} locked={locked} />),
   );
+  if (
+    [...container.querySelectorAll('button')].some(
+      (b) => b.textContent === 'Open Counter Trading',
+    )
+  )
+    await act(async () => button('Open Counter Trading').click());
 }
 async function resolve(data: unknown, status = 200) {
   const call = pending.shift()!;
@@ -310,5 +316,29 @@ it('shows a recovery message for an HTML Counter error without exposing parser t
   );
   expect(container.textContent).not.toMatch(
     /Unexpected token|PRIVATE-UPSTREAM|SyntaxError/,
+  );
+});
+
+it('waits for explicit opening and cancels pending reads when closed', async () => {
+  await act(async () =>
+    root.render(<CounterTradePanel project={project} locked={false} />),
+  );
+  expect(fetch).not.toHaveBeenCalled();
+  await click('Open Counter Trading');
+  const call = pending.shift()!;
+  await click('Close Counter Trading');
+  expect(call.signal.aborted).toBe(true);
+  await act(async () =>
+    call.resolve(
+      Response.json({
+        projectId: project.id,
+        plans: [plan()],
+        executionAllowed: false,
+      }),
+    ),
+  );
+  expect(container.textContent).not.toContain('State: active');
+  expect(button('Open Counter Trading').getAttribute('aria-expanded')).toBe(
+    'false',
   );
 });

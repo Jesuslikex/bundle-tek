@@ -51,7 +51,7 @@ export function CounterTradePanel({
 }) {
   if (project.document.token.chain !== 'Solana') return null;
   return (
-    <CounterWorkspace
+    <CounterDisclosure
       key={JSON.stringify([
         project.id,
         project.revision,
@@ -62,6 +62,27 @@ export function CounterTradePanel({
       project={project}
       locked={locked}
     />
+  );
+}
+function CounterDisclosure({
+  project,
+  locked,
+}: {
+  project: ImportedTokenProject;
+  locked: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section aria-label="Counter Trading controls">
+      <Button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {open ? 'Close' : 'Open'} Counter Trading
+      </Button>
+      {open && <CounterWorkspace project={project} locked={locked} />}
+    </section>
   );
 }
 function CounterWorkspace({
