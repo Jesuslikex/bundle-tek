@@ -30,6 +30,7 @@ import { ConditionalLevelPreview } from './conditional-level-preview';
 import type { SavedTokenMarket } from '@/lib/token-market';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
 import { ConditionalTriggerQueue } from './conditional-trigger-queue';
+import { ConditionalMonitor } from './conditional-monitor';
 type Page = {
   projectId: string;
   orders: ConditionalOrder[];
@@ -365,6 +366,42 @@ export function ConditionalSellOrders({
       className="conditional-sell-orders"
     >
       <h5>Saved conditional orders</h5>
+      <ConditionalMonitor
+        key={`${project.id}:${project.revision}:${project.archived}`}
+        project={project}
+        reviewDisabled={busy || !loaded}
+        onReview={(orderId, revision, level) => {
+          const order = orders.find(
+            (o) =>
+              o.id === orderId &&
+              o.revision === revision &&
+              o.state === 'draft',
+          );
+          const wallet =
+            order &&
+            wallets.find(
+              (w) =>
+                w.address === order.terms.wallet &&
+                w.revision === order.terms.walletRevision &&
+                !w.archived,
+            );
+          if (
+            !order ||
+            !wallet ||
+            !order.terms.levels.some((l) => l.level === level) ||
+            order.terms.projectRevision !== project.revision
+          ) {
+            setError(
+              'Reload saved orders and wallets before reviewing this notice.',
+            );
+            return;
+          }
+          setRecovery(null);
+          setMessage('');
+          setError('');
+          setPreparing({ order, level, wallet });
+        }}
+      />
       <p>
         Save Limit or Grid terms for later review. Drafts do not run
         automatically. Each trade still needs fresh balance, route and signing

@@ -512,6 +512,13 @@
       "when": 1791866064603,
       "tag": "0072_conditional_buy_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "6",
+      "when": 1791871762665,
+      "tag": "0073_conditional_monitoring",
+      "breakpoints": true
     }
   ]
 }

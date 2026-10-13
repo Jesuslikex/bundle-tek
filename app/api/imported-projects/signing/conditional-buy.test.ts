@@ -61,6 +61,11 @@ import {
 } from '@/lib/conditional-order';
 import type { WarmupSigningReview } from '@/lib/warmup-signing';
 import { decodeWarmupReceipt } from '@/lib/warmup-buy-receipt';
+import {
+  configureConditionalMonitor,
+  readConditionalMonitor,
+  runConditionalMonitors,
+} from '@/lib/conditional-monitor-server';
 import type { SavedSwapPreparation } from '@/lib/imported-swap-preparation-history';
 const fixtureEnv = env as unknown as Record<string, string | undefined>;
 const { unstable_splitSqlQuery: splitHostedSql } = createRequire(
@@ -291,6 +296,59 @@ async function count(table: string) {
     .bind(owner)
     .first<{ n: number }>())!.n;
 }
+it('does not retain a monitor match when an explicit approval reserves the level during its provider read', async () => {
+  await mocks.db.prepare('UPDATE conditional_monitor_jobs SET enabled=0').run();
+  const history = await prepared();
+  await configureConditionalMonitor(mocks.db, owner, {
+    projectId,
+    projectRevision: 1,
+    monitorRevision: 0,
+    enabled: true,
+  });
+  const fetcher = vi.fn(async () => {
+    await reviewed(history.id);
+    return Response.json([
+      {
+        chainId: 'solana',
+        dexId: 'raydium',
+        pairAddress: f.mint,
+        baseToken: { address: f.mint },
+        quoteToken: {
+          address: 'So11111111111111111111111111111111111111112',
+          symbol: 'SOL',
+        },
+        marketCap: 50,
+        priceUsd: '1',
+      },
+    ]);
+  });
+  await runConditionalMonitors(mocks.db, fetcher);
+  const p = await readConditionalMonitor(mocks.db, owner, projectId);
+  expect(p?.notices).toHaveLength(0);
+  expect(p?.monitor?.error).toBe('context-changed');
+  expect(await count('conditional_level_reservations')).toBe(1);
+  expect(mocks.rpc.mock.calls.some((c) => c[1] === 'sendTransaction')).toBe(
+    false,
+  );
+});
+it('skips provider reads for a level already reserved by its genuine approval', async () => {
+  await mocks.db.prepare('UPDATE conditional_monitor_jobs SET enabled=0').run();
+  const history = await prepared();
+  await reviewed(history.id);
+  await configureConditionalMonitor(mocks.db, owner, {
+    projectId,
+    projectRevision: 1,
+    monitorRevision: 0,
+    enabled: true,
+  });
+  const fetcher = vi.fn();
+  await runConditionalMonitors(mocks.db, fetcher);
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(
+    (await readConditionalMonitor(mocks.db, owner, projectId))?.monitor?.error,
+  ).toBe('no-current-orders');
+  expect(await count('conditional_level_reservations')).toBe(1);
+});
 it.each(['limit', 'grid'] as const)(
   'runs a real conditional Buy %s through explicit review, registration, one submission and exact finalized fill',
   async (kind) => {

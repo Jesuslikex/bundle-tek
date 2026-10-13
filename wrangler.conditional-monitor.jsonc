@@ -1,0 +1,9 @@
+{
+  "name": "bundle-conditional-monitor",
+  "main": "workers/conditional-monitor.ts",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": { "CONDITIONAL_MONITOR_ENABLED": "false" },
+  "d1_databases": [{ "binding": "DB", "database_name": "bundle-conditional-monitor", "database_id": "00000000-0000-4000-8000-000000000000", "migrations_dir": "drizzle" }],
+  "triggers": { "crons": [] }
+}

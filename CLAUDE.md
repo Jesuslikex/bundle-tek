@@ -30,6 +30,8 @@ Keep claims tied to the code or captured evidence you inspected. State when prov
 
 ## Commit checkpoints and current handoff
 
+Latest Codex continuation adds read-only conditional monitoring: new jobs/notices/heartbeat storage in unapplied migration 0073, authenticated request/history API, a separate disabled worker with no cron, and a panel in conditional orders for request/pause and explicit review of retained matches. Ninety targeted tests across nine files, TypeScript, typed lint and production build passed on an unchanged 1,038-file snapshot. It never prepares or signs transactions. Deployment/activation and live after-close/browser QA remain outstanding. Check the latest local commit before editing these files; source/tests do not touch Claude's holder-view or timeline implementations.
+
 The user requires Codex to commit completed, verified work locally so Claude can follow progress. Both agents should inspect the latest commit, index and remaining working-tree changes before editing. Commit only owned files or hunks, leave concurrent work separate, and report the local commit hash. This does not authorize pushing or deploying.
 
 The current Codex checkpoint integrates conditional Buy/Sell Limit and Grid review, exact SOL input budgets, explicit transaction approval, all-wallet session outcome reads, atomic cancellation of pending unsigned jobs, token chart/history and holder continuations, and mainnet funding history. See `docs/CODEX-CURRENT-FULL-SUITE.md` and `docs/CODEX-PROXIMA-COMPLETION-MATRIX.md` for validation and remaining requirements. The latest Codex feature run passed 322 targeted tests across 36 files, TypeScript, typed lint and production build; the older 1,919-test full-suite result covers an earlier source snapshot.
