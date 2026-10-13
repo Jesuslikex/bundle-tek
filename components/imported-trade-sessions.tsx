@@ -30,6 +30,7 @@ import { ImportedSwapPreparation } from './imported-swap-preparation';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
 import { SessionEntryOutcomesPanel } from './session-entry-outcomes';
 import { DcaTradeSession } from './dca-trade-session';
+import { formatNativeBalance } from '@/lib/wallet-balance-format';
 type Activity = {
   sessionId: string;
   entry: number;
@@ -638,6 +639,22 @@ export function ImportedTradeSessions({
               Scheduled start (UTC): {s.terms.schedule.startAt}. Spacing:{' '}
               {s.terms.schedule.spacingSeconds} seconds. Saving does not start
               background execution.
+            </p>
+          )}
+          {s.terms.randomization && (
+            <p>
+              Randomized cycle amounts:{' '}
+              {formatNativeBalance(
+                s.terms.randomization.minimumRaw,
+                s.terms.side === 'Buy' ? 9 : s.terms.decimals,
+              )}{' '}
+              to{' '}
+              {formatNativeBalance(
+                s.terms.randomization.maximumRaw,
+                s.terms.side === 'Buy' ? 9 : s.terms.decimals,
+              )}{' '}
+              {s.terms.side === 'Buy' ? 'SOL' : project.document.token.symbol}.
+              Saved cycle amounts stay fixed for review and recovery.
             </p>
           )}
           {s.terms.marketCapRange && (

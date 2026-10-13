@@ -314,6 +314,121 @@ const dcaBody = () => ({
     amount: '0.001',
   })),
 });
+it.each(['Buy', 'Sell'] as const)(
+  'retains exact randomized %s cycles through idempotent save, approved submission and receipt recovery',
+  async (side) => {
+    if (side === 'Sell') {
+      f = await nativeWarmupFixture({ side: 'Sell', lookup: true, v2: true });
+      mocks.simulate.mockResolvedValue(f.simulation);
+      const document = {
+        ...unsignedPreparationSummary(f.order, f.simulation),
+        balance: {
+          source: 'fixture.test',
+          observedAt: new Date().toISOString(),
+          requestedRaw: '1000',
+          amountCovered: true,
+        },
+      };
+      await mocks.db
+        .prepare(
+          'UPDATE imported_swap_preparations SET document=? WHERE owner_id=? AND id=?',
+        )
+        .bind(JSON.stringify(document), owner, preparationId)
+        .run();
+    }
+    const minimumRaw = side === 'Buy' ? '1000000' : '1000',
+      maximumRaw = side === 'Buy' ? '2000000' : '2000';
+    const input = {
+      ...dcaBody(),
+      randomization: {
+        format: 'bounded-dca-allocation-v1',
+        minimumRaw,
+        maximumRaw,
+        totalRaw: (BigInt(minimumRaw) + BigInt(maximumRaw)).toString(),
+      },
+      entries: [
+        { wallet: f.wallet, walletRevision: 1, amount: '0.001' },
+        { wallet: f.wallet, walletRevision: 1, amount: '0.002' },
+      ],
+    };
+    const created = await sessionPost(request(input));
+    expect(created.status).toBe(200);
+    const saved = (await created.json()) as {
+      session: { terms: ReturnType<typeof tradeSessionTerms> };
+    };
+    expect(saved.session.terms.entries.map((e) => e.unitsRaw)).toEqual([
+      minimumRaw,
+      maximumRaw,
+    ]);
+    expect(saved.session.terms.randomization).toEqual(input.randomization);
+    const altered = {
+      ...input,
+      id: crypto.randomUUID(),
+      entries: input.entries.map((e) => ({ ...e, amount: '0.002' })),
+    };
+    expect((await sessionPost(request(altered))).status).toBe(400);
+    expect((await sessionPost(request(input))).status).toBe(200);
+    expect(
+      (
+        await sessionPost(
+          request({ ...input, entries: [...input.entries].reverse() }),
+        )
+      ).status,
+    ).toBe(409);
+    const guard = await captureTradeSession(
+      mocks.db,
+      owner,
+      { sessionId, revision: 1, entry: 1 },
+      {
+        projectId,
+        projectRevision: 1,
+        wallet: f.wallet,
+        walletRevision: 1,
+        side,
+        unitsRaw: minimumRaw,
+        mint: f.mint,
+        decimals: 6,
+      },
+    );
+    await mocks.db
+      .prepare(
+        "UPDATE imported_swap_preparations SET document=json_set(document,'$.session',json(?)) WHERE owner_id=? AND id=?",
+      )
+      .bind(JSON.stringify(guard.selection), owner, preparationId)
+      .run();
+    const review = await reviewed();
+    expect(review.inputRaw).toBe(minimumRaw);
+    expect(
+      (
+        await post({
+          action: 'register',
+          id: review.id,
+          transaction: f.signed.transaction,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await post({
+          action: 'submit',
+          id: review.id,
+          transaction: f.signed.transaction,
+        })
+      ).status,
+    ).toBe(200);
+    expect((await post({ action: 'recover', id: review.id })).status).toBe(200);
+    const history = (await (
+      await sessionGet(
+        new Request(
+          `http://localhost/api/imported-projects/trade-sessions?projectId=${projectId}`,
+        ),
+      )
+    ).json()) as {
+      sessions: { terms: ReturnType<typeof tradeSessionTerms> }[];
+    };
+    expect(history.sessions[0].terms).toEqual(saved.session.terms);
+  },
+);
 async function rangeMarket(cap: number, observedAt = new Date().toISOString()) {
   const document = JSON.stringify([
     {

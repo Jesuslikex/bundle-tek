@@ -3,6 +3,11 @@ import { walletAddress } from './wallet-workspace';
 import { solanaTokenAtoms } from './solana-token-amount';
 import { formatNativeBalance } from './wallet-balance-format';
 import { dcaMarketCapRange, type DcaMarketCapRange } from './dca-market-cap';
+import {
+  dcaRandomization,
+  validateRandomDcaAllocation,
+  type DcaRandomization,
+} from './dca-random-allocation';
 export type TradeSessionTerms = {
   format:
     | 'imported-trade-session-v1'
@@ -10,6 +15,7 @@ export type TradeSessionTerms = {
     | 'imported-trade-session-v3';
   endsAt?: string;
   marketCapRange?: DcaMarketCapRange;
+  randomization?: DcaRandomization;
   strategy?: 'DCA';
   schedule?: TradeSessionSchedule;
   projectId: string;
@@ -123,6 +129,7 @@ export function tradeSessionTerms(
     strategy?: unknown;
     endsAt?: unknown;
     marketCapRange?: unknown;
+    randomization?: unknown;
   };
   if (
     !v ||
@@ -153,6 +160,12 @@ export function tradeSessionTerms(
     v.marketCapRange === undefined
       ? undefined
       : dcaMarketCapRange(v.marketCapRange);
+  if (v.randomization !== undefined && !dca)
+    throw new Error('Only DCA supports randomized cycle amounts.');
+  const randomization =
+    v.randomization === undefined
+      ? undefined
+      : dcaRandomization(v.randomization);
   if (dca && (!schedule || schedule.spacingSeconds < 1 || v.entries.length < 2))
     throw new Error('DCA needs 2 to 25 cycles and a positive saved interval.');
   const seen = new Set<string>();
@@ -180,13 +193,23 @@ export function tradeSessionTerms(
         (e) =>
           e.wallet !== first.wallet ||
           e.walletRevision !== first.walletRevision ||
-          BigInt(e.unitsRaw) !==
-            total / BigInt(entries.length) +
-              (BigInt(e.entry - 1) < total % BigInt(entries.length) ? 1n : 0n),
+          (!randomization &&
+            BigInt(e.unitsRaw) !==
+              total / BigInt(entries.length) +
+                (BigInt(e.entry - 1) < total % BigInt(entries.length)
+                  ? 1n
+                  : 0n)),
       )
     )
       throw new Error(
-        'DCA must conserve an evenly split exact budget for one current wallet.',
+        'DCA must conserve its exact budget and sizing rules for one current wallet.',
+      );
+    if (randomization)
+      validateRandomDcaAllocation(
+        total.toString(),
+        entries.length,
+        randomization,
+        entries.map((e) => e.unitsRaw),
       );
   }
   if (schedule) sessionEntryNotBefore({ schedule }, entries.length);
@@ -216,6 +239,7 @@ export function tradeSessionTerms(
     ...(schedule ? { schedule } : {}),
     ...(v.endsAt === undefined ? {} : { endsAt: v.endsAt as string }),
     ...(marketCapRange === undefined ? {} : { marketCapRange }),
+    ...(randomization === undefined ? {} : { randomization }),
   };
 }
 export function decodeTradeSession(value: unknown): TradeSession {

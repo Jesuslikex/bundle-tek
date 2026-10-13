@@ -1,5 +1,9 @@
 # Latest source verification, 13 October 2026
 
+## Later randomized DCA targeted verification
+
+Final randomized-allocation continuation passed 75 tests across six actual-checkout files, zero failures/skips, exact handle 92517 exit 0 and JSON success=true. Actual-source TypeScript, all ten changed-file typed lint checks and production build pass. The 1,052-file source retained digest 75bc12915fed1e29d3cb23754a6d632beb831ea5f5120431187b34b2bd7273a4. See CODEX-RANDOMIZED-DCA.md for the isolated worktree, reports and exact contracts. This later source has not received a replacement full-suite run; the 2,113-test full result below remains scoped to its earlier pre-range/pre-random snapshot. No funded, rendered or hosted proof is implied.
+
 ## Terminal combined baseline and later DCA range continuation
 
 Exact handle **86907 terminated with exit 0**. Terminal log and JSON agree: **303 files, 2,113 tests passed, zero failures and zero skips**, duration 1,654.41 seconds. The wrapper verified unchanged=true for all 1,046 files with digest 60f5df53b7fedee6872e04dca13ad1c3ce46b79cfaaa9b974deedc0f13f163ee. This covers Claude's merged token layout, monitor-fixture repair, finite DCA and deadline work. It does not prove rendered/funded/hosted readiness.

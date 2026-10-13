@@ -122,8 +122,9 @@ export async function POST(request: Request) {
       Object.keys(body)
         .filter(
           (key) =>
-            !['strategy', 'endsAt', 'marketCapRange'].includes(key) ||
-            body.action !== 'create',
+            !['strategy', 'endsAt', 'marketCapRange', 'randomization'].includes(
+              key,
+            ) || body.action !== 'create',
         )
         .sort()
         .join(',') !==

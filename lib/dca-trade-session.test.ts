@@ -22,6 +22,71 @@ const input = {
   startAt: '2026-10-13T12:00:00.000Z',
   intervalSeconds: 60,
 };
+it('retains reviewed randomized amounts and bounds and rejects altered or legacy misuse', () => {
+  const randomization = {
+    format: 'bounded-dca-allocation-v1' as const,
+    minimumRaw: '2',
+    maximumRaw: '5',
+    totalRaw: '11',
+  };
+  const { request, terms } = dcaTradeSessionInput(
+    { ...input, randomization, cycleAmountsRaw: ['2', '4', '5'] },
+    token,
+  );
+  expect(terms.entries.map((e) => e.unitsRaw)).toEqual(['2', '4', '5']);
+  expect(terms.totalRaw).toBe('11');
+  expect(() =>
+    tradeSessionTerms(
+      {
+        ...request,
+        entries: request.entries.map((e) => ({ ...e, amount: '0.000000005' })),
+      },
+      token,
+    ),
+  ).toThrow('exact total budget');
+  expect(terms.randomization).toEqual(randomization);
+  const now = input.startAt;
+  expect(
+    decodeTradeSession({
+      id: id(2),
+      revision: 1,
+      state: 'active',
+      terms,
+      createdAt: now,
+      updatedAt: now,
+    }).terms,
+  ).toEqual(terms);
+  expect(() =>
+    dcaTradeSessionInput({ ...input, randomization }, token),
+  ).toThrow('review every');
+  expect(() =>
+    dcaTradeSessionInput({ ...input, cycleAmountsRaw: ['2', '4', '5'] }, token),
+  ).toThrow('Choose randomized');
+  expect(() =>
+    tradeSessionTerms({ ...request, randomization: undefined }, token),
+  ).toThrow();
+  expect(() =>
+    tradeSessionTerms({ ...request, strategy: undefined }, token),
+  ).toThrow('Only DCA');
+  expect(() =>
+    tradeSessionTerms(
+      { ...request, randomization: { ...randomization, minimumRaw: '3' } },
+      token,
+    ),
+  ).toThrow('outside');
+  expect(() =>
+    tradeSessionTerms(
+      {
+        ...request,
+        entries: request.entries.map((e, i) => ({
+          ...e,
+          walletRevision: i + 1,
+        })),
+      },
+      token,
+    ),
+  ).toThrow();
+});
 it('saves canonical DCA market-cap bounds without changing unbounded legacy terms', () => {
   const plain = dcaTradeSessionInput(input, token);
   expect(plain.terms).not.toHaveProperty('marketCapRange');

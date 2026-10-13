@@ -210,6 +210,65 @@ it('previews exact cycle amounts and saves only after an explicit click without 
   expect(container.textContent).toContain('Review each due cycle');
   expect(requests).toHaveLength(1);
 });
+it('generates randomized bounds only on request, preserves the preview across rerenders/retries and invalidates changed inputs', async () => {
+  await fill();
+  await setField('DCA amount sizing', 'randomized');
+  await setField('Minimum input per cycle', '0.000000002');
+  await setField('Maximum input per cycle', '0.000000005');
+  const random = vi.spyOn(crypto, 'getRandomValues');
+  expect(saveButton().disabled).toBe(true);
+  expect(random).not.toHaveBeenCalled();
+  const generate = () =>
+    Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Generate random allocation',
+    )!;
+  await act(async () => generate().click());
+  expect(random).toHaveBeenCalled();
+  expect(saveButton().disabled).toBe(false);
+  const preview = Array.from(container.querySelectorAll('li')).map(
+      (e) => e.textContent,
+    ),
+    draws = random.mock.calls.length;
+  await act(async () =>
+    root.render(
+      <DcaTradeSession
+        project={project}
+        wallets={wallets}
+        locked={false}
+        onSaved={saved}
+        onBusyChange={busyChanged}
+      />,
+    ),
+  );
+  expect(
+    Array.from(container.querySelectorAll('li')).map((e) => e.textContent),
+  ).toEqual(preview);
+  expect(random).toHaveBeenCalledTimes(draws);
+  await act(async () => saveButton().click());
+  const body = requests[0].body;
+  expect(body.randomization).toEqual({
+    format: 'bounded-dca-allocation-v1',
+    minimumRaw: '2',
+    maximumRaw: '5',
+    totalRaw: '11',
+  });
+  await act(async () =>
+    requests[0].resolve(
+      Response.json({ error: 'Retry this preview' }, { status: 503 }),
+    ),
+  );
+  await act(async () => saveButton().click());
+  expect(requests[1].body).toEqual(body);
+  await respond(1);
+  expect(saved.mock.calls[0][0].terms.randomization).toEqual(
+    body.randomization,
+  );
+  await setField('Total DCA input', '0.000000012');
+  expect(saveButton().disabled).toBe(true);
+  await act(async () => generate().click());
+  expect(saveButton().disabled).toBe(false);
+  random.mockRestore();
+});
 it('reuses immutable request identity after an ambiguous gateway failure and rejects execution payloads', async () => {
   await fill();
   await act(async () => saveButton().click());

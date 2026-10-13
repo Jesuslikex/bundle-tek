@@ -5,6 +5,11 @@ import {
 import { solanaTokenAtoms } from './solana-token-amount';
 import { formatNativeBalance } from './wallet-balance-format';
 import { dcaMarketCapRange, type DcaMarketCapRange } from './dca-market-cap';
+import {
+  dcaRandomization,
+  validateRandomDcaAllocation,
+  type DcaRandomization,
+} from './dca-random-allocation';
 
 export function dcaTradeSessionInput(
   input: {
@@ -19,6 +24,8 @@ export function dcaTradeSessionInput(
     intervalSeconds: number;
     endsAt?: string;
     marketCapRange?: DcaMarketCapRange;
+    randomization?: DcaRandomization;
+    cycleAmountsRaw?: string[];
   },
   token: { chain: string; address: string; decimals: number },
 ): {
@@ -30,6 +37,7 @@ export function dcaTradeSessionInput(
     strategy: 'DCA';
     endsAt?: string;
     marketCapRange?: DcaMarketCapRange;
+    randomization?: DcaRandomization;
     schedule: { startAt: string; spacingSeconds: number };
     entries: { wallet: string; walletRevision: number; amount: string }[];
   };
@@ -42,12 +50,27 @@ export function dcaTradeSessionInput(
     count = BigInt(input.cycles);
   if (total < count)
     throw new Error('Each DCA cycle needs at least one input atom.');
+  const randomization =
+    input.randomization === undefined
+      ? undefined
+      : dcaRandomization(input.randomization);
+  if (!randomization && input.cycleAmountsRaw !== undefined)
+    throw new Error('Choose randomized sizing before reviewing an allocation.');
+  const randomized = randomization
+    ? validateRandomDcaAllocation(
+        total.toString(),
+        input.cycles,
+        randomization,
+        input.cycleAmountsRaw,
+      )
+    : undefined;
   const request = {
     action: 'create' as const,
     projectId: input.projectId,
     projectRevision: input.projectRevision,
     side: input.side,
     strategy: 'DCA' as const,
+    ...(randomization ? { randomization } : {}),
     ...(input.endsAt === undefined ? {} : { endsAt: input.endsAt }),
     ...(input.marketCapRange === undefined
       ? {}
@@ -57,7 +80,8 @@ export function dcaTradeSessionInput(
       wallet: input.wallet,
       walletRevision: input.walletRevision,
       amount: formatNativeBalance(
-        (total / count + (BigInt(i) < total % count ? 1n : 0n)).toString(),
+        randomized?.[i] ??
+          (total / count + (BigInt(i) < total % count ? 1n : 0n)).toString(),
         decimals,
       ),
     })),
