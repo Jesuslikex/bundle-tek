@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useConditionalMonitorStatus } from './use-conditional-monitor-status';
 import { Button } from './ui/button';
 import {
   decodeConditionalMonitorPage,
@@ -83,21 +84,45 @@ function MatchNotice({
     </details>
   );
 }
-export function ConditionalMonitor({
-  project,
-  onReview,
-  reviewDisabled = false,
-}: {
+type ConditionalMonitorProps = {
   project: ImportedTokenProject;
   onReview: (orderId: string, revision: number, level: number) => void;
   reviewDisabled?: boolean;
-}) {
+};
+export function ConditionalMonitor(props: ConditionalMonitorProps) {
+  return (
+    <ConditionalMonitorPanel
+      key={`${props.project.id}:${props.project.revision}:${props.project.archived}`}
+      {...props}
+    />
+  );
+}
+function ConditionalMonitorPanel({
+  project,
+  onReview,
+  reviewDisabled = false,
+}: ConditionalMonitorProps) {
   const [page, setPage] = useState<ConditionalMonitorPage | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [sampleNow, setSampleNow] = useState(() => Date.now());
   const pending = useRef<AbortController | null>(null);
-  useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => {
+    return () => {
+      pending.current?.abort();
+      pending.current = null;
+    };
+  }, []);
+  const live = useConditionalMonitorStatus(
+    project.id,
+    project.revision,
+    project.archived,
+    busy,
+    (snapshot) => {
+      setPage(snapshot);
+      setSampleNow(Date.now());
+    },
+  );
   useEffect(() => {
     if (!page) return;
     const timer = setInterval(() => setSampleNow(Date.now()), 10000);
@@ -180,6 +205,30 @@ export function ConditionalMonitor({
       <Button variant="outline" disabled={busy} onClick={() => void request()}>
         Reload background monitoring
       </Button>
+      <Button
+        variant="outline"
+        disabled={busy}
+        onClick={() =>
+          live.state.status === 'off' ? live.start() : live.stop()
+        }
+      >
+        {live.state.status === 'off'
+          ? 'Follow monitoring notices'
+          : 'Stop following monitoring notices'}
+      </Button>
+      {live.state.status !== 'off' && (
+        <output className="block">
+          Notice updates: {live.state.status}. {live.state.reads} successful
+          reads. {live.state.reason}
+          {live.state.retryInMs !== null &&
+            ` Retry in ${live.state.retryInMs / 1000} seconds.`}
+        </output>
+      )}
+      <p>
+        Following refreshes retained notices while this tab is visible and
+        online. It does not enable the background worker or approve a trade.
+      </p>
+      {live.error && <p role="alert">{live.error}</p>}
       {page && (
         <>
           <p>
@@ -212,10 +261,12 @@ export function ConditionalMonitor({
               require a new monitoring request.
             </output>
           )}
-          <p>
+          <p aria-live="polite" aria-atomic="true">
             Latest {page.notices.length} retained match notices. They are
             sampled conditions, not reserved inventory or executed trades. An
             older notice does not prove the condition still holds.
+            {page.notices[0] &&
+              ` Latest match observed ${page.notices[0].observedAt}.`}
           </p>
           {page.notices.map((n) => (
             <MatchNotice

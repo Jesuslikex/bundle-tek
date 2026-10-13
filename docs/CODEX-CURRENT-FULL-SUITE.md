@@ -1,5 +1,9 @@
 # Latest source verification, 13 October 2026
 
+## Retained conditional notice following
+
+The latest continuation adds explicit visible/online following, bounded read retries, retained-error disclosure, context cancellation and manual settings race protection to the conditional monitoring panel. Nineteen tests across three files, actual-source TypeScript, three-file typed lint and production build passed on the final unchanged 1,040-file snapshot, digest 8becf128e119adf11e7d9488b00d1320e2fd075bd0166289f757400a4ba49b95. See CODEX-MONITOR-NOTICE-FOLLOW.md for exact artifacts and scope. No worker activation, deployment or live/funded/browser proof is included. These targeted checks do not replace the earlier full-suite result.
+
 ## Read-only conditional monitoring continuation
 
 The latest 1,038-file snapshot is work/release-qa/source-conditional-monitor-20261013.json, digest 8c72501dfc2758cf09b8648f72bac74c71f6204d80ede64f335bc2857aa1d127. Final combined handle 41154 completed with exit 0: **90 tests across nine actual-checkout files, zero failures/skips**, duration 181.28 seconds. JSON/log prefix: conditional-monitor-final-tests-20261013. Actual-source TypeScript passed, handle 66964; production build passed, handle 60263. Typed lint passed for twelve owned TypeScript files. Post-check source verification reports unchanged=true. Earlier intermediate failures and pre-freeze results remain historical, not current validation.

@@ -109,6 +109,8 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  Reflect.deleteProperty(document, 'hidden');
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 it('loads on demand and saves an explicit monitoring request without claiming an inactive worker is running', async () => {
@@ -230,4 +232,116 @@ it('aborts in-flight reads on unmount and keeps failures readable for non-JSON g
   await act(async () => root.unmount());
   expect(requests[1].init.signal?.aborted).toBe(true);
   root = createRoot(container);
+});
+it('follows new retained matches, retries a gateway failure and never writes or reviews automatically', async () => {
+  vi.useFakeTimers();
+  await click('Follow monitoring notices');
+  await respond(0, { ...empty(), monitor: monitor(), notices: [notice()] });
+  expect(container.textContent).toContain('Latest 1 retained match notices');
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  await act(async () =>
+    requests[1].resolve(new Response('<html>gateway</html>', { status: 502 })),
+  );
+  expect(container.textContent).toContain('retrying');
+  expect(container.textContent).toContain('Latest 1 retained match notices');
+  expect(container.textContent).not.toContain('<html>');
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  const newer = { ...notice(), id: '44444444-4444-4444-8444-444444444444' };
+  await respond(2, { ...empty(), notices: [newer, notice()] });
+  expect(container.textContent).toContain('Latest 2 retained match notices');
+  expect(container.textContent).toContain('2 successful reads');
+  expect(requests.every((r) => !r.init.method || r.init.method === 'GET')).toBe(
+    true,
+  );
+  expect(review).not.toHaveBeenCalled();
+  await click('Stop following monitoring notices');
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(requests).toHaveLength(3);
+});
+it('aborts hidden-tab reads and resumes when visible without accepting a stale response', async () => {
+  vi.useFakeTimers();
+  await click('Follow monitoring notices');
+  Object.defineProperty(document, 'hidden', {
+    configurable: true,
+    value: true,
+  });
+  await act(async () => {
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(requests[0].init.signal?.aborted).toBe(true);
+  expect(container.textContent).toContain('Tab hidden');
+  await respond(0, { ...empty(), notices: [notice()] });
+  expect(container.textContent).not.toContain('Latest 1 retained');
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(requests).toHaveLength(1);
+  Object.defineProperty(document, 'hidden', {
+    configurable: true,
+    value: false,
+  });
+  await act(async () => {
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(requests).toHaveLength(2);
+  await respond(1, { ...empty(), notices: [notice()] });
+  expect(container.textContent).toContain('Latest 1 retained');
+});
+it('clears project state, stops following, and rejects both manual and followed stale responses on revision changes', async () => {
+  await click('Reload background');
+  await respond(0, { ...empty(), notices: [notice()] });
+  await click('Follow monitoring notices');
+  expect(requests).toHaveLength(2);
+  await act(async () =>
+    root.render(
+      <ConditionalMonitor
+        project={{ ...project, revision: 2 }}
+        onReview={review}
+      />,
+    ),
+  );
+  expect(requests[1].init.signal?.aborted).toBe(true);
+  await respond(1, { ...empty(), notices: [notice()] });
+  expect(container.textContent).not.toContain('Latest 1 retained');
+  expect(button('Follow monitoring notices')).toBeDefined();
+  await click('Reload background');
+  await act(async () =>
+    root.render(
+      <ConditionalMonitor
+        project={{ ...project, revision: 3 }}
+        onReview={review}
+      />,
+    ),
+  );
+  expect(requests[2].init.signal?.aborted).toBe(true);
+  await respond(2, { ...empty(), notices: [notice()] });
+  expect(container.textContent).not.toContain('Latest 1 retained');
+  expect(review).not.toHaveBeenCalled();
+});
+it('pauses following during a manual settings update and rejects the earlier followed snapshot', async () => {
+  await click('Reload background');
+  await respond(0, empty());
+  await click('Follow monitoring notices');
+  await click('Request background');
+  expect(requests[1].init.signal?.aborted).toBe(true);
+  expect(requests[2].init.method).toBe('POST');
+  await respond(2, { ...empty(), monitor: monitor() });
+  expect(container.textContent).toContain('Monitoring requested');
+  expect(requests).toHaveLength(4);
+  await respond(1, {
+    ...empty(),
+    monitor: monitor(false),
+    notices: [notice()],
+  });
+  expect(container.textContent).toContain('Monitoring requested');
+  expect(container.textContent).not.toContain('Latest 1 retained');
+  await respond(3, { ...empty(), monitor: monitor(), notices: [notice()] });
+  expect(container.textContent).toContain('Latest 1 retained');
+  expect(review).not.toHaveBeenCalled();
 });
