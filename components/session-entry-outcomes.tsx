@@ -1,4 +1,5 @@
 'use client';
+import { readPanelJson } from './read-panel-json';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
@@ -202,7 +203,10 @@ function OutcomeSnapshot({
         })}`,
         { method: 'GET', cache: 'no-store', signal: controller.signal },
       );
-      const value: unknown = await response.json();
+      const value = await readPanelJson(
+        response,
+        'Session outcomes unavailable. Reload to refresh retained evidence.',
+      );
       if (controller.signal.aborted || pending.current !== request) return;
       if (!response.ok)
         throw new Error(

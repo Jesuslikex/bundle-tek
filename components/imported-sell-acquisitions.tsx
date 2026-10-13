@@ -1,4 +1,5 @@
 'use client';
+import { readPanelJson } from './read-panel-json';
 import { useEffect, useRef, useState, useId } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -79,7 +80,10 @@ export function ImportedSellAcquisitions({
           signal: AbortSignal.any([c.signal, AbortSignal.timeout(25000)]),
         },
       );
-      const data = await response.json();
+      const data = await readPanelJson(
+        response,
+        'Acquisition history unavailable.',
+      );
       if (!response.ok)
         throw new Error(
           (data as { error?: string })?.error ||

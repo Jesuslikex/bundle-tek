@@ -1,4 +1,5 @@
 'use client';
+import { readPanelJson } from './read-panel-json';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { SessionEntryOutcomes } from './session-entry-outcomes';
@@ -80,7 +81,10 @@ function OperationHistory({
             ]),
           },
         );
-        const body = await response.json();
+        const body = await readPanelJson(
+          response,
+          'Operation history unavailable.',
+        );
         if (!response.ok)
           throw new Error(
             body &&

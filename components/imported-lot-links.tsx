@@ -1,4 +1,5 @@
 'use client';
+import { readPanelJson } from './read-panel-json';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -220,7 +221,12 @@ export function ImportedLotLinks({
             : {}),
         },
       );
-      const body: unknown = await response.json();
+      const body = await readPanelJson(
+        response,
+        save
+          ? 'Acquisition link could not be confirmed. Reload and review history before retrying.'
+          : 'Acquisition history unavailable. No partial accounting is shown.',
+      );
       if (!response.ok)
         throw new Error(
           save
