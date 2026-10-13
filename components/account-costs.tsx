@@ -130,10 +130,13 @@ export function AccountCostsPanel() {
         cache: 'no-store',
         signal: current.signal,
       });
-      const body: unknown = await response.json();
-      if (!response.ok)
+      // Gateway errors may return HTML; never surface parser text.
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok || body === null)
         throw new Error(
-          'Account costs unavailable. No partial totals are shown.',
+          response.status === 401
+            ? 'Sign in to view account transaction costs.'
+            : 'Account costs unavailable. No partial totals are shown.',
         );
       const summary = validatedAccountCosts(body);
       if (!current.signal.aborted) setValue(summary);

@@ -1,16 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type FocusEvent, type MouseEvent } from 'react';
 import { ArrowRight, ImagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { LaunchPlanInput } from '@/lib/launch-plan';
+import { DEFAULT_LAUNCH_PLAN, type LaunchPlanInput } from '@/lib/launch-plan';
 import { EMPTY_IDENTITY, type TokenIdentity } from '@/lib/workspace-project';
 import { TokenCloneLookup } from './token-clone-lookup';
 import { ArtworkUpload } from './artwork-upload';
 import { ArtworkLibrary } from './artwork-library';
 import { isUploadedArtwork } from '@/lib/artwork';
 import { venueLimits, validateVenuePlan } from '@/lib/venue-limits';
+
+/**
+ * New drafts start with default name and ticker values. Select them on focus so
+ * typing replaces the default instead of appending to it ("Untitled PlanMy Token").
+ */
+function replaceDefaultOnFocus(isDefault: boolean) {
+  if (!isDefault) return {};
+  return {
+    onFocus: (e: FocusEvent<HTMLInputElement>) => e.currentTarget.select(),
+    // A click would otherwise place the caret and drop the selection.
+    onMouseUp: (e: MouseEvent<HTMLInputElement>) => e.preventDefault(),
+  };
+}
 
 export function TokenDetailsForm({
   plan,
@@ -144,6 +157,9 @@ export function TokenDetailsForm({
               maxLength={limits.maxName}
               value={plan.tokenName}
               onChange={(e) => onChange({ tokenName: e.target.value })}
+              {...replaceDefaultOnFocus(
+                plan.tokenName === DEFAULT_LAUNCH_PLAN.tokenName,
+              )}
               placeholder="Project name"
             />
           </div>
@@ -165,6 +181,9 @@ export function TokenDetailsForm({
                     .replace(/[^A-Z0-9]/g, ''),
                 })
               }
+              {...replaceDefaultOnFocus(
+                plan.ticker === DEFAULT_LAUNCH_PLAN.ticker,
+              )}
               placeholder="TOKEN"
             />
           </div>

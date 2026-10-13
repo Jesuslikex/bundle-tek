@@ -280,11 +280,28 @@ export function AccountPerformancePanel() {
             : 'Review recorded performance'}
       </Button>
       {error && <p role="alert">{error}</p>}
-      {timeline && (
-        <PerformanceTimeline key={timeline.observedAt} data={timeline} />
-      )}
-      {value && (
-        <AccountPerformanceSummary key={value.observedAt} value={value} />
+      {value && value.receiptCount === 0 && value.scopes.length === 0 ? (
+        // One clear empty state instead of an empty chart, calendar and table.
+        <p className="performance-empty">
+          No finalized trades are recorded yet. Linked buy-to-sell results
+          appear here after your first recorded sale. Checked{' '}
+          {new Date(value.observedAt).toLocaleString()}.
+        </p>
+      ) : (
+        <>
+          {timeline && (
+            <PerformanceTimeline
+              key={`timeline:${timeline.observedAt}`}
+              data={timeline}
+            />
+          )}
+          {value && (
+            <AccountPerformanceSummary
+              key={`summary:${value.observedAt}`}
+              value={value}
+            />
+          )}
+        </>
       )}
     </section>
   );

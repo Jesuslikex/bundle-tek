@@ -848,7 +848,7 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
       )}
       {historyWallet && (
         <TrackedTransactionHistory
-          key={`${key(historyWallet)}:${historyWallet.updatedAt}`}
+          key={`history:${key(historyWallet)}:${historyWallet.updatedAt}`}
           wallet={historyWallet}
           refreshVersion={historyRefresh}
           onClose={() => setHistoryKey(null)}
@@ -874,7 +874,7 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
       {holdingsWallet &&
         (isSolanaTrackedWallet(holdingsWallet) ? (
           <WalletHoldingsPanel
-            key={`${key(holdingsWallet)}:${holdingsWallet.updatedAt}`}
+            key={`holdings:${key(holdingsWallet)}:${holdingsWallet.updatedAt}`}
             address={holdingsWallet.address}
             label={holdingsWallet.label}
             active={!holdingsWallet.archived && !loadFailed}
@@ -883,7 +883,7 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
           />
         ) : (
           <EvmHoldingsPanel
-            key={`${key(holdingsWallet)}:${holdingsWallet.updatedAt}`}
+            key={`holdings:${key(holdingsWallet)}:${holdingsWallet.updatedAt}`}
             chain={evmChain(holdingsWallet.network)}
             address={holdingsWallet.address}
             label={holdingsWallet.label}

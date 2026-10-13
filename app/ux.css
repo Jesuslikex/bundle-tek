@@ -4337,3 +4337,22 @@ body {
 .imported-market-toolbar select {
   max-width: 320px;
 }
+/* Table captions read as quiet labels, not centered headings. */
+.project-table caption {
+  caption-side: top;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+/* Single empty state for recorded performance with no trades yet. */
+.performance-empty {
+  margin-top: 16px;
+  padding: 18px 20px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.6;
+}
