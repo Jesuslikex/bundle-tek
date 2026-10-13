@@ -1,0 +1,15 @@
+# Local-only CROP candidate result
+
+Request: CLAUDE-CROP-CANDIDATE-REQUEST-20261013.md, introduced by e7362b5 and preserved while the supply-sizing feature was integrated.
+
+- Source: committed main **60e6fa1b51f819734ffcedfc9546cb9c92b54ca0**, exported with git archive into a clean directory. No working-tree changes, .env files or credentials were copied.
+- Candidate local commit: **6e75c7e**, folder C:/Users/Julian/Documents/Codex/2026-10-09/https-github-com-morluto-rea-https/sites/bundle-tek-crop-hosting, owned project appgprj_6ab6edb6b85c8191a8a67d6d5ce20684.
+- Migration comparison against **5cb5d81**: zero differences anywhere in drizzle/, zero appended entries. All 83 entries and existing tag mapping remain unchanged, ending at 0082_dca_session_end_time. The uncommitted main 0068 newline was not exported.
+- Actual Wrangler whole-file apply on disposable local D1: **83 applied, exact ledger match, exit 0**, handle 83526. Report: C:/Users/Julian/AppData/Local/Temp/bundle-wrangler-migrations-tkEsJf/report.json.
+- Candidate tests: **85 passed across eight files**, handle 32661 exit 0, covering DCA timing/end time, market-cap range, randomized and supply sizing, signing/session workflow and token-market contracts. Additional final chart/history workspace tests: **27 passed across six files**. No full suite, browser rendering or funded tests were run.
+- Final actual-source typecheck: passed, handle 41105 exit 0. Production build: passed, handle 50517 exit 0. Scoped DCA/token-workspace typed lint: passed for 23 files.
+- Whole-repository typed lint: **failed with 19 findings in 12 files**, all matching the committed source export. They are supplied UI-template accessibility/compiler findings; no rules were suppressed or source components rewritten. This candidate is not globally lint-clean. Machine comparison: candidate work/release-qa/crop-lint-final-source-comparison-20261013.json.
+- Two stale candidate-only QA files absent from committed main were removed: test/hosted-d1-splitting.test.ts and test/hosted-sql-splitting.test.ts. They were not in the selected 85-test run. Only these test-file deletions followed that run; production source remained unchanged. Final typecheck and the 27 chart/history tests ran after removal.
+- Final source: **1,069 files**, unchanged digest b1348036898c2038033d45edc273694eef199c73db0c74b0fecb5051fdbea0d2. Reports/logs: candidate work/release-qa/crop-60e6fa1-*. No dependency installation was needed; package content matches the baseline despite archive line-ending normalization.
+
+Nothing pushed, saved, deployed or executed against a hosted database. No remote, credential or main Claude-owned source file changed. Candidate Git is clean. The partially applied hosted incomplete input failure remains unresolved; no runner, failed SQL chunk or ledger/checksum diagnostics were supplied in this task. No new migration was added, but existing pending/history failures can still block a release. This candidate does not repair hosted state and is not saved version 116. Publication remains deferred pending diagnostic recovery and explicit user approval.
