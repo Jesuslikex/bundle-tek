@@ -4147,7 +4147,8 @@ body {
 }
 @media (min-width: 1101px) and (min-height: 640px) {
   .imported-live-workspace.imported-live-workspace--compact {
-    grid-template-columns: minmax(0, 1fr) clamp(340px, 30%, 440px);
+    /* Trading pane stays readable without taking chart width on wide screens. */
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 22%, 380px);
   }
   .imported-live-workspace--compact > [aria-label='Open token chart'],
   .imported-live-workspace--compact > .imported-workspace-trading {
