@@ -12,6 +12,7 @@ import {
 import {
   validatedConditionalSigning,
   sameConditionalTerms,
+  requireConditionalSwapContext,
 } from './conditional-signing';
 import {
   importedAcquisitionWriteGuard,
@@ -64,6 +65,13 @@ export async function reserveImportedApproval(
   )
     throw new Error('Conditional approval binding differs.');
   if (conditional) {
+    const document = JSON.parse(captured.document);
+    requireConditionalSwapContext(conditional, {
+      side: document.side,
+      inputMint: review.inputMint,
+      outputMint: review.outputMint,
+      inputRaw: review.inputRaw,
+    });
     validatedConditionalSigning(conditional, review.inputRaw, Date.now());
     if (!sameConditionalTerms(conditional, conditionalGuard!.selection))
       throw new Error('Conditional approval terms differ.');

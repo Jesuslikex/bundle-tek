@@ -1,5 +1,5 @@
 import { validatedTradeSessionCapture } from './imported-trade-session';
-import { validatedConditionalSigning } from './conditional-signing';
+import { requireConditionalSwapContext } from './conditional-signing';
 import { validatedImportedAcquisitionSelection } from './imported-acquisition';
 import { validatedSwapFailure } from './swap-failure';
 import type { ImportedSwapApproval } from './imported-swap-approval';
@@ -66,12 +66,12 @@ export function importedApprovalPage(value: unknown, projectId: string) {
     if (row.document.session)
       validatedTradeSessionCapture(row.document.session, row.document.inputRaw);
     if (row.document.conditional) {
-      if (row.side !== 'Sell')
-        throw new Error('Conditional approval requires a sell.');
-      validatedConditionalSigning(
-        row.document.conditional,
-        row.document.inputRaw,
-      );
+      requireConditionalSwapContext(row.document.conditional, {
+        side: row.side,
+        inputMint: row.document.inputMint,
+        outputMint: row.document.outputMint,
+        inputRaw: row.document.inputRaw,
+      });
     }
     if (row.document.acquisition) {
       if (row.side !== 'Sell') throw new Error('Acquisition requires a sell.');

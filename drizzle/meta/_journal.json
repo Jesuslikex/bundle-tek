@@ -498,6 +498,20 @@
       "when": 1791842038611,
       "tag": "0070_overjoyed_betty_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "6",
+      "when": 1791851066933,
+      "tag": "0071_curious_glorian",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "6",
+      "when": 1791866064603,
+      "tag": "0072_conditional_buy_approval",
+      "breakpoints": true
     }
   ]
 }

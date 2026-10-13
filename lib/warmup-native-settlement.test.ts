@@ -108,6 +108,27 @@ it.each([
     );
   },
 );
+it.each([
+  {},
+  { existing: true },
+  { keepWrapped: true },
+  { seed: true, seedRentOnly: true },
+])(
+  'rejects finalized Buy debit drift after reconciling wrapping and rent for %j',
+  async (options) => {
+    const f = await nativeWarmupFixture({ side: 'Buy', ...options });
+    const prep = saved(f);
+    for (const drift of [-1n, 1n]) {
+      const receipt = structuredClone(f.receipt);
+      receipt.meta.postBalances[0] = String(
+        BigInt(receipt.meta.postBalances[0]) + drift,
+      );
+      await expect(
+        decodeWarmupReceipt(receipt, prep, f.signed.signature, 'Buy'),
+      ).rejects.toThrow('Buy SOL settlement');
+    }
+  },
+);
 it('accepts a closed simulated system tombstone only when its native balance, bytes and token metadata show complete closure', async () => {
   const f = await nativeWarmupFixture({ v2: true, fee: 2 });
   f.simulation.settlementEvidence!.postAccounts![0] = {

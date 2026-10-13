@@ -7,7 +7,12 @@ import {
   currentConditionalSigning,
   conditionalSigningWriteGuard,
 } from '@/lib/conditional-preparation-server';
-import { validatedConditionalSigning } from '@/lib/conditional-signing';
+import {
+  validatedConditionalSigning,
+  requireConditionalSwapContext,
+  requireConditionalBuyOutputPrecision,
+} from '@/lib/conditional-signing';
+import { ConditionalBuyStorageUnavailable } from '@/lib/conditional-buy-capability';
 import { decodeSwapFailure } from '@/lib/swap-failure-server';
 import { validatedSwapFailure } from '@/lib/swap-failure';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
@@ -150,7 +155,12 @@ export async function GET(request: Request) {
       if (document.session)
         validatedTradeSessionCapture(document.session, document.inputRaw);
       if (document.conditional) {
-        if (row.side !== 'Sell') throw new Error();
+        requireConditionalSwapContext(document.conditional, {
+          side: row.side,
+          inputMint: document.inputMint,
+          outputMint: document.outputMint,
+          inputRaw: document.inputRaw,
+        });
         validatedConditionalSigning(document.conditional, document.inputRaw);
       }
       const failureReceipt = row.failureReceipt
@@ -280,8 +290,12 @@ export async function POST(request: Request) {
           429,
         );
       }
-      const simulation = await simulateImportedSwap(order, signal, fetch, true),
-        settlement = await requireWarmupSigningReview(order, simulation);
+      const simulation = await simulateImportedSwap(order, signal, fetch, true);
+      requireConditionalBuyOutputPrecision(
+        saved.document.conditional,
+        simulation.tokenChanges,
+      );
+      const settlement = await requireWarmupSigningReview(order, simulation);
       const review: WarmupSigningReview = {
         id: crypto.randomUUID(),
         preparationId: saved.id,
@@ -435,13 +449,14 @@ export async function POST(request: Request) {
           review,
           row.signature,
         );
+        const transitionAt = new Date().toISOString();
         await db
           .prepare(
             "UPDATE imported_swap_signing_intents SET state='failed',failure_receipt=?,updated_at=? WHERE owner_id=? AND id=? AND signature=? AND (state IN ('signed','submitted') OR (state='failed' AND failure_receipt IS NULL))",
           )
           .bind(
             JSON.stringify(failureReceipt),
-            now,
+            transitionAt,
             user.userId,
             row.id,
             row.signature,
@@ -482,19 +497,28 @@ export async function POST(request: Request) {
         document.side,
         review,
       );
+      requireConditionalBuyOutputPrecision(document.conditional, [evidence]);
+      const transitionAt = new Date().toISOString();
       const receipt = {
         id: crypto.randomUUID(),
         projectId: saved.projectId,
         preparationId: saved.id,
         projectRevision: saved.projectRevision,
         walletRevision: saved.walletRevision,
-        createdAt: now,
+        createdAt: transitionAt,
         document: {
           ...evidence,
           side: document.side,
           tokenUnitsRaw: acquiredRaw,
+          ...(document.conditional?.format === 'conditional-preparation-v2'
+            ? {
+                quoteUnitsRaw: (-BigInt(
+                  evidence.nativeSettlementRaw,
+                )).toString(),
+              }
+            : {}),
           source: new URL(endpoint).hostname,
-          observedAt: now,
+          observedAt: transitionAt,
           limitations:
             'Exact signed packet and finalized wallet token/native changes. Selected acquisitions are recorded separately as bookkeeping links. This does not reconstruct external transfers or prove profit.',
         },
@@ -517,14 +541,14 @@ export async function POST(request: Request) {
             saved.walletRevision,
             row.signature,
             text,
-            now,
+            transitionAt,
           ),
         db
           .prepare(
             "UPDATE imported_swap_signing_intents SET state='finalized',updated_at=? WHERE owner_id=? AND id=? AND signature=? AND state IN ('signed','submitted') AND EXISTS(SELECT 1 FROM imported_swap_receipts WHERE owner_id=? AND intent_id=? AND signature=?)",
           )
           .bind(
-            now,
+            transitionAt,
             user.userId,
             row.id,
             row.signature,
@@ -628,8 +652,12 @@ export async function POST(request: Request) {
       { ...captured, document: JSON.parse(captured.document) },
       row.id,
     );
-    const simulation = await simulateImportedSwap(order, signal, fetch, true),
-      settlement = await requireWarmupSigningReview(order, simulation);
+    const simulation = await simulateImportedSwap(order, signal, fetch, true);
+    requireConditionalBuyOutputPrecision(
+      review.conditional,
+      simulation.tokenChanges,
+    );
+    const settlement = await requireWarmupSigningReview(order, simulation);
     if (
       JSON.stringify(settlement) !== JSON.stringify(review.settlement) ||
       simulation.networkFeeLamports !== review.maximumFeeLamports
@@ -729,6 +757,8 @@ export async function POST(request: Request) {
       );
     }
   } catch (error) {
+    if (error instanceof ConditionalBuyStorageUnavailable)
+      return json({ error: error.message }, 503);
     if (
       error instanceof Error &&
       /Wallet already reserved|Signature already registered|Conditional approval already exists/.test(

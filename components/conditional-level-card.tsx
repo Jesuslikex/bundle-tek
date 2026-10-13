@@ -1,6 +1,9 @@
 'use client';
 import { Button } from './ui/button';
-import type { ConditionalSellOrder } from '@/lib/conditional-sell-order';
+import {
+  conditionalOrderSide,
+  type ConditionalOrder,
+} from '@/lib/conditional-order';
 import type { ConditionalLevelStatus } from '@/lib/conditional-level-status';
 
 export function ConditionalLevelCard({
@@ -13,8 +16,8 @@ export function ConditionalLevelCard({
   onPrepare,
   onRecover,
 }: {
-  order: ConditionalSellOrder;
-  level: ConditionalSellOrder['terms']['levels'][number];
+  order: ConditionalOrder;
+  level: ConditionalOrder['terms']['levels'][number];
   status?: ConditionalLevelStatus;
   symbol: string;
   busy: boolean;
@@ -52,9 +55,10 @@ export function ConditionalLevelCard({
         </span>
       </div>
       <p>
-        Sell{' '}
+        {conditionalOrderSide(order) === 'Buy' ? 'Buy with' : 'Sell'}{' '}
         <strong>
-          {level.amount} {symbol}
+          {level.amount}{' '}
+          {conditionalOrderSide(order) === 'Buy' ? 'SOL' : symbol}
         </strong>
       </p>
       {order.state === 'draft' && (

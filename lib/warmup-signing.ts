@@ -27,7 +27,10 @@ import type { WarmupBuyLink } from './warmup-buy-link';
 import type { UnsignedSwapPreparationSummary } from './imported-swap-preparation-history';
 import type { ImportedAcquisitionSelection } from './imported-acquisition';
 import type { ConditionalPreparation } from './conditional-preparation-server';
-import { validatedConditionalSigning } from './conditional-signing';
+import {
+  validatedConditionalSigning,
+  requireConditionalSwapContext,
+} from './conditional-signing';
 export type WarmupSigningReview = {
   id: string;
   preparationId: string;
@@ -197,12 +200,22 @@ export async function requireApprovedWarmupPacket(
     validatedTradeSessionCapture(review.session, review.inputRaw);
     requireSessionEntryDue(review.session);
   }
-  if (review.conditional)
+  if (review.conditional) {
+    requireConditionalSwapContext(review.conditional, {
+      side:
+        review.inputMint === 'So11111111111111111111111111111111111111112'
+          ? 'Buy'
+          : 'Sell',
+      inputMint: review.inputMint,
+      outputMint: review.outputMint,
+      inputRaw: review.inputRaw,
+    });
     validatedConditionalSigning(
       review.conditional,
       review.inputRaw,
       Date.now(),
     );
+  }
   if (
     review.network !== 'mainnet' ||
     !Number.isFinite(Date.parse(review.expiresAt)) ||

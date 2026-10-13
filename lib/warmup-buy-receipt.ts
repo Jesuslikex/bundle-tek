@@ -196,6 +196,13 @@ export async function decodeWarmupReceipt(
     uint(meta.fee) +
     rentChange +
     wrappedChanges.reduce((sum, change) => sum + BigInt(change.changeRaw), 0n);
+  if (side === 'Buy') {
+    const input = uint(saved.inAmountRaw);
+    if (input === 0n || nativeOutput !== -input)
+      throw new Error(
+        'Buy SOL settlement differs from the reviewed exact input.',
+      );
+  }
   if (
     !tokens.complete ||
     matches.length !== 1 ||

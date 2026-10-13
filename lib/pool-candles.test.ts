@@ -5,7 +5,9 @@ import {
   candleSelection,
   appendOlderCandles,
   refreshSavedCandles,
+  SOL_CANDLE_QUOTE,
 } from './pool-candles';
+import { acquisitionMint } from '../test/imported-sell-acquisition-fixture';
 const source = {
     chain: 'Solana' as const,
     address: 'So11111111111111111111111111111111111111112',
@@ -55,6 +57,86 @@ it('requests actual one-minute candles, preserves missing minutes and enforces m
   expect(() =>
     decodePoolCandles(data([[time - 1, 1, 2, 0.5, 1, 10]]), source, pool, '1m'),
   ).toThrow();
+});
+it('binds SOL prices to the actual pool quote and returned quote metadata, and refuses mixed-currency pages', async () => {
+  const token = { chain: 'Solana' as const, address: acquisitionMint };
+  const identity = {
+    data: {
+      id: 'solana_' + pool,
+      type: 'pool',
+      relationships: {
+        base_token: { data: { type: 'token', id: 'solana_' + token.address } },
+        quote_token: {
+          data: { type: 'token', id: 'solana_' + SOL_CANDLE_QUOTE },
+        },
+      },
+    },
+  };
+  const quoteData = {
+    ...data(),
+    meta: {
+      base: { address: token.address },
+      quote: { address: SOL_CANDLE_QUOTE },
+    },
+  };
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json(identity))
+    .mockResolvedValueOnce(Response.json(quoteData));
+  const sol = await observePoolCandles(
+    token,
+    pool,
+    '1h',
+    AbortSignal.timeout(1000),
+    fetcher,
+    undefined,
+    'sol',
+  );
+  expect(sol.currency).toBe('sol');
+  expect(sol.quoteMint).toBe(SOL_CANDLE_QUOTE);
+  expect(fetcher.mock.calls[1][0]).toContain('currency=token&token=base');
+  expect(() =>
+    decodePoolCandles(
+      { ...quoteData, meta: { ...quoteData.meta, quote: { address: pool } } },
+      token,
+      pool,
+      '1h',
+      'sol',
+    ),
+  ).toThrow('quote context');
+  const wrong = vi.fn().mockResolvedValue(
+    Response.json({
+      ...identity,
+      data: {
+        ...identity.data,
+        relationships: {
+          ...identity.data.relationships,
+          quote_token: { data: { type: 'token', id: 'solana_' + pool } },
+        },
+      },
+    }),
+  );
+  await expect(
+    observePoolCandles(
+      token,
+      pool,
+      '1h',
+      AbortSignal.timeout(1000),
+      wrong,
+      undefined,
+      'sol',
+    ),
+  ).rejects.toThrow('SOL-quoted');
+  expect(wrong).toHaveBeenCalledTimes(1);
+  const usd = decodePoolCandles(quoteData, token, pool, '1h');
+  expect(usd.currency).toBeUndefined();
+  expect(() =>
+    refreshSavedCandles(usd, {
+      ...sol,
+      observedAt: '2099-01-01T00:00:00.000Z',
+    }),
+  ).toThrow();
+  expect(() => appendOlderCandles(usd, { ...sol, candles: [] })).toThrow();
 });
 it('refreshes recent prices while retaining older actual candles and replacing the entire fresh range', () => {
   const previous = {
@@ -239,7 +321,7 @@ it('uses fixed provider paths without redirects or credentials and refuses unrel
       Response.json(data([[time - 7200, 1, 2, 0.5, 1, 10]])),
     );
   await observePoolCandles(source, pool, '1h', signal, paged, time - 3600);
-  expect(paged.mock.calls[1][0]).toContain(`before_timestamp=${time - 3600}`);
+  expect(paged.mock.calls[1][0]).toContain(`before_timestamp=${time - 3601}`);
   const ignored = vi
     .fn()
     .mockResolvedValueOnce(Response.json(identity))
@@ -262,3 +344,100 @@ it('uses fixed provider paths without redirects or credentials and refuses unrel
     observePoolCandles(source, pool, '1h', signal, large),
   ).rejects.toThrow('too large');
 });
+
+it.each(['usd', 'sol'] as const)(
+  'translates exclusive %s history boundaries for an inclusive provider and merges without duplicates',
+  async (currency) => {
+    const token = { chain: 'Solana' as const, address: acquisitionMint };
+    const identity = {
+      data: {
+        type: 'pool',
+        id: 'solana_' + pool,
+        relationships: {
+          base_token: {
+            data: { type: 'token', id: 'solana_' + token.address },
+          },
+          quote_token: {
+            data: { type: 'token', id: 'solana_' + SOL_CANDLE_QUOTE },
+          },
+        },
+      },
+    };
+    const rows = [time, time - 60, time - 120, time - 180].map((t) => [
+      t,
+      1,
+      2,
+      0.5,
+      1,
+      10,
+    ]);
+    const response = (selected: number[][]) => ({
+      data: {
+        type: 'ohlcv_request_response',
+        attributes: { ohlcv_list: selected },
+      },
+      meta: {
+        base: { address: token.address },
+        quote: { address: SOL_CANDLE_QUOTE },
+      },
+    });
+    const requestUrl = (url: string | URL | Request) =>
+      typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
+    const fetcher = vi.fn(async (url: string | URL | Request) => {
+      const parsed = new URL(requestUrl(url));
+      if (!parsed.pathname.includes('/ohlcv/')) return Response.json(identity);
+      const cursor = Number(parsed.searchParams.get('before_timestamp'));
+      return Response.json(response(rows.filter((row) => row[0] <= cursor)));
+    });
+    const boundary = time - 60;
+    const prior = decodePoolCandles(
+      response(rows.slice(0, 2)),
+      token,
+      pool,
+      '1m',
+      currency,
+    );
+    const older = await observePoolCandles(
+      token,
+      pool,
+      '1m',
+      AbortSignal.timeout(1000),
+      fetcher,
+      boundary,
+      currency,
+    );
+    expect(
+      new URL(requestUrl(fetcher.mock.calls[1][0])).searchParams.get(
+        'before_timestamp',
+      ),
+    ).toBe(String(boundary - 1));
+    expect(older.candles.map((c) => c.time)).toEqual([time - 180, time - 120]);
+    const merged = appendOlderCandles(prior, older);
+    expect(merged.candles.map((c) => c.time)).toEqual([
+      time - 180,
+      time - 120,
+      time - 60,
+      time,
+    ]);
+    expect(new Set(merged.candles.map((c) => c.time)).size).toBe(4);
+    for (const invalidTime of [boundary, time]) {
+      const ignored = vi
+        .fn()
+        .mockResolvedValueOnce(Response.json(identity))
+        .mockResolvedValueOnce(
+          Response.json(response([[invalidTime, 1, 2, 0.5, 1, 10]])),
+        );
+      await expect(
+        observePoolCandles(
+          token,
+          pool,
+          '1m',
+          AbortSignal.timeout(1000),
+          ignored,
+          boundary,
+          currency,
+        ),
+      ).rejects.toThrow('ignored cursor');
+    }
+  },
+);

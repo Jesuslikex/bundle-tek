@@ -37,3 +37,35 @@ it('shows exact level terms, captured observation, expiry and separate signing/s
   ])
     expect(html).toContain(text);
 });
+it('labels conditional Buy input as SOL and keeps the target token precision separate', () => {
+  const html = renderToStaticMarkup(
+    <ConditionalSigningReview
+      conditional={{
+        format: 'conditional-preparation-v2',
+        side: 'Buy',
+        inputMint: 'So11111111111111111111111111111111111111112',
+        inputDecimals: 9,
+        outputMint: '11111111111111111111111111111111',
+        outputDecimals: 6,
+        orderId: '11111111-1111-4111-8111-111111111111',
+        orderRevision: 1,
+        level: 1,
+        termsSha256: 'b'.repeat(64),
+        pair: 'selected-pool',
+        direction: 'at-or-below',
+        targetUsd: '100',
+        unitsRaw: '11',
+        observedMarketCapUsd: '80',
+        observedAt: '2026-10-13T00:00:00.000Z',
+        expiresAt: '2026-10-13T00:00:30.000Z',
+        source: 'api.dexscreener.com',
+      }}
+    />,
+  );
+  expect(html).toContain('Conditional buy');
+  expect(html).toContain('11 atomic SOL input units');
+  expect(html).toContain('9 decimals');
+  expect(html).toContain('6 decimals');
+  expect(html).toContain('minimum token output');
+  expect(html).not.toContain('11 atomic token units');
+});

@@ -1,4 +1,4 @@
-import type { ConditionalSellOrder } from './conditional-sell-order';
+import type { ConditionalOrder } from './conditional-order';
 import { UUID } from './wallet-operation';
 export type ConditionalLevelStatus = {
   orderId: string;
@@ -11,7 +11,7 @@ export type ConditionalLevelStatus = {
 };
 export function conditionalLevelStatuses(
   value: unknown,
-  orders: ConditionalSellOrder[],
+  orders: ConditionalOrder[],
 ): ConditionalLevelStatus[] {
   if (!Array.isArray(value) || value.length > 5000)
     throw new Error('Conditional level status unavailable.');

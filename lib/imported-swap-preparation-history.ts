@@ -12,6 +12,7 @@ import {
   type ConditionalPreparation,
   type ConditionalPreparationGuard,
 } from './conditional-preparation-server';
+import { requireConditionalSwapContext } from './conditional-signing';
 import {
   importedAcquisitionWriteGuard,
   type ImportedAcquisitionGuard,
@@ -167,6 +168,13 @@ export async function saveSwapPreparation(
   conditionalGuard?: ConditionalPreparationGuard,
   sessionGuard?: TradeSessionGuard,
 ) {
+  if (document.conditional)
+    requireConditionalSwapContext(document.conditional, {
+      side: document.side,
+      inputMint: document.inputMint,
+      outputMint: document.outputMint,
+      inputRaw: document.inAmountRaw,
+    });
   const text = JSON.stringify(document);
   if (
     text.length > 8192 ||
@@ -181,8 +189,7 @@ export async function saveSwapPreparation(
     JSON.stringify(document.conditional) !==
       JSON.stringify(conditionalGuard?.selection) ||
     (document.conditional !== undefined &&
-      (document.side !== 'Sell' ||
-        document.inAmountRaw !== document.conditional.unitsRaw))
+      document.inAmountRaw !== document.conditional.unitsRaw)
   )
     throw new Error('Invalid saved preparation.');
   const id = crypto.randomUUID(),

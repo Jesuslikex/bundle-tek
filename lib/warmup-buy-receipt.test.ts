@@ -79,7 +79,7 @@ async function fixture() {
       fee: '5000',
       loadedAddresses: { writable: [] as string[], readonly: [] as string[] },
       preBalances: ['1000000', '1', '1'],
-      postBalances: ['995000', '1', '1'],
+      postBalances: ['994999', '1', '1'],
       preTokenBalances: [balance('9007199254740993')],
       postTokenBalances: [balance('9007199254741094')],
       logMessages: ['private-log-sentinel'],
@@ -102,8 +102,9 @@ it('verifies the wallet signature and exact saved packet, counting only the net 
     acquiredRaw: '101',
     decimals: 6,
     slot: 300,
-    nativeChangeRaw: '-5000',
+    nativeChangeRaw: '-5001',
     networkFeeLamports: '5000',
+    nativeSettlementRaw: '-1',
   });
   expect(receipt.limitations).toContain(
     'does not verify swap instruction semantics',

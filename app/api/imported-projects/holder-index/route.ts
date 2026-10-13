@@ -1,6 +1,7 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { observeHolderIndexPage } from '@/lib/holder-index-provider';
+import { HolderMintObservationConflict } from '@/lib/holder-index-mint';
 import { HOLDER_INDEX_MAX_PAGES } from '@/lib/holder-index';
 import type { HolderIndexPage } from '@/lib/holder-index';
 import { WalletRpcError } from '@/lib/wallet-balances';
@@ -213,7 +214,10 @@ export async function POST(request: Request) {
     }
     return json({ id: query.id, revision: query.revision, ...saved });
   } catch (error) {
-    if (error instanceof HolderIndexConflict)
+    if (
+      error instanceof HolderIndexConflict ||
+      error instanceof HolderMintObservationConflict
+    )
       return json({ error: error.message }, 409);
     return json(
       {

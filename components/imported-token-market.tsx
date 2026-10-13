@@ -5,6 +5,7 @@ import { ImportedPoolCandles } from './imported-pool-candles';
 import { ImportedPoolTrades } from './imported-pool-trades';
 import { MarketConditionReview } from './market-condition-review';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
+import type { ImportedSwapReceipt } from '@/lib/imported-approval-history';
 import { MARKET_CHAINS, type SavedTokenMarket } from '@/lib/token-market';
 import {
   createForegroundMarketFeed,
@@ -92,8 +93,10 @@ export function MarketObservationChart({
 }
 export function ImportedTokenMarket({
   project,
+  onReviewBuy,
 }: {
   project: ImportedTokenProject;
+  onReviewBuy?: (receipt: ImportedSwapReceipt) => void;
 }) {
   const [observations, setObservations] = useState<SavedTokenMarket[]>([]),
     [selected, setSelected] = useState(''),
@@ -232,7 +235,10 @@ export function ImportedTokenMarket({
   const latest = observations[0],
     pair = latest?.pairs.find((p) => p.address === selected);
   return (
-    <section className="wallet-warmup-panel" aria-label="Imported token market">
+    <section
+      className="wallet-warmup-panel imported-market-pane"
+      aria-label="Imported token market"
+    >
       <h3>Market observations</h3>
       <details className="market-data-coverage">
         <summary>Market data coverage and feed behavior</summary>
@@ -337,12 +343,21 @@ export function ImportedTokenMarket({
           )}
           {pair && (
             <>
-              <ImportedPoolCandles
-                key={pair.address}
-                project={project}
-                pool={pair.address}
-                feedRunning={feedState.status === 'running'}
-              />
+              <div className="imported-market-board">
+                <ImportedPoolCandles
+                  key={pair.address}
+                  project={project}
+                  pool={pair.address}
+                  feedRunning={feedState.status === 'running'}
+                />
+                <ImportedPoolTrades
+                  key={`trades:${pair.address}`}
+                  project={project}
+                  pool={pair.address}
+                  feedRunning={feedState.status === 'running'}
+                  compact
+                />
+              </div>
               <details className="market-analysis-tools">
                 <summary>Market observations and conditions</summary>
                 <p>
@@ -357,6 +372,7 @@ export function ImportedTokenMarket({
                   observation={latest}
                   feedRunning={feedState.status === 'running'}
                   pair={pair.address}
+                  onReviewBuy={onReviewBuy}
                 />
                 <p className="warmup-address">
                   Pair: {pair.address} ·{' '}
@@ -404,12 +420,6 @@ export function ImportedTokenMarket({
                   pair={pair.address}
                 />
               </details>
-              <ImportedPoolTrades
-                key={`trades:${pair.address}`}
-                project={project}
-                pool={pair.address}
-                feedRunning={feedState.status === 'running'}
-              />
             </>
           )}
         </>

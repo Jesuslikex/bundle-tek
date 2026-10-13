@@ -4,6 +4,8 @@ import { balanceRpc, SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import { DEVNET_GENESIS_HASH } from './devnet-intent';
 import { getSolanaRpcEndpoint } from './solana-rpc';
 import { walletAddress } from './wallet-workspace';
+import { transactionSignature } from './transaction-signature';
+export { transactionSignature } from './transaction-signature';
 
 export type TrackedTransaction = {
   transactionVersion?: 'legacy' | 0 | 1;
@@ -58,15 +60,6 @@ export type MovementInstruction = {
   type?: string;
   info?: Record<string, string>;
 };
-export function transactionSignature(value: unknown) {
-  if (
-    typeof value !== 'string' ||
-    value.length > 88 ||
-    bs58.decode(value).length !== 64
-  )
-    throw new Error('Invalid transaction signature.');
-  return value;
-}
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('Invalid transaction data.');

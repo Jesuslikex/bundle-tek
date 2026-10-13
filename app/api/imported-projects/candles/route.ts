@@ -3,6 +3,7 @@ import { getD1 } from '@/db';
 import { validateTokenSource } from '@/lib/token-source';
 import {
   CANDLE_NETWORKS,
+  candleCurrency,
   observePoolCandles,
   type PoolCandles,
   candleSelection,
@@ -20,6 +21,7 @@ function input(value: {
   pool?: unknown;
   interval?: unknown;
   mode?: unknown;
+  currency?: unknown;
 }) {
   if (
     !value ||
@@ -42,6 +44,7 @@ function input(value: {
     pool: value.pool,
     interval: value.interval,
     mode: value.mode ?? 'latest',
+    currency: candleCurrency(value.currency ?? 'usd'),
   };
 }
 type Context = {
@@ -70,6 +73,7 @@ export async function GET(request: Request) {
     query = input({
       id: params.get('id'),
       revision: Number(params.get('revision')),
+      currency: params.get('currency') ?? 'usd',
     });
   } catch {
     return json({ error: 'Choose an imported project revision.' }, 400);
@@ -79,10 +83,19 @@ export async function GET(request: Request) {
     if (!row) return json({ error: 'Imported project not found.' }, 404);
     if (row.revision !== query.revision)
       return json({ error: 'Project changed. Reload imported projects.' }, 409);
+    if (query.currency === 'sol' && row.chain !== 'Solana')
+      return json(
+        { error: 'SOL-denominated candles require a Solana token project.' },
+        400,
+      );
     return json({
       id: query.id,
       revision: row.revision,
-      observations: row.document ? JSON.parse(row.document) : [],
+      observations: row.document
+        ? (JSON.parse(row.document) as PoolCandles[]).filter(
+            (p) => (p.currency ?? 'usd') === query.currency,
+          )
+        : [],
       executionAllowed: false,
     });
   } catch {
@@ -132,6 +145,7 @@ export async function POST(request: Request) {
     row = owned;
     try {
       selection = candleSelection(row.chain, query.pool, query.interval);
+      candleCurrency(query.currency, row.chain);
       const markets: SavedTokenMarket[] = row.market_document
         ? JSON.parse(row.market_document)
         : [];
@@ -139,7 +153,10 @@ export async function POST(request: Request) {
         throw new Error();
       const saved: PoolCandles[] = row.document ? JSON.parse(row.document) : [];
       priorSelection = saved.find(
-        (p) => p.pool === selection.pool && p.interval === selection.interval,
+        (p) =>
+          p.pool === selection.pool &&
+          p.interval === selection.interval &&
+          (p.currency ?? 'usd') === query.currency,
       );
       if (
         query.mode === 'older' &&
@@ -204,10 +221,21 @@ export async function POST(request: Request) {
             await observePoolCandles(
               ...args,
               fetch,
-              priorSelection!.candles[0].time - 1,
+              priorSelection!.candles[0].time,
+              query.currency,
             ),
           )
-        : await observePoolCandles(...args);
+        : await observePoolCandles(...args, fetch, undefined, query.currency);
+    if (
+      (observation.currency ?? 'usd') !== query.currency ||
+      observation.chain !== row.chain ||
+      observation.address !== row.address ||
+      observation.pool !== selection.pool ||
+      observation.interval !== selection.interval ||
+      (query.currency === 'sol' &&
+        observation.quoteMint !== 'So11111111111111111111111111111111111111112')
+    )
+      throw new Error('Candle denomination differs.');
     if (query.mode === 'follow' && priorSelection)
       observation = refreshSavedCandles(priorSelection, observation);
   } catch {
@@ -234,7 +262,10 @@ export async function POST(request: Request) {
     const observations = [
       { ...observation, projectRevision: query.revision },
       ...previous.filter(
-        (p) => p.pool !== selection.pool || p.interval !== selection.interval,
+        (p) =>
+          p.pool !== selection.pool ||
+          p.interval !== selection.interval ||
+          (p.currency ?? 'usd') !== query.currency,
       ),
     ].slice(0, 20);
     const result = await db
@@ -273,7 +304,9 @@ export async function POST(request: Request) {
     return json({
       id: query.id,
       revision: query.revision,
-      observations,
+      observations: observations.filter(
+        (p) => (p.currency ?? 'usd') === query.currency,
+      ),
       executionAllowed: false,
     });
   } catch {

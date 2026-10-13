@@ -28,6 +28,7 @@ import { walletFolderIds } from '@/lib/wallet-workspace';
 import type { WorkspaceWallet, WalletFolder } from '@/lib/wallet-workspace';
 import { ImportedSwapPreparation } from './imported-swap-preparation';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
+import { SessionEntryOutcomesPanel } from './session-entry-outcomes';
 type Activity = {
   sessionId: string;
   entry: number;
@@ -555,7 +556,14 @@ export function ImportedTradeSessions({
       {error && <p role="alert">{error}</p>}
       {sessions.map((s) => (
         <article key={s.id} className="space-y-2 rounded-md border p-3">
-          <JitoAtomicBundle projectId={project.id} session={s} locked={locked || controls.find(c => c.sessionId === s.id)?.state !== 'ready'} />
+          <JitoAtomicBundle
+            projectId={project.id}
+            session={s}
+            locked={
+              locked ||
+              controls.find((c) => c.sessionId === s.id)?.state !== 'ready'
+            }
+          />
           <h5>
             {s.terms.side} session · {s.state}
           </h5>
@@ -564,6 +572,17 @@ export function ImportedTradeSessions({
             {s.terms.totalRaw} atomic units. Fees and wallet reserves are
             additional.
           </p>
+          <SessionEntryOutcomesPanel
+            session={s}
+            revision={historyRevision}
+            recoveryDisabled={busy}
+            sellDisabled={busy || locked || project.archived}
+            onRecover={(entry, intentId) => {
+              setPreparing(null);
+              setRecovery({ entry, intentId, session: s });
+            }}
+            onReviewBuy={onReviewBuy}
+          />
           <p>
             Session control:{' '}
             {controls.find((c) => c.sessionId === s.id)?.state || 'unavailable'}

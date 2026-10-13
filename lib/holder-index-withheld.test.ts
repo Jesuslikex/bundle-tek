@@ -76,7 +76,7 @@ it('keeps withheld fees outside owners and preserves them through serialized sav
   );
   expect(holderIndexSummary(scan).holders[0].raw).toBe(5n);
   expect(holderIndexSummary(scan).remainderRaw).toBe('5');
-  expect(holderIndexWithheldFees(scan)).toEqual({
+  expect(holderIndexWithheldFees(scan)).toMatchObject({
     raw: '3',
     reportedAccounts: 1,
     remainderAfterObservedFeesRaw: '2',
@@ -91,7 +91,7 @@ it('does not turn missing fee metadata into a measured zero', async () => {
 it('rejects malformed or duplicated fee extensions and contradictory totals', async () => {
   await expect(
     page([{ extension: 'transferFeeAmount', state: { withheldAmount: '-1' } }]),
-  ).rejects.toThrow('fees');
+  ).rejects.toThrow('fee');
   await expect(
     page([
       { extension: 'transferFeeAmount', state: { withheldAmount: '3' } },

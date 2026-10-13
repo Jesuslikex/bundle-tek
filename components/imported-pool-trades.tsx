@@ -15,10 +15,12 @@ export function ImportedPoolTrades({
   project,
   pool,
   feedRunning,
+  compact = false,
 }: {
   project: ImportedTokenProject;
   pool: string;
   feedRunning: boolean;
+  compact?: boolean;
 }) {
   const [saved, setSaved] = useState<PoolTrades[]>([]),
     [busy, setBusy] = useState(true),
@@ -152,7 +154,10 @@ export function ImportedPoolTrades({
           ? 'https://basescan.org/tx/'
           : 'https://bscscan.com/tx/';
   return (
-    <section aria-label="Selected pool trade tape">
+    <section
+      aria-label="Selected pool trade tape"
+      className={`imported-pool-trade-tape${compact ? ' imported-pool-trade-tape--compact' : ''}`}
+    >
       <h4>Recent pool trades</h4>
       <Button
         variant="outline"
@@ -161,14 +166,17 @@ export function ImportedPoolTrades({
       >
         {busy ? 'Loading pool trades…' : 'Refresh pool trades'}
       </Button>
-      <p>
-        Provider-reported swaps for this pool, with direction relative to its
-        base token. Retains the latest 100 records for each of up to 10 selected
-        pools. Refresh replaces that pool&apos;s saved tape. Manual reads only;
-        stop the market feed before refreshing. This is a limited provider
-        window, not complete tick coverage, our execution receipts, wallet
-        ownership or verified trader activity.
-      </p>
+      <details className="pool-trade-coverage">
+        <summary>Trade tape coverage</summary>
+        <p>
+          Provider-reported swaps for this pool, with direction relative to its
+          base token. Retains the latest 100 records for each of up to 10
+          selected pools. Refresh replaces that pool&apos;s saved tape. Manual
+          reads only; stop the market feed before refreshing. This is a limited
+          provider window, not complete tick coverage, our execution receipts,
+          wallet ownership or verified trader activity.
+        </p>
+      </details>
       {error && <p role="alert">{error}</p>}
       {snapshot ? (
         <>
@@ -188,7 +196,7 @@ export function ImportedPoolTrades({
             </p>
           )}
           {snapshot.trades.length ? (
-            <div style={{ overflowX: 'auto', maxHeight: 360 }}>
+            <div className="pool-trade-table-scroll">
               <table className="project-table">
                 <caption>
                   Provider pool trades, newest first. USD values rounded for
@@ -206,21 +214,69 @@ export function ImportedPoolTrades({
                       'Sender',
                       'Transaction',
                     ].map((h) => (
-                      <th key={h}>{h}</th>
+                      <th
+                        key={h}
+                        className={
+                          [
+                            'Time',
+                            'Sender',
+                            'Token amount',
+                            'Quote amount',
+                            'Token price USD',
+                          ].includes(h)
+                            ? 'pool-trade-extra-column'
+                            : undefined
+                        }
+                      >
+                        {compact && h === 'Transaction'
+                          ? 'Sender / Tx'
+                          : compact && h === 'Side'
+                            ? 'Side / time'
+                            : h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {snapshot.trades.map((t) => (
-                    <tr key={t.id}>
-                      <td>
-                        {new Date(t.timestamp).toLocaleString()}
-                        <small>Block {t.block}</small>
+                    <tr key={t.id} data-side={t.side}>
+                      <td className="pool-trade-extra-column">
+                        <time
+                          dateTime={t.timestamp}
+                          title={`${t.timestamp} · block ${t.block}`}
+                        >
+                          {compact
+                            ? new Date(t.timestamp).toLocaleTimeString(
+                                undefined,
+                                { hour: '2-digit', minute: '2-digit' },
+                              )
+                            : new Date(t.timestamp).toLocaleString()}
+                        </time>
+                        {!compact && <small>Block {t.block}</small>}
                       </td>
-                      <td>{t.side}</td>
-                      <td>{t.tokenAmount}</td>
-                      <td>{t.quoteAmount}</td>
-                      <td title={t.priceUsd}>
+                      <td className="pool-trade-side">
+                        {t.side}
+                        {compact && (
+                          <small>
+                            <time dateTime={t.timestamp}>
+                              {new Date(t.timestamp).toLocaleTimeString(
+                                undefined,
+                                { hour: '2-digit', minute: '2-digit' },
+                              )}
+                            </time>
+                          </small>
+                        )}
+                      </td>
+                      <td className="pool-trade-extra-column">
+                        {t.tokenAmount}
+                      </td>
+                      <td className="pool-trade-extra-column">
+                        {t.quoteAmount}
+                      </td>
+                      <td
+                        className="pool-trade-extra-column"
+                        title={t.priceUsd}
+                      >
                         {Number(t.priceUsd).toLocaleString(undefined, {
                           maximumSignificantDigits: 8,
                         })}
@@ -230,22 +286,31 @@ export function ImportedPoolTrades({
                           maximumSignificantDigits: 8,
                         })}
                       </td>
-                      <td>
+                      <td className="pool-trade-extra-column">
                         <code title={t.sender}>
                           {t.sender.slice(0, 6)}…{t.sender.slice(-4)}
                         </code>
                       </td>
                       <td>
+                        {compact && (
+                          <code title={t.sender}>
+                            {t.sender.slice(0, 6)}…{t.sender.slice(-4)}
+                          </code>
+                        )}
                         <a
                           href={`${explorer}${t.transaction}`}
                           target="_blank"
                           rel="noreferrer"
                           title={t.transaction}
+                          aria-label={`View transaction ${t.transaction}`}
                         >
-                          View transaction
+                          {compact ? 'Tx' : 'View transaction'}
                         </a>
                         <details>
                           <summary>Exact values</summary>
+                          <p>
+                            Time: {t.timestamp}. Block: {t.block}
+                          </p>
                           <p>Token amount: {t.tokenAmount}</p>
                           <p>Quote amount: {t.quoteAmount}</p>
                           <p>Price USD: {t.priceUsd}</p>
@@ -272,7 +337,7 @@ export function ImportedPoolTrades({
                               })
                             }
                           >
-                            Inspect wallet movement
+                            {compact ? 'Inspect' : 'Inspect wallet movement'}
                           </Button>
                         )}
                       </td>

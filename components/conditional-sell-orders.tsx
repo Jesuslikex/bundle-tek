@@ -6,10 +6,13 @@ import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import {
-  decodeConditionalSellOrder,
-  conditionalSellTerms,
-  type ConditionalSellOrder,
-} from '@/lib/conditional-sell-order';
+  decodeConditionalOrder,
+  conditionalOrderTerms,
+  conditionalOrderSide,
+  conditionalOrderInputDecimals,
+  type ConditionalOrder,
+} from '@/lib/conditional-order';
+import type { ImportedSwapReceipt } from '@/lib/imported-approval-history';
 import {
   conditionalLevelStatuses,
   type ConditionalLevelStatus,
@@ -26,15 +29,16 @@ import {
 import { ConditionalLevelPreview } from './conditional-level-preview';
 import type { SavedTokenMarket } from '@/lib/token-market';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
+import { ConditionalTriggerQueue } from './conditional-trigger-queue';
 type Page = {
   projectId: string;
-  orders: ConditionalSellOrder[];
+  orders: ConditionalOrder[];
   levels: ConditionalLevelStatus[];
   executionAllowed: false;
   error?: string;
 };
 type Result = {
-  order: ConditionalSellOrder;
+  order: ConditionalOrder;
   orderId?: string;
   revision?: number;
   reviews: { met: boolean; observedAt: string }[];
@@ -48,7 +52,7 @@ function FollowedConditionalSample({
   observation,
   now,
 }: {
-  order: ConditionalSellOrder;
+  order: ConditionalOrder;
   project: ImportedTokenProject;
   pair: string;
   observation: SavedTokenMarket;
@@ -74,11 +78,15 @@ export function ConditionalSellOrders({
   grid,
   observation,
   feedRunning = false,
+  side = 'Sell',
+  onReviewBuy,
 }: {
   project: ImportedTokenProject;
   pair: string;
   observation?: SavedTokenMarket;
   feedRunning?: boolean;
+  side?: 'Buy' | 'Sell';
+  onReviewBuy?: (receipt: ImportedSwapReceipt) => void;
   limit?: Pick<MarketTrigger, 'direction' | 'targetUsd'> & { amount: string };
   grid?: {
     minimumUsd: string;
@@ -89,7 +97,7 @@ export function ConditionalSellOrders({
 }) {
   const [wallets, setWallets] = useState<WorkspaceWallet[]>([]),
     [selected, setSelected] = useState('');
-  const [orders, setOrders] = useState<ConditionalSellOrder[]>([]),
+  const [orders, setOrders] = useState<ConditionalOrder[]>([]),
     [loaded, setLoaded] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -113,7 +121,7 @@ export function ConditionalSellOrders({
   const pending = useRef<AbortController | null>(null);
   const retry = useRef<{ key: string; id: string } | null>(null);
   const [preparing, setPreparing] = useState<{
-    order: ConditionalSellOrder;
+    order: ConditionalOrder;
     level: number;
     wallet: WorkspaceWallet;
   } | null>(null);
@@ -208,7 +216,7 @@ export function ConditionalSellOrders({
             (w: WorkspaceWallet) => w.chain === 'Solana' && !w.archived,
           ),
         );
-        const validated = page.orders.map(decodeConditionalSellOrder);
+        const validated = page.orders.map(decodeConditionalOrder);
         if (
           validated.some((o) => o.terms.projectId !== project.id) ||
           new Set(validated.map((o) => o.id)).size !== validated.length
@@ -239,8 +247,11 @@ export function ConditionalSellOrders({
       wallet: wallet.address,
       walletRevision: wallet.revision,
       kind,
+      side,
       ...terms,
-      ...(kind === 'grid' ? { direction: 'at-or-above' } : {}),
+      ...(kind === 'grid'
+        ? { direction: side === 'Buy' ? 'at-or-below' : 'at-or-above' }
+        : {}),
     };
     const key = JSON.stringify(input);
     if (retry.current?.key !== key)
@@ -269,10 +280,10 @@ export function ConditionalSellOrders({
       )
         throw new Error('Saved order response differs. Reload saved orders.');
       if (!controller.signal.aborted) {
-        const validated = decodeConditionalSellOrder(data.order);
+        const validated = decodeConditionalOrder(data.order);
         if (
           JSON.stringify(validated.terms) !==
-          JSON.stringify(conditionalSellTerms(input, project.document.token))
+          JSON.stringify(conditionalOrderTerms(input, project.document.token))
         )
           throw new Error(
             'Saved draft terms differ from the requested review.',
@@ -293,7 +304,7 @@ export function ConditionalSellOrders({
       if (!controller.signal.aborted) setBusy(false);
     }
   }
-  async function act(order: ConditionalSellOrder, action: 'cancel' | 'review') {
+  async function act(order: ConditionalOrder, action: 'cancel' | 'review') {
     const controller = begin();
     try {
       const response = await fetch(
@@ -323,7 +334,7 @@ export function ConditionalSellOrders({
         )
           throw new Error('Cancellation response differs. Reload orders.');
         if (!controller.signal.aborted) {
-          const validated = decodeConditionalSellOrder(data.order);
+          const validated = decodeConditionalOrder(data.order);
           if (JSON.stringify(validated.terms) !== JSON.stringify(order.terms))
             throw new Error('Cancelled order terms changed. Reload orders.');
           setOrders((old) =>
@@ -350,10 +361,10 @@ export function ConditionalSellOrders({
   }
   return (
     <section
-      aria-label="Saved conditional sell drafts"
+      aria-label={`Saved conditional ${side.toLowerCase()} drafts`}
       className="conditional-sell-orders"
     >
-      <h5>Saved conditional sells</h5>
+      <h5>Saved conditional orders</h5>
       <p>
         Save Limit or Grid terms for later review. Drafts do not run
         automatically. Each trade still needs fresh balance, route and signing
@@ -387,7 +398,7 @@ export function ConditionalSellOrders({
             </>
           )}
           <label>
-            Draft sell wallet
+            Draft {side.toLowerCase()} wallet
             <select
               disabled={busy || project.archived}
               value={selected}
@@ -404,6 +415,26 @@ export function ConditionalSellOrders({
               ))}
             </select>
           </label>
+          {following && observation && (
+            <ConditionalTriggerQueue
+              input={{
+                orders,
+                statuses: levels,
+                wallets,
+                project,
+                pair,
+                observation,
+                now: sampleNow,
+              }}
+              busy={busy}
+              onReview={({ order, level, wallet }) => {
+                setRecovery(null);
+                setMessage('');
+                setError('');
+                setPreparing({ order, level, wallet });
+              }}
+            />
+          )}
           <div className="imported-trade-wallet-filters">
             <Button
               variant="outline"
@@ -427,15 +458,18 @@ export function ConditionalSellOrders({
               {orders.map((order) => (
                 <li className="conditional-order" key={order.id}>
                   <strong>
+                    {conditionalOrderSide(order)}{' '}
                     {order.terms.kind === 'grid' ? 'Grid' : 'Limit'} ·{' '}
                     {order.state}
                   </strong>{' '}
                   · {order.terms.levels.length} level(s) ·{' '}
                   {formatNativeBalance(
                     order.terms.totalRaw,
-                    order.terms.decimals,
+                    conditionalOrderInputDecimals(order),
                   )}{' '}
-                  {project.document.token.symbol} total
+                  {conditionalOrderSide(order) === 'Buy'
+                    ? 'SOL input budget'
+                    : `${project.document.token.symbol} total`}
                   <details className="conditional-order__details">
                     <summary>Order wallet and saved terms</summary>
                     <p>
@@ -564,6 +598,7 @@ export function ConditionalSellOrders({
           project={project}
           selection={recovery}
           submissionBlocked={busy || recovery.order.state !== 'draft'}
+          onReviewBuy={onReviewBuy}
         />
       )}
       {preparing && (
@@ -571,13 +606,14 @@ export function ConditionalSellOrders({
           key={`${preparing.order.id}:${preparing.order.revision}:${preparing.level}`}
           project={project}
           wallet={preparing.wallet}
-          side="Sell"
+          side={conditionalOrderSide(preparing.order)}
           amount={
             preparing.order.terms.levels.find(
               (l) => l.level === preparing.level,
             )!.amount
           }
           locked={busy}
+          onReviewBuy={onReviewBuy}
           conditionalOrder={preparing.order}
           conditional={{
             orderId: preparing.order.id,

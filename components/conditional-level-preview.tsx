@@ -1,11 +1,14 @@
-import type { ConditionalSellOrder } from '@/lib/conditional-sell-order';
+import {
+  conditionalOrderSide,
+  type ConditionalOrder,
+} from '@/lib/conditional-order';
 import type { ConditionalLevelReview } from '@/lib/conditional-level-review';
 export function ConditionalLevelPreview({
   order,
   reviews,
   now,
 }: {
-  order: ConditionalSellOrder;
+  order: ConditionalOrder;
   reviews: ConditionalLevelReview[];
   now: number;
 }) {
@@ -37,7 +40,12 @@ export function ConditionalLevelPreview({
               : r.met
                 ? 'Met in this sample'
                 : 'Not met in this sample'}
-            . Exact sell amount {order.terms.levels[i].amount} tokens.
+            . Exact{' '}
+            {conditionalOrderSide(order) === 'Buy'
+              ? 'buy budget'
+              : 'sell amount'}{' '}
+            {order.terms.levels[i].amount}{' '}
+            {conditionalOrderSide(order) === 'Buy' ? 'SOL' : 'tokens'}.
           </li>
         ))}
       </ul>

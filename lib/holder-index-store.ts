@@ -4,6 +4,10 @@ import {
   HOLDER_RUN_RESUME_MS,
   type HolderIndexPage,
 } from './holder-index';
+import {
+  sameHolderMintFees,
+  type HolderMintObservation,
+} from './holder-index-mint';
 
 export type HolderIndexRunRow = {
   id: string;
@@ -20,6 +24,8 @@ export type HolderIndexRunContext = {
   decimals: number;
   totalSupplyRaw: string;
   source: string;
+  mintObservation?: HolderMintObservation;
+  observedAccountWithheldRaw?: string | null;
 };
 export class HolderIndexConflict extends Error {}
 export const MAX_HOLDER_RUNS = 20;
@@ -60,6 +66,10 @@ export function requireHolderRunPage(
     throw new HolderIndexConflict(
       'Holder run changed or is too old to resume. Start a fresh scan.',
     );
+  if (!sameHolderMintFees(context.mintObservation, page.mintObservation))
+    throw new HolderIndexConflict(
+      'Mint fees or extensions changed. Start a fresh scan.',
+    );
 }
 export function holderRun(
   db: D1Database,
@@ -94,6 +104,29 @@ export async function saveHolderRunPage(
     throw new HolderIndexConflict(
       'Indexed balances exceed supply. Start a fresh scan.',
     );
+  const priorContext = run
+    ? (JSON.parse(run.document) as HolderIndexRunContext)
+    : null;
+  const observedBefore = run
+    ? (priorContext?.observedAccountWithheldRaw ?? null)
+    : '0';
+  const observedAccountWithheldRaw =
+    observedBefore === null
+      ? null
+      : (
+          BigInt(observedBefore) +
+          page.accounts.reduce(
+            (sum, account) => sum + BigInt(account.withheldRaw ?? '0'),
+            0n,
+          )
+        ).toString();
+  const knownFees =
+    BigInt(observedAccountWithheldRaw ?? '0') +
+    BigInt(page.mintObservation?.withheldRaw ?? '0');
+  if (indexed + knownFees > BigInt(page.totalSupplyRaw))
+    throw new HolderIndexConflict(
+      'Observed balances and fees exceed supply. Start a fresh scan.',
+    );
   const status = (
     page.enumeration ? page.nextCursor === null : page.accounts.length === 0
   )
@@ -107,6 +140,8 @@ export async function saveHolderRunPage(
     decimals: page.decimals,
     totalSupplyRaw: page.totalSupplyRaw,
     source: page.source,
+    observedAccountWithheldRaw,
+    ...(page.mintObservation ? { mintObservation: page.mintObservation } : {}),
   };
   // A page row is the commit gate. Every following statement requires that exact
   // serialized page, and the batch rolls back if any account identity overlaps.
@@ -153,7 +188,7 @@ export async function saveHolderRunPage(
         ),
       db
         .prepare(
-          `INSERT INTO holder_index_runs(owner_id,project_id,id,project_revision,document,last_page,indexed_raw,status,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE ${gate} ON CONFLICT(owner_id,project_id,id) DO UPDATE SET last_page=excluded.last_page,indexed_raw=excluded.indexed_raw,status=excluded.status,updated_at=excluded.updated_at WHERE holder_index_runs.last_page=?`,
+          `INSERT INTO holder_index_runs(owner_id,project_id,id,project_revision,document,last_page,indexed_raw,status,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE ${gate} ON CONFLICT(owner_id,project_id,id) DO UPDATE SET document=excluded.document,last_page=excluded.last_page,indexed_raw=excluded.indexed_raw,status=excluded.status,updated_at=excluded.updated_at WHERE holder_index_runs.last_page=?`,
         )
         .bind(
           owner,

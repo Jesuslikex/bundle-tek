@@ -12,6 +12,19 @@ export const CANDLE_INTERVALS = {
   '1d': { timeframe: 'day', aggregate: 1, seconds: 86400 },
 } as const;
 export type CandleInterval = keyof typeof CANDLE_INTERVALS;
+export type CandleCurrency = 'usd' | 'sol';
+export const SOL_CANDLE_QUOTE = 'So11111111111111111111111111111111111111112';
+export function candleCurrency(
+  value: unknown = 'usd',
+  chain?: string,
+): CandleCurrency {
+  if (
+    (value !== 'usd' && value !== 'sol') ||
+    (value === 'sol' && chain !== undefined && chain !== 'Solana')
+  )
+    throw new Error('Unsupported candle denomination.');
+  return value;
+}
 export type Candle = {
   time: number;
   open: number;
@@ -25,6 +38,8 @@ export type PoolCandles = {
   address: string;
   pool: string;
   interval: CandleInterval;
+  currency?: CandleCurrency;
+  quoteMint?: string;
   candles: Candle[];
   observedAt: string;
   source: 'api.geckoterminal.com';
@@ -43,6 +58,8 @@ export function refreshSavedCandles(
     previous.address !== page.address ||
     previous.pool !== page.pool ||
     previous.interval !== page.interval ||
+    (previous.currency ?? 'usd') !== (page.currency ?? 'usd') ||
+    previous.quoteMint !== page.quoteMint ||
     !page.candles.length ||
     page.observedAt <= (previous.latestObservedAt ?? previous.observedAt) ||
     (previous.candles.at(-1)?.time ?? 0) > page.candles.at(-1)!.time
@@ -71,6 +88,8 @@ export function appendOlderCandles(previous: PoolCandles, page: PoolCandles) {
     previous.address !== page.address ||
     previous.pool !== page.pool ||
     previous.interval !== page.interval ||
+    (previous.currency ?? 'usd') !== (page.currency ?? 'usd') ||
+    previous.quoteMint !== page.quoteMint ||
     !boundary ||
     previous.olderExhausted ||
     previous.candles.length >= MAX_SAVED_CANDLES ||
@@ -147,6 +166,7 @@ export function decodePoolCandles(
   source: TokenSource,
   pool: string,
   interval: CandleInterval,
+  currency: CandleCurrency = 'usd',
 ): PoolCandles {
   const document = object(value),
     data = object(document.data),
@@ -157,6 +177,13 @@ export function decodePoolCandles(
   }).address;
   if (base !== source.address || data.type !== 'ohlcv_request_response')
     throw new Error('Candle token context mismatch.');
+  candleCurrency(currency, source.chain);
+  if (
+    currency === 'sol' &&
+    (source.address === SOL_CANDLE_QUOTE ||
+      object(meta.quote).address !== SOL_CANDLE_QUOTE)
+  )
+    throw new Error('SOL candle quote context mismatch.');
   const rows = object(data.attributes).ohlcv_list;
   if (!Array.isArray(rows) || rows.length > 100)
     throw new Error('Invalid candle list.');
@@ -193,6 +220,7 @@ export function decodePoolCandles(
     ...source,
     pool,
     interval,
+    ...(currency === 'sol' ? { currency, quoteMint: SOL_CANDLE_QUOTE } : {}),
     candles,
     observedAt: new Date().toISOString(),
     source: 'api.geckoterminal.com',
@@ -206,6 +234,7 @@ export async function observePoolCandles(
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
   before?: number,
+  currency: CandleCurrency = 'usd',
 ) {
   if (
     before !== undefined &&
@@ -221,6 +250,7 @@ export async function observePoolCandles(
       intervalValue,
     ),
     network = CANDLE_NETWORKS[source.chain];
+  candleCurrency(currency, source.chain);
   const root = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${pool}`;
   const identity = object(object(await readJson(root, signal, fetcher)).data);
   const baseToken = object(
@@ -241,13 +271,25 @@ export async function observePoolCandles(
     baseToken.id !== baseId
   )
     throw new Error('Pool does not price this base token.');
+  if (currency === 'sol') {
+    const quoteToken = object(
+      object(object(identity.relationships).quote_token).data,
+    );
+    if (
+      quoteToken.type !== 'token' ||
+      quoteToken.id !== `${network}_${SOL_CANDLE_QUOTE}` ||
+      source.address === SOL_CANDLE_QUOTE
+    )
+      throw new Error('Pool is not SOL-quoted.');
+  }
+  // GeckoTerminal includes its before_timestamp candle. Translate our exclusive boundary.
   const config = CANDLE_INTERVALS[interval];
   const data = await readJson(
-    `${root}/ohlcv/${config.timeframe}?aggregate=${config.aggregate}&limit=100&currency=usd&token=base&include_empty_intervals=false${before === undefined ? '' : `&before_timestamp=${before}`}`,
+    `${root}/ohlcv/${config.timeframe}?aggregate=${config.aggregate}&limit=100&currency=${currency === 'sol' ? 'token' : 'usd'}&token=base&include_empty_intervals=false${before === undefined ? '' : `&before_timestamp=${before - 1}`}`,
     signal,
     fetcher,
   );
-  const result = decodePoolCandles(data, source, pool, interval);
+  const result = decodePoolCandles(data, source, pool, interval, currency);
   if (before !== undefined && result.candles.some((c) => c.time >= before))
     throw new Error('Candle provider ignored cursor.');
   return result;

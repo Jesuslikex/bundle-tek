@@ -1,5 +1,7 @@
 # Live holder enumeration and persistence, 12 October 2026
 
+Latest continuation, 13 October 2026: the Token-2022 mint read now captures ordinary mint-harvested fees, extension names and observation slots, with persisted reload and changed-observation guards. Confidential mint/account extensions are explicitly identified as unmeasured encrypted balance/fee coverage. The later bounded PYUSD run passed eight read-only HTTP-200 requests and retained both zero ordinary fee totals plus confidential mint extensions. Two pages still cover only 0.0012% of supply. This supersedes earlier implementation statements that mint-harvested fees are always unmeasured; it does not prove nonzero live fees or complete enumeration. See CODEX-HOLDER-MINT-FEES.md and work/live-provider-qa/holder-mint-fee-route-live-report-20261013.json.
+
 The existing Proxima workspace visibly identifies DINGER mint `Ap1o2WJYUarJLjT5LQWGH1ztuiV4PcUyqEEfL8jbpump`. Bundle's unchanged default DAS cursor reader was tested against its existing mainnet Helius configuration for this public mint. No keys, endpoint queries, cursor values or raw provider errors were retained in reports.
 
 ## Live enumeration

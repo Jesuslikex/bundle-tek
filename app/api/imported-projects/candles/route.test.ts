@@ -1,6 +1,7 @@
 import { beforeAll, afterAll, beforeEach, expect, it, vi } from 'vitest';
 import { Miniflare } from 'miniflare';
 import type { PoolCandles } from '@/lib/pool-candles';
+import { acquisitionMint } from '../../../../test/imported-sell-acquisition-fixture';
 const mocks = vi.hoisted(() => ({
   db: null as unknown as D1Database,
   observe: vi.fn(),
@@ -160,4 +161,69 @@ it('retains prior observations on empty pages and refuses another owner before p
   mocks.observe.mockClear();
   expect((await POST(post())).status).toBe(404);
   expect(mocks.observe).not.toHaveBeenCalled();
+});
+it('stores and reloads SOL and legacy USD independently and withholds mismatched quote responses', async () => {
+  const usd = { ...old, address: acquisitionMint };
+  await mocks.db
+    .prepare(
+      'UPDATE imported_token_projects SET address=? WHERE owner_id=? AND id=?',
+    )
+    .bind(acquisitionMint, 'one', id)
+    .run();
+  await mocks.db
+    .prepare(
+      'UPDATE imported_pool_candles SET document=? WHERE owner_id=? AND project_id=?',
+    )
+    .bind(JSON.stringify([usd]), 'one', id)
+    .run();
+  const sol: PoolCandles = {
+    ...usd,
+    currency: 'sol',
+    quoteMint: address,
+    observedAt: '2026-10-11T10:01:00Z',
+  };
+  mocks.observe.mockResolvedValue(sol);
+  const selected = () =>
+    new Request('http://localhost/api/imported-projects/candles', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        revision: 1,
+        pool,
+        interval: '1h',
+        currency: 'sol',
+      }),
+    });
+  expect((await POST(selected())).status).toBe(200);
+  expect(mocks.observe.mock.calls[0][6]).toBe('sol');
+  const read = (currency?: string) =>
+    GET(
+      new Request(
+        `http://localhost/api/imported-projects/candles?id=${id}&revision=1${currency ? '&currency=' + currency : ''}`,
+      ),
+    );
+  const legacy = (await (await read()).json()) as {
+    observations: PoolCandles[];
+  };
+  expect(legacy.observations).toEqual([usd]);
+  const native = (await (await read('sol')).json()) as {
+    observations: PoolCandles[];
+  };
+  expect(native.observations[0].currency).toBe('sol');
+  expect(native.observations).toHaveLength(1);
+  await mocks.db.prepare('DELETE FROM market_read_gates').run();
+  mocks.observe.mockResolvedValue({
+    ...sol,
+    quoteMint: pool,
+    observedAt: '2026-10-11T10:02:00Z',
+  });
+  expect((await POST(selected())).status).toBe(502);
+  expect(
+    ((await (await read('sol')).json()) as { observations: PoolCandles[] })
+      .observations[0].quoteMint,
+  ).toBe(address);
+  expect((await read('unknown')).status).toBe(400);
+  mocks.user = { userId: 'other' };
+  expect((await read('sol')).status).toBe(404);
 });

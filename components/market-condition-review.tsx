@@ -7,18 +7,22 @@ import { solanaTokenAtoms } from '@/lib/solana-token-amount';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { SavedTokenMarket } from '@/lib/token-market';
 import { ConditionalSellOrders } from './conditional-sell-orders';
+import type { ImportedSwapReceipt } from '@/lib/imported-approval-history';
 export function MarketConditionReview({
   project,
   observation,
   pair,
   feedRunning = false,
+  onReviewBuy,
 }: {
   project: ImportedTokenProject;
   observation: SavedTokenMarket;
   pair: string;
   feedRunning?: boolean;
+  onReviewBuy?: (receipt: ImportedSwapReceipt) => void;
 }) {
   const id = useId(),
+    [side, setSide] = useState<'Buy' | 'Sell'>('Sell'),
     [direction, setDirection] = useState<'at-or-above' | 'at-or-below'>(
       'at-or-above',
     ),
@@ -52,6 +56,8 @@ export function MarketConditionReview({
     setExpired(false);
   };
   const current = review && review.observation === observation && !expired;
+  const inputDecimals = side === 'Buy' ? 9 : project.document.token.decimals;
+  const inputCurrency = side === 'Buy' ? 'SOL' : project.document.token.symbol;
   return (
     <section
       aria-label="Market cap condition review"
@@ -63,6 +69,23 @@ export function MarketConditionReview({
         pool. These previews do not place orders.
       </p>
       <div className="imported-trade-wallet-filters">
+        <label>
+          Conditional trade direction
+          <select
+            value={side}
+            onChange={(event) => {
+              const next = event.target.value as 'Buy' | 'Sell';
+              changed();
+              setSide(next);
+              setDirection(next === 'Buy' ? 'at-or-below' : 'at-or-above');
+              setLimitAmount('');
+              setAmount('');
+            }}
+          >
+            <option>Sell</option>
+            <option>Buy</option>
+          </select>
+        </label>
         <label>
           Condition
           <select
@@ -90,7 +113,8 @@ export function MarketConditionReview({
         </label>
       </div>
       <label htmlFor={id + 'limitamount'}>
-        Limit sell amount ({project.document.token.symbol})
+        {side === 'Buy' ? 'Limit buy budget' : 'Limit sell amount'} (
+        {inputCurrency})
         <Input
           id={id + 'limitamount'}
           inputMode="decimal"
@@ -140,9 +164,10 @@ export function MarketConditionReview({
       )}
       <h5>Grid amount allocation</h5>
       <p>
-        Distribute an exact sell amount across increasing market-cap levels.
-        Rounding residue stays in the final level. These are proposed levels,
-        not placed orders or an inventory check.
+        Distribute an exact {side === 'Buy' ? 'SOL buy budget' : 'sell amount'}{' '}
+        across increasing market-cap levels. Rounding residue stays in the final
+        level. These are proposed levels, not placed orders or an inventory
+        check.
       </p>
       <div className="imported-trade-wallet-filters">
         <label htmlFor={id + 'minimum'}>
@@ -182,7 +207,8 @@ export function MarketConditionReview({
           />
         </label>
         <label htmlFor={id + 'amount'}>
-          Total sell amount ({project.document.token.symbol})
+          {side === 'Buy' ? 'Total buy budget' : 'Total sell amount'} (
+          {inputCurrency})
           <Input
             id={id + 'amount'}
             inputMode="decimal"
@@ -207,11 +233,8 @@ export function MarketConditionReview({
                 minimumUsd: minimum,
                 maximumUsd: maximum,
                 lines: Number(lines),
-                totalRaw: solanaTokenAtoms(
-                  amount,
-                  project.document.token.decimals,
-                ).toString(),
-                decimals: project.document.token.decimals,
+                totalRaw: solanaTokenAtoms(amount, inputDecimals).toString(),
+                decimals: inputDecimals,
               }),
             );
           } catch (e) {
@@ -228,13 +251,16 @@ export function MarketConditionReview({
         <div className="imported-trade-wallet-table">
           <table>
             <caption>
-              Proposed sell levels for pool {pair}. No orders placed.
+              Proposed {side.toLowerCase()} levels for pool {pair}. No orders
+              placed.
             </caption>
             <thead>
               <tr>
                 <th scope="col">Level</th>
                 <th scope="col">Market cap USD</th>
-                <th scope="col">Token amount</th>
+                <th scope="col">
+                  {side === 'Buy' ? 'SOL input budget' : 'Token amount'}
+                </th>
                 <th scope="col">Atomic units</th>
               </tr>
             </thead>
@@ -253,11 +279,13 @@ export function MarketConditionReview({
       )}
       {project.document.token.chain === 'Solana' && (
         <ConditionalSellOrders
-          key={`${project.id}:${project.revision}:${pair}`}
+          key={`${project.id}:${project.revision}:${pair}:${side}`}
           project={project}
           pair={pair}
           observation={observation}
           feedRunning={feedRunning}
+          side={side}
+          onReviewBuy={onReviewBuy}
           limit={
             current
               ? { direction, targetUsd: review!.targetUsd, amount: limitAmount }

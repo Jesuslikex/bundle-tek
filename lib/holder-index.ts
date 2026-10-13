@@ -1,5 +1,11 @@
 import { walletAddress } from './wallet-workspace';
 import { percentOfSupply } from './supply-analysis';
+import {
+  holderExtensionNames,
+  sameHolderMintFees,
+  validateHolderMintObservation,
+  type HolderMintObservation,
+} from './holder-index-mint';
 
 export const HOLDER_INDEX_PAGE_SIZE = 1000;
 export const HOLDER_INDEX_MAX_PAGES = 500;
@@ -21,12 +27,14 @@ export type HolderIndexAccount = {
   raw: string;
   frozen: boolean;
   withheldRaw?: string;
+  extensions?: string[];
 };
 export type HolderIndexPage = {
   enumeration?: 'program-accounts-v2' | 'das-cursor';
   requestedCursor?: string | null;
   nextCursor?: string | null;
   tokenProgram?: string;
+  mintObservation?: HolderMintObservation;
   mint: string;
   page: number;
   decimals: number;
@@ -54,6 +62,7 @@ export function decodeHolderIndexPage(
       amount?: unknown;
       frozen?: unknown;
       withheldRaw?: unknown;
+      extensions?: unknown;
     }>;
   };
   const token = supply as {
@@ -86,6 +95,9 @@ export function decodeHolderIndexPage(
       ...(account.withheldRaw !== undefined
         ? { withheldRaw: uint(account.withheldRaw) }
         : {}),
+      ...(account.extensions !== undefined
+        ? { extensions: holderExtensionNames(account.extensions) }
+        : {}),
     };
   });
   return {
@@ -105,6 +117,9 @@ export type HolderIndexScan = {
   enumeration?: 'program-accounts-v2' | 'das-cursor';
   nextCursor?: string | null;
   tokenProgram?: string;
+  mintObservation?: HolderMintObservation;
+  minMintSlot?: number;
+  maxMintSlot?: number;
   mint: string;
   decimals: number;
   totalSupplyRaw: string;
@@ -147,6 +162,19 @@ export function appendHolderIndexPage(
       );
   } else if (previous?.enumeration)
     throw new Error('Holder enumeration method changed.');
+  if (page.mintObservation) {
+    validateHolderMintObservation(page.mintObservation);
+    if (
+      page.tokenProgram !== 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' ||
+      page.mintObservation.slot < page.supplySlot
+    )
+      throw new Error('Holder mint observation provenance differs.');
+  }
+  if (
+    previous &&
+    !sameHolderMintFees(previous.mintObservation, page.mintObservation)
+  )
+    throw new Error('Mint fees or extensions changed. Start a fresh scan.');
   if (
     page.mint !== mint ||
     page.decimals !== decimals ||
@@ -196,6 +224,16 @@ export function appendHolderIndexPage(
       )
         throw new Error('Withheld fee account provenance differs.');
     }
+    if (account.extensions !== undefined) {
+      const extensions = holderExtensionNames(account.extensions);
+      if (
+        page.tokenProgram !== 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' ||
+        page.enumeration !== 'program-accounts-v2' ||
+        extensions.includes('transferFeeAmount') !==
+          (account.withheldRaw !== undefined)
+      )
+        throw new Error('Holder account extension provenance differs.');
+    }
   }
   const indexedRaw = (previous?.indexedRaw ?? 0n) + addition;
   if (indexedRaw > BigInt(page.totalSupplyRaw))
@@ -227,6 +265,19 @@ export function appendHolderIndexPage(
     accounts,
     owners,
     indexedRaw,
+    ...(page.mintObservation
+      ? {
+          mintObservation: page.mintObservation,
+          minMintSlot: Math.min(
+            previous?.minMintSlot ?? page.mintObservation.slot,
+            page.mintObservation.slot,
+          ),
+          maxMintSlot: Math.max(
+            previous?.maxMintSlot ?? page.mintObservation.slot,
+            page.mintObservation.slot,
+          ),
+        }
+      : {}),
     minIndexedSlot: Math.min(
       previous?.minIndexedSlot ?? page.indexedSlot,
       page.indexedSlot,

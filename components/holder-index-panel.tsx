@@ -70,14 +70,16 @@ export function HolderIndexResults({ scan }: { scan: HolderIndexScan }) {
       </output>
       <p>
         {summary.coveredPercent.toFixed(4)}% of reference supply in scanned
-        accounts. Unreconciled remainder:{' '}
+        owner balances. Remainder outside those balances:{' '}
         {formatNativeBalance(summary.remainderRaw, scan.decimals)} tokens.
       </p>
       {scan.status === 'enumerated' && (
         <p>
           {summary.remainderRaw === '0'
             ? 'All reference supply units reconcile with the enumerated provider account set.'
-            : 'Enumeration ended with unreconciled supply. Full supply coverage is not established.'}
+            : fees.value?.remainderAfterObservedFeesRaw === '0'
+              ? 'Reference supply units reconcile with visible balances and the observed fees. This does not establish complete hidden-balance coverage.'
+              : 'Enumeration ended with unreconciled supply. Full supply coverage is not established.'}
         </p>
       )}
       <p>
@@ -86,29 +88,51 @@ export function HolderIndexResults({ scan }: { scan: HolderIndexScan }) {
         inferred.
       </p>
       <p className={styles.context}>
-        {fees.error ? (
-          <span role="alert">{fees.error} </span>
-        ) : fees.value && fees.value.reportedAccounts > 0 ? (
+        {fees.value && fees.value.reportedAccounts > 0 ? (
           <span>
             Observed account-withheld fees:{' '}
             {formatNativeBalance(fees.value.raw, scan.decimals)} tokens in{' '}
             {fees.value.reportedAccounts} accounts. These are not spendable by
-            the listed owners and are excluded from holdings and concentration.
-            Unexplained remainder after these observed fees:{' '}
-            {formatNativeBalance(
-              fees.value.remainderAfterObservedFeesRaw,
-              scan.decimals,
-            )}{' '}
-            tokens. Mint-harvested fees and missing account extensions remain
-            unmeasured.{' '}
+            the listed owners and are excluded from holdings and
+            concentration.{' '}
           </span>
         ) : scan.tokenProgram ===
           'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' ? (
           <span>
-            Account-withheld and mint-harvested fees have not been measured for
-            this Token-2022 scan.{' '}
+            Account-withheld fees have not been measured for this Token-2022
+            scan.{' '}
           </span>
         ) : null}
+        {scan.tokenProgram === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' &&
+          fees.value && (
+            <span>
+              {fees.value.mintRaw === null ? (
+                'Mint-harvested fees remain unmeasured. '
+              ) : (
+                <>
+                  Observed mint-harvested fees:{' '}
+                  {formatNativeBalance(fees.value.mintRaw, scan.decimals)}{' '}
+                  tokens, excluded from owner holdings. Mint observation slots{' '}
+                  {scan.minMintSlot} to {scan.maxMintSlot}.{' '}
+                </>
+              )}
+              Unexplained remainder after observed fees:{' '}
+              {formatNativeBalance(
+                fees.value.remainderAfterObservedFeesRaw,
+                scan.decimals,
+              )}{' '}
+              tokens.{' '}
+              {fees.value.extensionAccounts < scan.accounts.size &&
+                'Some account extensions were not reported. '}
+              {fees.value.unparseableAccounts > 0 &&
+                'Some account extensions could not be parsed. '}
+              {(fees.value.confidentialAccounts > 0 ||
+                fees.value.confidentialMint) &&
+                'Confidential extensions detected. Encrypted balances and encrypted fees are not measured by this scan. '}
+              {fees.value.incompleteMintExtensions &&
+                'Some mint extensions could not be parsed. '}
+            </span>
+          )}
         Index slots {scan.minIndexedSlot} to {scan.maxIndexedSlot} ·{' '}
         {scan.pages} pages · {scan.source}. Pages are live index reads, not an
         atomic on-chain snapshot. Exhaustion means the provider returned a{' '}

@@ -1,0 +1,98 @@
+# Latest source verification, 13 October 2026
+
+The conditional Buy and session-outcome integration passed **322 tests across 36 actual-checkout files, zero failures and zero skips**, terminal handle 13909 exit 0, duration 626.74 seconds. The JSON report confirms success and exactly the selected 36 files, with no archived work tests. Report/log prefix: work/release-qa/conditional-session-combined-20261013. This includes the protected existing signing suite, legacy Sell/session regressions, Buy Limit/Grid preparation/review/submission/recovery, mixed-denomination UI/history, all-wallet outcome reads, atomic session/job cancellation, exact signature validation and complete migration-chain checks.
+
+Final frozen source: work/release-qa/source-conditional-session-final-20261013.json, **1,024 files**, digest 53718007e44da5480b4e2bea83e7bd30b91ea45d2754a8260b39d13e1c6e33f0. Post-test/build verification reports unchanged=true. Actual-source TypeScript passed, handle 79410 exit 0; a disposable configuration excludes dependencies, build output and archived work copies without changing tsconfig.json or protected Vitest configuration. Its resolved input has 899 files and zero archived files. All 46 changed TypeScript files passed typed lint and formatting; changed-scope diff check passed for 49 source files. Final production build passed, handle 98977 exit 0. Earlier failed command/client-import build attempts remain retained and are superseded by the final build after extracting the unchanged signature validator into a browser-safe helper.
+
+All 97 earlier SQL/snapshot file hashes and the original 72 journal entries independently match the prior baseline. New unapplied 0072 adds side-specific conditional Buy reservation/fill validation. The installed Wrangler splitter produces exactly five statements for it, applied in actual disposable D1 alongside all 73 current migrations. All six protected Claude files match the prior verified baseline. Machine verification: work/release-qa/conditional-session-verification-20261013.json.
+
+This is targeted integration verification of later source, not a replacement full-suite result. The 1,919-test full-suite result below belongs to the earlier 997-file snapshot. Actual browser rendering, funded user-performed execution and hosted recovery/publication remain unverified. CROP's partially applied migration history is unchanged; runner, exact failed SQL and internal ledger/checksums remain unavailable.
+
+# Earlier 1,010-file targeted verification, 13 October 2026
+
+The current 1,010-file source is later than the 997-file full-suite result below. Its snapshot is work/release-qa/source-funding-warmup-receipts-20261013.json, digest 7ce597a1526d08ac52326e2a94b80bfa8e3fc45c2de3cb9410e85c9bd4d88c1c. Root combined verification completed with exit 0 in handle 93956: 146 tests across 10 actual-checkout files passed, zero failures, in 253.70 seconds. JSON success=true and no work artifact files were selected. Report/log prefix: funding-warmup-receipts-combined-20261013. TypeScript/scoped lint passed, handle 34018 exit 0; production build passed, handle 68343 exit 0, log funding-warmup-receipts-build-20261013.log. All 1,010 source files retained the launch digest after tests and build; all six protected Claude files match the previous verified baseline. Work artifacts were excluded through CLI --exclude work/** without editing protected vitest.config.mjs. This is targeted integration verification, not a new full-suite pass. It includes mainnet funding history, Warmup receipt matching, Buy exact-input and withdrawal timestamp corrections plus existing warmup planning/signing and withdrawal workflow regressions. Earlier 1,002-file checks passed 53 focused tests, TypeScript, lint and build at their own source scope. Browser, funded and hosted requirements remain separate.
+
+# Current full-suite verification
+
+## Latest verified result, 13 October 2026
+
+Handle 93888 terminated with exit 0: **289 files and 1,919 tests passed, zero failures, 17 opt-in live-provider tests/files skipped**, duration 1,349.49 seconds. JSON success=true and numFailedTests=0. The skipped tests were enumerated from the actual report; none is counted as executed live QA.
+
+Post-run verification confirms all 997 source files unchanged, digest `730897e9cac301a35edfee924b9ba1eca0ca2b5ba7f8aaaea02b4cabcecb00b5`, snapshot `work/release-qa/source-exclusive-cursor-20261013-0239.json`. Report/log prefix: `work/release-qa/full-suite-exclusive-cursor-20261013-0239`. This includes the chart/history/0071 integration and the cursor contract corrections. Earlier failed reports remain retained. No full suite is currently running. Actual browser rendering, hosted migration recovery and funded execution remain separate unproven requirements.
+
+The sections below retain earlier runs and their then-current status; this result supersedes their pending full-suite statements.
+
+## Combined workspace and expense snapshot, 13 October 2026
+
+Handle **72422** completed with exit code 0. Terminal log and JSON confirm **1,891 passing tests, zero failures, 17 skipped tests; 284 passing files and 17 skipped files**, duration 1,355.96 seconds. The run began at 00:46:14 local time. JSON nested-suite counts are not file counts.
+
+Report: `work/release-qa/full-suite-workspace-20261013-0052.json`; log: its sibling `.log`. Source snapshot: `work/release-qa/source-workspace-final-20261013-0052.json`, 983 files, aggregate SHA256 `554be58fd7e12c70ad731c4722691acd7e417c57ec7816016cab79531bc3d0b3`. The snapshot verified unchanged after terminal completion. Opt-in live QA was disabled. Claude-owned source files remained unchanged.
+
+This run covers the integrated Jito expense readers, explicit unavailable-schema handling and initial chart/tape/wallet layout. It supersedes the earlier failed expense snapshot as engineering evidence for these frozen files; it does not erase that failure or establish funded execution, live coverage, rendered UI or hosted readiness. After completion, the tape CSS width was bounded to 230–300 pixels to follow the newly verified maximized Proxima reference. That later CSS is outside this full-suite result and receives its own production-build check.
+
+## Current combined bundle-cost run
+
+Terminal result: handle 49396 completed with exit code 1. The unchanged 983-file snapshot had 283 passing files, one failed file and 17 skipped files; 1,885 passing tests, six failures and 17 skips, in 1,307.82 seconds. JSON success=false; all six failures are in the existing imported-project signing integration suite. Its database fixture applies migrations through 0068 and therefore has no Jito cost tables; the newly expense-aware receipt/acquisition readers returned 503. The protected signing test file was inspected but not edited. This run is not a passing current-suite result.
+
+The source is now unfrozen for a correction: read-only schema detection explicitly marks unavailable bundle expense storage while preserving raw receipt/acquisition history and withholding complete profit claims. Installed malformed schemas and contradictory evidence still fail. Targeted original signing and real-D1 regression verification is in progress; a subsequent passing target does not change this full run's failed result.
+
+Targeted correction results: all 38 original signing integration tests passed with the protected test file hash unchanged. Another 63 expense/project/account/acquisition/markup/real-D1 tests passed; TypeScript and scoped oxlint passed. The current build is in progress. The frozen full run remains failed and a new current full-suite result is not claimed. Source changes may proceed after these targeted contracts are verified; current rendered and hosted verification remains outstanding.
+
+The correction build is now terminal with exit code 0; its log is `work/release-qa/bundle-cost-schema-coverage-build-20261013.log`. The later source is covered by 101 focused tests and type/lint/build checks, with a fresh full-suite result still outstanding.
+
+After account performance, project FIFO/acquisition and transaction-cost integration, a new full-suite process is running under exact execution handle **49396**. Command: `npm run test -- --maxWorkers=1 --reporter=dot --reporter=json --outputFile.json=work/release-qa/full-suite-bundle-costs-20261012-2253.json`, redirected to the sibling `.log`. Snapshot: `work/release-qa/source-bundle-costs-20261012-2253.json`; 983 application/config/test/public files, aggregate SHA256 `1dcad0ade6c6e15b9863e1877c8f3ff7eb8d6ab7ff217b8e67c2ea413027e301`. Enabled live-provider flags were checked before launch and the source snapshot was reverified unchanged after launch.
+
+Hold application source edits while this run remains live; documents are outside its hash. Revalidate handle 49396 rather than relying on this record for liveness. Do not duplicate or restart a quiet run. Inspect terminal JSON, exit code and post-run hashes before treating it as a current passing suite. The previous 1,877-test result below predates these expense integrations and must not be extended to them by assumption. Funded execution, hosted deployment and current rendered behavior remain separate requirements.
+
+## New run after Jito history and receipt work
+
+Terminal verification: execution handle 18546 completed with exit code 0. The terminal log reports 282 passing test files, 17 skipped files, 1,877 passing tests, 17 skipped tests and zero failures, in 1,290.65 seconds. The JSON report confirms success=true, numFailedTests=0 and numFailedTestSuites=0. A fresh post-run source snapshot verification reports unchanged=true for all 978 files with aggregate SHA256 `5533ea94b4652ed0431ab931065e468552d410350bc2d39796bf7c64c32bcdaa`. This establishes the current frozen engineering baseline, including Jito history/finalization work; it does not prove funded execution, hosted release or full product parity. Earlier statements below that this handle is running are historical and superseded by this terminal result. Application edits may now resume with their subsequent validation scope kept separate.
+
+12 October 2026 around 22:05 UTC. A fresh source snapshot covers 978 application/config/test/public files with aggregate SHA256 `5533ea94b4652ed0431ab931065e468552d410350bc2d39796bf7c64c32bcdaa`. Snapshot: `work/release-qa/source-current-20261012-2205.json`. It was reverified unchanged after starting the suite. Live-provider flags were checked and none were enabled.
+
+Command: `npm run test -- --maxWorkers=1 --reporter=dot --reporter=json --outputFile.json=work/release-qa/full-suite-current-20261012-2205.json`, redirected to the sibling `.log`. Exact execution handle: **18546**. A write_stdin poll confirmed that handle is running. Do not infer liveness from this document or the log, and do not start a duplicate while this handle remains live. Application edits are held during verification. The terminal JSON, exit code and a post-run snapshot check are still required. This run has not passed yet and does not supersede the earlier successful snapshot until terminal verification.
+
+Follow-up for handle 18546: repeated bounded polls confirm the same run remains live. Its Vitest parent process remains present and worker process identity advanced, so an earlier worker disappearing is not a terminal test result. The redirected log has no terminal summary and the JSON report is not yet present. The 978-file source snapshot reverified unchanged. Do not restart based on quiet/line-buffered output, infer passing tests from the live process, or alter application source before terminal verification.
+
+## Earlier successful snapshot
+
+12 October 2026. Status: **completed successfully; terminal JSON reports success**.
+
+The original full-suite baseline preceded the current v1/exact-quote decoder, warmup summary and holder retry work. This run verifies the combined current source rather than extending that older passing result by assumption.
+
+Command: `npm run test -- --maxWorkers=1 --reporter=dot --reporter=json --outputFile.json=work/release-qa/full-suite-current-20261012.json`.
+
+Execution handle: **82497**. Revalidate that exact handle to establish liveness; this document or a log file alone is not evidence that the process remains running. Do not start a duplicate run merely because output is quiet. Standard output is redirected into `work/release-qa/full-suite-current-20261012.log`; the terminal JSON report is `work/release-qa/full-suite-current-20261012.json`.
+
+Source snapshot: `work/release-qa/current-suite-source-20261012.json`, covering 950 application/config/test/public files. Aggregate SHA256: `cabd469e6796dfe4e2add4d1e5df9b2f4f959b607a4c002f49179094b364f1bc`. The verifier confirmed no source drift during the first live check. Local environment files, credentials, runtime state and documentation are excluded from the source hash. Ignored opt-in QA harnesses are also outside that snapshot; no BUNDLE_LIVE_* variables were present when the run started. All live-provider tests are intended to stay disabled.
+
+Application source is held unchanged during this run. Preserve Claude's protected files and the existing dirty worktree. After the process terminates, inspect exit code and JSON failures/skips and verify the source snapshot again. A passing report with source drift does not verify the later checkout.
+
+This is engineering verification, not proof of hosted publication, complete Proxima parity, rendered desktop/mobile behavior, full holder history or funded buy/sell/Jito execution. Those requirements remain open in CODEX-PROXIMA-COMPLETION-MATRIX.md.
+
+Follow-up live checks: handle 82497 remained running through two additional bounded waits. The 950-file snapshot still matched exactly. Warmup approval warnings in the current log also appear in the earlier passing full-suite log; stderr alone is not treated as a test failure. The selected hosting remains owned by the current connector and at latest saved version 115. No additional publication or schema mutation occurred. The terminal result remains pending.
+
+Terminal verification: the exact execution handle is no longer registered. The terminal log records 272 test files passed and 16 skipped; 1,829 tests passed, 16 skipped, zero failed, in 1,264.10 seconds. The JSON report has success=true and numFailedTests=0. A fresh source snapshot verification after completion reports unchanged=true for all 950 files with the same aggregate digest. The reporter counts nested suites separately in JSON, so use the terminal log for file counts. No new test run was started.
+
+
+## Current SOL chart and history integration run
+
+13 October 2026. Full-suite execution handle **14501** is running against the 997-file snapshot `work/release-qa/source-sol-chart-20261013-0216.json`, digest `4a59c4c6134493337970ecf15cc2cdbcdcf4c4b5382399874e449924e5a68906`. It includes the operation-history integration, migration 0071, exact chart averages and SOL denomination UI. All live-provider QA flags were disabled at launch. Source is held unchanged during this run. Do not start a duplicate run based on quiet output.
+
+Terminal log: `work/release-qa/full-suite-sol-chart-20261013-0216.log`. JSON report: `work/release-qa/full-suite-sol-chart-20261013-0216.json`. Terminal success/failure and post-run source verification remain pending. The previous 1,891-test passing full suite does not cover this source. Focused SOL chart checks pass 16 tests, TypeScript and scoped lint; the clean production-build retry exited 0 after a first-run Windows Node shutdown assertion.
+
+Terminal verification for handle 14501: exit 1, 288 files passed, one file failed, 17 skipped. Tests: 1,915 passed, two failed, 17 skipped; duration 1,316.91 seconds. The full 997-file source snapshot matched unchanged after termination. Both failures are in app/api/imported-projects/route.test.ts, in the latest and older candle-provider argument expectations: the route now passes explicit fetch/cursor/currency arguments while the expectations retain its former signature. The failed report remains retained and is not counted as a green full suite.
+
+After terminal verification, the two expectations were updated for explicit USD context, and the inclusive provider cursor conversion was centralized in the provider helper; the route now passes the canonical unadjusted boundary. Existing API provider timestamp behavior is preserved. New USD/SOL regressions cover unique older-page merges and ignored-boundary rejection. Current focused/type/lint/build checks and a fresh full-suite result belong to this later source; they cannot change the preceding failed report.
+
+## Current exclusive-cursor integrated rerun
+
+Execution handle **93888** is running against `work/release-qa/source-exclusive-cursor-20261013-0239.json`, 997 files, digest `730897e9cac301a35edfee924b9ba1eca0ca2b5ba7f8aaaea02b4cabcecb00b5`. It includes the cursor centralization, explicit currency mock corrections and two new inclusive-provider regressions. All live-provider flags were disabled. Application/test source is frozen until the terminal result and post-run snapshot verification.
+
+Log/report prefix: `work/release-qa/full-suite-exclusive-cursor-20261013-0239`. Do not restart based on quiet output or count the preceding failed run as passing. Fifty-five focused tests, TypeScript, scoped lint, build and four bounded public live-provider reads passed before launch. All six Claude-protected file hashes still match the earlier verified baseline. Full-suite success/failure remains pending.
+
+Post-baseline addition: test/watch-wallet-flow.test.ts adds two focused real-route Watch/baseline/reload/movement cases, both passing with disposable complete-schema D1 and declared provider fixtures. Every existing file in the 997-file full-suite snapshot still matches its SHA256. This addition changes tests only; the preceding 1,919-test terminal report does not include these two new cases. Fresh snapshot: work/release-qa/source-watch-wallet-flow-20261013-0307.json. No new full suite was launched.
+
+Final verification of the test-only Watch addition: both real-route integration cases passed again after TypeScript fixture corrections. TypeScript and scoped lint pass. Final 998-file snapshot is work/release-qa/source-watch-wallet-flow-final-20261013-0309.json, digest 27478faf249586ef01ceebfe3f0ddab8e271b5289b90a1d1bdd948afa242e314. The earlier 0307 snapshot is preliminary and superseded. Final log: work/release-qa/watch-wallet-flow-final-20261013.log. Production source remains identical to the passing 1,919-test baseline.
+
+Additional opt-in live QA: one bounded PYUSD Token-2022 holder-route test passed separately on 13 October. Two live parsed pages persisted/reloaded/replayed through actual routes and disposable D1; all eight RPC reads returned HTTP 200. Source snapshot 998 remains unchanged. This check was not part of the 1,919-test full run. A future default full run would include the additional opt-in harness as skipped unless its flag is explicitly enabled; live flags remain off outside this one bounded run. See the sanitized holder-token2022-route-live-report-20261013.json under work/live-provider-qa.

@@ -1,0 +1,15 @@
+# Mainnet funding history and recipient progress
+
+13 October 2026. The existing mainnet transfer approval engine is reused. This change adds history; it does not add signing, submission, automatic retries or a migration.
+
+The funding planner now exposes on-demand mainnet history for an owned saved funding plan. `GET /api/funding/mainnet-history` paginates retained withdrawal transitions across all or one historical funding revision. It validates the immutable reviewed funding capture, exact transfer terms and receipt/failure evidence through the existing withdrawal validators, without comparing old approvals against an edited current plan. Cursor anchors are owner, plan and revision bound. Public responses omit transaction packets, full review documents, signature bytes and provider details.
+
+Recipient progress selects the latest retained attempt per allocation for the chosen revision, including unresolved signing/submission states. Only matching finalized delivery or failure evidence counts as verified. Allocations without a retained attempt are explicitly excluded. Earlier attempts remain in transition history. Native SOL funding is not assigned to a token project by guessing from wallet addresses. The old devnet history panel remains available; its devnet-only reader does not describe the already implemented mainnet engine.
+
+The UI supports archived plans, historical revisions, expansion, reload and older pages. Requests are bounded, cancellable and protected against stale responses. Existing encrypted-vault and per-transaction approval controls remain in the transfer engine.
+
+Review identified a recovery chronology bug: the withdrawal route captured `updated_at` before receipt decoding, whose observation timestamp is later. The recovery branch now captures its transition time after decoding, preserving the SQL state, owner, signature, reservation and send-once guards. Existing misordered summaries are not backdated or discarded: their captured state remains visible with an evidence gap, and their outcome proof is withheld from verified progress. Canonical attempt/event times and bounded u64 DTO values are required.
+
+The agent's final focused check passed 41 actual-checkout tests across the new complete-schema D1 route, mounted UI and existing withdrawal route. It covers owner/cursor isolation, tied-time pagination, multiple recipients, archived/edited plans, exact Token-2022 net delivery/fee/rent, unresolved states, future/malformed outcome times and actual recovery timestamps using mocked read RPCs. Scoped typed lint, format and whitespace checks passed. Root combined checks passed 146 tests across 10 actual-checkout files, TypeScript/scoped lint and production build on the unchanged 1,010-file snapshot; details are tracked in CODEX-CURRENT-FULL-SUITE.md.
+
+Rendered browser behavior, hosted deployment and user-performed funded delivery remain unverified. No provider read, real wallet unlock, funded signature, broadcast or publication was performed for this implementation.

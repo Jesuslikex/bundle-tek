@@ -1,14 +1,16 @@
 import {
-  decodeConditionalSellOrder,
-  type ConditionalSellOrder,
-} from './conditional-sell-order';
+  decodeConditionalOrder,
+  conditionalOrderSide,
+  CONDITIONAL_BUY_INPUT_MINT,
+  type ConditionalOrder,
+} from './conditional-order';
 import { validatedConditionalSigning } from './conditional-signing';
 import type { ConditionalLevelRequest } from './conditional-preparation-server';
 
 export async function requireSelectedConditionalPreparation(
   value: unknown,
   selection: ConditionalLevelRequest,
-  retained: ConditionalSellOrder | undefined,
+  retained: ConditionalOrder | undefined,
   context: {
     projectId: string;
     projectRevision: number;
@@ -23,7 +25,7 @@ export async function requireSelectedConditionalPreparation(
 ) {
   if (!retained)
     throw new Error('Selected saved conditional order unavailable.');
-  const order = decodeConditionalSellOrder(retained);
+  const order = decodeConditionalOrder(retained);
   const terms = order.terms;
   const level = terms.levels.find((item) => item.level === selection.level);
   const capture = validatedConditionalSigning(value, context.unitsRaw, now);
@@ -32,7 +34,15 @@ export async function requireSelectedConditionalPreparation(
     order.id !== selection.orderId ||
     order.revision !== selection.revision ||
     !level ||
-    context.side !== 'Sell' ||
+    context.side !== conditionalOrderSide(order) ||
+    (context.side === 'Buy' &&
+      (capture.format !== 'conditional-preparation-v2' ||
+        capture.outputMint !== terms.mint ||
+        capture.outputDecimals !== terms.decimals ||
+        capture.inputMint !== CONDITIONAL_BUY_INPUT_MINT ||
+        capture.inputDecimals !== 9)) ||
+    (context.side === 'Sell' &&
+      capture.format !== 'conditional-preparation-v1') ||
     terms.projectId !== context.projectId ||
     terms.projectRevision !== context.projectRevision ||
     terms.wallet !== context.wallet ||

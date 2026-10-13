@@ -1,10 +1,10 @@
-import type { ConditionalSellOrder } from './conditional-sell-order';
+import type { ConditionalOrder } from './conditional-order';
 import { marketUsdMicros, reviewMarketTrigger } from './market-trigger';
 import type { SavedTokenMarket } from './token-market';
 import type { ImportedTokenProject } from './imported-token-project';
 export type ConditionalLevelReview = ReturnType<typeof reviewMarketTrigger>;
 export function sampledSavedConditions(
-  order: ConditionalSellOrder,
+  order: ConditionalOrder,
   project: ImportedTokenProject,
   pair: string,
   observation: SavedTokenMarket,
@@ -48,7 +48,7 @@ export function sampledSavedConditions(
 }
 export function conditionalLevelReviews(
   value: unknown,
-  order: ConditionalSellOrder,
+  order: ConditionalOrder,
   now = Date.now(),
 ): ConditionalLevelReview[] {
   const page = value as {

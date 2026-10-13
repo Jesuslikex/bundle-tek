@@ -6,9 +6,14 @@ import {
   MAX_SAVED_CANDLES,
   type CandleInterval,
   type PoolCandles,
+  type CandleCurrency,
+  SOL_CANDLE_QUOTE,
 } from '@/lib/pool-candles';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import { chartTradeMarkers } from '@/lib/chart-trade-markers';
+import { ChartExecutionAverages } from './chart-execution-averages';
+import { chartExecutionAverages } from '@/lib/chart-execution-averages';
+import { chartPriceContext } from '@/lib/chart-price-context';
 import { chartCapSupply, type ChartSupply } from '@/lib/chart-cap-supply';
 import {
   chartDrawingStorageKey,
@@ -55,14 +60,19 @@ export function PoolCandleChart({
   projectId,
   revision,
   supplyToken,
+  executionAverages,
 }: {
   snapshot: PoolCandles;
   markers?: ReturnType<typeof chartTradeMarkers>;
   projectId?: string;
   revision?: number;
   supplyToken?: ChartSupply;
+  executionAverages?: ReturnType<typeof chartExecutionAverages>;
 }) {
-  const context = `${projectId ?? ''}:${snapshot.chain}:${snapshot.address}:${snapshot.pool}:${snapshot.interval}`;
+  const context = chartPriceContext(snapshot, projectId);
+  const unit = snapshot.currency === 'sol' ? 'SOL' : 'USD',
+    prefix = unit === 'SOL' ? 'SOL ' : '$',
+    volumeUnit = unit === 'SOL' ? 'provider units' : 'USD';
   const [capMode, setCapMode] = useState(false);
   const capSupply = chartCapSupply(snapshot, supplyToken);
   const showCap = capMode && capSupply !== null;
@@ -266,6 +276,17 @@ export function PoolCandleChart({
     high = Math.max(...rows.map((c) => c.high));
   const y = (v: number) =>
     high === low ? 110 : 20 + ((high - v) / (high - low)) * 180;
+  const averageLevels =
+    unit === 'SOL' && executionAverages
+      ? (['buy', 'sell'] as const).flatMap((side) => {
+          const value = executionAverages[side];
+          if (!value) return [];
+          const price = Number(value.numerator) / Number(value.denominator);
+          return Number.isFinite(price) && price > 0
+            ? [{ side, price, inRange: price >= low && price <= high }]
+            : [];
+        })
+      : [];
   const start = rows[0].time,
     end = rows.at(-1)!.time;
   const plotSpan = plotWidth - 80;
@@ -418,8 +439,8 @@ export function PoolCandleChart({
           {capSupply!.toLocaleString()} tokens, observed{' '}
           {new Date(supplyToken.observedAt).toLocaleString()}). The same supply
           applies to all candles; this does not reconstruct historical
-          circulating supply. Drawing inputs use token-price USD; plotted guide
-          labels use the selected scale.
+          circulating supply. Drawing inputs use token-price {unit}; plotted
+          guide labels use the selected scale.
         </p>
       )}
       {projectId && (
@@ -461,11 +482,11 @@ export function PoolCandleChart({
       {selected && (
         <p aria-live="polite">
           {new Date(selected.time * 1000).toLocaleString()} ·{' '}
-          {showCap ? 'Estimated market cap' : 'Token price'} · Open $
-          {displayed(selected.open).toPrecision(6)} · High $
-          {displayed(selected.high).toPrecision(6)} · Low $
-          {displayed(selected.low).toPrecision(6)} · Close $
-          {displayed(selected.close).toPrecision(6)} · Volume USD{' '}
+          {showCap ? 'Estimated market cap' : 'Token price'} · Open {prefix}
+          {displayed(selected.open).toPrecision(6)} · High {prefix}
+          {displayed(selected.high).toPrecision(6)} · Low {prefix}
+          {displayed(selected.low).toPrecision(6)} · Close {prefix}
+          {displayed(selected.close).toPrecision(6)} · Volume {volumeUnit}{' '}
           {selected.volume.toLocaleString()}
         </p>
       )}
@@ -521,13 +542,13 @@ export function PoolCandleChart({
           }}
         >
           <label>
-            Guide USD{' '}
+            Guide {unit}{' '}
             <input
               type="number"
               step="any"
               min="0"
               required
-              aria-label="Price guide USD"
+              aria-label={`Price guide ${unit}`}
               value={guideInput}
               onChange={(e) => setGuideInput(e.target.value)}
               style={{ width: 110 }}
@@ -565,7 +586,7 @@ export function PoolCandleChart({
               type="button"
               variant="outline"
               aria-label={`Remove trend line ${index + 1}`}
-              title={`${new Date(line.first.time * 1000).toLocaleString()} $${line.first.price.toPrecision(6)} to ${new Date(line.second.time * 1000).toLocaleString()} $${line.second.price.toPrecision(6)}`}
+              title={`${new Date(line.first.time * 1000).toLocaleString()} ${prefix}${line.first.price.toPrecision(6)} to ${new Date(line.second.time * 1000).toLocaleString()} ${prefix}${line.second.price.toPrecision(6)}`}
               onClick={() =>
                 setTrendLines((old) => old.filter((_, i) => i !== index))
               }
@@ -595,7 +616,7 @@ export function PoolCandleChart({
               key={price}
               type="button"
               variant="outline"
-              aria-label={`Remove price guide $${price}`}
+              aria-label={`Remove price guide ${prefix}${price}`}
               onClick={() =>
                 setPriceGuides((old) => ({
                   context,
@@ -606,7 +627,8 @@ export function PoolCandleChart({
                 }))
               }
             >
-              ${price.toPrecision(6)} · Remove
+              {prefix}
+              {price.toPrecision(6)} · Remove
               {price < low || price > high ? ' (outside view)' : ''}
             </Button>
           ))}
@@ -804,15 +826,12 @@ export function PoolCandleChart({
       >
         <svg
           role="img"
-          aria-label={`${rows.length} ${snapshot.interval} ${showCap ? 'estimated market cap' : 'USD price'} candles for selected pool`}
+          aria-label={`${rows.length} ${snapshot.interval} ${showCap ? 'estimated market cap ' + unit : unit + ' price'} candles for selected pool`}
           viewBox={`0 0 ${plotWidth} 310`}
           style={{ width: '100%', height: 310, display: 'block' }}
         >
           <title>
-            {showCap
-              ? 'Estimated market cap using saved total supply.'
-              : 'Provider OHLC prices.'}{' '}
-            Green closes at or above open; red closes below open.
+            {`${showCap ? 'Estimated market cap using saved total supply.' : 'Provider OHLC prices.'} ${unit} denomination. Green closes at or above open; red closes below open.`}
           </title>
           {[high, low].map((v, i) => (
             <g key={i}>
@@ -866,12 +885,7 @@ export function PoolCandleChart({
               fill={c.close >= c.open ? '#34d399' : '#fb7185'}
               stroke={c.close >= c.open ? '#34d399' : '#fb7185'}
             >
-              <title>
-                {new Date(c.time * 1000).toLocaleString()}:{' '}
-                {showCap ? 'Estimated market cap' : 'Token price'} O{' '}
-                {displayed(c.open)}, H {displayed(c.high)}, L {displayed(c.low)}
-                , C {displayed(c.close)}, volume USD {c.volume}
-              </title>
+              <title>{`${new Date(c.time * 1000).toLocaleString()}: ${showCap ? 'Estimated market cap' : 'Token price'} ${unit} O ${displayed(c.open)}, H ${displayed(c.high)}, L ${displayed(c.low)}, C ${displayed(c.close)}, volume ${volumeUnit} ${c.volume}`}</title>
               <line
                 x1={x(c.time)}
                 x2={x(c.time)}
@@ -900,8 +914,11 @@ export function PoolCandleChart({
           {guides
             .filter((price) => price >= low && price <= high)
             .map((price) => (
-              <g key={`guide:${price}`} aria-label={`Price guide $${price}`}>
-                <title>Visual price guide: ${price}. No trade order.</title>
+              <g
+                key={`guide:${price}`}
+                aria-label={`Price guide ${prefix}${price}`}
+              >
+                <title>{`Visual price guide: ${prefix}${price}. No trade order.`}</title>
                 <line
                   x1="55"
                   x2={plotWidth - 15}
@@ -917,7 +934,35 @@ export function PoolCandleChart({
                   fill="#60a5fa"
                   fontSize="11"
                 >
-                  ${displayed(price).toPrecision(6)}
+                  {prefix}
+                  {displayed(price).toPrecision(6)}
+                </text>
+              </g>
+            ))}
+          {averageLevels
+            .filter((a) => a.inRange)
+            .map((a) => (
+              <g
+                key={`average:${a.side}`}
+                aria-label={`Recorded average ${a.side} price SOL`}
+              >
+                <title>{`Recorded weighted ${a.side} average: ${a.price} SOL/token, loaded receipts across routes.`}</title>
+                <line
+                  x1="55"
+                  x2={plotWidth - 15}
+                  y1={y(a.price)}
+                  y2={y(a.price)}
+                  stroke={a.side === 'buy' ? '#34d399' : '#fb7185'}
+                  strokeDasharray="5 5"
+                />
+                <text
+                  x={plotWidth - 18}
+                  y={Math.max(30, y(a.price) - 5)}
+                  textAnchor="end"
+                  fill={a.side === 'buy' ? '#34d399' : '#fb7185'}
+                  fontSize="10"
+                >
+                  Avg {a.side}: {displayed(a.price).toPrecision(6)} SOL
                 </text>
               </g>
             ))}
@@ -931,10 +976,7 @@ export function PoolCandleChart({
               fill={c.close >= c.open ? '#34d399' : '#fb7185'}
               opacity="0.45"
             >
-              <title>
-                {new Date(c.time * 1000).toLocaleString()}: volume USD{' '}
-                {c.volume}
-              </title>
+              <title>{`${new Date(c.time * 1000).toLocaleString()}: volume ${volumeUnit} ${c.volume}`}</title>
             </rect>
           ))}
           <text x="2" y="285" fill="currentColor" fontSize="9">
@@ -976,21 +1018,32 @@ export function PoolCandleChart({
         {markers &&
           `${visibleMarkers?.reduce((n, g) => n + g.receipts.length, 0) ?? 0} recorded trades visible.`}
       </figcaption>
+      {averageLevels.some((a) => !a.inRange) && (
+        <output>
+          Recorded averages outside the current candle price range are not
+          drawn. Exact loaded-receipt prices remain available below.
+        </output>
+      )}
       <details>
         <summary>Inspect OHLC and volume table</summary>
         <div style={{ overflowX: 'auto', maxHeight: 320 }}>
           <table className="project-table">
             <caption>
-              {showCap ? 'Estimated market cap USD' : 'Token price USD'}. Volume
-              remains USD.
+              {showCap ? 'Estimated market cap' : 'Token price'} {unit}. Volume:{' '}
+              {volumeUnit}.
             </caption>
             <thead>
               <tr>
-                {['Time', 'Open', 'High', 'Low', 'Close', 'Volume USD'].map(
-                  (h) => (
-                    <th key={h}>{h}</th>
-                  ),
-                )}
+                {[
+                  'Time',
+                  'Open',
+                  'High',
+                  'Low',
+                  'Close',
+                  `Volume ${volumeUnit}`,
+                ].map((h) => (
+                  <th key={h}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -1022,6 +1075,7 @@ export function ImportedPoolCandles({
     [saved, setSaved] = useState<PoolCandles[]>([]),
     [busy, setBusy] = useState(true),
     [error, setError] = useState('');
+  const [currency, setCurrency] = useState<CandleCurrency>('usd');
   const pending = useRef<AbortController | null>(null);
   const accept = useCallback(
     (data: Result) => {
@@ -1035,7 +1089,9 @@ export function ImportedPoolCandles({
           (s) =>
             s.chain !== project.document.token.chain ||
             s.address !== project.document.token.address ||
-            s.executionAllowed !== false,
+            s.executionAllowed !== false ||
+            (s.currency ?? 'usd') !== currency ||
+            (currency === 'sol' && s.quoteMint !== SOL_CANDLE_QUOTE),
         )
       )
         throw new Error('Candle context mismatch.');
@@ -1046,16 +1102,24 @@ export function ImportedPoolCandles({
       project.revision,
       project.document.token.chain,
       project.document.token.address,
+      currency,
     ],
   );
   useEffect(() => {
     const c = new AbortController();
     pending.current = c;
-    void fetch(
-      `/api/imported-projects/candles?${new URLSearchParams({ id: project.id, revision: String(project.revision) })}`,
-      { signal: c.signal, cache: 'no-store' },
-    )
+    void Promise.resolve()
+      .then(() => {
+        if (c.signal.aborted) return null;
+        setBusy(true);
+        setError('');
+        return fetch(
+          `/api/imported-projects/candles?${new URLSearchParams({ id: project.id, revision: String(project.revision), currency })}`,
+          { signal: c.signal, cache: 'no-store' },
+        );
+      })
       .then(async (response) => {
+        if (!response) return;
         const data = (await response.json()) as Result;
         if (!response.ok)
           throw new Error(data.error || 'Saved candles unavailable.');
@@ -1069,7 +1133,9 @@ export function ImportedPoolCandles({
             (s) =>
               s.chain !== project.document.token.chain ||
               s.address !== project.document.token.address ||
-              s.executionAllowed !== false,
+              s.executionAllowed !== false ||
+              (s.currency ?? 'usd') !== currency ||
+              (currency === 'sol' && s.quoteMint !== SOL_CANDLE_QUOTE),
           )
         )
           throw new Error('Candle context mismatch.');
@@ -1090,8 +1156,9 @@ export function ImportedPoolCandles({
     project.revision,
     project.document.token.chain,
     project.document.token.address,
+    currency,
   ]);
-  const followContext = `${project.id}:${project.revision}:${pool}:${interval}:${feedRunning}:${project.archived}`;
+  const followContext = `${project.id}:${project.revision}:${pool}:${interval}:${currency}:${feedRunning}:${project.archived}`;
   const [follow, setFollow] = useState<{
     context: string;
     state: MarketFeedState;
@@ -1130,6 +1197,7 @@ export function ImportedPoolCandles({
             pool,
             interval,
             mode,
+            currency,
           }),
         });
         const data = (await response.json()) as Result;
@@ -1154,6 +1222,7 @@ export function ImportedPoolCandles({
       pool,
       interval,
       accept,
+      currency,
     ],
   );
   useEffect(() => {
@@ -1182,12 +1251,30 @@ export function ImportedPoolCandles({
     };
   }, [refresh, followContext, project.archived, feedRunning]);
   const snapshot = saved.find(
-    (s) => s.pool === pool && s.interval === interval,
+    (s) =>
+      s.pool === pool &&
+      s.interval === interval &&
+      (s.currency ?? 'usd') === currency,
   );
   return (
     <section aria-label="Selected pool candles">
       <h4>Pool candlesticks</h4>
       <div className="wallet-roster-actions">
+        <label>
+          Price currency{' '}
+          <select
+            aria-label="Candle price currency"
+            value={currency}
+            disabled={busy || followState.status === 'running'}
+            onChange={(e) => setCurrency(e.target.value as CandleCurrency)}
+          >
+            <option value="usd">USD</option>
+            {project.document.token.chain === 'Solana' &&
+              project.document.token.address !== SOL_CANDLE_QUOTE && (
+                <option value="sol">SOL (WSOL-quoted pools)</option>
+              )}
+          </select>
+        </label>
         <label>
           Candle interval{' '}
           <select
@@ -1248,13 +1335,13 @@ export function ImportedPoolCandles({
       <details className="candle-data-coverage">
         <summary>Candle data coverage</summary>
         <p>
-          GeckoTerminal USD candles for this pool&apos;s base token. Read 100
-          intervals at a time and retain up to 500, with no invented gaps.
-          Refresh latest replaces the saved history for this selection. Candle
-          updates retain older loaded candles up to 500 and replace the
-          refreshed time range. Stop the market feed before starting candle
-          updates. Latest candle sets for up to 20 pool/interval selections are
-          retained.
+          GeckoTerminal {currency.toUpperCase()} candles for this pool&apos;s
+          base token. Read 100 intervals at a time and retain up to 500, with no
+          invented gaps. Refresh latest replaces the saved history for this
+          selection. Candle updates retain older loaded candles up to 500 and
+          replace the refreshed time range. Stop the market feed before starting
+          candle updates. Latest candle sets for up to 20 pool/interval
+          selections are retained.
         </p>
         <output style={{ display: 'block' }}>
           Candle updates {followState.status}. {followState.reads} successful
@@ -1416,6 +1503,14 @@ function ImportedChartTrades({
       ),
     [project.id, project.document.token.address, load],
   );
+  const executionAverages = visible
+    ? chartExecutionAverages(
+        rows,
+        project.id,
+        project.document.token.address,
+        project.document.token.decimals,
+      )
+    : undefined;
   const markers = visible
     ? chartTradeMarkers(
         snapshot,
@@ -1473,9 +1568,18 @@ function ImportedChartTrades({
         projectId={project.id}
         revision={project.revision}
         supplyToken={project.document.token}
+        executionAverages={executionAverages}
       />
       {markers && (
         <>
+          <ChartExecutionAverages
+            receipts={rows}
+            projectId={project.id}
+            mint={project.document.token.address}
+            decimals={project.document.token.decimals}
+            hasOlder={cursor !== null}
+            chartCurrency={snapshot.currency ?? 'usd'}
+          />
           <p>
             B: finalized buys. S: finalized sells. {markers.matched.length}{' '}
             trades mapped from {rows.length} loaded receipts.{' '}

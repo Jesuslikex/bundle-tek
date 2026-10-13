@@ -1733,6 +1733,9 @@ it('retains owned candle sets, replaces the same selection and keeps archive acc
     candlePool,
     '1h',
     expect.any(AbortSignal),
+    fetch,
+    undefined,
+    'usd',
   );
   mocks.candles.mockClear();
   expect((await (await candleRead(project)).json()).observations).toEqual([
@@ -1830,7 +1833,8 @@ it('derives older candle cursors from owned saved history, retains latest prices
     '1h',
     expect.any(AbortSignal),
     fetch,
-    snapshot.candles[0].time - 1,
+    snapshot.candles[0].time,
+    'usd',
   );
   const saved = (await (await candleRead(project)).json())
     .observations[0] as typeof snapshot & {

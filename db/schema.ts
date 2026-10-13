@@ -1221,6 +1221,27 @@ export const conditionalLevelReservations = sqliteTable(
     ),
   ],
 );
+export const conditionalOrderEvents = sqliteTable(
+  'conditional_order_events',
+  {
+    sequence: integer('sequence').primaryKey({ autoIncrement: true }),
+    id: text('id').notNull().unique(),
+    ownerId: text('owner_id').notNull(),
+    projectId: text('project_id').notNull(),
+    orderId: text('order_id').notNull(),
+    type: text('type').notNull(),
+    document: text('document').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    index('conditional_order_events_scope').on(
+      t.ownerId,
+      t.projectId,
+      t.createdAt,
+      t.sequence,
+    ),
+  ],
+);
 export const conditionalLevelFills = sqliteTable(
   'conditional_level_fills',
   {

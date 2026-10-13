@@ -30,7 +30,7 @@ import type {
   ConditionalLevelRequest,
   ConditionalPreparation,
 } from '@/lib/conditional-preparation-server';
-import type { ConditionalSellOrder } from '@/lib/conditional-sell-order';
+import type { ConditionalOrder } from '@/lib/conditional-order';
 import { requireSelectedConditionalPreparation } from '@/lib/conditional-preparation-selection';
 export function ImportedSwapPreparation({
   project,
@@ -56,7 +56,7 @@ export function ImportedSwapPreparation({
   buyReceiptId?: string;
   buyAllocations?: ImportedAcquisitionAllocation[];
   conditional?: ConditionalLevelRequest;
-  conditionalOrder?: ConditionalSellOrder;
+  conditionalOrder?: ConditionalOrder;
   session?: TradeSessionRequest;
   sessionNotBefore?: string;
   preparationJobId?: string;

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { EVM_NETWORKS } from '@/lib/evm-network';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import { ImportedTokenHistory } from './imported-token-history';
+import { TokenOperationHistory } from './token-operation-history';
 import { ImportedPreparationHistory } from './imported-preparation-history';
 import { ImportedApprovalHistory } from './imported-approval-history';
 import { ImportedTradeHistory } from './imported-trade-history';
@@ -414,6 +415,7 @@ export function ImportedTokenProjects({
               <ImportedTokenMarket
                 key={`market:${current.id}:${current.revision}`}
                 project={current}
+                onReviewBuy={reviewBuy}
               />
             </section>
             <section
@@ -439,18 +441,29 @@ export function ImportedTokenProjects({
                 }}
               />
             </section>
-            <ImportedSupplyTracker
-              key={`supply:${current.id}:${current.revision}`}
-              project={current}
-              onOpenChart={openChart}
-            />
-            {current.document.token.chain === 'Solana' && (
-              <HolderIndexPanel
-                key={`holder-index:${current.id}:${current.revision}`}
+            <section
+              className="imported-workspace-wallets"
+              aria-label="Token wallet and holder views"
+            >
+              <ImportedSupplyTracker
+                key={`supply:${current.id}:${current.revision}`}
                 project={current}
                 onOpenChart={openChart}
               />
-            )}
+              {current.document.token.chain === 'Solana' && (
+                <HolderIndexPanel
+                  key={`holder-index:${current.id}:${current.revision}`}
+                  project={current}
+                  onOpenChart={openChart}
+                />
+              )}
+              <TokenOperationHistory
+                projectId={current.id}
+                revision={current.revision}
+                project={current}
+                onReviewBuy={reviewBuy}
+              />
+            </section>
           </div>
           {current.document.token.chain !== 'Solana' && (
             <ImportedEvmWalletBalances

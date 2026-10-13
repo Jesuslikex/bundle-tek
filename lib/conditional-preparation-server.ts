@@ -2,7 +2,12 @@ import {
   validatedConditionalSigning,
   sameConditionalTerms,
 } from './conditional-signing';
-import { decodeConditionalSellOrder } from './conditional-sell-order';
+import {
+  decodeConditionalOrder,
+  conditionalOrderSide,
+  CONDITIONAL_BUY_INPUT_MINT,
+} from './conditional-order';
+import { requireConditionalBuyStorage } from './conditional-buy-capability';
 import { reviewMarketTrigger } from './market-trigger';
 import type { SavedTokenMarket } from './token-market';
 import { UUID } from './wallet-operation';
@@ -11,7 +16,7 @@ export type ConditionalLevelRequest = {
   revision: number;
   level: number;
 };
-export type ConditionalPreparation = {
+export type LegacyConditionalPreparation = {
   format: 'conditional-preparation-v1';
   orderId: string;
   orderRevision: number;
@@ -26,6 +31,20 @@ export type ConditionalPreparation = {
   expiresAt: string;
   source: 'api.dexscreener.com';
 };
+export type ConditionalBuyPreparation = Omit<
+  LegacyConditionalPreparation,
+  'format'
+> & {
+  format: 'conditional-preparation-v2';
+  side: 'Buy';
+  inputMint: typeof CONDITIONAL_BUY_INPUT_MINT;
+  inputDecimals: 9;
+  outputMint: string;
+  outputDecimals: number;
+};
+export type ConditionalPreparation =
+  | LegacyConditionalPreparation
+  | ConditionalBuyPreparation;
 export type ConditionalPreparationGuard = {
   selection: ConditionalPreparation;
   document: string;
@@ -71,6 +90,7 @@ export async function captureConditionalPreparation(
   now = Date.now(),
   intentId?: string,
 ): Promise<ConditionalPreparationGuard> {
+  if (context.side === 'Buy') await requireConditionalBuyStorage(db);
   const row = await db
     .prepare(`SELECT o.id,o.document,o.state,o.revision,o.created_at AS createdAt,o.updated_at AS updatedAt,m.document AS market
     FROM conditional_sell_orders o JOIN imported_token_projects p ON p.owner_id=o.owner_id AND p.id=o.project_id
@@ -108,14 +128,14 @@ export async function captureConditionalPreparation(
     }>();
   if (!row)
     throw new Error('Conditional draft, wallet or market context unavailable.');
-  const order = decodeConditionalSellOrder({
+  const order = decodeConditionalOrder({
       ...row,
       terms: JSON.parse(row.document),
     }),
     terms = order.terms;
   const level = terms.levels.find((l) => l.level === request.level);
   if (
-    context.side !== 'Sell' ||
+    context.side !== conditionalOrderSide(order) ||
     terms.projectId !== context.projectId ||
     terms.projectRevision !== context.projectRevision ||
     terms.wallet !== context.wallet ||
@@ -145,24 +165,36 @@ export async function captureConditionalPreparation(
   const termsSha256 = Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('');
+  const selection: LegacyConditionalPreparation = {
+    format: 'conditional-preparation-v1',
+    orderId: order.id,
+    orderRevision: order.revision,
+    level: level.level,
+    termsSha256,
+    pair: terms.pair,
+    direction: terms.direction,
+    targetUsd: level.targetUsd,
+    unitsRaw: level.unitsRaw,
+    observedMarketCapUsd: review.observedMarketCapUsd,
+    observedAt: review.observedAt,
+    expiresAt: review.expiresAt,
+    source: review.source,
+  };
   return {
     document: row.document,
     marketDocument: row.market,
-    selection: {
-      format: 'conditional-preparation-v1',
-      orderId: order.id,
-      orderRevision: order.revision,
-      level: level.level,
-      termsSha256,
-      pair: terms.pair,
-      direction: terms.direction,
-      targetUsd: level.targetUsd,
-      unitsRaw: level.unitsRaw,
-      observedMarketCapUsd: review.observedMarketCapUsd,
-      observedAt: review.observedAt,
-      expiresAt: review.expiresAt,
-      source: review.source,
-    },
+    selection:
+      terms.format === 'conditional-buy-v1'
+        ? {
+            ...selection,
+            format: 'conditional-preparation-v2' as const,
+            side: 'Buy' as const,
+            inputMint: CONDITIONAL_BUY_INPUT_MINT,
+            inputDecimals: 9 as const,
+            outputMint: terms.mint,
+            outputDecimals: terms.decimals,
+          }
+        : selection,
   };
 }
 // Approval and submission capture a fresh observation, while the original packet binding stays immutable.
@@ -196,7 +228,10 @@ export async function currentConditionalSigning(
       projectRevision: saved.projectRevision,
       wallet: saved.document.wallet,
       walletRevision: saved.walletRevision,
-      mint: saved.document.inputMint,
+      mint:
+        saved.document.side === 'Buy'
+          ? saved.document.outputMint
+          : saved.document.inputMint,
       decimals: JSON.parse(project.document).token.decimals,
       side: saved.document.side,
       unitsRaw: saved.document.inAmountRaw,
@@ -235,7 +270,7 @@ export function conditionalPreparationWriteGuard(
 ) {
   return guard
     ? {
-        sql: ` AND EXISTS(SELECT 1 FROM conditional_sell_orders o JOIN imported_market_observations m ON m.owner_id=o.owner_id AND m.project_id=o.project_id WHERE o.owner_id=? AND o.project_id=? AND o.id=? AND o.state='draft' AND o.revision=? AND o.document=? AND m.document=? AND NOT EXISTS(SELECT 1 FROM conditional_level_reservations v WHERE v.owner_id=o.owner_id AND v.order_id=o.id AND v.level=?) AND NOT EXISTS(SELECT 1 FROM conditional_level_fills f WHERE f.owner_id=o.owner_id AND f.order_id=o.id AND f.level=?)) AND ?>?`,
+        sql: ` AND EXISTS(SELECT 1 FROM conditional_sell_orders o JOIN imported_market_observations m ON m.owner_id=o.owner_id AND m.project_id=o.project_id WHERE o.owner_id=? AND o.project_id=? AND o.id=? AND o.state='draft' AND o.revision=? AND o.document=? AND m.document=? AND NOT EXISTS(SELECT 1 FROM conditional_level_reservations v WHERE v.owner_id=o.owner_id AND v.order_id=o.id AND v.level=?) AND NOT EXISTS(SELECT 1 FROM conditional_level_fills f WHERE f.owner_id=o.owner_id AND f.order_id=o.id AND f.level=?)) AND julianday(?)>julianday('now')`,
         bindings: [
           owner,
           projectId,
@@ -245,8 +280,7 @@ export function conditionalPreparationWriteGuard(
           guard.marketDocument,
           guard.selection.level,
           guard.selection.level,
-          Date.parse(guard.selection.expiresAt),
-          Date.now(),
+          guard.selection.expiresAt,
         ],
       }
     : { sql: '', bindings: [] };

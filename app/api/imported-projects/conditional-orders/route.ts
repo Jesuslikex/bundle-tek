@@ -3,11 +3,14 @@ import { getD1 } from '@/db';
 import { walletRequest } from '@/lib/wallet-request';
 import { UUID } from '@/lib/wallet-operation';
 import {
-  conditionalSellTerms,
-  decodeConditionalSellOrder,
-  type ConditionalSellOrder,
-  type ConditionalSellTerms,
-} from '@/lib/conditional-sell-order';
+  conditionalOrderTerms,
+  decodeConditionalOrder,
+  type ConditionalOrder,
+} from '@/lib/conditional-order';
+import {
+  requireConditionalBuyStorage,
+  ConditionalBuyStorageUnavailable,
+} from '@/lib/conditional-buy-capability';
 import { reviewMarketTrigger } from '@/lib/market-trigger';
 import type { SavedTokenMarket } from '@/lib/token-market';
 export const dynamic = 'force-dynamic';
@@ -23,10 +26,10 @@ type Row = {
 };
 const columns =
   'id,document,state,revision,created_at AS createdAt,updated_at AS updatedAt';
-const order = (row: Row): ConditionalSellOrder =>
-  decodeConditionalSellOrder({
+const order = (row: Row): ConditionalOrder =>
+  decodeConditionalOrder({
     id: row.id,
-    terms: JSON.parse(row.document) as ConditionalSellTerms,
+    terms: JSON.parse(row.document),
     state: row.state,
     revision: row.revision,
     createdAt: row.createdAt,
@@ -109,7 +112,15 @@ export async function POST(request: Request) {
           ? 'action,amount,direction,kind,lines,maximumUsd,minimumUsd,orderId,pair,projectId,projectRevision,wallet,walletRevision'
           : 'action,amount,direction,kind,orderId,pair,projectId,projectRevision,targetUsd,wallet,walletRevision'
         : 'action,orderId,projectId,revision';
-    if (Object.keys(body).sort().join(',') !== allowed) throw new Error();
+    const expected =
+      body.action === 'create' && body.side !== undefined
+        ? allowed.split(',').concat('side').sort().join(',')
+        : allowed;
+    if (
+      Object.keys(body).sort().join(',') !== expected ||
+      (body.side !== undefined && body.side !== 'Buy' && body.side !== 'Sell')
+    )
+      throw new Error();
     if (body.action !== 'create') revision(body.revision);
   } catch {
     return json({ error: 'Review valid conditional order inputs.' }, 400);
@@ -126,6 +137,7 @@ export async function POST(request: Request) {
         .first<Row>();
     const existing = await read();
     if (body.action === 'create') {
+      if (body.side === 'Buy') await requireConditionalBuyStorage(db);
       const project = await db
         .prepare(
           'SELECT chain,address,revision,archived,document FROM imported_token_projects WHERE owner_id=? AND id=?',
@@ -145,12 +157,12 @@ export async function POST(request: Request) {
           { error: 'Project changed or is archived. Reload projects.' },
           409,
         );
-      let terms: ConditionalSellTerms;
+      let terms: ConditionalOrder['terms'];
       try {
         const token = JSON.parse(project.document).token;
         if (token.chain !== project.chain || token.address !== project.address)
           throw new Error();
-        terms = conditionalSellTerms(body, token);
+        terms = conditionalOrderTerms(body, token);
       } catch {
         return json(
           {
@@ -242,6 +254,8 @@ export async function POST(request: Request) {
     if (existing.state !== 'draft' || existing.revision !== body.revision)
       return json({ error: 'Order changed or was cancelled.' }, 409);
     const terms = order(existing).terms;
+    if (terms.format === 'conditional-buy-v1')
+      await requireConditionalBuyStorage(db);
     const context = await db
       .prepare(`SELECT p.revision,p.archived,p.chain,p.address,m.document AS market,w.revision AS walletRevision,w.archived AS walletArchived FROM imported_token_projects p
       LEFT JOIN imported_market_observations m ON m.owner_id=p.owner_id AND m.project_id=p.id
@@ -311,7 +325,15 @@ export async function POST(request: Request) {
         422,
       );
     }
-  } catch {
-    return json({ error: 'Conditional order storage unavailable.' }, 503);
+  } catch (error) {
+    return json(
+      {
+        error:
+          error instanceof ConditionalBuyStorageUnavailable
+            ? error.message
+            : 'Conditional order storage unavailable.',
+      },
+      503,
+    );
   }
 }

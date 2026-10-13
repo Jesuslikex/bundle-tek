@@ -8,6 +8,7 @@ import { FundingFeeReviewPanel } from './funding-fee-review';
 import { SolanaFundingReview } from './solana-funding-review';
 import { DevnetFundingExecution } from './devnet-funding-execution';
 import { MainnetFundingExecution } from './mainnet-funding-execution';
+import { MainnetFundingHistoryPanel } from './mainnet-funding-history';
 import { FundingExecutionHistoryPanel } from './funding-execution-history';
 import { chainQuoteAssets } from '@/lib/quote-catalog';
 import { LaunchFundingPicker } from './launch-funding-picker';
@@ -213,12 +214,12 @@ export function FundingPlanner({
           <span className="eyebrow">SAVED FUNDING PLANS</span>
           <h2>Plan every allocation.</h2>
           <p>
-            Amounts and timing for manual review. Saved wallet drafts support
-            EVM fee checks and unsigned SOL or SPL token preparation. Exchange
-            connections, mainnet funding and scheduled execution remain
-            unavailable. Immediate SOL and standard SPL wallet drafts also
-            support one approved recipient at a time on devnet, using the exact
-            saved mint and amounts.
+            Saved wallet drafts support EVM fee checks and Solana funding
+            reviews. Solana mainnet transfers require one exact recipient,
+            individual signing approval and separate submission approval.
+            Immediate SOL and standard SPL drafts also support approved devnet
+            transfers. Exchange connections and background scheduled execution
+            remain unavailable.
           </p>
         </div>
         <Button
@@ -640,6 +641,14 @@ export function FundingPlanner({
             }
           />
         )}
+      {historyDraft && (
+        <MainnetFundingHistoryPanel
+          key={`mainnet:${historyDraft.id}`}
+          id={historyDraft.id}
+          revision={historyDraft.revision}
+          name={historyDraft.document.name}
+        />
+      )}
       {historyDraft && (
         <FundingExecutionHistoryPanel
           key={historyDraft.id}

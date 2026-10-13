@@ -7,6 +7,12 @@ import {
 } from './holder-index';
 import { TOKEN_PROGRAMS } from './wallet-holdings';
 import { tokenExtensionNames } from './token-extension-names';
+import {
+  decodeHolderMintObservation,
+  HolderMintObservationConflict,
+  holderFeeUnits,
+  sameHolderMintFees,
+} from './holder-index-mint';
 export async function observeHolderIndexPage(
   mint: string,
   page: number,
@@ -35,8 +41,7 @@ export async function observeHolderIndexPage(
     mint,
     {
       commitment: 'finalized',
-      encoding: 'base64',
-      dataSlice: { offset: 0, length: 0 },
+      encoding: 'jsonParsed',
       minContextSlot: Number(supply.context.slot),
     },
   ])) as { value?: { owner?: string; executable?: boolean } };
@@ -49,6 +54,17 @@ export async function observeHolderIndexPage(
     throw new Error('Mint token program unavailable.');
   if (previous?.tokenProgram && previous.tokenProgram !== program)
     throw new Error('Mint token program changed.');
+  const mintObservation =
+    program === TOKEN_PROGRAMS[1]
+      ? decodeHolderMintObservation(mintAccount, supply)
+      : undefined;
+  if (
+    previous &&
+    !sameHolderMintFees(previous.mintObservation, mintObservation)
+  )
+    throw new HolderMintObservationConflict(
+      'Mint fees or extensions changed. Start a fresh scan.',
+    );
   const cursor = previous?.nextCursor ?? null;
   const enumeration = previous?.enumeration ?? method;
   if (enumeration === 'das-cursor') {
@@ -90,6 +106,7 @@ export async function observeHolderIndexPage(
       nextCursor:
         decoded.accounts.length === 0 ? null : (nextCursor as string | null),
       tokenProgram: program,
+      ...(mintObservation ? { mintObservation } : {}),
     };
   }
   const result = (await rpc('getProgramAccountsV2', [
@@ -150,9 +167,10 @@ export async function observeHolderIndexPage(
       !['initialized', 'frozen'].includes(String(info?.state))
     )
       throw new Error('Indexed token account layout differs.');
-    let withheldRaw: string | undefined;
+    let withheldRaw: string | undefined, extensions: string[] | undefined;
     if (program === TOKEN_PROGRAMS[1] && info?.extensions !== undefined) {
       const names = tokenExtensionNames(info.extensions);
+      extensions = names;
       if (names.includes('transferFeeAmount')) {
         const fee = (
           info.extensions as Array<{
@@ -161,13 +179,7 @@ export async function observeHolderIndexPage(
           }>
         ).find((e) => e.extension === 'transferFeeAmount');
         const raw = fee?.state?.withheldAmount;
-        if (
-          typeof raw !== 'string' ||
-          !/^(0|[1-9]\d{0,19})$/.test(raw) ||
-          BigInt(raw) > (1n << 64n) - 1n
-        )
-          throw new Error('Indexed account withheld fees unavailable.');
-        withheldRaw = raw;
+        withheldRaw = holderFeeUnits(raw);
       }
     }
     return {
@@ -177,6 +189,7 @@ export async function observeHolderIndexPage(
       amount: info?.tokenAmount?.amount,
       frozen: info?.state === 'frozen',
       ...(withheldRaw !== undefined ? { withheldRaw } : {}),
+      ...(extensions !== undefined ? { extensions } : {}),
     };
   });
   const decoded = decodeHolderIndexPage(
@@ -201,5 +214,6 @@ export async function observeHolderIndexPage(
     requestedCursor: cursor,
     nextCursor: data.paginationKey as string | null,
     tokenProgram: program,
+    ...(mintObservation ? { mintObservation } : {}),
   };
 }

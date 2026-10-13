@@ -440,6 +440,7 @@ export async function POST(request: Request) {
       const failed = 'failed' in receipt;
       if (row.state === 'failed' && !failed)
         throw new Error('Retained failure outcome differs.');
+      const outcomeRecordedAt = new Date().toISOString();
       phase = 'storage';
       await db
         .prepare(
@@ -449,7 +450,7 @@ export async function POST(request: Request) {
           failed ? 'failed' : 'finalized',
           failed ? null : JSON.stringify(receipt),
           failed ? JSON.stringify(receipt) : null,
-          now,
+          outcomeRecordedAt,
           user.userId,
           row.id,
           row.signature,

@@ -11,6 +11,7 @@ import {
 import type { LaunchChain } from '@/lib/launch-plan';
 import { WalletWarmupPlans } from '@/components/wallet-warmup-plans';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
+import { WarmupPlanSummary } from './warmup-plan-summary';
 
 type HistoryResult = {
   address: string;
@@ -287,6 +288,7 @@ export function WalletWarmup({
         </div>
       </form>
       {error && <p role="alert">{error}</p>}
+      {plan && <WarmupPlanSummary plan={plan} />}
       <WalletWarmupPlans
         initialPlan={initialPlan}
         chain={chain}
@@ -312,11 +314,6 @@ export function WalletWarmup({
       {plan && (
         <section aria-label="Warmup plan review">
           <h4>{plan.actions.length} planned actions</h4>
-          <p>
-            Per-wallet buy budget: {plan.buyBudgetPerWallet} {plan.currency}.
-            With fee reserve: {plan.requiredPerWallet} {plan.currency}. Total
-            for {addresses.length} wallets: {plan.totalBudget} {plan.currency}.
-          </p>
           <p>
             Buys start at fixed staggered offsets within the first quarter of
             each interval. Sells follow half an interval later. Sell proceeds do

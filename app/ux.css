@@ -3936,15 +3936,87 @@ body {
 .saved-supply-monitor {
   min-width: 0;
 }
-.token-monitor-heading, .token-monitor-navigation {
+.imported-market-pane {
+  container-type: inline-size;
+  container-name: imported-market;
+}
+.imported-market-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.imported-market-board > *,
+.imported-workspace-wallets {
+  min-width: 0;
+}
+.imported-workspace-wallets > .wallet-warmup-panel {
+  margin-top: 0;
+}
+.imported-workspace-wallets {
+  display: grid;
+  gap: 20px;
+}
+.pool-trade-table-scroll {
+  overflow: auto;
+  max-height: 420px;
+  scrollbar-gutter: stable;
+}
+.imported-pool-trade-tape--compact .pool-trade-extra-column {
+  display: none;
+}
+.imported-pool-trade-tape--compact .project-table {
+  font-size: 0.75rem;
+}
+.imported-pool-trade-tape--compact .project-table th,
+.imported-pool-trade-tape--compact .project-table td {
+  padding: 7px 5px;
+  vertical-align: top;
+}
+.imported-pool-trade-tape--compact .project-table caption {
+  text-align: left;
+  padding: 8px 0;
+}
+.imported-pool-trade-tape--compact details[open] {
+  min-width: 220px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.imported-pool-trade-tape--compact tr[data-side='Buy'] .pool-trade-side {
+  color: var(--positive, #16a34a);
+}
+.imported-pool-trade-tape--compact tr[data-side='Sell'] .pool-trade-side {
+  color: var(--negative, #e11d48);
+}
+@container imported-market (min-width: 640px) {
+  .imported-market-board {
+    grid-template-columns: minmax(0, 1fr) clamp(230px, 20cqw, 300px);
+  }
+}
+@media (min-width: 1101px) {
+  .imported-live-workspace > .imported-workspace-wallets {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .imported-live-workspace.imported-live-workspace--compact
+    > .imported-workspace-trading {
+    grid-row: 1 / span 2;
+  }
+}
+.token-monitor-heading,
+.token-monitor-navigation {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 16px;
 }
-.token-monitor-heading { justify-content: space-between; }
-.token-monitor-heading h3 { margin: 0; }
+.token-monitor-heading {
+  justify-content: space-between;
+}
+.token-monitor-heading h3 {
+  margin: 0;
+}
 .saved-supply-monitor .wallet-roster-actions button {
   max-width: 100%;
   height: auto;
@@ -3956,9 +4028,15 @@ body {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
-.imported-holder-view { min-width: 0; }
-.imported-holder-view .project-table { width: 100%; }
-.imported-holder-view td { font-variant-numeric: tabular-nums; }
+.imported-holder-view {
+  min-width: 0;
+}
+.imported-holder-view .project-table {
+  width: 100%;
+}
+.imported-holder-view td {
+  font-variant-numeric: tabular-nums;
+}
 .token-monitor-navigation + output {
   display: block;
   padding: 12px;
@@ -4078,14 +4156,6 @@ body {
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     scroll-padding: 20px;
-  }
-  .imported-live-workspace.imported-live-workspace--compact
-    > .wallet-warmup-panel {
-    grid-column: 1 / -1;
-  }
-  .imported-live-workspace.imported-live-workspace--compact
-    > .imported-workspace-trading {
-    grid-row: 1;
   }
 }
 @media (max-width: 1100px), (max-height: 639px) {

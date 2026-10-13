@@ -185,18 +185,37 @@ export async function POST(request: Request) {
     if (body.action === 'cancel') {
       if (!old || old.revision !== body.revision || old.state !== 'active')
         return json({ error: 'Session changed.' }, 409);
-      const result = await db
+      const cancelledAt = new Date().toISOString();
+      const jobsInstalled = await db
         .prepare(
-          "UPDATE imported_trade_sessions SET state='cancelled',revision=revision+1,updated_at=? WHERE owner_id=? AND project_id=? AND id=? AND revision=? AND state='active' AND NOT EXISTS(SELECT 1 FROM imported_swap_signing_intents i JOIN imported_swap_preparations p ON p.owner_id=i.owner_id AND p.id=i.preparation_id WHERE i.owner_id=imported_trade_sessions.owner_id AND json_extract(p.document,'$.session.sessionId')=imported_trade_sessions.id AND i.state IN ('awaiting_signature','signed','submitted'))",
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='session_preparation_jobs'",
         )
-        .bind(
-          new Date().toISOString(),
-          owner,
-          body.projectId,
-          body.id,
-          body.revision,
-        )
-        .run();
+        .first();
+      const writes = [
+        db
+          .prepare(
+            "UPDATE imported_trade_sessions SET state='cancelled',revision=revision+1,updated_at=? WHERE owner_id=? AND project_id=? AND id=? AND revision=? AND state='active' AND NOT EXISTS(SELECT 1 FROM imported_swap_signing_intents i JOIN imported_swap_preparations p ON p.owner_id=i.owner_id AND p.id=i.preparation_id WHERE i.owner_id=imported_trade_sessions.owner_id AND json_extract(p.document,'$.session.sessionId')=imported_trade_sessions.id AND i.state IN ('awaiting_signature','signed','submitted'))",
+          )
+          .bind(cancelledAt, owner, body.projectId, body.id, body.revision),
+      ];
+      if (jobsInstalled)
+        writes.push(
+          db
+            .prepare(
+              "UPDATE session_preparation_jobs SET state='cancelled',lease_token=NULL,lease_until=NULL,last_error='context-changed',updated_at=? WHERE owner_id=? AND project_id=? AND session_id=? AND state IN ('queued','running') AND EXISTS(SELECT 1 FROM imported_trade_sessions s WHERE s.owner_id=session_preparation_jobs.owner_id AND s.project_id=session_preparation_jobs.project_id AND s.id=session_preparation_jobs.session_id AND s.state='cancelled' AND s.revision=? AND s.updated_at=?)",
+            )
+            .bind(
+              cancelledAt,
+              owner,
+              body.projectId,
+              body.id,
+              Number(body.revision) + 1,
+              cancelledAt,
+            ),
+        );
+      // The installed job lifecycle and its audit triggers commit with parent
+      // cancellation. Older databases without jobs retain session cancellation.
+      const [result] = await db.batch(writes);
       return result.meta.changes
         ? json({ cancelled: true })
         : json(

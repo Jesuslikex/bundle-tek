@@ -42,5 +42,39 @@ it('distinguishes partial rankings from provider exhaustion without claiming an 
   const final = renderToStaticMarkup(<HolderIndexResults scan={exhausted} />);
   expect(final).toContain('Provider enumeration exhausted');
   expect(final).toContain('not proof of globally complete');
-  expect(final).toContain('Unreconciled remainder: 0.8 tokens');
+  expect(final).toContain('Remainder outside those balances: 0.8 tokens');
+});
+it('separates mint and account fees from holder rankings and discloses confidential coverage', () => {
+  const feePage: HolderIndexPage = {
+    ...page,
+    enumeration: 'program-accounts-v2',
+    requestedCursor: null,
+    nextCursor: null,
+    tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+    mintObservation: {
+      slot: 201,
+      withheldRaw: '500000',
+      extensions: ['transferFeeConfig', 'confidentialTransferMint'],
+    },
+    accounts: page.accounts.map((account) => ({
+      ...account,
+      withheldRaw: '300000',
+      extensions: [
+        'transferFeeAmount',
+        'confidentialTransferAccount',
+        'unparseableExtension',
+      ],
+    })),
+  };
+  const scan = appendHolderIndexPage(null, feePage, page.mint, 6);
+  const html = renderToStaticMarkup(<HolderIndexResults scan={scan} />);
+  expect(html).toContain('20.0000%');
+  expect(html).toContain('0.3 tokens in 1 accounts');
+  expect(html).toContain('Observed mint-harvested fees: 0.5 tokens');
+  expect(html).toContain('Unexplained remainder after observed fees: 0 tokens');
+  expect(html).toContain(
+    'Encrypted balances and encrypted fees are not measured',
+  );
+  expect(html).toContain('does not establish complete hidden-balance coverage');
+  expect(html).toContain('Some account extensions could not be parsed');
 });

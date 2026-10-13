@@ -3,6 +3,8 @@ import {
   type TradeSessionRequest,
 } from '@/lib/imported-trade-session';
 import { captureTradeSession } from '@/lib/imported-trade-session-server';
+import { ConditionalBuyStorageUnavailable } from '@/lib/conditional-buy-capability';
+import { requireConditionalBuyOutputPrecision } from '@/lib/conditional-signing';
 import { env } from 'cloudflare:workers';
 import { walletAddress } from '@/lib/wallet-workspace';
 import {
@@ -86,7 +88,7 @@ export async function prepareOwnedImportedSwap(
     input.wallet = walletAddress(input.wallet, 'Solana');
     if (input.conditional !== undefined) {
       input.conditional = conditionalLevelRequest(input.conditional);
-      if (input.side !== 'Sell') throw new Error();
+      if (!['Buy', 'Sell'].includes(input.side)) throw new Error();
     }
     if (
       input.buyReceiptId !== undefined &&
@@ -223,7 +225,9 @@ export async function prepareOwnedImportedSwap(
             conditionContext,
           )
         : undefined;
-    } catch {
+    } catch (error) {
+      if (error instanceof ConditionalBuyStorageUnavailable)
+        return json({ error: error.message }, 503);
       return json(
         {
           error:
@@ -322,6 +326,10 @@ export async function prepareOwnedImportedSwap(
         409,
       );
     const simulation = await simulateImportedSwap(order, signal);
+    requireConditionalBuyOutputPrecision(
+      conditional?.selection,
+      simulation.tokenChanges,
+    );
     if (
       !(await read()) ||
       Date.parse(order.expiresAt) <= Date.now() ||

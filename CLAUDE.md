@@ -28,3 +28,11 @@ Wallet private keys belong encrypted in the browser with user-controlled export.
 
 Keep claims tied to the code or captured evidence you inspected. State when provider data is sampled or incomplete. Before any code change, summarize the files and behavior you plan to change; for financial actions, credential changes, or deployment, wait for explicit user authorization.
 
+## Commit checkpoints and current handoff
+
+The user requires Codex to commit completed, verified work locally so Claude can follow progress. Both agents should inspect the latest commit, index and remaining working-tree changes before editing. Commit only owned files or hunks, leave concurrent work separate, and report the local commit hash. This does not authorize pushing or deploying.
+
+The current Codex checkpoint integrates conditional Buy/Sell Limit and Grid review, exact SOL input budgets, explicit transaction approval, all-wallet session outcome reads, atomic cancellation of pending unsigned jobs, token chart/history and holder continuations, and mainnet funding history. See `docs/CODEX-CURRENT-FULL-SUITE.md` and `docs/CODEX-PROXIMA-COMPLETION-MATRIX.md` for validation and remaining requirements. The latest Codex feature run passed 322 targeted tests across 36 files, TypeScript, typed lint and production build; the older 1,919-test full-suite result covers an earlier source snapshot.
+
+Claude's timeline changes in `components/account-performance.tsx`, `components/performance-timeline.tsx`, `lib/performance-timeline.ts` and `lib/performance-timeline.test.ts` were committed separately as `2e2d177` while this checkpoint was being prepared. They are not part of Codex's staged changes. Inspect any newer edits before taking ownership of those files. CROP hosting remains blocked by missing runner, failed SQL and migration ledger diagnostics. No live transaction or deployment is part of this checkpoint.
+

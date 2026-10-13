@@ -261,7 +261,11 @@ it('enforces the conditional contract in the actual preparation API before provi
     );
   expect((await prepare({ ...levelRequest, level: 4 })).status).toBe(409);
   expect((await prepare({ ...levelRequest, amount: '1' })).status).toBe(400);
-  expect((await prepare(levelRequest, { side: 'Buy' })).status).toBe(400);
+  const unsupportedBuy = await prepare(levelRequest, { side: 'Buy' });
+  expect(unsupportedBuy.status).toBe(503);
+  expect(((await unsupportedBuy.json()) as { error: string }).error).toContain(
+    'Conditional Buy storage is not upgraded',
+  );
   expect((await prepare(levelRequest, { amount: '0.000013' })).status).toBe(
     409,
   );

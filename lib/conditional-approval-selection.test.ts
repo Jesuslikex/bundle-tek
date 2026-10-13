@@ -52,7 +52,9 @@ async function fixture() {
     document: {
       inputRaw: saved.unitsRaw,
       inputMint: mint,
+      outputMint: 'So11111111111111111111111111111111111111112',
       conditional: {
+        format: 'conditional-preparation-v1',
         orderId: order.id,
         orderRevision: 1,
         level: 1,
@@ -61,6 +63,10 @@ async function fixture() {
         direction: terms.direction,
         targetUsd: saved.targetUsd,
         unitsRaw: saved.unitsRaw,
+        observedMarketCapUsd: '200',
+        observedAt: '2026-10-11T12:00:00.000Z',
+        expiresAt: '2026-10-11T12:00:30.000Z',
+        source: 'api.dexscreener.com',
       },
     },
   } as ImportedApprovalRow;
