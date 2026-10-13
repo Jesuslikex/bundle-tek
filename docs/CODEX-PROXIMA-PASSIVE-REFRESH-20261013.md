@@ -1,0 +1,13 @@
+# Fresh passive Proxima reference
+
+13 October 2026, 18:57:59–18:58:01 UTC. The previously approved dedicated browser is reachable at http://127.0.0.1:9223. Actual REA discovery, scoped only to https://app.proxima.tools, returns Chrome/155.0.8059.40 and the existing account target 3693D0D2327B26B35068D16F84D8A0BC at https://app.proxima.tools/account. Discovery Evidence: ev_10eae1ea7bb5aee403fc3824689407beef27b4f187af865033b0afab442709e0.
+
+A two-second passive inspect_web_page capture succeeded on that exact target. It retained DOM/accessibility and observation metadata without script sources, console text, storage keys/fingerprints, JSON/WebSocket shapes or transport contents. Current account navigation includes a Create launch control and existing launch links. No navigation, click, JavaScript evaluation, form edit, launch creation, trade, signing or wallet export occurred.
+
+Inspection Evidence: ev_8052247a58bad8983d6efa1d269818ad1c0e4d1b492b66512706e6aa4f78fa7a. Complete inline record retained locally at C:/Users/Julian/Documents/Codex/2026-10-09/https-github-com-morluto-rea-https/work/proxima-passive-account-20261013-1858/inspect-page.json, 457654 bytes, SHA-256 7a7352012e2b1ea6ffbe3f4f3aa2da2af11ca8fc7988d1c44b9ec1c8d5959d03. The complete record was saved in bounded data-only pieces and reassembled with identity/JSON verification; it is outside the application/deployment tree. This avoids another large whole-session export.
+
+Coverage is **policy_filtered**. Zero requests were observed during this brief attached window, which does not establish absence of prior or future traffic. Account visibility is not new strategy-form evidence or backend/custody/automation knowledge. Older form captures retain their historical scope; no claim of complete REA coverage or Proxima parity is made.
+
+The actual main full suite remains active under existing handle 75317. It is executing the frozen 1056-file session-progress source, and repeated hashes still match digest 7593e0ccc5b2f76f0c1475b7a988378b73841301e82a2fcb5b98ce05006bb5fd. Passing session and signing test output is visible, but terminal totals and final source verification are pending. Do not restart the process or modify application/tests while it runs. See CODEX-CURRENT-FULL-SUITE.md.
+
+Only documentation changed in this continuation. No source, protected Claude file, migration, provider credential, hosting candidate, remote or scheduler changed. Nothing pushed, saved as a hosting version, deployed or transacted. Fresh form inspection, remaining strategy/session semantics, supported launch execution, marketplace, complete holder coverage, audited P&L, funded/integrated proof and hosted recovery remain open.
