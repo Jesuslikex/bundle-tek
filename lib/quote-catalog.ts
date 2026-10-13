@@ -3910,6 +3910,14 @@ const VENUES: Record<string, string[]> = {
   'Solana/Lesgo': ['So11111111111111111111111111111111111111112'],
   'Solana/meme.fun': ['So11111111111111111111111111111111111111112'],
 };
+// Presentation order only. These exact captured identities remain subject to
+// live issuer and venue checks before any launch can be prepared.
+const FEATURED_STOCK_QUOTE_MINTS = new Set([
+  'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB', // TSLAX
+  'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh', // NVDAX
+  'XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W', // SPYX
+]);
+
 export function quoteCatalog(chain: string, venue: string) {
   const addresses = VENUES[chain + '/' + venue];
   const assets: QuoteAsset[] = [];
@@ -3919,7 +3927,24 @@ export function quoteCatalog(chain: string, venue: string) {
     if (token) assets.push({ address, ...token });
     else unresolved.push(address);
   }
-  return { captured: addresses !== undefined, assets, unresolved };
+  // Keep the first asset stable: the chain/venue selector uses it as its default.
+  const orderedAssets =
+    chain === 'Solana' && venue === 'StonkFun' && assets.length > 1
+      ? [
+          assets[0],
+          ...assets
+            .slice(1)
+            .filter((a) => FEATURED_STOCK_QUOTE_MINTS.has(a.address)),
+          ...assets
+            .slice(1)
+            .filter((a) => !FEATURED_STOCK_QUOTE_MINTS.has(a.address)),
+        ]
+      : assets;
+  return {
+    captured: addresses !== undefined,
+    assets: orderedAssets,
+    unresolved,
+  };
 }
 export function quoteAsset(chain: string, venue: string, address: string) {
   return quoteCatalog(chain, venue).assets.find((a) =>
