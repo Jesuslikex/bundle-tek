@@ -1,5 +1,15 @@
 # Latest source verification, 13 October 2026
 
+## Current integrated session-progress full run
+
+The actual main checkout's combined suite is now running under exact execution handle **75317**, from committed source **e8c0e29** plus only the two preserved pre-existing whitespace edits. It includes DCA range/random/supply/duration, composer layout, draft-status attribution and receipt-backed session progress. Source is frozen until terminal verification. Snapshot: work/release-qa/source-full-suite-session-progress-20261013.json, **1056 files**, digest **7593e0ccc5b2f76f0c1475b7a988378b73841301e82a2fcb5b98ce05006bb5fd**. A post-launch verification already matched unchanged; that is not a terminal pass.
+
+Command: node node_modules/vitest/vitest.mjs run --config vitest.config.mjs --exclude 'work/**' --maxWorkers=1 --reporter=default --reporter=json --outputFile=work/release-qa/full-suite-session-progress-20261013.json. Retained QA/archive/live harnesses under work are excluded; no live-provider opt-in was enabled. Known fixture-export flags were disabled/unset for this process. Git reports no ignored test files under test. No .env or credentials were read or printed by the orchestration.
+
+Log: work/release-qa/full-suite-session-progress-20261013.log. The wrapper will record actual test/source exit codes in full-suite-session-progress-exit-20261013.json and final snapshot verification in full-suite-session-progress-source-20261013.json. These terminal outputs do not exist yet. The one-worker choice limits contention between Miniflare-backed fixtures and follows the previous integrated full-run approach. Poll the existing handle; quiet output or an observation timeout is not a reason to restart.
+
+**Pending:** terminal success/failure, JSON report totals and post-run source hashes. No full-suite pass is claimed. The latest separate 51-test outcomes/UI/real-route/local-D1/status verification, actual-source TypeScript, scoped lint and build are recorded in CODEX-SESSION-PROGRESS.md. No application file, migration, hosting candidate or remote was changed to launch this run. Nothing pushed, saved as a hosting version, deployed or transacted. Broader Proxima strategy/launch/marketplace, complete holder coverage, integrated/funded proof and uncertain hosted migration recovery remain open.
+
 ## Later Sell DCA supply sizing verification
 
 The final captured-supply continuation passed 84 tests across seven actual-checkout files, zero failures/skips, exact handle 62828 exit 0 and JSON success=true. TypeScript, thirteen-file typed lint and build pass. The 1,054-file snapshot retained digest 8c56e1663374f7b691d1a5a174dea5546833b5db513235864a06947e5a0394ef. See CODEX-DCA-SUPPLY-SIZING.md for exact semantics, worktree and evidence. This is targeted later-source verification, not a replacement full-suite pass or funded/rendered/hosted proof.
