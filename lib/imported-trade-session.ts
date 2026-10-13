@@ -2,12 +2,14 @@ import { UUID } from './wallet-operation';
 import { walletAddress } from './wallet-workspace';
 import { solanaTokenAtoms } from './solana-token-amount';
 import { formatNativeBalance } from './wallet-balance-format';
+import { dcaMarketCapRange, type DcaMarketCapRange } from './dca-market-cap';
 export type TradeSessionTerms = {
   format:
     | 'imported-trade-session-v1'
     | 'imported-trade-session-v2'
     | 'imported-trade-session-v3';
   endsAt?: string;
+  marketCapRange?: DcaMarketCapRange;
   strategy?: 'DCA';
   schedule?: TradeSessionSchedule;
   projectId: string;
@@ -120,6 +122,7 @@ export function tradeSessionTerms(
     schedule?: unknown;
     strategy?: unknown;
     endsAt?: unknown;
+    marketCapRange?: unknown;
   };
   if (
     !v ||
@@ -144,6 +147,12 @@ export function tradeSessionTerms(
     v.schedule === undefined ? undefined : tradeSessionSchedule(v.schedule);
   if (v.endsAt !== undefined && (!dca || !canonicalScheduleDate(v.endsAt)))
     throw new Error('Only DCA supports an exact UTC end time.');
+  if (v.marketCapRange !== undefined && !dca)
+    throw new Error('Only DCA supports saved market-cap bounds.');
+  const marketCapRange =
+    v.marketCapRange === undefined
+      ? undefined
+      : dcaMarketCapRange(v.marketCapRange);
   if (dca && (!schedule || schedule.spacingSeconds < 1 || v.entries.length < 2))
     throw new Error('DCA needs 2 to 25 cycles and a positive saved interval.');
   const seen = new Set<string>();
@@ -206,6 +215,7 @@ export function tradeSessionTerms(
     entries,
     ...(schedule ? { schedule } : {}),
     ...(v.endsAt === undefined ? {} : { endsAt: v.endsAt as string }),
+    ...(marketCapRange === undefined ? {} : { marketCapRange }),
   };
 }
 export function decodeTradeSession(value: unknown): TradeSession {

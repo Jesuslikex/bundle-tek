@@ -69,6 +69,64 @@ async function fill() {
   await setField('DCA cycles', '3');
   await setField('DCA start', '2026-10-13T12:00');
 }
+it('saves the reviewed inclusive pool range and rejects reversed bounds in the composer', async () => {
+  await fill();
+  await act(async () => {
+    const box = container.querySelector(
+      'input[type=checkbox]',
+    ) as HTMLInputElement;
+    box.click();
+  });
+  expect(saveButton().disabled).toBe(true);
+  const originalFetch = fetch;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init: RequestInit) => {
+      if (url.startsWith('/api/imported-projects/market?'))
+        return Promise.resolve(
+          Response.json({
+            id: project.id,
+            revision: 1,
+            executionAllowed: false,
+            observations: [
+              {
+                chain: 'Solana',
+                address: mint,
+                projectRevision: 1,
+                source: 'api.dexscreener.com',
+                executionAllowed: false,
+                observedAt: new Date().toISOString(),
+                pairs: [{ address: wallet, dex: 'raydium', marketCapUsd: 150 }],
+              },
+            ],
+          }),
+        );
+      return originalFetch(url, init);
+    }),
+  );
+  await act(async () =>
+    Array.from(container.querySelectorAll('button'))
+      .find((b) => b.textContent === 'Load saved market pools')!
+      .click(),
+  );
+  await setField('Selected market pool', wallet);
+  await setField('Minimum market cap', '100');
+  await setField('Maximum market cap', '99');
+  expect(saveButton().disabled).toBe(true);
+  await setField('Maximum market cap', '200');
+  expect(container.textContent).toContain('Bounds are inclusive');
+  expect(saveButton().disabled).toBe(false);
+  await act(async () => saveButton().click());
+  expect(requests[0].body.marketCapRange).toEqual({
+    pair: wallet,
+    minimumUsd: '100',
+    maximumUsd: '200',
+  });
+  await respond(0);
+  expect(saved.mock.calls[0][0].terms.marketCapRange).toEqual(
+    requests[0].body.marketCapRange,
+  );
+});
 async function respond(index: number, patch: Record<string, unknown> = {}) {
   const body = requests[index].body;
   const now = new Date().toISOString();

@@ -4,6 +4,7 @@ import {
 } from './imported-trade-session';
 import { solanaTokenAtoms } from './solana-token-amount';
 import { formatNativeBalance } from './wallet-balance-format';
+import { dcaMarketCapRange, type DcaMarketCapRange } from './dca-market-cap';
 
 export function dcaTradeSessionInput(
   input: {
@@ -17,6 +18,7 @@ export function dcaTradeSessionInput(
     startAt: string;
     intervalSeconds: number;
     endsAt?: string;
+    marketCapRange?: DcaMarketCapRange;
   },
   token: { chain: string; address: string; decimals: number },
 ): {
@@ -27,6 +29,7 @@ export function dcaTradeSessionInput(
     side: 'Buy' | 'Sell';
     strategy: 'DCA';
     endsAt?: string;
+    marketCapRange?: DcaMarketCapRange;
     schedule: { startAt: string; spacingSeconds: number };
     entries: { wallet: string; walletRevision: number; amount: string }[];
   };
@@ -46,6 +49,9 @@ export function dcaTradeSessionInput(
     side: input.side,
     strategy: 'DCA' as const,
     ...(input.endsAt === undefined ? {} : { endsAt: input.endsAt }),
+    ...(input.marketCapRange === undefined
+      ? {}
+      : { marketCapRange: dcaMarketCapRange(input.marketCapRange) }),
     schedule: { startAt: input.startAt, spacingSeconds: input.intervalSeconds },
     entries: Array.from({ length: input.cycles }, (_, i) => ({
       wallet: input.wallet,

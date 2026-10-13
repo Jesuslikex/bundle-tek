@@ -640,6 +640,16 @@ export function ImportedTradeSessions({
               background execution.
             </p>
           )}
+          {s.terms.marketCapRange && (
+            <p>
+              DCA market-cap range: ${s.terms.marketCapRange.minimumUsd} to{' '}
+              {s.terms.marketCapRange.maximumUsd === undefined
+                ? 'no maximum'
+                : '$' + s.terms.marketCapRange.maximumUsd}
+              . Pool: {s.terms.marketCapRange.pair}. Inclusive bounds need a
+              fresh market observation at preparation, approval and submission.
+            </p>
+          )}
           {s.terms.entries.map((e) => {
             const notBefore = sessionEntryNotBefore(s.terms, e.entry),
               waiting = notBefore !== undefined && Date.parse(notBefore) > now,

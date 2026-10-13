@@ -12,6 +12,7 @@ import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { DcaMarketPool } from './dca-market-pool';
 
 export function DcaTradeSession({
   project,
@@ -33,6 +34,10 @@ export function DcaTradeSession({
     [interval, setInterval] = useState('60'),
     [start, setStart] = useState(''),
     [end, setEnd] = useState(''),
+    [rangeEnabled, setRangeEnabled] = useState(false),
+    [pair, setPair] = useState(''),
+    [minimum, setMinimum] = useState('0'),
+    [maximum, setMaximum] = useState(''),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
   const pending = useRef<AbortController | null>(null);
@@ -41,6 +46,8 @@ export function DcaTradeSession({
     intervalId = useId(),
     startId = useId();
   const endId = useId();
+  const minimumId = useId(),
+    maximumId = useId();
   const retry = useRef<{ key: string; id: string } | null>(null);
   useEffect(
     () => () => {
@@ -76,13 +83,36 @@ export function DcaTradeSession({
           startAt: new Date(start).toISOString(),
           intervalSeconds: Number(interval),
           ...(end ? { endsAt: new Date(end).toISOString() } : {}),
+          ...(rangeEnabled
+            ? {
+                marketCapRange: {
+                  pair,
+                  minimumUsd: minimum,
+                  ...(maximum ? { maximumUsd: maximum } : {}),
+                },
+              }
+            : {}),
         },
         project.document.token,
       );
     } catch {
       return null;
     }
-  }, [wallets, wallet, start, end, cycles, interval, project, side, amount]);
+  }, [
+    wallets,
+    wallet,
+    start,
+    end,
+    cycles,
+    interval,
+    project,
+    side,
+    amount,
+    rangeEnabled,
+    pair,
+    minimum,
+    maximum,
+  ]);
   const disabled = locked || busy || project.archived;
   async function save() {
     if (!preview || disabled || pending.current) return;
@@ -249,6 +279,60 @@ export function DcaTradeSession({
       </p>
       {preview?.terms.endsAt && (
         <p>DCA stops at {preview.terms.endsAt} (UTC).</p>
+      )}
+      <label>
+        <input
+          type="checkbox"
+          checked={rangeEnabled}
+          disabled={disabled}
+          onChange={(e) => setRangeEnabled(e.target.checked)}
+        />
+        Limit DCA to a market-cap range
+      </label>
+      {rangeEnabled && (
+        <fieldset disabled={disabled} className="space-y-2">
+          <legend>Market-cap range</legend>
+          <DcaMarketPool
+            project={project}
+            value={pair}
+            disabled={disabled}
+            onChange={setPair}
+          />
+          <label htmlFor={minimumId}>
+            Minimum market cap (USD)
+            <Input
+              id={minimumId}
+              inputMode="decimal"
+              value={minimum}
+              onChange={(e) => setMinimum(e.target.value)}
+            />
+          </label>
+          <label htmlFor={maximumId}>
+            Maximum market cap (USD, optional)
+            <Input
+              id={maximumId}
+              inputMode="decimal"
+              value={maximum}
+              onChange={(e) => setMaximum(e.target.value)}
+            />
+          </label>
+          <p>
+            Choose a saved market pool. Zero minimum and a blank maximum are
+            unbounded. Bounds are inclusive. Every cycle needs a fresh
+            observation for this pool before preparation, approval and
+            submission.
+          </p>
+        </fieldset>
+      )}
+      {preview?.terms.marketCapRange && (
+        <p>
+          Saved range: ${preview.terms.marketCapRange.minimumUsd} to{' '}
+          {preview.terms.marketCapRange.maximumUsd === undefined
+            ? 'no maximum'
+            : '$' + preview.terms.marketCapRange.maximumUsd}
+          . A cycle outside this range waits for a fresh eligible observation;
+          signatures and receipts remain recoverable.
+        </p>
       )}
       {preview ? (
         <ol aria-label="DCA cycle preview">

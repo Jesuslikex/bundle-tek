@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { Miniflare } from 'miniflare';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { nativeWarmupFixture } from '../../../../test/warmup-native-fixture';
 import { unsignedPreparationSummary } from '@/lib/imported-swap-preparation-history';
 const mocks = vi.hoisted(() => ({
@@ -116,6 +116,7 @@ beforeAll(async () => {
     .run();
   for (const name of [
     '0024_imported_token_projects',
+    '0033_imported_market_observations',
     '0041_imported_swap_preparations',
     '0045_warmup_signing_intents',
     '0047_shared_swap_reservations',
@@ -312,6 +313,247 @@ const dcaBody = () => ({
     walletRevision: 1,
     amount: '0.001',
   })),
+});
+async function rangeMarket(cap: number, observedAt = new Date().toISOString()) {
+  const document = JSON.stringify([
+    {
+      chain: 'Solana',
+      address: f.mint,
+      projectRevision: 1,
+      source: 'api.dexscreener.com',
+      executionAllowed: false,
+      observedAt,
+      returnedPairCount: 1,
+      quoteOnlyPairCount: 0,
+      pairs: [
+        {
+          address: f.wallet,
+          dex: 'fixture',
+          url: 'https://dexscreener.com/solana/' + f.wallet,
+          quoteSymbol: 'SOL',
+          priceUsd: '1',
+          liquidityUsd: 100,
+          volume24hUsd: 100,
+          change24h: 0,
+          marketCapUsd: cap,
+        },
+      ],
+    },
+  ]);
+  await mocks.db
+    .prepare(
+      'INSERT INTO imported_market_observations VALUES(?,?,?,?) ON CONFLICT(owner_id,project_id) DO UPDATE SET document=excluded.document,observed_at=excluded.observed_at',
+    )
+    .bind(owner, projectId, document, observedAt)
+    .run();
+}
+async function boundedDca() {
+  const response = await sessionPost(
+    request({
+      ...dcaBody(),
+      schedule: {
+        startAt: new Date(Date.now() - 30000).toISOString(),
+        spacingSeconds: 1,
+      },
+      marketCapRange: { pair: f.wallet, minimumUsd: '100', maximumUsd: '200' },
+    }),
+  );
+  expect(response.status).toBe(200);
+  return response.json() as Promise<{
+    session: { terms: ReturnType<typeof tradeSessionTerms> };
+  }>;
+}
+const rangeCapture = () =>
+  captureTradeSession(
+    mocks.db,
+    owner,
+    { sessionId, revision: 1, entry: 1 },
+    {
+      projectId,
+      projectRevision: 1,
+      wallet: f.wallet,
+      walletRevision: 1,
+      side: 'Buy',
+      unitsRaw: '1000000',
+      mint: f.mint,
+      decimals: 6,
+    },
+  );
+it('enforces saved DCA bounds before quote/review/submission providers and preserves signed recovery', async () => {
+  const saved = await boundedDca();
+  expect(saved.session.terms.marketCapRange).toEqual({
+    pair: f.wallet,
+    minimumUsd: '100',
+    maximumUsd: '200',
+  });
+  await rangeMarket(100);
+  const guard = await rangeCapture();
+  await mocks.db
+    .prepare(
+      "UPDATE imported_swap_preparations SET document=json_set(document,'$.session',json(?)) WHERE owner_id=? AND id=?",
+    )
+    .bind(JSON.stringify(guard.selection), owner, preparationId)
+    .run();
+  await rangeMarket(99);
+  const quote = await prepareImported(
+    new Request('http://localhost/api/imported-projects/prepare', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id: projectId,
+        revision: 1,
+        wallet: f.wallet,
+        walletRevision: 1,
+        side: 'Buy',
+        amount: '0.001',
+        session: { sessionId, revision: 1, entry: 1 },
+      }),
+    }),
+  );
+  expect(quote.status).toBe(409);
+  expect(((await quote.json()) as { error: string }).error).toContain(
+    'outside the saved range',
+  );
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  expect(
+    (
+      await post({
+        action: 'review',
+        preparationId,
+        transaction: f.order.preparation.transaction,
+      })
+    ).status,
+  ).toBe(409);
+  expect(mocks.simulate).not.toHaveBeenCalled();
+  await rangeMarket(200);
+  const review = await reviewed();
+  await rangeMarket(201);
+  expect(
+    (
+      await post({
+        action: 'register',
+        id: review.id,
+        transaction: f.signed.transaction,
+      })
+    ).status,
+  ).toBe(200);
+  const simulations = mocks.simulate.mock.calls.length;
+  expect(
+    (
+      await post({
+        action: 'submit',
+        id: review.id,
+        transaction: f.signed.transaction,
+      })
+    ).status,
+  ).toBe(409);
+  expect(mocks.simulate.mock.calls.length).toBe(simulations);
+  expect(
+    mocks.rpc.mock.calls.some((call) => call[1] === 'sendTransaction'),
+  ).toBe(false);
+  expect((await post({ action: 'recover', id: review.id })).status).toBe(200);
+});
+it('rejects changed market evidence atomically even when its new cap remains inside the saved range', async () => {
+  await boundedDca();
+  await rangeMarket(100);
+  const guard = await rangeCapture();
+  const write = tradeSessionWriteGuard(owner, guard);
+  await rangeMarket(200);
+  const changed = await mocks.db
+    .prepare(
+      'UPDATE imported_swap_preparations SET document=document WHERE owner_id=? AND id=?' +
+        write.sql,
+    )
+    .bind(owner, preparationId, ...write.bindings)
+    .run();
+  expect(changed.meta.changes).toBe(0);
+  const fresh = tradeSessionWriteGuard(owner, await rangeCapture());
+  const unchanged = await mocks.db
+    .prepare(
+      'UPDATE imported_swap_preparations SET document=document WHERE owner_id=? AND id=?' +
+        fresh.sql,
+    )
+    .bind(owner, preparationId, ...fresh.bindings)
+    .run();
+  expect(unchanged.meta.changes).toBe(1);
+});
+it('applies DCA market-cap bounds to Sell cycles with exact token precision', async () => {
+  f = await nativeWarmupFixture({ side: 'Sell', lookup: true, v2: true });
+  mocks.simulate.mockResolvedValue(f.simulation);
+  const document = {
+    ...unsignedPreparationSummary(f.order, f.simulation),
+    balance: {
+      source: 'fixture.test',
+      observedAt: new Date().toISOString(),
+      requestedRaw: '1000',
+      amountCovered: true,
+    },
+  };
+  await mocks.db
+    .prepare(
+      'UPDATE imported_swap_preparations SET document=? WHERE owner_id=? AND id=?',
+    )
+    .bind(JSON.stringify(document), owner, preparationId)
+    .run();
+  const saved = await boundedDca();
+  expect(saved.session.terms.side).toBe('Sell');
+  expect(saved.session.terms.entries[0].unitsRaw).toBe('1000');
+  await rangeMarket(100);
+  const guard = await captureTradeSession(
+    mocks.db,
+    owner,
+    { sessionId, revision: 1, entry: 1 },
+    {
+      projectId,
+      projectRevision: 1,
+      wallet: f.wallet,
+      walletRevision: 1,
+      side: 'Sell',
+      unitsRaw: '1000',
+      mint: f.mint,
+      decimals: 6,
+    },
+  );
+  await mocks.db
+    .prepare(
+      "UPDATE imported_swap_preparations SET document=json_set(document,'$.session',json(?)) WHERE owner_id=? AND id=?",
+    )
+    .bind(JSON.stringify(guard.selection), owner, preparationId)
+    .run();
+  await rangeMarket(201);
+  expect(
+    (
+      await post({
+        action: 'review',
+        preparationId,
+        transaction: f.order.preparation.transaction,
+      })
+    ).status,
+  ).toBe(409);
+  expect(mocks.simulate).not.toHaveBeenCalled();
+  await rangeMarket(200);
+  const review = await reviewed();
+  expect(review.inputMint).toBe(f.mint);
+  expect(review.session?.unitsRaw).toBe('1000');
+});
+it('uses database time to reject expired DCA market evidence captured by a lagging application clock', async () => {
+  await boundedDca();
+  const actual = Date.now();
+  await rangeMarket(100, new Date(actual - 40000).toISOString());
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(actual - 20000);
+  try {
+    const write = tradeSessionWriteGuard(owner, await rangeCapture());
+    const changed = await mocks.db
+      .prepare(
+        'UPDATE imported_swap_preparations SET document=document WHERE owner_id=? AND id=?' +
+          write.sql,
+      )
+      .bind(owner, preparationId, ...write.bindings)
+      .run();
+    expect(changed.meta.changes).toBe(0);
+  } finally {
+    clock.mockRestore();
+  }
 });
 it('closes DCA at its saved deadline before providers while preserving exact signature registration and receipt recovery', async () => {
   const endsAt = new Date(Date.now() + 60000).toISOString();
@@ -1766,6 +2008,9 @@ it('prepares a due unsigned job once, restores only its owned current unexpired 
       )
     ).json()) as { sessions: unknown[] }
   ).sessions[0];
+  await mkdir(new URL('../../../../work/trade-session-qa/', import.meta.url), {
+    recursive: true,
+  });
   await writeFile(
     new URL(
       '../../../../work/trade-session-qa/job-packet.json',

@@ -206,11 +206,13 @@ export async function prepareOwnedImportedSwap(
       return json(
         {
           error:
-            error instanceof Error && error.message.includes('not due')
-              ? 'Trade session entry is not due yet.'
-              : error instanceof Error && error.message.includes('paused')
-                ? 'Trade session is paused. Resume it before preparation.'
-                : 'Trade session entry changed, filled or already has an approval.',
+            error instanceof Error && error.message.startsWith('DCA market')
+              ? error.message
+              : error instanceof Error && error.message.includes('not due')
+                ? 'Trade session entry is not due yet.'
+                : error instanceof Error && error.message.includes('paused')
+                  ? 'Trade session is paused. Resume it before preparation.'
+                  : 'Trade session entry changed, filled or already has an approval.',
         },
         409,
       );

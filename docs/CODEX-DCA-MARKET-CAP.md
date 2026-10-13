@@ -1,0 +1,23 @@
+# DCA market-cap bounds
+
+This continuation follows the retained 13 October Proxima form capture in CODEX-PROXIMA-DCA-LIVE-CONTROLS.md. Proxima exposes optional minimum/maximum market cap; inclusive endpoints are an explicit Bundle convention because the capture did not establish exact backend boundaries.
+
+The composer now loads owned saved market pools on explicit request, binds the selection to the current token/project revision, and saves canonical USD bounds with finite Buy/Sell DCA terms. Zero minimum and an absent maximum are unbounded. Values use the existing exact USD-micro parser; reversed or unsupported bounds cannot be saved. Historical sessions without a range retain their exact terms. Saved session history displays its range and pool.
+
+Preparation, approval and submission reread the latest owned market observation, require the same mint/revision and exactly one selected pool, enforce its 30-second freshness window, and apply the inclusive range before provider work. Preparation/approval/submission writes bind the exact observed document and verify expiry against database time. Changed evidence is rejected even if the new cap is still inside the range. Eligibility failures return a recoverable 409. Signature registration and receipt recovery remain available when the cap leaves the range; no automatic signing, broadcasting or scheduler activation is added.
+
+The pool picker uses only retained database observations. It does not refresh the external provider, hides pools without supported market-cap data, aborts on unmount/context change, and ignores late results. Each actual cycle still requires fresh server evidence. Range eligibility is not a guarantee of the market cap at eventual on-chain settlement.
+
+## Verification
+
+Main's preceding combined snapshot passed **2,113 tests across 303 files, zero failures/skips**, exact handle 86907 exit 0, JSON success=true and unchanged 1,046-file source digest 60f5df53b7fedee6872e04dca13ad1c3ce46b79cfaaa9b974deedc0f13f163ee. That full run does not include this later feature.
+
+This feature was implemented in an isolated detached worktree while main remained frozen. The real signing/session API plus disposable D1 and model/composer/pool tests passed **70 tests across six files** in handle 61441. After the final picker remount/accessibility corrections, both affected UI files passed again: **nine tests**, report dca-range-ui-final3-20261013.json. Native/backend/model source hashes were unchanged across that UI-only correction. A separately selected real-D1 Sell-range case verifies exact token precision and in/out-of-range review; its other 48 cases are filtered, not new failures or live-provider skips.
+
+Actual-source TypeScript, all changed-file typed lint and final production build pass at the recorded terminal checks. QA reports/logs are retained under work/release-qa in C:/Users/Julian/Documents/Codex/2026-10-09/https-github-com-morluto-rea-https/worktrees/dca-market-cap. Earlier diagnostic failures remain retained: range rejection originally mapped to generic 502, the pre-existing job artifact writer assumed its directory, and the new test used the incompatible global Element.append overload. These have explicit corrections. The existing test now creates its own ignored artifact folder.
+
+Final actual-source TypeScript completed in handle 45801 with exit 0; final build handle 50364 exited 0. All fifteen changed TypeScript files passed typed lint, with the final added Sell test checked again. Final isolated snapshot source-dca-range-final4-20261013.json has 1,050 files and digest 6265601930bdaa27e4fbe73d54e8d3da0c61afef8bc1b72233c585b478d78541; post-check comparison reports unchanged=true. The separate Sell test passed in handle 22987, with 48 filtered cases. Its preceding failed assertion referenced a nonexistent review.side property; the final assertion binds the actual reviewed token input mint.
+
+No migration, credential, deployed worker or protected Claude layout/holder/timeline file is changed. Source/schema history remains preserved. Browser rendering and funded execution have not been verified; tests use declared providers and synthetic receipts. The full goal remains open, including strategy/session ending semantics, randomized sizing, multi-strategy controls, launch execution, marketplace, representative live evidence, holder completeness, funded workflow proof and hosted recovery.
+
+CROP's saved version 116 predates this continuation and has no deployment. Its partial hosted migration history remains unresolved. Do not deploy against it without the diagnostics described in CODEX-CROP-SOURCE-RECOVERY.md.

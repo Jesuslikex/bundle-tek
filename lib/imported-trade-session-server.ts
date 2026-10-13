@@ -6,10 +6,13 @@ import {
   type TradeSessionCapture,
 } from './imported-trade-session';
 import type { SavedSwapPreparation } from './imported-swap-preparation-history';
+import { reviewDcaMarketCap } from './dca-market-cap';
+import type { SavedTokenMarket } from './token-market';
 export type TradeSessionGuard = {
   selection: TradeSessionCapture;
   document: string;
   controlRevision: number;
+  market?: { projectId: string; document: string; expiresAt: string };
 };
 export async function captureTradeSession(
   db: D1Database,
@@ -75,6 +78,45 @@ export async function captureTradeSession(
     throw new Error('DCA session has reached its saved end time.');
   if (notBefore && Date.parse(notBefore) > Date.now())
     throw new Error('Trade session entry is not due yet.');
+  let market: TradeSessionGuard['market'];
+  if (session.terms.marketCapRange) {
+    const observed = await db
+      .prepare(
+        'SELECT document FROM imported_market_observations WHERE owner_id=? AND project_id=?',
+      )
+      .bind(owner, context.projectId)
+      .first<{ document: string }>();
+    if (!observed)
+      throw new Error(
+        'DCA market-cap observation unavailable. Refresh the market.',
+      );
+    const observations: SavedTokenMarket[] = JSON.parse(observed.document);
+    if (!Array.isArray(observations) || !observations[0])
+      throw new Error('DCA market-cap observation unavailable.');
+    let review;
+    try {
+      review = reviewDcaMarketCap(
+        session.terms.marketCapRange,
+        observations[0],
+        {
+          chain: 'Solana',
+          mint: session.terms.mint,
+          revision: session.terms.projectRevision,
+        },
+      );
+    } catch {
+      throw new Error(
+        'DCA market-cap observation is stale, unavailable or differs from the saved pool. Refresh the market.',
+      );
+    }
+    if (!review.met)
+      throw new Error('DCA market cap is outside the saved range.');
+    market = {
+      projectId: context.projectId,
+      document: observed.document,
+      expiresAt: review.expiresAt,
+    };
+  }
   const busy = await db
     .prepare(
       "SELECT i.id FROM imported_swap_signing_intents i JOIN imported_swap_preparations p ON p.owner_id=i.owner_id AND p.id=i.preparation_id WHERE i.owner_id=? AND json_extract(p.document,'$.session.sessionId')=? AND json_extract(p.document,'$.session.entry')=? AND i.state IN ('awaiting_signature','signed','submitted','finalized') AND (? IS NULL OR i.id<>?)",
@@ -92,6 +134,7 @@ export async function captureTradeSession(
   return {
     document: row.document,
     controlRevision: control.revision,
+    ...(market ? { market } : {}),
     selection: {
       format: notBefore ? 'trade-session-entry-v2' : 'trade-session-entry-v1',
       ...(notBefore ? { notBefore } : {}),
@@ -110,7 +153,7 @@ export function tradeSessionWriteGuard(
   guard?: TradeSessionGuard,
   intentId?: string,
 ) {
-  return guard
+  const result = guard
     ? {
         sql: " AND EXISTS(SELECT 1 FROM imported_trade_sessions t WHERE t.owner_id=? AND t.id=? AND t.revision=? AND t.state='active' AND t.document=? AND EXISTS(SELECT 1 FROM imported_trade_session_controls c WHERE c.owner_id=t.owner_id AND c.session_id=t.id AND c.state='ready' AND c.revision=?) AND (? IS NULL OR julianday(?)<=julianday('now')) AND (json_type(t.document,'$.endsAt') IS NULL OR julianday('now')<julianday(json_extract(t.document,'$.endsAt')))) AND NOT EXISTS(SELECT 1 FROM imported_swap_signing_intents i JOIN imported_swap_preparations p ON p.owner_id=i.owner_id AND p.id=i.preparation_id WHERE i.owner_id=? AND json_extract(p.document,'$.session.sessionId')=? AND json_extract(p.document,'$.session.entry')=? AND i.state IN ('awaiting_signature','signed','submitted','finalized') AND (? IS NULL OR i.id<>?))",
         bindings: [
@@ -129,6 +172,17 @@ export function tradeSessionWriteGuard(
         ],
       }
     : { sql: '', bindings: [] };
+  if (guard?.market) {
+    result.sql +=
+      " AND EXISTS(SELECT 1 FROM imported_market_observations m WHERE m.owner_id=? AND m.project_id=? AND m.document=?) AND julianday(?)>julianday('now')";
+    result.bindings.push(
+      owner,
+      guard.market.projectId,
+      guard.market.document,
+      guard.market.expiresAt,
+    );
+  }
+  return result;
 }
 export async function currentTradeSession(
   db: D1Database,

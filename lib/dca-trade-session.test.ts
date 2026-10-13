@@ -22,6 +22,48 @@ const input = {
   startAt: '2026-10-13T12:00:00.000Z',
   intervalSeconds: 60,
 };
+it('saves canonical DCA market-cap bounds without changing unbounded legacy terms', () => {
+  const plain = dcaTradeSessionInput(input, token);
+  expect(plain.terms).not.toHaveProperty('marketCapRange');
+  const bounded = dcaTradeSessionInput(
+    {
+      ...input,
+      marketCapRange: {
+        pair: wallet,
+        minimumUsd: '100.00',
+        maximumUsd: '200.00',
+      },
+    },
+    token,
+  );
+  expect(bounded.request.marketCapRange).toEqual({
+    pair: wallet,
+    minimumUsd: '100',
+    maximumUsd: '200',
+  });
+  expect(bounded.terms.marketCapRange).toEqual(bounded.request.marketCapRange);
+  const now = input.startAt;
+  expect(
+    decodeTradeSession({
+      id: id(2),
+      revision: 1,
+      state: 'active',
+      createdAt: now,
+      updatedAt: now,
+      terms: bounded.terms,
+    }).terms,
+  ).toEqual(bounded.terms);
+  expect(() =>
+    tradeSessionTerms(
+      {
+        ...plain.request,
+        strategy: undefined,
+        marketCapRange: bounded.terms.marketCapRange,
+      },
+      token,
+    ),
+  ).toThrow('Only DCA');
+});
 it('conserves SOL and token atoms and retains the exact repeated-wallet schedule', () => {
   const { terms } = dcaTradeSessionInput(input, token);
   expect(terms.format).toBe('imported-trade-session-v3');

@@ -793,6 +793,14 @@ export async function POST(request: Request) {
         },
         409,
       );
+    if (error instanceof Error && error.message.startsWith('DCA market'))
+      return json(
+        {
+          error:
+            'DCA market cap is outside the saved range or its observation is unavailable. Refresh the market before reviewing again. No submission occurred; retain registered signatures for recovery.',
+        },
+        409,
+      );
     if (error instanceof SwapBlockhashExpiredError)
       return json(
         {

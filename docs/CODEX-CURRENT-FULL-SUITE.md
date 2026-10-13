@@ -1,5 +1,11 @@
 # Latest source verification, 13 October 2026
 
+## Terminal combined baseline and later DCA range continuation
+
+Exact handle **86907 terminated with exit 0**. Terminal log and JSON agree: **303 files, 2,113 tests passed, zero failures and zero skips**, duration 1,654.41 seconds. The wrapper verified unchanged=true for all 1,046 files with digest 60f5df53b7fedee6872e04dca13ad1c3ce46b79cfaaa9b974deedc0f13f163ee. This covers Claude's merged token layout, monitor-fixture repair, finite DCA and deadline work. It does not prove rendered/funded/hosted readiness.
+
+The later isolated DCA range continuation has its own targeted verification, described in CODEX-DCA-MARKET-CAP.md. Do not extend this full-suite result to that new source. The following running-handle notes are retained history and superseded by this terminal result. Owned CROP source authentication was recovered and refreshed source saved as version 116, without deployment; see CODEX-CROP-SOURCE-RECOVERY.md.
+
 ## Combined Claude UI and monitor-fixture verification
 
 A fresh full-suite run covers Claude's merged layout and the repaired monitor fixture together. Exact execution handle **86907** was polled and remains running. Command: `node node_modules/vitest/vitest.mjs run --maxWorkers=1 --exclude 'work/**' --reporter=default --reporter=json --outputFile=work/release-qa/full-suite-combined-ui-20261013.json`. The sibling `.log` records output. Do not duplicate this run or infer success from partial output.
