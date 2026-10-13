@@ -60,7 +60,7 @@ export function DcaTradeSession({
     [minimum, setMinimum] = useState('0'),
     [maximum, setMaximum] = useState(''),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState('');
+    [notice, setNotice] = useState<{ key: string; text: string } | null>(null);
   const pending = useRef<AbortController | null>(null);
   const amountId = useId(),
     cyclesId = useId(),
@@ -175,6 +175,26 @@ export function DcaTradeSession({
         }
       : {}),
   });
+  const draftKey = JSON.stringify({
+    allocationKey,
+    allocation,
+    sizing,
+    sellUnit,
+    start,
+    interval,
+    end,
+    ending,
+    duration,
+    rangeEnabled,
+    pair,
+    minimum,
+    maximum,
+    archived: project.archived,
+  });
+  const message = notice?.key === draftKey ? notice.text : '';
+  function setMessage(text: string) {
+    setNotice(text ? { key: draftKey, text } : null);
+  }
   function generate() {
     if (locked || busy || project.archived || !selectedWallet) return;
     try {

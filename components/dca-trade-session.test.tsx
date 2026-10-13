@@ -438,3 +438,22 @@ it('clears hidden ending inputs on a rule switch rather than saving a stale dead
   expect(requests[0].body).not.toHaveProperty('endsAt');
   await respond(0);
 });
+it('attributes saved status to its exact draft rather than a changed amount, timing or side', async () => {
+  await fill();
+  await act(async () => saveButton().click());
+  await respond(0);
+  expect(container.textContent).toContain('DCA session saved.');
+  await setField('Total DCA input', '0.000000012');
+  expect(container.textContent).not.toContain('DCA session saved.');
+  await act(async () => saveButton().click());
+  await respond(1);
+  expect(container.textContent).toContain('DCA session saved.');
+  await setField('DCA start', '2026-10-14T12:00');
+  expect(container.textContent).not.toContain('DCA session saved.');
+  await act(async () => saveButton().click());
+  await respond(2);
+  expect(container.textContent).toContain('DCA session saved.');
+  await setField('DCA side', 'Sell');
+  expect(container.textContent).not.toContain('DCA session saved.');
+  expect(saveButton().disabled).toBe(true);
+});
