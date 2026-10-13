@@ -11,7 +11,16 @@ import {
   acquisitionWallet as wallet,
   acquisitionMint as mint,
 } from '../test/imported-sell-acquisition-fixture';
-const token = { chain: 'Solana', address: mint, decimals: 6, symbol: 'TEST' };
+const token = {
+  chain: 'Solana' as const,
+  address: mint,
+  decimals: 6,
+  symbol: 'TEST',
+  name: 'Test token',
+  source: 'fixture.test',
+  totalSupplyRaw: '17',
+  observedAt: '2026-10-13T12:00:00.000Z',
+};
 const project = {
   id: id(1),
   revision: 1,
@@ -209,6 +218,75 @@ it('previews exact cycle amounts and saves only after an explicit click without 
   expect(saved).toHaveBeenCalledOnce();
   expect(container.textContent).toContain('Review each due cycle');
   expect(requests).toHaveLength(1);
+});
+it('converts an even Sell supply percentage once and saves its exact captured source', async () => {
+  await fill();
+  await setField('DCA side', 'Sell');
+  await setField('Sell amount unit', 'supply');
+  await setField('Total DCA input', '50');
+  expect(container.textContent).toContain('saved total mint supply');
+  expect(container.textContent).toContain('Cycle 1: 0.000003 TEST');
+  expect(container.textContent).toContain('Cycle 3: 0.000002 TEST');
+  await act(async () => saveButton().click());
+  expect(requests[0].body.supplySizing).toEqual({
+    format: 'dca-supply-percentage-v1',
+    mint,
+    totalSupplyRaw: '17',
+    observedAt: token.observedAt,
+    totalPercent: '50',
+  });
+  await respond(0);
+  expect(saved.mock.calls[0][0].terms.totalRaw).toBe('8');
+});
+it('uses rounded percentage bounds for randomized Sell sizing and invalidates a changed supply capture', async () => {
+  await fill();
+  await setField('DCA side', 'Sell');
+  await setField('Sell amount unit', 'supply');
+  await setField('Total DCA input', '50');
+  await setField('DCA amount sizing', 'randomized');
+  await setField('Minimum input per cycle', '10');
+  await setField('Maximum input per cycle', '30');
+  await act(async () =>
+    Array.from(container.querySelectorAll('button'))
+      .find((b) => b.textContent === 'Generate random allocation')!
+      .click(),
+  );
+  expect(saveButton().disabled).toBe(false);
+  await act(async () => saveButton().click());
+  expect(requests[0].body.randomization).toEqual({
+    format: 'bounded-dca-allocation-v1',
+    minimumRaw: '2',
+    maximumRaw: '5',
+    totalRaw: '8',
+  });
+  expect(requests[0].body.supplySizing).toMatchObject({
+    totalPercent: '50',
+    minimumPercent: '10',
+    maximumPercent: '30',
+    totalSupplyRaw: '17',
+  });
+  await respond(0);
+  await act(async () =>
+    root.render(
+      <DcaTradeSession
+        project={{
+          ...project,
+          document: {
+            ...project.document,
+            token: { ...token, totalSupplyRaw: '18' },
+          },
+        }}
+        wallets={wallets}
+        locked={false}
+        onSaved={saved}
+        onBusyChange={busyChanged}
+      />,
+    ),
+  );
+  expect(saveButton().disabled).toBe(true);
+  expect(container.textContent).toContain(
+    'Input changed. Generate a new allocation',
+  );
 });
 it('generates randomized bounds only on request, preserves the preview across rerenders/retries and invalidates changed inputs', async () => {
   await fill();

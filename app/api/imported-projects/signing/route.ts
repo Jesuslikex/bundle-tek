@@ -793,6 +793,14 @@ export async function POST(request: Request) {
         },
         409,
       );
+    if (error instanceof Error && error.message.startsWith('DCA supply'))
+      return json(
+        {
+          error:
+            'The captured DCA supply or project changed. Review a new session using the current saved supply. No submission occurred; registered signatures remain recoverable.',
+        },
+        409,
+      );
     if (error instanceof Error && error.message.startsWith('DCA market'))
       return json(
         {

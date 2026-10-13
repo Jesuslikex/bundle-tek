@@ -18,6 +18,12 @@ import {
   type DcaRandomization,
 } from '@/lib/dca-random-allocation';
 import { solanaTokenAtoms } from '@/lib/solana-token-amount';
+import {
+  dcaSupplyBasis,
+  dcaSupplyInput,
+  type DcaSupplySizing,
+} from '@/lib/dca-supply-sizing';
+import { formatNativeBalance } from '@/lib/wallet-balance-format';
 
 export function DcaTradeSession({
   project,
@@ -35,6 +41,7 @@ export function DcaTradeSession({
   const [side, setSide] = useState<'Buy' | 'Sell'>('Buy'),
     [wallet, setWallet] = useState(''),
     [amount, setAmount] = useState(''),
+    [sellUnit, setSellUnit] = useState<'tokens' | 'supply'>('tokens'),
     [cycles, setCycles] = useState('5'),
     [interval, setInterval] = useState('60'),
     [start, setStart] = useState(''),
@@ -73,6 +80,75 @@ export function DcaTradeSession({
     [onBusyChange],
   );
   const roster = wallets.filter((w) => w.chain === 'Solana' && !w.archived);
+  const useSupply = side === 'Sell' && sellUnit === 'supply';
+  const basis = useMemo(() => {
+    try {
+      return dcaSupplyBasis(project.document.token);
+    } catch {
+      return null;
+    }
+  }, [project.document.token]);
+  const unit =
+    side === 'Buy'
+      ? 'SOL'
+      : useSupply
+        ? '% of saved supply'
+        : project.document.token.symbol;
+  const amountTerms = useMemo<{
+    totalRaw: string;
+    randomization?: DcaRandomization;
+    supplySizing?: DcaSupplySizing;
+  } | null>(() => {
+    try {
+      if (useSupply) {
+        const sized = dcaSupplyInput(project.document.token, {
+          totalPercent: amount,
+          ...(sizing === 'randomized'
+            ? { minimumPercent: cycleMinimum, maximumPercent: cycleMaximum }
+            : {}),
+        });
+        return {
+          totalRaw: sized.totalRaw,
+          supplySizing: sized.sizing,
+          ...(sizing === 'randomized'
+            ? {
+                randomization: {
+                  format: 'bounded-dca-allocation-v1' as const,
+                  totalRaw: sized.totalRaw,
+                  minimumRaw: sized.minimumRaw!,
+                  maximumRaw: sized.maximumRaw!,
+                },
+              }
+            : {}),
+        };
+      }
+      const decimals = side === 'Buy' ? 9 : project.document.token.decimals,
+        totalRaw = solanaTokenAtoms(amount, decimals).toString();
+      return {
+        totalRaw,
+        ...(sizing === 'randomized'
+          ? {
+              randomization: {
+                format: 'bounded-dca-allocation-v1' as const,
+                totalRaw,
+                minimumRaw: solanaTokenAtoms(cycleMinimum, decimals).toString(),
+                maximumRaw: solanaTokenAtoms(cycleMaximum, decimals).toString(),
+              },
+            }
+          : {}),
+      };
+    } catch {
+      return null;
+    }
+  }, [
+    useSupply,
+    side,
+    sizing,
+    amount,
+    cycleMinimum,
+    cycleMaximum,
+    project.document.token,
+  ]);
   const selectedWallet = wallets.find(
     (w) => w.address === wallet && w.chain === 'Solana' && !w.archived,
   );
@@ -88,24 +164,25 @@ export function DcaTradeSession({
     cycles,
     cycleMinimum,
     cycleMaximum,
+    useSupply,
+    ...(useSupply
+      ? {
+          supplyRaw: basis?.totalSupplyRaw,
+          supplyObservedAt: basis?.observedAt,
+        }
+      : {}),
   });
-  function bounds(): DcaRandomization {
-    const decimals = side === 'Buy' ? 9 : project.document.token.decimals;
-    return {
-      format: 'bounded-dca-allocation-v1',
-      minimumRaw: solanaTokenAtoms(cycleMinimum, decimals).toString(),
-      maximumRaw: solanaTokenAtoms(cycleMaximum, decimals).toString(),
-      totalRaw: solanaTokenAtoms(amount, decimals).toString(),
-    };
-  }
   function generate() {
     if (locked || busy || project.archived || !selectedWallet) return;
     try {
-      const decimals = side === 'Buy' ? 9 : project.document.token.decimals;
+      if (!amountTerms?.randomization)
+        throw new Error(
+          'Enter supported total, minimum and maximum inputs before generating.',
+        );
       const amountsRaw = randomDcaAllocation(
-        solanaTokenAtoms(amount, decimals).toString(),
+        amountTerms.totalRaw,
         Number(cycles),
-        bounds(),
+        amountTerms.randomization,
       );
       setAllocation({ key: allocationKey, amountsRaw });
       setMessage(
@@ -126,6 +203,7 @@ export function DcaTradeSession({
       );
       if (
         !selected ||
+        !amountTerms ||
         !start ||
         !/^[1-9]\d?$/.test(cycles) ||
         !/^[1-9]\d{0,4}$/.test(interval)
@@ -140,27 +218,19 @@ export function DcaTradeSession({
           side,
           wallet,
           walletRevision: selected.revision,
-          totalAmount: amount,
+          totalAmount: formatNativeBalance(
+            amountTerms.totalRaw,
+            side === 'Buy' ? 9 : project.document.token.decimals,
+          ),
+          ...(amountTerms.supplySizing
+            ? { supplySizing: amountTerms.supplySizing }
+            : {}),
           cycles: Number(cycles),
           startAt: new Date(start).toISOString(),
           intervalSeconds: Number(interval),
           ...(sizing === 'randomized'
             ? {
-                randomization: {
-                  format: 'bounded-dca-allocation-v1' as const,
-                  totalRaw: solanaTokenAtoms(
-                    amount,
-                    side === 'Buy' ? 9 : project.document.token.decimals,
-                  ).toString(),
-                  minimumRaw: solanaTokenAtoms(
-                    cycleMinimum,
-                    side === 'Buy' ? 9 : project.document.token.decimals,
-                  ).toString(),
-                  maximumRaw: solanaTokenAtoms(
-                    cycleMaximum,
-                    side === 'Buy' ? 9 : project.document.token.decimals,
-                  ).toString(),
-                },
+                randomization: amountTerms.randomization!,
                 cycleAmountsRaw: allocation!.amountsRaw,
               }
             : {}),
@@ -189,7 +259,6 @@ export function DcaTradeSession({
     interval,
     project,
     side,
-    amount,
     rangeEnabled,
     pair,
     minimum,
@@ -197,8 +266,7 @@ export function DcaTradeSession({
     sizing,
     allocation,
     allocationKey,
-    cycleMinimum,
-    cycleMaximum,
+    amountTerms,
   ]);
   const disabled = locked || busy || project.archived;
   async function save() {
@@ -280,6 +348,8 @@ export function DcaTradeSession({
           onChange={(e) => {
             setSide(e.target.value as 'Buy' | 'Sell');
             setAmount('');
+            setCycleMinimum('');
+            setCycleMaximum('');
           }}
         >
           <option value="Buy">Buy with SOL</option>
@@ -301,9 +371,41 @@ export function DcaTradeSession({
           ))}
         </select>
       </label>
+      {side === 'Sell' && (
+        <label>
+          Sell amount unit
+          <select
+            value={sellUnit}
+            disabled={disabled}
+            onChange={(e) => {
+              setSellUnit(e.target.value as 'tokens' | 'supply');
+              setAmount('');
+              setCycleMinimum('');
+              setCycleMaximum('');
+            }}
+          >
+            <option value="tokens">Token amounts</option>
+            <option value="supply" disabled={!basis}>
+              % of saved supply
+            </option>
+          </select>
+        </label>
+      )}
+      {useSupply && basis && (
+        <p>
+          Supply basis:{' '}
+          {formatNativeBalance(
+            basis.totalSupplyRaw,
+            project.document.token.decimals,
+          )}{' '}
+          {project.document.token.symbol}, observed {basis.observedAt}. This is
+          saved total mint supply. The total rounds down to token atoms; random
+          minimums round up and maximums round down. Refreshing the project
+          requires a new session.
+        </p>
+      )}
       <label htmlFor={amountId}>
-        Total DCA input (
-        {side === 'Buy' ? 'SOL' : project.document.token.symbol})
+        Total DCA input ({unit})
         <Input
           id={amountId}
           inputMode="decimal"
@@ -335,10 +437,7 @@ export function DcaTradeSession({
       </label>
       {sizing === 'randomized' && (
         <fieldset disabled={disabled} className="space-y-2">
-          <legend>
-            Randomized cycle amounts (
-            {side === 'Buy' ? 'SOL' : project.document.token.symbol})
-          </legend>
+          <legend>Randomized cycle amounts ({unit})</legend>
           <label htmlFor={cycleMinimumId}>
             Minimum input per cycle
             <Input
@@ -491,15 +590,14 @@ export function DcaTradeSession({
       <Button disabled={disabled || !preview} onClick={() => void save()}>
         Save DCA session
       </Button>
-      {message && (
-        <output className="block">
-          {message.startsWith('Random allocation generated') &&
-          sizing === 'randomized' &&
-          allocation?.key !== allocationKey
-            ? 'Input changed. Generate a new allocation before saving.'
-            : message}
-        </output>
-      )}
+      {sizing === 'randomized' &&
+        allocation &&
+        allocation.key !== allocationKey && (
+          <output className="block">
+            Input changed. Generate a new allocation before saving.
+          </output>
+        )}
+      {message && <output className="block">{message}</output>}
     </details>
   );
 }

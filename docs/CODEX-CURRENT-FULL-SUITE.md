@@ -1,5 +1,9 @@
 # Latest source verification, 13 October 2026
 
+## Later Sell DCA supply sizing verification
+
+The final captured-supply continuation passed 84 tests across seven actual-checkout files, zero failures/skips, exact handle 62828 exit 0 and JSON success=true. TypeScript, thirteen-file typed lint and build pass. The 1,054-file snapshot retained digest 8c56e1663374f7b691d1a5a174dea5546833b5db513235864a06947e5a0394ef. See CODEX-DCA-SUPPLY-SIZING.md for exact semantics, worktree and evidence. This is targeted later-source verification, not a replacement full-suite pass or funded/rendered/hosted proof.
+
 ## Later randomized DCA targeted verification
 
 Final randomized-allocation continuation passed 75 tests across six actual-checkout files, zero failures/skips, exact handle 92517 exit 0 and JSON success=true. Actual-source TypeScript, all ten changed-file typed lint checks and production build pass. The 1,052-file source retained digest 75bc12915fed1e29d3cb23754a6d632beb831ea5f5120431187b34b2bd7273a4. See CODEX-RANDOMIZED-DCA.md for the isolated worktree, reports and exact contracts. This later source has not received a replacement full-suite run; the 2,113-test full result below remains scoped to its earlier pre-range/pre-random snapshot. No funded, rendered or hosted proof is implied.

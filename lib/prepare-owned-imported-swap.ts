@@ -206,7 +206,9 @@ export async function prepareOwnedImportedSwap(
       return json(
         {
           error:
-            error instanceof Error && error.message.startsWith('DCA market')
+            error instanceof Error &&
+            (error.message.startsWith('DCA market') ||
+              error.message.startsWith('DCA supply'))
               ? error.message
               : error instanceof Error && error.message.includes('not due')
                 ? 'Trade session entry is not due yet.'

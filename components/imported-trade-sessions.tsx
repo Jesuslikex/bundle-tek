@@ -641,6 +641,15 @@ export function ImportedTradeSessions({
               background execution.
             </p>
           )}
+          {s.terms.supplySizing && (
+            <p>
+              Supply sizing: {s.terms.supplySizing.totalPercent}% of saved total
+              mint supply observed {s.terms.supplySizing.observedAt}.
+              {s.terms.supplySizing.minimumPercent !== undefined &&
+                ` Per-cycle bounds: ${s.terms.supplySizing.minimumPercent}% to ${s.terms.supplySizing.maximumPercent}%.`}{' '}
+              Exact token amounts stay fixed for review and recovery.
+            </p>
+          )}
           {s.terms.randomization && (
             <p>
               Randomized cycle amounts:{' '}

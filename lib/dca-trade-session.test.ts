@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { dcaTradeSessionInput } from './dca-trade-session';
+import { dcaSupplyInput } from './dca-supply-sizing';
 import {
   decodeTradeSession,
   tradeSessionTerms,
@@ -22,6 +23,85 @@ const input = {
   startAt: '2026-10-13T12:00:00.000Z',
   intervalSeconds: 60,
 };
+it('saves exact Sell supply intent and rejects altered atoms, random bounds or forged captures', () => {
+  const supplyToken = {
+    ...token,
+    totalSupplyRaw: '17',
+    observedAt: input.startAt,
+  };
+  const sized = dcaSupplyInput(supplyToken, {
+    totalPercent: '50',
+    minimumPercent: '10',
+    maximumPercent: '30',
+  });
+  const requestInput = {
+    ...input,
+    side: 'Sell' as const,
+    totalAmount: '0.000008',
+    supplySizing: sized.sizing,
+    randomization: {
+      format: 'bounded-dca-allocation-v1' as const,
+      minimumRaw: '2',
+      maximumRaw: '5',
+      totalRaw: '8',
+    },
+    cycleAmountsRaw: ['2', '3', '3'],
+  };
+  const { request, terms } = dcaTradeSessionInput(requestInput, supplyToken);
+  expect(terms.totalRaw).toBe('8');
+  expect(terms.supplySizing).toEqual(sized.sizing);
+  expect(
+    decodeTradeSession({
+      id: id(2),
+      revision: 1,
+      state: 'active',
+      terms,
+      createdAt: input.startAt,
+      updatedAt: input.startAt,
+    }).terms,
+  ).toEqual(terms);
+  expect(() =>
+    tradeSessionTerms({ ...request, side: 'Buy' }, supplyToken),
+  ).toThrow('Only Sell');
+  expect(() =>
+    tradeSessionTerms(
+      { ...request, supplySizing: { ...sized.sizing, totalSupplyRaw: '18' } },
+      supplyToken,
+    ),
+  ).toThrow('capture differs');
+  expect(() =>
+    tradeSessionTerms(
+      {
+        ...request,
+        randomization: { ...request.randomization!, minimumRaw: '1' },
+      },
+      supplyToken,
+    ),
+  ).toThrow('input bounds');
+  const even = dcaSupplyInput(supplyToken, { totalPercent: '50' });
+  const fixed = dcaTradeSessionInput(
+    {
+      ...input,
+      side: 'Sell',
+      totalAmount: '0.000008',
+      supplySizing: even.sizing,
+    },
+    supplyToken,
+  );
+  expect(fixed.terms.entries.map((e) => e.unitsRaw)).toEqual(['3', '3', '2']);
+  expect(() =>
+    tradeSessionTerms(
+      {
+        ...fixed.request,
+        entries: fixed.request.entries.map((e) => ({
+          ...e,
+          amount: '0.000004',
+        })),
+      },
+      supplyToken,
+    ),
+  ).toThrow('conserve the captured');
+});
 it('retains reviewed randomized amounts and bounds and rejects altered or legacy misuse', () => {
   const randomization = {
     format: 'bounded-dca-allocation-v1' as const,

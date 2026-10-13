@@ -10,6 +10,7 @@ import {
   validateRandomDcaAllocation,
   type DcaRandomization,
 } from './dca-random-allocation';
+import type { DcaSupplySizing, DcaSupplyToken } from './dca-supply-sizing';
 
 export function dcaTradeSessionInput(
   input: {
@@ -26,8 +27,9 @@ export function dcaTradeSessionInput(
     marketCapRange?: DcaMarketCapRange;
     randomization?: DcaRandomization;
     cycleAmountsRaw?: string[];
+    supplySizing?: DcaSupplySizing;
   },
-  token: { chain: string; address: string; decimals: number },
+  token: DcaSupplyToken,
 ): {
   request: {
     action: 'create';
@@ -38,6 +40,7 @@ export function dcaTradeSessionInput(
     endsAt?: string;
     marketCapRange?: DcaMarketCapRange;
     randomization?: DcaRandomization;
+    supplySizing?: DcaSupplySizing;
     schedule: { startAt: string; spacingSeconds: number };
     entries: { wallet: string; walletRevision: number; amount: string }[];
   };
@@ -71,6 +74,7 @@ export function dcaTradeSessionInput(
     side: input.side,
     strategy: 'DCA' as const,
     ...(randomization ? { randomization } : {}),
+    ...(input.supplySizing ? { supplySizing: input.supplySizing } : {}),
     ...(input.endsAt === undefined ? {} : { endsAt: input.endsAt }),
     ...(input.marketCapRange === undefined
       ? {}

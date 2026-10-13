@@ -73,6 +73,7 @@ import {
   tradeSessionWriteGuard,
 } from '@/lib/imported-trade-session-server';
 import { tradeSessionTerms } from '@/lib/imported-trade-session';
+import { dcaSupplyInput } from '@/lib/dca-supply-sizing';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 let mf: Miniflare;
 let f: Awaited<ReturnType<typeof nativeWarmupFixture>>;
@@ -313,6 +314,233 @@ const dcaBody = () => ({
     walletRevision: 1,
     amount: '0.001',
   })),
+});
+async function supplyDca(randomized = false) {
+  f = await nativeWarmupFixture({ side: 'Sell', lookup: true, v2: true });
+  mocks.simulate.mockResolvedValue(f.simulation);
+  const token = {
+    chain: 'Solana',
+    address: f.mint,
+    decimals: 6,
+    totalSupplyRaw: '1000000',
+    observedAt: new Date().toISOString(),
+  };
+  await mocks.db
+    .prepare(
+      'UPDATE imported_token_projects SET document=? WHERE owner_id=? AND id=?',
+    )
+    .bind(JSON.stringify({ token }), owner, projectId)
+    .run();
+  await mocks.db
+    .prepare(
+      'UPDATE imported_swap_preparations SET document=? WHERE owner_id=? AND id=?',
+    )
+    .bind(
+      JSON.stringify({
+        ...unsignedPreparationSummary(f.order, f.simulation),
+        balance: {
+          source: 'fixture.test',
+          observedAt: new Date().toISOString(),
+          requestedRaw: '1000',
+          amountCovered: true,
+        },
+      }),
+      owner,
+      preparationId,
+    )
+    .run();
+  const sized = dcaSupplyInput(token, {
+    totalPercent: randomized ? '0.3' : '0.2',
+    ...(randomized ? { minimumPercent: '0.1', maximumPercent: '0.2' } : {}),
+  });
+  const input = {
+    ...dcaBody(),
+    supplySizing: sized.sizing,
+    ...(randomized
+      ? {
+          randomization: {
+            format: 'bounded-dca-allocation-v1',
+            minimumRaw: '1000',
+            maximumRaw: '2000',
+            totalRaw: '3000',
+          },
+        }
+      : {}),
+    entries: [
+      { wallet: f.wallet, walletRevision: 1, amount: '0.001' },
+      {
+        wallet: f.wallet,
+        walletRevision: 1,
+        amount: randomized ? '0.002' : '0.001',
+      },
+    ],
+  };
+  expect((await sessionPost(request(input))).status).toBe(200);
+  return input;
+}
+async function supplyCapture() {
+  return captureTradeSession(
+    mocks.db,
+    owner,
+    { sessionId, revision: 1, entry: 1 },
+    {
+      projectId,
+      projectRevision: 1,
+      wallet: f.wallet,
+      walletRevision: 1,
+      side: 'Sell',
+      unitsRaw: '1000',
+      mint: f.mint,
+      decimals: 6,
+    },
+  );
+}
+it.each([false, true])(
+  'binds Sell supply sizing to genuine saved source and preserves signature recovery after supply drift (randomized=%s)',
+  async (randomized) => {
+    const input = await supplyDca(randomized),
+      guard = await supplyCapture();
+    expect(
+      (
+        await sessionPost(
+          request({
+            ...input,
+            id: crypto.randomUUID(),
+            supplySizing: { ...input.supplySizing, totalSupplyRaw: '2000000' },
+          }),
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await sessionPost(
+          request({
+            ...input,
+            id: crypto.randomUUID(),
+            entries: input.entries.map((e) => ({ ...e, amount: '0.002' })),
+          }),
+        )
+      ).status,
+    ).toBe(400);
+    await mocks.db
+      .prepare(
+        "UPDATE imported_swap_preparations SET document=json_set(document,'$.session',json(?)) WHERE owner_id=? AND id=?",
+      )
+      .bind(JSON.stringify(guard.selection), owner, preparationId)
+      .run();
+    const prepareCycle = () =>
+      prepareImported(
+        new Request('http://localhost/api/imported-projects/prepare', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            id: projectId,
+            revision: 1,
+            wallet: f.wallet,
+            walletRevision: 1,
+            side: 'Sell',
+            amount: '0.001',
+            session: { sessionId, revision: 1, entry: 1 },
+          }),
+        }),
+      );
+    await mocks.db
+      .prepare(
+        "UPDATE imported_token_projects SET document=json_set(document,'$.token.totalSupplyRaw','1000001') WHERE owner_id=? AND id=?",
+      )
+      .bind(owner, projectId)
+      .run();
+    const blocked = await prepareCycle();
+    expect(blocked.status).toBe(409);
+    expect(((await blocked.json()) as { error: string }).error).toContain(
+      'DCA supply',
+    );
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(
+      (
+        await post({
+          action: 'review',
+          preparationId,
+          transaction: f.order.preparation.transaction,
+        })
+      ).status,
+    ).toBe(409);
+    expect(mocks.simulate).not.toHaveBeenCalled();
+    await mocks.db
+      .prepare(
+        "UPDATE imported_token_projects SET document=json_set(document,'$.token.totalSupplyRaw','1000000') WHERE owner_id=? AND id=?",
+      )
+      .bind(owner, projectId)
+      .run();
+    const review = await reviewed();
+    await mocks.db
+      .prepare(
+        "UPDATE imported_token_projects SET document=json_set(document,'$.token.totalSupplyRaw','1000001') WHERE owner_id=? AND id=?",
+      )
+      .bind(owner, projectId)
+      .run();
+    expect(
+      (
+        await post({
+          action: 'register',
+          id: review.id,
+          transaction: f.signed.transaction,
+        })
+      ).status,
+    ).toBe(200);
+    const before = mocks.simulate.mock.calls.length;
+    expect(
+      (
+        await post({
+          action: 'submit',
+          id: review.id,
+          transaction: f.signed.transaction,
+        })
+      ).status,
+    ).toBe(409);
+    expect(mocks.simulate.mock.calls.length).toBe(before);
+    expect(
+      mocks.rpc.mock.calls.some((call) => call[1] === 'sendTransaction'),
+    ).toBe(false);
+    const prepared = await prepareCycle();
+    expect(prepared.status).toBe(409);
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect((await post({ action: 'recover', id: review.id })).status).toBe(200);
+  },
+);
+it('rejects a source-document race atomically even if its supply values are unchanged', async () => {
+  await supplyDca();
+  const guard = await supplyCapture(),
+    write = tradeSessionWriteGuard(owner, guard);
+  await mocks.db
+    .prepare(
+      "UPDATE imported_token_projects SET document=json_set(document,'$.fixtureRace',1) WHERE owner_id=? AND id=?",
+    )
+    .bind(owner, projectId)
+    .run();
+  expect(
+    (
+      await mocks.db
+        .prepare(
+          'UPDATE imported_swap_preparations SET document=document WHERE owner_id=? AND id=?' +
+            write.sql,
+        )
+        .bind(owner, preparationId, ...write.bindings)
+        .run()
+    ).meta.changes,
+  ).toBe(0);
+  const current = tradeSessionWriteGuard(owner, await supplyCapture());
+  expect(
+    (
+      await mocks.db
+        .prepare(
+          'UPDATE imported_swap_preparations SET document=document WHERE owner_id=? AND id=?' +
+            current.sql,
+        )
+        .bind(owner, preparationId, ...current.bindings)
+        .run()
+    ).meta.changes,
+  ).toBe(1);
 });
 it.each(['Buy', 'Sell'] as const)(
   'retains exact randomized %s cycles through idempotent save, approved submission and receipt recovery',

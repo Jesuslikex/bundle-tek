@@ -8,11 +8,13 @@ import {
 import type { SavedSwapPreparation } from './imported-swap-preparation-history';
 import { reviewDcaMarketCap } from './dca-market-cap';
 import type { SavedTokenMarket } from './token-market';
+import { dcaSupplySizing } from './dca-supply-sizing';
 export type TradeSessionGuard = {
   selection: TradeSessionCapture;
   document: string;
   controlRevision: number;
   market?: { projectId: string; document: string; expiresAt: string };
+  supply?: { projectId: string; projectRevision: number; document: string };
 };
 export async function captureTradeSession(
   db: D1Database,
@@ -78,6 +80,31 @@ export async function captureTradeSession(
     throw new Error('DCA session has reached its saved end time.');
   if (notBefore && Date.parse(notBefore) > Date.now())
     throw new Error('Trade session entry is not due yet.');
+  let supply: TradeSessionGuard['supply'];
+  if (session.terms.supplySizing) {
+    const project = await db
+      .prepare(
+        "SELECT document FROM imported_token_projects WHERE owner_id=? AND id=? AND revision=? AND chain='Solana' AND archived=0",
+      )
+      .bind(owner, context.projectId, session.terms.projectRevision)
+      .first<{ document: string }>();
+    if (!project) throw new Error('DCA supply project changed.');
+    try {
+      dcaSupplySizing(
+        session.terms.supplySizing,
+        JSON.parse(project.document).token,
+      );
+    } catch {
+      throw new Error(
+        'DCA supply capture changed. Review a new session against the current project.',
+      );
+    }
+    supply = {
+      projectId: context.projectId,
+      projectRevision: session.terms.projectRevision,
+      document: project.document,
+    };
+  }
   let market: TradeSessionGuard['market'];
   if (session.terms.marketCapRange) {
     const observed = await db
@@ -135,6 +162,7 @@ export async function captureTradeSession(
     document: row.document,
     controlRevision: control.revision,
     ...(market ? { market } : {}),
+    ...(supply ? { supply } : {}),
     selection: {
       format: notBefore ? 'trade-session-entry-v2' : 'trade-session-entry-v1',
       ...(notBefore ? { notBefore } : {}),
@@ -180,6 +208,16 @@ export function tradeSessionWriteGuard(
       guard.market.projectId,
       guard.market.document,
       guard.market.expiresAt,
+    );
+  }
+  if (guard?.supply) {
+    result.sql +=
+      ' AND EXISTS(SELECT 1 FROM imported_token_projects p WHERE p.owner_id=? AND p.id=? AND p.revision=? AND p.archived=0 AND p.document=?)';
+    result.bindings.push(
+      owner,
+      guard.supply.projectId,
+      guard.supply.projectRevision,
+      guard.supply.document,
     );
   }
   return result;

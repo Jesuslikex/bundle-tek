@@ -8,6 +8,11 @@ import {
   validateRandomDcaAllocation,
   type DcaRandomization,
 } from './dca-random-allocation';
+import {
+  dcaSupplySizing,
+  type DcaSupplySizing,
+  type DcaSupplyToken,
+} from './dca-supply-sizing';
 export type TradeSessionTerms = {
   format:
     | 'imported-trade-session-v1'
@@ -16,6 +21,7 @@ export type TradeSessionTerms = {
   endsAt?: string;
   marketCapRange?: DcaMarketCapRange;
   randomization?: DcaRandomization;
+  supplySizing?: DcaSupplySizing;
   strategy?: 'DCA';
   schedule?: TradeSessionSchedule;
   projectId: string;
@@ -118,7 +124,7 @@ export function tradeSessionRequest(value: unknown): TradeSessionRequest {
 }
 export function tradeSessionTerms(
   value: unknown,
-  token: { chain: string; address: string; decimals: number },
+  token: DcaSupplyToken,
 ): TradeSessionTerms {
   const v = value as {
     projectId: string;
@@ -130,6 +136,7 @@ export function tradeSessionTerms(
     endsAt?: unknown;
     marketCapRange?: unknown;
     randomization?: unknown;
+    supplySizing?: unknown;
   };
   if (
     !v ||
@@ -166,6 +173,25 @@ export function tradeSessionTerms(
     v.randomization === undefined
       ? undefined
       : dcaRandomization(v.randomization);
+  if (v.supplySizing !== undefined && (!dca || v.side !== 'Sell'))
+    throw new Error('Only Sell DCA supports saved supply percentages.');
+  const supply =
+    v.supplySizing === undefined
+      ? undefined
+      : dcaSupplySizing(v.supplySizing, token);
+  if (
+    supply &&
+    (randomization
+      ? supply.minimumRaw === undefined ||
+        supply.maximumRaw === undefined ||
+        randomization.minimumRaw !== supply.minimumRaw ||
+        randomization.maximumRaw !== supply.maximumRaw ||
+        randomization.totalRaw !== supply.totalRaw
+      : supply.minimumRaw !== undefined)
+  )
+    throw new Error(
+      'DCA supply percentages differ from the saved input bounds.',
+    );
   if (dca && (!schedule || schedule.spacingSeconds < 1 || v.entries.length < 2))
     throw new Error('DCA needs 2 to 25 cycles and a positive saved interval.');
   const seen = new Set<string>();
@@ -187,6 +213,10 @@ export function tradeSessionTerms(
   if (dca) {
     const first = entries[0],
       total = entries.reduce((sum, e) => sum + BigInt(e.unitsRaw), 0n);
+    if (supply && total.toString() !== supply.totalRaw)
+      throw new Error(
+        'DCA inputs must conserve the captured supply percentage.',
+      );
     if (
       total > 18446744073709551615n ||
       entries.some(
@@ -240,6 +270,7 @@ export function tradeSessionTerms(
     ...(v.endsAt === undefined ? {} : { endsAt: v.endsAt as string }),
     ...(marketCapRange === undefined ? {} : { marketCapRange }),
     ...(randomization === undefined ? {} : { randomization }),
+    ...(supply === undefined ? {} : { supplySizing: supply.sizing }),
   };
 }
 export function decodeTradeSession(value: unknown): TradeSession {
@@ -263,6 +294,12 @@ export function decodeTradeSession(value: unknown): TradeSession {
     chain: 'Solana',
     address: v.terms.mint,
     decimals: v.terms.decimals,
+    ...(v.terms.supplySizing
+      ? {
+          totalSupplyRaw: v.terms.supplySizing.totalSupplyRaw,
+          observedAt: v.terms.supplySizing.observedAt,
+        }
+      : {}),
   });
   if (JSON.stringify(terms) !== JSON.stringify(v.terms))
     throw new Error('Trade session terms differ.');
