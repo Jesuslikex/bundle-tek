@@ -534,6 +534,7 @@ export async function verifyPumpHolderSettlement(
       principalRaw: principal.toString(),
       protocolFeeRaw: protocol.toString(),
       creatorFeeRaw: creator.toString(),
+      volumeGainRaw: volumeGain.toString(),
       solDebitRaw: debit.toString(),
       feeAndRentDebitRaw: feeRent.toString(),
     });

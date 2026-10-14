@@ -8,6 +8,12 @@ import {
 } from './pump-holder-preparation';
 import { pumpHolderSettlementFixture } from '../test/pump-holder-settlement-fixture';
 import { PUMP_TOKEN_2022 } from './pump-launch-config';
+import { buildPumpCreateHolderMessage } from './pump-holder-message';
+import {
+  preparePumpHolderReview,
+  refreshPumpHolderReview,
+  cancelUnsignedPumpHolderReview,
+} from './pump-holder-review-service';
 import {
   getTransactionDecoder,
   getCompiledTransactionMessageDecoder,
@@ -423,6 +429,14 @@ for (const revoke of [false, true])
     let holderMode = false,
       simulations = 0;
     const rpc: PumpLaunchRpc = async (method, params, signal) => {
+      if (method === 'getLatestBlockhash')
+        return {
+          context: { slot: '100' },
+          value: {
+            blockhash: '11111111111111111111111111111111',
+            lastValidBlockHeight: '2000',
+          },
+        };
       if (
         method === 'getFeeForMessage' &&
         getCompiledTransactionMessageDecoder().decode(
@@ -474,11 +488,21 @@ for (const revoke of [false, true])
       'alice',
       terms,
       new AbortController().signal,
-      { rpc },
+      {
+        rpc,
+        lifetime: {
+          blockhash: g.input.create.blockhash,
+          lastValidBlockHeight: g.input.create.lastValidBlockHeight.toString(),
+        },
+      },
     );
     if (revoke) await expect(result).rejects.toThrow('Every saved holder');
-    else
-      expect(await result).toMatchObject({
+    else {
+      const checked = await result;
+      expect(checked.packet.packetSha256).toBe(
+        (await buildPumpCreateHolderMessage(g.input)).packetSha256,
+      );
+      expect(checked).toMatchObject({
         fundingValidated: true,
         signingAllowed: false,
         executionAllowed: false,
@@ -489,7 +513,51 @@ for (const revoke of [false, true])
           accounting: { accountingValidated: true, wallets: expect.any(Array) },
         },
       });
-    expect(simulations).toBe(1);
+      await f.client.execute(
+        'CREATE TABLE solana_execution_reservations(owner_id TEXT,wallet_address TEXT,scope TEXT,intent_id TEXT,state TEXT,PRIMARY KEY(owner_id,wallet_address))',
+      );
+      for (const file of ['0079_real_justice', '0081_pump_holder_reservations'])
+        for (const sql of readFileSync(`drizzle/${file}.sql`, 'utf8').split(
+          '--> statement-breakpoint',
+        ))
+          if (sql.trim()) await f.client.execute(sql);
+      holderMode = false;
+      const stored = await preparePumpHolderReview(
+        f.db,
+        'alice',
+        terms,
+        new AbortController().signal,
+        rpc,
+      );
+      expect(stored).toMatchObject({
+        state: 'review',
+        signingAllowed: false,
+        executionAllowed: false,
+      });
+      expect(stored.review.input.create.blockhash).toBe(
+        '11111111111111111111111111111111',
+      );
+      holderMode = false;
+      const refreshed = await refreshPumpHolderReview(
+        f.db,
+        'alice',
+        stored.review.id,
+        new AbortController().signal,
+        rpc,
+      );
+      expect(refreshed.packet.packetSha256).toBe(stored.review.sha256);
+      expect(
+        (
+          await cancelUnsignedPumpHolderReview(
+            f.db,
+            'alice',
+            stored.review.id,
+            new AbortController().signal,
+          )
+        ).state,
+      ).toBe('cancelled');
+    }
+    expect(simulations).toBe(revoke ? 1 : 3);
   });
 for (const revoke of [false, true])
   it(`checks owned all-wallet funding and revalidates ownership after RPC (revoke=${revoke})`, async () => {

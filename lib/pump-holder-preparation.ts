@@ -49,6 +49,7 @@ export async function prepareOwnedPumpHolderPacket(
   signal: AbortSignal,
   options: {
     rpc?: PumpLaunchRpc;
+    lifetime?: { blockhash: string; lastValidBlockHeight: string };
     captureInput?: (
       input: Parameters<typeof buildPumpCreateHolderMessage>[0],
     ) => void;
@@ -136,6 +137,7 @@ export async function prepareOwnedPumpHolderPacket(
     signal,
     {
       rpc: options.rpc,
+      lifetime: options.lifetime,
       captureInput: (input) => {
         create = input;
       },
@@ -275,6 +277,7 @@ export async function preflightOwnedPumpHolderFunding(
   signal: AbortSignal,
   options: {
     rpc?: PumpLaunchRpc;
+    lifetime?: { blockhash: string; lastValidBlockHeight: string };
     captureInput?: (
       input: Parameters<typeof buildPumpCreateHolderMessage>[0],
     ) => void;
@@ -290,6 +293,7 @@ export async function preflightOwnedPumpHolderFunding(
     deadline,
     {
       rpc: options.rpc,
+      lifetime: options.lifetime,
       captureInput: (captured) => {
         input = captured;
       },
@@ -358,7 +362,13 @@ export async function preflightOwnedPumpHolderSimulation(
   owner: string,
   supplied: Terms,
   signal: AbortSignal,
-  options: { rpc?: PumpLaunchRpc } = {},
+  options: {
+    rpc?: PumpLaunchRpc;
+    lifetime?: { blockhash: string; lastValidBlockHeight: string };
+    captureInput?: (
+      input: Parameters<typeof buildPumpCreateHolderMessage>[0],
+    ) => void;
+  } = {},
 ) {
   const terms = structuredClone(supplied),
     deadline = AbortSignal.any([signal, AbortSignal.timeout(60000)]);
@@ -370,6 +380,7 @@ export async function preflightOwnedPumpHolderSimulation(
     deadline,
     {
       rpc: options.rpc,
+      lifetime: options.lifetime,
       captureInput: (value) => {
         input = value;
       },
@@ -387,5 +398,6 @@ export async function preflightOwnedPumpHolderSimulation(
   if (simulation.packetSha256 !== prepared.packet.packetSha256)
     return fail('Holder simulation packet changed.');
   await assertOwnedHolderContext(db, owner, terms, input, prepared, deadline);
+  options.captureInput?.(structuredClone(input));
   return { ...prepared, allWalletSimulation: simulation };
 }
