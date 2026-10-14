@@ -223,6 +223,7 @@ export async function prepareCounterBuyProposal(
     format: 'counter-buy-preparation-v1' as const,
     executionAllowed: false as const,
     instructionsVerified: false as const,
+    tokenDecimals: plan.ledger.scope.decimals,
     quote,
     review,
     preparation: {
