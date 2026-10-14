@@ -439,10 +439,10 @@ function PulseBackendControls(props: PulseProps) {
       {state === 'auth' ? (
         <Link
           className="backend-signin"
-          href="/signin-with-chatgpt?return_to=/"
+          href="/sign-in"
           target="_top"
         >
-          Sign in with ChatGPT
+          Sign in
         </Link>
       ) : (
         <div className="backend-actions">
@@ -1006,7 +1006,7 @@ export default function Home() {
         }
         if (planResponse.status === 401) {
           setPersistenceState('auth');
-          setPlanMessage('Sign in with ChatGPT to save and reload this plan.');
+          setPlanMessage('Sign in to save and reload this plan.');
           return;
         }
         if (!planResponse.ok)
@@ -1065,7 +1065,7 @@ export default function Home() {
       });
       if (response.status === 401) {
         setPersistenceState('auth');
-        setPlanMessage('Sign in with ChatGPT to save this plan.');
+        setPlanMessage('Sign in to save this plan.');
         return;
       }
       const payload = (await response.json()) as {
@@ -2177,10 +2177,9 @@ export default function Home() {
           </output>
         )}
         {persistenceState === 'auth' && (
-          // oxlint-disable-next-line next/no-html-link-for-pages -- Sites sign-in must use a top-level document navigation.
-          <a href="/signin-with-chatgpt?return_to=/" target="_top">
+          <Link href="/sign-in">
             Sign in to save
-          </a>
+          </Link>
         )}
         <span className="network-boundary">
           DEVNET TOOLS · SWAP APPROVAL REQUIRED
