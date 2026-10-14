@@ -53,6 +53,27 @@ export function encodePumpSigningInput(
     ...(quoteControl ? { quoteControl: encode(quoteControl) } : {}),
   };
 }
+export function decodePumpSigningInput(
+  encoded: PumpSigningInput,
+): PumpCreateInput {
+  const decode = (a: EncodedAccount) => {
+    if (a.data.length > 270000 || btoa(atob(a.data)) !== a.data)
+      throw new Error('Launch configuration differs.');
+    return {
+      ...a,
+      data: Uint8Array.from(atob(a.data), (c) => c.charCodeAt(0)),
+    };
+  };
+  const { global, quoteMintAccount, quoteControl, ...base } = encoded;
+  return {
+    ...base,
+    lastValidBlockHeight: BigInt(encoded.lastValidBlockHeight),
+    global: decode(global),
+    ...(quoteMintAccount ? { quoteMintAccount: decode(quoteMintAccount) } : {}),
+    ...(quoteControl ? { quoteControl: decode(quoteControl) } : {}),
+  };
+}
+
 export async function requirePumpSigningReview(
   review: PumpSigningReview,
   current: () => void = () => {},
@@ -66,22 +87,7 @@ export async function requirePumpSigningReview(
     BigInt(review.feeAndRentLimitRaw) > 1000000000n
   )
     throw new Error('Launch review expired or allowance differs.');
-  const decode = (a: EncodedAccount) => {
-    if (a.data.length > 270000 || btoa(atob(a.data)) !== a.data)
-      throw new Error('Launch configuration differs.');
-    return {
-      ...a,
-      data: Uint8Array.from(atob(a.data), (c) => c.charCodeAt(0)),
-    };
-  };
-  const { global, quoteMintAccount, quoteControl, ...base } = review.input;
-  const input: PumpCreateInput = {
-    ...base,
-    lastValidBlockHeight: BigInt(review.input.lastValidBlockHeight),
-    global: decode(global),
-    ...(quoteMintAccount ? { quoteMintAccount: decode(quoteMintAccount) } : {}),
-    ...(quoteControl ? { quoteControl: decode(quoteControl) } : {}),
-  };
+  const input = decodePumpSigningInput(review.input);
   const built = await buildPumpCreateMessage(input);
   if (
     built.packetSha256 !== review.sha256 ||
