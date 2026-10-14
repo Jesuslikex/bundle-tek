@@ -1,3 +1,4 @@
+import { buildPumpLaunchPacketGroup } from './pump-launch-packet-group';
 import {
   getTransactionDecoder,
   getCompiledTransactionMessageDecoder,
@@ -83,20 +84,89 @@ const feeFor = (principal: bigint, bps: bigint) =>
   (principal * bps + 9999n) / 10000n;
 
 /** Pure accounting verifier. RPC origin, freshness, resources and deployment checks are separate mandatory gates. */
-export async function verifyPumpHolderSettlement(
+async function verifySettlement(
   supplied: Input,
   suppliedLimits: PumpHolderAllowances,
   suppliedEvidence: PumpHolderSettlementEvidence,
+  groupMode = false,
+  prefixCount?: number,
 ) {
   const input = structuredClone(supplied),
     limits = structuredClone(suppliedLimits),
     evidence = structuredClone(suppliedEvidence),
-    packet = await buildPumpCreateHolderMessage(input),
-    tx = getTransactionDecoder().decode(
-      Buffer.from(packet.transaction, 'base64'),
+    assembled = groupMode
+      ? await buildPumpLaunchPacketGroup(input)
+      : await buildPumpCreateHolderMessage(input);
+  const group = 'packets' in assembled ? assembled : null;
+  const count = group ? (prefixCount ?? group.packets.length) : 1;
+  if (
+    !Number.isInteger(count) ||
+    count < 1 ||
+    (group && count > group.packets.length)
+  )
+    throw new Error('Group settlement prefix scope differs.');
+  const selected = group?.packets.slice(0, count);
+  const packet = group
+    ? {
+        packetSha256: group.manifestSha256,
+        quote: group.quote,
+        quoteMint: input.create.quoteMint,
+        instructions: group.packets.flatMap((p) => p.instructions),
+        buyerAccounts: selected!.flatMap((p) => p.buyerAccounts),
+      }
+    : (assembled as Awaited<ReturnType<typeof buildPumpCreateHolderMessage>>);
+  const transactions = group
+    ? group.packets.map((p) => p.transaction)
+    : [
+        (assembled as Awaited<ReturnType<typeof buildPumpCreateHolderMessage>>)
+          .transaction,
+      ];
+  const messages = transactions.map((encoded) =>
+    getCompiledTransactionMessageDecoder().decode(
+      getTransactionDecoder().decode(Buffer.from(encoded, 'base64'))
+        .messageBytes,
     ),
-    message = getCompiledTransactionMessageDecoder().decode(tx.messageBytes),
-    keys = message.staticAccounts.map(String);
+  );
+  const keys = [
+    ...new Set([
+      ...messages.flatMap((m) => m.staticAccounts.map(String)),
+      ...(groupMode
+        ? [
+            input.create.quoteControl?.address,
+            input.create.quoteMintAccount?.address,
+          ].filter((k): k is string => k !== undefined)
+        : []),
+    ]),
+  ];
+  const writableKeys = new Set(
+    messages
+      .slice(0, count)
+      .flatMap((m) =>
+        m.staticAccounts.flatMap((key, i) =>
+          i < m.header.numSignerAccounts - m.header.numReadonlySignerAccounts ||
+          (i >= m.header.numSignerAccounts &&
+            i < m.staticAccounts.length - m.header.numReadonlyNonSignerAccounts)
+            ? [String(key)]
+            : [],
+        ),
+      ),
+  );
+  if (group) {
+    const covered = new Set(selected!.flatMap((p) => p.holderIndices));
+    input.holders = input.holders.map((h, i) =>
+      covered.has(i) ? h : { address: h.address, kind: 'none' },
+    );
+    limits.holders = limits.holders.map((l, i) =>
+      covered.has(i)
+        ? l
+        : {
+            address: l.address,
+            feeAndRentLimitRaw: '0',
+            maximumQuoteCostRaw: null,
+            minimumTokenOutputRaw: null,
+          },
+    );
+  }
   if (
     JSON.stringify(keys) !== JSON.stringify(evidence.addresses) ||
     evidence.before.length !== keys.length ||
@@ -145,12 +215,7 @@ export async function verifyPumpHolderSettlement(
   if (!fee || at(input.create.mint, before))
     throw new Error('Holder creation or network fee differs.');
   for (const [i] of keys.entries()) {
-    const writable =
-      i <
-        message.header.numSignerAccounts -
-          message.header.numReadonlySignerAccounts ||
-      (i >= message.header.numSignerAccounts &&
-        i < keys.length - message.header.numReadonlyNonSignerAccounts);
+    const writable = writableKeys.has(keys[i]);
     if (
       (!writable || before[i]?.executable) &&
       (await hash(before[i])) !== (await hash(after[i]))
@@ -635,6 +700,13 @@ export async function verifyPumpHolderSettlement(
     format: 'pump-holder-settlement-accounting-v1' as const,
     packetSha256: packet.packetSha256,
     accountingValidated: true as const,
+    ...(group
+      ? {
+          groupPacketCount: group.packets.length,
+          verifiedPacketCount: count,
+          fullGroupAccountingValidated: count === group.packets.length,
+        }
+      : {}),
     rpcCollectionRequired: true as const,
     signingAllowed: false as const,
     executionAllowed: false as const,
@@ -648,5 +720,36 @@ export async function verifyPumpHolderSettlement(
     buybackSplitRoundingAttested: false as const,
     rentAccounts,
     wallets: rows,
+  };
+}
+
+/** Pure single-packet economics; original public report shape is preserved. */
+export function verifyPumpHolderSettlement(
+  input: Input,
+  limits: PumpHolderAllowances,
+  evidence: PumpHolderSettlementEvidence,
+) {
+  return verifySettlement(input, limits, evidence);
+}
+
+/** Pure complete-group aggregate accounting. Trace/RPC/deployment gates remain mandatory. */
+export async function verifyPumpLaunchGroupSettlement(
+  input: Input,
+  limits: PumpHolderAllowances,
+  evidence: PumpHolderSettlementEvidence,
+  prefixCount?: number,
+) {
+  const { packetSha256, ...accounting } = await verifySettlement(
+    input,
+    limits,
+    evidence,
+    true,
+    prefixCount,
+  );
+  return {
+    ...accounting,
+    format: 'pump-launch-group-settlement-accounting-v1' as const,
+    manifestSha256: packetSha256,
+    traceVerificationRequired: true as const,
   };
 }
