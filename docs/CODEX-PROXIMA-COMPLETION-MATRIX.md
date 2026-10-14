@@ -2,6 +2,8 @@
 
 Full goal: **make this product like Proxima**. Status: **not complete**. This matrix preserves the full goal rather than defining success around passing local tests or recently added features.
 
+The latest combined local application source e33fc8f incorporates Claude's branding/sign-in changes, independent initial-buy simulation f97f9b7 and strict Solana signature checks e207e6f. Twenty-six focused files, 181 tests, type checking, lint and production build pass on that combined source. Nothing deployed; see CODEX-COMBINED-CHECKPOINT-20261014.md. This supersedes earlier wholly missing combined simulation/signature-hardening statements only within their precise source scopes. Owned initial-buy API/approval/signing, buyback split attestation, holder buys, funded proof and broader parity remain required.
+
 ## Atomic Pump developer-buy construction, 14 October 2026
 
 An independent two-stage combined simulation collector now verifies native/SPL/Token-2022 settlement, price/fee totals, exact custody, gross funding, separate rent, source/deployment stability and original lifetimes. Seventy-eight focused regressions, type checking, lint and build pass. Current public FeeConfig bytes decode under the pinned layout, but successful funded combined simulation is unproven and buyback split rounding remains explicitly unattested. The owned API, durable approval/signing, holder buys and submission/recovery are still required. See CODEX-PUMP-INITIAL-BUY-SIMULATION-20261014.md. Every new report still disables signing/execution; earlier entirely-missing combined-simulation notes are superseded only by this internal collector.
