@@ -35,7 +35,7 @@ export type PumpHolderBuy = { address: string } & (
       minimumTokenOutputRaw: string;
     }
 );
-type Input = {
+export type PumpHolderMessageInput = {
   create: PumpCreateInput;
   developer?: { tokenAmountRaw: string; maximumQuoteCostRaw: string };
   holders: PumpHolderBuy[];
@@ -51,9 +51,10 @@ const positive = (value: string) => {
 };
 
 /** Unsigned assembly only. All-wallet funding, sequential curve/migration/fee simulation and approval are still required. */
-export async function buildPumpCreateHolderMessage(
-  supplied: Input,
+export async function collectPumpHolderInstructionUnits(
+  supplied: PumpHolderMessageInput,
   signal?: AbortSignal,
+  singlePacket = false,
 ) {
   const input = structuredClone(supplied);
   const current = () => {
@@ -122,9 +123,13 @@ export async function buildPumpCreateHolderMessage(
     throw new Error(
       'No holder buy is requested; use the create/developer-buy flow.',
     );
-  if ((active.length + 2) * 96 > 4096)
+  if (singlePacket && (active.length + 2) * 96 > 4096)
     throw new Error(
       'The complete holder signer list needs multiple reviewed packets; no slots were removed.',
+    );
+  if (singlePacket && active.length + 2 > 12)
+    throw new Error(
+      'Complete holder group exceeds the pinned v1 limit of 12 signers and needs multiple reviewed packets; no partial packet was returned.',
     );
   const created = await buildPumpCreateMessage(input.create);
   const global = decodePumpLaunchConfig('Global', input.create.global.data);
@@ -135,7 +140,9 @@ export async function buildPumpCreateHolderMessage(
     throw new Error(
       'Combined exact-output buys must leave tokens on the curve.',
     );
-  const instructions: Instruction[] = [created.instruction];
+  const units: { holderIndex: number | null; instructions: Instruction[] }[] = [
+    { holderIndex: null, instructions: [created.instruction] },
+  ];
   const buyers = [];
   if (input.developer) {
     const built = await buildPumpCreateAndBuyMessage({
@@ -143,10 +150,10 @@ export async function buildPumpCreateHolderMessage(
       ...input.developer,
       transactionVersion: 1,
     });
-    instructions.push(...built.instructions.slice(1));
+    units[0].instructions.push(...built.instructions.slice(1));
     buyers.push(built);
   }
-  for (const holder of input.holders) {
+  for (const [holderIndex, holder] of input.holders.entries()) {
     current();
     if (holder.kind === 'none') continue;
     const built = await buildPumpCreateAndBuyMessage({
@@ -178,10 +185,25 @@ export async function buildPumpCreateHolderMessage(
       data[24] = 0;
       setup[setup.length - 1] = { ...original, data };
     }
-    instructions.push(...setup);
+    units.push({ holderIndex, instructions: setup });
     buyers.push(built);
   }
   current();
+  return { input, created, active, units, buyers };
+}
+
+/** One complete unsigned packet. Never silently groups or removes selected wallets. */
+export async function buildPumpCreateHolderMessage(
+  supplied: PumpHolderMessageInput,
+  signal?: AbortSignal,
+) {
+  const { input, created, active, units, buyers } =
+    await collectPumpHolderInstructionUnits(supplied, signal, true);
+  const current = () => {
+    if (signal?.aborted)
+      throw new Error('Holder packet construction cancelled.');
+  };
+  const instructions = units.flatMap((unit) => unit.instructions);
   const resourceLimits = {
     computeUnitLimit: 1400000,
     loadedAccountsDataSizeLimit: 64 * 1024 * 1024,

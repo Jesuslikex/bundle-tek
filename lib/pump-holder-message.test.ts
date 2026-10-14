@@ -168,7 +168,7 @@ it('rejects complete oversized holder groups without returning a silently trunca
   );
 });
 
-it('rejects the measured account graph when the signer-only lower bound fits', async () => {
+it('rejects the signer count when the signer-only byte lower bound fits', async () => {
   const f = await fixture();
   const holders: PumpHolderBuy[] = await Promise.all(
     Array.from({ length: 18 }, async () => ({
