@@ -118,28 +118,23 @@ function tier(value: unknown, marketCap: bigint): Fees {
       ?.fees ?? tiers[0].fees,
   );
 }
-/** Pinned official SDK 4.1.0 curve leg arithmetic. No synthetic migration or configurable creator rate. */
-export function pumpInitialBuyPrice(input: {
+function positivePumpAmount(raw: string) {
+  if (
+    typeof raw !== 'string' ||
+    !/^[1-9][0-9]{0,19}$/.test(raw) ||
+    BigInt(raw) > (1n << 64n) - 1n
+  )
+    throw new Error('Pump initial buy reserve or amount differs.');
+  return BigInt(raw);
+}
+export function pumpBuyFeeRates(input: {
   quoteMint: string;
   virtualTokensRaw: string;
   virtualQuoteRaw: string;
-  tokenAmountRaw: string;
   feeConfig: Record<string, unknown>;
 }) {
-  const positive = (raw: string) => {
-    if (
-      typeof raw !== 'string' ||
-      !/^[1-9][0-9]{0,19}$/.test(raw) ||
-      BigInt(raw) > (1n << 64n) - 1n
-    )
-      throw new Error('Pump initial buy reserve or amount differs.');
-    return BigInt(raw);
-  };
-  const virtualTokens = positive(input.virtualTokensRaw),
-    virtualQuote = positive(input.virtualQuoteRaw),
-    amount = positive(input.tokenAmountRaw);
-  if (amount >= virtualTokens)
-    throw new Error('Initial buy must leave virtual tokens on the curve.');
+  const virtualTokens = positivePumpAmount(input.virtualTokensRaw),
+    virtualQuote = positivePumpAmount(input.virtualQuoteRaw);
   const marketCap = (virtualQuote * 1000000000000000n) / virtualTokens;
   let selected: Fees;
   if (input.quoteMint === PUMP_NATIVE_QUOTE)
@@ -158,10 +153,29 @@ export function pumpInitialBuyPrice(input: {
       ? fees(input.feeConfig.flat_fees)
       : exotic;
   }
+  return {
+    protocolFeeBps: selected.protocol_fee_bps,
+    creatorFeeBps: selected.creator_fee_bps,
+  };
+}
+/** Pinned official SDK 4.1.0 curve leg arithmetic. No synthetic migration or configurable creator rate. */
+export function pumpInitialBuyPrice(input: {
+  quoteMint: string;
+  virtualTokensRaw: string;
+  virtualQuoteRaw: string;
+  tokenAmountRaw: string;
+  feeConfig: Record<string, unknown>;
+}) {
+  const virtualTokens = positivePumpAmount(input.virtualTokensRaw),
+    virtualQuote = positivePumpAmount(input.virtualQuoteRaw),
+    amount = positivePumpAmount(input.tokenAmountRaw);
+  if (amount >= virtualTokens)
+    throw new Error('Initial buy must leave virtual tokens on the curve.');
+  const selected = pumpBuyFeeRates(input);
   const principal = (virtualQuote * amount) / (virtualTokens - amount) + 1n;
   const fee = (bps: bigint) => (principal * bps + 9999n) / 10000n;
-  const protocol = fee(selected.protocol_fee_bps),
-    creator = fee(selected.creator_fee_bps),
+  const protocol = fee(selected.protocolFeeBps),
+    creator = fee(selected.creatorFeeBps),
     total = principal + protocol + creator;
   if (total > (1n << 64n) - 1n)
     throw new Error('Initial buy quote cost exceeds u64.');
@@ -170,7 +184,7 @@ export function pumpInitialBuyPrice(input: {
     protocolFeeRaw: protocol.toString(),
     creatorFeeRaw: creator.toString(),
     totalQuoteCostRaw: total.toString(),
-    protocolFeeBps: selected.protocol_fee_bps.toString(),
-    creatorFeeBps: selected.creator_fee_bps.toString(),
+    protocolFeeBps: selected.protocolFeeBps.toString(),
+    creatorFeeBps: selected.creatorFeeBps.toString(),
   };
 }
