@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
 import { PumpHolderLaunchReview } from './pump-holder-launch-review';
+import { PumpLaunchHistory } from './pump-launch-history';
 import { holdersBuyUnit } from '@/lib/launch-buy';
 import type { ProjectDocument } from '@/lib/workspace-project';
 import { Button } from '@/components/ui/button';
@@ -937,18 +938,21 @@ export function PumpLaunchReview(
     holdersBuyUnit(props.plan) === 'supply'
       ? props.plan.holdersBuy > 0
       : /[1-9]/.test(props.plan.holdersBuyQuote ?? '');
-  if (holder)
-    return (
-      <PumpHolderLaunchReview
-        key={JSON.stringify([props.project, props.plan, props.releaseId])}
-        project={props.project}
-        releaseId={props.releaseId}
-      />
-    );
   return (
-    <PumpLaunchReviewContent
-      key={JSON.stringify([props.project, props.plan, props.releaseId])}
-      {...props}
-    />
+    <>
+      {holder ? (
+        <PumpHolderLaunchReview
+          key={JSON.stringify([props.project, props.plan, props.releaseId])}
+          project={props.project}
+          releaseId={props.releaseId}
+        />
+      ) : (
+        <PumpLaunchReviewContent
+          key={JSON.stringify([props.project, props.plan, props.releaseId])}
+          {...props}
+        />
+      )}
+      <PumpLaunchHistory projectId={props.project.id} />
+    </>
   );
 }

@@ -1,0 +1,3 @@
+# Saved launch recovery UI notice
+
+Before edits, based on 40ae02e. Codex will add a project-scoped saved launch recovery component and tests, and mount it in pump-launch-review.tsx independently of the current plan type. Existing signing panels, server routes, migrations, global CSS and protected Claude files remain unchanged. The new panel only lists saved records and explicitly requests existing status recovery. It never prepares, approves, signs, registers or submits packets. Controlled component/route regressions, TypeScript, scoped lint and build will verify the change. Nothing pushed or deployed.

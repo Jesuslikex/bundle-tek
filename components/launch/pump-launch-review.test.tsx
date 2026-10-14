@@ -418,6 +418,9 @@ it('routes a holder plan to the complete holder flow instead of omitting its buy
   );
   expect(container.textContent).toContain('Create coin with holder buys');
   expect(
+    container.querySelector('[aria-label="Saved launch recovery"]'),
+  ).not.toBeNull();
+  expect(
     button('Approve and sign creation with developer buy'),
   ).toBeUndefined();
   expect(container.textContent).toContain(
@@ -445,5 +448,8 @@ it('renders an expired unobserved recovery without calling it a finalized failur
   );
   await click('Reload saved launch');
   expect(container.textContent).toContain('network fees remain unresolved');
+  expect(
+    container.querySelector('[aria-label="Saved launch recovery"]'),
+  ).not.toBeNull();
   expect(container.textContent).not.toContain('Finalized transaction failure');
 });
