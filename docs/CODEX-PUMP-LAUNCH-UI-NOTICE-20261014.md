@@ -1,0 +1,3 @@
+# Pump launch UI work notice
+
+Codex is taking the user-authorized UI scope while Claude is unavailable. Planned edits: a dedicated components/launch/pump-launch-review.tsx, minimal deployer props through app/page.tsx and token-details-form.tsx, and a metadata-release handoff in launch-metadata-review.tsx. Existing upload, layout, holder and timeline implementations stay intact. Supporting owned lib/API/schema/tests implement browser mint custody, exact create-only review, explicit signing and separate submission/recovery. Saved initial buys, schedules and unsupported creator options must fail rather than silently disappear. No real launch, hosted SQL or deployment is part of development QA.

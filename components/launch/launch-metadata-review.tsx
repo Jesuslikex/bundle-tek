@@ -6,14 +6,20 @@ import { isUploadedArtwork } from '@/lib/artwork';
 import type { LaunchPlanInput } from '@/lib/launch-plan';
 import type { TokenIdentity } from '@/lib/workspace-project';
 import { readPanelJson } from '@/components/read-panel-json';
+import { PumpLaunchReview } from './pump-launch-review';
 
-export type MetadataProject = { id: string; updatedAt: string };
+export type MetadataProject = {
+  id: string;
+  updatedAt: string;
+  payer?: { address: string; revision: number };
+};
 type Props = {
   plan: LaunchPlanInput;
   identity: TokenIdentity;
   project?: MetadataProject | null;
   onSave?: () => void;
   saving?: boolean;
+  onCreateOnly?: () => void;
 };
 const interrupted =
   'Publication may have completed. Retry this same saved draft to recover its link.';
@@ -28,6 +34,7 @@ function SavedMetadataReview({
   project,
   onSave,
   saving,
+  onCreateOnly,
 }: Props) {
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -264,6 +271,14 @@ function SavedMetadataReview({
           )}
         </div>
       </div>
+      {project && plan.launchpad === 'PumpFun' && (
+        <PumpLaunchReview
+          project={project}
+          plan={plan}
+          releaseId={uri.split('/').at(-1) ?? ''}
+          onCreateOnly={onCreateOnly}
+        />
+      )}
     </details>
   );
 }

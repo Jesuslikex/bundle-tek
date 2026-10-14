@@ -1724,10 +1724,26 @@ export default function Home() {
                   key={projectId ?? 'new-project'}
                   validationError={planValidation.error}
                   metadataProject={
-                    projectId && projectVersion && !hasEdits && !saveBusy &&
+                    projectId &&
+                    projectVersion &&
+                    !hasEdits &&
+                    !saveBusy &&
                     persistenceState === 'ready' &&
-                    projects.some(project => project.id === projectId && !project.archived)
-                      ? { id: projectId, updatedAt: projectVersion }
+                    projects.some(
+                      (project) =>
+                        project.id === projectId && !project.archived,
+                    )
+                      ? {
+                          id: projectId,
+                          updatedAt: projectVersion,
+                          payer: venueOptions.wallets?.deployer
+                            ? {
+                                address: venueOptions.wallets.deployer.address,
+                                revision:
+                                  venueOptions.wallets.deployer.revision,
+                              }
+                            : undefined,
+                        }
                       : null
                   }
                   onSave={() => void saveLaunchPlan()}

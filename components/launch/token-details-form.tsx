@@ -334,6 +334,14 @@ export function TokenDetailsForm({
           project={metadataProject}
           onSave={onSave}
           saving={saving}
+          onCreateOnly={() =>
+            onChange({
+              developerBuy: 0,
+              holdersBuy: 0,
+              holdersBuyQuote: '0',
+              scheduled: false,
+            })
+          }
         />
         <Button className="flow-next" disabled={!ready} onClick={onNext}>
           Continue to launch settings <ArrowRight />

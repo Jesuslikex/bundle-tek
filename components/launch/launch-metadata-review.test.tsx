@@ -119,7 +119,10 @@ it('sends only the reviewed project/version/consent and validates the public lin
   expect(container.textContent).toContain(
     'Coin creation still requires a separate transaction review',
   );
-  expect(container.querySelector('input')).toBeNull();
+  expect(
+    container.querySelector('[aria-label="PumpFun launch review"]'),
+  ).not.toBeNull();
+  expect(button()).toBeUndefined();
 });
 it('resets consent and released links after the reviewed identity changes', async () => {
   fetcher.mockResolvedValue(Response.json(result()));
