@@ -1,3 +1,8 @@
+import {
+  pumpHistoryPageRequest,
+  PumpHistoryRequestError,
+} from '@/lib/pump-launch-history-page';
+import { listPumpHolderPage } from '@/lib/pump-holder-review-service';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { PumpPreflightError } from '@/lib/owned-pump-preflight';
@@ -30,10 +35,21 @@ export async function GET(request: Request) {
   if (!projectId || projectId.length > 128)
     return json({ error: 'Choose a project.' }, 400);
   try {
+    const page = pumpHistoryPageRequest(
+      new URL(request.url).searchParams,
+      projectId,
+      'holders',
+    );
+    if (page)
+      return json(
+        await listPumpHolderPage(getD1(), user.userId, projectId, page),
+      );
     return json({
       launches: await listPumpHolderReviews(getD1(), user.userId, projectId),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof PumpHistoryRequestError)
+      return json({ error: error.message }, 400);
     return json({ error: 'Holder launch history is unavailable.' }, 503);
   }
 }

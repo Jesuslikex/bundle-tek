@@ -1,3 +1,7 @@
+import {
+  readPumpHistoryPage,
+  type PumpHistoryPage,
+} from './pump-launch-history-page';
 import { buildPumpCreateAndBuyMessage } from './pump-initial-buy-message';
 import {
   preflightOwnedPumpInitialBuy,
@@ -437,4 +441,20 @@ export async function listPumpInitialBuyReviews(
     .bind(owner, projectId)
     .all<Row>();
   return results.map(publicPumpInitialBuyReview);
+}
+
+export function listPumpInitialBuyPage(
+  db: D1Database,
+  owner: string,
+  projectId: string,
+  page: PumpHistoryPage,
+) {
+  return readPumpHistoryPage(
+    db,
+    owner,
+    projectId,
+    'developer',
+    page,
+    publicPumpInitialBuyReview,
+  );
 }

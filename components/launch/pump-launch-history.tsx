@@ -58,6 +58,7 @@ function History({ projectId }: { projectId: string }) {
     [errors, setErrors] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [loaded, setLoaded] = useState(false);
+  const [cursors, setCursors] = useState<Record<string, string | null>>({});
   const active = useRef(true),
     running = useRef(false),
     abort = useRef<AbortController | null>(null);
@@ -71,9 +72,16 @@ function History({ projectId }: { projectId: string }) {
   async function request(
     source: Source,
     body?: { action: 'recover'; id: string },
+    cursor?: string,
   ) {
     const response = await fetch(
-      source.path + (body ? '' : '?projectId=' + encodeURIComponent(projectId)),
+      source.path +
+        (body
+          ? ''
+          : '?projectId=' +
+            encodeURIComponent(projectId) +
+            '&page=1' +
+            (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')),
       {
         ...(body
           ? {
@@ -117,22 +125,16 @@ function History({ projectId }: { projectId: string }) {
     const results = await Promise.all(
       sources.map(async (source) => {
         try {
-          const value = await request(source);
-          if (
-            !record(value) ||
-            !Array.isArray(value.launches) ||
-            value.launches.length > 200
-          )
-            throw new Error();
-          const entries = value.launches.map((v) =>
-            entry(v, source, projectId),
-          );
-          if (new Set(entries.map((r) => r.id)).size !== entries.length)
-            throw new Error();
-          return { entries, error: '' };
+          return {
+            ...parsePage(await request(source), source),
+            source,
+            error: '',
+          };
         } catch {
           return {
             entries: [],
+            next: null,
+            source,
             error:
               source.name +
               ' history is unavailable. Other launch types can still be checked.',
@@ -142,8 +144,48 @@ function History({ projectId }: { projectId: string }) {
     );
     if (!active.current) return;
     setRows(results.flatMap((r) => r.entries));
+    setCursors(Object.fromEntries(results.map((r) => [r.source.path, r.next])));
     setErrors(results.map((r) => r.error).filter(Boolean));
     setLoaded(true);
+  }
+  function parsePage(value: unknown, source: Source, previous?: string) {
+    if (
+      !record(value) ||
+      !Array.isArray(value.launches) ||
+      value.launches.length > 20 ||
+      !(
+        value.nextCursor === null ||
+        (typeof value.nextCursor === 'string' &&
+          /^[A-Za-z0-9_-]{1,1024}$/.test(value.nextCursor))
+      ) ||
+      value.nextCursor === previous ||
+      (value.nextCursor !== null && !value.launches.length)
+    )
+      throw new Error('Saved history page is invalid.');
+    const entries = value.launches.map((v) => entry(v, source, projectId));
+    if (new Set(entries.map((r) => r.id)).size !== entries.length)
+      throw new Error('Saved history page repeats records.');
+    return { entries, next: value.nextCursor as string | null };
+  }
+  async function older(source: Source) {
+    const cursor = cursors[source.path];
+    if (!cursor) return;
+    const page = parsePage(
+      await request(source, undefined, cursor),
+      source,
+      cursor,
+    );
+    if (
+      page.entries.some((item) =>
+        rows.some(
+          (row) => row.source.path === source.path && row.id === item.id,
+        ),
+      )
+    )
+      throw new Error('Saved history page overlaps. Reload the first page.');
+    if (!active.current) return;
+    setRows((all) => [...all, ...page.entries]);
+    setCursors((all) => ({ ...all, [source.path]: page.next }));
   }
   return (
     <section
@@ -220,6 +262,22 @@ function History({ projectId }: { projectId: string }) {
           </li>
         ))}
       </ul>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {sources.map(
+          (source) =>
+            cursors[source.path] && (
+              <Button
+                key={source.path}
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => void run(() => older(source))}
+              >
+                Load older {source.name.toLowerCase()} launches
+              </Button>
+            ),
+        )}
+      </div>
       <div aria-live="polite">
         {busy && <p>Checking saved launches…</p>}
         {errors.map((error) => (

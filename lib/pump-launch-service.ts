@@ -1,4 +1,8 @@
 import {
+  readPumpHistoryPage,
+  type PumpHistoryPage,
+} from './pump-launch-history-page';
+import {
   preflightOwnedPumpCreate,
   type OwnedPumpTerms,
   PumpPreflightError,
@@ -361,4 +365,20 @@ export async function listPumpLaunches(
     .bind(owner, projectId)
     .all<Row>();
   return results.map(publicPumpLaunch);
+}
+
+export function listPumpLaunchPage(
+  db: D1Database,
+  owner: string,
+  projectId: string,
+  page: PumpHistoryPage,
+) {
+  return readPumpHistoryPage(
+    db,
+    owner,
+    projectId,
+    'create',
+    page,
+    publicPumpLaunch,
+  );
 }

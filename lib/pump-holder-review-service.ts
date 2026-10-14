@@ -1,3 +1,7 @@
+import {
+  readPumpHistoryPage,
+  type PumpHistoryPage,
+} from './pump-launch-history-page';
 import { PumpPreflightError } from './owned-pump-preflight';
 import { preflightOwnedPumpHolderSimulation } from './pump-holder-preparation';
 import { readOwnedPumpHolderWallets } from './pump-holder-selection';
@@ -422,4 +426,20 @@ export async function registerPumpHolderSignedPacket(
   if (!changed.meta.changes)
     return fail('Holder signature state changed. Reload its saved review.');
   return publicReview(await read(db, owner, id));
+}
+
+export function listPumpHolderPage(
+  db: D1Database,
+  owner: string,
+  projectId: string,
+  page: PumpHistoryPage,
+) {
+  return readPumpHistoryPage(
+    db,
+    owner,
+    projectId,
+    'holders',
+    page,
+    publicReview,
+  );
 }

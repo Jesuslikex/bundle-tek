@@ -1,3 +1,8 @@
+import {
+  pumpHistoryPageRequest,
+  PumpHistoryRequestError,
+} from '@/lib/pump-launch-history-page';
+import { listPumpInitialBuyPage } from '@/lib/pump-initial-buy-review';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { address, isOffCurveAddress } from '@solana/kit';
@@ -20,6 +25,15 @@ export async function GET(request: Request) {
   if (!projectId || projectId.length > 128)
     return json({ error: 'Choose a project.' }, 400);
   try {
+    const page = pumpHistoryPageRequest(
+      new URL(request.url).searchParams,
+      projectId,
+      'developer',
+    );
+    if (page)
+      return json(
+        await listPumpInitialBuyPage(getD1(), user.userId, projectId, page),
+      );
     return json({
       launches: await listPumpInitialBuyReviews(
         getD1(),
@@ -27,7 +41,9 @@ export async function GET(request: Request) {
         projectId,
       ),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof PumpHistoryRequestError)
+      return json({ error: error.message }, 400);
     return json({ error: 'Launch history is unavailable.' }, 503);
   }
 }

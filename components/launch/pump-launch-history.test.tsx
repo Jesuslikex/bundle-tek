@@ -36,6 +36,7 @@ beforeEach(() => {
       });
     }
     return Response.json({
+      nextCursor: null,
       launches: path.includes('holders')
         ? [row('older'), row('newest', 'review')]
         : [row(path.includes('initial-buy') ? 'developer' : 'create')],
@@ -43,6 +44,53 @@ beforeEach(() => {
   });
   vi.stubGlobal('fetch', fetcher);
   act(() => root.render(<PumpLaunchHistory projectId="project" />));
+});
+it('appends older records with the selected type cursor and preserves the first page on failure', async () => {
+  fetcher.mockImplementation(async (path: string) =>
+    path.includes('cursor=')
+      ? Response.json({ launches: [row('older-page')], nextCursor: null })
+      : Response.json({
+          launches: [row('first-page')],
+          nextCursor: path.includes('holders') ? 'cursor1' : null,
+        }),
+  );
+  await click('Reload all saved launches');
+  await click('Load older holder buys launches');
+  expect(fetcher.mock.calls.at(-1)![0]).toBe(
+    '/api/launch/pump/holders?projectId=project&page=1&cursor=cursor1',
+  );
+  expect(container.textContent).toContain('Review: first-page');
+  expect(container.textContent).toContain('Review: older-page');
+  expect(container.textContent).not.toContain('Load older holder buys');
+  fetcher.mockImplementation(async (path: string) =>
+    path.includes('cursor=')
+      ? new Response('<html>bad</html>', { status: 503 })
+      : Response.json({
+          launches: [row('first-page')],
+          nextCursor: path.includes('holders') ? 'cursor1' : null,
+        }),
+  );
+  await click('Reload all saved launches');
+  await click('Load older holder buys launches');
+  expect(container.textContent).toContain('Review: first-page');
+  expect(container.textContent).toContain('Load older holder buys');
+});
+it('refuses overlapping pages and cursor loops without replacing existing rows', async () => {
+  fetcher.mockImplementation(async (path: string) =>
+    Response.json({
+      launches: [row('same')],
+      nextCursor: path.includes('holders') ? 'cursor1' : null,
+    }),
+  );
+  await click('Reload all saved launches');
+  await click('Load older holder buys launches');
+  expect(container.textContent).toContain('Status check did not complete');
+  expect(container.querySelectorAll('li')).toHaveLength(3);
+  fetcher.mockImplementation(async () =>
+    Response.json({ launches: [row('same')], nextCursor: 'cursor2' }),
+  );
+  await click('Load older holder buys launches');
+  expect(container.querySelectorAll('li')).toHaveLength(3);
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -78,7 +126,7 @@ it('keeps working history when a provider returns an HTML error page', async () 
   fetcher.mockImplementation(async (path: string) =>
     path.includes('holders')
       ? new Response('<html>private raw parser detail</html>', { status: 503 })
-      : Response.json({ launches: [row('available')] }),
+      : Response.json({ launches: [row('available')], nextCursor: null }),
   );
   await click('Reload all saved launches');
   expect(container.textContent).toContain('Holder buys history is unavailable');
@@ -87,14 +135,17 @@ it('keeps working history when a provider returns an HTML error page', async () 
 });
 it('rejects records from another project and mismatched recovery responses', async () => {
   fetcher.mockImplementation(async () =>
-    Response.json({ launches: [row('foreign', 'signed', 'other')] }),
+    Response.json({
+      launches: [row('foreign', 'signed', 'other')],
+      nextCursor: null,
+    }),
   );
   await click('Reload all saved launches');
   expect(container.textContent).not.toContain('Review: foreign');
   fetcher.mockImplementation(async (_path: string, init?: RequestInit) =>
     init?.body
       ? Response.json(row('wrong-id', 'finalized'))
-      : Response.json({ launches: [row('original')] }),
+      : Response.json({ launches: [row('original')], nextCursor: null }),
   );
   await click('Reload all saved launches');
   await click('Check holder buys status: original');

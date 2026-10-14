@@ -1,0 +1,3 @@
+# Launch history pagination notice
+
+Before edits, based on 4847b64. Add a shared bounded owner/project/type-scoped keyset reader and cursor parser, use it through the three existing launch GET routes, and add Load older controls to pump-launch-history.tsx with tests. Keep legacy non-paged responses unchanged. No signing/submission, protected Claude file, SQL migration or global CSS change. Verify actual local SQL and route owner isolation/timestamp ties, UI partial failures, typecheck, scoped lint/build and controlled browser rendering. Commit locally and record the UI handoff. No remote SQL, provider change, cron, push or deployment.
