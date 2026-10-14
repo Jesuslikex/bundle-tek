@@ -1723,6 +1723,15 @@ export default function Home() {
                 <TokenDetailsForm
                   key={projectId ?? 'new-project'}
                   validationError={planValidation.error}
+                  metadataProject={
+                    projectId && projectVersion && !hasEdits && !saveBusy &&
+                    persistenceState === 'ready' &&
+                    projects.some(project => project.id === projectId && !project.archived)
+                      ? { id: projectId, updatedAt: projectVersion }
+                      : null
+                  }
+                  onSave={() => void saveLaunchPlan()}
+                  saving={saveBusy}
                   identity={identity}
                   onIdentityChange={updateIdentity}
                   plan={launchPlan}

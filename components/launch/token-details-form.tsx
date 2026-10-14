@@ -11,6 +11,10 @@ import { ArtworkUpload } from './artwork-upload';
 import { ArtworkLibrary } from './artwork-library';
 import { isUploadedArtwork } from '@/lib/artwork';
 import { venueLimits, validateVenuePlan } from '@/lib/venue-limits';
+import {
+  LaunchMetadataReview,
+  type MetadataProject,
+} from './launch-metadata-review';
 
 /**
  * New drafts start with default name and ticker values. Select them on focus so
@@ -32,6 +36,9 @@ export function TokenDetailsForm({
   identity = EMPTY_IDENTITY,
   onIdentityChange,
   validationError,
+  metadataProject,
+  onSave,
+  saving,
 }: {
   plan: LaunchPlanInput;
   onChange: (change: Partial<LaunchPlanInput>) => void;
@@ -39,6 +46,9 @@ export function TokenDetailsForm({
   identity?: TokenIdentity;
   onIdentityChange?: (change: Partial<TokenIdentity>) => void;
   validationError?: string | null;
+  metadataProject?: MetadataProject | null;
+  onSave?: () => void;
+  saving?: boolean;
 }) {
   const [failedImage, setFailedImage] = useState('');
   const limits = venueLimits(plan.chain, plan.launchpad);
@@ -318,6 +328,13 @@ export function TokenDetailsForm({
             </div>
           ))}
         </div>
+        <LaunchMetadataReview
+          plan={plan}
+          identity={identity}
+          project={metadataProject}
+          onSave={onSave}
+          saving={saving}
+        />
         <Button className="flow-next" disabled={!ready} onClick={onNext}>
           Continue to launch settings <ArrowRight />
         </Button>
