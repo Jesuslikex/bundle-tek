@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   link: vi.fn(),
   signOut: vi.fn(),
 }));
+const route = vi.hoisted(() => ({ path: '/' }));
+vi.mock('next/navigation', () => ({ usePathname: () => route.path }));
 vi.mock('better-auth/react', () => ({
   createAuthClient: () => ({
     useSession: () => ({ data: mocks.session, isPending: false }),
@@ -90,5 +92,15 @@ it('does not offer email-matched Google linking for a wallet-only account', asyn
   expect(container.textContent).toContain('ABCD…EFGH');
   expect(container.textContent).not.toContain('Link Google');
   expect(mocks.list).not.toHaveBeenCalled();
+  await act(async () => root.unmount());
+});
+it('stays out of the way on the sign-in page, which has its own form', async () => {
+  mocks.session = null;
+  route.path = '/sign-in';
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () => root.render(<BundleAccount googleEnabled />));
+  expect(container.innerHTML).toBe('');
   await act(async () => root.unmount());
 });

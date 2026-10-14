@@ -103,3 +103,16 @@
   height: 1px;
   background: #383b4b;
 }
+
+/* Way back to the app for people who only want to plan without an account. */
+.panel .back {
+  justify-self: start;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #9aa0b4;
+  text-decoration: none;
+}
+.panel .back:hover {
+  color: #e2e3ff;
+  text-decoration: underline;
+}
