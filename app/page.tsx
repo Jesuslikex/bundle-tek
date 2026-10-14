@@ -1730,6 +1730,11 @@ export default function Home() {
                       ? {
                           id: projectId,
                           updatedAt: projectVersion,
+                          document: {
+                            plan: launchPlan,
+                            identity,
+                            options: venueOptions,
+                          },
                           payer: venueOptions.wallets?.deployer
                             ? {
                                 address: venueOptions.wallets.deployer.address,

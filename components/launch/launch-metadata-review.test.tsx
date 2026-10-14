@@ -120,7 +120,7 @@ it('sends only the reviewed project/version/consent and validates the public lin
     'Coin creation still requires a separate transaction review',
   );
   expect(
-    container.querySelector('[aria-label="PumpFun launch review"]'),
+    container.querySelector('[aria-label="PumpFun holder launch review"]'),
   ).not.toBeNull();
   expect(button()).toBeUndefined();
 });

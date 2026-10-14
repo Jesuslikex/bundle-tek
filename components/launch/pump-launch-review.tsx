@@ -1,5 +1,8 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
+import { PumpHolderLaunchReview } from './pump-holder-launch-review';
+import { holdersBuyUnit } from '@/lib/launch-buy';
+import type { ProjectDocument } from '@/lib/workspace-project';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { readPanelJson } from '@/components/read-panel-json';
@@ -35,7 +38,14 @@ type Launch = {
   review: PumpSigningReview | PumpInitialBuySigningReview;
   state: string;
   signature: string | null;
-  receipt: { succeeded: boolean; slot: string } | null;
+  receipt: {
+    succeeded?: boolean;
+    slot?: string;
+    kind?: string;
+    networkFeeUnresolved?: boolean;
+    mintAbsent?: boolean;
+    finalizedBlockHeight?: string;
+  } | null;
   simulation: {
     payerDebitRaw: string;
     networkFeeRaw: string;
@@ -110,14 +120,19 @@ function parseLaunch(value: unknown, atomic: boolean): Launch {
         !/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(value.signature))) ||
     (value.receipt !== null &&
       (!record(value.receipt) ||
-        typeof value.receipt.succeeded !== 'boolean' ||
-        !/^\d+$/.test(String(value.receipt.slot))))
+        (value.receipt.kind === 'expired-unobserved'
+          ? value.receipt.networkFeeUnresolved !== true ||
+            value.receipt.mintAbsent !== true ||
+            !/^\d+$/.test(String(value.receipt.finalizedBlockHeight))
+          : typeof value.receipt.succeeded !== 'boolean' ||
+            !/^\d+$/.test(String(value.receipt.slot)))))
   )
     throw new Error('Invalid launch response.');
   return value as Launch;
 }
 
 type Project = {
+  document?: ProjectDocument;
   id: string;
   updatedAt: string;
   payer?: { address: string; revision: number };
@@ -879,10 +894,9 @@ function PumpLaunchReviewContent({
           )}
           {launch.receipt && (
             <p>
-              {launch.receipt.succeeded
-                ? 'Finalized coin creation'
-                : 'Finalized transaction failure'}{' '}
-              at slot {launch.receipt.slot}.
+              {launch.receipt.kind === 'expired-unobserved'
+                ? 'Expired packet released after finalized mint absence. No receipt was observed; network fees remain unresolved.'
+                : `${launch.receipt.succeeded ? 'Finalized coin creation' : 'Finalized transaction failure'} at slot ${launch.receipt.slot}.`}
             </p>
           )}
           {!['finalized', 'failed', 'cancelled'].includes(launch.state) && (
@@ -919,6 +933,18 @@ function PumpLaunchReviewContent({
 export function PumpLaunchReview(
   props: Parameters<typeof PumpLaunchReviewContent>[0],
 ) {
+  const holder =
+    holdersBuyUnit(props.plan) === 'supply'
+      ? props.plan.holdersBuy > 0
+      : /[1-9]/.test(props.plan.holdersBuyQuote ?? '');
+  if (holder)
+    return (
+      <PumpHolderLaunchReview
+        key={JSON.stringify([props.project, props.plan, props.releaseId])}
+        project={props.project}
+        releaseId={props.releaseId}
+      />
+    );
   return (
     <PumpLaunchReviewContent
       key={JSON.stringify([props.project, props.plan, props.releaseId])}

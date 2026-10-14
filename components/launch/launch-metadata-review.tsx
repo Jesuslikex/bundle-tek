@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { isUploadedArtwork } from '@/lib/artwork';
 import type { LaunchPlanInput } from '@/lib/launch-plan';
-import type { TokenIdentity } from '@/lib/workspace-project';
+import type { TokenIdentity, ProjectDocument } from '@/lib/workspace-project';
 import { readPanelJson } from '@/components/read-panel-json';
 import { PumpLaunchReview } from './pump-launch-review';
 
 export type MetadataProject = {
+  document?: ProjectDocument;
   id: string;
   updatedAt: string;
   payer?: { address: string; revision: number };

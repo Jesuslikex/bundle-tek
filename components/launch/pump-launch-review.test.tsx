@@ -265,7 +265,7 @@ async function atomicSetup() {
     root.render(
       <PumpLaunchReview
         project={project}
-        plan={{ ...plan, developerBuy: 0.1, holdersBuy: 20 }}
+        plan={{ ...plan, developerBuy: 0.1, holdersBuy: 0 }}
         releaseId={'a'.repeat(64)}
       />,
     ),
@@ -278,7 +278,7 @@ async function atomicSetup() {
 it('requires the separate quote cap, exact atomic scope and limits consent before dual signing, then distinct broadcast consent', async () => {
   const { payloads } = await atomicSetup();
   expect(fetcher).not.toHaveBeenCalled();
-  expect(container.textContent).toContain('saved holder buys are not included');
+  expect(container.textContent).toContain('No holder buys are included');
   check('I saved');
   await click('Simulate and prepare launch');
   expect(fetcher).not.toHaveBeenCalled();
@@ -404,4 +404,46 @@ it('invalidates a prepared review when the fee/rent allowance changes', async ()
   expect(button('Approve and sign creation').disabled).toBe(true);
   expect(label('I approve signing').disabled).toBe(true);
   expect(container.textContent).toContain('differs from the current draft');
+});
+
+it('routes a holder plan to the complete holder flow instead of omitting its buys', async () => {
+  await act(async () =>
+    root.render(
+      <PumpLaunchReview
+        project={project}
+        plan={{ ...plan, developerBuy: 0.1, holdersBuy: 20 }}
+        releaseId={'a'.repeat(64)}
+      />,
+    ),
+  );
+  expect(container.textContent).toContain('Create coin with holder buys');
+  expect(
+    button('Approve and sign creation with developer buy'),
+  ).toBeUndefined();
+  expect(container.textContent).toContain(
+    'Save the complete unscheduled holder selection',
+  );
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+it('renders an expired unobserved recovery without calling it a finalized failure', async () => {
+  fetcher.mockImplementation(async () =>
+    Response.json({
+      launches: [
+        {
+          ...saved,
+          state: 'cancelled',
+          receipt: {
+            kind: 'expired-unobserved',
+            mintAbsent: true,
+            networkFeeUnresolved: true,
+            finalizedBlockHeight: '1033',
+          },
+        },
+      ],
+    }),
+  );
+  await click('Reload saved launch');
+  expect(container.textContent).toContain('network fees remain unresolved');
+  expect(container.textContent).not.toContain('Finalized transaction failure');
 });
