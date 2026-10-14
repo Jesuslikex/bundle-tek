@@ -10,6 +10,7 @@ import {
 } from './pump-launch-signing';
 import {
   requirePumpInitialBuySigningReview,
+  requirePumpInitialBuyReviewForRecovery,
   verifyPumpInitialBuySignedPacket,
   type PumpInitialBuySigningReview,
 } from './pump-initial-buy-signing';
@@ -19,7 +20,7 @@ import {
 } from './pump-launch-service';
 import type { PumpCreateInput } from './pump-launch-message';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
-import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
+import { observePumpLaunchRecovery } from './pump-launch-recovery';
 type Terms = OwnedPumpTerms & { maximumQuoteCostRaw: string };
 type Row = {
   id: string;
@@ -286,9 +287,18 @@ export async function actPumpInitialBuyReview(
     if (signal.aborted) fail('Atomic launch action interrupted.');
     const result = await db
       .prepare(
-        `UPDATE pump_launch_reviews SET state=?${extraSql} WHERE owner_id=? AND id=? AND state=?`,
+        `UPDATE pump_launch_reviews SET state=?${extraSql} WHERE owner_id=? AND id=? AND state=? AND review=? AND signed IS ? AND signature IS ?`,
       )
-      .bind(state, ...extra, owner, id, row.state)
+      .bind(
+        state,
+        ...extra,
+        owner,
+        id,
+        row.state,
+        row.review,
+        row.signed,
+        row.signature,
+      )
       .run();
     if (!result.meta.changes)
       fail('Atomic launch state changed. Reload its saved history.');
@@ -381,78 +391,36 @@ export async function actPumpInitialBuyReview(
       await change('cancelled');
       return publicPumpInitialBuyReview(row);
     }
-    if ((await rpc('getGenesisHash', [], signal)) !== SOLANA_MAINNET_GENESIS)
-      fail('Recovery RPC is not mainnet.');
-    if (row.signature) {
-      const result = (await rpc(
-        'getTransaction',
-        [
-          row.signature,
-          {
-            encoding: 'base64',
-            commitment: 'finalized',
-            maxSupportedTransactionVersion: 1,
-          },
-        ],
-        signal,
-      )) as {
-        slot?: unknown;
-        transaction?: [string, string];
-        meta?: { err: unknown };
-      } | null;
-      if (result) {
-        if (
-          !result.meta ||
-          !Object.hasOwn(result.meta, 'err') ||
-          result.transaction?.[1] !== 'base64' ||
-          result.transaction[0] !== row.signed ||
-          !/^\d+$/.test(String(result.slot))
-        )
-          fail('Finalized atomic receipt differs.');
-        if (
-          (await verifyPumpInitialBuySignedPacket(
-            review,
-            result.transaction![0],
-          )) !== row.signature
-        )
-          fail('Finalized atomic signature differs.');
-        await change(
-          result.meta!.err === null ? 'finalized' : 'failed',
-          ',receipt=?',
-          [
-            JSON.stringify({
-              network: 'mainnet',
-              commitment: 'finalized',
-              signature: row.signature,
-              slot: String(result.slot),
-              packetSha256: review.sha256,
-              containsInitialBuy: true,
-              containsHolderBuys: false,
-              succeeded: result.meta!.err === null,
-              observedAt: new Date().toISOString(),
-            }),
-          ],
-        );
-        return publicPumpInitialBuyReview(row);
-      }
-    }
-    const height = await rpc(
-      'getBlockHeight',
-      [{ commitment: 'finalized' }],
-      signal,
-    );
+    if (row.state === 'review') return publicPumpInitialBuyReview(row);
+    await requirePumpInitialBuyReviewForRecovery(review);
     if (
-      typeof height === 'string' &&
-      /^\d+$/.test(height) &&
-      BigInt(height) > BigInt(review.input.create.lastValidBlockHeight) + 32n
-    ) {
-      const mint = (await rpc(
-        'getAccountInfo',
-        [row.mint, { encoding: 'base64', commitment: 'finalized' }],
-        signal,
-      )) as { value?: unknown };
-      if (mint && mint.value === null) await change('cancelled');
-    }
+      row.mint !== review.input.create.mint ||
+      (row.state !== 'approved' && (!row.signed || !row.signature))
+    )
+      return fail('Saved atomic recovery context or signatures differ.');
+    const original = JSON.parse(row.simulation) as { minimumSlot: number };
+    const observed = await observePumpLaunchRecovery(
+      {
+        minimumSlot: original.minimumSlot,
+        mint: review.input.create.mint,
+        lastValidBlockHeight: review.input.create.lastValidBlockHeight,
+        signed: row.signed,
+        signature: row.signature,
+        verifySigned: (packet) =>
+          verifyPumpInitialBuySignedPacket(review, packet),
+      },
+      signal,
+      rpc,
+    );
+    if (observed.state === 'pending') return publicPumpInitialBuyReview(row);
+    await change(observed.state, ',receipt=?', [
+      JSON.stringify({
+        ...observed.receipt,
+        packetSha256: review.sha256,
+        containsInitialBuy: true,
+        containsHolderBuys: false,
+      }),
+    ]);
   }
   return publicPumpInitialBuyReview(row);
 }

@@ -24,6 +24,6 @@ The final broader cohort passed 227 tests across eighteen launch/holder files on
 
 The matching-slot policy and correct-RPC assumptions are documented in `CODEX-PUMP-HOLDER-SNAPSHOT-COHERENCE-20261014.md`, with primary Solana/Agave references. Matching reported confirmed slots is not a cryptographic bank proof, and confirmed state can reorganize. Slow providers may exhaust the retry limit. Live provider latency/bank rollovers, real wallet approval and funded execution remain unverified.
 
-This checkpoint changes simulation and review refresh only. The developer-only recovery implementation still needs the linked finalized height/slot/mint-absence and final network recheck audit already implemented for holders before funded release. Holder UI integration/rendering, large multi-packet groups, StonkFun execution and broader Proxima parity also remain outstanding.
+This checkpoint changes simulation and review refresh only. The subsequent recovery continuation shares the linked finalized height/slot/mint-absence and final network checks between both launch paths; see `CODEX-PUMP-LAUNCH-RECOVERY-20261014.md` for its validation and remaining limits. Holder UI integration/rendering, large multi-packet groups, StonkFun execution and broader Proxima parity also remain outstanding.
 
 No UI or Claude-owned file, migration/hosted SQL, provider/credential, cron, push/deployment, real signature or transaction broadcast changed. Main's two unrelated dirty files remain preserved. Migration 0081 remains local only.

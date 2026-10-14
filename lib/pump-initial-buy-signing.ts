@@ -128,6 +128,13 @@ export async function requirePumpInitialBuySigningReview(
   return reconstructInitialBuyReview(supplied, current, true);
 }
 
+/** Validate an expired or live immutable packet for read-only recovery. Never grants signing permission. */
+export async function requirePumpInitialBuyReviewForRecovery(
+  supplied: PumpInitialBuySigningReview,
+) {
+  return reconstructInitialBuyReview(supplied, () => {}, false);
+}
+
 /** Browser-only signing primitive. The durable approval API and UI must supply this exact consent. */
 export async function signPumpInitialBuy(
   payerSession: VaultSession,
@@ -200,7 +207,7 @@ export async function verifyPumpInitialBuySignedPacket(
   signed: string,
 ) {
   const review = structuredClone(supplied);
-  const original = await reconstructInitialBuyReview(review, () => {}, false),
+  const original = await requirePumpInitialBuyReviewForRecovery(review),
     tx = packet(signed);
   if (
     getBase64Decoder().decode(tx.messageBytes) !==

@@ -1,3 +1,4 @@
+import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 import { beforeAll, afterAll, beforeEach, expect, it, vi } from 'vitest';
 import { Miniflare } from 'miniflare';
 import { readFileSync } from 'node:fs';
@@ -1001,3 +1002,229 @@ for (const [stock, token22] of [
     ).rejects.toThrow('costs or observed state changed');
     expect(f.calls.some((c) => /send|bundle|sign/i.test(c.method))).toBe(false);
   });
+
+async function atomicRecoveryFixture(registered = true) {
+  const launch = await prepareAtomicApi();
+  expect(
+    (
+      await atomicSend({
+        action: 'approve',
+        id: launch.review.id,
+        ...atomicConsent(launch),
+      })
+    ).status,
+  ).toBe(200);
+  const signed = registered ? await syntheticAtomicSign(launch) : null;
+  if (signed)
+    expect(
+      (
+        await atomicSend({
+          action: 'register',
+          id: launch.review.id,
+          transaction: signed.transaction,
+        })
+      ).status,
+    ).toBe(200);
+  const calls: { method: string; params: unknown[] }[] = [];
+  const state = {
+    receipt: null as unknown,
+    slot: '2000',
+    height: '1033',
+    mintSlot: '2001',
+    mint: null as unknown,
+    finalNetwork: SOLANA_MAINNET_GENESIS,
+  };
+  let genesisReads = 0;
+  mocks.rpc = async (method, params, signal) => {
+    signal.throwIfAborted();
+    calls.push({ method, params });
+    if (method === 'getGenesisHash')
+      return ++genesisReads % 2 === 1
+        ? SOLANA_MAINNET_GENESIS
+        : state.finalNetwork;
+    if (method === 'getTransaction') return state.receipt;
+    if (method === 'getEpochInfo')
+      return { absoluteSlot: state.slot, blockHeight: state.height };
+    if (method === 'getAccountInfo')
+      return { context: { slot: state.mintSlot }, value: state.mint };
+    throw new Error('Unexpected recovery-only method');
+  };
+  const read = () =>
+    mocks.db
+      .prepare(
+        'SELECT state,receipt,signature FROM pump_launch_reviews WHERE id=?',
+      )
+      .bind(launch.review.id)
+      .first<{
+        state: string;
+        receipt: string | null;
+        signature: string | null;
+      }>();
+  return {
+    launch,
+    signed,
+    calls,
+    state,
+    read,
+    resetNetworkReads: () => {
+      genesisReads = 0;
+    },
+    recover: () => atomicSend({ action: 'recover', id: launch.review.id }),
+  };
+}
+for (const registered of [false, true])
+  it(`recovers expired developer history only from linked finalized mint absence (registered=${registered})`, async () => {
+    const r = await atomicRecoveryFixture(registered);
+    const clock = vi
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.parse(r.launch.review.expiresAt) + 1);
+    try {
+      const response = await r.recover();
+      expect(response.status).toBe(200);
+      const result = await response.json();
+      expect(result).toMatchObject({
+        state: 'cancelled',
+        signingAllowed: false,
+        completeLaunch: false,
+        receipt: {
+          kind: 'expired-unobserved',
+          signatureKnown: registered,
+          networkFeeUnresolved: true,
+          finalizedBlockHeight: '1033',
+          expiryBankSlot: '2000',
+          mintObservedSlot: '2001',
+          mintAbsent: true,
+          packetSha256: r.launch.review.sha256,
+          mint: r.launch.review.input.create.mint,
+        },
+      });
+      expect(
+        r.calls.find((c) => c.method === 'getAccountInfo')?.params[1],
+      ).toEqual({
+        encoding: 'base64',
+        commitment: 'finalized',
+        minContextSlot: 2000,
+      });
+      expect(r.calls.some((c) => c.method === 'getTransaction')).toBe(
+        registered,
+      );
+      expect((await r.read())!.signature).toBe(
+        registered ? r.signed!.signature : null,
+      );
+      const count = r.calls.length;
+      expect((await r.recover()).status).toBe(200);
+      expect(r.calls).toHaveLength(count);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+it('keeps developer reservations across the expiry margin, a present mint, stale absence or a changed final network', async () => {
+  const r = await atomicRecoveryFixture();
+  r.state.height = '1032';
+  expect((await r.recover()).status).toBe(200);
+  expect(r.calls.some((c) => c.method === 'getAccountInfo')).toBe(false);
+  expect((await r.read())!.state).toBe('signed');
+  r.state.height = '1033';
+  r.state.mint = {};
+  expect((await r.recover()).status).toBe(200);
+  expect((await r.read())!.state).toBe('signed');
+  r.state.mint = null;
+  r.state.mintSlot = '1999';
+  expect((await r.recover()).status).toBe(409);
+  expect((await r.read())!.state).toBe('signed');
+  r.resetNetworkReads();
+  r.state.mintSlot = '2001';
+  r.state.finalNetwork = 'wrong';
+  expect((await r.recover()).status).toBe(409);
+  expect(await r.read()).toMatchObject({ state: 'signed', receipt: null });
+  expect(r.calls.some((c) => /send|bundle/i.test(c.method))).toBe(false);
+});
+it('rejects malformed developer receipts without replacing history, then records the exact finalized failure and fee', async () => {
+  const r = await atomicRecoveryFixture();
+  for (const patch of [
+    { meta: {} },
+    { meta: { err: false } },
+    { slot: '99' },
+    { transaction: [r.launch.review.transaction, 'base64'] },
+    { meta: { err: null, fee: '-1' } },
+  ]) {
+    r.state.receipt = {
+      slot: '2000',
+      transaction: [r.signed!.transaction, 'base64'],
+      meta: { err: null },
+      ...patch,
+    };
+    expect((await r.recover()).status).toBe(
+      Object.hasOwn(patch.meta ?? {}, 'fee') ? 502 : 409,
+    );
+    expect(await r.read()).toMatchObject({ state: 'signed', receipt: null });
+  }
+  r.state.receipt = {
+    slot: '2000',
+    transaction: [r.signed!.transaction, 'base64'],
+    meta: { err: { InstructionError: ['1', 'Custom'] }, fee: '10000' },
+  };
+  const response = await r.recover();
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    state: 'failed',
+    completeLaunch: false,
+    receipt: {
+      kind: 'finalized',
+      succeeded: false,
+      networkFeeRaw: '10000',
+      networkFeeUnresolved: false,
+    },
+  });
+  expect(r.calls.some((c) => /send|bundle/i.test(c.method))).toBe(false);
+});
+it('rechecks mainnet before committing a successful developer receipt', async () => {
+  const r = await atomicRecoveryFixture();
+  r.state.receipt = {
+    slot: '2000',
+    transaction: [r.signed!.transaction, 'base64'],
+    meta: { err: null },
+  };
+  r.state.finalNetwork = 'wrong';
+  expect((await r.recover()).status).toBe(409);
+  expect(await r.read()).toMatchObject({ state: 'signed', receipt: null });
+});
+it('allows only one concurrent developer recovery transition and never sends during recovery', async () => {
+  const r = await atomicRecoveryFixture(),
+    waiters: (() => void)[] = [];
+  const recoveryRpc = mocks.rpc!;
+  mocks.rpc = async (method, params, signal) => {
+    if (method === 'getTransaction') {
+      await new Promise<void>((resolve) => {
+        waiters.push(resolve);
+        if (waiters.length === 2) for (const done of waiters) done();
+      });
+      return {
+        slot: '2000',
+        transaction: [r.signed!.transaction, 'base64'],
+        meta: { err: null, fee: '10000' },
+      };
+    }
+    return recoveryRpc(method, params, signal);
+  };
+  const responses = await Promise.all([r.recover(), r.recover()]);
+  expect(responses.map((r) => r.status).sort((a, b) => a - b)).toEqual([
+    200, 409,
+  ]);
+  expect((await r.read())!.state).toBe('finalized');
+  expect(r.calls.some((c) => /send|bundle/i.test(c.method))).toBe(false);
+});
+it('cancels an unsigned initial developer review locally and leaves a recover-only request unchanged', async () => {
+  const l = await prepareAtomicApi();
+  f.calls.length = 0;
+  expect(
+    (await atomicSend({ action: 'recover', id: l.review.id })).status,
+  ).toBe(200);
+  const cancelled = await atomicSend({ action: 'cancel', id: l.review.id });
+  expect(cancelled.status).toBe(200);
+  expect(await cancelled.json()).toMatchObject({
+    state: 'cancelled',
+    receipt: null,
+  });
+  expect(f.calls).toEqual([]);
+});

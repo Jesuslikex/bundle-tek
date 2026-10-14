@@ -16,6 +16,7 @@ import { buildPumpCreateAndBuyMessage } from './pump-initial-buy-message';
 import { encodePumpSigningInput } from './pump-launch-signing';
 import {
   requirePumpInitialBuySigningReview,
+  requirePumpInitialBuyReviewForRecovery,
   signPumpInitialBuy,
   verifyPumpInitialBuySignedPacket,
   type PumpInitialBuySigningReview,
@@ -241,4 +242,19 @@ it('verifies a previously signed packet for expired receipt recovery while refus
   expect(
     await verifyPumpInitialBuySignedPacket(expired, signed.transaction),
   ).toBe(signed.signature);
+});
+
+it('validates expired unsigned reviews for recovery without granting new signing permission', async () => {
+  const expired = { ...reviews[0], expiresAt: '2000-01-01' };
+  const tx = await requirePumpInitialBuyReviewForRecovery(expired);
+  expect(Object.values(tx.signatures).every((s) => s === null)).toBe(true);
+  await expect(requirePumpInitialBuySigningReview(expired)).rejects.toThrow(
+    'expired',
+  );
+  await expect(
+    requirePumpInitialBuyReviewForRecovery({
+      ...expired,
+      sha256: '0'.repeat(64),
+    }),
+  ).rejects.toThrow('differs');
 });
