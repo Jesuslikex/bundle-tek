@@ -2687,3 +2687,7 @@ Read-only Pump.fun buy_exact_quote_in_v2 attribution now joins fixed-amount buy_
 
 This extension is local to the original Bundle source and is not in hosted version 115. The separate CROP hosting upgrade remains blocked by incomplete input: SQLITE_ERROR despite its local migration/D1 checks. Claude's protected files remain unchanged; no funded execution or provider secret read occurred.
 
+
+## 14 October 2026: larger launch-group assembly
+
+Local implementation 3177346 preserves complete selections across bounded unsigned v1 packets rather than dropping wallets. Creation/developer buy stay together; zero slots and exact spend/output terms remain in a hashed group manifest. 151 targeted tests, TypeScript, scoped lint and production build pass. This is only an unsigned assembly foundation: group funding, genuine sequential bank simulation, transport/tip support, durable complete-group approval/signatures/submission/recovery and UI remain unfinished. Groups exceeding five packets are not called atomic Jito bundles. No funded/live execution, remote migration, push or deployment. REA could not reach the approved Proxima endpoint; no fresh runtime-equivalence claim. See docs/CODEX-PUMP-LAUNCH-GROUP-ASSEMBLY-20261014.md. The original full Proxima goal remains active.
