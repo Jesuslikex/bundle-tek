@@ -65,3 +65,34 @@
     margin: 6vh auto;
   }
 }
+
+.panel .google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  background: #fff;
+  color: #202124;
+  font-weight: 600;
+  border: 1px solid #dadce0;
+}
+.google span {
+  font-size: 20px;
+  font-weight: 700;
+}
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #a6a9bc;
+  font-size: 12px;
+  margin: 22px 0;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #383b4b;
+}
