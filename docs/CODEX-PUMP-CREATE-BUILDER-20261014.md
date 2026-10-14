@@ -1,0 +1,33 @@
+# Pump create transaction and released metadata binding
+
+14 October 2026. Local unsigned create component. No browser key, credential file, hosted database, version, deployment, signature or transaction was accessed or changed. No UI file, migration or CROP candidate changed.
+
+## Primary protocol evidence
+
+Fresh official Pump IDL at commit `639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22`: https://github.com/pump-fun/pump-public-docs/blob/639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22/idl/pump.json . Full fetched IDL SHA-256: `7616681ea557975f9f623ac211080f22a93060781eaf4765b0a488d980997207`. The tracked `lib/pump-launch-schema.json` contains only its stripped create_v2 instruction/account layout and Global/QuoteControl/QuoteControlMint definitions, with provenance. It does not vendor or execute a provider SDK.
+
+Official creation reference: https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/COIN_CREATION.md . The IDL additionally describes quote-control admission and the permitted xStock-operable Token-2022 extension set. Token-2022 native SOL identity was independently checked at https://github.com/solana-program/token-2022/blob/main/interface/src/native_mint.rs . These are protocol source references, not REA runtime evidence or proof of current mainnet deployment/configuration.
+
+## Implementation
+
+`lib/pump-launch-config.ts` decodes pinned, bounded raw Global and QuoteControl account data, verifies discriminators and boolean encodings and rejects unknown nonzero tails. Creation must be enabled with usable reserves/supply. Quotes use native SOL, the Global whitelist, or a positive unique quote-control entry. An unlisted quote is rejected explicitly; nested Pump-coin quote-chain resolution remains separate and is not guessed.
+
+Quote mint inspection preserves exact owner program, raw supply/decimals and issuer authorities. Canonical Token-2022 TLVs support the operable metadata, permanent delegate, initialized default state, scaled UI amount, unpaused pausable config, confidential-transfer mint and empty-program transfer hook set. Unknown/duplicate/fee/nontransferable extensions, frozen defaults, paused mints, active hooks, substituted metadata mint and invalid multipliers reject this path. Token-2022 native SOL is explicitly rejected. Extension details are retained for the later signing review. An issuer retaining authority is not hidden or treated as issuer verification.
+
+`lib/pump-launch-message.ts` derives all Pump/Mayhem PDAs and token-program-specific ATAs, builds the exact 16-account create_v2 instruction and optional quote accounts, and compiles a complete unsigned legacy packet with a 300,000-unit compute limit and zero extra unit price. The creator is the payer. Its two required signers are the distinct on-curve payer and newly generated mint. No key is generated or signature added here. Identity limits apply to UTF-8 bytes; metadata URI requires HTTPS. The canonical option tail is 11 bytes: false mayhem, false cashback, zero custom creator fee and false holder reward. Packet size must fit 1,232 bytes. Configuration observations must be within 32 slots; this is coherence, not a freshness/mainnet guarantee. Data hashes, observed slots, signer set, mint/quote/precision/supply and wire hash are returned for the later collector/review.
+
+`lib/pump-launch-preparation.ts` joins only the owner's active saved project and metadata release, verifies the selected image bytes/hash/MIME and public identity against the release, builds its metadata URI, resolves the exact saved quote identity and rejects live precision or fixed-supply disagreement. Caller-supplied transaction context cannot override metadata or quote fields. A second read rejects observed project drift. Funding-only draft edits may reuse the same immutable public identity; editing public identity/image requires a matching release. Pump-specific reward/offchain/fee-sharing/custom-fee options are not silently omitted. Generic creatorTax/communityCoin/buyback controls are in the Robinhood pons.family/hood.fun UI and do not override Pump's venue-specific settings.
+
+The result explicitly retains `executionAllowed=false`, `signingAllowed=false`, `simulationRequired=true`, `containsInitialBuy=false` and `completeLaunch=false`. It returns requested developer/holder buys separately so this create component cannot be mistaken for having executed or bundled them. This is server-internal code, not a new HTTP endpoint.
+
+## Verification scope
+
+Fifteen protocol/model tests cover independent Anchor discriminator hashes; actual compiled packet decoding; zero signatures and exact signers; Borsh strings/creator/11-byte tail; native/global/control quote account order; exact stock-labelled fixture identity and precision; Token-2022 extension handling; malformed config, duplicate entries, bounded vectors, disabled creation, signer/URI/byte/slot limits; unsupported options; owned-release query parameters and identity/image/context/drift guards. Saved-project tests use a scoped database double. They do not replace the existing real-route/local-D1 release tests.
+
+Final verification passed 57 tests across seven files: the 15 new tests plus the existing metadata UI, token details, metadata route, artwork route, launch plan and quote catalog regressions. Report: `work/release-qa/pump-create-final-20261014.json`. Actual-source TypeScript, four-file typed lint and production build all exited zero. Snapshot: `work/release-qa/source-pump-create-final-20261014.json`, 1,115 files, digest `37f98dcb191b608f6fadeb0c4edef5dc798e04feac14166543325424f7fed734`. No full-suite, browser launch, real-provider simulation or funded success is claimed.
+
+## Still required for a real launch
+
+Authenticated API with server-collected mainnet genesis, program/config/mint reads, fee payer ownership and balance, mint nonexistence, blockhash and simulation; current quote admission and issuer verification; atomic initial-buy composition and complete instruction/authority/fee/rent review; browser-controlled new mint key generation/persistence and explicit dual signing; durable preparation/approval/reservation/submission/receipt recovery; approved funded proof. Saved Pump catalog discovery has not been promoted to a fresh admission catalog. StonkFun uses a separate adapter and still needs current primary program/platform/global configuration evidence. No actual stock quote is claimed to be currently admitted from the synthetic account tests.
+
+The existing launch screen remains planning/metadata review only. Nothing here enables a launch button or resolves the original site's ownership mismatch or the CROP hosted migration failure.
