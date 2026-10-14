@@ -1,14 +1,15 @@
-export type PumpHistoryKind = 'create' | 'developer' | 'holders';
+export type PumpHistoryKind = 'create' | 'developer' | 'holders' | 'groups';
 export type PumpHistoryPage = {
   before: { createdAt: string; id: string } | null;
 };
 export class PumpHistoryRequestError extends Error {}
 const predicates: Record<PumpHistoryKind, string> = {
   create:
-    "json_type(terms,'$.maximumQuoteCostRaw') IS NULL AND COALESCE(json_extract(review,'$.format'),'')!='pump-create-holders-review-v1'",
+    "json_type(terms,'$.maximumQuoteCostRaw') IS NULL AND COALESCE(json_extract(review,'$.format'),'') NOT IN ('pump-create-holders-review-v1','pump-launch-group-review-v1')",
   developer:
-    "json_type(terms,'$.maximumQuoteCostRaw') IS NOT NULL AND COALESCE(json_extract(review,'$.format'),'')!='pump-create-holders-review-v1'",
+    "json_type(terms,'$.maximumQuoteCostRaw') IS NOT NULL AND COALESCE(json_extract(review,'$.format'),'') NOT IN ('pump-create-holders-review-v1','pump-launch-group-review-v1')",
   holders: "json_extract(review,'$.format')='pump-create-holders-review-v1'",
+  groups: "json_extract(review,'$.format')='pump-launch-group-review-v1'",
 };
 const validId = (id: unknown): id is string =>
   typeof id === 'string' && /^[\x21-\x7e]{1,128}$/.test(id);

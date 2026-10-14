@@ -56,7 +56,9 @@ export const publicPumpLaunch = (row: Row) => ({
 });
 export async function getPumpLaunch(db: D1Database, owner: string, id: string) {
   const row = await db
-    .prepare('SELECT * FROM pump_launch_reviews WHERE owner_id=? AND id=?')
+    .prepare(
+      "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND id=? AND COALESCE(json_extract(review,'$.format'),'')!='pump-launch-group-review-v1'",
+    )
     .bind(owner, id)
     .first<Row>();
   if (!row) return fail('Launch review not found.', 404);
@@ -360,7 +362,7 @@ export async function listPumpLaunches(
 ) {
   const { results } = await db
     .prepare(
-      "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND project_id=? AND json_type(terms,'$.maximumQuoteCostRaw') IS NULL AND COALESCE(json_extract(review,'$.format'),'')!='pump-create-holders-review-v1' ORDER BY created_at DESC LIMIT 20",
+      "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND project_id=? AND json_type(terms,'$.maximumQuoteCostRaw') IS NULL AND COALESCE(json_extract(review,'$.format'),'') NOT IN ('pump-create-holders-review-v1','pump-launch-group-review-v1') ORDER BY created_at DESC LIMIT 20",
     )
     .bind(owner, projectId)
     .all<Row>();

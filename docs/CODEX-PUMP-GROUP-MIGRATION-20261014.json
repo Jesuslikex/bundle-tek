@@ -1,0 +1,16 @@
+{
+  "format": "bundle-local-group-migration-verification-v1",
+  "sourceBase": "597e700",
+  "startedAt": "2026-10-14T22:14:37.926Z",
+  "finishedAt": "2026-10-14T22:15:42.85Z",
+  "wranglerVersion": "4.127.1",
+  "migrationCount": 83,
+  "appliedCount": 83,
+  "applyExit": 0,
+  "ledgerExit": 0,
+  "passed": true,
+  "previousJournalEntriesUnchanged": true,
+  "newMigration": "0082_pump_group_reviews.sql",
+  "testedWorkingCopySha256": "47b873c78da763c1d5dc282cdad68ef6b44e9eee79ae905b122ad6f9050c6b96",
+  "remoteDatabaseTouched": false
+}

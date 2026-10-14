@@ -66,7 +66,7 @@ const routes = {
   holders: holdersGET,
 };
 it('pages actual authenticated routes through timestamp ties without omissions, duplication or owner/project/type leakage', async () => {
-  for (const kind of Object.keys(routes) as PumpHistoryKind[]) {
+  for (const kind of Object.keys(routes) as (keyof typeof routes)[]) {
     const ids: string[] = [];
     let cursor: string | null = null;
     do {

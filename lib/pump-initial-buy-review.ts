@@ -275,7 +275,7 @@ export async function actPumpInitialBuyReview(
   const read = () =>
     db
       .prepare(
-        "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND id=? AND json_type(terms,'$.maximumQuoteCostRaw') IS NOT NULL",
+        "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND id=? AND json_type(terms,'$.maximumQuoteCostRaw') IS NOT NULL AND COALESCE(json_extract(review,'$.format'),'')!='pump-launch-group-review-v1'",
       )
       .bind(owner, id)
       .first<Row>();
@@ -436,7 +436,7 @@ export async function listPumpInitialBuyReviews(
 ) {
   const { results } = await db
     .prepare(
-      "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND project_id=? AND json_type(terms,'$.maximumQuoteCostRaw') IS NOT NULL ORDER BY created_at DESC LIMIT 20",
+      "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND project_id=? AND json_type(terms,'$.maximumQuoteCostRaw') IS NOT NULL AND COALESCE(json_extract(review,'$.format'),'')!='pump-launch-group-review-v1' ORDER BY created_at DESC LIMIT 20",
     )
     .bind(owner, projectId)
     .all<Row>();
