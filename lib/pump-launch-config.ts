@@ -28,7 +28,7 @@ const types = schema.types as unknown as Struct[];
 
 // Decode only the pinned IDL's bounded configuration types. Unknown nonzero tails fail.
 export function decodePumpLaunchConfig(
-  name: 'Global' | 'QuoteControl',
+  name: 'Global' | 'QuoteControl' | 'BondingCurve',
   bytes: Uint8Array,
 ) {
   const discriminator = schema.accounts.find(
