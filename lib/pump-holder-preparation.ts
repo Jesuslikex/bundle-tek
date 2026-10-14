@@ -17,6 +17,7 @@ import { pumpDeveloperBuyTarget } from './pump-initial-buy-preparation';
 import type { PumpCreateInput } from './pump-launch-message';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 import { collectPumpHolderFunding } from './pump-holder-funding';
+import { simulatePumpHolderPacket } from './pump-holder-simulation';
 type Limits = {
   address: string;
   feeAndRentLimitRaw: string;
@@ -272,7 +273,12 @@ export async function preflightOwnedPumpHolderFunding(
   owner: string,
   supplied: Terms,
   signal: AbortSignal,
-  options: { rpc?: PumpLaunchRpc } = {},
+  options: {
+    rpc?: PumpLaunchRpc;
+    captureInput?: (
+      input: Parameters<typeof buildPumpCreateHolderMessage>[0],
+    ) => void;
+  } = {},
 ) {
   const terms = structuredClone(supplied);
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
@@ -297,6 +303,27 @@ export async function preflightOwnedPumpHolderFunding(
     deadline,
     options.rpc,
   );
+  if (
+    funding.packetSha256 !== prepared.packet.packetSha256 ||
+    funding.allowanceSha256 !== prepared.allowanceSha256
+  )
+    return fail('Holder funding context changed; prepare a new review.');
+  await assertOwnedHolderContext(db, owner, terms, input, prepared, deadline);
+  options.captureInput?.(structuredClone(input));
+  return { ...prepared, funding, fundingValidated: true as const };
+}
+
+async function assertOwnedHolderContext(
+  db: D1Database,
+  owner: string,
+  terms: Terms,
+  input: Parameters<typeof buildPumpCreateHolderMessage>[0],
+  prepared: Pick<
+    Awaited<ReturnType<typeof prepareOwnedPumpHolderPacket>>,
+    'packet' | 'holderBindingSha256' | 'deployerBindingSha256'
+  >,
+  signal: AbortSignal,
+) {
   const global = decodePumpLaunchConfig('Global', input.create.global.data);
   if (typeof global.initial_real_token_reserves !== 'bigint')
     return fail('Observed initial curve reserve unavailable.');
@@ -318,12 +345,47 @@ export async function preflightOwnedPumpHolderFunding(
   } = terms;
   if (
     after.bindingSha256 !== prepared.holderBindingSha256 ||
-    (await readOwnedPumpCreateBinding(db, owner, createTerms, deadline)) !==
-      prepared.deployerBindingSha256 ||
-    funding.packetSha256 !== prepared.packet.packetSha256 ||
-    funding.allowanceSha256 !== prepared.allowanceSha256
+    (await readOwnedPumpCreateBinding(db, owner, createTerms, signal)) !==
+      prepared.deployerBindingSha256
   )
     return fail('Holder funding context changed; prepare a new review.');
-  deadline.throwIfAborted();
-  return { ...prepared, funding, fundingValidated: true as const };
+  signal.throwIfAborted();
+}
+
+/** Complete owned simulation only. A durable review, reservations and explicit browser approval are still required. */
+export async function preflightOwnedPumpHolderSimulation(
+  db: D1Database,
+  owner: string,
+  supplied: Terms,
+  signal: AbortSignal,
+  options: { rpc?: PumpLaunchRpc } = {},
+) {
+  const terms = structuredClone(supplied),
+    deadline = AbortSignal.any([signal, AbortSignal.timeout(60000)]);
+  let input: Parameters<typeof buildPumpCreateHolderMessage>[0] | undefined;
+  const prepared = await preflightOwnedPumpHolderFunding(
+    db,
+    owner,
+    terms,
+    deadline,
+    {
+      rpc: options.rpc,
+      captureInput: (value) => {
+        input = value;
+      },
+    },
+  );
+  if (!input) return fail('Owned holder simulation context is unavailable.');
+  const simulation = await simulatePumpHolderPacket(
+    input,
+    prepared.allowances,
+    prepared.funding,
+    prepared.creationSimulation,
+    deadline,
+    options.rpc,
+  );
+  if (simulation.packetSha256 !== prepared.packet.packetSha256)
+    return fail('Holder simulation packet changed.');
+  await assertOwnedHolderContext(db, owner, terms, input, prepared, deadline);
+  return { ...prepared, allWalletSimulation: simulation };
 }

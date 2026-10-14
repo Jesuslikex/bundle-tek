@@ -4,7 +4,10 @@ import { releaseLaunchMetadata } from './launch-metadata-release';
 import {
   prepareOwnedPumpHolderPacket,
   preflightOwnedPumpHolderFunding,
+  preflightOwnedPumpHolderSimulation,
 } from './pump-holder-preparation';
+import { pumpHolderSettlementFixture } from '../test/pump-holder-settlement-fixture';
+import { PUMP_TOKEN_2022 } from './pump-launch-config';
 import {
   getTransactionDecoder,
   getCompiledTransactionMessageDecoder,
@@ -344,6 +347,150 @@ async function preparationFixture(
   };
   return { ...f, rpc, terms };
 }
+for (const revoke of [false, true])
+  it(`runs the complete owned unsigned holder preflight and rechecks proof after simulation (revoke=${revoke})`, async () => {
+    const f = await preparationFixture(),
+      g = await pumpHolderSettlementFixture(false, false, true, false);
+    const recipients = g.input.holders.map((h) => ({
+      address: h.address,
+      revision: 1,
+      folderRevision: 0,
+      root: true as const,
+    }));
+    f.document.options.wallets!.deployer = {
+      address: g.input.create.payer,
+      revision: 1,
+      folderRevision: 0,
+      root: true,
+    };
+    f.document.options.wallets!.recipients = recipients;
+    f.document.plan.developerBuy = 0.1;
+    f.document.plan.holdersBuy = 0.3;
+    f.document.plan.holdersDistribution = {
+      kind: 'custom',
+      weights: ['2', '1', '0'],
+      deviationPercent: 0,
+      seed: 'a'.repeat(32),
+    };
+    f.document.plan.tokenName = g.input.create.name;
+    f.document.plan.ticker = g.input.create.symbol;
+    const updatedAt = '2026-10-14T01:00:00Z';
+    await f.client.execute({
+      sql: 'UPDATE workspace_projects SET document=?,updated_at=?',
+      args: [JSON.stringify(f.document), updatedAt],
+    });
+    for (const [address, role] of [
+      [g.input.create.payer, 'Deployer'],
+      ...recipients.map((r) => [r.address, 'Recipient']),
+    ]) {
+      await f.client.execute({
+        sql: "INSERT INTO workspace_wallets VALUES('alice','Solana',?,?,1,0,'',NULL)",
+        args: [address, role],
+      });
+      await f.client.execute({
+        sql: "INSERT INTO wallet_ownership_proofs VALUES('alice','Solana',?)",
+        args: [address],
+      });
+    }
+    const release = await releaseLaunchMetadata(
+      f.db,
+      'alice',
+      f.terms.projectId,
+      updatedAt,
+      'https://bundle.test',
+    );
+    g.f.setMetadataUri(release.uri);
+    g.input.create.uri = release.uri;
+    g.evidence.after[g.evidence.addresses.indexOf(g.input.create.mint)] = raw(
+      PUMP_TOKEN_2022,
+      g.f.metadataMint(),
+    );
+    const terms = {
+      ...f.terms,
+      updatedAt,
+      releaseId: release.id,
+      payer: g.input.create.payer,
+      mint: g.input.create.mint,
+      developerMaximumQuoteCostRaw: '100000000',
+      holderLimits: g.input.holders.map((h) => ({
+        address: h.address,
+        feeAndRentLimitRaw: h.kind === 'none' ? '0' : '10000000',
+        ...(h.kind === 'exact-base-output'
+          ? { maximumQuoteCostRaw: h.maximumQuoteCostRaw }
+          : {}),
+      })),
+    };
+    let holderMode = false,
+      simulations = 0;
+    const rpc: PumpLaunchRpc = async (method, params, signal) => {
+      if (
+        method === 'getFeeForMessage' &&
+        getCompiledTransactionMessageDecoder().decode(
+          Buffer.from(params[0] as string, 'base64'),
+        ).version === 1
+      ) {
+        holderMode = true;
+        return { context: { slot: '100' }, value: '20000' };
+      }
+      if (holderMode && method === 'getMultipleAccounts')
+        return {
+          context: { slot: '100' },
+          value: (params[0] as string[]).map((k) =>
+            structuredClone(
+              g.evidence.before[g.evidence.addresses.indexOf(k)] ?? null,
+            ),
+          ),
+        };
+      if (
+        method === 'simulateTransaction' &&
+        getCompiledTransactionMessageDecoder().decode(
+          getTransactionDecoder().decode(
+            Buffer.from(params[0] as string, 'base64'),
+          ).messageBytes,
+        ).version === 1
+      ) {
+        simulations++;
+        if (revoke)
+          await f.client.execute({
+            sql: 'DELETE FROM wallet_ownership_proofs WHERE address=?',
+            args: [recipients[1].address],
+          });
+        return {
+          context: { slot: '100' },
+          value: {
+            err: null,
+            accounts: structuredClone(g.evidence.after),
+            fee: '20000',
+            unitsConsumed: '600000',
+            loadedAccountsDataSize: '1048576',
+            replacementBlockhash: null,
+          },
+        };
+      }
+      return g.f.rpc(method, params, signal);
+    };
+    const result = preflightOwnedPumpHolderSimulation(
+      f.db,
+      'alice',
+      terms,
+      new AbortController().signal,
+      { rpc },
+    );
+    if (revoke) await expect(result).rejects.toThrow('Every saved holder');
+    else
+      expect(await result).toMatchObject({
+        fundingValidated: true,
+        signingAllowed: false,
+        executionAllowed: false,
+        completeLaunch: false,
+        allWalletSimulation: {
+          status: 'Simulated',
+          settlementValidated: true,
+          accounting: { accountingValidated: true, wallets: expect.any(Array) },
+        },
+      });
+    expect(simulations).toBe(1);
+  });
 for (const revoke of [false, true])
   it(`checks owned all-wallet funding and revalidates ownership after RPC (revoke=${revoke})`, async () => {
     const f = await preparationFixture();
