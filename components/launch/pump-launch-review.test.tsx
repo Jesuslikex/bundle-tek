@@ -7,6 +7,7 @@ import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
 import { VAULT_STORAGE_KEY } from '@/lib/browser-wallet-vault';
 const mocks = vi.hoisted(() => ({
   sign: vi.fn(),
+  atomicSign: vi.fn(),
   unlock: vi.fn(),
   clear: vi.fn(),
 }));
@@ -26,6 +27,14 @@ vi.mock('@/lib/pump-launch-signing', () => ({
   requirePumpSigningReview: async (_r: unknown, current: () => void) =>
     current(),
   signPumpLaunch: mocks.sign,
+  decodePumpSigningInput: (input: unknown) => input,
+}));
+vi.mock('@/lib/pump-initial-buy-signing', () => ({
+  requirePumpInitialBuySigningReview: async (
+    _r: unknown,
+    current: () => void,
+  ) => current(),
+  signPumpInitialBuy: mocks.atomicSign,
 }));
 const project = {
   id: 'project',
@@ -128,6 +137,10 @@ beforeEach(async () => {
     transaction: 'synthetic signed packet',
     signature: '2'.repeat(88),
   });
+  mocks.atomicSign.mockReset().mockResolvedValue({
+    transaction: 'synthetic atomic packet',
+    signature: '2'.repeat(88),
+  });
   mocks.clear.mockReset();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -201,4 +214,194 @@ it('shows a safe error for an HTML gateway failure', async () => {
   await click('Reload saved launch');
   expect(container.textContent).toContain('Launch history is unavailable');
   expect(container.textContent).not.toContain('private proxy');
+});
+
+async function atomicSetup() {
+  const initial = initialReview();
+  let atomicSaved = {
+    ...initial,
+    format: 'pump-create-buy-review-v1',
+    containsHolderBuys: false,
+    completeLaunch: false,
+    review: {
+      ...initial.review,
+      developerSupplyPercent: 0.1,
+      input: {
+        create: initial.review.input,
+        transactionVersion: 1,
+        tokenAmountRaw: '1000000000000',
+        maximumQuoteCostRaw: '100000000',
+      },
+    },
+    simulation: {
+      ...initial.simulation,
+      quoteCostRaw: '28334890',
+      feeAndRentDebitRaw: '5010000',
+    },
+  };
+  const payloads: Record<string, unknown>[] = [];
+  fetcher.mockImplementation(async (path: string, init?: RequestInit) => {
+    expect(path).toContain('/api/launch/pump/initial-buy');
+    if (init?.body) {
+      const b = JSON.parse(
+        typeof init.body === 'string' ? init.body : '{}',
+      ) as Record<string, unknown>;
+      payloads.push(b);
+      requests.push(String(b.action));
+      if (b.action === 'approve')
+        atomicSaved = { ...atomicSaved, state: 'approved' };
+      if (b.action === 'register')
+        atomicSaved = {
+          ...atomicSaved,
+          state: 'signed',
+          signature: '2'.repeat(88),
+        };
+      if (b.action === 'submit')
+        atomicSaved = { ...atomicSaved, state: 'submitted' };
+    }
+    return Response.json(atomicSaved);
+  });
+  await act(async () =>
+    root.render(
+      <PumpLaunchReview
+        project={project}
+        plan={{ ...plan, developerBuy: 0.1, holdersBuy: 20 }}
+        releaseId={'a'.repeat(64)}
+      />,
+    ),
+  );
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  });
+  return { payloads, getSaved: () => atomicSaved };
+}
+it('requires the separate quote cap, exact atomic scope and limits consent before dual signing, then distinct broadcast consent', async () => {
+  const { payloads } = await atomicSetup();
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('saved holder buys are not included');
+  check('I saved');
+  await click('Simulate and prepare launch');
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('positive maximum quote spend');
+  input('Maximum developer buy spend', '0.1');
+  await click('Simulate and prepare launch');
+  expect(payloads[0]).toMatchObject({
+    action: 'prepare',
+    maximumQuoteCostRaw: '100000000',
+    feeAndRentLimitRaw: '50000000',
+  });
+  input('Mint backup passphrase', 'mint password');
+  input('Deployer vault passphrase', 'payer password');
+  check('I approve signing');
+  expect(button('Approve and sign creation with developer buy').disabled).toBe(
+    true,
+  );
+  check('I understand');
+  await click('Approve and sign creation with developer buy');
+  expect(payloads[1]).toMatchObject({
+    action: 'approve',
+    approvedScope: 'create-and-developer-buy',
+    acknowledgeSimulationLimits: true,
+    approved: true,
+  });
+  expect(mocks.atomicSign).toHaveBeenCalledOnce();
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.clear).toHaveBeenCalledTimes(2);
+  expect(requests).toEqual(['prepare', 'approve', 'register']);
+  expect(button('Broadcast approved launch').disabled).toBe(true);
+  check('I approve broadcasting');
+  await click('Broadcast approved launch');
+  expect(payloads.at(-1)).toMatchObject({
+    action: 'submit',
+    approved: true,
+    approvedScope: 'create-and-developer-buy',
+    acknowledgeSimulationLimits: true,
+  });
+});
+it('invalidates atomic consent when quote caps change and blocks schedules', async () => {
+  await atomicSetup();
+  check('I saved');
+  input('Maximum developer buy spend', '0.1');
+  await click('Simulate and prepare launch');
+  check('I approve signing');
+  check('I understand');
+  input('Maximum developer buy spend', '0.2');
+  expect(label('I approve signing').checked).toBe(false);
+  expect(label('I understand').checked).toBe(false);
+  expect(button('Approve and sign creation with developer buy').disabled).toBe(
+    true,
+  );
+  expect(container.textContent).toContain('differs from the current draft');
+  await act(async () =>
+    root.render(
+      <PumpLaunchReview
+        project={project}
+        plan={{ ...plan, developerBuy: 0.1, scheduled: true }}
+        releaseId={'a'.repeat(64)}
+      />,
+    ),
+  );
+  expect(button('Simulate and prepare launch').disabled).toBe(true);
+});
+it('rejects excess quote precision and prevents a stale async sign after project context changes', async () => {
+  await atomicSetup();
+  check('I saved');
+  input('Maximum developer buy spend', '0.0000000001');
+  await click('Simulate and prepare launch');
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('asset precision');
+  input('Maximum developer buy spend', '0.1');
+  await click('Simulate and prepare launch');
+  input('Mint backup passphrase', 'mint password');
+  input('Deployer vault passphrase', 'payer password');
+  check('I approve signing');
+  check('I understand');
+  let resolve!: () => void;
+  fetcher.mockImplementationOnce(
+    () =>
+      new Promise<Response>((r) => {
+        resolve = () =>
+          r(
+            Response.json({
+              ...initialReview(),
+              format: 'pump-create-buy-review-v1',
+              containsHolderBuys: false,
+              completeLaunch: false,
+              review: {
+                ...initialReview().review,
+                developerSupplyPercent: 0.1,
+                input: {
+                  create: initialReview().review.input,
+                  transactionVersion: 1,
+                  tokenAmountRaw: '1000000000000',
+                  maximumQuoteCostRaw: '100000000',
+                },
+              },
+              state: 'approved',
+            }),
+          );
+      }),
+  );
+  act(() => button('Approve and sign creation with developer buy').click());
+  await act(async () =>
+    root.render(
+      <PumpLaunchReview
+        project={{ ...project, updatedAt: 'changed' }}
+        plan={{ ...plan, developerBuy: 0.1 }}
+        releaseId={'a'.repeat(64)}
+      />,
+    ),
+  );
+  await act(async () => resolve());
+  expect(mocks.atomicSign).not.toHaveBeenCalled();
+  expect(mocks.unlock).not.toHaveBeenCalled();
+});
+
+it('invalidates a prepared review when the fee/rent allowance changes', async () => {
+  check('I saved');
+  await click('Simulate and prepare launch');
+  input('Maximum network fee and rent', '0.01');
+  expect(button('Approve and sign creation').disabled).toBe(true);
+  expect(label('I approve signing').disabled).toBe(true);
+  expect(container.textContent).toContain('differs from the current draft');
 });

@@ -1,0 +1,3 @@
+# Atomic Pump UI work notice
+
+Codex will extend `components/launch/pump-launch-review.tsx` and its tests to support the dedicated atomic initial-buy API, exact quote caps, saved developer target review, explicit scope/simulation consent, browser-encrypted dual signing and separately approved submission/recovery. The review component will get a keyed context boundary to invalidate asynchronous signing when mode or saved plan changes. Inspection confirmed the metadata parent already keys its full draft; that parent does not need an edit. Existing upload and mint-backup controls will be reused. No shell, token-chart, holder, timeline or Claude-owned layout file is in scope. No real wallet or transaction will be used, and nothing will be deployed.

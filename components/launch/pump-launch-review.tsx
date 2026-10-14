@@ -20,18 +20,37 @@ import {
 import {
   signPumpLaunch,
   requirePumpSigningReview,
+  decodePumpSigningInput,
   type PumpSigningReview,
 } from '@/lib/pump-launch-signing';
+import {
+  signPumpInitialBuy,
+  requirePumpInitialBuySigningReview,
+  type PumpInitialBuySigningReview,
+} from '@/lib/pump-initial-buy-signing';
+import { inspectPumpQuoteMint } from '@/lib/pump-launch-config';
 import { quoteCatalog } from '@/lib/quote-catalog';
 import type { LaunchPlanInput } from '@/lib/launch-plan';
 type Launch = {
-  review: PumpSigningReview;
+  review: PumpSigningReview | PumpInitialBuySigningReview;
   state: string;
   signature: string | null;
   receipt: { succeeded: boolean; slot: string } | null;
-  simulation: { payerDebitRaw: string; networkFeeRaw: string };
+  simulation: {
+    payerDebitRaw: string;
+    networkFeeRaw: string;
+    quoteCostRaw?: string;
+    feeAndRentDebitRaw?: string;
+  };
 };
-function parseLaunch(value: unknown): Launch {
+function displayAmount(raw: string | undefined, decimals: number) {
+  if (!raw || !/^\d{1,20}$/.test(raw)) return 'Unavailable';
+  const digits = raw.padStart(decimals + 1, '0');
+  const whole = digits.slice(0, -decimals),
+    fraction = digits.slice(-decimals).replace(/0+$/, '');
+  return whole + (fraction ? '.' + fraction : '');
+}
+function parseLaunch(value: unknown, atomic: boolean): Launch {
   const record = (v: unknown): v is Record<string, unknown> =>
     !!v && typeof v === 'object' && !Array.isArray(v);
   if (
@@ -42,8 +61,23 @@ function parseLaunch(value: unknown): Launch {
   )
     throw new Error('Invalid launch response.');
   const r = value.review,
-    i = value.review.input,
+    i = atomic ? value.review.input.create : value.review.input,
     sim = value.simulation;
+  if (!record(i)) throw new Error('Invalid launch response.');
+  if (
+    atomic &&
+    (value.format !== 'pump-create-buy-review-v1' ||
+      value.containsHolderBuys !== false ||
+      value.completeLaunch !== false ||
+      typeof r.developerSupplyPercent !== 'number' ||
+      !Number.isFinite(r.developerSupplyPercent) ||
+      r.developerSupplyPercent <= 0 ||
+      value.review.input.transactionVersion !== 1 ||
+      typeof value.review.input.tokenAmountRaw !== 'string' ||
+      typeof value.review.input.maximumQuoteCostRaw !== 'string' ||
+      !/^[1-9]\d{0,19}$/.test(value.review.input.maximumQuoteCostRaw))
+  )
+    throw new Error('Invalid atomic launch response.');
   if (
     [
       'id',
@@ -98,7 +132,7 @@ function download(name: string, value: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function PumpLaunchReview({
+function PumpLaunchReviewContent({
   project,
   plan,
   releaseId,
@@ -115,7 +149,9 @@ export function PumpLaunchReview({
   const [mint, setMint] = useState<PumpMintBackup | null>(null),
     [password, setPassword] = useState(''),
     [payerPassword, setPayerPassword] = useState(''),
-    [allowance, setAllowance] = useState('0.05');
+    [allowance, setAllowance] = useState('0.05'),
+    [quoteCap, setQuoteCap] = useState(''),
+    [limitsConsent, setLimitsConsent] = useState(false);
   const [launch, setLaunch] = useState<Launch | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -133,11 +169,64 @@ export function PumpLaunchReview({
     if (!mounted.current) throw new Error('Launch context changed.');
   };
   const pendingKey = (id: string) => 'bundle.pump-signed.v1:' + id;
+  const atomic = plan.developerBuy > 0;
+  const endpoint = atomic ? '/api/launch/pump/initial-buy' : '/api/launch/pump';
   const hasBuys =
-    plan.developerBuy !== 0 ||
-    plan.holdersBuy !== 0 ||
-    Number(plan.holdersBuyQuote ?? 0) !== 0 ||
-    plan.scheduled;
+    plan.scheduled ||
+    (!atomic &&
+      (plan.holdersBuy !== 0 || Number(plan.holdersBuyQuote ?? 0) !== 0));
+  const creation = (r: Launch['review']) =>
+    'create' in r.input ? r.input.create : r.input;
+  const quoteRaw = () => {
+    if (!quote || !/^\d{1,20}(\.\d{1,18})?$/.test(quoteCap))
+      throw new Error('Enter a positive maximum quote spend.');
+    const [whole, fraction = ''] = quoteCap.split('.');
+    if (fraction.length > quote.decimals)
+      throw new Error(
+        'Maximum quote spend exceeds the selected asset precision.',
+      );
+    const raw =
+      BigInt(whole) * 10n ** BigInt(quote.decimals) +
+      BigInt(fraction.padEnd(quote.decimals, '0'));
+    if (raw <= 0n || raw > (1n << 64n) - 1n)
+      throw new Error(
+        'Choose a positive quote-spend cap within the asset limit.',
+      );
+    return raw.toString();
+  };
+  const matchesAllowance = () => {
+    try {
+      if (!launch || !/^(0|1)(\.\d{1,9})?$/.test(allowance)) return false;
+      const [whole, fraction = ''] = allowance.split('.');
+      const raw = BigInt(whole) * 1000000000n + BigInt(fraction.padEnd(9, '0'));
+      return (
+        raw > 0n &&
+        raw <= 1000000000n &&
+        raw.toString() === launch.review.feeAndRentLimitRaw
+      );
+    } catch {
+      return false;
+    }
+  };
+  const matchesQuoteCap = () => {
+    try {
+      return (
+        !atomic ||
+        (launch &&
+          'create' in launch.review.input &&
+          launch.review.input.maximumQuoteCostRaw === quoteRaw())
+      );
+    } catch {
+      return false;
+    }
+  };
+  const scopeConsent = () =>
+    atomic
+      ? {
+          approvedScope: 'create-and-developer-buy',
+          acknowledgeSimulationLimits: limitsConsent,
+        }
+      : {};
   useEffect(() => {
     mounted.current = true;
     const load = setTimeout(() => {
@@ -159,11 +248,11 @@ export function PumpLaunchReview({
     };
   }, [project.id]);
   async function api(body: Record<string, unknown>): Promise<Launch> {
-    const response = await fetch('/api/launch/pump', {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(50000),
     });
     const value = await readPanelJson(
       response,
@@ -178,7 +267,7 @@ export function PumpLaunchReview({
           ? value.error
           : 'Launch request did not complete.',
       );
-    return parseLaunch(value);
+    return parseLaunch(value, atomic);
   }
   function accept(value: Launch) {
     current();
@@ -187,6 +276,7 @@ export function PumpLaunchReview({
     setLaunch(value);
     setApprove(false);
     setBroadcast(false);
+    setLimitsConsent(false);
     setPending(localStorage.getItem(pendingKey(value.review.id)) ?? '');
   }
   async function run(fn: () => Promise<void>) {
@@ -206,7 +296,7 @@ export function PumpLaunchReview({
   }
   async function history() {
     const response = await fetch(
-      '/api/launch/pump?projectId=' + encodeURIComponent(project.id),
+      endpoint + '?projectId=' + encodeURIComponent(project.id),
       { signal: AbortSignal.timeout(15000) },
     );
     const value = (await readPanelJson(
@@ -217,7 +307,7 @@ export function PumpLaunchReview({
       throw new Error('Launch history is unavailable.');
     current();
     const latest = value.launches[0];
-    if (latest) accept(parseLaunch(latest));
+    if (latest) accept(parseLaunch(latest, atomic));
     else {
       setLaunch(null);
       setError('No saved launch review yet.');
@@ -227,13 +317,18 @@ export function PumpLaunchReview({
     launch &&
     launch.review.projectUpdatedAt === project.updatedAt &&
     launch.review.releaseId === releaseId &&
-    launch.review.input.name === plan.tokenName &&
-    launch.review.input.symbol === plan.ticker &&
-    launch.review.input.quoteMint === quote?.address &&
-    launch.review.input.payer === project.payer?.address &&
-    launch.review.input.mint === mint?.mint &&
-    launch.review.input.uri ===
-      `${window.location.origin}/api/launch/metadata/${releaseId}`;
+    creation(launch.review).name === plan.tokenName &&
+    creation(launch.review).symbol === plan.ticker &&
+    creation(launch.review).quoteMint === quote?.address &&
+    creation(launch.review).payer === project.payer?.address &&
+    creation(launch.review).mint === mint?.mint &&
+    creation(launch.review).uri ===
+      `${window.location.origin}/api/launch/metadata/${releaseId}` &&
+    matchesQuoteCap() &&
+    matchesAllowance() &&
+    (!atomic ||
+      ('developerSupplyPercent' in launch.review &&
+        launch.review.developerSupplyPercent === plan.developerBuy));
   const fresh = !!launch && Date.parse(launch.review.expiresAt) > now;
   async function sign() {
     if (
@@ -243,7 +338,8 @@ export function PumpLaunchReview({
       !approve ||
       !backedUp ||
       !mint ||
-      hasBuys
+      hasBuys ||
+      (atomic && !limitsConsent)
     )
       throw new Error(
         'Review the exact saved launch and back up its mint first.',
@@ -268,9 +364,24 @@ export function PumpLaunchReview({
       )
         throw new Error('Stored mint changed.');
     };
-    await requirePumpSigningReview(saved.review, check);
+    if (atomic) {
+      if (!('create' in saved.review.input))
+        throw new Error('Atomic launch review differs.');
+      const reviewed = saved.review as PumpInitialBuySigningReview;
+      const decoded = decodePumpSigningInput(reviewed.input.create);
+      const precision = decoded.quoteMintAccount
+        ? inspectPumpQuoteMint(decoded.quoteMintAccount).decimals
+        : 9;
+      if (precision !== quote?.decimals)
+        throw new Error(
+          'Observed quote precision differs. Review the selected asset before signing.',
+        );
+      await requirePumpInitialBuySigningReview(reviewed, check);
+    } else
+      await requirePumpSigningReview(saved.review as PumpSigningReview, check);
     const approved = await api({
       action: 'approve',
+      ...scopeConsent(),
       id: saved.review.id,
       sha256: saved.review.sha256,
       approved: true,
@@ -293,12 +404,24 @@ export function PumpLaunchReview({
       payerSession = await unlockVault(vault, payerPass);
       mintSession = await unlockPumpMint(backup, mintPass);
       check();
-      const signed = await signPumpLaunch(
-        payerSession,
-        mintSession,
-        saved.review,
-        check,
-      );
+      const signed = atomic
+        ? await signPumpInitialBuy(
+            payerSession,
+            mintSession,
+            saved.review as PumpInitialBuySigningReview,
+            {
+              approved: true,
+              reviewId: saved.review.id,
+              sha256: saved.review.sha256,
+            },
+            check,
+          )
+        : await signPumpLaunch(
+            payerSession,
+            mintSession,
+            saved.review as PumpSigningReview,
+            check,
+          );
       setPending(signed.transaction);
       setLaunch(approved);
       setApprove(false);
@@ -327,11 +450,17 @@ export function PumpLaunchReview({
         marginTop: 20,
       }}
     >
-      <h3>Create your PumpFun coin</h3>
+      <h3>
+        {atomic ? 'Create coin with developer buy' : 'Create your PumpFun coin'}
+      </h3>
       <p>
-        Creates a mainnet coin paired with <strong>{plan.currency}</strong>. No
-        initial buys are included. Signing and broadcasting require separate
-        approval.
+        Creates a mainnet coin paired with <strong>{plan.currency}</strong>. No{' '}
+        {atomic
+          ? 'holder buys are included. The developer buys ' +
+            plan.developerBuy +
+            '% of total supply in the creation transaction.'
+          : 'initial buys are included.'}{' '}
+        Signing and broadcasting require separate approval.
       </p>
       <p className="source-note" style={{ overflowWrap: 'anywhere' }}>
         Exact quote mint: {quote?.address ?? 'Choose an asset'}. Stock-labelled
@@ -341,8 +470,9 @@ export function PumpLaunchReview({
       {hasBuys && (
         <div>
           <p>
-            Saved initial buys or scheduling are not supported by this
-            create-only transaction.
+            {plan.scheduled
+              ? 'Disable scheduling and save before preparing this launch.'
+              : 'Holder buys require their own execution flow. Use a developer buy or choose create-only.'}
           </p>
           {onCreateOnly && (
             <Button
@@ -470,6 +600,30 @@ export function PumpLaunchReview({
           }}
         />
       </label>
+      {atomic && (
+        <label htmlFor={fieldId + '-quote-cap'}>
+          Maximum developer buy spend ({plan.currency})
+          <Input
+            id={fieldId + '-quote-cap'}
+            inputMode="decimal"
+            value={quoteCap}
+            disabled={busy}
+            onChange={(e) => {
+              setQuoteCap(e.target.value);
+              setApprove(false);
+              setBroadcast(false);
+              setLimitsConsent(false);
+            }}
+          />
+        </label>
+      )}
+      {atomic &&
+        (plan.holdersBuy !== 0 || Number(plan.holdersBuyQuote ?? 0) !== 0) && (
+          <p>
+            Your saved holder buys are not included in this transaction. Only
+            creation and the developer buy will execute.
+          </p>
+        )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <Button
           type="button"
@@ -497,6 +651,7 @@ export function PumpLaunchReview({
               accept(
                 await api({
                   action: 'prepare',
+                  ...(atomic ? { maximumQuoteCostRaw: quoteRaw() } : {}),
                   projectId: project.id,
                   updatedAt: project.updatedAt,
                   releaseId,
@@ -524,24 +679,47 @@ export function PumpLaunchReview({
         <div style={{ display: 'grid', gap: 10, overflowWrap: 'anywhere' }}>
           <strong>Status: {launch.state}</strong>
           <p>
-            {launch.review.input.name} ({launch.review.input.symbol}) · Mainnet
-            · No initial buys
+            {creation(launch.review).name} ({creation(launch.review).symbol}) ·
+            Mainnet · {atomic ? 'Atomic developer buy' : 'No initial buys'}
           </p>
           <p>
-            Mint: {launch.review.input.mint}
+            Mint: {creation(launch.review).mint}
             <br />
-            Payer: {launch.review.input.payer}
+            Payer: {creation(launch.review).payer}
             <br />
-            Quote: {launch.review.input.quoteMint}
+            Quote: {creation(launch.review).quoteMint}
             <br />
-            Metadata: {launch.review.input.uri}
+            Metadata: {creation(launch.review).uri}
           </p>
           <p>
-            Approved debit ceiling: {launch.review.feeAndRentLimitRaw} lamports.
-            Simulated debit: {launch.simulation.payerDebitRaw}; network fee:{' '}
-            {launch.simulation.networkFeeRaw}. Remaining created-account rent is
-            included in the debit.
+            Maximum network fee and rent:{' '}
+            {displayAmount(launch.review.feeAndRentLimitRaw, 9)} SOL. Simulated
+            SOL debit: {displayAmount(launch.simulation.payerDebitRaw, 9)} SOL;
+            network fee: {displayAmount(launch.simulation.networkFeeRaw, 9)}{' '}
+            SOL. Created-account rent is included.
           </p>
+          {atomic && 'create' in launch.review.input && (
+            <p>
+              Developer target:{' '}
+              {'developerSupplyPercent' in launch.review
+                ? launch.review.developerSupplyPercent
+                : ''}
+              % of total supply (
+              {displayAmount(launch.review.input.tokenAmountRaw, 6)} tokens).
+              Maximum quote spend:{' '}
+              {displayAmount(
+                launch.review.input.maximumQuoteCostRaw,
+                quote?.decimals ?? 9,
+              )}{' '}
+              {plan.currency}. Simulated quote spend:{' '}
+              {displayAmount(
+                launch.simulation.quoteCostRaw,
+                quote?.decimals ?? 9,
+              )}{' '}
+              {plan.currency}. The quote-spend cap is separate from network fees
+              and rent.
+            </p>
+          )}
           <p>
             Packet fingerprint: {launch.review.sha256}
             <br />
@@ -585,12 +763,27 @@ export function PumpLaunchReview({
                   disabled={busy || !validScope || !fresh || hasBuys}
                   onChange={(e) => setApprove(e.target.checked)}
                 />{' '}
-                I approve signing this exact mainnet coin creation, quote mint,
-                immutable metadata and SOL debit ceiling.
+                I approve signing this exact mainnet coin creation
+                {atomic ? ', developer supply target and quote-spend cap' : ''},
+                quote mint, immutable metadata and fee/rent allowance.
               </label>
+              {atomic && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={limitsConsent}
+                    disabled={busy || !validScope || !fresh}
+                    onChange={(e) => setLimitsConsent(e.target.checked)}
+                  />{' '}
+                  I understand that holder buys are excluded and simulation
+                  cannot prove every venue behavior, including buyback rounding
+                  or the full deployed program.
+                </label>
+              )}
               <Button
                 type="button"
                 disabled={
+                  (atomic && !limitsConsent) ||
                   busy ||
                   !!pending ||
                   !validScope ||
@@ -603,7 +796,9 @@ export function PumpLaunchReview({
                 }
                 onClick={() => void run(sign)}
               >
-                Approve and sign creation
+                {atomic
+                  ? 'Approve and sign creation with developer buy'
+                  : 'Approve and sign creation'}
               </Button>
             </>
           )}
@@ -635,7 +830,11 @@ export function PumpLaunchReview({
                   disabled={busy || !fresh || !validScope}
                   onChange={(e) => setBroadcast(e.target.checked)}
                 />{' '}
-                I approve broadcasting this signed launch to Solana mainnet.
+                I approve broadcasting this signed launch
+                {atomic
+                  ? ' with its developer buy and the stated simulation limits, without holder buys'
+                  : ''}{' '}
+                to Solana mainnet.
               </label>
               <Button
                 type="button"
@@ -645,6 +844,12 @@ export function PumpLaunchReview({
                     accept(
                       await api({
                         action: 'submit',
+                        ...(atomic
+                          ? {
+                              approvedScope: 'create-and-developer-buy',
+                              acknowledgeSimulationLimits: broadcast,
+                            }
+                          : {}),
                         id: launch.review.id,
                         sha256: launch.review.sha256,
                         approved: true,
@@ -708,5 +913,16 @@ export function PumpLaunchReview({
         {error && <p role="alert">{error}</p>}
       </div>
     </section>
+  );
+}
+
+export function PumpLaunchReview(
+  props: Parameters<typeof PumpLaunchReviewContent>[0],
+) {
+  return (
+    <PumpLaunchReviewContent
+      key={JSON.stringify([props.project, props.plan, props.releaseId])}
+      {...props}
+    />
   );
 }
