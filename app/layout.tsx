@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import {BundleAccount} from '@/components/bundle-account';
+import { BundleAccount } from '@/components/bundle-account';
+import { getGoogleCredentials } from '@/lib/auth';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { SolanaProvider } from '@/components/solana-provider';
 import './globals.css';
@@ -17,7 +18,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'PulseForge Launch & Market Console',
-  description: 'Interactive token launch planning and simulation-first market-making controls.',
+  description:
+    'Interactive token launch planning and simulation-first market-making controls.',
   icons: { icon: '/favicon.svg' },
 };
 
@@ -31,7 +33,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SolanaProvider>{children}</SolanaProvider><BundleAccount />
+        <SolanaProvider>{children}</SolanaProvider>
+        <BundleAccount googleEnabled={Boolean(getGoogleCredentials())} />
       </body>
     </html>
   );

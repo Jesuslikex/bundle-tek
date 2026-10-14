@@ -57,7 +57,9 @@ export function createBundleAuth(
           },
         }
       : {},
-    account: { accountLinking: { enabled: false } },
+    account: {
+      accountLinking: { enabled: true, disableImplicitLinking: true },
+    },
     emailAndPassword: { enabled: true, minPasswordLength: 12 },
     rateLimit: { enabled: true, storage: 'database' },
   });

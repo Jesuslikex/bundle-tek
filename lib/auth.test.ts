@@ -98,7 +98,7 @@ describe('Google OAuth with disposable libSQL', () => {
         }),
       );
       expect(response.status).toBe(200);
-      const body = await response.json() as {url:string};
+      const body = (await response.json()) as { url: string };
       const url = new URL(body.url);
       expect(url.origin).toBe('https://accounts.google.com');
       expect(url.searchParams.get('client_id')).toBe(
@@ -118,8 +118,9 @@ describe('Google OAuth with disposable libSQL', () => {
       expect(url.searchParams.get('include_granted_scopes')).not.toBe('true');
       expect(response.headers.get('set-cookie')).toBeTruthy();
       expect(
-        (await auth.$context).options.account?.accountLinking?.enabled,
-      ).toBe(false);
+        (await auth.$context).options.account?.accountLinking
+          ?.disableImplicitLinking,
+      ).toBe(true);
     } finally {
       db.close();
     }
@@ -167,6 +168,74 @@ describe('Google OAuth with disposable libSQL', () => {
         }),
       );
       expect(response.status).toBe(404);
+    } finally {
+      db.close();
+    }
+  });
+  it('requires a real session for explicit Google linking and binds OAuth state to its owner', async () => {
+    const { db, auth } = await fixture();
+    try {
+      const request = (cookie?: string) =>
+        new Request('https://bundle.example/api/auth/link-social', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'https://bundle.example',
+            ...(cookie ? { cookie } : {}),
+          },
+          body: JSON.stringify({
+            provider: 'google',
+            callbackURL: '/',
+            disableRedirect: true,
+            additionalData: {
+              link: { userId: 'victim', email: 'victim@example.com' },
+            },
+          }),
+        });
+      expect((await auth.handler(request())).status).toBe(401);
+      const signup = await auth.handler(
+        new Request('https://bundle.example/api/auth/sign-up/email', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'https://bundle.example',
+          },
+          body: JSON.stringify({
+            name: 'Owner',
+            email: 'owner@example.com',
+            password: 'disposable-owner-password',
+          }),
+        }),
+      );
+      expect(signup.status).toBe(200);
+      const cookie = signup.headers
+        .getSetCookie()
+        .map((value) => value.split(';')[0])
+        .join('; ');
+      const owner = await auth.api.getSession({
+        headers: new Headers({ cookie }),
+      });
+      expect(owner).toBeTruthy();
+      const linked = await auth.handler(request(cookie));
+      expect(linked.status).toBe(200);
+      const response = (await linked.json()) as { url: string };
+      const state = new URL(response.url).searchParams.get('state');
+      const record = await db.execute({
+        sql: 'SELECT value FROM verification WHERE identifier=?',
+        args: ['auth-state:' + state],
+      });
+      const stored = JSON.parse(record.rows[0].value as string);
+      expect(stored.link).toEqual({
+        userId: owner!.user.id,
+        email: 'owner@example.com',
+      });
+      expect(
+        (
+          await db.execute(
+            "SELECT count(*) AS count FROM account WHERE provider_id='google'",
+          )
+        ).rows[0].count,
+      ).toBe(0);
     } finally {
       db.close();
     }

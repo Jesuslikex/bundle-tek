@@ -78,6 +78,10 @@ export function SignInForm({
           >
             <span aria-hidden="true">G</span> Continue with Google
           </button>
+          <p>
+            Already use email? Sign in first, then link Google from your
+            account.
+          </p>
           <div className={styles.divider}>or use email</div>
         </>
       )}
