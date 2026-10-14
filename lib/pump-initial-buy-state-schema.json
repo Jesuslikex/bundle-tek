@@ -1,0 +1,163 @@
+{
+  "source": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22/idl/pump.json",
+  "commit": "639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22",
+  "sourceSha256": "7616681ea557975f9f623ac211080f22a93060781eaf4765b0a488d980997207",
+  "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+  "feeProgram": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+  "accounts": [
+    {
+      "name": "FeeConfig",
+      "discriminator": [143, 52, 146, 187, 219, 123, 76, 155]
+    },
+    {
+      "name": "UserVolumeAccumulator",
+      "discriminator": [86, 255, 112, 14, 102, 53, 154, 250]
+    }
+  ],
+  "types": [
+    {
+      "name": "FeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "flat_fees",
+            "type": {
+              "defined": {
+                "name": "Fees"
+              }
+            }
+          },
+          {
+            "name": "fee_tiers",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FeeTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "stable_fee_tiers",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FeeTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "exotic_flat_fees",
+            "type": {
+              "defined": {
+                "name": "Fees"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTier",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_cap_lamports_threshold",
+            "type": "u128"
+          },
+          {
+            "name": "fees",
+            "type": {
+              "defined": {
+                "name": "Fees"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Fees",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lp_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "protocol_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "creator_fee_bps",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserVolumeAccumulator",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "needs_claim",
+            "type": "bool"
+          },
+          {
+            "name": "total_unclaimed_tokens",
+            "type": "u64"
+          },
+          {
+            "name": "total_claimed_tokens",
+            "type": "u64"
+          },
+          {
+            "name": "current_sol_volume",
+            "type": "u64"
+          },
+          {
+            "name": "last_update_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "has_total_claimed_tokens",
+            "type": "bool"
+          },
+          {
+            "name": "cashback_earned",
+            "type": "u64"
+          },
+          {
+            "name": "total_cashback_claimed",
+            "type": "u64"
+          },
+          {
+            "name": "stable_cashback_earned",
+            "type": "u64"
+          },
+          {
+            "name": "total_stable_cashback_claimed",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

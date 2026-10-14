@@ -148,6 +148,15 @@ function token(
   }
 }
 
+// Shared raw-account checks retain exactly the create-only policy. They do not create a review or grant signing permission.
+export {
+  account as pumpRpcAccount,
+  bytes as pumpAccountBytes,
+  uint as pumpUnsignedInteger,
+  system as pumpSystemAccount,
+  token as verifyPumpTokenCustody,
+};
+
 /** Bounded read-only RPC collector. Passing simulation does not enable signing. */
 export async function simulatePumpCreate(
   intent: PumpCreateIntent,
