@@ -26,10 +26,16 @@ vi.mock('@/lib/pump-launch-simulation', async (original) => {
   return {
     ...actual,
     simulatePumpCreate: (
-      intent: Parameters<typeof actual.simulatePumpCreate>[0],
-      limit: string,
-      signal: AbortSignal,
-    ) => actual.simulatePumpCreate(intent, limit, signal, mocks.rpc!),
+      ...args: Parameters<typeof actual.simulatePumpCreate>
+    ) =>
+      actual.simulatePumpCreate(
+        args[0],
+        args[1],
+        args[2],
+        args[3] ?? mocks.rpc!,
+        args[4],
+        args[5],
+      ),
   };
 });
 vi.mock('@/lib/pump-initial-buy-simulation', async (original) => {
@@ -38,12 +44,22 @@ vi.mock('@/lib/pump-initial-buy-simulation', async (original) => {
   return {
     ...actual,
     simulatePumpInitialBuy: (
-      intent: Parameters<typeof actual.simulatePumpInitialBuy>[0],
-      limit: string,
-      signal: AbortSignal,
-    ) => actual.simulatePumpInitialBuy(intent, limit, signal, mocks.rpc!),
+      ...args: Parameters<typeof actual.simulatePumpInitialBuy>
+    ) =>
+      actual.simulatePumpInitialBuy(
+        args[0],
+        args[1],
+        args[2],
+        args[3] ?? mocks.rpc!,
+        args[4],
+        args[5],
+      ),
   };
 });
+import {
+  preparePumpInitialBuyReview,
+  refreshPumpInitialBuyReview,
+} from '@/lib/pump-initial-buy-review';
 import { POST } from './route';
 let mf: Miniflare,
   f: Awaited<ReturnType<typeof pumpInitialBuySimulationFixture>>,
@@ -100,6 +116,7 @@ beforeAll(async () => {
     'CREATE TABLE wallet_folders(owner_id TEXT,id TEXT,chain TEXT,revision INTEGER,archived INTEGER,PRIMARY KEY(owner_id,id))',
     'CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT)',
     'CREATE TABLE imported_token_project_gates(owner_id TEXT PRIMARY KEY,next_allowed_at INTEGER)',
+    'CREATE TABLE solana_execution_reservations(owner_id TEXT,wallet_address TEXT,scope TEXT,intent_id TEXT,state TEXT,PRIMARY KEY(owner_id,wallet_address))',
   ])
     await mocks.db.prepare(sql).run();
   for (const sql of readFileSync(
@@ -109,12 +126,18 @@ beforeAll(async () => {
     .split('--> statement-breakpoint')
     .filter((s) => s.trim()))
     await mocks.db.prepare(sql).run();
+  for (const sql of readFileSync(
+    new URL('../../../../../drizzle/0079_real_justice.sql', import.meta.url),
+    'utf8',
+  ).split('--> statement-breakpoint'))
+    if (sql.trim()) await mocks.db.prepare(sql).run();
 }, 30000);
 async function seed(stock = false, token22 = false) {
   mocks.user = { userId: 'alice' };
   f = await pumpInitialBuySimulationFixture(stock, token22);
   mocks.rpc = f.rpc;
   for (const table of [
+    'solana_execution_reservations',
     'workspace_projects',
     'project_artwork',
     'workspace_wallets',
@@ -466,4 +489,148 @@ it('rejects changes to the saved developer percentage during atomic RPC', async 
   expect(
     (await send({ ...body, maximumQuoteCostRaw: '100000000' })).status,
   ).toBe(409);
+});
+
+it('persists the atomic review under real immutable and reservation triggers, without approval', async () => {
+  const terms = {
+    ...body,
+    origin,
+    maximumQuoteCostRaw: '100000000',
+  } as Parameters<typeof preparePumpInitialBuyReview>[2];
+  const result = await preparePumpInitialBuyReview(
+    mocks.db,
+    'alice',
+    terms,
+    new AbortController().signal,
+    f.rpc,
+  );
+  expect(result).toMatchObject({
+    format: 'pump-create-buy-review-v1',
+    state: 'review',
+    signingAllowed: false,
+    executionAllowed: false,
+    review: {
+      developerSupplyPercent: 0.1,
+      input: { tokenAmountRaw: '1000000000000', transactionVersion: 1 },
+    },
+  });
+  const reads = f.calls.length;
+  expect(
+    await preparePumpInitialBuyReview(
+      mocks.db,
+      'alice',
+      terms,
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).toEqual(result);
+  expect(f.calls).toHaveLength(reads);
+  const refreshed = await refreshPumpInitialBuyReview(
+    mocks.db,
+    'alice',
+    result.review.id,
+    new AbortController().signal,
+    f.rpc,
+  );
+  expect(refreshed.packet.sha256).toBe(result.review.sha256);
+  await expect(
+    refreshPumpInitialBuyReview(
+      mocks.db,
+      'bob',
+      result.review.id,
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('not found');
+  await expect(
+    preparePumpInitialBuyReview(
+      mocks.db,
+      'alice',
+      { ...terms, maximumQuoteCostRaw: '100000001' },
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('Another launch review');
+  await expect(
+    preparePumpInitialBuyReview(
+      mocks.db,
+      'bob',
+      terms,
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('owned launch');
+  await expect(
+    mocks.db
+      .prepare("UPDATE pump_launch_reviews SET terms='{}' WHERE id=?")
+      .bind(result.review.id)
+      .run(),
+  ).rejects.toThrow('Immutable');
+  await expect(
+    mocks.db
+      .prepare('INSERT INTO solana_execution_reservations VALUES(?,?,?,?,?)')
+      .bind('alice', terms.payer, 'swap', 'other', 'approved')
+      .run(),
+  ).rejects.toThrow('reserved for launch');
+  expect(
+    f.calls.some((c) => ['sendTransaction', 'sendBundle'].includes(c.method)),
+  ).toBe(false);
+});
+it('rejects an existing swap reservation before collecting a durable atomic review', async () => {
+  const terms = {
+    ...body,
+    origin,
+    maximumQuoteCostRaw: '100000000',
+  } as Parameters<typeof preparePumpInitialBuyReview>[2];
+  await mocks.db
+    .prepare('INSERT INTO solana_execution_reservations VALUES(?,?,?,?,?)')
+    .bind('alice', terms.payer, 'swap', 'other', 'approved')
+    .run();
+  await expect(
+    preparePumpInitialBuyReview(
+      mocks.db,
+      'alice',
+      terms,
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('already reserved');
+  expect(f.calls).toEqual([]);
+});
+it('does not persist or reserve a project edited after its unsigned atomic simulation', async () => {
+  const terms = {
+    ...body,
+    origin,
+    maximumQuoteCostRaw: '100000000',
+  } as Parameters<typeof preparePumpInitialBuyReview>[2];
+  let simulations = 0;
+  const rpc = async (
+    method: string,
+    params: unknown[],
+    signal: AbortSignal,
+  ) => {
+    const response = await f.rpc(method, params, signal);
+    if (method === 'simulateTransaction' && ++simulations === 2)
+      await mocks.db
+        .prepare("UPDATE workspace_projects SET updated_at='changed'")
+        .run();
+    return response;
+  };
+  await expect(
+    preparePumpInitialBuyReview(
+      mocks.db,
+      'alice',
+      terms,
+      new AbortController().signal,
+      rpc,
+    ),
+  ).rejects.toThrow('changed');
+  expect(
+    (await mocks.db
+      .prepare(
+        'SELECT COUNT(*) AS n FROM pump_launch_reviews WHERE owner_id=? AND project_id=?',
+      )
+      .bind('alice', terms.projectId)
+      .first<{ n: number }>())!.n,
+  ).toBe(0);
 });

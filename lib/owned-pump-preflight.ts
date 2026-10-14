@@ -242,7 +242,14 @@ export async function preflightOwnedPumpInitialBuy(
   owner: string,
   terms: OwnedPumpTerms & { maximumQuoteCostRaw: string },
   signal: AbortSignal,
-  options: { rpc?: PumpLaunchRpc; beforeRpc?: () => Promise<void> } = {},
+  options: {
+    rpc?: PumpLaunchRpc;
+    beforeRpc?: () => Promise<void>;
+    captureInput?: (
+      input: import('./pump-launch-message').PumpCreateInput,
+    ) => void;
+    lifetime?: { blockhash: string; lastValidBlockHeight: string };
+  } = {},
 ) {
   const supplied = structuredClone(terms);
   const { t, original, intent, assertUnchanged } = await ownedPumpSelection(
@@ -281,6 +288,8 @@ export async function preflightOwnedPumpInitialBuy(
     t.feeAndRentLimitRaw,
     signal,
     options.rpc,
+    fetch,
+    options.lifetime,
   );
   await assertUnchanged();
   const component = await buildSavedPumpInitialBuyComponent(db, owner, {
@@ -298,6 +307,7 @@ export async function preflightOwnedPumpInitialBuy(
       409,
     );
   await assertUnchanged();
+  options.captureInput?.({ ...reviewed.context, ...intent });
   return {
     format: 'pump-create-buy-preflight-v1' as const,
     executionAllowed: false as const,

@@ -79,8 +79,11 @@ async function project(db: D1Database, owner: string, id: string) {
     );
   return row;
 }
-async function authorityPolicy(
-  sim: Awaited<ReturnType<typeof preflightOwnedPumpCreate>>['simulation'],
+export async function requirePumpLaunchAuthorityPolicy(
+  sim: Pick<
+    Awaited<ReturnType<typeof preflightOwnedPumpCreate>>['simulation'],
+    'metadataUpdateAuthority' | 'metadataPointerAuthority' | 'mintAuthority'
+  >,
   mint: string,
 ) {
   const pdas = await pumpCreateAddresses(mint);
@@ -121,7 +124,7 @@ export async function preparePumpLaunch(
       input = v;
     },
   });
-  await authorityPolicy(checked.simulation, terms.mint);
+  await requirePumpLaunchAuthorityPolicy(checked.simulation, terms.mint);
   if (!input || signal.aborted) fail('Launch preparation interrupted.');
   const review: PumpSigningReview = {
     id: crypto.randomUUID(),
@@ -178,7 +181,7 @@ async function refresh(
       lastValidBlockHeight: review.input.lastValidBlockHeight,
     },
   });
-  await authorityPolicy(checked.simulation, row.mint);
+  await requirePumpLaunchAuthorityPolicy(checked.simulation, row.mint);
   if (checked.packet.sha256 !== review.sha256)
     fail('Launch configuration changed. Prepare again.');
   return checked;
