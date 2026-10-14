@@ -2,6 +2,12 @@
 
 Full goal: **make this product like Proxima**. Status: **not complete**. This matrix preserves the full goal rather than defining success around passing local tests or recently added features.
 
+## Atomic Pump developer-buy construction, 14 October 2026
+
+An unsigned atomic create + developer buy component now binds exact saved supply percentages, released metadata/image and quote mint to a separately declared quote-token spending cap. Version 1 resolves the old packet-size obstacle without lookup tables; version 0 remains an explicitly selected bounded fallback. Sixty-six targeted construction/saved-libSQL/create-only regressions, TypeScript and typed lint pass. Read-only native mainnet simulation accepted the v1 format and failed on the deliberately unfunded generated payer; a current TSLAX configuration produced an unsigned stock packet. No signing/API/UI integration or successful funded launch is established. See CODEX-PUMP-ATOMIC-INITIAL-BUY-20261014.md for the exact evidence and required combined simulation, durable approval, holder buys and submission/recovery work. Existing launch signing remains create-only.
+
+Wallet login is committed separately as 9a611a4, with 22 focused tests, build and rendered desktop/mobile checks. It is not deployed; Google consent/credentials remain pending. See CODEX-WALLET-LOGIN-20261014.md.
+
 ## Vercel release and identity update, 14 October 2026
 
 The production app is now available at https://bundle-tek.vercel.app/ using Next.js and a fresh Turso database. App source 6cd047d is deployed; handoff 589eaae is on main. All 81 committed migrations applied to fresh local libSQL and the new remote database. The prior full Node 24 suite passed 2,390 tests, with the final login-link follow-up separately verified. Real hosted HTTP checks proved project persistence, owner isolation, image upload/retrieval, explicit public metadata/image release, request-origin protection and session revocation. The old friend-owned Site and CROP database remain unchanged; their historical blockers do not block this separate live host. See CODEX-VERCEL-MIGRATION-20261014.md.

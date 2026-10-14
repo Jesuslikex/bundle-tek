@@ -1,0 +1,91 @@
+{
+  "source": "https://raw.githubusercontent.com/pump-fun/pump-public-docs/639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22/idl/pump.json",
+  "commit": "639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22",
+  "sourceSha256": "7616681ea557975f9f623ac211080f22a93060781eaf4765b0a488d980997207",
+  "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+  "feeProgram": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+  "instruction": {
+    "name": "buy_v3",
+    "discriminator": [7, 5, 29, 196, 245, 23, 101, 80],
+    "accounts": [
+      {
+        "name": "global"
+      },
+      {
+        "name": "base_mint"
+      },
+      {
+        "name": "quote_mint"
+      },
+      {
+        "name": "base_token_program"
+      },
+      {
+        "name": "quote_token_program"
+      },
+      {
+        "name": "bonding_curve",
+        "writable": true
+      },
+      {
+        "name": "associated_base_bonding_curve",
+        "writable": true
+      },
+      {
+        "name": "associated_quote_bonding_curve",
+        "writable": true
+      },
+      {
+        "name": "user",
+        "writable": true,
+        "signer": true
+      },
+      {
+        "name": "associated_base_user",
+        "writable": true
+      },
+      {
+        "name": "associated_quote_user",
+        "writable": true
+      },
+      {
+        "name": "user_volume_accumulator",
+        "writable": true
+      },
+      {
+        "name": "fee_config"
+      },
+      {
+        "name": "buyback_fee_recipient",
+        "writable": true
+      },
+      {
+        "name": "system_program"
+      },
+      {
+        "name": "event_authority"
+      },
+      {
+        "name": "program"
+      }
+    ],
+    "args": [
+      {
+        "name": "amount",
+        "type": "u64"
+      },
+      {
+        "name": "max_sol_cost",
+        "type": "u64"
+      },
+      {
+        "name": "partial_fill",
+        "type": {
+          "defined": {
+            "name": "OptionBool"
+          }
+        }
+      }
+    ]
+  }
+}

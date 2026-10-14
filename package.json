@@ -31,6 +31,7 @@
     "@solana/kit-plugin-instruction-plan": "0.13.0",
     "@solana/kit-plugin-rpc": "^0.15.0",
     "@solana/kit-plugin-wallet": "^0.14.0",
+    "@solana/kit-v1": "npm:@solana/kit@8.5.0",
     "@solana/react": "^7.1.1",
     "@wallet-standard/app": "1.1.1",
     "better-auth": "^1.7.7",
