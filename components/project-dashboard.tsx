@@ -251,10 +251,10 @@ export function ProjectDashboard({
             {/* oxlint-disable-next-line next/no-html-link-for-pages -- Sites sign-in must use a top-level document navigation. */}
             <a
               className={buttonVariants()}
-              href="/signin-with-chatgpt?return_to=/"
+              href="/sign-in"
               target="_top"
             >
-              <LogIn /> Sign in with ChatGPT
+              <LogIn /> Sign in
             </a>
           </div>
         )}

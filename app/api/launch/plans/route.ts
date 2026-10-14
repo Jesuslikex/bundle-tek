@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 function unauthorized() {
   return Response.json(
-    { error: 'Sign in with ChatGPT to save launch plans.' },
+    { error: 'Sign in to save launch plans.' },
     { status: 401 },
   );
 }

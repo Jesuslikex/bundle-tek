@@ -5,7 +5,7 @@ import { validatePulseStrategy } from '@/lib/pulse-validation';
 export const dynamic = 'force-dynamic';
 
 function unauthorized() {
-  return Response.json({ error: 'Sign in with ChatGPT to control the backend.' }, { status: 401 });
+  return Response.json({ error: 'Sign in to control the backend.' }, { status: 401 });
 }
 
 export async function GET() {

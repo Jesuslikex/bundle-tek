@@ -26,7 +26,7 @@ it('shows one sign-in prompt instead of empty-workspace claims when signed out',
     importsError: 'Sign in to open imported token projects.',
   });
   expect(html).toContain('Sign in to open your workspace');
-  expect(html).toContain('href="/signin-with-chatgpt?return_to=/"');
+  expect(html).toContain('href="/sign-in"');
   expect(html).toContain('Sign in to load your imported tokens.');
   expect(html).not.toContain('Your next launch starts here');
   expect(html).not.toContain('0 active imports');
