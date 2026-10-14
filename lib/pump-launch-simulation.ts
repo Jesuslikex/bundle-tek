@@ -155,6 +155,7 @@ export async function simulatePumpCreate(
   signal: AbortSignal,
   suppliedRpc?: PumpLaunchRpc,
   fetcher: typeof fetch = fetch,
+  lifetime?: { blockhash: string; lastValidBlockHeight: string },
 ) {
   const i = structuredClone(intent),
     limit = uint(feeAndRentLimitRaw);
@@ -195,8 +196,10 @@ export async function simulatePumpCreate(
     value?: { blockhash?: unknown; lastValidBlockHeight?: unknown };
   };
   const slots = [slot(latest.context?.slot)],
-    latestHash = latest.value?.blockhash,
-    lastValidBlockHeight = uint(latest.value?.lastValidBlockHeight);
+    latestHash = lifetime?.blockhash ?? latest.value?.blockhash,
+    lastValidBlockHeight = uint(
+      lifetime?.lastValidBlockHeight ?? latest.value?.lastValidBlockHeight,
+    );
   if (typeof latestHash !== 'string')
     throw new Error('Pump launch blockhash is unavailable.');
   const pdas = await pumpCreateAddresses(i.mint);

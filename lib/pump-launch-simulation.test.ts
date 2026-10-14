@@ -324,3 +324,46 @@ it('rejects changed readonly executable state even when money still reconciles',
     ),
   ).rejects.toThrow(/executable/);
 });
+
+it('resimulates the reviewed lifetime instead of replacing its blockhash', async () => {
+  const f = await fixture();
+  const first = await simulatePumpCreate(
+    f.intent,
+    '5000000',
+    new AbortController().signal,
+    f.rpc,
+  );
+  const rpc: PumpLaunchRpc = async (method, params, signal) =>
+    method === 'getLatestBlockhash'
+      ? {
+          context: { slot: '100' },
+          value: {
+            blockhash: '11111111111111111111111111111111',
+            lastValidBlockHeight: '1200',
+          },
+        }
+      : f.rpc(method, params, signal);
+  const second = await simulatePumpCreate(
+    f.intent,
+    '5000000',
+    new AbortController().signal,
+    rpc,
+    fetch,
+    {
+      blockhash: first.context.blockhash,
+      lastValidBlockHeight: first.context.lastValidBlockHeight.toString(),
+    },
+  );
+  expect(second.preparation.transaction).toBe(first.preparation.transaction);
+  f.state.height = '1001';
+  await expect(
+    simulatePumpCreate(
+      f.intent,
+      '5000000',
+      new AbortController().signal,
+      rpc,
+      fetch,
+      { blockhash: first.context.blockhash, lastValidBlockHeight: '1000' },
+    ),
+  ).rejects.toThrow();
+});

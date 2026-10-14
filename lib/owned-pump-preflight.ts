@@ -44,7 +44,14 @@ export async function preflightOwnedPumpCreate(
   owner: string,
   terms: OwnedPumpTerms,
   signal: AbortSignal,
-  options: { rpc?: PumpLaunchRpc; beforeRpc?: () => Promise<void> } = {},
+  options: {
+    rpc?: PumpLaunchRpc;
+    beforeRpc?: () => Promise<void>;
+    lifetime?: { blockhash: string; lastValidBlockHeight: string };
+    captureInput?: (
+      input: import('./pump-launch-message').PumpCreateInput,
+    ) => void;
+  } = {},
 ) {
   const t = structuredClone(terms),
     origin = new URL(t.origin);
@@ -146,6 +153,8 @@ export async function preflightOwnedPumpCreate(
     t.feeAndRentLimitRaw,
     signal,
     options.rpc,
+    fetch,
+    options.lifetime,
   );
   const observed = await read();
   if (
@@ -165,6 +174,7 @@ export async function preflightOwnedPumpCreate(
     origin: t.origin,
     context: reviewed.context,
   });
+  options.captureInput?.({ ...reviewed.context, ...intent });
   if (component.packetSha256 !== reviewed.preparation.packetSha256)
     throw new PumpPreflightError(
       'Saved metadata or quote changed during preflight.',

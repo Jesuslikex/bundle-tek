@@ -16,8 +16,10 @@ import {
   type PumpLaunchAccount,
 } from '../lib/pump-launch-config';
 export async function pumpLaunchFixture() {
-  const payer = (await generateKeyPairSigner()).address,
-    mint = (await generateKeyPairSigner()).address;
+  const payerSigner = await generateKeyPairSigner(),
+    mintSigner = await generateKeyPairSigner();
+  const payer = payerSigner.address,
+    mint = mintSigner.address;
   const pdas = await pumpCreateAddresses(mint),
     globalAddress = pdas.global,
     controlAddress = pdas.control;
@@ -147,6 +149,8 @@ export async function pumpLaunchFixture() {
   }
 
   return {
+    payerSigner,
+    mintSigner,
     payer,
     mint,
     pdas,
