@@ -5,7 +5,7 @@ import {
 import { captureTradeSession } from '@/lib/imported-trade-session-server';
 import { ConditionalBuyStorageUnavailable } from '@/lib/conditional-buy-capability';
 import { requireConditionalBuyOutputPrecision } from '@/lib/conditional-signing';
-import { env } from 'cloudflare:workers';
+import { env } from '@/lib/server-env';
 import { walletAddress } from '@/lib/wallet-workspace';
 import {
   importedTradeSettings,

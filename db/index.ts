@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:workers';
+import {getTursoDatabase} from './turso';
 
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS pulse_strategies (
@@ -110,8 +110,7 @@ const schemaStatements = [
 ];
 
 export function getD1(): D1Database {
-  if (!env.DB) throw new Error('D1 binding DB is unavailable');
-  return env.DB;
+  return getTursoDatabase();
 }
 
 export async function ensurePulseSchema() {

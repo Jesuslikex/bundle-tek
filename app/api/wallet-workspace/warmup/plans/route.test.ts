@@ -110,7 +110,7 @@ const request = (
     }),
   );
 const list = async () =>
-  (await (await GET()).json()) as { plans: SavedWarmup[] };
+  (await (await GET(new Request('http://localhost:3000/api/wallet-workspace/warmup/plans'))).json()) as { plans: SavedWarmup[] };
 const eventList = (cursor?: string) =>
   history(
     new Request(
@@ -825,7 +825,7 @@ it('rejects stale, archived and cross-chain wallet snapshots at save time', asyn
 });
 it('requires auth/origin and bounds names, input and per-owner storage', async () => {
   mocks.user = null;
-  expect((await GET()).status).toBe(401);
+  expect((await GET(new Request('http://localhost:3000/api/wallet-workspace/warmup/plans'))).status).toBe(401);
   expect((await request()).status).toBe(401);
   mocks.user = { userId: 'one' };
   expect(

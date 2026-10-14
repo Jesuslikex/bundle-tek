@@ -4,7 +4,7 @@ import { validateFunding } from '@/lib/funding-plan';
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
-export async function GET(request?: Request) {
+export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return json({ error: 'Sign in to open funding plans.' }, 401);
   const id = request ? new URL(request.url).searchParams.get('id') : null;

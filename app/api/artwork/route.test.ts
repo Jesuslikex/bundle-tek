@@ -233,7 +233,7 @@ it('lists owned metadata without image bytes and counts active and archived proj
       )
       .bind(owner, id, archived, document, '2026-10-10')
       .run();
-  const response = await listArtwork();
+  const response = await listArtwork(new Request('http://localhost:3000/api/artwork'));
   expect(response.status).toBe(200);
   expect(response.headers.get('cache-control')).toContain('no-store');
   const body = (await response.json()) as {
@@ -264,12 +264,12 @@ it('lists owned metadata without image bytes and counts active and archived proj
     )?.n,
   ).toBe(1);
   mocks.user = { userId: 'bob' };
-  expect(await (await listArtwork()).json()).toMatchObject({
+  expect(await (await listArtwork(new Request('http://localhost:3000/api/artwork'))).json()).toMatchObject({
     artwork: [],
     usage: { count: 0, bytes: 0 },
   });
   await upload();
-  const other = (await (await listArtwork()).json()) as typeof body;
+  const other = (await (await listArtwork(new Request('http://localhost:3000/api/artwork'))).json()) as typeof body;
   expect(other.artwork[0]).toMatchObject({
     activeProjects: 1,
     archivedProjects: 0,
@@ -277,13 +277,13 @@ it('lists owned metadata without image bytes and counts active and archived proj
 });
 it('requires sign-in for the library and reports storage failures instead of an empty collection', async () => {
   mocks.user = null;
-  expect((await listArtwork()).status).toBe(401);
+  expect((await listArtwork(new Request('http://localhost:3000/api/artwork'))).status).toBe(401);
   mocks.user = { userId: 'alice' };
   await mocks.db
     .prepare('ALTER TABLE workspace_projects RENAME TO projects_hidden')
     .run();
   try {
-    const response = await listArtwork();
+    const response = await listArtwork(new Request('http://localhost:3000/api/artwork'));
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain('projects_hidden');
   } finally {
@@ -329,7 +329,7 @@ it('archives and restores owned images with stable bytes, quota and saved projec
     revision: 2,
     archived: true,
   });
-  expect(await (await listArtwork()).json()).toMatchObject({
+  expect(await (await listArtwork(new Request('http://localhost:3000/api/artwork'))).json()).toMatchObject({
     artwork: [],
     usage: { count: 1, bytes: png.length, archivedCount: 1 },
   });
@@ -351,7 +351,7 @@ it('archives and restores owned images with stable bytes, quota and saved projec
   });
   expect((await manage(artwork.id, 1, 'restore')).status).toBe(409);
   expect((await manage(artwork.id, 2, 'restore')).status).toBe(200);
-  expect(await (await listArtwork()).json()).toMatchObject({
+  expect(await (await listArtwork(new Request('http://localhost:3000/api/artwork'))).json()).toMatchObject({
     artwork: [
       expect.objectContaining({
         archived: false,

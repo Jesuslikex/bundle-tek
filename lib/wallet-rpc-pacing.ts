@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:workers';
+import { env } from '@/lib/server-env';
 
 const nextReads = new Map<string, number>();
 // Optional per-runtime pacing for a configured low-rate provider. No retries or rotation.

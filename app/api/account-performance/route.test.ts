@@ -189,9 +189,9 @@ async function warmupFixture() {
 }
 it('authenticates and returns an explicit empty summary without invented gains', async () => {
   mocks.user = null;
-  expect((await GET()).status).toBe(401);
+  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(401);
   mocks.user = { userId: 'empty' };
-  expect(await (await GET()).json()).toMatchObject({
+  expect(await (await GET(new Request('http://localhost:3000/api/account-performance'))).json()).toMatchObject({
     receiptCount: 0,
     recordedRealizedLamports: null,
     scopes: [],
@@ -280,7 +280,7 @@ it('reads owner-bound bundle expenses in the real D1 snapshot and reconciles par
         .bind(owner, row.id, p.packet, p.signature)
         .run();
   }
-  const response = await GET();
+  const response = await GET(new Request('http://localhost:3000/api/account-performance'));
   expect(response.status).toBe(200);
   const summary = (await response.json()) as AccountPerformance;
   const expense = (BigInt(f.manifest.tip.amountRaw) + 2n) / 2n;
@@ -315,7 +315,7 @@ it('reads owner-bound bundle expenses in the real D1 snapshot and reconciles par
     .prepare('DELETE FROM jito_bundle_finalizations WHERE owner_id=?')
     .bind('one')
     .run();
-  const missing = (await (await GET()).json()) as AccountPerformance;
+  const missing = (await (await GET(new Request('http://localhost:3000/api/account-performance'))).json()) as AccountPerformance;
   expect(missing).toMatchObject({
     missingBundleCostCount: 1,
     recordedRealizedLamports: null,
@@ -324,7 +324,7 @@ it('reads owner-bound bundle expenses in the real D1 snapshot and reconciles par
   expect(missing.bundleTipLamports).toBe('0');
   await mocks.db.prepare('DROP TABLE jito_bundle_packets').run();
   try {
-    const legacyResponse = await GET();
+    const legacyResponse = await GET(new Request('http://localhost:3000/api/account-performance'));
     expect(legacyResponse.status).toBe(200);
     const legacy = (await legacyResponse.json()) as AccountPerformance;
     expect(legacy).toMatchObject({
@@ -346,7 +346,7 @@ it('aggregates two-source sales and partial warmup exits exactly across archived
   await importedFixture();
   await importedFixture('other');
   await warmupFixture();
-  const response = await GET();
+  const response = await GET(new Request('http://localhost:3000/api/account-performance'));
   expect(response.status).toBe(200);
   expect(response.headers.get('cache-control')).toBe('no-store');
   const value = (await response.json()) as AccountPerformance;
@@ -388,7 +388,7 @@ it('withholds complete results for unlinked inventory sales rather than treating
       JSON.stringify(r.document),
     )
     .run();
-  expect(await (await GET()).json()).toMatchObject({
+  expect(await (await GET(new Request('http://localhost:3000/api/account-performance'))).json()).toMatchObject({
     recordedRealizedLamports: null,
     linkedResultLamports: '-153',
     unlinkedSaleCount: 1,
@@ -401,10 +401,10 @@ it('refuses incomplete splits, orphan projects and cross-plan warmup sales witho
     .prepare('DELETE FROM imported_trade_lot_links WHERE owner_id=? AND id=?')
     .bind('one', id(501))
     .run();
-  expect((await GET()).status).toBe(503);
+  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(503);
   await mocks.db.prepare('DELETE FROM imported_trade_lot_links').run();
   await mocks.db.prepare('DELETE FROM imported_token_projects').run();
-  expect((await GET()).status).toBe(503);
+  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(503);
   await mocks.db.prepare('DELETE FROM imported_swap_receipts').run();
   await mocks.db
     .prepare('INSERT INTO wallet_warmup_plans VALUES(?,?,?,0)')
@@ -414,7 +414,7 @@ it('refuses incomplete splits, orphan projects and cross-plan warmup sales witho
     .prepare('UPDATE warmup_sell_receipts SET plan_id=?')
     .bind(id(11))
     .run();
-  expect((await GET()).status).toBe(503);
+  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(503);
 });
 it('reads all receipts beyond one UI page and rejects duplicate cross-workflow signatures', async () => {
   await importedFixture();
@@ -437,7 +437,7 @@ it('reads all receipts beyond one UI page and rejects duplicate cross-workflow s
         );
     }),
   );
-  expect(await (await GET()).json()).toMatchObject({
+  expect(await (await GET(new Request('http://localhost:3000/api/account-performance'))).json()).toMatchObject({
     receiptCount: 56,
     unallocatedCostLamports: '5656',
     recordedRealizedLamports: null,
@@ -448,7 +448,7 @@ it('reads all receipts beyond one UI page and rejects duplicate cross-workflow s
     .prepare('UPDATE imported_swap_receipts SET document=? WHERE id=?')
     .bind(JSON.stringify(buy.document), id(20))
     .run();
-  expect((await GET()).status).toBe(503);
+  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(503);
 });
 it('rejects an over-capacity account snapshot before displaying any subset', async () => {
   await importedFixture();
@@ -459,7 +459,7 @@ it('rejects an over-capacity account snapshot before displaying any subset', asy
     )
     .bind(id(2))
     .run();
-  const response = await GET();
+  const response = await GET(new Request('http://localhost:3000/api/account-performance'));
   expect(response.status).toBe(503);
   expect(await response.json()).toEqual({
     error:

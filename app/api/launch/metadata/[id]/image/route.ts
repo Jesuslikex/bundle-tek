@@ -1,6 +1,6 @@
 import { getD1 } from '@/db';
 import { artworkIdValid } from '@/lib/artwork';
-import { publicMetadataHeaders } from '../route';
+import { publicMetadataHeaders } from '@/lib/public-metadata-headers';
 export const dynamic = 'force-dynamic';
 
 export async function GET(

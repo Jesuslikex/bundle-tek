@@ -11,7 +11,7 @@ import {
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
-export async function GET(request?: Request) {
+export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return json({ error: 'Sign in to browse your artwork.' }, 401);
   const view = request ? new URL(request.url).searchParams.get('view') : null;

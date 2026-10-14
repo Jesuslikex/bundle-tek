@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:workers';
+import { env } from '@/lib/server-env';
 import { decodeTradeSession } from './imported-trade-session';
 import {
   captureTradeSession,

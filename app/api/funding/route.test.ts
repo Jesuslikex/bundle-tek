@@ -189,7 +189,7 @@ describe('saved funding plans on real D1', () => {
     expect(await missing.json()).toEqual({
       error: 'Saved funding draft not found.',
     });
-    expect((await read(await GET())).plans).toHaveLength(1);
+    expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans).toHaveLength(1);
   });
   it('preserves exact amounts and derives recipient times from delay', () => {
     const value = input(),
@@ -263,7 +263,7 @@ describe('saved funding plans on real D1', () => {
       ],
     };
     expect((await post({ document })).status).toBe(200);
-    const before = await read(await GET());
+    const before = await read(await GET(new Request('http://localhost:3000/api/funding')));
     expect(before.plans[0].document).toMatchObject({
       assetAddress: document.assetAddress,
       total: '0.123456789012345678',
@@ -279,12 +279,12 @@ describe('saved funding plans on real D1', () => {
         })
       ).status,
     ).toBe(400);
-    expect(await read(await GET())).toEqual(before);
+    expect(await read(await GET(new Request('http://localhost:3000/api/funding')))).toEqual(before);
     expect((await read(await history())).events).toHaveLength(1);
   });
   it('enforces authentication, same origin and JSON', async () => {
     mocks.user = null;
-    expect((await GET()).status).toBe(401);
+    expect((await GET(new Request('http://localhost:3000/api/funding'))).status).toBe(401);
     expect((await history()).status).toBe(401);
     expect((await post()).status).toBe(401);
     mocks.user = { userId: 'alice', email: 'a@b.test' };
@@ -292,7 +292,7 @@ describe('saved funding plans on real D1', () => {
       403,
     );
     expect((await post({}, { 'content-type': 'text/plain' })).status).toBe(415);
-    expect((await GET()).headers.get('cache-control')).toBe('no-store');
+    expect((await GET(new Request('http://localhost:3000/api/funding'))).headers.get('cache-control')).toBe('no-store');
   });
   it('saves actual history through update, archive and restore', async () => {
     expect((await post()).status).toBe(200);
@@ -313,7 +313,7 @@ describe('saved funding plans on real D1', () => {
     expect(
       (await post({ action: 'restore', expectedRevision: 3 })).status,
     ).toBe(200);
-    const rows = await read(await GET());
+    const rows = await read(await GET(new Request('http://localhost:3000/api/funding')));
     expect(rows.plans[0].revision).toBe(4);
     expect(rows.plans[0].document.name).toBe('Changed');
     expect(rows.plans[0].archived).toBe(false);
@@ -327,7 +327,7 @@ describe('saved funding plans on real D1', () => {
   it('isolates owners even when IDs coincide', async () => {
     await post();
     mocks.user = { userId: 'bob', email: 'b@b.test' };
-    expect((await read(await GET())).plans).toEqual([]);
+    expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans).toEqual([]);
     expect((await read(await history())).events).toEqual([]);
     expect((await post({ expectedRevision: 1 })).status).toBe(409);
     expect((await post()).status).toBe(200);
@@ -343,7 +343,7 @@ describe('saved funding plans on real D1', () => {
       200, 409,
     ]);
     expect((await read(await history())).events).toHaveLength(2);
-    expect((await read(await GET())).plans[0].revision).toBe(2);
+    expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans[0].revision).toBe(2);
   });
   it('rolls back the plan mutation when event storage fails', async () => {
     await post();
@@ -352,7 +352,7 @@ describe('saved funding plans on real D1', () => {
       .run();
     try {
       expect((await post({ expectedRevision: 1 })).status).toBe(503);
-      expect((await read(await GET())).plans[0].revision).toBe(1);
+      expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans[0].revision).toBe(1);
     } finally {
       await mocks.db
         .prepare('ALTER TABLE funding_events_hidden RENAME TO funding_events')
@@ -371,7 +371,7 @@ describe('saved funding plans on real D1', () => {
       ).status,
     ).toBe(400);
     expect((await post({ action: 'execute' })).status).toBe(400);
-    expect((await read(await GET())).plans).toEqual([]);
+    expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans).toEqual([]);
     expect((await read(await history())).events).toEqual([]);
   });
   it('pages history without duplicate events and rejects invalid cursors', async () => {

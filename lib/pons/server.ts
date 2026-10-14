@@ -1,5 +1,5 @@
 import { observeReceipt } from './receipt';
-import { env } from 'cloudflare:workers';
+import { env } from '@/lib/server-env';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { PonsStore } from './store';

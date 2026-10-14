@@ -33,7 +33,7 @@ type Stored = Record<string, unknown> & {
   scopeDocument: string;
   scopeArchived: number;
 };
-export async function GET(request?: Request) {
+export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user)
     return json(

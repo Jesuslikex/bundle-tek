@@ -1446,3 +1446,4 @@ export const sessionPreparationJobEvents = sqliteTable(
     ),
   ],
 );
+export * from './auth-schema';

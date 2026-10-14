@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:workers';
+import { env } from '@/lib/server-env';
 
 type RpcEnvelope<T> = { result?: T; error?: { code: number; message: string } };
 

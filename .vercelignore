@@ -1,0 +1,10 @@
+work/
+outputs/
+node_modules/
+.next/
+.agents/
+docs/
+.git/
+.env*
+*.test.ts
+*.test.tsx

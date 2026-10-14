@@ -1,12 +1,9 @@
+import { publicMetadataHeaders } from '@/lib/public-metadata-headers';
 import { getD1 } from '@/db';
 import { artworkIdValid } from '@/lib/artwork';
 export const dynamic = 'force-dynamic';
 
-export const publicMetadataHeaders = {
-  'access-control-allow-origin': '*',
-  'cross-origin-resource-policy': 'cross-origin',
-  'x-content-type-options': 'nosniff',
-};
+
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },

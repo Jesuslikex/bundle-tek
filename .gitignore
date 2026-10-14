@@ -39,3 +39,9 @@ next-env.d.ts
 /.playwright-cli/
 /.sites/
 *.tsbuildinfo
+
+/.next/
+
+# Provider CLI skill installation is local tooling
+/.agents/
+/skills-lock.json
