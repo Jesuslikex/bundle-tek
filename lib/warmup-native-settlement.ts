@@ -2,6 +2,10 @@ import bs58 from 'bs58';
 import { address, getProgramDerivedAddress } from '@solana/kit';
 import type { ImportedSwapSimulation } from './imported-swap-simulation';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
+import {
+  assessJupiterExactOutRoute,
+  type JupiterExactOutOrder,
+} from './jupiter-exact-out-assessment';
 export const WARMUP_TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 export const WARMUP_NATIVE = 'So11111111111111111111111111111111111111112';
 const SYSTEM = '11111111111111111111111111111111';
@@ -171,10 +175,152 @@ export type WarmupSettlement = {
   }[];
   lookupTables: { address: string; sha256: string; lastExtendedSlot: string }[];
 };
+type NativeOrder = Pick<
+  SolanaSwapPreparation,
+  'side' | 'inputMint' | 'outputMint' | 'inAmount' | 'minimumOutAmount'
+> & {
+  preparation: Pick<
+    SolanaSwapPreparation['preparation'],
+    'wallet' | 'accountCount' | 'lookupTableCount'
+  >;
+};
+export type NativeSettlementSimulation = Pick<
+  ImportedSwapSimulation,
+  | 'settlementEvidence'
+  | 'instructionReview'
+  | 'accountBindings'
+  | 'nativeChangeRaw'
+  | 'networkFeeLamports'
+  | 'lookupObservation'
+  | 'simulationSlot'
+> & {
+  routeAssessment: {
+    decoded: { sourceAccount: string; destinationAccount: string } | null;
+  };
+};
 export async function reviewWarmupSettlement(
   order: SolanaSwapPreparation,
   simulation: ImportedSwapSimulation,
 ): Promise<WarmupSettlement> {
+  return (await reviewNativeSettlement(order, simulation, null)).settlement;
+}
+export async function reviewExactOutputNativeSettlement(
+  order: JupiterExactOutOrder & {
+    accountCount: number;
+    lookupTableCount: number;
+  },
+  simulation: NativeSettlementSimulation,
+  feeRentLimitRaw: string,
+) {
+  if (
+    order.inputMint !== WARMUP_NATIVE ||
+    order.outputMint === WARMUP_NATIVE ||
+    uint(simulation.networkFeeLamports) < 1n ||
+    uint(simulation.networkFeeLamports) > 1000000n
+  )
+    throw new Error(
+      'ExactOut settlement requires a native Buy with bounded observed fees.',
+    );
+  const route = assessJupiterExactOutRoute(simulation.instructionReview, order);
+  if (route.status !== 'Matched fields' || !route.decoded)
+    throw new Error(
+      'ExactOut native settlement requires matching declared route fields.',
+    );
+  const call = simulation.instructionReview.instructions.find(
+    (i) => i.program.address === 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4',
+  )!;
+  const budgets = new Set<number>();
+  for (const instruction of simulation.instructionReview.instructions) {
+    if (
+      instruction.program.address !==
+      'ComputeBudget111111111111111111111111111111'
+    )
+      continue;
+    const bytes = Uint8Array.from(instruction.dataHex.match(/../g) ?? [], (v) =>
+        parseInt(v, 16),
+      ),
+      view = new DataView(bytes.buffer),
+      tag = bytes[0];
+    if (instruction.accounts.length || budgets.has(tag))
+      throw new Error('ExactOut requires unique account-free compute budgets.');
+    budgets.add(tag);
+    if (
+      tag === 2 &&
+      bytes.length === 5 &&
+      view.getUint32(1, true) >= 1 &&
+      view.getUint32(1, true) <= 1400000
+    )
+      continue;
+    if (tag === 3 && bytes.length === 9 && view.getBigUint64(1, true) === 0n)
+      continue;
+    if (
+      tag === 1 &&
+      bytes.length === 5 &&
+      view.getUint32(1, true) >= 32768 &&
+      view.getUint32(1, true) <= 262144 &&
+      view.getUint32(1, true) % 1024 === 0
+    )
+      continue;
+    if (
+      tag === 4 &&
+      bytes.length === 5 &&
+      view.getUint32(1, true) >= 1 &&
+      view.getUint32(1, true) <= 67108864
+    )
+      continue;
+    throw new Error('ExactOut compute budget or priority fee is unsupported.');
+  }
+  const result = await reviewNativeSettlement(
+    {
+      side: 'Buy',
+      inputMint: order.inputMint,
+      outputMint: order.outputMint,
+      inAmount: order.quotedInputRaw,
+      minimumOutAmount: order.outputTargetRaw,
+      preparation: {
+        wallet: order.wallet,
+        accountCount: order.accountCount,
+        lookupTableCount: order.lookupTableCount,
+      },
+    },
+    {
+      ...simulation,
+      routeAssessment: {
+        decoded: {
+          sourceAccount: call.accounts[3].address,
+          destinationAccount: call.accounts[6].address,
+        },
+      },
+    },
+    {
+      maximumInputRaw: order.maximumInputRaw,
+      exactOutputRaw: order.outputTargetRaw,
+      feeRentLimitRaw,
+    },
+  );
+  if (!result.settlement.closesWrappedAccount)
+    throw new Error(
+      'ExactOut automatic wrapping requires wallet-bound cleanup.',
+    );
+  return {
+    format: 'exact-output-native-settlement-v1' as const,
+    executionAllowed: false as const,
+    instructionsVerified: false as const,
+    swapMode: 'ExactOut' as const,
+    actualInputRaw: (-BigInt(result.nativeSettlementRaw)).toString(),
+    rentChangeRaw: result.rentChangeRaw,
+    settlement: result.settlement,
+  };
+}
+async function reviewNativeSettlement(
+  order: NativeOrder,
+  simulation: NativeSettlementSimulation,
+  exactOut: {
+    maximumInputRaw: string;
+    exactOutputRaw: string;
+    feeRentLimitRaw: string;
+  } | null,
+) {
   const evidence = simulation.settlementEvidence,
     route = simulation.routeAssessment.decoded;
   if (
@@ -511,7 +657,9 @@ export async function reviewWarmupSettlement(
     if (
       s.funding > 0n &&
       (order.side !== 'Buy' ||
-        s.funding !== uint(order.inAmount) ||
+        (exactOut
+          ? s.funding > uint(exactOut.maximumInputRaw)
+          : s.funding !== uint(order.inAmount)) ||
         (s.syncedAt === -1 && s.fundedAt > s.initializedAt))
     )
       throw new Error(
@@ -523,7 +671,9 @@ export async function reviewWarmupSettlement(
       const delta = (s.final?.amount ?? 0n) - (s.initial?.amount ?? 0n);
       if (
         order.side === 'Buy'
-          ? delta < uint(order.minimumOutAmount)
+          ? exactOut
+            ? delta !== uint(exactOut.exactOutputRaw)
+            : delta < uint(order.minimumOutAmount)
           : delta !== -uint(order.inAmount)
       )
         throw new Error(
@@ -544,7 +694,12 @@ export async function reviewWarmupSettlement(
     uint(simulation.networkFeeLamports);
   if (
     order.side === 'Buy'
-      ? effective !== -uint(order.inAmount)
+      ? exactOut
+        ? effective >= 0n ||
+          -effective > uint(exactOut.maximumInputRaw) ||
+          -effective > wrapped.funding ||
+          (wrapped.initial?.amount ?? 0n) !== 0n
+        : effective !== -uint(order.inAmount)
       : effective < uint(order.minimumOutAmount)
   )
     throw new Error(
@@ -556,6 +711,9 @@ export async function reviewWarmupSettlement(
   );
   if (
     maximumRent > 6000000n ||
+    (exactOut &&
+      maximumRent + uint(simulation.networkFeeLamports) >
+        uint(exactOut.feeRentLimitRaw)) ||
     uint(before[0]) < setupDebit + uint(simulation.networkFeeLamports)
   )
     throw new Error(
@@ -571,7 +729,7 @@ export async function reviewWarmupSettlement(
     tables.some((t) => !/^[a-f0-9]{64}$/.test(t.sha256))
   )
     throw new Error('Signing requires rechecked lookup tables.');
-  return {
+  const settlement: WarmupSettlement = {
     version: 1,
     accountKeysSha256: await warmupAccountKeysHash(keys),
     wrappedFromNativeRaw: wrapped.funding.toString(),
@@ -593,5 +751,10 @@ export async function reviewWarmupSettlement(
       rentBeforeRaw: s.firstRent.toString(),
     })),
     lookupTables: tables,
+  };
+  return {
+    settlement,
+    nativeSettlementRaw: effective.toString(),
+    rentChangeRaw: rentChange.toString(),
   };
 }

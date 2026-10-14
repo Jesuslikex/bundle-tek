@@ -299,6 +299,14 @@ export async function simulateCounterBuyPreparation(
     precisions.get(order.quote.outputMint) !== order.tokenDecimals
   )
     throw new Error('Counter mint precision changed.');
+  const rentLamports = uint(
+    await call('getMinimumBalanceForRentExemption', [
+      165,
+      { commitment: 'confirmed' },
+    ]),
+  );
+  if (rentLamports < 1n || rentLamports > 3000000n)
+    throw new Error('Counter token account rent is unsupported.');
   function balances(accounts: Account[]) {
     return accounts.flatMap((a, index) => {
       const t = token(a);
@@ -457,6 +465,34 @@ export async function simulateCounterBuyPreparation(
       reviewedFeeAndRentLimitRaw,
     );
   if (deadline.aborted) throw new Error('Counter simulation was cancelled.');
+  const bindingAccounts = (
+    [
+      ['Source', source, WRAPPED_SOL],
+      ['Destination', destination, order.quote.outputMint],
+    ] as const
+  ).map(([role, key, expectedMint]) => {
+    const a = before[keys.indexOf(key)],
+      t = token(a);
+    return {
+      role,
+      address: key,
+      expectedMint,
+      exists: a !== null,
+      status: t ? ('Matched bindings' as const) : ('Unavailable' as const),
+      reason: t
+        ? 'Decoded standard wallet token account.'
+        : 'Account absent before simulation.',
+      lamports: a?.lamports,
+      mint: t?.mint ?? null,
+      walletOwner: t?.owner ?? null,
+      state: t ? 'Initialized' : null,
+      delegate: null,
+      delegatedAmountRaw: t ? t.delegated.toString() : null,
+      closeAuthority: t?.closeAuthority ?? null,
+      amountRaw: t?.amount,
+      nativeReserveRaw: t?.nativeReserve?.toString() ?? null,
+    };
+  });
   return {
     format: 'counter-buy-simulation-v1' as const,
     executionAllowed: false as const,
@@ -469,6 +505,46 @@ export async function simulateCounterBuyPreparation(
     originalBlockhashRetained: true as const,
     accountSnapshotHashes: hashes,
     balanceAssessment,
+    settlementEvidence: post
+      ? {
+          keys,
+          before: before.map((a) => a?.lamports ?? '0'),
+          after: post.map((a) => a?.lamports ?? '0'),
+          preTokens: preTokenBalances,
+          postTokens: balances(post),
+          postAccounts: [
+            post[keys.indexOf(source)],
+            post[keys.indexOf(destination)],
+          ],
+          rentLamports: rentLamports.toString(),
+        }
+      : null,
+    instructionReview: review,
+    accountBindings: {
+      slot: Math.max(...slots),
+      accounts: bindingAccounts,
+      status: bindingAccounts.every((a) => a.status === 'Matched bindings')
+        ? ('Matched bindings' as const)
+        : ('Unavailable' as const),
+      limitations:
+        'Checked chain pre-state; newly created accounts can be absent.',
+    },
+    networkFeeLamports: networkFee.toString(),
+    nativeChangeRaw: balanceAssessment.nativeWalletChangeRaw,
+    simulationSlot,
+    lookupObservation: lookup
+      ? {
+          slot: lookup.observedSlot,
+          tables: lookup.tables.map(
+            ({ address, sha256, lastExtendedSlot }) => ({
+              address,
+              sha256,
+              lastExtendedSlot,
+            }),
+          ),
+          recheckSlot: afterLookup!.observedSlot,
+        }
+      : null,
     limitations:
       'Read-only original-packet simulation and checked account snapshots. Busy pool accounts are not assumed unchanged. Gross debits, wrapping instructions, fee/rent sources, fresh project/source/ownership admission and durable proposal reservation still require verification before explicit approval. No signing clearance.',
   };

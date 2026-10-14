@@ -88,6 +88,7 @@ async function fixture() {
   const base: CounterSimulationRpc = async (method, params) => {
     if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
     if (method === 'getBlockHeight') return '1000';
+    if (method === 'getMinimumBalanceForRentExemption') return '2039280';
     if (method === 'getFeeForMessage')
       return { context: { slot: '100' }, value: '5000' };
     if (method === 'getMultipleAccounts')
@@ -155,6 +156,7 @@ it('collects standard account snapshots and simulates the original packet withou
         'getFeeForMessage',
         'getMultipleAccounts',
         'simulateTransaction',
+        'getMinimumBalanceForRentExemption',
       ].includes(c[0]),
     ),
   ).toBe(true);
