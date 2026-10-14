@@ -137,6 +137,19 @@ export function splitExactAtoms(total: bigint, weights: bigint[]) {
   return amounts;
 }
 
+/** Apply the saved seed/weights to actual base units, rather than rounded preview percentages. */
+export function allocateHolderBaseUnits(plan: LaunchPlanInput, total: bigint) {
+  const config = parseHolderDistribution(plan.holdersDistribution);
+  if (
+    !config ||
+    !Number.isInteger(plan.holderCount) ||
+    plan.holderCount < 1 ||
+    plan.holderCount > 200
+  )
+    throw new Error('Save an explicit distribution for 1 to 200 holder slots.');
+  return splitExactAtoms(total, distributionWeights(config, plan.holderCount));
+}
+
 function decimalAtoms(value: string, decimals: number) {
   const [whole, fraction = ''] = value.split('.');
   if (fraction.length > decimals)
