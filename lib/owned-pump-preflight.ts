@@ -156,6 +156,24 @@ async function ownedPumpSelection(
   return { t, original, intent, assertUnchanged };
 }
 
+/** Read-only deployer/project/proof binding for composition around independent RPC collection. */
+export async function readOwnedPumpCreateBinding(
+  db: D1Database,
+  owner: string,
+  terms: OwnedPumpTerms,
+  signal: AbortSignal,
+) {
+  const selection = await ownedPumpSelection(db, owner, terms, signal);
+  await selection.assertUnchanged();
+  const digest = new Uint8Array(
+    await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(JSON.stringify(selection.original.row)),
+    ),
+  );
+  return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 /** Authenticated callers supply owner from the session, never from request JSON. */
 export async function preflightOwnedPumpCreate(
   db: D1Database,

@@ -23,10 +23,10 @@ type WalletRow = {
 };
 
 /** Read-only owned holder manifest. Caller must recheck its binding around simulation and approval. */
-export async function readOwnedPumpHolderSelection(
+export async function readOwnedPumpHolderWallets(
   db: D1Database,
   owner: string,
-  supplied: Terms,
+  supplied: Pick<Terms, 'projectId' | 'updatedAt'>,
 ) {
   const terms = structuredClone(supplied);
   const read = () =>
@@ -40,8 +40,21 @@ export async function readOwnedPumpHolderSelection(
   if (!project || project.archived || project.updated_at !== terms.updatedAt)
     throw new PumpPreflightError('Reload the active owned holder launch.', 409);
   const document = validateProjectDocument(JSON.parse(project.document));
-  const targets = buildPumpHolderTargets(document, terms.observation);
-  const refs = document.options.wallets!.recipients;
+  const selection = document.options.wallets;
+  if (
+    document.plan.chain !== 'Solana' ||
+    document.plan.launchpad !== 'PumpFun' ||
+    document.plan.scheduled ||
+    !selection ||
+    selection.chain !== 'Solana' ||
+    !selection.deployer ||
+    selection.recipients.length !== document.plan.holderCount
+  )
+    throw new PumpPreflightError(
+      'Save the complete unscheduled Pump holder wallet selection.',
+      409,
+    );
+  const refs = selection.recipients;
   for (const ref of refs)
     if (!validSolanaSigningKey(bs58.decode(ref.address)))
       throw new PumpPreflightError(
@@ -100,15 +113,43 @@ export async function readOwnedPumpHolderSelection(
       'Holder project or selection changed while reading.',
       409,
     );
-  const binding = JSON.stringify({ project, refs, rows, targets });
+  const binding = JSON.stringify({ project, refs, rows });
   const digest = new Uint8Array(
     await crypto.subtle.digest('SHA-256', new TextEncoder().encode(binding)),
   );
   return {
     projectId: terms.projectId,
     projectUpdatedAt: terms.updatedAt,
-    targets,
+    document,
     bindingSha256: Array.from(digest, (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join(''),
+    signingAllowed: false as const,
+    executionAllowed: false as const,
+  };
+}
+
+export async function readOwnedPumpHolderSelection(
+  db: D1Database,
+  owner: string,
+  supplied: Terms,
+) {
+  const terms = structuredClone(supplied);
+  const wallets = await readOwnedPumpHolderWallets(db, owner, terms);
+  const targets = buildPumpHolderTargets(wallets.document, terms.observation);
+  const bytes = new Uint8Array(
+    await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(
+        JSON.stringify({ walletBinding: wallets.bindingSha256, targets }),
+      ),
+    ),
+  );
+  return {
+    projectId: wallets.projectId,
+    projectUpdatedAt: wallets.projectUpdatedAt,
+    targets,
+    bindingSha256: Array.from(bytes, (b) =>
       b.toString(16).padStart(2, '0'),
     ).join(''),
     signingAllowed: false as const,

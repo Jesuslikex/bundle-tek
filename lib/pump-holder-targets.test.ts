@@ -1,3 +1,8 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { releaseLaunchMetadata } from './launch-metadata-release';
+import { prepareOwnedPumpHolderPacket } from './pump-holder-preparation';
+import { pumpInitialBuySimulationFixture } from '../test/pump-initial-buy-simulation-fixture';
 import { afterEach, expect, it } from 'vitest';
 import { generateKeyPairSigner } from '@solana/kit';
 import { createClient, type Client } from '@libsql/client';
@@ -53,14 +58,12 @@ async function fixture() {
           folderRevision: 0,
           root: true,
         },
-        recipients: addresses
-          .slice(1)
-          .map((address) => ({
-            address,
-            revision: 1,
-            folderRevision: 0,
-            root: true,
-          })),
+        recipients: addresses.slice(1).map((address) => ({
+          address,
+          revision: 1,
+          folderRevision: 0,
+          root: true,
+        })),
       },
     },
   });
@@ -249,4 +252,241 @@ it('rejects stale wallet revisions, wrong roles and moved/archived selected fold
   await expect(
     readOwnedPumpHolderSelection(f.db, 'alice', f.terms),
   ).rejects.toThrow('folder changed');
+});
+
+async function preparationFixture(
+  stock = false,
+  quoteMode = false,
+  token22 = false,
+) {
+  const f = await fixture(),
+    rpc = await pumpInitialBuySimulationFixture(stock, token22);
+  const image = new Uint8Array(
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aR2QAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  );
+  const imageId = createHash('sha256').update(image).digest('hex');
+  f.document.plan.tokenName = rpc.intent.name;
+  f.document.plan.ticker = rpc.intent.symbol;
+  f.document.plan.quoteAddress = rpc.intent.quoteMint;
+  f.document.plan.currency = stock ? 'TSLAX' : 'SOL';
+  if (quoteMode) {
+    f.document.plan.mode = 'Quick';
+    f.document.plan.holdersBuyQuote = '1';
+  }
+  f.document.options.wallets!.deployer = {
+    address: rpc.intent.payer,
+    revision: 1,
+    folderRevision: 0,
+    root: true,
+  };
+  f.document.identity.artworkUrl = '/api/artwork/' + imageId;
+  await f.client.execute({
+    sql: 'UPDATE workspace_projects SET document=?',
+    args: [JSON.stringify(f.document)],
+  });
+  await f.client.execute(
+    'CREATE TABLE project_artwork(owner_id TEXT,id TEXT,data BLOB,mime TEXT,archived INTEGER DEFAULT 0)',
+  );
+  for (const sql of readFileSync('drizzle/0078_lush_rictor.sql', 'utf8').split(
+    '--> statement-breakpoint',
+  ))
+    if (sql.trim()) await f.client.execute(sql);
+  await f.client.execute({
+    sql: 'INSERT INTO project_artwork VALUES(?,?,?,?,0)',
+    args: ['alice', imageId, image, 'image/png'],
+  });
+  await f.client.execute({
+    sql: "INSERT INTO workspace_wallets VALUES('alice','Solana',?,'Deployer',1,0,'',NULL)",
+    args: [rpc.intent.payer],
+  });
+  await f.client.execute({
+    sql: "INSERT INTO wallet_ownership_proofs VALUES('alice','Solana',?)",
+    args: [rpc.intent.payer],
+  });
+  const released = await releaseLaunchMetadata(
+    f.db,
+    'alice',
+    f.terms.projectId,
+    f.terms.updatedAt,
+    'https://bundle.test',
+  );
+  rpc.intent.uri = released.uri;
+  rpc.setMetadataUri(released.uri);
+  const terms = {
+    projectId: f.terms.projectId,
+    updatedAt: f.terms.updatedAt,
+    origin: 'https://bundle.test',
+    releaseId: released.id,
+    payer: rpc.intent.payer,
+    payerRevision: 1,
+    mint: rpc.intent.mint,
+    feeAndRentLimitRaw: '10000000',
+    developerMaximumQuoteCostRaw: '1000000000',
+    holderLimits: f.document.options.wallets!.recipients.map((r) => ({
+      address: r.address,
+      feeAndRentLimitRaw: '10000000',
+      ...(quoteMode
+        ? { minimumTokenOutputRaw: '1000000' }
+        : { maximumQuoteCostRaw: '1000000000' }),
+    })),
+  };
+  return { ...f, rpc, terms };
+}
+for (const [stock, quoteMode, token22] of [
+  [false, false, false],
+  [true, false, false],
+  [true, true, false],
+  [true, true, true],
+])
+  it(`binds the owned release, independently observed supply and all wallet limits into a disabled packet (${stock ? 'stock' : 'SOL'}, quote=${quoteMode}, token22=${token22})`, async () => {
+    const f = await preparationFixture(stock, quoteMode, token22);
+    const result = await prepareOwnedPumpHolderPacket(
+      f.db,
+      'alice',
+      f.terms,
+      new AbortController().signal,
+      { rpc: f.rpc.rpc },
+    );
+    expect(result).toMatchObject({
+      format: 'pump-owned-holder-packet-v1',
+      fundingValidated: false,
+      allWalletSimulation: null,
+      signingAllowed: false,
+      executionAllowed: false,
+      completeLaunch: false,
+      metadataUri: f.rpc.intent.uri,
+      packet: {
+        activeHolderCount: 3,
+        containsHolderBuys: true,
+        requiredSigners: expect.arrayContaining([f.terms.payer, f.terms.mint]),
+      },
+    });
+    expect(result.allowances.holders.map((h) => h.address)).toEqual(
+      f.document.options.wallets!.recipients.map((r) => r.address),
+    );
+    expect(result.allowanceSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(
+      f.rpc.calls.filter((c) => c.method === 'simulateTransaction'),
+    ).toHaveLength(1);
+    expect(
+      f.rpc.calls.some((c) =>
+        ['sendTransaction', 'sendBundle'].includes(c.method),
+      ),
+    ).toBe(false);
+  });
+it('rejects moved limit slots and a watch-only holder before provider reads', async () => {
+  const f = await preparationFixture();
+  await expect(
+    prepareOwnedPumpHolderPacket(
+      f.db,
+      'alice',
+      { ...f.terms, holderLimits: [...f.terms.holderLimits].reverse() },
+      new AbortController().signal,
+      { rpc: f.rpc.rpc },
+    ),
+  ).rejects.toThrow('in order');
+  expect(f.rpc.calls).toEqual([]);
+  await f.client.execute({
+    sql: 'DELETE FROM wallet_ownership_proofs WHERE address=?',
+    args: [f.addresses[2]],
+  });
+  await expect(
+    prepareOwnedPumpHolderPacket(
+      f.db,
+      'alice',
+      f.terms,
+      new AbortController().signal,
+      { rpc: f.rpc.rpc },
+    ),
+  ).rejects.toThrow('Every saved holder');
+  expect(f.rpc.calls).toEqual([]);
+});
+it('rejects target overrides, wrong limit denominations and revocation during collection', async () => {
+  const f = await preparationFixture();
+  await expect(
+    prepareOwnedPumpHolderPacket(
+      f.db,
+      'alice',
+      { ...f.terms, tokenAmountRaw: '1' } as typeof f.terms,
+      new AbortController().signal,
+      { rpc: f.rpc.rpc },
+    ),
+  ).rejects.toThrow('targets cannot');
+  const wrong = {
+    ...f.terms,
+    holderLimits: f.terms.holderLimits.map((l) => ({
+      address: l.address,
+      feeAndRentLimitRaw: l.feeAndRentLimitRaw,
+      minimumTokenOutputRaw: '1',
+    })),
+  };
+  await expect(
+    prepareOwnedPumpHolderPacket(
+      f.db,
+      'alice',
+      wrong,
+      new AbortController().signal,
+      { rpc: f.rpc.rpc },
+    ),
+  ).rejects.toThrow('own quote cap');
+  const rpc: typeof f.rpc.rpc = async (method, params, signal) => {
+    const result = await f.rpc.rpc(method, params, signal);
+    if (method === 'simulateTransaction')
+      await f.client.execute({
+        sql: 'DELETE FROM wallet_ownership_proofs WHERE address=?',
+        args: [f.addresses[1]],
+      });
+    return result;
+  };
+  await expect(
+    prepareOwnedPumpHolderPacket(
+      f.db,
+      'alice',
+      f.terms,
+      new AbortController().signal,
+      { rpc },
+    ),
+  ).rejects.toThrow('Every saved holder');
+});
+
+it('retains inactive holder slots with zero allowances and no generated signer', async () => {
+  const f = await preparationFixture();
+  f.document.plan.holdersDistribution = {
+    kind: 'single',
+    seed: 'a'.repeat(32),
+    deviationPercent: 0,
+  };
+  await f.client.execute({
+    sql: 'UPDATE workspace_projects SET document=?',
+    args: [JSON.stringify(f.document)],
+  });
+  const targets = buildPumpHolderTargets(f.document, observed);
+  const terms = {
+    ...f.terms,
+    holderLimits: targets.items.map((i) =>
+      i.participates
+        ? {
+            address: i.wallet.address,
+            feeAndRentLimitRaw: '10000000',
+            maximumQuoteCostRaw: '1000000000',
+          }
+        : { address: i.wallet.address, feeAndRentLimitRaw: '0' },
+    ),
+  };
+  const result = await prepareOwnedPumpHolderPacket(
+    f.db,
+    'alice',
+    terms,
+    new AbortController().signal,
+    { rpc: f.rpc.rpc },
+  );
+  expect(result.packet.activeHolderCount).toBe(1);
+  expect(result.packet.holderSlots).toHaveLength(3);
+  expect(result.packet.requiredSigners).toHaveLength(3);
+  expect(
+    result.allowances.holders.filter((h) => h.feeAndRentLimitRaw === '0'),
+  ).toHaveLength(2);
 });
