@@ -3,7 +3,7 @@ import { Miniflare } from 'miniflare';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import type { PumpLaunchRpc } from '@/lib/pump-launch-simulation';
-import { pumpSimulationFixture } from '../../../../../test/pump-launch-simulation-fixture';
+import { pumpInitialBuySimulationFixture } from '../../../../../test/pump-initial-buy-simulation-fixture';
 import { releaseLaunchMetadata } from '@/lib/launch-metadata-release';
 import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
 import {
@@ -32,9 +32,21 @@ vi.mock('@/lib/pump-launch-simulation', async (original) => {
     ) => actual.simulatePumpCreate(intent, limit, signal, mocks.rpc!),
   };
 });
+vi.mock('@/lib/pump-initial-buy-simulation', async (original) => {
+  const actual =
+    await original<typeof import('@/lib/pump-initial-buy-simulation')>();
+  return {
+    ...actual,
+    simulatePumpInitialBuy: (
+      intent: Parameters<typeof actual.simulatePumpInitialBuy>[0],
+      limit: string,
+      signal: AbortSignal,
+    ) => actual.simulatePumpInitialBuy(intent, limit, signal, mocks.rpc!),
+  };
+});
 import { POST } from './route';
 let mf: Miniflare,
-  f: Awaited<ReturnType<typeof pumpSimulationFixture>>,
+  f: Awaited<ReturnType<typeof pumpInitialBuySimulationFixture>>,
   body: Record<string, unknown>,
   sequence = 0;
 const origin = 'https://bundle.test',
@@ -98,9 +110,9 @@ beforeAll(async () => {
     .filter((s) => s.trim()))
     await mocks.db.prepare(sql).run();
 }, 30000);
-beforeEach(async () => {
+async function seed(stock = false, token22 = false) {
   mocks.user = { userId: 'alice' };
-  f = await pumpSimulationFixture();
+  f = await pumpInitialBuySimulationFixture(stock, token22);
   mocks.rpc = f.rpc;
   for (const table of [
     'workspace_projects',
@@ -118,6 +130,8 @@ beforeEach(async () => {
       ...DEFAULT_LAUNCH_PLAN,
       tokenName: f.intent.name,
       ticker: f.intent.symbol,
+      developerBuy: 0.1,
+      ...(stock ? { currency: 'TSLAX', quoteAddress: f.intent.quoteMint } : {}),
     },
     identity: { ...EMPTY_IDENTITY, artworkUrl: '/api/artwork/' + id },
     options: {
@@ -162,6 +176,7 @@ beforeEach(async () => {
     origin,
   );
   f.intent.uri = release.uri;
+  f.setMetadataUri(release.uri);
   body = {
     projectId,
     updatedAt,
@@ -169,9 +184,10 @@ beforeEach(async () => {
     payer: f.intent.payer,
     payerRevision: 1,
     mint: f.intent.mint,
-    feeAndRentLimitRaw: '5000000',
+    feeAndRentLimitRaw: '10000000',
   };
-});
+}
+beforeEach(() => seed());
 afterAll(async () => {
   await mf?.dispose();
 });
@@ -308,4 +324,146 @@ it('sanitizes provider failure and cannot return a successful approval from it',
   const text = await response.text();
   expect(text).not.toContain('SECRET');
   expect(text).toContain('No signing approval');
+});
+
+for (const [stock, token22] of [
+  [false, false],
+  [true, false],
+  [true, true],
+])
+  it(`preflights the exact saved developer target with owned database reads and two unsigned simulations (${stock ? (token22 ? 'Token-2022 stock' : 'SPL stock') : 'SOL'})`, async () => {
+    await seed(stock, token22);
+    const response = await send({ ...body, maximumQuoteCostRaw: '100000000' });
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result).toMatchObject({
+      format: 'pump-create-buy-preflight-v1',
+      signingAllowed: false,
+      executionAllowed: false,
+      completeLaunch: false,
+      containsInitialBuy: true,
+      containsHolderBuys: false,
+      developerSupplyPercent: 0.1,
+      tokenAmountRaw: '1000000000000',
+      maximumQuoteCostRaw: '100000000',
+      metadataUri: f.intent.uri,
+      requestedHoldersBuy: 20,
+      packet: { transactionVersion: 1 },
+      simulation: { status: 'Simulated', buybackSplitRoundingAttested: false },
+    });
+    expect(
+      f.calls.filter((c) => c.method === 'simulateTransaction'),
+    ).toHaveLength(2);
+    expect(
+      f.calls.some((c) => ['sendTransaction', 'sendBundle'].includes(c.method)),
+    ).toBe(false);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+it('rejects invalid quote caps and caller-supplied supply targets before RPC', async () => {
+  for (const maximumQuoteCostRaw of [
+    '0',
+    '-1',
+    '1.1',
+    '18446744073709551616',
+    1,
+  ])
+    expect((await send({ ...body, maximumQuoteCostRaw })).status).toBe(400);
+  expect(
+    (
+      await send({
+        ...body,
+        maximumQuoteCostRaw: '100000000',
+        tokenAmountRaw: '1',
+      })
+    ).status,
+  ).toBe(400);
+  expect(f.calls).toEqual([]);
+});
+it('rejects a watch-only or foreign payer before atomic RPC', async () => {
+  mocks.user = { userId: 'bob' };
+  expect(
+    (await send({ ...body, maximumQuoteCostRaw: '100000000' })).status,
+  ).toBe(404);
+  mocks.user = { userId: 'alice' };
+  await mocks.db.prepare('DELETE FROM wallet_ownership_proofs').run();
+  expect(
+    (await send({ ...body, maximumQuoteCostRaw: '100000000' })).status,
+  ).toBe(404);
+  expect(f.calls).toEqual([]);
+});
+it('rejects zero developer buys and scheduling before atomic RPC', async () => {
+  const row = await mocks.db
+    .prepare('SELECT document FROM workspace_projects')
+    .first<{ document: string }>();
+  const doc = JSON.parse(row!.document);
+  doc.plan.developerBuy = 0;
+  await mocks.db
+    .prepare('UPDATE workspace_projects SET document=?')
+    .bind(JSON.stringify(doc))
+    .run();
+  expect(
+    (await send({ ...body, maximumQuoteCostRaw: '100000000' })).status,
+  ).toBe(409);
+  doc.plan.developerBuy = 0.1;
+  doc.plan.scheduled = true;
+  await mocks.db
+    .prepare('UPDATE workspace_projects SET document=?')
+    .bind(JSON.stringify(doc))
+    .run();
+  expect(
+    (await send({ ...body, maximumQuoteCostRaw: '100000000' })).status,
+  ).toBe(409);
+  expect(f.calls).toEqual([]);
+});
+it('rejects ownership changes during the atomic simulation', async () => {
+  let simulations = 0;
+  mocks.rpc = async (method, params, signal) => {
+    const response = await f.rpc(method, params, signal);
+    if (method === 'simulateTransaction' && ++simulations === 2)
+      await mocks.db.prepare('DELETE FROM wallet_ownership_proofs').run();
+    return response;
+  };
+  expect(
+    (await send({ ...body, maximumQuoteCostRaw: '100000000' })).status,
+  ).toBe(409);
+});
+
+it('shares the project rate gate between create-only and atomic preflight', async () => {
+  expect(
+    (await send({ ...body, maximumQuoteCostRaw: '100000000' })).status,
+  ).toBe(200);
+  const reads = f.calls.length;
+  const retry = await send();
+  expect(retry.status).toBe(429);
+  expect(retry.headers.get('retry-after')).toBe('15');
+  expect(f.calls).toHaveLength(reads);
+});
+it('sanitizes atomic simulation failures and cannot expose an approval', async () => {
+  f.state.err = { InstructionError: [3, 'SECRET provider detail'] };
+  const response = await send({ ...body, maximumQuoteCostRaw: '100000000' });
+  expect(response.status).toBe(502);
+  const text = await response.text();
+  expect(text).not.toContain('SECRET');
+  expect(text).toContain('No signing approval');
+});
+it('rejects changes to the saved developer percentage during atomic RPC', async () => {
+  let simulations = 0;
+  mocks.rpc = async (method, params, signal) => {
+    const response = await f.rpc(method, params, signal);
+    if (method === 'simulateTransaction' && ++simulations === 2) {
+      const row = await mocks.db
+        .prepare('SELECT document FROM workspace_projects')
+        .first<{ document: string }>();
+      const doc = JSON.parse(row!.document);
+      doc.plan.developerBuy = 0.2;
+      await mocks.db
+        .prepare('UPDATE workspace_projects SET document=?')
+        .bind(JSON.stringify(doc))
+        .run();
+    }
+    return response;
+  };
+  expect(
+    (await send({ ...body, maximumQuoteCostRaw: '100000000' })).status,
+  ).toBe(409);
 });

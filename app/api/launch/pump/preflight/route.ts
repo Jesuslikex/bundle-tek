@@ -4,6 +4,7 @@ import { address, isOffCurveAddress } from '@solana/kit';
 import { artworkIdValid } from '@/lib/artwork';
 import {
   preflightOwnedPumpCreate,
+  preflightOwnedPumpInitialBuy,
   PumpPreflightError,
   type OwnedPumpTerms,
 } from '@/lib/owned-pump-preflight';
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     return json({ error: 'JSON required.' }, 415);
   const reader = request.body?.getReader();
   if (!reader) return json({ error: 'Review the saved launch first.' }, 400);
-  let terms: OwnedPumpTerms;
+  let terms: OwnedPumpTerms & { maximumQuoteCostRaw?: string };
   try {
     const chunks: Uint8Array[] = [];
     let size = 0;
@@ -57,7 +58,13 @@ export async function POST(request: Request) {
       typeof body !== 'object' ||
       Array.isArray(body) ||
       Object.keys(body).sort().join(',') !==
-        'feeAndRentLimitRaw,mint,payer,payerRevision,projectId,releaseId,updatedAt' ||
+        ('maximumQuoteCostRaw' in body
+          ? 'feeAndRentLimitRaw,maximumQuoteCostRaw,mint,payer,payerRevision,projectId,releaseId,updatedAt'
+          : 'feeAndRentLimitRaw,mint,payer,payerRevision,projectId,releaseId,updatedAt') ||
+      ('maximumQuoteCostRaw' in body &&
+        (typeof body.maximumQuoteCostRaw !== 'string' ||
+          !/^[1-9]\d{0,19}$/.test(body.maximumQuoteCostRaw) ||
+          BigInt(body.maximumQuoteCostRaw) > (1n << 64n) - 1n)) ||
       typeof body.projectId !== 'string' ||
       !body.projectId ||
       body.projectId.length > 128 ||
@@ -91,33 +98,43 @@ export async function POST(request: Request) {
   }
   try {
     const db = getD1();
-    const result = await preflightOwnedPumpCreate(
-      db,
-      user.userId,
-      terms,
-      request.signal,
-      {
-        beforeRpc: async () => {
-          const now = Date.now(),
-            key = JSON.stringify([
-              'pump-create-preflight-v1',
-              user.userId,
-              terms.projectId,
-            ]);
-          const gate = await db
-            .prepare(
-              'INSERT INTO imported_token_project_gates(owner_id,next_allowed_at) VALUES(?,?) ON CONFLICT(owner_id) DO UPDATE SET next_allowed_at=excluded.next_allowed_at WHERE imported_token_project_gates.next_allowed_at<=?',
-            )
-            .bind(key, now + 15000, now)
-            .run();
-          if (!gate.meta.changes)
-            throw new PumpPreflightError(
-              'Wait 15 seconds before checking this project again.',
-              429,
-            );
-        },
+    const options = {
+      beforeRpc: async () => {
+        const now = Date.now(),
+          key = JSON.stringify([
+            'pump-create-preflight-v1',
+            user.userId,
+            terms.projectId,
+          ]);
+        const gate = await db
+          .prepare(
+            'INSERT INTO imported_token_project_gates(owner_id,next_allowed_at) VALUES(?,?) ON CONFLICT(owner_id) DO UPDATE SET next_allowed_at=excluded.next_allowed_at WHERE imported_token_project_gates.next_allowed_at<=?',
+          )
+          .bind(key, now + 15000, now)
+          .run();
+        if (!gate.meta.changes)
+          throw new PumpPreflightError(
+            'Wait 15 seconds before checking this project again.',
+            429,
+          );
       },
-    );
+    };
+    const result =
+      terms.maximumQuoteCostRaw !== undefined
+        ? await preflightOwnedPumpInitialBuy(
+            db,
+            user.userId,
+            { ...terms, maximumQuoteCostRaw: terms.maximumQuoteCostRaw },
+            request.signal,
+            options,
+          )
+        : await preflightOwnedPumpCreate(
+            db,
+            user.userId,
+            terms,
+            request.signal,
+            options,
+          );
     return json(result);
   } catch (error) {
     if (error instanceof PumpPreflightError)

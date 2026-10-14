@@ -326,3 +326,28 @@ it('pins fee layout and exact rounding, and rejects malformed/unknown state fiel
     decodePumpInitialBuyState('UserVolumeAccumulator', volume),
   ).toThrow('boolean');
 });
+
+it('derives the saved percentage from independently observed supply and rejects mixed target inputs', async () => {
+  const f = await pumpInitialBuySimulationFixture();
+  const { tokenAmountRaw: _target, ...intent } = f.intent;
+  const report = await simulatePumpInitialBuy(
+    { ...intent, developerSupplyPercent: 0.1 },
+    '10000000',
+    new AbortController().signal,
+    f.rpc,
+  );
+  expect(report.simulation.tokenAmountRaw).toBe('1000000000000');
+  expect(
+    f.calls.filter((c) => c.method === 'simulateTransaction'),
+  ).toHaveLength(2);
+  const untouched = await pumpInitialBuySimulationFixture();
+  await expect(
+    simulatePumpInitialBuy(
+      { ...untouched.intent, developerSupplyPercent: 0.1 },
+      '10000000',
+      new AbortController().signal,
+      untouched.rpc,
+    ),
+  ).rejects.toThrow('Unsupported');
+  expect(untouched.calls).toEqual([]);
+});

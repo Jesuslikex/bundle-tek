@@ -2,6 +2,8 @@ import { validateProjectDocument } from './workspace-project';
 import { quoteCatalog, validateQuoteSelection } from './quote-catalog';
 import { artworkIdValid } from './artwork';
 import { buildSavedPumpCreateComponent } from './pump-launch-preparation';
+import { buildSavedPumpInitialBuyComponent } from './pump-initial-buy-preparation';
+import { simulatePumpInitialBuy } from './pump-initial-buy-simulation';
 import {
   simulatePumpCreate,
   type PumpLaunchRpc,
@@ -38,20 +40,11 @@ type Row = {
   folderChain: string | null;
 };
 
-/** Authenticated callers supply owner from the session, never from request JSON. */
-export async function preflightOwnedPumpCreate(
+async function ownedPumpSelection(
   db: D1Database,
   owner: string,
   terms: OwnedPumpTerms,
   signal: AbortSignal,
-  options: {
-    rpc?: PumpLaunchRpc;
-    beforeRpc?: () => Promise<void>;
-    lifetime?: { blockhash: string; lastValidBlockHeight: string };
-    captureInput?: (
-      input: import('./pump-launch-message').PumpCreateInput,
-    ) => void;
-  } = {},
 ) {
   const t = structuredClone(terms),
     origin = new URL(t.origin);
@@ -139,7 +132,6 @@ export async function preflightOwnedPumpCreate(
   const original = check(await read());
   if (signal.aborted)
     throw new PumpPreflightError('Pump preflight was cancelled.', 409);
-  await options.beforeRpc?.();
   const intent = {
     name: original.doc.plan.tokenName,
     symbol: original.doc.plan.ticker,
@@ -148,6 +140,44 @@ export async function preflightOwnedPumpCreate(
     mint: t.mint,
     quoteMint: original.quote.address,
   };
+  const assertUnchanged = async () => {
+    const latest = await read();
+    if (
+      !latest ||
+      JSON.stringify(latest) !== JSON.stringify(original.row) ||
+      signal.aborted
+    )
+      throw new PumpPreflightError(
+        'The project, payer proof or folder changed during simulation. Review again.',
+        409,
+      );
+    check(latest);
+  };
+  return { t, original, intent, assertUnchanged };
+}
+
+/** Authenticated callers supply owner from the session, never from request JSON. */
+export async function preflightOwnedPumpCreate(
+  db: D1Database,
+  owner: string,
+  terms: OwnedPumpTerms,
+  signal: AbortSignal,
+  options: {
+    rpc?: PumpLaunchRpc;
+    beforeRpc?: () => Promise<void>;
+    lifetime?: { blockhash: string; lastValidBlockHeight: string };
+    captureInput?: (
+      input: import('./pump-launch-message').PumpCreateInput,
+    ) => void;
+  } = {},
+) {
+  const { t, intent, assertUnchanged } = await ownedPumpSelection(
+    db,
+    owner,
+    terms,
+    signal,
+  );
+  await options.beforeRpc?.();
   const reviewed = await simulatePumpCreate(
     intent,
     t.feeAndRentLimitRaw,
@@ -156,17 +186,7 @@ export async function preflightOwnedPumpCreate(
     fetch,
     options.lifetime,
   );
-  const observed = await read();
-  if (
-    !observed ||
-    JSON.stringify(observed) !== JSON.stringify(original.row) ||
-    signal.aborted
-  )
-    throw new PumpPreflightError(
-      'The project, payer proof or folder changed during simulation.',
-      409,
-    );
-  check(observed);
+  await assertUnchanged();
   const component = await buildSavedPumpCreateComponent(db, owner, {
     projectId: t.projectId,
     updatedAt: t.updatedAt,
@@ -180,15 +200,7 @@ export async function preflightOwnedPumpCreate(
       'Saved metadata or quote changed during preflight.',
       409,
     );
-  const final = check(await read());
-  if (
-    JSON.stringify(final.row) !== JSON.stringify(original.row) ||
-    signal.aborted
-  )
-    throw new PumpPreflightError(
-      'The project, payer proof or folder changed. Review again.',
-      409,
-    );
+  await assertUnchanged();
   return {
     format: 'pump-create-preflight-v1' as const,
     executionAllowed: false as const,
@@ -218,6 +230,100 @@ export async function preflightOwnedPumpCreate(
       transaction: component.transaction,
       sha256: component.packetSha256,
       bytes: component.packetBytes,
+      lastValidBlockHeight: component.lastValidBlockHeight,
+    },
+    simulation: reviewed.simulation,
+  };
+}
+
+/** Owned unsigned atomic preflight. Never creates a signing review or a durable approval. */
+export async function preflightOwnedPumpInitialBuy(
+  db: D1Database,
+  owner: string,
+  terms: OwnedPumpTerms & { maximumQuoteCostRaw: string },
+  signal: AbortSignal,
+  options: { rpc?: PumpLaunchRpc; beforeRpc?: () => Promise<void> } = {},
+) {
+  const supplied = structuredClone(terms);
+  const { t, original, intent, assertUnchanged } = await ownedPumpSelection(
+    db,
+    owner,
+    supplied,
+    signal,
+  );
+  if (original.doc.plan.scheduled)
+    throw new PumpPreflightError(
+      'Disable scheduling before reviewing an atomic initial buy.',
+      409,
+    );
+  const cap = supplied.maximumQuoteCostRaw;
+  if (
+    typeof cap !== 'string' ||
+    !/^[1-9]\d{0,19}$/.test(cap) ||
+    BigInt(cap) > (1n << 64n) - 1n
+  )
+    throw new PumpPreflightError(
+      'Review a positive exact quote-spend cap.',
+      400,
+    );
+  if (original.doc.plan.developerBuy <= 0)
+    throw new PumpPreflightError(
+      'Save a positive developer supply percentage or use create-only.',
+      409,
+    );
+  await options.beforeRpc?.();
+  const reviewed = await simulatePumpInitialBuy(
+    {
+      ...intent,
+      developerSupplyPercent: original.doc.plan.developerBuy,
+      maximumQuoteCostRaw: cap,
+    },
+    t.feeAndRentLimitRaw,
+    signal,
+    options.rpc,
+  );
+  await assertUnchanged();
+  const component = await buildSavedPumpInitialBuyComponent(db, owner, {
+    projectId: t.projectId,
+    updatedAt: t.updatedAt,
+    releaseId: t.releaseId,
+    origin: t.origin,
+    context: reviewed.context,
+    maximumQuoteCostRaw: cap,
+    transactionVersion: 1,
+  });
+  if (component.packetSha256 !== reviewed.preparation.packetSha256)
+    throw new PumpPreflightError(
+      'Saved metadata, quote or developer target changed during preflight.',
+      409,
+    );
+  await assertUnchanged();
+  return {
+    format: 'pump-create-buy-preflight-v1' as const,
+    executionAllowed: false as const,
+    signingAllowed: false as const,
+    completeLaunch: false as const,
+    containsInitialBuy: true as const,
+    containsHolderBuys: false as const,
+    network: 'mainnet' as const,
+    projectId: t.projectId,
+    projectUpdatedAt: t.updatedAt,
+    payer: t.payer,
+    payerRevision: t.payerRevision,
+    mint: t.mint,
+    metadataReleaseId: t.releaseId,
+    metadataUri: intent.uri,
+    developerSupplyPercent: component.developerSupplyPercent,
+    tokenAmountRaw: component.tokenAmountRaw,
+    maximumQuoteCostRaw: cap,
+    requestedHoldersBuy: component.requestedHoldersBuy,
+    requestedHoldersBuyQuote: component.requestedHoldersBuyQuote,
+    quote: { mint: component.quoteMint, ...component.quote },
+    packet: {
+      transaction: component.transaction,
+      sha256: component.packetSha256,
+      bytes: component.packetBytes,
+      transactionVersion: component.transactionVersion,
       lastValidBlockHeight: component.lastValidBlockHeight,
     },
     simulation: reviewed.simulation,

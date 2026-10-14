@@ -290,6 +290,9 @@ export async function pumpInitialBuySimulationFixture(
     packet,
     state,
     token,
+    setMetadataUri: (uri: string) => {
+      baseline.intent.uri = uri;
+    },
     curveQuote,
     intent: {
       ...baseline.intent,

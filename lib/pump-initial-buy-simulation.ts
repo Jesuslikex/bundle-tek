@@ -15,6 +15,7 @@ import {
   type PumpRpcAccount,
 } from './pump-launch-simulation';
 import { buildPumpCreateAndBuyMessage } from './pump-initial-buy-message';
+import { pumpDeveloperBuyTarget } from './pump-initial-buy-preparation';
 import {
   decodePumpInitialBuyState,
   pumpInitialBuyPrice,
@@ -34,6 +35,10 @@ import {
 
 export type PumpInitialBuyIntent = PumpCreateIntent & {
   tokenAmountRaw: string;
+  maximumQuoteCostRaw: string;
+};
+export type PumpSavedInitialBuyIntent = PumpCreateIntent & {
+  developerSupplyPercent: number;
   maximumQuoteCostRaw: string;
 };
 const SYSTEM = '11111111111111111111111111111111',
@@ -76,7 +81,7 @@ function sameTokenExceptAmount(before: PumpRpcAccount, after: PumpRpcAccount) {
 
 /** Two independent unsigned simulations: creation invariants, then exact atomic settlement. Never issues approval or signatures. */
 export async function simulatePumpInitialBuy(
-  supplied: PumpInitialBuyIntent,
+  supplied: PumpInitialBuyIntent | PumpSavedInitialBuyIntent,
   feeAndRentLimitRaw: string,
   signal: AbortSignal,
   suppliedRpc?: PumpLaunchRpc,
@@ -84,7 +89,9 @@ export async function simulatePumpInitialBuy(
   lifetime?: { blockhash: string; lastValidBlockHeight: string },
 ) {
   const input = structuredClone(supplied);
+  const savedPercent = 'developerSupplyPercent' in input;
   if (
+    (savedPercent && 'tokenAmountRaw' in input) ||
     Object.keys(input).some(
       (key) =>
         ![
@@ -94,13 +101,30 @@ export async function simulatePumpInitialBuy(
           'payer',
           'mint',
           'quoteMint',
-          'tokenAmountRaw',
+          savedPercent ? 'developerSupplyPercent' : 'tokenAmountRaw',
           'maximumQuoteCostRaw',
         ].includes(key),
     )
   )
     throw new Error('Unsupported initial buy intent.');
-  const { tokenAmountRaw, maximumQuoteCostRaw, ...intent } = input;
+  if (
+    savedPercent &&
+    (!Number.isFinite(input.developerSupplyPercent) ||
+      input.developerSupplyPercent <= 0 ||
+      input.developerSupplyPercent > 100)
+  )
+    throw new Error(
+      'Save a positive developer supply percentage, or use create-only.',
+    );
+  const { maximumQuoteCostRaw } = input;
+  const intent: PumpCreateIntent = {
+    name: input.name,
+    symbol: input.symbol,
+    uri: input.uri,
+    payer: input.payer,
+    mint: input.mint,
+    quoteMint: input.quoteMint,
+  };
   const quoteLimit = pumpUnsignedInteger(maximumQuoteCostRaw),
     allowance = pumpUnsignedInteger(feeAndRentLimitRaw);
   if (quoteLimit === 0n || allowance === 0n)
@@ -154,6 +178,12 @@ export async function simulatePumpInitialBuy(
     fetcher,
     lifetime,
   );
+  const tokenAmountRaw = savedPercent
+    ? pumpDeveloperBuyTarget(
+        creation.preparation.quote.tokenSupplyRaw,
+        input.developerSupplyPercent,
+      )
+    : input.tokenAmountRaw;
   const preparation = await buildPumpCreateAndBuyMessage({
     create: { ...intent, ...creation.context },
     tokenAmountRaw,
