@@ -1,5 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import {
+  getTransactionDecoder,
+  getCompiledTransactionMessageDecoder,
+} from '@solana/kit-v1';
 import type { Client } from '@libsql/client';
 import { pumpOwnedGroupFixture } from '../test/pump-owned-group-fixture';
 import { preflightOwnedPumpCreate } from './owned-pump-preflight';
@@ -8,6 +12,7 @@ import {
   readPumpLaunchGroupReview,
   cancelUnsignedPumpLaunchGroupReview,
   listPumpLaunchGroupPage,
+  refreshPumpLaunchGroupReview,
 } from './pump-launch-group-review-service';
 import { listPumpLaunches, getPumpLaunch } from './pump-launch-service';
 import { pumpHistoryPageRequest } from './pump-launch-history-page';
@@ -69,6 +74,153 @@ it('persists and resumes a complete immutable owned review without enabling appr
     (await listPumpLaunchGroupPage(f.db, 'alice', 'group', { before: null }))
       .launches,
   ).toEqual([result]);
+}, 30000);
+it('revalidates original group bytes at a fresh bank without changing the saved manifest or history', async () => {
+  const f = await fixture(),
+    saved = await f.prepare();
+  const before = (
+    await f.client.execute({
+      sql: 'SELECT review,simulation,state FROM pump_launch_reviews WHERE id=?',
+      args: [saved.review.id],
+    })
+  ).rows[0];
+  f.input.create.global.slot = 200;
+  f.creationPreflight.simulation.minimumSlot = 200;
+  f.creationPreflight.simulation.maximumSlot = 200;
+  f.creationPreflight.simulation.slot = 200;
+  const rpc: import('./pump-launch-simulation').PumpLaunchRpc = async (
+    method,
+    params,
+    signal,
+  ) => {
+    const value = await f.rpc(method, params, signal);
+    if (value && typeof value === 'object' && 'context' in value) {
+      const cloned = structuredClone(value) as { context: { slot: string } };
+      cloned.context.slot = '200';
+      return cloned;
+    }
+    return value;
+  };
+  const refreshed = await refreshPumpLaunchGroupReview(
+    f.db,
+    'alice',
+    saved.review.id,
+    new AbortController().signal,
+    rpc,
+  );
+  expect(refreshed).toMatchObject({
+    reviewContextSha256: saved.review.contextSha256,
+    sourceRevalidated: true,
+    approvalRequired: true,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(refreshed.checked.group.manifestSha256).toBe(
+    saved.review.manifestSha256,
+  );
+  expect(refreshed.checked.simulation.bankSlot).toBe(200);
+  expect(refreshed.checked.group.manifest.creationInput.global.slot).toBe(100);
+  expect(
+    (
+      await f.client.execute({
+        sql: 'SELECT review,simulation,state FROM pump_launch_reviews WHERE id=?',
+        args: [saved.review.id],
+      })
+    ).rows[0],
+  ).toEqual(before);
+}, 30000);
+it('rejects changed configuration bytes before replay and keeps the original review intact', async () => {
+  const f = await fixture(),
+    saved = await f.prepare();
+  f.calls.length = 0;
+  f.input.create.global.data[9] ^= 1;
+  await expect(
+    refreshPumpLaunchGroupReview(
+      f.db,
+      'alice',
+      saved.review.id,
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('configuration, targets or limits differ');
+  expect(
+    f.calls.filter((call) => call.method === 'simulateBundle'),
+  ).toHaveLength(0);
+  expect(
+    (await readPumpLaunchGroupReview(f.db, 'alice', saved.review.id)).review
+      .contextSha256,
+  ).toBe(saved.review.contextSha256);
+}, 30000);
+it('rejects changed wallet source even when it still covers the full declared cap', async () => {
+  const f = await fixture(),
+    saved = await f.prepare();
+  const account = f.before.get(f.input.holders[0].address)!;
+  account.lamports = (BigInt(account.lamports) + 1n).toString();
+  for (const [i, packet] of f.group.packets.entries()) {
+    const keys = getCompiledTransactionMessageDecoder()
+      .decode(
+        getTransactionDecoder().decode(
+          Buffer.from(packet.transaction, 'base64'),
+        ).messageBytes,
+      )
+      .staticAccounts.map(String);
+    const index = keys.indexOf(f.input.holders[0].address);
+    if (index < 0) continue;
+    const frame = f.response.value.transactionResults[i];
+    for (const accounts of [
+      frame.preExecutionAccounts,
+      frame.postExecutionAccounts,
+    ]) {
+      const value = accounts[index]!;
+      value.lamports = (BigInt(value.lamports) + 1n).toString();
+    }
+  }
+  // Fresh funding/replay/economics are internally valid; the saved wallet source still must not silently change.
+  await expect(
+    refreshPumpLaunchGroupReview(
+      f.db,
+      'alice',
+      saved.review.id,
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('source, fees, deployment or economic results changed');
+  expect(
+    (await readPumpLaunchGroupReview(f.db, 'alice', saved.review.id)).state,
+  ).toBe('review');
+}, 30000);
+it('rejects cancellation during revalidation without restoring or approving its old row', async () => {
+  const f = await fixture(),
+    saved = await f.prepare();
+  let cancelled = false;
+  const rpc: import('./pump-launch-simulation').PumpLaunchRpc = async (
+    method,
+    params,
+    signal,
+  ) => {
+    if (!cancelled && method === 'getMinimumBalanceForRentExemption') {
+      cancelled = true;
+      await cancelUnsignedPumpLaunchGroupReview(
+        f.db,
+        'alice',
+        saved.review.id,
+        new AbortController().signal,
+      );
+    }
+    return f.rpc(method, params, signal);
+  };
+  await expect(
+    refreshPumpLaunchGroupReview(
+      f.db,
+      'alice',
+      saved.review.id,
+      new AbortController().signal,
+      rpc,
+    ),
+  ).rejects.toThrow('review changed during revalidation');
+  expect(
+    (await readPumpLaunchGroupReview(f.db, 'alice', saved.review.id)).state,
+  ).toBe('cancelled');
 }, 30000);
 it('refuses preparation without migration guards before any provider read', async () => {
   const f = await fixture(false);

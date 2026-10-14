@@ -7,6 +7,8 @@ import { buildPumpLaunchPacketGroup } from './pump-launch-packet-group';
 import { collectPumpLaunchGroupSimulation } from './pump-launch-group-simulation';
 import { PumpPreflightError } from './owned-pump-preflight';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
+import { encodePumpSigningInput } from './pump-launch-signing';
+import { canonicalPumpHolderJson } from './pump-holder-review';
 
 type Terms = Parameters<typeof prepareOwnedPumpHolderContext>[2];
 type Input = Awaited<ReturnType<typeof prepareOwnedPumpHolderContext>>['input'];
@@ -20,6 +22,7 @@ export async function preflightOwnedPumpLaunchGroup(
     rpc: PumpLaunchRpc;
     lifetime?: { blockhash: string; lastValidBlockHeight: string };
     captureInput?: (input: Input) => void;
+    originalInput?: Input;
   },
 ) {
   const terms = structuredClone(supplied),
@@ -32,8 +35,36 @@ export async function preflightOwnedPumpLaunchGroup(
     deadline,
     { rpc: options.rpc, lifetime: options.lifetime },
   );
-  const input = structuredClone(context.input),
-    group = await buildPumpLaunchPacketGroup(input, deadline);
+  let input = structuredClone(context.input);
+  if (options.originalInput) {
+    const original = structuredClone(options.originalInput);
+    const stable = (value: Input) => {
+      const create = encodePumpSigningInput(value.create);
+      return {
+        ...value,
+        create: {
+          ...create,
+          global: { ...create.global, slot: 0 },
+          ...(create.quoteMintAccount
+            ? { quoteMintAccount: { ...create.quoteMintAccount, slot: 0 } }
+            : {}),
+          ...(create.quoteControl
+            ? { quoteControl: { ...create.quoteControl, slot: 0 } }
+            : {}),
+        },
+      };
+    };
+    if (
+      canonicalPumpHolderJson(stable(input)) !==
+      canonicalPumpHolderJson(stable(original))
+    )
+      throw new PumpPreflightError(
+        'Fresh group configuration, targets or limits differ from the original review.',
+        409,
+      );
+    input = original;
+  }
+  const group = await buildPumpLaunchPacketGroup(input, deadline);
   if (group.packets.length > 5)
     throw new PumpPreflightError(
       'This launch exceeds one five-packet group. No subset or alternative execution policy is enabled.',

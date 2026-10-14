@@ -7,7 +7,10 @@ import {
   canonicalPumpHolderJson,
   pumpHolderDigest,
 } from './pump-holder-review';
-import { encodePumpSigningInput } from './pump-launch-signing';
+import {
+  encodePumpSigningInput,
+  decodePumpSigningInput,
+} from './pump-launch-signing';
 import { PumpPreflightError } from './owned-pump-preflight';
 import {
   readPumpHistoryPage,
@@ -235,4 +238,130 @@ export function listPumpLaunchGroupPage(
     page,
     publicReview,
   );
+}
+
+/** Rechecks exact frozen group semantics using fresh owned server evidence. Never modifies, approves or signs. */
+export async function refreshPumpLaunchGroupReview(
+  db: D1Database,
+  owner: string,
+  id: string,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc,
+) {
+  const deadline = AbortSignal.any([signal, AbortSignal.timeout(60000)]);
+  deadline.throwIfAborted();
+  await requireGuards(db);
+  const read = () =>
+    db
+      .prepare(
+        "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND id=? AND json_extract(review,'$.format')=?",
+      )
+      .bind(owner, id, FORMAT)
+      .first<Row>();
+  const row = await read();
+  if (!row) return fail('Owned complete-group review not found.', 404);
+  if (
+    row.state !== 'review' ||
+    row.signed !== null ||
+    row.signature !== null ||
+    row.receipt !== null
+  )
+    return fail(
+      'Only an unsigned group review can be revalidated at this stage.',
+    );
+  const { review } = await requirePumpLaunchGroupReview(JSON.parse(row.review));
+  const terms = JSON.parse(row.terms) as Terms;
+  const saved = await db
+    .prepare(
+      'SELECT document,updated_at,archived FROM workspace_projects WHERE owner_id=? AND id=?',
+    )
+    .bind(owner, review.projectId)
+    .first<{ document: string; updated_at: string; archived: number }>();
+  if (
+    !saved ||
+    saved.archived ||
+    saved.document !== row.project_document ||
+    saved.updated_at !== terms.updatedAt
+  )
+    return fail(
+      'Saved group project changed. Cancel its unsigned review before preparing again.',
+    );
+  const originalInput = {
+    ...review.input,
+    create: decodePumpSigningInput(review.input.create),
+  };
+  const checked = await preflightOwnedPumpLaunchGroup(
+    db,
+    owner,
+    terms,
+    deadline,
+    {
+      rpc,
+      originalInput,
+      lifetime: {
+        blockhash: review.input.create.blockhash,
+        lastValidBlockHeight: review.input.create.lastValidBlockHeight,
+      },
+    },
+  );
+  const original = JSON.parse(row.simulation) as Checked;
+  const stable = (value: Checked) => {
+    const { bankSlot: _slot, ...accounting } = value.simulation.accounting;
+    return {
+      projectId: value.projectId,
+      projectUpdatedAt: value.projectUpdatedAt,
+      releaseId: value.metadataReleaseId,
+      uri: value.metadataUri,
+      deployerBinding: value.deployerBindingSha256,
+      holderBinding: value.holderBindingSha256,
+      allowanceSha256: value.allowanceSha256,
+      manifestSha256: value.group.manifestSha256,
+      targets: value.targets,
+      allowances: value.allowances,
+      packetFees: value.funding.packetFees,
+      networkFeeRaw: value.simulation.networkFeeRaw,
+      source: value.funding.accountHashes.map((account) => ({
+        address: account.address,
+        sha256: account.sourceIdentitySha256,
+      })),
+      programs: value.simulation.programDeploymentHashes,
+      accounting,
+    };
+  };
+  if (
+    checked.group.manifestSha256 !== review.manifestSha256 ||
+    canonicalPumpHolderJson(stable(checked)) !==
+      canonicalPumpHolderJson(stable(original))
+  )
+    return fail(
+      'Group ownership, source, fees, deployment or economic results changed. Prepare a new review.',
+    );
+  const current = await read();
+  if (
+    !current ||
+    current.state !== row.state ||
+    current.review !== row.review ||
+    current.simulation !== row.simulation ||
+    current.signed !== row.signed ||
+    current.signature !== row.signature ||
+    current.receipt !== row.receipt
+  )
+    return fail('Group review changed during revalidation.');
+  deadline.throwIfAborted();
+  if (Date.parse(review.expiresAt) <= Date.now())
+    return fail('Group review expired during revalidation.');
+  const result = {
+    checked,
+    reviewContextSha256: review.contextSha256,
+    simulationSha256: await pumpHolderDigest(checked.simulation),
+    originalReviewExpiresAt: review.expiresAt,
+    sourceRevalidated: true as const,
+    approvalRequired: true as const,
+    signingAllowed: false as const,
+    executionAllowed: false as const,
+  };
+  deadline.throwIfAborted();
+  if (Date.parse(review.expiresAt) <= Date.now())
+    return fail('Group review expired during revalidation.');
+  return result;
 }
