@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'PulseForge Launch & Market Console',
+  title: 'Bundle Tek',
   description:
     'Interactive token launch planning and simulation-first market-making controls.',
   icons: { icon: '/favicon.svg' },

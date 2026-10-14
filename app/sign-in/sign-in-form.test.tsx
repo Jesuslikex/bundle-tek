@@ -24,3 +24,14 @@ it('keeps email available and does not advertise an unconfigured Google provider
  expect(element.textContent).not.toContain('Continue with Google');expect(element.querySelector('input[type=email]')).toBeTruthy();
  await act(async()=>root.unmount());
 });
+it('offers a way back to the app without signing in', async () => {
+  const element = document.createElement('div');
+  document.body.appendChild(element);
+  const root = createRoot(element);
+  await act(async () => root.render(<SignInForm googleEnabled={false} />));
+  const back = Array.from(element.querySelectorAll('a')).find((a) =>
+    a.textContent?.includes('Continue without signing in'),
+  );
+  expect(back?.getAttribute('href')).toBe('/');
+  await act(async () => root.unmount());
+});

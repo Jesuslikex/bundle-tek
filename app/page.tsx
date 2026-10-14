@@ -266,7 +266,7 @@ function PulseBackendControls(props: PulseProps) {
     'loading' | 'ready' | 'working' | 'auth' | 'error'
   >('loading');
   const [message, setMessage] = useState(
-    'Connecting to PulseForge control plane…',
+    'Connecting to Bundle Tek control plane…',
   );
 
   const payload = () => ({
@@ -437,11 +437,7 @@ function PulseBackendControls(props: PulseProps) {
       </div>
       <p className="backend-message">{message}</p>
       {state === 'auth' ? (
-        <Link
-          className="backend-signin"
-          href="/sign-in"
-          target="_top"
-        >
+        <Link className="backend-signin" href="/sign-in" target="_top">
           Sign in
         </Link>
       ) : (
@@ -1348,9 +1344,7 @@ export default function Home() {
             <i />
             <i />
           </div>
-          <strong>
-            PulseForge <span>v1.1</span>
-          </strong>
+          <strong>Bundle Tek</strong>
           <PanelLeftClose className="ml-auto size-4 text-[#717789]" />
         </div>
         {workspaceTitle ? (
@@ -1611,7 +1605,7 @@ export default function Home() {
               <Plus /> Create launch
             </Button>
           </div>
-          <p className="sidebar-footnote">PulseForge · Planning &amp; devnet</p>
+          <p className="sidebar-footnote">Bundle Tek · Planning &amp; devnet</p>
         </div>
       </aside>
 
@@ -2177,9 +2171,7 @@ export default function Home() {
           </output>
         )}
         {persistenceState === 'auth' && (
-          <Link href="/sign-in">
-            Sign in to save
-          </Link>
+          <Link href="/sign-in">Sign in to save</Link>
         )}
         <span className="network-boundary">
           DEVNET TOOLS · SWAP APPROVAL REQUIRED

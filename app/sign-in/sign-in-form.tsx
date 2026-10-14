@@ -124,6 +124,9 @@ export function SignInForm({
       >
         {register ? 'Already have an account? Sign in' : 'Create an account'}
       </button>
+      <Link href="/" className={styles.back}>
+        ← Continue without signing in
+      </Link>
     </main>
   );
 }

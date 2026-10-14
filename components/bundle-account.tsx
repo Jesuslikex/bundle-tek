@@ -1,6 +1,7 @@
 'use client';
 import { createAuthClient } from 'better-auth/react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 const auth = createAuthClient();
 export function BundleAccount({
@@ -9,6 +10,7 @@ export function BundleAccount({
   googleEnabled?: boolean;
 }) {
   const { data: session, isPending } = auth.useSession();
+  const pathname = usePathname();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const ownerId = session?.user.id;
@@ -67,7 +69,8 @@ export function BundleAccount({
       setBusy(false);
     }
   }
-  if (isPending) return null;
+  // The sign-in page has its own form; a floating "Sign in" link there is redundant.
+  if (isPending || pathname === '/sign-in') return null;
   return (
     <aside
       aria-label="Bundle account"
