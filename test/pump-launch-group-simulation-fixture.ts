@@ -113,5 +113,14 @@ export async function pumpLaunchGroupSimulationFixture(
       signal,
       provider,
     );
-  return { ...f, funding, creation, rpc, calls, state, run };
+  return {
+    ...f,
+    creationPreflight: f.creation,
+    funding,
+    creation,
+    rpc,
+    calls,
+    state,
+    run,
+  };
 }

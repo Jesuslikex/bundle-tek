@@ -41,8 +41,8 @@ const uint = (value: string) => {
   return BigInt(value);
 };
 
-/** Owned unsigned packet preparation. A create-only simulation cannot authorize this larger transaction. */
-export async function prepareOwnedPumpHolderPacket(
+/** Shared owned targets and limits, independent of packet count. A create-only simulation grants no launch permission. */
+export async function prepareOwnedPumpHolderContext(
   db: D1Database,
   owner: string,
   supplied: Terms,
@@ -213,10 +213,7 @@ export async function prepareOwnedPumpHolderPacket(
           maximumQuoteCostRaw: developerMaximumQuoteCostRaw!,
         }
       : undefined;
-  const packet = await buildPumpCreateHolderMessage(
-    { create, holders, ...(developer ? { developer } : {}) },
-    signal,
-  );
+  const input = { create, holders, ...(developer ? { developer } : {}) };
   const after = await readOwnedPumpHolderWallets(db, owner, terms);
   if (
     after.bindingSha256 !== wallets.bindingSha256 ||
@@ -247,12 +244,12 @@ export async function prepareOwnedPumpHolderPacket(
     structuredClone({ create, holders, ...(developer ? { developer } : {}) }),
   );
   return {
-    format: 'pump-owned-holder-packet-v1' as const,
+    format: 'pump-owned-holder-context-v1' as const,
     projectId: terms.projectId,
     projectUpdatedAt: terms.updatedAt,
     metadataReleaseId: terms.releaseId,
     metadataUri: creation.metadataUri,
-    packet,
+    input,
     targets: selection.targets,
     allowances: canonicalLimits,
     deployerBindingSha256: deployerBinding,
@@ -269,6 +266,33 @@ export async function prepareOwnedPumpHolderPacket(
   };
 }
 
+/** Preserves the original single-packet preparation and post-build owned-context checks. */
+export async function prepareOwnedPumpHolderPacket(
+  db: D1Database,
+  owner: string,
+  supplied: Terms,
+  signal: AbortSignal,
+  options: Parameters<typeof prepareOwnedPumpHolderContext>[4] = {},
+) {
+  const terms = structuredClone(supplied);
+  const context = await prepareOwnedPumpHolderContext(
+    db,
+    owner,
+    terms,
+    signal,
+    { ...options, captureInput: undefined },
+  );
+  const { input, ...prepared } = context;
+  const packet = await buildPumpCreateHolderMessage(input, signal);
+  const result = {
+    ...prepared,
+    format: 'pump-owned-holder-packet-v1' as const,
+    packet,
+  };
+  await assertOwnedHolderContext(db, owner, terms, input, result, signal);
+  options.captureInput?.(structuredClone(input));
+  return result;
+}
 /** Owned, read-only all-wallet funding check. Settlement and signing remain separate pending gates. */
 export async function preflightOwnedPumpHolderFunding(
   db: D1Database,
@@ -317,15 +341,18 @@ export async function preflightOwnedPumpHolderFunding(
   return { ...prepared, funding, fundingValidated: true as const };
 }
 
-async function assertOwnedHolderContext(
+export async function assertOwnedHolderContext(
   db: D1Database,
   owner: string,
   terms: Terms,
   input: Parameters<typeof buildPumpCreateHolderMessage>[0],
-  prepared: Pick<
-    Awaited<ReturnType<typeof prepareOwnedPumpHolderPacket>>,
-    'packet' | 'holderBindingSha256' | 'deployerBindingSha256'
-  >,
+  prepared: {
+    packet: {
+      quote: Awaited<ReturnType<typeof buildPumpCreateHolderMessage>>['quote'];
+    };
+    holderBindingSha256: string;
+    deployerBindingSha256: string;
+  },
   signal: AbortSignal,
 ) {
   const global = decodePumpLaunchConfig('Global', input.create.global.data);
