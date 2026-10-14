@@ -1,7 +1,16 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { releaseLaunchMetadata } from './launch-metadata-release';
-import { prepareOwnedPumpHolderPacket } from './pump-holder-preparation';
+import {
+  prepareOwnedPumpHolderPacket,
+  preflightOwnedPumpHolderFunding,
+} from './pump-holder-preparation';
+import {
+  getTransactionDecoder,
+  getCompiledTransactionMessageDecoder,
+} from '@solana/kit-v1';
+import { raw, SYSTEM } from '../test/pump-launch-simulation-fixture';
+import type { PumpLaunchRpc } from './pump-launch-simulation';
 import { pumpInitialBuySimulationFixture } from '../test/pump-initial-buy-simulation-fixture';
 import { afterEach, expect, it } from 'vitest';
 import { generateKeyPairSigner } from '@solana/kit';
@@ -335,6 +344,74 @@ async function preparationFixture(
   };
   return { ...f, rpc, terms };
 }
+for (const revoke of [false, true])
+  it(`checks owned all-wallet funding and revalidates ownership after RPC (revoke=${revoke})`, async () => {
+    const f = await preparationFixture();
+    f.terms.developerMaximumQuoteCostRaw = '100000000';
+    for (const limit of f.terms.holderLimits)
+      if ('maximumQuoteCostRaw' in limit)
+        limit.maximumQuoteCostRaw = '100000000';
+    for (const key of f.addresses)
+      f.rpc.before.set(key, raw(SYSTEM, new Uint8Array(), '1000000000'));
+    let funding = false,
+      snapshots = 0;
+    const rpc: PumpLaunchRpc = async (method, params, signal) => {
+      if (method === 'getFeeForMessage') {
+        const message = getCompiledTransactionMessageDecoder().decode(
+          Buffer.from(params[0] as string, 'base64'),
+        );
+        if (message.version === 1) {
+          funding = true;
+          return { context: { slot: '100' }, value: '25000' };
+        }
+      }
+      if (funding && method === 'getMultipleAccounts') {
+        if (++snapshots === 2 && revoke)
+          await f.client.execute({
+            sql: 'DELETE FROM wallet_ownership_proofs WHERE address=?',
+            args: [f.addresses[2]],
+          });
+        return {
+          context: { slot: '100' },
+          value: (params[0] as string[]).map((key) =>
+            structuredClone(f.rpc.before.get(key) ?? null),
+          ),
+        };
+      }
+      return f.rpc.rpc(method, params, signal);
+    };
+    const result = preflightOwnedPumpHolderFunding(
+      f.db,
+      'alice',
+      f.terms,
+      new AbortController().signal,
+      { rpc },
+    );
+    if (revoke) await expect(result).rejects.toThrow('Every saved holder');
+    else {
+      const checked = await result;
+      expect(checked).toMatchObject({
+        fundingValidated: true,
+        allWalletSimulation: null,
+        signingAllowed: false,
+        funding: {
+          fundingValidated: true,
+          settlementValidated: false,
+          networkFeeRaw: '25000',
+        },
+      });
+      expect(checked.funding.wallets).toHaveLength(4);
+      expect(checked.funding.packetSha256).toBe(checked.packet.packetSha256);
+      expect(checked.funding.allowanceSha256).toBe(checked.allowanceSha256);
+      const packet = getTransactionDecoder().decode(
+        Buffer.from(checked.packet.transaction, 'base64'),
+      );
+      expect(Object.values(packet.signatures).every((s) => s === null)).toBe(
+        true,
+      );
+    }
+    expect(snapshots).toBe(2);
+  });
 for (const [stock, quoteMode, token22] of [
   [false, false, false],
   [true, false, false],

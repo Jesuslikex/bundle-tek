@@ -16,6 +16,7 @@ import { decodePumpLaunchConfig } from './pump-launch-config';
 import { pumpDeveloperBuyTarget } from './pump-initial-buy-preparation';
 import type { PumpCreateInput } from './pump-launch-message';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
+import { collectPumpHolderFunding } from './pump-holder-funding';
 type Limits = {
   address: string;
   feeAndRentLimitRaw: string;
@@ -45,7 +46,12 @@ export async function prepareOwnedPumpHolderPacket(
   owner: string,
   supplied: Terms,
   signal: AbortSignal,
-  options: { rpc?: PumpLaunchRpc } = {},
+  options: {
+    rpc?: PumpLaunchRpc;
+    captureInput?: (
+      input: Parameters<typeof buildPumpCreateHolderMessage>[0],
+    ) => void;
+  } = {},
 ) {
   const terms = structuredClone(supplied);
   if (
@@ -234,6 +240,9 @@ export async function prepareOwnedPumpHolderPacket(
       new TextEncoder().encode(JSON.stringify(canonicalLimits)),
     ),
   );
+  options.captureInput?.(
+    structuredClone({ create, holders, ...(developer ? { developer } : {}) }),
+  );
   return {
     format: 'pump-owned-holder-packet-v1' as const,
     projectId: terms.projectId,
@@ -255,4 +264,66 @@ export async function prepareOwnedPumpHolderPacket(
     executionAllowed: false as const,
     completeLaunch: false as const,
   };
+}
+
+/** Owned, read-only all-wallet funding check. Settlement and signing remain separate pending gates. */
+export async function preflightOwnedPumpHolderFunding(
+  db: D1Database,
+  owner: string,
+  supplied: Terms,
+  signal: AbortSignal,
+  options: { rpc?: PumpLaunchRpc } = {},
+) {
+  const terms = structuredClone(supplied);
+  const deadline = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
+  let input: Parameters<typeof buildPumpCreateHolderMessage>[0] | undefined;
+  const prepared = await prepareOwnedPumpHolderPacket(
+    db,
+    owner,
+    terms,
+    deadline,
+    {
+      rpc: options.rpc,
+      captureInput: (captured) => {
+        input = captured;
+      },
+    },
+  );
+  if (!input) return fail('Owned holder funding context is unavailable.');
+  const funding = await collectPumpHolderFunding(
+    input,
+    prepared.allowances,
+    prepared.creationSimulation,
+    deadline,
+    options.rpc,
+  );
+  const global = decodePumpLaunchConfig('Global', input.create.global.data);
+  if (typeof global.initial_real_token_reserves !== 'bigint')
+    return fail('Observed initial curve reserve unavailable.');
+  const after = await readOwnedPumpHolderSelection(db, owner, {
+    projectId: terms.projectId,
+    updatedAt: terms.updatedAt,
+    observation: {
+      tokenSupplyRaw: prepared.packet.quote.tokenSupplyRaw,
+      initialRealTokenReservesRaw:
+        global.initial_real_token_reserves.toString(),
+      quoteMint: input.create.quoteMint,
+      quoteDecimals: prepared.packet.quote.decimals,
+    },
+  });
+  const {
+    holderLimits: _holderLimits,
+    developerMaximumQuoteCostRaw: _developerLimit,
+    ...createTerms
+  } = terms;
+  if (
+    after.bindingSha256 !== prepared.holderBindingSha256 ||
+    (await readOwnedPumpCreateBinding(db, owner, createTerms, deadline)) !==
+      prepared.deployerBindingSha256 ||
+    funding.packetSha256 !== prepared.packet.packetSha256 ||
+    funding.allowanceSha256 !== prepared.allowanceSha256
+  )
+    return fail('Holder funding context changed; prepare a new review.');
+  deadline.throwIfAborted();
+  return { ...prepared, funding, fundingValidated: true as const };
 }
