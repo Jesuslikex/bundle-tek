@@ -60,23 +60,33 @@ async function requireReservationGuards(db: D1Database) {
       503,
     );
 }
-const publicReview = (row: Row) => ({
-  format: FORMAT,
-  review: JSON.parse(row.review) as PumpHolderReview,
-  simulation: JSON.parse(row.simulation) as Checked,
-  state: row.state,
-  signature: row.signature,
-  receipt: row.receipt ? JSON.parse(row.receipt) : null,
-  signingAllowed:
-    row.state === 'approved' && Date.parse(row.expires_at) > Date.now(),
-  executionAllowed: false as const,
-  completeLaunch: false as const,
-  simulationLimits: [
-    'program-deployment-metadata-only',
-    'buyback-split-rounding-unattested',
-    'holder-funded-proof-pending',
-  ] as const,
-});
+const publicReview = (row: Row) => {
+  const review = JSON.parse(row.review) as PumpHolderReview,
+    receipt = row.receipt ? JSON.parse(row.receipt) : null;
+  return {
+    format: FORMAT,
+    review,
+    simulation: JSON.parse(row.simulation) as Checked,
+    state: row.state,
+    signature: row.signature,
+    receipt,
+    signingAllowed:
+      row.state === 'approved' && Date.parse(row.expires_at) > Date.now(),
+    executionAllowed: false as const,
+    completeLaunch:
+      row.state === 'finalized' &&
+      receipt?.kind === 'finalized' &&
+      receipt.succeeded === true &&
+      receipt.containsHolderBuys === true &&
+      receipt.packetSha256 === review.sha256 &&
+      receipt.contextSha256 === review.contextSha256,
+    simulationLimits: [
+      'program-deployment-metadata-only',
+      'buyback-split-rounding-unattested',
+      'holder-funded-proof-pending',
+    ] as const,
+  };
+};
 async function read(db: D1Database, owner: string, id: string) {
   const row = await db
     .prepare(
@@ -87,6 +97,12 @@ async function read(db: D1Database, owner: string, id: string) {
   if (!row) return fail('Owned holder launch review not found.', 404);
   return row;
 }
+export {
+  read as readPumpHolderReview,
+  publicReview as publicPumpHolderReview,
+  requireReservationGuards as requirePumpHolderReservationGuards,
+};
+export type PumpHolderReviewRow = Row;
 
 /** Persist an immutable complete review. The authenticated owner must be supplied by the calling route. */
 export async function preparePumpHolderReview(

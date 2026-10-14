@@ -18,6 +18,10 @@ import {
 } from './pump-holder-review-service';
 import type { PumpHolderConsent } from './pump-holder-signing';
 import {
+  submitPumpHolderReview,
+  recoverPumpHolderReview,
+} from './pump-holder-execution';
+import {
   getTransactionDecoder,
   getCompiledTransactionMessageDecoder,
   getTransactionEncoder,
@@ -435,7 +439,27 @@ for (const revoke of [false, true])
     };
     let holderMode = false,
       simulations = 0;
+    let sentPacket: string | null = null,
+      sends = 0;
     const rpc: PumpLaunchRpc = async (method, params, signal) => {
+      if (method === 'sendTransaction') {
+        sends++;
+        sentPacket = params[0] as string;
+        return (
+          await f.db
+            .prepare('SELECT signature FROM pump_launch_reviews WHERE signed=?')
+            .bind(sentPacket)
+            .first<{ signature: string }>()
+        )?.signature;
+      }
+      if (method === 'getTransaction')
+        return sentPacket
+          ? {
+              slot: '2000',
+              transaction: [sentPacket, 'base64'],
+              meta: { err: null, fee: '20000' },
+            }
+          : null;
       if (method === 'getLatestBlockhash')
         return {
           context: { slot: '100' },
@@ -630,8 +654,37 @@ for (const revoke of [false, true])
         executionAllowed: false,
         completeLaunch: false,
       });
+      holderMode = false;
+      expect(
+        await submitPumpHolderReview(
+          f.db,
+          'alice',
+          next.review.id,
+          { consent, submitApproved: true },
+          new AbortController().signal,
+          rpc,
+        ),
+      ).toMatchObject({ state: 'submitted', completeLaunch: false });
+      expect(
+        await recoverPumpHolderReview(
+          f.db,
+          'alice',
+          next.review.id,
+          new AbortController().signal,
+          rpc,
+        ),
+      ).toMatchObject({
+        state: 'finalized',
+        completeLaunch: true,
+        receipt: {
+          containsHolderBuys: true,
+          activeHolderCount: 2,
+          succeeded: true,
+        },
+      });
     }
-    expect(simulations).toBe(revoke ? 1 : 5);
+    expect(simulations).toBe(revoke ? 1 : 6);
+    expect(sends).toBe(revoke ? 0 : 1);
   });
 for (const revoke of [false, true])
   it(`checks owned all-wallet funding and revalidates ownership after RPC (revoke=${revoke})`, async () => {
