@@ -1,3 +1,4 @@
+import { requirePumpHolderReviewPlan } from './pump-holder-review-plan';
 import {
   getTransactionDecoder,
   getTransactionEncoder,
@@ -11,13 +12,8 @@ import {
   buildPumpCreateHolderMessage,
   type PumpHolderBuy,
 } from './pump-holder-message';
-import { buildPumpHolderTargets } from './pump-holder-targets';
-import { pumpDeveloperBuyTarget } from './pump-initial-buy-preparation';
-import { decodePumpLaunchConfig } from './pump-launch-config';
-import {
-  validateProjectDocument,
-  type ProjectDocument,
-} from './workspace-project';
+
+import type { ProjectDocument } from './workspace-project';
 import type { PumpHolderAllowances } from './pump-holder-funding';
 
 export type PumpHolderReview = {
@@ -60,20 +56,6 @@ const digestText = async (value: string) =>
   ).join('');
 export const pumpHolderDigest = (value: unknown) =>
   digestText(canonicalPumpHolderJson(value));
-const allowanceDigest = (limits: PumpHolderAllowances) =>
-  digestText(
-    JSON.stringify({
-      deployerFeeAndRentLimitRaw: limits.deployerFeeAndRentLimitRaw,
-      developerMaximumQuoteCostRaw: limits.developerMaximumQuoteCostRaw,
-      holders: limits.holders.map((l) => ({
-        address: l.address,
-        feeAndRentLimitRaw: l.feeAndRentLimitRaw,
-        maximumQuoteCostRaw: l.maximumQuoteCostRaw,
-        minimumTokenOutputRaw: l.minimumTokenOutputRaw,
-      })),
-    }),
-  );
-
 /** Reconstruct the complete immutable review. This validator grants no signing permission. */
 export async function requirePumpHolderReview(
   supplied: PumpHolderReview,
@@ -123,85 +105,15 @@ export async function requirePumpHolderReview(
   )
     throw new Error('Holder review allowance fields differ.');
   const create = decodePumpSigningInput(review.input.create),
-    built = await buildPumpCreateHolderMessage({ ...review.input, create }),
-    document = validateProjectDocument(review.document),
-    global = decodePumpLaunchConfig('Global', create.global.data);
-  if (typeof global.initial_real_token_reserves !== 'bigint')
-    throw new Error('Holder review curve reserve differs.');
-  const targets = buildPumpHolderTargets(document, {
-    tokenSupplyRaw: built.quote.tokenSupplyRaw,
-    initialRealTokenReservesRaw: global.initial_real_token_reserves.toString(),
-    quoteMint: create.quoteMint,
-    quoteDecimals: built.quote.decimals,
-  });
+    built = await buildPumpCreateHolderMessage({ ...review.input, create });
+  await requirePumpHolderReviewPlan(review, create, built.quote);
   if (
-    document.options.wallets!.deployer!.address !== create.payer ||
-    review.input.holders.length !== targets.items.length ||
-    review.allowances.holders.length !== targets.items.length ||
     built.packetSha256 !== review.sha256 ||
-    built.transaction !== review.transaction ||
-    document.plan.tokenName !== create.name ||
-    document.plan.ticker !== create.symbol ||
-    (await allowanceDigest(review.allowances)) !== review.allowanceSha256
+    built.transaction !== review.transaction
   )
     throw new Error(
       'Holder packet differs from the saved project, targets or allowances.',
     );
-  const developer = review.input.developer;
-  if (
-    document.plan.developerBuy > 0
-      ? !developer ||
-        developer.tokenAmountRaw !==
-          pumpDeveloperBuyTarget(
-            built.quote.tokenSupplyRaw,
-            document.plan.developerBuy,
-          )
-      : developer !== undefined
-  )
-    throw new Error(
-      'Holder review developer target differs from the saved supply plan.',
-    );
-  if (
-    review.allowances.developerMaximumQuoteCostRaw !==
-    (developer?.maximumQuoteCostRaw ?? null)
-  )
-    throw new Error('Holder review developer cap differs.');
-  const feeLimit = (value: string, active: boolean) => {
-    if (
-      typeof value !== 'string' ||
-      !/^(0|[1-9]\d{0,9})$/.test(value) ||
-      BigInt(value) > 1000000000n ||
-      (active ? value === '0' : value !== '0')
-    )
-      throw new Error('Holder review fee/rent allowance differs.');
-  };
-  feeLimit(review.allowances.deployerFeeAndRentLimitRaw, true);
-  for (const [i, target] of targets.items.entries()) {
-    const holder = review.input.holders[i],
-      limit = review.allowances.holders[i];
-    feeLimit(limit.feeAndRentLimitRaw, target.participates);
-    if (
-      holder.address !== target.wallet.address ||
-      limit.address !== holder.address ||
-      (target.participates
-        ? holder.kind !== targets.kind
-        : holder.kind !== 'none')
-    )
-      throw new Error('Holder review slot order or participation differs.');
-    if (
-      holder.kind === 'exact-base-output'
-        ? holder.tokenAmountRaw !== target.tokenAmountRaw ||
-          limit.maximumQuoteCostRaw !== holder.maximumQuoteCostRaw ||
-          limit.minimumTokenOutputRaw !== null
-        : holder.kind === 'exact-quote-input'
-          ? holder.quoteAmountRaw !== target.quoteAmountRaw ||
-            limit.minimumTokenOutputRaw !== holder.minimumTokenOutputRaw ||
-            limit.maximumQuoteCostRaw !== null
-          : limit.maximumQuoteCostRaw !== null ||
-            limit.minimumTokenOutputRaw !== null
-    )
-      throw new Error('Holder review amount denomination or limit differs.');
-  }
   const raw = Uint8Array.from(atob(review.transaction), (c) => c.charCodeAt(0)),
     tx = getTransactionDecoder().decode(raw);
   if (
