@@ -61,9 +61,10 @@ function packet(value: string) {
 }
 
 /** Reconstruct the complete version-1 packet before exposing it to a signer. */
-export async function requirePumpInitialBuySigningReview(
+async function reconstructInitialBuyReview(
   supplied: PumpInitialBuySigningReview,
-  current: () => void = () => {},
+  current: () => void,
+  requireLive: boolean,
 ) {
   const review = structuredClone(supplied);
   current();
@@ -73,7 +74,7 @@ export async function requirePumpInitialBuySigningReview(
     !review.id ||
     !/^[0-9a-f]{64}$/.test(review.sha256) ||
     !Number.isFinite(Date.parse(review.expiresAt)) ||
-    Date.parse(review.expiresAt) <= Date.now() ||
+    (requireLive && Date.parse(review.expiresAt) <= Date.now()) ||
     typeof review.feeAndRentLimitRaw !== 'string' ||
     !/^[1-9]\d{0,19}$/.test(review.feeAndRentLimitRaw) ||
     BigInt(review.feeAndRentLimitRaw) > 1000000000n ||
@@ -115,9 +116,16 @@ export async function requirePumpInitialBuySigningReview(
       'Atomic launch review must contain exactly two unsigned identities.',
     );
   current();
-  if (Date.parse(review.expiresAt) <= Date.now())
+  if (requireLive && Date.parse(review.expiresAt) <= Date.now())
     throw new Error('Atomic launch review expired.');
   return tx;
+}
+
+export async function requirePumpInitialBuySigningReview(
+  supplied: PumpInitialBuySigningReview,
+  current: () => void = () => {},
+) {
+  return reconstructInitialBuyReview(supplied, current, true);
 }
 
 /** Browser-only signing primitive. The durable approval API and UI must supply this exact consent. */
@@ -192,7 +200,7 @@ export async function verifyPumpInitialBuySignedPacket(
   signed: string,
 ) {
   const review = structuredClone(supplied);
-  const original = await requirePumpInitialBuySigningReview(review),
+  const original = await reconstructInitialBuyReview(review, () => {}, false),
     tx = packet(signed);
   if (
     getBase64Decoder().decode(tx.messageBytes) !==

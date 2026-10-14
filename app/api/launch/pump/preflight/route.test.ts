@@ -56,6 +56,43 @@ vi.mock('@/lib/pump-initial-buy-simulation', async (original) => {
       ),
   };
 });
+vi.mock('@/lib/pump-initial-buy-review', async (original) => {
+  const actual =
+    await original<typeof import('@/lib/pump-initial-buy-review')>();
+  return {
+    ...actual,
+    preparePumpInitialBuyReview: (
+      ...args: Parameters<typeof actual.preparePumpInitialBuyReview>
+    ) =>
+      actual.preparePumpInitialBuyReview(
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4] ?? mocks.rpc!,
+      ),
+    actPumpInitialBuyReview: (
+      ...args: Parameters<typeof actual.actPumpInitialBuyReview>
+    ) =>
+      actual.actPumpInitialBuyReview(
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+        args[5],
+        args[6] ?? mocks.rpc!,
+      ),
+  };
+});
+import { POST as atomicPOST, GET as atomicGET } from '../initial-buy/route';
+import {
+  getTransactionDecoder as atomicDecoder,
+  getTransactionEncoder as atomicEncoder,
+  getBase64Decoder as atomicBase64,
+  type SignatureBytes as AtomicSignature,
+} from '@solana/kit-v1';
+import bs58 from 'bs58';
 import {
   preparePumpInitialBuyReview,
   refreshPumpInitialBuyReview,
@@ -633,4 +670,257 @@ it('does not persist or reserve a project edited after its unsigned atomic simul
       .bind('alice', terms.projectId)
       .first<{ n: number }>())!.n,
   ).toBe(0);
+});
+
+const atomicSend = (value: unknown, headers: Record<string, string> = {}) =>
+  atomicPOST(
+    new Request(origin + '/api/launch/pump/initial-buy', {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(value),
+    }),
+  );
+async function prepareAtomicApi() {
+  const response = await atomicSend({
+    ...body,
+    action: 'prepare',
+    maximumQuoteCostRaw: '100000000',
+  });
+  expect(response.status).toBe(200);
+  return (await response.json()) as Awaited<
+    ReturnType<typeof preparePumpInitialBuyReview>
+  >;
+}
+const atomicConsent = (
+  l: Awaited<ReturnType<typeof preparePumpInitialBuyReview>>,
+) => ({
+  approved: true,
+  sha256: l.review.sha256,
+  approvedScope: 'create-and-developer-buy',
+  acknowledgeSimulationLimits: true,
+});
+async function syntheticAtomicSign(
+  l: Awaited<ReturnType<typeof preparePumpInitialBuyReview>>,
+) {
+  const tx = atomicDecoder().decode(
+    Buffer.from(l.review.transaction, 'base64'),
+  );
+  const signatures: Record<string, AtomicSignature> = {};
+  for (const signer of [f.f.payerSigner, f.f.mintSigner])
+    signatures[signer.address] = new Uint8Array(
+      await crypto.subtle.sign(
+        'Ed25519',
+        signer.keyPair.privateKey,
+        Uint8Array.from(tx.messageBytes),
+      ),
+    ) as AtomicSignature;
+  return {
+    transaction: atomicBase64().decode(
+      atomicEncoder().encode({ ...tx, signatures }),
+    ),
+    signature: bs58.encode(signatures[f.intent.payer]),
+  };
+}
+it('authenticates strict atomic API terms and isolates history', async () => {
+  mocks.user = null;
+  expect(
+    (
+      await atomicSend({
+        ...body,
+        action: 'prepare',
+        maximumQuoteCostRaw: '100000000',
+      })
+    ).status,
+  ).toBe(401);
+  mocks.user = { userId: 'alice' };
+  expect(
+    (
+      await atomicSend(
+        { ...body, action: 'prepare', maximumQuoteCostRaw: '100000000' },
+        { origin: 'https://foreign.example' },
+      )
+    ).status,
+  ).toBe(403);
+  expect(
+    (await atomicSend({ ...body, action: 'prepare', maximumQuoteCostRaw: '0' }))
+      .status,
+  ).toBe(400);
+  expect((await atomicSend({ large: 'x'.repeat(8300) })).status).toBe(413);
+  expect(f.calls).toEqual([]);
+  const l = await prepareAtomicApi();
+  expect(l.signingAllowed).toBe(false);
+  const history = await atomicGET(
+    new Request(
+      origin + '/api/launch/pump/initial-buy?projectId=' + body.projectId,
+    ),
+  );
+  expect(
+    ((await history.json()) as { launches: unknown[] }).launches,
+  ).toHaveLength(1);
+  mocks.user = { userId: 'bob' };
+  expect(
+    (await atomicSend({ action: 'recover', id: l.review.id })).status,
+  ).toBe(404);
+});
+for (const [stock, token22] of [
+  [false, false],
+  [true, false],
+  [true, true],
+])
+  it(`executes controlled atomic approval, dual registration, submission and v1 recovery (${stock ? (token22 ? 'Token-2022 stock' : 'SPL stock') : 'SOL'})`, async () => {
+    await seed(stock, token22);
+    const l = await prepareAtomicApi(),
+      s = await syntheticAtomicSign(l);
+    expect(
+      (
+        await atomicSend({
+          action: 'register',
+          id: l.review.id,
+          transaction: s.transaction,
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await atomicSend({
+          action: 'approve',
+          id: l.review.id,
+          ...atomicConsent(l),
+          acknowledgeSimulationLimits: false,
+        })
+      ).status,
+    ).toBe(400);
+    const approved = await atomicSend({
+      action: 'approve',
+      id: l.review.id,
+      ...atomicConsent(l),
+    });
+    expect(approved.status).toBe(200);
+    expect(
+      ((await approved.json()) as { signingAllowed: boolean }).signingAllowed,
+    ).toBe(true);
+    expect(
+      (
+        await atomicSend({
+          action: 'register',
+          id: l.review.id,
+          transaction: s.transaction,
+        })
+      ).status,
+    ).toBe(200);
+    expect(f.calls.some((c) => c.method === 'sendTransaction')).toBe(false);
+    let sends = 0;
+    mocks.rpc = async (method, params, signal) => {
+      if (method === 'sendTransaction') {
+        sends++;
+        expect(params[0]).toBe(s.transaction);
+        expect(params[1]).toMatchObject({
+          skipPreflight: false,
+          maxRetries: 0,
+        });
+        return s.signature;
+      }
+      if (method === 'getTransaction') {
+        expect(params[1]).toMatchObject({
+          commitment: 'finalized',
+          maxSupportedTransactionVersion: 1,
+        });
+        return {
+          slot: '101',
+          transaction: [s.transaction, 'base64'],
+          meta: { err: null },
+        };
+      }
+      return f.rpc(method, params, signal);
+    };
+    expect(
+      (
+        await atomicSend({
+          action: 'submit',
+          id: l.review.id,
+          ...atomicConsent(l),
+          approved: false,
+        })
+      ).status,
+    ).toBe(400);
+    const submitted = await atomicSend({
+      action: 'submit',
+      id: l.review.id,
+      ...atomicConsent(l),
+    });
+    expect(submitted.status).toBe(200);
+    expect(((await submitted.json()) as { state: string }).state).toBe(
+      'submitted',
+    );
+    await atomicSend({
+      action: 'submit',
+      id: l.review.id,
+      ...atomicConsent(l),
+    });
+    expect(sends).toBe(1);
+    const recovered = await atomicSend({ action: 'recover', id: l.review.id });
+    expect(recovered.status).toBe(200);
+    expect(await recovered.json()).toMatchObject({
+      state: 'finalized',
+      receipt: {
+        succeeded: true,
+        containsInitialBuy: true,
+        containsHolderBuys: false,
+      },
+    });
+  });
+it('never resends after a lost atomic submission response', async () => {
+  const l = await prepareAtomicApi(),
+    s = await syntheticAtomicSign(l);
+  expect(
+    (
+      await atomicSend({
+        action: 'approve',
+        id: l.review.id,
+        ...atomicConsent(l),
+      })
+    ).status,
+  ).toBe(200);
+  await atomicSend({
+    action: 'register',
+    id: l.review.id,
+    transaction: s.transaction,
+  });
+  let sends = 0;
+  mocks.rpc = async (method, params, signal) => {
+    if (method === 'sendTransaction') {
+      sends++;
+      throw new Error('lost response');
+    }
+    return f.rpc(method, params, signal);
+  };
+  const response = await atomicSend({
+    action: 'submit',
+    id: l.review.id,
+    ...atomicConsent(l),
+  });
+  expect(((await response.json()) as { state: string }).state).toBe(
+    'submitting',
+  );
+  await atomicSend({ action: 'submit', id: l.review.id, ...atomicConsent(l) });
+  expect(sends).toBe(1);
+});
+
+it('rejects revoked payer ownership before approving the atomic review', async () => {
+  const l = await prepareAtomicApi();
+  await mocks.db.prepare('DELETE FROM wallet_ownership_proofs').run();
+  expect(
+    (
+      await atomicSend({
+        action: 'approve',
+        id: l.review.id,
+        ...atomicConsent(l),
+      })
+    ).status,
+  ).toBe(404);
+  const state = await mocks.db
+    .prepare('SELECT state FROM pump_launch_reviews WHERE id=?')
+    .bind(l.review.id)
+    .first<{ state: string }>();
+  expect(state!.state).toBe('review');
 });

@@ -197,6 +197,8 @@ export async function actPumpLaunch(
 ) {
   let row = await getPumpLaunch(db, owner, id);
   const review = JSON.parse(row.review) as PumpSigningReview;
+  if ('create' in review.input)
+    fail('Use the atomic initial-buy launch flow for this review.');
   const change = async (
     state: string,
     extraSql = '',
@@ -354,7 +356,7 @@ export async function listPumpLaunches(
 ) {
   const { results } = await db
     .prepare(
-      'SELECT * FROM pump_launch_reviews WHERE owner_id=? AND project_id=? ORDER BY created_at DESC LIMIT 20',
+      "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND project_id=? AND json_type(terms,'$.maximumQuoteCostRaw') IS NULL ORDER BY created_at DESC LIMIT 20",
     )
     .bind(owner, projectId)
     .all<Row>();

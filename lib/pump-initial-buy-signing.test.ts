@@ -230,3 +230,15 @@ it('rejects unexpected atomic options and degenerate signing identities', async 
     }),
   ).rejects.toThrow('signing identity');
 });
+
+it('verifies a previously signed packet for expired receipt recovery while refusing new expired signing', async () => {
+  const r = reviews[0],
+    signed = await signPumpInitialBuy(payer, mint, r, consent(r), () => {});
+  const expired = { ...r, expiresAt: '2000-01-01' };
+  await expect(
+    signPumpInitialBuy(payer, mint, expired, consent(expired), () => {}),
+  ).rejects.toThrow('expired');
+  expect(
+    await verifyPumpInitialBuySignedPacket(expired, signed.transaction),
+  ).toBe(signed.signature);
+});
