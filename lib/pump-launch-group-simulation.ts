@@ -1,6 +1,12 @@
 import { collectPumpLaunchGroupTrace } from './pump-launch-group-trace';
 import { verifyPumpLaunchGroupAccounting } from './pump-launch-group-accounting';
 import { buildPumpLaunchPacketGroup } from './pump-launch-packet-group';
+import { buildPumpCreateMessage } from './pump-launch-message';
+import {
+  pumpDeploymentHash,
+  pumpGroupProgramDataLink,
+  requirePumpGroupDeploymentHeader,
+} from './pump-launch-group-deployments';
 import { pumpHolderSourceHash } from './pump-holder-source';
 import {
   pumpAccountBytes,
@@ -26,6 +32,7 @@ export async function collectPumpLaunchGroupSimulation(
   suppliedCreation: {
     accountHashes: Evidence['creationAccountHashes'];
     expiresAt: string;
+    programDeploymentHashes: { address: string; sha256: string }[];
   },
   signal: AbortSignal,
   rpc: PumpLaunchRpc,
@@ -65,7 +72,7 @@ export async function collectPumpLaunchGroupSimulation(
   ]);
   const call: PumpLaunchRpc = async (method, params) => {
     current();
-    if (!allowed.has(method) || ++reads > 32 + 6 * chunks)
+    if (!allowed.has(method) || ++reads > 36 + 6 * chunks)
       throw new Error('Group simulation read budget exceeded.');
     if (method === 'simulateBundle' && ++replayCount !== 1)
       throw new Error('Group simulation cannot replay a second time.');
@@ -93,6 +100,98 @@ export async function collectPumpLaunchGroupSimulation(
     if (method === 'simulateBundle') response = result;
     return result;
   };
+  if ((await call('getGenesisHash', [], deadline)) !== SOLANA_MAINNET_GENESIS)
+    throw new Error('Group deployment collection requires mainnet.');
+  const created = await buildPumpCreateMessage(input.create);
+  const programKeys = [
+    ...new Set([
+      ...group.packets.flatMap((packet) =>
+        packet.instructions.map((ix) => String(ix.programAddress)),
+      ),
+      ...created.instruction
+        .accounts!.slice(7, 10)
+        .map((a) => String(a.address)),
+      group.quote.tokenProgram,
+    ]),
+  ];
+  if (
+    programKeys.length > 64 ||
+    !Array.isArray(creation.programDeploymentHashes) ||
+    new Set(creation.programDeploymentHashes.map((item) => item.address))
+      .size !== creation.programDeploymentHashes.length ||
+    creation.programDeploymentHashes.some(
+      (item) => !/^[a-f0-9]{64}$/.test(item.sha256),
+    )
+  )
+    throw new Error('Group deployment baseline scope differs.');
+  const deploymentSlots = [funding.minimumSlot, funding.maximumSlot];
+  const deploymentSnapshot = async (addresses: string[], sliced = false) => {
+    if (addresses.length > 100)
+      throw new Error('Group deployment snapshot exceeds its bound.');
+    const floor = Math.max(...deploymentSlots);
+    const value = await call(
+      'getMultipleAccounts',
+      [
+        addresses,
+        {
+          encoding: 'base64',
+          commitment: 'confirmed',
+          minContextSlot: floor,
+          ...(sliced ? { dataSlice: { offset: 0, length: 45 } } : {}),
+        },
+      ],
+      deadline,
+    );
+    if (
+      !record(value) ||
+      !record(value.context) ||
+      !Array.isArray(value.value) ||
+      value.value.length !== addresses.length
+    )
+      throw new Error('Group deployment snapshot mapping differs.');
+    const slot = Number(pumpUnsignedInteger(value.context.slot));
+    if (!Number.isSafeInteger(slot) || slot < floor)
+      throw new Error('Group deployment snapshot ignored bank floor.');
+    deploymentSlots.push(slot);
+    requireConsistentSolanaSlots(deploymentSlots);
+    return value.value.map(pumpRpcAccount);
+  };
+  const programs = await deploymentSnapshot(programKeys);
+  for (const [i, address] of programKeys.entries()) {
+    const funded = funding.accountHashes.find(
+      (item) => item.address === address,
+    );
+    if (
+      !funded ||
+      (await pumpDeploymentHash(programs[i])) !== funded.sourceIdentitySha256
+    )
+      throw new Error('Group executable differs from funded source.');
+  }
+  const deploymentKeys = [
+    ...new Set(
+      programKeys.flatMap((address, i) => {
+        const link = pumpGroupProgramDataLink(address, programs[i]);
+        return link ? [link] : [];
+      }),
+    ),
+  ];
+  if (
+    creation.programDeploymentHashes.some(
+      (item) => !deploymentKeys.includes(item.address),
+    )
+  )
+    throw new Error('Group deployment baseline coverage differs.');
+  const deployments = deploymentKeys.length
+    ? await deploymentSnapshot(deploymentKeys, true)
+    : [];
+  for (const [i, account] of deployments.entries()) {
+    requirePumpGroupDeploymentHeader(account, funding.maximumSlot);
+    const baseline = creation.programDeploymentHashes.find(
+      (item) => item.address === deploymentKeys[i],
+    );
+    if (baseline && (await pumpDeploymentHash(account)) !== baseline.sha256)
+      throw new Error('Group deployment changed after creation observation.');
+  }
   const trace = await collectPumpLaunchGroupTrace(
     input,
     limits,
@@ -141,7 +240,13 @@ export async function collectPumpLaunchGroupSimulation(
     quoteMint: input.create.quoteMint,
     buyerAccounts: group.packets.flatMap((packet) => packet.buyerAccounts),
   };
-  const slots = [trace.minimumSlot, trace.maximumSlot, trace.bankSlot];
+  const slots = [
+    trace.minimumSlot,
+    trace.maximumSlot,
+    trace.bankSlot,
+    ...deploymentSlots,
+  ];
+  requireConsistentSolanaSlots(slots);
   let sourceRecheckSlot = 0;
   for (let attempt = 0; attempt < 3; attempt++) {
     const minimum = Math.max(...slots),
@@ -192,6 +297,20 @@ export async function collectPumpLaunchGroupSimulation(
     sourceRecheckSlot = parts[0].slot;
     break;
   }
+  deploymentSlots.push(...slots);
+  if (deploymentKeys.length) {
+    const stable = await deploymentSnapshot(deploymentKeys, true);
+    for (const [i, account] of stable.entries()) {
+      requirePumpGroupDeploymentHeader(account, trace.bankSlot);
+      if (
+        (await pumpDeploymentHash(account)) !==
+        (await pumpDeploymentHash(deployments[i]))
+      )
+        throw new Error('Group deployment changed during verification.');
+    }
+    slots.push(...deploymentSlots);
+    requireConsistentSolanaSlots(slots);
+  }
   const valid = await call(
     'isBlockhashValid',
     [
@@ -219,7 +338,7 @@ export async function collectPumpLaunchGroupSimulation(
   if ((await call('getGenesisHash', [], deadline)) !== SOLANA_MAINNET_GENESIS)
     throw new Error('Group simulation provider network changed.');
   current();
-  return {
+  const report = {
     format: 'pump-launch-group-simulation-v1' as const,
     manifestSha256: group.manifestSha256,
     allowanceSha256: funding.allowanceSha256,
@@ -228,6 +347,15 @@ export async function collectPumpLaunchGroupSimulation(
     settlementValidated: true as const,
     rpcCollectionRequired: false as const,
     programDeploymentReviewRequired: true as const,
+    programDeploymentMetadataValidated: true as const,
+    programDeploymentMetadataOnly: true as const,
+    programCodeAttested: false as const,
+    programDeploymentHashes: await Promise.all(
+      deploymentKeys.map(async (address, i) => ({
+        address,
+        sha256: await pumpDeploymentHash(deployments[i]),
+      })),
+    ),
     transportReviewRequired: true as const,
     authorityReviewRequired: true as const,
     signingAllowed: false as const,
@@ -243,4 +371,6 @@ export async function collectPumpLaunchGroupSimulation(
     reads,
     replayCount,
   };
+  current();
+  return report;
 }

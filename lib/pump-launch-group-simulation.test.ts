@@ -6,8 +6,14 @@ import { collectPumpLaunchGroupSimulation } from './pump-launch-group-simulation
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 
-async function fixture(stock = false, token22 = false) {
-  const f = await pumpLaunchGroupSettlementFixture(stock, token22);
+async function fixture(stock = false, token22 = false, upgradeable = false) {
+  const f = await pumpLaunchGroupSettlementFixture(
+    stock,
+    token22,
+    true,
+    true,
+    upgradeable,
+  );
   const calls: { method: string; params: unknown[] }[] = [];
   const state = {
     rent: '1000000',
@@ -15,8 +21,9 @@ async function fixture(stock = false, token22 = false) {
     changeSource: false,
     expired: false,
     networkChanged: false,
+    changeDeployment: false,
   };
-  const rpc: PumpLaunchRpc = async (method, params) => {
+  const rpc: PumpLaunchRpc = async (method, params, signal) => {
     calls.push({ method, params });
     if (method === 'getGenesisHash')
       return state.afterRent && state.networkChanged
@@ -34,6 +41,21 @@ async function fixture(stock = false, token22 = false) {
         ).toString(),
       };
     if (method === 'simulateBundle') return structuredClone(f.response);
+    if (
+      method === 'getMultipleAccounts' &&
+      (params[1] as { dataSlice?: unknown })?.dataSlice
+    ) {
+      const result = (await f.f.rpc(method, params, signal)) as {
+        context: { slot: string };
+        value: { data: [string, 'base64'] }[];
+      };
+      if (state.changeDeployment && state.afterRent) {
+        const bytes = Buffer.from(result.value[0].data[0], 'base64');
+        bytes[13] ^= 1;
+        result.value[0].data[0] = bytes.toString('base64');
+      }
+      return result;
+    }
     if (method === 'getMultipleAccounts')
       return {
         context: { slot: '100' },
@@ -73,6 +95,9 @@ async function fixture(stock = false, token22 = false) {
   calls.length = 0;
   const creation = {
     accountHashes: f.evidence.creationAccountHashes,
+    programDeploymentHashes: structuredClone(
+      f.creation.simulation.programDeploymentHashes,
+    ),
     expiresAt: new Date(Date.now() + 59000).toISOString(),
   };
   const run = (provider = rpc, signal = new AbortController().signal) =>
@@ -100,6 +125,9 @@ for (const [stock, token22] of [
       settlementValidated: true,
       rpcCollectionRequired: false,
       programDeploymentReviewRequired: true,
+      programDeploymentMetadataValidated: true,
+      programDeploymentMetadataOnly: true,
+      programCodeAttested: false,
       transportReviewRequired: true,
       signingAllowed: false,
       executionAllowed: false,
@@ -130,6 +158,35 @@ for (const [stock, token22] of [
     expect(new Set(sizes).size).toBe(sizes.length);
     expect(result.reads).toBe(f.calls.length);
   }, 15000);
+it('binds upgradeable deployment metadata before and after complete replay', async () => {
+  const f = await fixture(false, false, true),
+    result = await f.run();
+  expect(result.programDeploymentHashes).toEqual(
+    f.creation.programDeploymentHashes,
+  );
+  expect(
+    f.calls.filter(
+      (call) =>
+        call.method === 'getMultipleAccounts' &&
+        (call.params[1] as { dataSlice?: unknown }).dataSlice,
+    ),
+  ).toHaveLength(2);
+}, 15000);
+it('rejects deployment changes after replay', async () => {
+  const f = await fixture(false, false, true);
+  f.state.changeDeployment = true;
+  await expect(f.run()).rejects.toThrow(
+    'deployment changed during verification',
+  );
+}, 15000);
+it('rejects mismatched creation deployment hashes before replay', async () => {
+  const f = await fixture(false, false, true);
+  f.creation.programDeploymentHashes[0].sha256 = 'f'.repeat(64);
+  await expect(f.run()).rejects.toThrow('deployment changed after creation');
+  expect(
+    f.calls.filter((call) => call.method === 'simulateBundle'),
+  ).toHaveLength(0);
+}, 15000);
 it('rejects unsupported rent rather than trusting supplied fixture economics', async () => {
   const f = await fixture();
   f.state.rent = '2000000';
