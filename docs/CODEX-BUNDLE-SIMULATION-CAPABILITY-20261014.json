@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-14T20:41:25.721Z",
+  "operation": "empty-simulateBundle-capability-check",
+  "classification": "empty-bundle-accepted-only",
+  "httpStatus": 200,
+  "rpcErrorCode": null,
+  "walletsSent": 0,
+  "transactionsSent": 0,
+  "provider": "configured-indexer-or-mainnet",
+  "responseShape": {
+    "jsonRpcMatch": true,
+    "idMatch": true,
+    "hasContext": true,
+    "hasValue": true,
+    "summarySucceeded": true,
+    "resultCount": 0
+  }
+}
