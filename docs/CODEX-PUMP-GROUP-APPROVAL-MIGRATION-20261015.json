@@ -1,0 +1,16 @@
+{
+  "format": "bundle-local-group-approval-migration-v1",
+  "sourceBase": "072b455",
+  "startedAt": "2026-10-14T22:59:43.766Z",
+  "finishedAt": "2026-10-14T23:00:41.172Z",
+  "wranglerVersion": "4.127.1",
+  "migrationCount": 84,
+  "appliedCount": 84,
+  "applyExit": 0,
+  "ledgerExit": 0,
+  "passed": true,
+  "previousJournalEntriesUnchanged": true,
+  "newMigration": "0083_pump_group_approvals.sql",
+  "testedWorkingCopySha256": "858fe3800f04057bf0006b73d06003b6f5d9d4602a2ab77b04bbd7c7e2e4dab5",
+  "remoteDatabaseTouched": false
+}

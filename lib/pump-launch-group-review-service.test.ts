@@ -13,9 +13,14 @@ import {
   cancelUnsignedPumpLaunchGroupReview,
   listPumpLaunchGroupPage,
   refreshPumpLaunchGroupReview,
+  approvePumpLaunchGroupReview,
 } from './pump-launch-group-review-service';
 import { listPumpLaunches, getPumpLaunch } from './pump-launch-service';
 import { pumpHistoryPageRequest } from './pump-launch-history-page';
+import type {
+  PumpLaunchGroupReview,
+  PumpLaunchGroupConsent,
+} from './pump-launch-group-review';
 vi.mock('./owned-pump-preflight', async (original) => ({
   ...(await original<typeof import('./owned-pump-preflight')>()),
   preflightOwnedPumpCreate: vi.fn(),
@@ -26,7 +31,7 @@ afterEach(() => {
   mocked.mockReset();
   for (const client of clients.splice(0)) client.close();
 });
-async function fixture(installed = true) {
+async function fixture(installed = true, approvalInstalled = true) {
   const f = await pumpOwnedGroupFixture(mocked, clients);
   await f.client.execute(
     'CREATE TABLE solana_execution_reservations(owner_id TEXT,wallet_address TEXT,scope TEXT,intent_id TEXT,state TEXT,PRIMARY KEY(owner_id,wallet_address))',
@@ -35,6 +40,7 @@ async function fixture(installed = true) {
     '0079_real_justice',
     '0081_pump_holder_reservations',
     ...(installed ? ['0082_pump_group_reviews'] : []),
+    ...(installed && approvalInstalled ? ['0083_pump_group_approvals'] : []),
   ])
     for (const sql of readFileSync(`drizzle/${file}.sql`, 'utf8').split(
       '--> statement-breakpoint',
@@ -50,6 +56,184 @@ async function fixture(installed = true) {
     );
   return { ...f, prepare };
 }
+const consentFor = (review: PumpLaunchGroupReview): PumpLaunchGroupConsent => ({
+  approved: true,
+  reviewId: review.id,
+  manifestSha256: review.manifestSha256,
+  contextSha256: review.contextSha256,
+  simulationSha256: review.simulationSha256,
+  approvedScope: 'complete-create-developer-holder-packet-group',
+  acknowledgeSimulationLimits: true,
+});
+it('atomically records exact consent and approval while retaining all reservations and disabled signing', async () => {
+  const f = await fixture(),
+    saved = await f.prepare();
+  const consent = consentFor(saved.review);
+  const approved = await approvePumpLaunchGroupReview(
+    f.db,
+    'alice',
+    saved.review.id,
+    consent,
+    new AbortController().signal,
+    f.rpc,
+  );
+  expect(approved).toMatchObject({
+    state: 'approved',
+    approvalRequired: false,
+    signingAllowed: false,
+    executionAllowed: false,
+    completeLaunch: false,
+  });
+  const record = (await f.client.execute('SELECT * FROM pump_group_approvals'))
+    .rows[0];
+  expect(JSON.parse(record.consent as string)).toEqual(consent);
+  expect(JSON.parse(record.fresh as string).sourceRevalidated).toBe(true);
+  expect(
+    await approvePumpLaunchGroupReview(
+      f.db,
+      'alice',
+      saved.review.id,
+      consent,
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).toEqual(approved);
+  expect(
+    (await f.client.execute('SELECT count(*) AS n FROM pump_group_approvals'))
+      .rows[0].n,
+  ).toBe(1);
+  await expect(
+    f.client.execute("UPDATE pump_group_approvals SET fresh='{}'"),
+  ).rejects.toThrow('Immutable');
+  await expect(
+    f.client.execute('DELETE FROM pump_group_approvals'),
+  ).rejects.toThrow('history retained');
+  await expect(
+    cancelUnsignedPumpLaunchGroupReview(
+      f.db,
+      'alice',
+      saved.review.id,
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('never-approved');
+  await expect(
+    f.client.execute({
+      sql: "UPDATE pump_launch_reviews SET state='signed',signed='invalid',signature='invalid' WHERE id=?",
+      args: [saved.review.id],
+    }),
+  ).rejects.toThrow('not enabled');
+  await expect(
+    f.client.execute({
+      sql: 'INSERT INTO solana_execution_reservations VALUES(?,?,?,?,?)',
+      args: ['alice', f.input.holders[0].address, 'warmup', 'busy', 'approved'],
+    }),
+  ).rejects.toThrow('reserved');
+}, 30000);
+it('requires approval migration and exact simulation consent before fresh provider reads', async () => {
+  const f = await fixture(true, false),
+    saved = await f.prepare();
+  f.calls.length = 0;
+  await expect(
+    approvePumpLaunchGroupReview(
+      f.db,
+      'alice',
+      saved.review.id,
+      consentFor(saved.review),
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('approval migration');
+  expect(f.calls).toHaveLength(0);
+  const g = await fixture(),
+    review = await g.prepare();
+  g.calls.length = 0;
+  await expect(
+    approvePumpLaunchGroupReview(
+      g.db,
+      'alice',
+      review.review.id,
+      { ...consentFor(review.review), simulationSha256: 'f'.repeat(64) },
+      new AbortController().signal,
+      g.rpc,
+    ),
+  ).rejects.toThrow('Explicit approval');
+  expect(g.calls).toHaveLength(0);
+}, 30000);
+it('rolls back the consent row when the atomic parent transition itself fails', async () => {
+  const f = await fixture(),
+    saved = await f.prepare();
+  await f.client.execute(
+    "CREATE TRIGGER test_group_transition_failure BEFORE UPDATE OF state ON pump_launch_reviews WHEN NEW.state='approved' BEGIN SELECT RAISE(ABORT,'Controlled transition failure'); END;",
+  );
+  await expect(
+    approvePumpLaunchGroupReview(
+      f.db,
+      'alice',
+      saved.review.id,
+      consentFor(saved.review),
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('approval ownership');
+  expect(
+    (await f.client.execute('SELECT count(*) AS n FROM pump_group_approvals'))
+      .rows[0].n,
+  ).toBe(0);
+  expect(
+    (await readPumpLaunchGroupReview(f.db, 'alice', saved.review.id)).state,
+  ).toBe('review');
+}, 30000);
+it('rolls back approval at the atomic insert boundary when a zero-slot ownership proof is revoked', async () => {
+  const f = await fixture(),
+    saved = await f.prepare();
+  const wrap = (statement: D1PreparedStatement): D1PreparedStatement =>
+    new Proxy(statement, {
+      get(target, key) {
+        if (key === 'bind')
+          return (...args: unknown[]) => wrap(target.bind(...args));
+        if (key === 'run')
+          return async () => {
+            await f.client.execute({
+              sql: 'DELETE FROM wallet_ownership_proofs WHERE address=?',
+              args: [f.input.holders[2].address],
+            });
+            return target.run();
+          };
+        const value = Reflect.get(target, key);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  const db = new Proxy(f.db, {
+    get(target, key) {
+      if (key === 'prepare')
+        return (sql: string) => {
+          const statement = target.prepare(sql);
+          return sql.startsWith('INSERT INTO pump_group_approvals')
+            ? wrap(statement)
+            : statement;
+        };
+      const value = Reflect.get(target, key);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  await expect(
+    approvePumpLaunchGroupReview(
+      db,
+      'alice',
+      saved.review.id,
+      consentFor(saved.review),
+      new AbortController().signal,
+      f.rpc,
+    ),
+  ).rejects.toThrow('approval ownership');
+  expect(
+    (await f.client.execute('SELECT count(*) AS n FROM pump_group_approvals'))
+      .rows[0].n,
+  ).toBe(0);
+  expect(
+    (await readPumpLaunchGroupReview(f.db, 'alice', saved.review.id)).state,
+  ).toBe('review');
+}, 30000);
 it('persists and resumes a complete immutable owned review without enabling approval or signing', async () => {
   const f = await fixture(),
     result = await f.prepare();

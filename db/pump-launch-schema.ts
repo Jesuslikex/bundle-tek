@@ -20,3 +20,21 @@ export const pumpLaunchReviews = sqliteTable(
   },
   (t) => [index('pump_launch_owner_project').on(t.ownerId, t.projectId)],
 );
+export const pumpGroupApprovals = sqliteTable(
+  'pump_group_approvals',
+  {
+    reviewId: text('review_id')
+      .primaryKey()
+      .notNull()
+      .references(() => pumpLaunchReviews.id),
+    ownerId: text('owner_id').notNull(),
+    contextSha256: text('context_sha256').notNull(),
+    manifestSha256: text('manifest_sha256').notNull(),
+    simulationSha256: text('simulation_sha256').notNull(),
+    freshSimulationSha256: text('fresh_simulation_sha256').notNull(),
+    consent: text('consent').notNull(),
+    fresh: text('fresh').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('pump_group_approval_owner').on(t.ownerId, t.reviewId)],
+);

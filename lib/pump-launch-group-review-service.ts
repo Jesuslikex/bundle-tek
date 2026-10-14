@@ -1,7 +1,9 @@
 import { preflightOwnedPumpLaunchGroup } from './pump-launch-group-preparation';
 import {
   requirePumpLaunchGroupReview,
+  requirePumpLaunchGroupConsent,
   type PumpLaunchGroupReview,
+  type PumpLaunchGroupConsent,
 } from './pump-launch-group-review';
 import {
   canonicalPumpHolderJson,
@@ -58,7 +60,7 @@ function publicReview(row: Row) {
     simulation: JSON.parse(row.simulation) as Checked,
     state: row.state,
     durableReview: true as const,
-    approvalRequired: true as const,
+    approvalRequired: row.state !== 'approved',
     signingAllowed: false as const,
     executionAllowed: false as const,
     completeLaunch: false as const,
@@ -261,7 +263,7 @@ export async function refreshPumpLaunchGroupReview(
   const row = await read();
   if (!row) return fail('Owned complete-group review not found.', 404);
   if (
-    row.state !== 'review' ||
+    !['review', 'approved'].includes(row.state) ||
     row.signed !== null ||
     row.signature !== null ||
     row.receipt !== null
@@ -364,4 +366,86 @@ export async function refreshPumpLaunchGroupReview(
   if (Date.parse(review.expiresAt) <= Date.now())
     return fail('Group review expired during revalidation.');
   return result;
+}
+
+/** Records exact user consent after fresh revalidation. Approval never grants signing/submission qualification. */
+export async function approvePumpLaunchGroupReview(
+  db: D1Database,
+  owner: string,
+  id: string,
+  suppliedConsent: PumpLaunchGroupConsent,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc,
+) {
+  signal.throwIfAborted();
+  await requireGuards(db);
+  const installed = await db
+    .prepare(
+      "SELECT count(*) AS installed FROM sqlite_master WHERE type='trigger' AND name IN ('pump_group_approval_insert','pump_group_approval_apply','pump_group_approval_no_update','pump_group_approval_no_delete')",
+    )
+    .first<{ installed: number }>();
+  if (installed?.installed !== 4)
+    return fail(
+      'Group approval migration is not installed. Approval remains disabled.',
+      503,
+    );
+  const row = await db
+    .prepare(
+      "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND id=? AND json_extract(review,'$.format')=?",
+    )
+    .bind(owner, id, FORMAT)
+    .first<Row>();
+  if (!row) return fail('Owned complete-group review not found.', 404);
+  const { review } = await requirePumpLaunchGroupReview(JSON.parse(row.review));
+  const consent = structuredClone(suppliedConsent);
+  try {
+    requirePumpLaunchGroupConsent(review, consent);
+  } catch {
+    return fail(
+      'Explicit approval of this exact complete group and simulation limits is required.',
+      400,
+    );
+  }
+  if (!['review', 'approved'].includes(row.state))
+    return fail(
+      'This complete-group review cannot be approved in its current state.',
+    );
+  const fresh = await refreshPumpLaunchGroupReview(db, owner, id, signal, rpc);
+  signal.throwIfAborted();
+  const encodedConsent = canonicalPumpHolderJson(consent);
+  if (row.state === 'approved') {
+    const existing = await db
+      .prepare(
+        'SELECT consent FROM pump_group_approvals WHERE owner_id=? AND review_id=?',
+      )
+      .bind(owner, id)
+      .first<{ consent: string }>();
+    if (!existing || existing.consent !== encodedConsent)
+      return fail('Saved group approval differs. Reload its history.');
+    return readPumpLaunchGroupReview(db, owner, id);
+  }
+  try {
+    // The AFTER INSERT trigger transitions its parent in this same atomic statement.
+    await db
+      .prepare(
+        'INSERT INTO pump_group_approvals(review_id,owner_id,context_sha256,manifest_sha256,simulation_sha256,fresh_simulation_sha256,consent,fresh,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
+      )
+      .bind(
+        id,
+        owner,
+        review.contextSha256,
+        review.manifestSha256,
+        review.simulationSha256,
+        fresh.simulationSha256,
+        encodedConsent,
+        JSON.stringify(fresh),
+        new Date().toISOString(),
+      )
+      .run();
+  } catch {
+    return fail(
+      'Group approval ownership, review or source freshness changed. Reload before approving again.',
+    );
+  }
+  return readPumpLaunchGroupReview(db, owner, id);
 }
