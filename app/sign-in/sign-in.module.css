@@ -39,6 +39,13 @@
   border-radius: 8px;
   cursor: pointer;
 }
+.panel button[aria-expanded] {
+  width: 100%;
+  border: 1px solid #7662fa;
+  background: #252035;
+  color: #ececf5;
+  font-weight: 600;
+}
 .panel button[type='submit'] {
   background: #7662fa;
   color: #fff;

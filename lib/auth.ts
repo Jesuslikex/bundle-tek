@@ -3,6 +3,7 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { drizzle } from 'drizzle-orm/libsql';
 import { getTursoClient } from '@/db/turso';
 import * as schema from '@/db/auth-schema';
+import { solanaLogin } from './solana-login';
 let instance: ReturnType<typeof createAuth> | undefined;
 export function getAuth() {
   return (instance ??= createAuth());
@@ -40,6 +41,7 @@ export function createBundleAuth(
   },
 ) {
   return betterAuth({
+    plugins: [solanaLogin(client, baseURL)],
     secret,
     baseURL,
     advanced: { disableOriginCheck: false, disableCSRFCheck: false },

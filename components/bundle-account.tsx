@@ -12,17 +12,18 @@ export function BundleAccount({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const ownerId = session?.user.id;
+  const canLinkGoogle = googleEnabled && !ownerId?.startsWith('solana_');
   const [googleLinkState, setGoogleLinkState] = useState<{
     ownerId: string;
     linked: boolean;
   } | null>(null);
   const googleLinked =
-    googleEnabled && googleLinkState?.ownerId === ownerId
+    canLinkGoogle && googleLinkState?.ownerId === ownerId
       ? (googleLinkState?.linked ?? null)
       : null;
   useEffect(() => {
     let cancelled = false;
-    if (!ownerId || !googleEnabled) return;
+    if (!ownerId || !canLinkGoogle) return;
     void auth
       .listAccounts()
       .then((result) => {
@@ -44,9 +45,9 @@ export function BundleAccount({
     return () => {
       cancelled = true;
     };
-  }, [ownerId, googleEnabled]);
+  }, [ownerId, canLinkGoogle]);
   async function linkGoogle() {
-    if (busy || !googleEnabled || !session || googleLinked !== false) return;
+    if (busy || !canLinkGoogle || !session || googleLinked !== false) return;
     setBusy(true);
     setError('');
     try {
@@ -90,7 +91,7 @@ export function BundleAccount({
       {session ? (
         <>
           <span title={session.user.email}>{session.user.name}</span>{' '}
-          {googleEnabled &&
+          {canLinkGoogle &&
             (googleLinked === true ? (
               <span>Google linked</span>
             ) : (

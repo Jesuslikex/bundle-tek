@@ -75,3 +75,20 @@ it('does not inspect or link accounts for signed-out users', async () => {
   expect(mocks.link).not.toHaveBeenCalled();
   await act(async () => root.unmount());
 });
+it('does not offer email-matched Google linking for a wallet-only account', async () => {
+  mocks.session = {
+    user: {
+      id: 'solana_test',
+      name: 'ABCD…EFGH',
+      email: 'placeholder@wallet.bundle.invalid',
+    },
+  };
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () => root.render(<BundleAccount googleEnabled />));
+  expect(container.textContent).toContain('ABCD…EFGH');
+  expect(container.textContent).not.toContain('Link Google');
+  expect(mocks.list).not.toHaveBeenCalled();
+  await act(async () => root.unmount());
+});

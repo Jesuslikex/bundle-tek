@@ -3,6 +3,7 @@ import { createAuthClient } from 'better-auth/react';
 import { useState } from 'react';
 import Link from 'next/link';
 import styles from './sign-in.module.css';
+import { WalletLogin } from './wallet-login';
 function value(form: FormData, name: string) {
   const field = form.get(name);
   if (typeof field !== 'string') throw new Error('Invalid form field');
@@ -82,9 +83,10 @@ export function SignInForm({
             Already use email? Sign in first, then link Google from your
             account.
           </p>
-          <div className={styles.divider}>or use email</div>
         </>
       )}
+      <WalletLogin busy={busy} setBusy={setBusy} onError={setError} />
+      <div className={styles.divider}>or use email</div>
       <form onSubmit={submit} style={{ display: 'grid', gap: 16 }}>
         {register && (
           <label>
