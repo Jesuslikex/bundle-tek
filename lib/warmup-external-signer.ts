@@ -5,7 +5,7 @@ import {
   getTransactionEncoder,
 } from '@solana/kit';
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
+import { verifySolanaSignature } from '@/lib/solana-signature';
 import {
   requireApprovedWarmupPacket,
   type WarmupSigningReview,
@@ -165,7 +165,7 @@ export async function signApprovedExternalWarmupPacket(
     Object.keys(signed.signatures).length !== 1 ||
     !signature ||
     signature.length !== 64 ||
-    !nacl.sign.detached.verify(
+    !verifySolanaSignature(
       reviewedMessage,
       Uint8Array.from(signature),
       bs58.decode(review.wallet),

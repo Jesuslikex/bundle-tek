@@ -6,6 +6,7 @@ import {
   type SignatureBytes,
 } from '@solana/kit';
 import nacl from 'tweetnacl';
+import { verifySolanaSignature } from '@/lib/solana-signature';
 import bs58 from 'bs58';
 import {
   buildPumpCreateMessage,
@@ -161,7 +162,7 @@ export function verifyPumpSignedPacket(
     const sig = tx.signatures[address(key)];
     if (
       !sig ||
-      !nacl.sign.detached.verify(
+      !verifySolanaSignature(
         Uint8Array.from(tx.messageBytes),
         Uint8Array.from(sig),
         bs58.decode(key),

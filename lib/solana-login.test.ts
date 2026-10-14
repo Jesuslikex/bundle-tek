@@ -5,6 +5,21 @@ import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import { createBundleAuth } from './auth';
 const databases: Client[] = [];
+it('refuses degenerate wallet identities before creating a nonce or user session', async () => {
+  const f = await fixture(),
+    identity = new Uint8Array(32);
+  identity[0] = 1;
+  expect(
+    (await f.request('challenge', { address: bs58.encode(identity) })).status,
+  ).toBe(400);
+  expect(
+    (await f.db.execute('SELECT count(*) AS total FROM verification')).rows[0]
+      .total,
+  ).toBe(0);
+  expect(
+    (await f.db.execute('SELECT count(*) AS total FROM user')).rows[0].total,
+  ).toBe(0);
+});
 it('converges simultaneous first logins from separate server instances on one identity', async () => {
   const f = await fixture(),
     a = await f.challenge(),

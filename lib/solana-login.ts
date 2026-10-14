@@ -3,7 +3,10 @@ import type { Client } from '@libsql/client';
 import { createAuthEndpoint, APIError } from 'better-auth/api';
 import { setSessionCookie } from 'better-auth/cookies';
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
+import {
+  validSolanaSigningKey,
+  verifySolanaSignature,
+} from './solana-signature';
 import { z } from 'zod';
 
 const walletAddress = z
@@ -13,7 +16,7 @@ const walletAddress = z
   .refine((value) => {
     try {
       return (
-        bs58.decode(value).length === 32 &&
+        validSolanaSigningKey(bs58.decode(value)) &&
         bs58.encode(bs58.decode(value)) === value
       );
     } catch {
@@ -137,7 +140,7 @@ export function solanaLogin(client: Client, baseURL: string) {
           try {
             valid =
               saved.address === ctx.body.address &&
-              nacl.sign.detached.verify(
+              verifySolanaSignature(
                 new TextEncoder().encode(saved.message),
                 bs58.decode(ctx.body.signature),
                 bs58.decode(saved.address),

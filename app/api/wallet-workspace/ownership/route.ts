@@ -1,5 +1,5 @@
 import { recoverMessageAddress, type Hex } from 'viem';
-import nacl from 'tweetnacl';
+import { verifySolanaSignature } from '@/lib/solana-signature';
 import bs58 from 'bs58';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
         const signature = bs58.decode(body.signature);
         valid =
           signature.length === 64 &&
-          nacl.sign.detached.verify(
+          verifySolanaSignature(
             new TextEncoder().encode(row.message),
             signature,
             bs58.decode(address),

@@ -1,5 +1,5 @@
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
+import { verifySolanaSignature } from '@/lib/solana-signature';
 import {
   address,
   getBase64Encoder,
@@ -27,7 +27,7 @@ export function verifyExactSwapSignature(
     !signature ||
     unsigned.length !== approved.length ||
     unsigned.some((b, i) => b !== approved[i]) ||
-    !nacl.sign.detached.verify(
+    !verifySolanaSignature(
       Uint8Array.from(tx.messageBytes),
       Uint8Array.from(signature),
       bs58.decode(review.wallet),

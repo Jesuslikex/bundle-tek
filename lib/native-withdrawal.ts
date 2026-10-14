@@ -6,6 +6,7 @@ import bs58 from 'bs58';
 import { validatedFundingCapture } from './mainnet-funding';
 import { solanaTransferMessage } from './solana-transfer-message';
 import nacl from 'tweetnacl';
+import { verifySolanaSignature } from '@/lib/solana-signature';
 import { walletAddress } from './wallet-workspace';
 import { solanaTokenAtoms } from './solana-token-amount';
 import { formatNativeBalance } from './wallet-balance-format';
@@ -321,11 +322,7 @@ export async function inspectNativeWithdrawal(
   const signature = bytes.slice(1, 65);
   if (
     signed
-      ? !nacl.sign.detached.verify(
-          message,
-          signature,
-          bs58.decode(review.wallet),
-        )
+      ? !verifySolanaSignature(message, signature, bs58.decode(review.wallet))
       : signature.some((byte) => byte !== 0)
   )
     throw new Error('Invalid withdrawal wallet signature.');

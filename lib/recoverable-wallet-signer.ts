@@ -1,5 +1,5 @@
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
+import { verifySolanaSignature } from '@/lib/solana-signature';
 import {
   isExplicitSigningRejection,
   WalletSigningRejected,
@@ -99,7 +99,7 @@ export function recoverableWalletSigner(
         signatures[0] !== signer.address ||
         !signature ||
         signature.length !== 64 ||
-        !nacl.sign.detached.verify(
+        !verifySolanaSignature(
           new Uint8Array(signed.messageBytes),
           new Uint8Array(signature),
           bs58.decode(signer.address),

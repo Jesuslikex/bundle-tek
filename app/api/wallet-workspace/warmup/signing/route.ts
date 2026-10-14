@@ -22,7 +22,7 @@ import {
   getTransactionEncoder,
 } from '@solana/kit';
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
+import { verifySolanaSignature } from '@/lib/solana-signature';
 import {
   balanceRpc,
   SOLANA_MAINNET_GENESIS,
@@ -435,7 +435,7 @@ export async function POST(request: Request) {
         bs58.encode(sig) !== row.signature ||
         unsigned.length !== approved.length ||
         unsigned.some((b, i) => b !== approved[i]) ||
-        !nacl.sign.detached.verify(
+        !verifySolanaSignature(
           Uint8Array.from(tx.messageBytes),
           Uint8Array.from(sig),
           bs58.decode(review.wallet),
@@ -516,7 +516,7 @@ export async function POST(request: Request) {
       !sig ||
       unsigned.length !== approved.length ||
       unsigned.some((b, i) => b !== approved[i]) ||
-      !nacl.sign.detached.verify(
+      !verifySolanaSignature(
         Uint8Array.from(tx.messageBytes),
         Uint8Array.from(sig),
         bs58.decode(review.wallet),

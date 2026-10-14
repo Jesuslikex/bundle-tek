@@ -9,7 +9,7 @@ import {
   type SignatureBytes,
 } from '@solana/kit';
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
+import { verifySolanaSignature } from '@/lib/solana-signature';
 import type { WarmupSigningReview } from './warmup-signing';
 export type WarmupApprovalHistoryRow = {
   id: string;
@@ -68,7 +68,7 @@ export async function restoreRegisteredWarmupPacket(
     canonical.some((byte, index) => byte !== bytes[index]) ||
     sig.length !== 64 ||
     bs58.encode(sig) !== signature ||
-    !nacl.sign.detached.verify(
+    !verifySolanaSignature(
       Uint8Array.from(tx.messageBytes),
       sig,
       bs58.decode(review.wallet),
