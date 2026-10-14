@@ -14,6 +14,7 @@ export * from './jito-bundle-schema';
 export * from './conditional-monitor-schema';
 export * from './counter-trade-schema';
 export * from './counter-reservation-schema';
+export * from './launch-metadata-schema';
 
 export const importedSupplyScopes = sqliteTable(
   'imported_supply_scopes',

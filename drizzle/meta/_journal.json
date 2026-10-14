@@ -547,6 +547,13 @@
       "when": 1791938552537,
       "tag": "0077_worried_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "6",
+      "when": 1791940915562,
+      "tag": "0078_lush_rictor",
+      "breakpoints": true
     }
   ]
 }
