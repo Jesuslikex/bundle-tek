@@ -18,7 +18,7 @@ The matched pair feeds the existing independent settlement verifier without weak
 
 Busy/slow providers that cannot return a matching pair within three attempts fail closed with a retry-preparation message. Live-provider latency and rollover behavior have not been measured. Simulation balance metadata is not assumed available or sufficient to replace full account identity collection. A stock fee ATA appearing/disappearing or receiving changed SOL/rent still requires a new review. Older stored reviews without normalized identity hashes retain strict comparisons and may need cancellation/re-preparation.
 
-This change applies to the **complete holder flow**. The separate developer-only initial-buy collector/review still uses the earlier source comparison and needs the same coherence audit before treating that path as equally resilient. The holder UI, browser checks, funded proof, larger multi-packet groups, StonkFun execution and broader Proxima parity remain outstanding. No production readiness or funded success is claimed.
+This checkpoint originally applied to the **complete holder flow**. The subsequent developer-only collector/refresh continuation now shares this policy; see `CODEX-PUMP-DEVELOPER-SNAPSHOT-COHERENCE-20261014.md` for its tests and remaining recovery/provider limits. The holder UI, browser checks, funded proof, larger multi-packet groups, StonkFun execution and broader Proxima parity remain outstanding. No production readiness or funded success is claimed.
 
 ## Verification
 

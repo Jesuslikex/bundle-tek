@@ -2,6 +2,8 @@ import { beforeAll, afterAll, beforeEach, expect, it, vi } from 'vitest';
 import { Miniflare } from 'miniflare';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { pumpAccountBytes } from '@/lib/pump-launch-simulation';
+import { raw } from '../../../../../test/pump-launch-simulation-fixture';
 import type { PumpLaunchRpc } from '@/lib/pump-launch-simulation';
 import { pumpInitialBuySimulationFixture } from '../../../../../test/pump-initial-buy-simulation-fixture';
 import { releaseLaunchMetadata } from '@/lib/launch-metadata-release';
@@ -924,3 +926,78 @@ it('rejects revoked payer ownership before approving the atomic review', async (
     .first<{ state: string }>();
   expect(state!.state).toBe('review');
 });
+
+for (const [stock, token22] of [
+  [false, false],
+  [true, false],
+  [true, true],
+])
+  it(`refreshes real atomic history after shared recipient credits and a validated volume timestamp (${stock}, token22=${token22})`, async () => {
+    await seed(stock, token22);
+    const key = f.packet.buybackAccount;
+    if (stock)
+      f.before.set(
+        key,
+        raw(
+          f.packet.quote.tokenProgram,
+          f.token(f.intent.quoteMint, f.packet.buybackRecipient, 123n, token22),
+        ),
+      );
+    f.state.volumeGain = 7n;
+    const terms = {
+      ...body,
+      origin,
+      maximumQuoteCostRaw: '100000000',
+    } as Parameters<typeof preparePumpInitialBuyReview>[2];
+    const stored = await preparePumpInitialBuyReview(
+      mocks.db,
+      'alice',
+      terms,
+      new AbortController().signal,
+      f.rpc,
+    );
+    const account = f.before.get(key)!;
+    if (stock) {
+      const bytes = pumpAccountBytes(account),
+        view = new DataView(bytes.buffer);
+      view.setBigUint64(64, view.getBigUint64(64, true) + 1234567n, true);
+      f.before.set(key, raw(account.owner, bytes, account.lamports));
+    } else
+      f.before.set(key, {
+        ...account,
+        lamports: (BigInt(account.lamports) + 1234567n).toString(),
+      });
+    f.state.volumeTimestamp = BigInt(Math.floor(Date.now() / 1000));
+    const refreshed = await refreshPumpInitialBuyReview(
+      mocks.db,
+      'alice',
+      stored.review.id,
+      new AbortController().signal,
+      f.rpc,
+    );
+    expect(refreshed.packet.sha256).toBe(stored.review.sha256);
+    expect(refreshed.simulation.volumeGainRaw).toBe('7');
+    expect(refreshed.simulation.buybackFeeRaw).toBe(
+      stored.simulation.buybackFeeRaw,
+    );
+    const changed = refreshed.simulation.accountHashes.find(
+      (a) => a.address === key,
+    )!;
+    const original = stored.simulation.accountHashes.find(
+      (a) => a.address === key,
+    )!;
+    expect(changed.beforeSha256).not.toBe(original.beforeSha256);
+    expect(changed.sourceIdentitySha256).toBe(original.sourceIdentitySha256);
+    // A different, individually valid volume gain must not silently replace the reviewed accounting.
+    f.state.volumeGain = 8n;
+    await expect(
+      refreshPumpInitialBuyReview(
+        mocks.db,
+        'alice',
+        stored.review.id,
+        new AbortController().signal,
+        f.rpc,
+      ),
+    ).rejects.toThrow('costs or observed state changed');
+    expect(f.calls.some((c) => /send|bundle|sign/i.test(c.method))).toBe(false);
+  });

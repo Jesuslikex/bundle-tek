@@ -1,9 +1,13 @@
+import { buildPumpCreateAndBuyMessage } from './pump-initial-buy-message';
 import {
   preflightOwnedPumpInitialBuy,
   PumpPreflightError,
   type OwnedPumpTerms,
 } from './owned-pump-preflight';
-import { encodePumpSigningInput } from './pump-launch-signing';
+import {
+  encodePumpSigningInput,
+  decodePumpSigningInput,
+} from './pump-launch-signing';
 import {
   requirePumpInitialBuySigningReview,
   verifyPumpInitialBuySignedPacket,
@@ -182,6 +186,10 @@ export async function refreshPumpInitialBuyReview(
   const review = JSON.parse(row.review) as PumpInitialBuySigningReview;
   const terms = JSON.parse(row.terms) as Terms;
   await requirePumpInitialBuySigningReview(review);
+  const built = await buildPumpCreateAndBuyMessage({
+    ...review.input,
+    create: decodePumpSigningInput(review.input.create),
+  });
   const saved = await db
     .prepare(
       'SELECT document,updated_at,archived FROM workspace_projects WHERE owner_id=? AND id=?',
@@ -205,12 +213,32 @@ export async function refreshPumpInitialBuyReview(
   await requirePumpLaunchAuthorityPolicy(checked.simulation, terms.mint);
   const original = JSON.parse(row.simulation) as typeof checked.simulation;
   const stable = (s: typeof checked.simulation) => ({
-    accounts: s.accountHashes,
+    accounts: s.accountHashes.map((a) => ({
+      address: a.address,
+      beforeSha256:
+        a.address === built.buybackAccount
+          ? (a.sourceIdentitySha256 ?? a.beforeSha256)
+          : a.beforeSha256,
+      ...(a.address === built.volumeAccount
+        ? {}
+        : {
+            simulatedSha256:
+              a.address === built.buybackAccount
+                ? (a.simulatedIdentitySha256 ?? a.simulatedSha256)
+                : a.simulatedSha256,
+          }),
+    })),
     programs: s.programDeploymentHashes,
     price: s.price,
     quoteCostRaw: s.quoteCostRaw,
     feeAndRentDebitRaw: s.feeAndRentDebitRaw,
     payerDebitRaw: s.payerDebitRaw,
+    networkFeeRaw: s.networkFeeRaw,
+    buybackFeeRaw: s.buybackFeeRaw,
+    retainedProtocolFeeRaw: s.retainedProtocolFeeRaw,
+    creatorFeeUnclaimedRaw: s.creatorFeeUnclaimedRaw,
+    rentAccounts: s.rentAccounts,
+    volumeGainRaw: s.volumeGainRaw,
   });
   if (
     checked.packet.sha256 !== review.sha256 ||

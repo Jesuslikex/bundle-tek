@@ -1,3 +1,4 @@
+import { pumpBuybackSourceHash } from './pump-buyback-source';
 import bs58 from 'bs58';
 import {
   getTransactionDecoder,
@@ -243,7 +244,20 @@ export async function simulatePumpInitialBuy(
   const fee = pumpUnsignedInteger(feeResult.value);
   if (fee === 0n || fee > allowance)
     throw new Error('Initial buy network fee exceeds its allowance.');
-  const before = (await snapshot(keys)).accounts;
+  let before = (await snapshot(keys)).accounts;
+  const sourceHash = (address: string, account: PumpRpcAccount) =>
+    pumpBuybackSourceHash(
+      {
+        quoteMint: intent.quoteMint,
+        quote: preparation.quote,
+        buyerAccounts: [preparation],
+      },
+      address,
+      account,
+    );
+  const sourceHashes = await Promise.all(
+    keys.map((address, i) => sourceHash(address, before[i])),
+  );
   const at = (key: string, accounts: PumpRpcAccount[]) => {
     const index = keys.indexOf(key);
     if (index < 0) throw new Error('Initial buy packet account is missing.');
@@ -330,7 +344,7 @@ export async function simulatePumpInitialBuy(
         'Initial buy needs the full reviewed quote-token allowance.',
       );
   }
-  const buybackBefore = at(preparation.buybackAccount, before);
+  let buybackBefore = at(preparation.buybackAccount, before);
   if (native && !pumpSystemAccount(buybackBefore))
     throw new Error('Initial buy native buyback recipient is unavailable.');
   if (!native && buybackBefore)
@@ -412,37 +426,66 @@ export async function simulatePumpInitialBuy(
     if (baseline && (await hash(account)) !== baseline.sha256)
       throw new Error('Program changed after creation simulation.');
   }
-  const result = (await call(
-    'simulateTransaction',
-    [
-      preparation.transaction,
-      {
-        encoding: 'base64',
-        commitment: 'confirmed',
-        sigVerify: false,
-        replaceRecentBlockhash: false,
-        minContextSlot: minimum(),
-        accounts: { encoding: 'base64', addresses: keys },
-        innerInstructions: false,
-      },
-    ],
-    deadline,
-  )) as {
-    context?: { slot?: unknown };
-    value?: {
-      err?: unknown;
-      accounts?: unknown[];
-      fee?: unknown;
-      replacementBlockhash?: unknown;
-      unitsConsumed?: unknown;
-      loadedAccountsDataSize?: unknown;
+  let simulationSlot = 0,
+    simulationAttempts = 0;
+  let sim:
+    | {
+        err?: unknown;
+        accounts?: unknown[];
+        fee?: unknown;
+        replacementBlockhash?: unknown;
+        unitsConsumed?: unknown;
+        loadedAccountsDataSize?: unknown;
+      }
+    | undefined;
+  while (simulationAttempts < 3) {
+    deadline.throwIfAborted();
+    // A minimum slot ensures freshness, not a matching source/simulation bank.
+    const source = await snapshot(keys);
+    for (const [i, key] of keys.entries())
+      if ((await sourceHash(key, source.accounts[i])) !== sourceHashes[i])
+        throw new Error('Initial buy source state changed before simulation.');
+    const result = (await call(
+      'simulateTransaction',
+      [
+        preparation.transaction,
+        {
+          encoding: 'base64',
+          commitment: 'confirmed',
+          sigVerify: false,
+          replaceRecentBlockhash: false,
+          minContextSlot: minimum(),
+          accounts: { encoding: 'base64', addresses: keys },
+          innerInstructions: false,
+        },
+      ],
+      deadline,
+    )) as {
+      context?: { slot?: unknown };
+      value?: {
+        err?: unknown;
+        accounts?: unknown[];
+        fee?: unknown;
+        replacementBlockhash?: unknown;
+        unitsConsumed?: unknown;
+        loadedAccountsDataSize?: unknown;
+      };
     };
-  };
-  const simulationSlot = observe(result.context?.slot, minimum()),
+    simulationAttempts++;
+    simulationSlot = observe(result.context?.slot, minimum());
+    if (!result.value || result.value.err !== null)
+      throw new Error(
+        'Atomic Pump creation and initial buy simulation failed. No approval was created.',
+      );
+    if (simulationSlot !== source.slot) continue;
+    before = source.accounts;
+    buybackBefore = at(preparation.buybackAccount, before);
     sim = result.value;
-  if (!sim || sim.err !== null)
+    break;
+  }
+  if (!sim)
     throw new Error(
-      'Atomic Pump creation and initial buy simulation failed. No approval was created.',
+      'Initial buy simulation could not obtain a matching bank snapshot after three attempts. Retry preparation.',
     );
   if (
     sim.replacementBlockhash != null ||
@@ -696,7 +739,7 @@ export async function simulatePumpInitialBuy(
     );
   const stable = (await snapshot(keys)).accounts;
   for (let index = 0; index < keys.length; index++)
-    if ((await hash(stable[index])) !== (await hash(before[index])))
+    if ((await sourceHash(keys[index], stable[index])) !== sourceHashes[index])
       throw new Error('Initial buy source state changed during simulation.');
   if (distinctData.length) {
     const stableData = (await snapshot(distinctData, true)).accounts;
@@ -737,6 +780,9 @@ export async function simulatePumpInitialBuy(
     simulation: {
       status: 'Simulated' as const,
       slot: simulationSlot,
+      sourceSlot: simulationSlot,
+      sourceBankMatched: true as const,
+      simulationAttempts,
       observedAt,
       expiresAt: new Date(
         Math.min(
@@ -758,6 +804,7 @@ export async function simulatePumpInitialBuy(
       tokenAmountRaw,
       price,
       buybackFeeRaw: buybackFee.toString(),
+      volumeGainRaw: volumeGain.toString(),
       retainedProtocolFeeRaw: (protocolFee - buybackFee).toString(),
       creatorFeeUnclaimedRaw: creatorFee.toString(),
       buybackSplitRoundingAttested: false as const,
@@ -774,6 +821,8 @@ export async function simulatePumpInitialBuy(
           address,
           beforeSha256: await hash(before[index]),
           simulatedSha256: await hash(after[index]),
+          sourceIdentitySha256: await sourceHash(address, before[index]),
+          simulatedIdentitySha256: await sourceHash(address, after[index]),
         })),
       ),
       programDeploymentHashes: await Promise.all(

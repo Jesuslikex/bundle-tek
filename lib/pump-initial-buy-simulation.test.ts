@@ -351,3 +351,147 @@ it('derives the saved percentage from independently observed supply and rejects 
   ).rejects.toThrow('Unsupported');
   expect(untouched.calls).toEqual([]);
 });
+
+for (const [stock, token22] of [
+  [false, false],
+  [true, false],
+  [true, true],
+])
+  it(`retries a bank rollover without counting shared recipient credits as developer fees (${stock}, token22=${token22})`, async () => {
+    const f = await pumpInitialBuySimulationFixture(stock, token22);
+    const key = f.packet.buybackAccount;
+    if (stock)
+      f.before.set(
+        key,
+        raw(
+          f.packet.quote.tokenProgram,
+          f.token(f.intent.quoteMint, f.packet.buybackRecipient, 777n, token22),
+        ),
+      );
+    const baseline = await run(f);
+    f.state.atomicSimulations = 0;
+    f.state.beforeAtomicHook = () => {
+      if (f.state.atomicSimulations !== 1) return;
+      f.setSourceSlot('101');
+      const account = f.before.get(key)!;
+      if (stock) {
+        const bytes = pumpAccountBytes(account),
+          view = new DataView(bytes.buffer);
+        view.setBigUint64(64, view.getBigUint64(64, true) + 1234567n, true);
+        f.before.set(key, raw(account.owner, bytes, account.lamports));
+      } else
+        f.before.set(key, {
+          ...account,
+          lamports: (BigInt(account.lamports) + 1234567n).toString(),
+        });
+    };
+    const result = await run(f);
+    expect(result.simulation).toMatchObject({
+      sourceSlot: 101,
+      slot: 101,
+      simulationAttempts: 2,
+      sourceBankMatched: true,
+      quoteCostRaw: baseline.simulation.quoteCostRaw,
+      buybackFeeRaw: baseline.simulation.buybackFeeRaw,
+      retainedProtocolFeeRaw: baseline.simulation.retainedProtocolFeeRaw,
+      feeAndRentDebitRaw: baseline.simulation.feeAndRentDebitRaw,
+      payerDebitRaw: baseline.simulation.payerDebitRaw,
+    });
+    const a = result.simulation.accountHashes.find((a) => a.address === key)!;
+    const b = baseline.simulation.accountHashes.find((a) => a.address === key)!;
+    expect(a.beforeSha256).not.toBe(b.beforeSha256);
+    expect(a.simulatedSha256).not.toBe(b.simulatedSha256);
+    expect(a.sourceIdentitySha256).toBe(b.sourceIdentitySha256);
+    expect(a.simulatedIdentitySha256).toBe(b.simulatedIdentitySha256);
+    expect(result.simulation.rentAccounts).toEqual(
+      baseline.simulation.rentAccounts,
+    );
+  });
+it('stops after three developer-bank rollovers and never sends', async () => {
+  const f = await pumpInitialBuySimulationFixture();
+  f.state.beforeAtomicHook = () => {
+    f.setSourceSlot(String(100 + f.state.atomicSimulations));
+  };
+  await expect(run(f)).rejects.toThrow(
+    'matching bank snapshot after three attempts',
+  );
+  expect(f.state.atomicSimulations).toBe(3);
+  expect(f.calls.some((c) => /send|bundle|sign/i.test(c.method))).toBe(false);
+});
+it('rejects own-wallet changes or recipient authority changes before a developer retry', async () => {
+  for (const wallet of [true, false]) {
+    const f = await pumpInitialBuySimulationFixture();
+    f.state.beforeAtomicHook = () => {
+      f.setSourceSlot('101');
+      const key = wallet ? f.intent.payer : f.packet.buybackAccount,
+        account = f.before.get(key)!;
+      f.before.set(
+        key,
+        wallet
+          ? { ...account, lamports: '999999999' }
+          : { ...account, executable: true },
+      );
+    };
+    await expect(run(f)).rejects.toThrow(
+      wallet ? 'source state changed before' : 'shared fee recipient authority',
+    );
+    expect(f.state.atomicSimulations).toBe(1);
+  }
+});
+it('preserves coherent developer accounting when later banks credit the shared recipient', async () => {
+  const f = await pumpInitialBuySimulationFixture(),
+    baseline = await run(f);
+  f.state.postHook = () => {
+    const key = f.packet.buybackAccount,
+      account = f.before.get(key)!;
+    f.before.set(key, {
+      ...account,
+      lamports: (BigInt(account.lamports) + 999999n).toString(),
+    });
+    f.setSourceSlot('101');
+  };
+  const result = await run(f);
+  expect(result.simulation.buybackFeeRaw).toBe(
+    baseline.simulation.buybackFeeRaw,
+  );
+  expect(result.simulation).toMatchObject({
+    sourceSlot: 100,
+    maximumSlot: 101,
+    sourceBankMatched: true,
+    simulationAttempts: 1,
+  });
+});
+it('rejects inconsistent within-bank fee credits, stock custody mutations and unexplained payer spending', async () => {
+  for (const mutation of ['credit', 'delegate', 'spending']) {
+    const f = await pumpInitialBuySimulationFixture(mutation === 'delegate');
+    f.state.postHook = (post) => {
+      const key =
+          mutation === 'spending' ? f.intent.payer : f.packet.buybackAccount,
+        account = post.get(key)!;
+      if (mutation === 'delegate') {
+        const bytes = pumpAccountBytes(account);
+        bytes[72] = 1;
+        post.set(key, raw(account.owner, bytes, account.lamports));
+      } else
+        post.set(key, {
+          ...account,
+          lamports: (
+            BigInt(account.lamports) + (mutation === 'credit' ? 999999n : -1n)
+          ).toString(),
+        });
+    };
+    await expect(run(f)).rejects.toThrow();
+  }
+});
+it('cancels between developer simulation attempts without another provider call', async () => {
+  const f = await pumpInitialBuySimulationFixture(),
+    controller = new AbortController();
+  f.state.beforeAtomicHook = () => {
+    f.setSourceSlot('101');
+    controller.abort();
+  };
+  await expect(
+    simulatePumpInitialBuy(f.intent, '10000000', controller.signal, f.rpc),
+  ).rejects.toThrow();
+  expect(f.state.atomicSimulations).toBe(1);
+});

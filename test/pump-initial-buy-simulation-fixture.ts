@@ -152,6 +152,10 @@ export async function pumpInitialBuySimulationFixture(
     replacement: null as unknown,
     fee: '10000',
     slot: '100',
+    atomicSimulations: 0,
+    beforeAtomicHook: () => {},
+    volumeGain: 0n,
+    volumeTimestamp: 0n,
   };
   const calls: Array<{ method: string; params: unknown[] }> = [];
   const rpc: PumpLaunchRpc = async (method, params, signal) => {
@@ -166,6 +170,9 @@ export async function pumpInitialBuySimulationFixture(
           tx.messageBytes,
         );
       if (message.version === 1) {
+        state.atomicSimulations++;
+        state.beforeAtomicHook();
+        const simulationSlot = state.slot;
         if (!creationPost) throw new Error('Creation evidence is missing.');
         const price = pumpInitialBuyPrice({
           quoteMint: baseline.intent.quoteMint,
@@ -223,10 +230,21 @@ export async function pumpInitialBuySimulationFixture(
           packet.userBaseAccount,
           raw(PUMP_TOKEN_2022, token(f.mint, f.payer, 1000000000000n, true)),
         );
-        post.set(
-          packet.volumeAccount,
-          raw(PUMP_LAUNCH_PROGRAM, initialBuyVolumeFixture(f.payer)),
+        const volumeBytes = initialBuyVolumeFixture(f.payer, state.volumeGain);
+        new DataView(volumeBytes.buffer).setBigInt64(
+          65,
+          state.volumeTimestamp,
+          true,
         );
+        post.set(packet.volumeAccount, raw(PUMP_LAUNCH_PROGRAM, volumeBytes));
+        const recipientBefore = before.get(packet.buybackAccount);
+        const previousTokens =
+          stock && recipientBefore
+            ? new DataView(
+                pumpAccountBytes(recipientBefore).buffer,
+              ).getBigUint64(64, true)
+            : 0n;
+
         if (stock) {
           post.set(
             packet.userQuoteAccount,
@@ -249,14 +267,23 @@ export async function pumpInitialBuySimulationFixture(
           );
           post.set(
             packet.buybackAccount,
-            raw(quoteProgram, token(f.quoteMint, recipient, buyback, token22)),
+            raw(
+              quoteProgram,
+              token(f.quoteMint, recipient, previousTokens + buyback, token22),
+            ),
           );
         } else
           post.set(
             packet.buybackAccount,
-            raw(SYSTEM, new Uint8Array(), (1000000n + buyback).toString()),
+            raw(
+              SYSTEM,
+              new Uint8Array(),
+              (BigInt(recipientBefore?.lamports ?? '0') + buyback).toString(),
+            ),
           );
-        const rent = stock ? 7000000n : 5000000n;
+        const rent = stock
+          ? 7000000n - (recipientBefore ? 1000000n : 0n)
+          : 5000000n;
         post.set(
           f.payer,
           raw(
@@ -269,7 +296,7 @@ export async function pumpInitialBuySimulationFixture(
         const keys = (params[1] as { accounts: { addresses: string[] } })
           .accounts.addresses;
         return {
-          context: { slot: state.slot },
+          context: { slot: simulationSlot },
           value: {
             err: state.err,
             accounts: keys.map((key) => post.get(key) ?? null),
@@ -290,6 +317,10 @@ export async function pumpInitialBuySimulationFixture(
     packet,
     state,
     token,
+    setSourceSlot: (slot: string) => {
+      baseline.state.slot = slot;
+      state.slot = slot;
+    },
     setMetadataUri: (uri: string) => {
       baseline.intent.uri = uri;
     },
