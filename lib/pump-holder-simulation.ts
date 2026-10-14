@@ -4,6 +4,7 @@ import {
   getCompiledTransactionMessageDecoder,
 } from '@solana/kit-v1';
 import { buildPumpCreateHolderMessage } from './pump-holder-message';
+import { pumpHolderSourceHash } from './pump-holder-source';
 import { buildPumpCreateMessage } from './pump-launch-message';
 import {
   collectPumpHolderFunding,
@@ -130,23 +131,27 @@ export async function simulatePumpHolderPacket(
         ...(sliced ? { dataSlice: { offset: 0, length: 45 } } : {}),
       },
     ])) as { context?: { slot?: unknown }; value?: unknown[] };
-    observe(result.context?.slot);
+    const slot = observe(result.context?.slot);
     if (
       !Array.isArray(result.value) ||
       result.value.length !== addresses.length
     )
       throw new Error('Holder simulation source mapping differs.');
-    return result.value.map(pumpRpcAccount);
+    return { slot, accounts: result.value.map(pumpRpcAccount) };
   };
-  const before = await snapshot(keys),
-    at = (key: string) => {
-      const i = keys.indexOf(key);
-      if (i < 0)
-        throw new Error('Holder simulation executable account is missing.');
-      return before[i];
-    };
+  const initial = await snapshot(keys);
+  let before = initial.accounts;
+  const at = (key: string) => {
+    const i = keys.indexOf(key);
+    if (i < 0)
+      throw new Error('Holder simulation executable account is missing.');
+    return before[i];
+  };
   for (const [i, item] of funding.accountHashes.entries())
-    if ((await hash(before[i])) !== item.beforeSha256)
+    if (
+      (await pumpHolderSourceHash(packet, item.address, before[i])) !==
+      item.sourceIdentitySha256
+    )
       throw new Error('Holder funding changed before simulation.');
   const programKeys = new Set([
       ...packet.instructions.map((ix) => String(ix.programAddress)),
@@ -181,7 +186,7 @@ export async function simulatePumpHolderPacket(
     throw new Error('Holder simulation deployment coverage differs.');
   const deploymentKeys = [...dataKeys],
     deployments = deploymentKeys.length
-      ? await snapshot(deploymentKeys, true)
+      ? (await snapshot(deploymentKeys, true)).accounts
       : [];
   for (const [i, account] of deployments.entries()) {
     if (!account || account.executable || account.owner !== UPGRADEABLE)
@@ -210,33 +215,68 @@ export async function simulatePumpHolderPacket(
     throw new Error(
       'Holder simulation network fee changed after funding checks.',
     );
-  const result = (await call('simulateTransaction', [
-    packet.transaction,
-    {
-      encoding: 'base64',
-      commitment: 'confirmed',
-      sigVerify: false,
-      replaceRecentBlockhash: false,
-      minContextSlot: minimum(),
-      accounts: { encoding: 'base64', addresses: keys },
-      innerInstructions: false,
-    },
-  ])) as {
-    context?: { slot?: unknown };
-    value?: {
-      err?: unknown;
-      accounts?: unknown[];
-      fee?: unknown;
-      replacementBlockhash?: unknown;
-      unitsConsumed?: unknown;
-      loadedAccountsDataSize?: unknown;
+  let simulationSlot = 0;
+  let value:
+    | {
+        err?: unknown;
+        accounts?: unknown[];
+        fee?: unknown;
+        replacementBlockhash?: unknown;
+        unitsConsumed?: unknown;
+        loadedAccountsDataSize?: unknown;
+      }
+    | undefined;
+  let simulationAttempts = 0;
+  for (; simulationAttempts < 3;) {
+    current();
+    // Confirmed context freshness alone does not pair a pre-state with the simulated bank.
+    // Recollect immediately before each attempt; discard all post-state from a different slot.
+    const source = await snapshot(keys);
+    for (const [i, item] of funding.accountHashes.entries())
+      if (
+        (await pumpHolderSourceHash(
+          packet,
+          item.address,
+          source.accounts[i],
+        )) !== item.sourceIdentitySha256
+      )
+        throw new Error('Holder funding changed before simulation.');
+    const result = (await call('simulateTransaction', [
+      packet.transaction,
+      {
+        encoding: 'base64',
+        commitment: 'confirmed',
+        sigVerify: false,
+        replaceRecentBlockhash: false,
+        minContextSlot: minimum(),
+        accounts: { encoding: 'base64', addresses: keys },
+        innerInstructions: false,
+      },
+    ])) as {
+      context?: { slot?: unknown };
+      value?: {
+        err?: unknown;
+        accounts?: unknown[];
+        fee?: unknown;
+        replacementBlockhash?: unknown;
+        unitsConsumed?: unknown;
+        loadedAccountsDataSize?: unknown;
+      };
     };
-  };
-  const simulationSlot = observe(result.context?.slot),
+    simulationAttempts++;
+    simulationSlot = observe(result.context?.slot);
+    if (!result.value || result.value.err !== null)
+      throw new Error(
+        'Complete Pump holder simulation failed. No approval was created.',
+      );
+    if (simulationSlot !== source.slot) continue;
+    before = source.accounts;
     value = result.value;
-  if (!value || value.err !== null)
+    break;
+  }
+  if (!value)
     throw new Error(
-      'Complete Pump holder simulation failed. No approval was created.',
+      'Holder simulation could not obtain a matching bank snapshot after three attempts. Retry preparation.',
     );
   if (
     value.replacementBlockhash != null ||
@@ -276,12 +316,15 @@ export async function simulatePumpHolderPacket(
     minimumRentBySize,
     creationAccountHashes: creation.accountHashes,
   });
-  const stable = await snapshot(keys);
+  const stable = (await snapshot(keys)).accounts;
   for (const [i, account] of stable.entries())
-    if ((await hash(account)) !== funding.accountHashes[i].beforeSha256)
+    if (
+      (await pumpHolderSourceHash(packet, keys[i], account)) !==
+      funding.accountHashes[i].sourceIdentitySha256
+    )
       throw new Error('Holder source state changed during simulation.');
   if (deploymentKeys.length) {
-    const stableDeployments = await snapshot(deploymentKeys, true);
+    const stableDeployments = (await snapshot(deploymentKeys, true)).accounts;
     for (const [i, account] of stableDeployments.entries())
       if ((await hash(account)) !== (await hash(deployments[i])))
         throw new Error('Holder program changed during simulation.');
@@ -315,6 +358,9 @@ export async function simulatePumpHolderPacket(
     networkFeeRaw: fee.toString(),
     unitsConsumed: units.toString(),
     reads,
+    sourceSlot: simulationSlot,
+    simulationAttempts,
+    sourceBankMatched: true as const,
     accounting: { ...accounting, rpcCollectionRequired: false as const },
     settlementValidated: true as const,
     programDeploymentMetadataOnly: true as const,
@@ -327,6 +373,16 @@ export async function simulatePumpHolderPacket(
         address,
         beforeSha256: await hash(before[i]),
         simulatedSha256: await hash(after[i]),
+        sourceIdentitySha256: await pumpHolderSourceHash(
+          packet,
+          address,
+          before[i],
+        ),
+        simulatedIdentitySha256: await pumpHolderSourceHash(
+          packet,
+          address,
+          after[i],
+        ),
       })),
     ),
     programDeploymentHashes: await Promise.all(

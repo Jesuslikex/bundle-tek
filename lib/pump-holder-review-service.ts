@@ -256,6 +256,9 @@ export async function refreshPumpHolderReview(
     volumeAccounts = new Set<string>(
       built.buyerAccounts.map((b) => b.volumeAccount),
     );
+  const sharedFees = new Set<string>(
+    built.buyerAccounts.map((b) => b.buybackAccount),
+  );
   const stable = (value: Checked) => ({
     deployerBindingSha256: value.deployerBindingSha256,
     holderBindingSha256: value.holderBindingSha256,
@@ -266,9 +269,15 @@ export async function refreshPumpHolderReview(
     programs: value.allWalletSimulation.programDeploymentHashes,
     source: value.allWalletSimulation.accountHashes.map((a) => ({
       address: a.address,
-      beforeSha256: a.beforeSha256,
+      beforeSha256: sharedFees.has(a.address)
+        ? (a.sourceIdentitySha256 ?? a.beforeSha256)
+        : a.beforeSha256,
       ...(!volumeAccounts.has(a.address)
-        ? { simulatedSha256: a.simulatedSha256 }
+        ? {
+            simulatedSha256: sharedFees.has(a.address)
+              ? (a.simulatedIdentitySha256 ?? a.simulatedSha256)
+              : a.simulatedSha256,
+          }
         : {}),
     })),
   });
@@ -280,7 +289,8 @@ export async function refreshPumpHolderReview(
     return fail(
       'Holder packet, funding, settlement or observed source changed. Prepare a new review.',
     );
-  // Only validated simulated volume timestamps may differ. Source bytes, rewards and per-wallet accounting are rechecked.
+  // Only validated shared fee balances and simulated volume timestamps may differ.
+  // Recipient existence, custody/rent, rewards and per-wallet settlement remain bound.
   const current = await read(db, owner, id);
   if (
     current.state !== row.state ||

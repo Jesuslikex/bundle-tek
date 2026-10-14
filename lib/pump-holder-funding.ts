@@ -3,6 +3,7 @@ import {
   getCompiledTransactionMessageDecoder,
 } from '@solana/kit-v1';
 import { buildPumpCreateHolderMessage } from './pump-holder-message';
+import { pumpHolderSourceHash } from './pump-holder-source';
 import {
   pumpAccountBytes,
   pumpRpcAccount,
@@ -290,11 +291,19 @@ export async function collectPumpHolderFunding(
     accountHashes = [];
   for (const [i, key] of keys.entries()) {
     const beforeSha256 = await hash(before[i]);
-    if ((await hash(after[i])) !== beforeSha256)
+    const sourceIdentitySha256 = await pumpHolderSourceHash(
+      packet,
+      key,
+      before[i],
+    );
+    if (
+      (await pumpHolderSourceHash(packet, key, after[i])) !==
+      sourceIdentitySha256
+    )
       throw new Error(
         'Holder funding account state changed during observation.',
       );
-    accountHashes.push({ address: key, beforeSha256 });
+    accountHashes.push({ address: key, beforeSha256, sourceIdentitySha256 });
   }
   const validity = (await call('isBlockhashValid', [
     input.create.blockhash,

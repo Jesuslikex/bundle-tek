@@ -535,3 +535,28 @@ it('rejects revoked ownership at the final approval write and keeps the reservat
     }),
   ).rejects.toThrow('reserved');
 });
+
+it('refreshes shared balances while binding recipient identity and every own-wallet raw snapshot', async () => {
+  const f = await fixture(),
+    result = await f.prepare();
+  const fee = f.checked.allWalletSimulation.accountHashes.find(
+    (a) => a.address === f.g.packet.buyerAccounts[0].buybackAccount,
+  )!;
+  fee.beforeSha256 = '1'.repeat(64);
+  fee.simulatedSha256 = '2'.repeat(64);
+  await refreshPumpHolderReview(f.db, 'alice', result.review.id, signal(), rpc);
+  fee.sourceIdentitySha256 = '3'.repeat(64);
+  await expect(
+    refreshPumpHolderReview(f.db, 'alice', result.review.id, signal(), rpc),
+  ).rejects.toThrow('settlement or observed source changed');
+  const g = await fixture(),
+    other = await g.prepare();
+  const payer = g.checked.allWalletSimulation.accountHashes.find(
+    (a) => a.address === g.terms.payer,
+  )!;
+  payer.beforeSha256 = '4'.repeat(64);
+  // An unchanged normalized field must never mask own-wallet source changes.
+  await expect(
+    refreshPumpHolderReview(g.db, 'alice', other.review.id, signal(), rpc),
+  ).rejects.toThrow('settlement or observed source changed');
+});

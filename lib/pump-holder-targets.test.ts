@@ -568,6 +568,16 @@ for (const revoke of [false, true])
       expect(stored.review.input.create.blockhash).toBe(
         '11111111111111111111111111111111',
       );
+      // Simulate unrelated trades crediting Pump's shared fee recipient after review.
+      // Both snapshots retain these credits; they are not part of this packet's fees.
+      const recipient = g.packet.buyerAccounts[0].buybackAccount;
+      const feeIndex = g.evidence.addresses.indexOf(recipient);
+      for (const observations of [g.evidence.before, g.evidence.after]) {
+        const recipientAccount = observations[feeIndex] as { lamports: string };
+        recipientAccount.lamports = (
+          BigInt(recipientAccount.lamports) + 1234567n
+        ).toString();
+      }
       holderMode = false;
       const refreshed = await refreshPumpHolderReview(
         f.db,

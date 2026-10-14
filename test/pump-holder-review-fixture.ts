@@ -1,3 +1,5 @@
+import { pumpHolderSourceHash } from '../lib/pump-holder-source';
+import type { PumpRpcAccount } from '../lib/pump-launch-simulation';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createClient, type Client } from '@libsql/client';
@@ -179,11 +181,23 @@ export async function pumpHolderReviewServiceFixture(
       accounting,
       networkFeeRaw: '20000',
       programDeploymentHashes: g.creation.simulation.programDeploymentHashes,
-      accountHashes: g.evidence.addresses.map((address, i) => ({
-        address,
-        beforeSha256: digest(g.evidence.before[i]),
-        simulatedSha256: digest(g.evidence.after[i]),
-      })),
+      accountHashes: await Promise.all(
+        g.evidence.addresses.map(async (address, i) => ({
+          address,
+          beforeSha256: digest(g.evidence.before[i]),
+          simulatedSha256: digest(g.evidence.after[i]),
+          sourceIdentitySha256: await pumpHolderSourceHash(
+            g.packet,
+            address,
+            g.evidence.before[i] as PumpRpcAccount,
+          ),
+          simulatedIdentitySha256: await pumpHolderSourceHash(
+            g.packet,
+            address,
+            g.evidence.after[i] as PumpRpcAccount,
+          ),
+        })),
+      ),
     },
   } as unknown as Awaited<
     ReturnType<typeof preflightOwnedPumpHolderSimulation>

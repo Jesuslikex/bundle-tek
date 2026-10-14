@@ -86,6 +86,12 @@ async function fixture(stock = false, token22 = false) {
       b[108] = 1;
       accounts.set(buyer.userQuoteAccount, raw(packet.quote.tokenProgram, b));
     }
+  if (!stock)
+    for (const buyer of packet.buyerAccounts)
+      accounts.set(
+        buyer.buybackAccount,
+        raw(SYSTEM, new Uint8Array(), '1000000'),
+      );
   const evidence = {
     minimumSlot: 100,
     maximumSlot: 100,
@@ -249,3 +255,46 @@ it('does not make provider calls after cancellation', async () => {
   await expect(f.run(controller.signal)).rejects.toThrow();
   expect(f.calls).toEqual([]);
 });
+
+for (const [stock, token22] of [
+  [false, false],
+  [true, false],
+  [true, true],
+])
+  it(`tolerates shared recipient credits during funding but rejects our wallet changes (${stock}, token22=${token22})`, async () => {
+    const f = await fixture(stock, token22),
+      buyer = f.packet.buyerAccounts[0],
+      key = buyer.buybackAccount;
+    if (stock) {
+      const data = new Uint8Array(165);
+      data.set(bs58.decode(f.input.create.quoteMint));
+      data.set(bs58.decode(buyer.buybackRecipient), 32);
+      data[108] = 1;
+      f.accounts.set(key, raw(f.packet.quote.tokenProgram, data));
+    }
+    f.state.hook = (n) => {
+      if (n !== 2) return;
+      const recipient = f.accounts.get(key)!;
+      if (!stock) recipient.lamports = '7777777';
+      else {
+        const bytes = Buffer.from(recipient.data[0], 'base64');
+        new DataView(
+          bytes.buffer,
+          bytes.byteOffset,
+          bytes.byteLength,
+        ).setBigUint64(64, 7777777n, true);
+        recipient.data[0] = bytes.toString('base64');
+      }
+    };
+    const result = await f.run();
+    expect(result.fundingValidated).toBe(true);
+    expect(
+      result.accountHashes.find((a) => a.address === key)?.sourceIdentitySha256,
+    ).toMatch(/^[0-9a-f]{64}$/);
+    const g = await fixture(stock, token22);
+    g.state.hook = (n) => {
+      if (n === 2)
+        g.accounts.get(g.input.holders[0].address)!.lamports = '999999999';
+    };
+    await expect(g.run()).rejects.toThrow('state changed during');
+  });

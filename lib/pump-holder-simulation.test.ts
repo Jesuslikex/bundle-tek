@@ -3,7 +3,9 @@ import { pumpHolderSettlementFixture } from '../test/pump-holder-settlement-fixt
 import { collectPumpHolderFunding } from './pump-holder-funding';
 import { simulatePumpHolderPacket } from './pump-holder-simulation';
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
-import type { PumpLaunchRpc } from './pump-launch-simulation';
+import { pumpAccountBytes } from './pump-launch-simulation';
+import { pumpHolderSourceHash } from './pump-holder-source';
+import type { PumpLaunchRpc, PumpRpcAccount } from './pump-launch-simulation';
 
 async function fixture(stock = false, token22 = false, upgradeable = false) {
   const f = await pumpHolderSettlementFixture(
@@ -21,10 +23,36 @@ async function fixture(stock = false, token22 = false, upgradeable = false) {
     loaded: '1048576',
     replacement: null as unknown,
     changed: false,
+    recipientCredit: 0n,
+    snapshots: 0,
+    sourceHook: (_snapshot: number) => {},
     slot: '100',
     simulations: 0,
     deploymentChanged: false,
     hook: () => {},
+  };
+  const credited = (
+    key: string,
+    account: (typeof f.evidence.before)[number],
+  ) => {
+    if (
+      account &&
+      f.packet.buyerAccounts.some((b) => b.buybackAccount === key)
+    ) {
+      const a = account as NonNullable<PumpRpcAccount>;
+      if (stock) {
+        const bytes = pumpAccountBytes(a),
+          view = new DataView(bytes.buffer);
+        view.setBigUint64(
+          64,
+          view.getBigUint64(64, true) + state.recipientCredit,
+          true,
+        );
+        a.data[0] = Buffer.from(bytes).toString('base64');
+      } else
+        a.lamports = (BigInt(a.lamports) + state.recipientCredit).toString();
+    }
+    return account;
   };
   const calls: { method: string; params: unknown[] }[] = [];
   const rpc: PumpLaunchRpc = async (method, params, signal) => {
@@ -48,7 +76,8 @@ async function fixture(stock = false, token22 = false, upgradeable = false) {
       return result;
     }
     if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
-    if (method === 'getMultipleAccounts')
+    if (method === 'getMultipleAccounts') {
+      state.sourceHook(++state.snapshots);
       return {
         context,
         value: (params[0] as string[]).map((key) => {
@@ -56,9 +85,10 @@ async function fixture(stock = false, token22 = false, upgradeable = false) {
             account = structuredClone(f.evidence.before[i]);
           if (state.changed && key === f.input.holders[0].address && account)
             (account as { lamports: string }).lamports = '1';
-          return account;
+          return credited(key, account);
         }),
       };
+    }
     if (method === 'getFeeForMessage') return { context, value: state.fee };
     if (method === 'getMinimumBalanceForRentExemption') return '1000000';
     if (method === 'getBlockHeight') return '900';
@@ -67,14 +97,16 @@ async function fixture(stock = false, token22 = false, upgradeable = false) {
       state.simulations++;
       state.hook();
       return {
-        context,
+        context: { slot: state.slot },
         value: {
           err: state.err,
           fee: state.fee,
           unitsConsumed: state.units,
           loadedAccountsDataSize: state.loaded,
           replacementBlockhash: state.replacement,
-          accounts: structuredClone(f.evidence.after),
+          accounts: f.evidence.after.map((a, i) =>
+            credited(f.evidence.addresses[i], structuredClone(a)),
+          ),
         },
       };
     }
@@ -203,4 +235,161 @@ it('rejects changed fee, expired observations, invalid blockhash and stale conte
   const i = await fixture();
   i.state.slot = '99';
   await expect(i.run()).rejects.toThrow('context slot');
+});
+
+for (const [stock, token22] of [
+  [false, false],
+  [true, false],
+  [true, true],
+])
+  it(`keeps fee settlement exact after unrelated recipient credits (${stock}, token22=${token22})`, async () => {
+    const f = await fixture(stock, token22),
+      original = await f.run();
+    const key = f.packet.buyerAccounts[0].buybackAccount;
+    // Existing stock custody is needed to distinguish balance drift from changed ATA/rent existence.
+    if (stock) {
+      const index = f.evidence.addresses.indexOf(key);
+      const post = structuredClone(
+        f.evidence.after[index],
+      ) as NonNullable<PumpRpcAccount>;
+      const bytes = Buffer.from(post.data[0], 'base64');
+      new DataView(
+        bytes.buffer,
+        bytes.byteOffset,
+        bytes.byteLength,
+      ).setBigUint64(64, 0n, true);
+      post.data[0] = bytes.toString('base64');
+      f.evidence.before[index] = post;
+      f.funding.accountHashes[index].sourceIdentitySha256 =
+        await pumpHolderSourceHash(
+          f.packet,
+          key,
+          post as Parameters<typeof pumpHolderSourceHash>[2],
+        );
+      // The first buyer no longer funds this existing account.
+      const payerIndex = f.evidence.addresses.indexOf(
+        f.packet.buyerAccounts[0].payer,
+      );
+      const payer = f.evidence.after[payerIndex] as NonNullable<PumpRpcAccount>;
+      payer.lamports = (BigInt(payer.lamports) + 1000000n).toString();
+    }
+    const baseline = await f.run();
+    f.state.recipientCredit = 1234567n;
+    const result = await f.run();
+    expect(result.accounting).toEqual(baseline.accounting);
+    const a = result.accountHashes.find((a) => a.address === key)!;
+    const b = baseline.accountHashes.find((a) => a.address === key)!;
+    expect(a.beforeSha256).not.toBe(b.beforeSha256);
+    expect(a.simulatedSha256).not.toBe(b.simulatedSha256);
+    expect(a.sourceIdentitySha256).toBe(b.sourceIdentitySha256);
+    expect(a.simulatedIdentitySha256).toBe(b.simulatedIdentitySha256);
+    expect(result.sourceBankMatched).toBe(true);
+    expect(original.packetSha256).toBe(result.packetSha256);
+  });
+it('retries a bank rollover and uses its new recipient baseline without counting external credits as fees', async () => {
+  const f = await fixture(),
+    baseline = await f.run();
+  f.state.simulations = 0;
+  f.state.hook = () => {
+    if (f.state.simulations === 1) {
+      f.state.slot = '101';
+      f.state.recipientCredit = 99999n;
+    }
+  };
+  const result = await f.run();
+  expect(result).toMatchObject({
+    sourceSlot: 101,
+    slot: 101,
+    simulationAttempts: 2,
+    sourceBankMatched: true,
+  });
+  expect(result.accounting).toEqual(baseline.accounting);
+});
+it('stops after three bank rollovers without granting signing or sending', async () => {
+  const f = await fixture();
+  f.state.hook = () => {
+    f.state.slot = String(BigInt(f.state.slot) + 1n);
+  };
+  await expect(f.run()).rejects.toThrow(
+    'matching bank snapshot after three attempts',
+  );
+  expect(f.state.simulations).toBe(3);
+  expect(f.calls.some((c) => /send|sign|bundle/i.test(c.method))).toBe(false);
+});
+it('allows later shared credits but still rejects a recipient authority change', async () => {
+  const f = await fixture(),
+    baseline = await f.run();
+  // Changing balances within one reported bank would be inconsistent. Advance only after simulation for the stable read.
+  f.state.sourceHook = () => {
+    if (f.state.simulations >= 2) f.state.recipientCredit += 100n;
+  };
+  const result = await f.run();
+  expect(result.accounting).toEqual(baseline.accounting);
+  const key = f.packet.buyerAccounts[0].buybackAccount;
+  (
+    f.evidence.before[
+      f.evidence.addresses.indexOf(key)
+    ] as NonNullable<PumpRpcAccount>
+  ).executable = true;
+  await expect(f.run()).rejects.toThrow('shared fee recipient authority');
+});
+
+it('rejects stock recipient rent and authority drift, and an unrelated wallet debit after credits', async () => {
+  for (const mutation of ['rent', 'delegate', 'existence']) {
+    const f = await fixture(true),
+      key = f.packet.buyerAccounts[0].buybackAccount;
+    const i = f.evidence.addresses.indexOf(key);
+    if (mutation === 'existence')
+      f.evidence.before[i] = structuredClone(f.evidence.after[i]);
+    else {
+      const account = f.evidence.after[i] as NonNullable<PumpRpcAccount>;
+      if (mutation === 'rent') account.lamports = '1000001';
+      else {
+        const bytes = Buffer.from(account.data[0], 'base64');
+        bytes[72] = 1;
+        account.data[0] = bytes.toString('base64');
+      }
+    }
+    await expect(f.run()).rejects.toThrow();
+  }
+  const f = await fixture();
+  f.state.recipientCredit = 9999999n;
+  const i = f.evidence.addresses.indexOf(f.input.holders[0].address);
+  const wallet = f.evidence.after[i] as NonNullable<PumpRpcAccount>;
+  wallet.lamports = (BigInt(wallet.lamports) - 1n).toString();
+  await expect(f.run()).rejects.toThrow();
+});
+it('rejects own-wallet drift on a rollover retry and respects cancellation between attempts', async () => {
+  const f = await fixture();
+  f.state.hook = () => {
+    f.state.slot = '101';
+    f.state.changed = true;
+  };
+  await expect(f.run()).rejects.toThrow('funding changed');
+  expect(f.state.simulations).toBe(1);
+  const g = await fixture(),
+    controller = new AbortController();
+  g.state.hook = () => {
+    g.state.slot = '101';
+    controller.abort();
+  };
+  await expect(
+    simulatePumpHolderPacket(
+      g.input,
+      g.limits,
+      g.funding,
+      g.creation,
+      controller.signal,
+      g.rpc,
+    ),
+  ).rejects.toThrow();
+  expect(g.state.simulations).toBe(1);
+});
+
+it('rejects inconsistent recipient credits within the same reported simulation bank', async () => {
+  const f = await fixture();
+  f.state.hook = () => {
+    f.state.recipientCredit = 999999n;
+  };
+  await expect(f.run()).rejects.toThrow();
 });
