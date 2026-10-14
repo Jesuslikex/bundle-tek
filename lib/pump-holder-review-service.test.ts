@@ -16,12 +16,23 @@ import {
   refreshPumpHolderReview,
   listPumpHolderReviews,
   cancelUnsignedPumpHolderReview,
+  approvePumpHolderReview,
+  registerPumpHolderSignedPacket,
 } from './pump-holder-review-service';
 import {
   canonicalPumpHolderJson,
   pumpHolderDigest,
   requirePumpHolderReview,
+  type PumpHolderReview,
 } from './pump-holder-review';
+import type { PumpHolderConsent } from './pump-holder-signing';
+import {
+  getTransactionDecoder,
+  getTransactionEncoder,
+  getBase64Decoder,
+  address,
+  type SignatureBytes,
+} from '@solana/kit-v1';
 import { listPumpLaunches } from './pump-launch-service';
 import {
   buildPumpCreateHolderMessage,
@@ -38,8 +49,43 @@ beforeEach(() => {
   mocked.mockReset();
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const client of clients.splice(0)) client.close();
 });
+const consentFor = (review: PumpHolderReview): PumpHolderConsent => ({
+  approved: true,
+  reviewId: review.id,
+  sha256: review.sha256,
+  contextSha256: review.contextSha256,
+  approvedScope: 'create-developer-and-holder-buys',
+  acknowledgeSimulationLimits: true,
+});
+async function syntheticSigned(
+  f: Awaited<ReturnType<typeof fixture>>,
+  review: PumpHolderReview,
+) {
+  const tx = getTransactionDecoder().decode(
+      Buffer.from(review.transaction, 'base64'),
+    ),
+    signatures = { ...tx.signatures };
+  for (const signer of [
+    f.g.f.f.payerSigner,
+    f.g.f.f.mintSigner,
+    ...f.g.holderSigners,
+  ]) {
+    if (!(signer.address in signatures)) continue;
+    signatures[address(signer.address)] = new Uint8Array(
+      await crypto.subtle.sign(
+        'Ed25519',
+        signer.keyPair.privateKey,
+        Uint8Array.from(tx.messageBytes),
+      ),
+    ) as SignatureBytes;
+  }
+  return getBase64Decoder().decode(
+    getTransactionEncoder().encode({ ...tx, signatures }),
+  );
+}
 const rpc: PumpLaunchRpc = async () => {
   throw new Error('Unexpected provider read outside the mocked preflight');
 };
@@ -484,4 +530,198 @@ it('rejects a holder packet when one recipient is already a legacy launch payer'
   });
   await expect(f.prepare()).rejects.toThrow('reservation changed');
   expect(await listPumpHolderReviews(f.db, 'alice', 'holders')).toEqual([]);
+});
+it('refreshes explicit approval and registers all strict signatures without any provider call or broadcast', async () => {
+  const f = await fixture(),
+    prepared = await f.prepare(),
+    consent = consentFor(prepared.review);
+  expect(
+    await approvePumpHolderReview(
+      f.db,
+      'alice',
+      prepared.review.id,
+      consent,
+      signal(),
+      rpc,
+    ),
+  ).toMatchObject({
+    state: 'approved',
+    signingAllowed: true,
+    executionAllowed: false,
+  });
+  await approvePumpHolderReview(
+    f.db,
+    'alice',
+    prepared.review.id,
+    consent,
+    signal(),
+    rpc,
+  );
+  expect(mocked).toHaveBeenCalledTimes(3);
+  const signed = await syntheticSigned(f, prepared.review),
+    registered = await registerPumpHolderSignedPacket(
+      f.db,
+      'alice',
+      prepared.review.id,
+      consent,
+      signed,
+      signal(),
+    );
+  expect(registered).toMatchObject({
+    state: 'signed',
+    signingAllowed: false,
+    executionAllowed: false,
+    completeLaunch: false,
+  });
+  expect(registered.signature).toBeTruthy();
+  expect(mocked).toHaveBeenCalledTimes(3);
+  expect(
+    await registerPumpHolderSignedPacket(
+      f.db,
+      'alice',
+      prepared.review.id,
+      consent,
+      signed,
+      signal(),
+    ),
+  ).toEqual(registered);
+  await expect(
+    cancelUnsignedPumpHolderReview(f.db, 'alice', prepared.review.id, signal()),
+  ).rejects.toThrow('lifetime/receipt recovery');
+});
+it('rejects wrong approval consent and foreign ownership before running a refresh', async () => {
+  const f = await fixture(),
+    prepared = await f.prepare(),
+    consent = consentFor(prepared.review);
+  for (const patch of [
+    { approved: false },
+    { sha256: '0'.repeat(64) },
+    { contextSha256: '0'.repeat(64) },
+    { reviewId: 'other' },
+    { approvedScope: 'create-and-developer-buy' },
+    { acknowledgeSimulationLimits: false },
+  ])
+    await expect(
+      approvePumpHolderReview(
+        f.db,
+        'alice',
+        prepared.review.id,
+        { ...consent, ...patch } as PumpHolderConsent,
+        signal(),
+        rpc,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+  await expect(
+    approvePumpHolderReview(
+      f.db,
+      'bob',
+      prepared.review.id,
+      consent,
+      signal(),
+      rpc,
+    ),
+  ).rejects.toMatchObject({ status: 404 });
+  expect(mocked).toHaveBeenCalledTimes(1);
+  expect((await listPumpHolderReviews(f.db, 'alice', 'holders'))[0].state).toBe(
+    'review',
+  );
+});
+it('rejects unsigned or unapproved registration and preserves the approved review on invalid signatures', async () => {
+  const f = await fixture(),
+    prepared = await f.prepare(),
+    consent = consentFor(prepared.review);
+  await expect(
+    registerPumpHolderSignedPacket(
+      f.db,
+      'alice',
+      prepared.review.id,
+      consent,
+      prepared.review.transaction,
+      signal(),
+    ),
+  ).rejects.toThrow('Approve');
+  await approvePumpHolderReview(
+    f.db,
+    'alice',
+    prepared.review.id,
+    consent,
+    signal(),
+    rpc,
+  );
+  await expect(
+    registerPumpHolderSignedPacket(
+      f.db,
+      'alice',
+      prepared.review.id,
+      consent,
+      prepared.review.transaction,
+      signal(),
+    ),
+  ).rejects.toMatchObject({ status: 400 });
+  expect((await listPumpHolderReviews(f.db, 'alice', 'holders'))[0].state).toBe(
+    'approved',
+  );
+  expect(mocked).toHaveBeenCalledTimes(2);
+});
+it('keeps expired signed packets for recovery even if a holder proof was subsequently revoked', async () => {
+  const f = await fixture(),
+    prepared = await f.prepare(),
+    consent = consentFor(prepared.review);
+  await approvePumpHolderReview(
+    f.db,
+    'alice',
+    prepared.review.id,
+    consent,
+    signal(),
+    rpc,
+  );
+  const signed = await syntheticSigned(f, prepared.review);
+  await f.client.execute({
+    sql: 'DELETE FROM wallet_ownership_proofs WHERE address=?',
+    args: [f.terms.holderLimits[0].address],
+  });
+  vi.spyOn(Date, 'now').mockReturnValue(
+    Date.parse(prepared.review.expiresAt) + 1,
+  );
+  expect(
+    await registerPumpHolderSignedPacket(
+      f.db,
+      'alice',
+      prepared.review.id,
+      consent,
+      signed,
+      signal(),
+    ),
+  ).toMatchObject({ state: 'signed', signingAllowed: false });
+  expect(mocked).toHaveBeenCalledTimes(2);
+});
+it('rejects revoked ownership at the final approval write and keeps the reservation', async () => {
+  const f = await fixture(),
+    prepared = await f.prepare(),
+    consent = consentFor(prepared.review);
+  f.setHook(async () => {
+    await f.client.execute({
+      sql: 'DELETE FROM wallet_ownership_proofs WHERE address=?',
+      args: [f.terms.holderLimits[1].address],
+    });
+  });
+  await expect(
+    approvePumpHolderReview(
+      f.db,
+      'alice',
+      prepared.review.id,
+      consent,
+      signal(),
+      rpc,
+    ),
+  ).rejects.toThrow('changed before approval');
+  expect((await listPumpHolderReviews(f.db, 'alice', 'holders'))[0].state).toBe(
+    'review',
+  );
+  await expect(
+    f.client.execute({
+      sql: "INSERT INTO solana_execution_reservations VALUES('alice',?,'warmup','other','signed')",
+      args: [f.terms.holderLimits[1].address],
+    }),
+  ).rejects.toThrow('reserved');
 });

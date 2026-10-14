@@ -14,6 +14,11 @@ import {
 } from './pump-holder-review';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 import type { buildPumpCreateHolderMessage } from './pump-holder-message';
+import {
+  requirePumpHolderConsent,
+  verifyPumpHolderSignedPacket,
+  type PumpHolderConsent,
+} from './pump-holder-signing';
 
 type Terms = Parameters<typeof preflightOwnedPumpHolderSimulation>[2];
 type Checked = Awaited<ReturnType<typeof preflightOwnedPumpHolderSimulation>>;
@@ -34,6 +39,16 @@ const FORMAT = 'pump-create-holders-review-v1';
 const fail = (message: string, status = 409): never => {
   throw new PumpPreflightError(message, status);
 };
+function validateConsent(review: PumpHolderReview, consent: PumpHolderConsent) {
+  try {
+    requirePumpHolderConsent(review, consent);
+  } catch {
+    return fail(
+      'Explicit approval of this exact holder packet, context and simulation limits is required.',
+      400,
+    );
+  }
+}
 async function requireReservationGuards(db: D1Database) {
   const row = await db
     .prepare(`SELECT count(*) AS installed FROM sqlite_master WHERE type='trigger' AND name IN
@@ -52,7 +67,8 @@ const publicReview = (row: Row) => ({
   state: row.state,
   signature: row.signature,
   receipt: row.receipt ? JSON.parse(row.receipt) : null,
-  signingAllowed: false as const,
+  signingAllowed:
+    row.state === 'approved' && Date.parse(row.expires_at) > Date.now(),
   executionAllowed: false as const,
   completeLaunch: false as const,
   simulationLimits: [
@@ -296,4 +312,88 @@ export async function listPumpHolderReviews(
     .bind(owner, projectId, FORMAT)
     .all<Row>();
   return results.map(publicReview);
+}
+
+/** Explicit consent followed by full original-packet refresh and an atomic ownership/state transition. Never signs or sends. */
+export async function approvePumpHolderReview(
+  db: D1Database,
+  owner: string,
+  id: string,
+  suppliedConsent: PumpHolderConsent,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc = pumpLaunchRpc(),
+) {
+  signal.throwIfAborted();
+  await requireReservationGuards(db);
+  const row = await read(db, owner, id),
+    review = JSON.parse(row.review) as PumpHolderReview,
+    consent = structuredClone(suppliedConsent);
+  validateConsent(review, consent);
+  if (!['review', 'approved'].includes(row.state))
+    return fail('This holder review cannot be approved in its current state.');
+  await refreshPumpHolderReview(db, owner, id, signal, rpc);
+  signal.throwIfAborted();
+  if (row.state === 'review') {
+    let changed: D1Result;
+    try {
+      changed = await db
+        .prepare(
+          "UPDATE pump_launch_reviews SET state='approved' WHERE owner_id=? AND id=? AND state='review'",
+        )
+        .bind(owner, id)
+        .run();
+    } catch {
+      return fail(
+        'Holder ownership, reservation or project changed before approval.',
+      );
+    }
+    if (!changed.meta.changes)
+      return fail('Holder approval state changed. Reload its review.');
+  }
+  const current = await read(db, owner, id);
+  if (
+    current.state !== 'approved' ||
+    current.review !== row.review ||
+    Date.parse(current.expires_at) <= Date.now()
+  )
+    return fail('Holder approval expired or changed before completion.');
+  return publicReview(current);
+}
+
+/** Retain the exact signed packet for later recovery, even after expiry. Registration never broadcasts or refreshes it. */
+export async function registerPumpHolderSignedPacket(
+  db: D1Database,
+  owner: string,
+  id: string,
+  suppliedConsent: PumpHolderConsent,
+  transaction: string,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  const row = await read(db, owner, id),
+    review = JSON.parse(row.review) as PumpHolderReview;
+  validateConsent(review, structuredClone(suppliedConsent));
+  if (row.signed !== transaction && row.state !== 'approved')
+    return fail('Approve the holder review before registering signatures.');
+  let signature: string;
+  try {
+    signature = await verifyPumpHolderSignedPacket(review, transaction);
+  } catch {
+    return fail(
+      'The exact packet with every reviewed wallet signature is required.',
+      400,
+    );
+  }
+  signal.throwIfAborted();
+  if (row.signed === transaction && row.signature === signature)
+    return publicReview(row);
+  const changed = await db
+    .prepare(
+      "UPDATE pump_launch_reviews SET state='signed',signed=?,signature=? WHERE owner_id=? AND id=? AND state='approved' AND signed IS NULL AND signature IS NULL",
+    )
+    .bind(transaction, signature, owner, id)
+    .run();
+  if (!changed.meta.changes)
+    return fail('Holder signature state changed. Reload its saved review.');
+  return publicReview(await read(db, owner, id));
 }

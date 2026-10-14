@@ -49,27 +49,30 @@ export async function pumpHolderSettlementFixture(
     f.rpc,
   );
   const create = { ...intent, ...creation.context };
+  const holderSigners = await Promise.all(
+    Array.from({ length: 3 }, () => generateKeyPairSigner()),
+  );
   const holders: PumpHolderBuy[] = [
     {
-      address: (await generateKeyPairSigner()).address,
+      address: holderSigners[0].address,
       kind: 'exact-base-output',
       tokenAmountRaw: '2000000000000',
       maximumQuoteCostRaw: '100000000',
     },
     quoteInput
       ? {
-          address: (await generateKeyPairSigner()).address,
+          address: holderSigners[1].address,
           kind: 'exact-quote-input',
           quoteAmountRaw: '1000000',
           minimumTokenOutputRaw: '1000000',
         }
       : {
-          address: (await generateKeyPairSigner()).address,
+          address: holderSigners[1].address,
           kind: 'exact-base-output',
           tokenAmountRaw: '1000000000000',
           maximumQuoteCostRaw: '100000000',
         },
-    { address: (await generateKeyPairSigner()).address, kind: 'none' },
+    { address: holderSigners[2].address, kind: 'none' },
   ];
   const input = {
       create,
@@ -279,6 +282,7 @@ export async function pumpHolderSettlementFixture(
   const run = () => verifyPumpHolderSettlement(input, limits, evidence);
   return {
     f,
+    holderSigners,
     creation,
     input,
     limits,

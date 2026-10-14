@@ -13,10 +13,17 @@ import {
   preparePumpHolderReview,
   refreshPumpHolderReview,
   cancelUnsignedPumpHolderReview,
+  approvePumpHolderReview,
+  registerPumpHolderSignedPacket,
 } from './pump-holder-review-service';
+import type { PumpHolderConsent } from './pump-holder-signing';
 import {
   getTransactionDecoder,
   getCompiledTransactionMessageDecoder,
+  getTransactionEncoder,
+  getBase64Decoder,
+  address,
+  type SignatureBytes,
 } from '@solana/kit-v1';
 import { raw, SYSTEM } from '../test/pump-launch-simulation-fixture';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
@@ -556,8 +563,75 @@ for (const revoke of [false, true])
           )
         ).state,
       ).toBe('cancelled');
+      holderMode = false;
+      const next = await preparePumpHolderReview(
+        f.db,
+        'alice',
+        terms,
+        new AbortController().signal,
+        rpc,
+      );
+      const consent: PumpHolderConsent = {
+        approved: true,
+        reviewId: next.review.id,
+        sha256: next.review.sha256,
+        contextSha256: next.review.contextSha256,
+        approvedScope: 'create-developer-and-holder-buys',
+        acknowledgeSimulationLimits: true,
+      };
+      holderMode = false;
+      expect(
+        await approvePumpHolderReview(
+          f.db,
+          'alice',
+          next.review.id,
+          consent,
+          new AbortController().signal,
+          rpc,
+        ),
+      ).toMatchObject({
+        state: 'approved',
+        signingAllowed: true,
+        executionAllowed: false,
+      });
+      const tx = getTransactionDecoder().decode(
+          Buffer.from(next.review.transaction, 'base64'),
+        ),
+        signatures = { ...tx.signatures };
+      for (const signer of [
+        g.f.f.payerSigner,
+        g.f.f.mintSigner,
+        ...g.holderSigners,
+      ]) {
+        if (!(signer.address in signatures)) continue;
+        signatures[address(signer.address)] = new Uint8Array(
+          await crypto.subtle.sign(
+            'Ed25519',
+            signer.keyPair.privateKey,
+            Uint8Array.from(tx.messageBytes),
+          ),
+        ) as SignatureBytes;
+      }
+      const signed = getBase64Decoder().decode(
+        getTransactionEncoder().encode({ ...tx, signatures }),
+      );
+      expect(
+        await registerPumpHolderSignedPacket(
+          f.db,
+          'alice',
+          next.review.id,
+          consent,
+          signed,
+          new AbortController().signal,
+        ),
+      ).toMatchObject({
+        state: 'signed',
+        signingAllowed: false,
+        executionAllowed: false,
+        completeLaunch: false,
+      });
     }
-    expect(simulations).toBe(revoke ? 1 : 3);
+    expect(simulations).toBe(revoke ? 1 : 5);
   });
 for (const revoke of [false, true])
   it(`checks owned all-wallet funding and revalidates ownership after RPC (revoke=${revoke})`, async () => {
