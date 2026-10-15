@@ -86,7 +86,11 @@ export async function pairRuntimeFixture() {
           innerInstructions?: boolean;
         }
       | undefined;
-    if (method === 'getMultipleAccounts' && config?.dataSlice?.length === 45) {
+    if (
+      method === 'getMultipleAccounts' &&
+      config &&
+      [45, 166].includes(config.dataSlice?.length ?? 0)
+    ) {
       const keys = params[0] as string[];
       state.onScan?.(keys);
       return {

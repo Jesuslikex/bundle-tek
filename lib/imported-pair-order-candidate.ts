@@ -38,12 +38,19 @@ export function importedPairOrderRequest(
   const { prepareUnsigned: _consent, ...rest } = v;
   return { ...importedPairWalletRequest(rest), prepareUnsigned: true };
 }
-export async function prepareOwnedImportedPairOrder(
+/** Shared owned preparation lifecycle. The inspector must finish before any candidate is published. */
+export async function inspectOwnedImportedPairOrder<Review>(
   db: D1Database,
   owner: string,
   value: ImportedPairOrderRequest,
   signal: AbortSignal,
-  dependencies?: ImportedPairOrderDependencies,
+  dependencies: ImportedPairOrderDependencies | undefined,
+  inspect: (
+    preflight: Awaited<ReturnType<typeof preflightOwnedImportedPairWallet>>,
+    order: Awaited<ReturnType<typeof prepareSolanaPair>>,
+    rpc: ImportedPairOrderDependencies['rpc'],
+    now: () => number,
+  ) => Promise<Review>,
 ) {
   const input = importedPairOrderRequest(value);
   signal = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
@@ -138,7 +145,7 @@ export async function prepareOwnedImportedPairOrder(
       );
     }
     signal.throwIfAborted();
-    const review = await collectPairOrderReview(
+    const review = await inspect(
       preflight,
       order,
       checked,
@@ -205,4 +212,22 @@ export async function prepareOwnedImportedPairOrder(
   } finally {
     signal.removeEventListener('abort', abort);
   }
+}
+
+export function prepareOwnedImportedPairOrder(
+  db: D1Database,
+  owner: string,
+  value: ImportedPairOrderRequest,
+  signal: AbortSignal,
+  dependencies?: ImportedPairOrderDependencies,
+) {
+  return inspectOwnedImportedPairOrder(
+    db,
+    owner,
+    value,
+    signal,
+    dependencies,
+    (preflight, order, rpc, now) =>
+      collectPairOrderReview(preflight, order, rpc, now),
+  );
 }

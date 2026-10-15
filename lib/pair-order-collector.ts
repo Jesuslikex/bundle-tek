@@ -97,11 +97,13 @@ export async function collectPairOrderReview(
     tx.messageBytes,
   );
   if (message.version !== 0) throw Error('Pair candidate version differs.');
-  if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+  const [genesis, initialHeight] = await Promise.all([
+    rpc('getGenesisHash', []),
+    rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
+  ]);
+  if (genesis !== SOLANA_MAINNET_GENESIS)
     throw Error('Pair candidate provider is not mainnet.');
-  const height = pairWalletUint(
-      await rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
-    ),
+  const height = pairWalletUint(initialHeight),
     last = pairWalletUint(order.preparation.lastValidBlockHeight);
   if (height + 10n > last || last > height + 200n)
     throw Error(
@@ -153,16 +155,17 @@ export async function collectPairOrderReview(
     slice: boolean,
   ): Promise<PairOrderAccountSnapshot[]> => {
     if (!addresses.length) return [];
+    const requestedFloor = floor();
     const response = (await rpc('getMultipleAccounts', [
       addresses,
       {
         encoding: 'base64',
         commitment: 'confirmed',
-        minContextSlot: floor(),
+        minContextSlot: requestedFloor,
         ...(slice ? { dataSlice: { offset: 0, length: 166 } } : {}),
       },
     ])) as { context?: { slot?: unknown }; value?: unknown[] };
-    slots.push(slot(response?.context?.slot, floor()));
+    slots.push(slot(response?.context?.slot, requestedFloor));
     if (
       !Array.isArray(response.value) ||
       response.value.length !== addresses.length
@@ -186,11 +189,6 @@ export async function collectPairOrderReview(
     other,
   );
   const checkedAccounts = [...selected, ...discovered.map((a) => a.address)];
-  const before = await readAccounts(checkedAccounts, false),
-    snapshots = [
-      ...before,
-      ...other.filter((a) => !checkedAccounts.includes(a.address)),
-    ];
   const quoted: PairMintEvidence = {
     slot: pair.mintPolicy.recheckSlot,
     unixTimestamp: pair.mintPolicy.recheckUnixTimestamp,
@@ -205,74 +203,91 @@ export async function collectPairOrderReview(
         i === 0 ? pair.mintPolicy.baseSha256 : pair.mintPolicy.quoteSha256,
     })),
   };
-  const mints = await readPairMintEvidence(
-    { inputMint: pair.base.address, outputMint: pair.quote.address },
-    floor(),
-    rpc,
-    now(),
-  );
+  const beforeFloor = floor();
+  const [before, mints, auxiliaryMints] = await Promise.all([
+    readAccounts(checkedAccounts, false),
+    readPairMintEvidence(
+      { inputMint: pair.base.address, outputMint: pair.quote.address },
+      beforeFloor,
+      rpc,
+      now(),
+    ),
+    discovered.length
+      ? readPairAuxiliaryMints(
+          [...new Set(discovered.map((a) => a.mint))],
+          beforeFloor,
+          rpc,
+          now,
+        )
+      : Promise.resolve(null),
+  ]);
+  const snapshots = [
+    ...before,
+    ...other.filter((a) => !checkedAccounts.includes(a.address)),
+  ];
   slots.push(mints.slot);
   assertSamePairMintEvidence(quoted, mints);
-  const auxiliaryMints = discovered.length
-    ? await readPairAuxiliaryMints(
-        [...new Set(discovered.map((a) => a.mint))],
-        floor(),
-        rpc,
-        now,
-      )
-    : null;
   if (auxiliaryMints) slots.push(auxiliaryMints.slot);
   const auxiliary = discovered.map((a) => ({
     ...a,
     mint: auxiliaryMints!.mints.find((m) => m.address === a.mint)!,
   }));
   const rentByMint: Record<string, string> = {};
+  const assetSizes = [...mints.mints, ...auxiliary.map((a) => a.mint)].map(
+    (asset) => {
+      const account = preflight.evidence.accounts.find(
+        (a) => a.mint === asset.address,
+      );
+      const extra = auxiliary.find((a) => a.mint.address === asset.address);
+      const raw = extra
+        ? (before.find((a) => a.address === extra.address)!.raw as {
+            data?: unknown;
+          } | null)
+        : null;
+      let extraSize =
+        asset.program === SWAP_TOKEN
+          ? 165
+          : getTokenSize(requiredPairAccountExtensions(asset));
+      if (extra && raw !== null) {
+        if (
+          !Array.isArray(raw?.data) ||
+          typeof raw.data[0] !== 'string' ||
+          raw.data[0].length > 5464
+        )
+          throw Error('Auxiliary account layout is unsupported.');
+        extraSize = atob(raw.data[0]).length;
+        if (extraSize > 4096) throw Error('Auxiliary account size differs.');
+      }
+      const size =
+        asset.address === SWAP_WRAPPED_SOL
+          ? 165
+          : account
+            ? account.byteLength || account.expectedByteLength
+            : extraSize;
+      return { asset, account, size };
+    },
+  );
+  const rentSizes = [...new Set([0, ...assetSizes.map((a) => a.size)])];
+  const observedRents = new Map(
+    await Promise.all(
+      rentSizes.map(async (size) => {
+        const rent = pairWalletUint(
+          await rpc('getMinimumBalanceForRentExemption', [
+            size,
+            { commitment: 'confirmed' },
+          ]),
+        );
+        if (rent < 1n) throw Error('Pair candidate rent is unavailable.');
+        return [size, rent] as const;
+      }),
+    ),
+  );
   if (
-    pairWalletUint(
-      await rpc('getMinimumBalanceForRentExemption', [
-        0,
-        { commitment: 'confirmed' },
-      ]),
-    ).toString() !== preflight.evidence.systemRentMinimumRaw
+    observedRents.get(0)!.toString() !== preflight.evidence.systemRentMinimumRaw
   )
     throw Error('Pair candidate system-wallet rent changed.');
-  for (const asset of [...mints.mints, ...auxiliary.map((a) => a.mint)]) {
-    const account = preflight.evidence.accounts.find(
-      (a) => a.mint === asset.address,
-    );
-    const extra = auxiliary.find((a) => a.mint.address === asset.address);
-    const raw = extra
-      ? (before.find((a) => a.address === extra.address)!.raw as {
-          data?: unknown;
-        } | null)
-      : null;
-    let extraSize =
-      asset.program === SWAP_TOKEN
-        ? 165
-        : getTokenSize(requiredPairAccountExtensions(asset));
-    if (extra && raw !== null) {
-      if (
-        !Array.isArray(raw?.data) ||
-        typeof raw.data[0] !== 'string' ||
-        raw.data[0].length > 5464
-      )
-        throw Error('Auxiliary account layout is unsupported.');
-      extraSize = atob(raw.data[0]).length;
-      if (extraSize > 4096) throw Error('Auxiliary account size differs.');
-    }
-    const size =
-      asset.address === SWAP_WRAPPED_SOL
-        ? 165
-        : account
-          ? account.byteLength || account.expectedByteLength
-          : extraSize;
-    const rent = pairWalletUint(
-      await rpc('getMinimumBalanceForRentExemption', [
-        size,
-        { commitment: 'confirmed' },
-      ]),
-    );
-    if (rent < 1n) throw Error('Pair candidate rent is unavailable.');
+  for (const { asset, account, size } of assetSizes) {
+    const rent = observedRents.get(size)!;
     rentByMint[asset.address] = rent.toString();
     if (
       account &&
@@ -336,7 +351,41 @@ export async function collectPairOrderReview(
       simulationResponse as { value: { accounts: unknown[] } }
     ).value.accounts.forEach(assertPairRuntimeWritableAccount);
   fresh();
-  const after = await readAccounts(checkedAccounts, false);
+  const afterFloor = floor();
+  const [
+    after,
+    finalMints,
+    finalAuxiliaryMints,
+    recheck,
+    rawValidity,
+    rawFinalHeight,
+    finalGenesis,
+  ] = await Promise.all([
+    readAccounts(checkedAccounts, false),
+    readPairMintEvidence(
+      { inputMint: pair.base.address, outputMint: pair.quote.address },
+      afterFloor,
+      rpc,
+      now(),
+    ),
+    auxiliaryMints
+      ? readPairAuxiliaryMints(
+          auxiliaryMints.mints.map((m) => m.address),
+          afterFloor,
+          rpc,
+          now,
+        )
+      : Promise.resolve(null),
+    lookups
+      ? readSwapLookupAccounts(message, afterFloor, rpc)
+      : Promise.resolve(null),
+    rpc('isBlockhashValid', [
+      message.lifetimeToken,
+      { commitment: 'confirmed', minContextSlot: afterFloor },
+    ]),
+    rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
+    rpc('getGenesisHash', []),
+  ]);
   const identity = (a: PairOrderAccountSnapshot) => {
     if (a.raw === null) return [a.address, null];
     const r = a.raw as {
@@ -352,26 +401,11 @@ export async function collectPairOrderReview(
   )
     throw Error('Pair candidate selected balances or custody changed.');
   if (lookups) {
-    const recheck = await readSwapLookupAccounts(message, floor(), rpc);
     assertSameSwapLookups(lookups, recheck, null);
     slots.push(recheck!.observedSlot);
   }
-  const finalMints = await readPairMintEvidence(
-    { inputMint: pair.base.address, outputMint: pair.quote.address },
-    floor(),
-    rpc,
-    now(),
-  );
   slots.push(finalMints.slot);
   assertSamePairMintEvidence(mints, finalMints);
-  const finalAuxiliaryMints = auxiliaryMints
-    ? await readPairAuxiliaryMints(
-        auxiliaryMints.mints.map((m) => m.address),
-        floor(),
-        rpc,
-        now,
-      )
-    : null;
   if (finalAuxiliaryMints) {
     slots.push(finalAuxiliaryMints.slot);
     for (const [i, m] of auxiliaryMints!.mints.entries())
@@ -383,19 +417,17 @@ export async function collectPairOrderReview(
         },
       );
   }
-  const validity = (await rpc('isBlockhashValid', [
-    message.lifetimeToken,
-    { commitment: 'confirmed', minContextSlot: floor() },
-  ])) as { context?: { slot?: unknown }; value?: unknown };
-  slots.push(slot(validity?.context?.slot, floor()));
-  const finalHeight = pairWalletUint(
-    await rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
-  );
+  const validity = rawValidity as {
+    context?: { slot?: unknown };
+    value?: unknown;
+  };
+  slots.push(slot(validity?.context?.slot, afterFloor));
+  const finalHeight = pairWalletUint(rawFinalHeight);
   if (
     validity.value !== true ||
     finalHeight < height ||
     finalHeight + 10n > last ||
-    (await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS
+    finalGenesis !== SOLANA_MAINNET_GENESIS
   )
     throw Error('Pair candidate lifetime or network changed.');
   requireConsistentSolanaSlots(slots);

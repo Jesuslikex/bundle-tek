@@ -34,7 +34,7 @@ it.each([false, true])(
     v.programs.set(SWAP_TOKEN, program);
     let simulations = 0;
     v.orderState.onSimulation = () => {
-      if (++simulations === 2 && lateChange)
+      if (++simulations === 1 && lateChange)
         v.runtimeState.onCodeRead = () => {
           prior.lamports = '20000001';
         };
@@ -75,6 +75,18 @@ function extraAccount(
 }
 it('binds complete reachable program identities around a fresh traced economic simulation, without trust or signing', async () => {
   f = await pairRuntimeFixture();
+  let traced = false,
+    before = 0,
+    after = 0;
+  f.runtimeState.onCodeRead = () => {
+    if (traced) after++;
+    else before++;
+  };
+  f.runtimeState.onTrace = (trace) => {
+    expect(before).toBeGreaterThan(0);
+    traced = true;
+    return trace;
+  };
   const result = await run(f);
   expect(result).toMatchObject({
     format: 'imported-pair-runtime-preview-v1',
@@ -107,10 +119,34 @@ it('binds complete reachable program identities around a fresh traced economic s
   expect(result.runtime.sha256).toMatch(/^[a-f0-9]{64}$/);
   expect(f.prepare).toHaveBeenCalledOnce();
   expect(
+    f.rpc.mock.calls.filter(([method]) => method === 'simulateTransaction'),
+  ).toHaveLength(1);
+  expect(before).toBeGreaterThan(0);
+  expect(after).toBeGreaterThan(0);
+  expect(
+    result.runtime.maximumSlot - result.runtime.minimumSlot,
+  ).toBeLessThanOrEqual(32);
+  expect(
     f.sqlite
       .prepare('SELECT count(*) AS n FROM imported_token_project_events')
       .get(),
   ).toMatchObject({ n: 0 });
+});
+it('retains the 32-slot limit before attempting the sole runtime simulation', async () => {
+  const v = (f = await pairRuntimeFixture()),
+    rpc = v.runtimeDependencies.programRpc!;
+  v.runtimeDependencies.programRpc = async (method, params) => {
+    const r = await rpc(method, params);
+    if (method === 'getMultipleAccounts')
+      (r as { context: { slot: string } }).context.slot = String(
+        (params[1] as { minContextSlot: number }).minContextSlot + 33,
+      );
+    return r;
+  };
+  await expect(run(v)).rejects.toMatchObject({ status: 409 });
+  expect(
+    v.rpc.mock.calls.some(([method]) => method === 'simulateTransaction'),
+  ).toBe(false);
 });
 it.each(['foreign', 'revision', 'missing-intent', 'extra-field'] as const)(
   'rejects %s before any wallet-bound runtime preparation',
@@ -268,7 +304,7 @@ it.each(['nonce', 'stake', 'loader', 'executable'] as const)(
     extraAccount(fixture, key, true);
     let simulations = 0;
     fixture.orderState.onSimulation = (response, keys) => {
-      if (++simulations !== 2) return;
+      if (++simulations !== 1) return;
       response.value.accounts[keys.indexOf(key)] = {
         owner:
           mode === 'nonce'
@@ -282,7 +318,7 @@ it.each(['nonce', 'stake', 'loader', 'executable'] as const)(
       };
     };
     await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
-    expect(simulations).toBe(2);
+    expect(simulations).toBe(1);
   },
 );
 it('cancels a stalled code read without storing approval or exposing provider secrets', async () => {

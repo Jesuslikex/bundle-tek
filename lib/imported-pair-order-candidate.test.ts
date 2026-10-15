@@ -14,6 +14,7 @@ import {
   importedPairOrderRequest,
 } from './imported-pair-order-candidate';
 import { SWAP_TOKEN, SWAP_WRAPPED_SOL } from './swap-token-program-evidence';
+import { PAIR_CLOCK } from './pair-mint-evidence';
 type Fixture = Awaited<ReturnType<typeof pairOrderFixture>>;
 type Message = Awaited<ReturnType<Fixture['makeMessage']>>;
 let f: Fixture | undefined;
@@ -42,6 +43,47 @@ function addReadonly(m: Message, key: string) {
   }
   return index;
 }
+it.each(['valid', 'below-floor', 'too-old'] as const)(
+  'retains individual request floors for parallel final observations: %s',
+  async (mode) => {
+    const v = (f = await pairOrderFixture()),
+      original = v.rpc.getMockImplementation()!;
+    let afterSimulation = false,
+      releaseMint = () => {};
+    const walletReturned = new Promise<void>((resolve) => {
+      releaseMint = resolve;
+    });
+    v.orderState.onSimulation = () => {
+      afterSimulation = true;
+    };
+    v.rpc.mockImplementation(async (method, params) => {
+      const result = await original(method, params);
+      if (afterSimulation && method === 'getMultipleAccounts') {
+        const keys = params[0] as string[],
+          config = params[1] as { minContextSlot: number };
+        if (keys[0] === v.wallet) {
+          (result as { context: { slot: string } }).context.slot = String(
+            config.minContextSlot +
+              (mode === 'too-old' ? 33 : mode === 'below-floor' ? -1 : 2),
+          );
+          releaseMint();
+        }
+        if (keys.includes(PAIR_CLOCK)) {
+          await walletReturned;
+          await Promise.resolve();
+        }
+      }
+      return result;
+    });
+    if (mode === 'valid') {
+      const result = await run(v);
+      expect(
+        result.review.maximumSlot - result.review.minimumSlot,
+      ).toBeLessThanOrEqual(32);
+      expect(result.economicSimulationVerified).toBe(true);
+    } else await expect(run(v)).rejects.toMatchObject({ status: 409 });
+  },
+);
 function addWritable(m: Message, key: string) {
   m.staticAccounts.splice(3, 0, address(key));
   m.instructions = m.instructions.map((i) => ({

@@ -19,8 +19,14 @@ import { collectPairOrderReview } from './pair-order-collector';
 import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import { requireConsistentSolanaSlots } from './solana-rpc';
+import { reviewUnsignedSwapEnvelope } from './unsigned-swap-order';
+import { assessJupiterRoute } from './jupiter-route-assessment';
+import { discoverPairAuxiliaryAccounts } from './pair-order-auxiliary';
 import type { prepareOwnedImportedPairOrder } from './imported-pair-order-candidate';
-type Candidate = Awaited<ReturnType<typeof prepareOwnedImportedPairOrder>>;
+type Candidate = Pick<
+  Awaited<ReturnType<typeof prepareOwnedImportedPairOrder>>,
+  'preflight' | 'order'
+>;
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
 const COMPUTE = 'ComputeBudget111111111111111111111111111111',
   NATIVE = 'NativeLoader1111111111111111111111111111111';
@@ -33,7 +39,11 @@ export async function collectPairRuntimePreview(
   now: () => number = Date.now,
 ) {
   const started = now(),
-    slots = [candidate.review.minimumSlot, candidate.review.maximumSlot],
+    slots = [
+      candidate.preflight.quote.pair.mintPolicy.slot,
+      candidate.preflight.quote.pair.mintPolicy.recheckSlot,
+      candidate.preflight.evidence.slot,
+    ],
     floor = () => Math.max(...slots);
   const fresh = () => {
     signal.throwIfAborted();
@@ -41,13 +51,17 @@ export async function collectPairRuntimePreview(
     if (
       !Number.isFinite(time) ||
       time < started - 1000 ||
-      time >= Date.parse(candidate.review.expiresAt)
+      time >=
+        Math.min(
+          Date.parse(candidate.preflight.expiresAt),
+          Date.parse(candidate.order.expiresAt),
+        )
     )
       throw Error('Pair runtime preview expired.');
   };
-  const context = (raw: unknown) => {
+  const context = (raw: unknown, requestedFloor = floor()) => {
     const slot = Number(pumpUnsignedInteger(raw));
-    if (!Number.isSafeInteger(slot) || slot < floor())
+    if (!Number.isSafeInteger(slot) || slot < requestedFloor)
       throw Error('Pair runtime context moved backwards.');
     slots.push(slot);
     requireConsistentSolanaSlots(slots);
@@ -80,6 +94,16 @@ export async function collectPairRuntimePreview(
     return result;
   };
   fresh();
+  const envelope = await reviewUnsignedSwapEnvelope(
+    candidate.order.preparation.transaction,
+    candidate.preflight.wallet,
+  );
+  if (
+    envelope.sha256 !== candidate.order.preparation.sha256 ||
+    envelope.accountCount !== candidate.order.preparation.accountCount ||
+    envelope.lookupTableCount !== candidate.order.preparation.lookupTableCount
+  )
+    throw Error('Pair runtime packet fingerprint differs.');
   const message = getCompiledTransactionMessageDecoder().decode(
     getTransactionDecoder().decode(
       getBase64Encoder().encode(candidate.order.preparation.transaction),
@@ -92,21 +116,42 @@ export async function collectPairRuntimePreview(
     ...(lookups?.writable ?? []),
     ...(lookups?.readonly ?? []),
   ];
-  if (new Set(keys).size !== keys.length || keys.length > 256)
+  if (
+    message.version !== 0 ||
+    new Set(keys).size !== keys.length ||
+    keys.length !== envelope.accountCount ||
+    keys.length > 256
+  )
     throw Error('Pair runtime account scope differs.');
-  const writable = candidate.review.writableAccounts;
+  const writable = keys.filter((_key, i) =>
+    i < message.staticAccounts.length
+      ? i < message.header.numSignerAccounts
+        ? i <
+          message.header.numSignerAccounts -
+            message.header.numReadonlySignerAccounts
+        : i <
+          message.staticAccounts.length -
+            message.header.numReadonlyNonSignerAccounts
+      : i < message.staticAccounts.length + (lookups?.writable.length ?? 0),
+  );
+  if (writable.length > 100 || !writable.includes(candidate.preflight.wallet))
+    throw Error('Pair runtime writable scope differs.');
   const top = reviewSwapInstructions(message, lookups ?? undefined);
+  const route = assessJupiterRoute(top, candidate.order);
+  if (route.status !== 'Matched fields' || !route.decoded)
+    throw Error('Pair runtime route fields differ.');
   async function read(keys: string[], sliced: boolean) {
+    const requestedFloor = floor();
     const response = (await call('getMultipleAccounts', [
       keys,
       {
         encoding: 'base64',
         commitment: 'confirmed',
-        minContextSlot: floor(),
-        ...(sliced ? { dataSlice: { offset: 0, length: 45 } } : {}),
+        minContextSlot: requestedFloor,
+        ...(sliced ? { dataSlice: { offset: 0, length: 166 } } : {}),
       },
     ])) as { context?: { slot?: unknown }; value?: unknown[] };
-    context(response?.context?.slot);
+    context(response?.context?.slot, requestedFloor);
     if (!Array.isArray(response.value) || response.value.length !== keys.length)
       throw Error('Pair runtime account snapshot is incomplete.');
     return response.value.map((raw) => {
@@ -138,15 +183,36 @@ export async function collectPairRuntimePreview(
       top.instructions.some((ix) => !programs.includes(ix.program.address))
     )
       throw Error('Pair runtime executable coverage differs.');
-    return { programs, compute: accounts[keys.indexOf(COMPUTE)] };
+    return { programs, compute: accounts[keys.indexOf(COMPUTE)], accounts };
   }
   const selected = [
     candidate.preflight.wallet,
-    ...candidate.review.assessment.accounts.map((a) => a.address),
-    ...candidate.review.assessment.auxiliaryAccounts.map((a) => a.address),
+    route.decoded.sourceAccount,
+    route.decoded.destinationAccount,
   ];
-  const beforeAccounts = await read(selected, false);
+  if (
+    new Set(selected).size !== 3 ||
+    selected.some((key) => !writable.includes(key))
+  )
+    throw Error('Pair runtime selected privileges differ.');
   const beforeInventory = await inventory();
+  // Reuse the bounded account inventory for intermediate discovery.
+  const auxiliary = discoverPairAuxiliaryAccounts(
+    candidate.preflight.wallet,
+    selected,
+    [
+      candidate.preflight.quote.pair.base.address,
+      candidate.preflight.quote.pair.quote.address,
+    ],
+    top,
+    keys.flatMap((key, i) =>
+      writable.includes(key) && !selected.includes(key)
+        ? [{ address: key, raw: beforeInventory.accounts[i] }]
+        : [],
+    ),
+  );
+  selected.push(...auxiliary.map((a) => a.address));
+  const beforeAccounts = await read(selected, false);
   async function identities(evidence: Awaited<ReturnType<typeof inventory>>) {
     const programs = evidence.programs.filter((p) => p !== COMPUTE);
     const code = await collectPumpProgramIdentities(
@@ -154,6 +220,7 @@ export async function collectPairRuntimePreview(
       floor(),
       signal,
       (method, params) => codeCall(method, params),
+      4,
     );
     context(String(code.maximumSlot));
     const result = code.programs.map((p) => ({
@@ -199,6 +266,12 @@ export async function collectPairRuntimePreview(
   );
   context(String(review.maximumSlot));
   if (
+    JSON.stringify(
+      review.assessment.auxiliaryAccounts.map((a) => a.address),
+    ) !== JSON.stringify(auxiliary.map((a) => a.address))
+  )
+    throw Error('Pair runtime intermediate custody scope changed.');
+  if (
     !review.runtimeTrace ||
     review.runtimeTrace.programs.some(
       (p) => !beforeInventory.programs.includes(p),
@@ -218,7 +291,20 @@ export async function collectPairRuntimePreview(
     throw Error(
       'Pair program code or upgrade authority changed around simulation.',
     );
-  const afterAccounts = await read(selected, false);
+  const afterFloor = floor();
+  const [afterAccounts, recheck, rawValidity, rawHeight, genesis] =
+    await Promise.all([
+      read(selected, false),
+      lookups
+        ? readSwapLookupAccounts(message, afterFloor, call)
+        : Promise.resolve(null),
+      call('isBlockhashValid', [
+        message.lifetimeToken,
+        { commitment: 'confirmed', minContextSlot: afterFloor },
+      ]),
+      call('getBlockHeight', [{ commitment: 'confirmed' }]),
+      call('getGenesisHash', []),
+    ]);
   const stateIdentity = (accounts: typeof beforeAccounts) =>
     accounts.map((a) => a && [a.owner, a.executable, a.lamports, a.data]);
   if (
@@ -227,23 +313,20 @@ export async function collectPairRuntimePreview(
   )
     throw Error('Pair runtime wallet custody or balances changed.');
   if (lookups) {
-    const recheck = await readSwapLookupAccounts(message, floor(), call);
     assertSameSwapLookups(lookups, recheck, null);
-    context(String(recheck!.observedSlot));
+    context(String(recheck!.observedSlot), afterFloor);
   }
-  const valid = (await call('isBlockhashValid', [
-    message.lifetimeToken,
-    { commitment: 'confirmed', minContextSlot: floor() },
-  ])) as { context?: { slot?: unknown }; value?: unknown };
-  context(valid?.context?.slot);
-  const height = pumpUnsignedInteger(
-    await call('getBlockHeight', [{ commitment: 'confirmed' }]),
-  );
+  const valid = rawValidity as {
+    context?: { slot?: unknown };
+    value?: unknown;
+  };
+  context(valid?.context?.slot, afterFloor);
+  const height = pumpUnsignedInteger(rawHeight);
   if (
     valid.value !== true ||
     height < BigInt(review.recheckBlockHeight) ||
     height + 10n > BigInt(review.lastValidBlockHeight) ||
-    (await call('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS
+    genesis !== SOLANA_MAINNET_GENESIS
   )
     throw Error('Pair runtime lifetime or network changed.');
   fresh();

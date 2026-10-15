@@ -1,0 +1,35 @@
+# Stock-pair runtime scheduling
+
+15 October 2026, with final verification on 16 October. Local continuation after ba3532e. Production remains d62300e. The user relayed Claude's signed-in Chrome checks of that release: ROADSTER import, market refresh, desktop/mobile stats, group API and 375px layout passed. Those are Claude's observations, not a new browser check by this increment.
+
+## Pipeline changes
+
+The owned runtime service previously created a completely reviewed and simulated candidate, then repeated the entire review and simulation inside the code observations. A shared owned preparation lifecycle now prepares the unsigned order once and runs its inspector before publication. The normal candidate endpoint retains its full review. The runtime endpoint performs exactly one complete static/economic review and traced simulation, bracketed by two complete code observations. Authentication, explicit inspection intent, saved context checks before/after, fresh quote parsing, cancellation and no approval/reservation/signing remain enforced.
+
+Runtime message fingerprint, resolved keys, writable privileges and route fields are checked directly. One bounded 166-byte inventory now discovers both all reachable executables and protected intermediate accounts. Full selected/intermediate account reads still bracket the code observations. The complete collector independently checks custody, raw units, rent, fees, mint policy, original blockhash, height, network and all reported inner programs before returning evidence.
+
+Independent rent reads run in parallel and duplicate rent sizes are read once per stage. Before-state account/mint reads run together only after intermediate discovery; all finish before simulation. Post-simulation account, mint, lookup, blockhash, height and network checks run together after the exact original-packet simulation. Final runtime checks run together after the second complete code collection. Each response must satisfy its own captured request floor; independent responses can arrive out of order, but all observation slots still contribute to the unchanged 32-slot bound. Sequential dependent stages use the maximum preceding observed slot.
+
+The shared full-code collector supports an explicit four-read code-slice profile for pair runtime inspection. Only independently addressed slices with declared sizes use that profile. Unknown-size short-chunk reads remain serial. Headers, links, authority, owner, lamports, declared lengths, per-program/total byte limits, read/deadline budgets and exact ordered hashing still apply. Independent network/header reads are grouped. Every response must satisfy its captured request floor and the existing 32-slot limit. No code cache or partial hash replaces the two complete vectors. Same-slot rewrites remain a limitation; these are identity observations, not a semantic audit or trusted policy.
+
+## Live qualification remains incomplete
+
+The read-only probes used isolated local SQL and historical public transaction references, existing server configuration, allowlisted mainnet reads and unsigned Jupiter GET requests. No real user wallet was unlocked and no signature, submission, remote SQL, provider change or funded trade occurred.
+
+The earlier single-simulation probe stopped after its first code observation. A later public reference changed balances/custody/rent during preflight and was refused. Public-reference runs with diagnostics then reported a pair-policy guard; comparison showed identical mint policy hashes and multipliers, but observation spans of 33 and 34 slots. The failures were freshness failures, not observed issuer-policy changes. No full fresh runtime preview passed in these probes, and the latest probe did not reach simulation.
+
+Transport timing shows reads starting about 200 ms apart even when requested in parallel. The existing optional wallet RPC pacing queues them, and this increment preserves that configured pacing. Parallel scheduling does not bypass it. Further reducing actual RPC calls by combining compatible account/mint/Clock snapshots is the next available optimization. Keep the 32-slot limit; do not relabel old evidence as fresh or turn these refusals into signing permission. The same limit also applies across the full quote/preflight/runtime sequence.
+
+Ignored live receipts are work/pair-runtime-fast[-v2/-v3/-v4/-v5]-live-transaction*. The diagnostic helper locally instruments only error/comparison recording; production exceptions remain sanitized. Its captured packets are expired and cannot be used for signing.
+
+## Verification and next steps
+
+The focused controlled run passed 183 tests in six files. New cases prove one simulation between both code observations, refusal beyond 32 slots, bounded concurrent code slices with out-of-order responses, exact full-byte hashing, truncation/cancellation rejection, serial unknown-size fallback, and final responses below their requested floor or beyond the slot bound. Synthetic code fixtures are not audited executable programs.
+
+The final frozen-source combined run passed 720 tests in 31 selected files, in 239.44 seconds. Production Next webpack build, subsequent standalone TypeScript, ten-file typed lint and whitespace checks passed. All 1,275 implementation/configuration/style hashes remained unchanged during that final run. An initial build found a missing TypeScript null guard in the expanded test fixture; it was corrected, then build and the combined run were repeated on the final files. The complete repository-wide suite was not run. Ignored receipts are work/pair-runtime-fast-{tests,build,types,lint}.log, the selected-file list and source-freeze manifest.
+
+The additional complete current pump-group / pump-launch-group selection passed 243 tests in 25 files together, including both browser-component suites, in 606.33 seconds. This selection overlaps the 31-file run; these counts are not a sum of unique tests. It covers full review/approval, signing and seed-access guards, one-attempt broadcast/races/unknown outcomes, terminal and chain-effects recovery, trace, accounting, code identity and runtime authorization with controlled providers and synthetic signatures. No file changed during this run. Receipts are work/pair-runtime-fast-group-tests.log and its selected-file list. No live wallet or funded trade was tested.
+
+Once runtime qualification passes, build separate initially unchecked approval, currency-aware durable reservations, browser-only signing, one send attempt and finalized-receipt recovery. Do not perform a funded mainnet test without user approval of that specific trade. Trade UI belongs in Codex's buy/sell review and trade-wallet components. Any slot change to components/imported-token-market.tsx, app/page.tsx or the token layout must first be supplied as an exact patch for Claude/user approval. No UI file is changed here.
+
+No migration/remote SQL, provider or credential setting, cron, push or deployment belongs to this increment. Preserve main's two unrelated dirty files. The broad Proxima objective remains incomplete.

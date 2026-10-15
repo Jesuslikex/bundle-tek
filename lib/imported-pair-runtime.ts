@@ -7,7 +7,7 @@ import {
 } from './imported-pair-quote-service';
 import {
   importedPairOrderRequest,
-  prepareOwnedImportedPairOrder,
+  inspectOwnedImportedPairOrder,
   type ImportedPairOrderDependencies,
   type ImportedPairOrderRequest,
 } from './imported-pair-order-candidate';
@@ -91,20 +91,23 @@ export async function previewOwnedImportedPairRuntime(
         }
       };
     const { inspectRuntime: _intent, ...orderRequest } = input;
-    const candidate = await prepareOwnedImportedPairOrder(
+    const inspected = await inspectOwnedImportedPairOrder(
       db,
       owner,
       orderRequest,
       signal,
       provider,
+      (preflight, order, rpc, now) =>
+        collectPairRuntimePreview(
+          { preflight, order },
+          rpc,
+          checked(provider.programRpc ?? provider.rpc),
+          signal,
+          now,
+        ),
     );
-    const preview = await collectPairRuntimePreview(
-      candidate,
-      checked(provider.rpc),
-      checked(provider.programRpc ?? provider.rpc),
-      signal,
-      provider.now ?? Date.now,
-    );
+    const preview = inspected.review;
+    const candidate = { ...inspected, review: preview.review };
     signal.throwIfAborted();
     const current = await read();
     signal.throwIfAborted();

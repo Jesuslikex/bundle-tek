@@ -373,17 +373,21 @@ export async function readPairWalletEvidence(
         .map((a) => a.byteLength || a.expectedByteLength),
     ]),
   ];
-  const rents = new Map<number, string>();
-  for (const size of sizes) {
-    const rent = pairWalletUint(
-      await rpc('getMinimumBalanceForRentExemption', [
-        size,
-        { commitment: 'confirmed' },
-      ]),
-    );
-    if (rent < 1n) throw new Error('Pair wallet rent minimum is unavailable.');
-    rents.set(size, rent.toString());
-  }
+  const rents = new Map(
+    await Promise.all(
+      sizes.map(async (size) => {
+        const rent = pairWalletUint(
+          await rpc('getMinimumBalanceForRentExemption', [
+            size,
+            { commitment: 'confirmed' },
+          ]),
+        );
+        if (rent < 1n)
+          throw new Error('Pair wallet rent minimum is unavailable.');
+        return [size, rent.toString()] as const;
+      }),
+    ),
+  );
   for (const a of accounts) {
     a.rentMinimumRaw = rents.get(
       a.kind === 'native-sol' ? 0 : a.byteLength || a.expectedByteLength,

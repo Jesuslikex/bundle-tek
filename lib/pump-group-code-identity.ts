@@ -34,13 +34,15 @@ export async function collectPumpProgramIdentities(
   minimumSlot: number,
   signal: AbortSignal,
   rpc: PumpLaunchRpc,
+  maxConcurrentCodeReads: 1 | 4 = 1,
 ) {
   if (
     !programs.length ||
     programs.length > 16 ||
     new Set(programs).size !== programs.length ||
     !Number.isSafeInteger(minimumSlot) ||
-    minimumSlot < 0
+    minimumSlot < 0 ||
+    ![1, 4].includes(maxConcurrentCodeReads)
   )
     throw new Error('Program identity scope differs.');
   programs.forEach(address);
@@ -73,19 +75,20 @@ export async function collectPumpProgramIdentities(
     });
   }
   async function accounts(keys: string[], offset: number, length: number) {
+    const requestedFloor = Math.max(...slots);
     const value = (await call('getMultipleAccounts', [
       keys,
       {
         encoding: 'base64',
         commitment: 'confirmed',
-        minContextSlot: Math.max(...slots),
+        minContextSlot: requestedFloor,
         dataSlice: { offset, length },
       },
     ])) as { context?: { slot?: unknown }; value?: unknown[] };
     const slot = Number(pumpUnsignedInteger(value?.context?.slot));
     if (
       !Number.isSafeInteger(slot) ||
-      slot < Math.max(...slots) ||
+      slot < requestedFloor ||
       slot - minimumSlot > 32 ||
       !Array.isArray(value.value) ||
       value.value.length !== keys.length
@@ -102,9 +105,12 @@ export async function collectPumpProgramIdentities(
         : account;
     });
   }
-  if ((await call('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+  const [genesis, executable] = await Promise.all([
+    call('getGenesisHash', []),
+    accounts(programs, 0, 45),
+  ]);
+  if (genesis !== SOLANA_MAINNET_GENESIS)
     throw new Error('Program identity requires mainnet.');
-  const executable = await accounts(programs, 0, 45);
   const links = executable.map((account, i) => {
     if (!account) throw new Error('Program identity is missing.');
     return pumpGroupProgramDataLink(programs[i], account);
@@ -163,39 +169,65 @@ export async function collectPumpProgramIdentities(
         720 * 1024,
         Math.floor(1048576 / active.length / 4096) * 4096,
       );
-      const parts = await accounts(
-        active.map((item) => item.dataKey),
-        start + offset,
-        chunkSize,
+      // Known declared sizes let independent slices run in a bounded batch.
+      // Unknown-size accounts keep the serial short-chunk termination profile.
+      const batches = active.every((item) => item.space !== null)
+        ? Math.min(
+            maxConcurrentCodeReads,
+            Math.ceil(
+              Math.max(...active.map((item) => item.space! - start - offset)) /
+                chunkSize,
+            ),
+          )
+        : 1;
+      const plan = Array.from({ length: batches }, (_, i) => ({
+        offset: offset + i * chunkSize,
+        items: active.filter(
+          (item) =>
+            item.space === null || offset + i * chunkSize < item.space - start,
+        ),
+      }));
+      const responses = await Promise.all(
+        plan.map((batch) =>
+          accounts(
+            batch.items.map((item) => item.dataKey),
+            start + batch.offset,
+            chunkSize,
+          ),
+        ),
       );
-      for (const [i, item] of active.entries()) {
-        const part = parts[i];
-        if (
-          !part ||
-          part.owner !== item.header.owner ||
-          part.executable !== item.header.executable ||
-          part.lamports !== item.header.lamports ||
-          String((part as typeof part & { space?: unknown }).space) !==
-            String(item.declared)
-        )
-          throw new Error('Program identity changed during code read.');
-        const chunk = pumpAccountBytes(part);
-        if (
-          chunk.length > chunkSize ||
-          (item.space !== null &&
-            chunk.length !== Math.min(chunkSize, item.space - start - offset))
-        )
-          throw new Error('Truncated program code.');
-        item.size += chunk.length;
-        totalBytes += chunk.length;
-        if (item.size > 10 * 1024 * 1024 || totalBytes > 32 * 1024 * 1024)
-          throw new Error('Program code size exceeds bounds.');
-        code.get(item.key)!.push(chunk);
-        item.done =
-          chunk.length < chunkSize ||
-          (item.space !== null && item.size === item.space - start);
+      for (const [batchIndex, batch] of plan.entries()) {
+        const parts = responses[batchIndex];
+        for (const [i, item] of batch.items.entries()) {
+          const part = parts[i];
+          if (
+            !part ||
+            part.owner !== item.header.owner ||
+            part.executable !== item.header.executable ||
+            part.lamports !== item.header.lamports ||
+            String((part as typeof part & { space?: unknown }).space) !==
+              String(item.declared)
+          )
+            throw new Error('Program identity changed during code read.');
+          const chunk = pumpAccountBytes(part);
+          if (
+            chunk.length > chunkSize ||
+            (item.space !== null &&
+              chunk.length !==
+                Math.min(chunkSize, item.space - start - batch.offset))
+          )
+            throw new Error('Truncated program code.');
+          item.size += chunk.length;
+          totalBytes += chunk.length;
+          if (item.size > 10 * 1024 * 1024 || totalBytes > 32 * 1024 * 1024)
+            throw new Error('Program code size exceeds bounds.');
+          code.get(item.key)!.push(chunk);
+          item.done =
+            chunk.length < chunkSize ||
+            (item.space !== null && item.size === item.space - start);
+        }
       }
-      offset += chunkSize;
+      offset += chunkSize * batches;
     }
   }
   const identities: PumpProgramIdentity[] = [];
@@ -253,7 +285,11 @@ export async function collectPumpProgramIdentities(
       identityKind: 'elf-code',
     });
   }
-  const repeated = await accounts(programs, 0, 45);
+  const [repeated, repeatedHeaders, finalGenesis] = await Promise.all([
+    accounts(programs, 0, 45),
+    linked.length ? accounts(linked, 0, 45) : Promise.resolve([]),
+    call('getGenesisHash', []),
+  ]);
   for (const [i, account] of repeated.entries())
     if (
       (await pumpDeploymentHash(account)) !==
@@ -261,7 +297,6 @@ export async function collectPumpProgramIdentities(
     )
       throw new Error('Program link or owner changed after code collection.');
   if (linked.length) {
-    const repeatedHeaders = await accounts(linked, 0, 45);
     for (const [i, key] of linked.entries())
       if (
         (await pumpDeploymentHash(repeatedHeaders[i])) !==
@@ -271,7 +306,7 @@ export async function collectPumpProgramIdentities(
           'Program deployment or authority changed after code collection.',
         );
   }
-  if ((await call('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+  if (finalGenesis !== SOLANA_MAINNET_GENESIS)
     throw new Error('Program identity provider network changed.');
   deadline.throwIfAborted();
   return {
