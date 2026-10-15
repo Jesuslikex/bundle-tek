@@ -9,6 +9,7 @@ import {
 } from './pair-wallet-evidence';
 import { importedTokenDocument } from './imported-token-project';
 import { pairQuoteMint } from '../test/imported-pair-quote-fixture';
+import { pairQuoteClock } from '../test/imported-pair-quote-fixture';
 import {
   prepareOwnedImportedPairOrder,
   importedPairOrderRequest,
@@ -67,6 +68,13 @@ it.each(['valid', 'below-floor', 'too-old'] as const)(
               (mode === 'too-old' ? 33 : mode === 'below-floor' ? -1 : 2),
           );
           releaseMint();
+          if (keys.includes(PAIR_CLOCK)) {
+            const r = result as { context: { slot: string }; value: unknown[] };
+            r.value[keys.indexOf(PAIR_CLOCK)] = pairQuoteClock(
+              Number(r.context.slot),
+              String(Math.floor(v.clock.now / 1000)),
+            );
+          }
         }
         if (keys.includes(PAIR_CLOCK)) {
           await walletReturned;
@@ -154,6 +162,17 @@ it.each([
       },
     ]);
     expect(f.prepare).toHaveBeenCalledOnce();
+    const snapshots = f.rpc.mock.calls.filter(
+      ([method, params]) =>
+        method === 'getMultipleAccounts' &&
+        (params[0] as string[])[0] === f!.wallet &&
+        (params[0] as string[]).includes(PAIR_CLOCK),
+    );
+    expect(snapshots).toHaveLength(4);
+    for (const [, params] of snapshots)
+      expect(params[0]).toEqual(
+        expect.arrayContaining([f.baseMint, f.asset.address]),
+      );
     const url = new URL(f.orderFetcher.mock.calls[0][0] as URL);
     expect(url.searchParams.get('taker')).toBe(f.wallet);
     expect(url.searchParams.get('excludeRouters')).toBe('jupiterz,dflow,okx');

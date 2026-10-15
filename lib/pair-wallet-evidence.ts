@@ -11,6 +11,8 @@ import {
   PAIR_CLOCK,
   PairMintPolicyError,
   pairClockUnixTimestamp,
+  inspectPairMintAccount,
+  assertSamePairMintEvidence,
   type PairMintEvidence,
   type PairMintMetadata,
 } from './pair-mint-evidence';
@@ -288,6 +290,7 @@ export async function readPairWalletEvidence(
   const requested = [
     wallet,
     ...atas.filter((a): a is string => a !== null),
+    ...mints.mints.map((m) => m.address),
     PAIR_CLOCK,
   ];
   if (new Set(requested).size !== requested.length)
@@ -308,6 +311,19 @@ export async function readPairWalletEvidence(
   )
     throw new Error('Pair wallet account context differs.');
   const unix = pairClockUnixTimestamp(result.value.at(-1), Number(s), now);
+  const observedMints: PairMintEvidence = {
+    slot: Number(s),
+    unixTimestamp: unix,
+    mints: await Promise.all(
+      mints.mints.map((m) =>
+        inspectPairMintAccount(
+          result.value![requested.indexOf(m.address)],
+          m.address,
+        ),
+      ),
+    ),
+  };
+  assertSamePairMintEvidence(mints, observedMints);
   if (
     BigInt(unix) < BigInt(mints.unixTimestamp) ||
     BigInt(unix) > BigInt(mints.unixTimestamp) + 30n ||

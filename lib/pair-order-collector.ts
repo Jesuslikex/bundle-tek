@@ -18,12 +18,9 @@ import {
   requiredPairAccountExtensions,
 } from './pair-wallet-evidence';
 import { getTokenSize } from '@solana-program/token-2022';
+import { discoverPairAuxiliaryAccounts } from './pair-order-auxiliary';
+import { readPairOrderState } from './pair-order-state';
 import {
-  discoverPairAuxiliaryAccounts,
-  readPairAuxiliaryMints,
-} from './pair-order-auxiliary';
-import {
-  readPairMintEvidence,
   assertSamePairMintEvidence,
   type PairMintEvidence,
 } from './pair-mint-evidence';
@@ -204,23 +201,15 @@ export async function collectPairOrderReview(
     })),
   };
   const beforeFloor = floor();
-  const [before, mints, auxiliaryMints] = await Promise.all([
-    readAccounts(checkedAccounts, false),
-    readPairMintEvidence(
-      { inputMint: pair.base.address, outputMint: pair.quote.address },
-      beforeFloor,
-      rpc,
-      now(),
-    ),
-    discovered.length
-      ? readPairAuxiliaryMints(
-          [...new Set(discovered.map((a) => a.mint))],
-          beforeFloor,
-          rpc,
-          now,
-        )
-      : Promise.resolve(null),
-  ]);
+  const beforeState = await readPairOrderState(
+    checkedAccounts,
+    [pair.base.address, pair.quote.address],
+    [...new Set(discovered.map((a) => a.mint))],
+    beforeFloor,
+    rpc,
+    now,
+  );
+  const { accounts: before, mints, auxiliaryMints } = beforeState;
   const snapshots = [
     ...before,
     ...other.filter((a) => !checkedAccounts.includes(a.address)),
@@ -352,40 +341,31 @@ export async function collectPairOrderReview(
     ).value.accounts.forEach(assertPairRuntimeWritableAccount);
   fresh();
   const afterFloor = floor();
-  const [
-    after,
-    finalMints,
-    finalAuxiliaryMints,
-    recheck,
-    rawValidity,
-    rawFinalHeight,
-    finalGenesis,
-  ] = await Promise.all([
-    readAccounts(checkedAccounts, false),
-    readPairMintEvidence(
-      { inputMint: pair.base.address, outputMint: pair.quote.address },
-      afterFloor,
-      rpc,
-      now(),
-    ),
-    auxiliaryMints
-      ? readPairAuxiliaryMints(
-          auxiliaryMints.mints.map((m) => m.address),
-          afterFloor,
-          rpc,
-          now,
-        )
-      : Promise.resolve(null),
-    lookups
-      ? readSwapLookupAccounts(message, afterFloor, rpc)
-      : Promise.resolve(null),
-    rpc('isBlockhashValid', [
-      message.lifetimeToken,
-      { commitment: 'confirmed', minContextSlot: afterFloor },
-    ]),
-    rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
-    rpc('getGenesisHash', []),
-  ]);
+  const [afterState, recheck, rawValidity, rawFinalHeight, finalGenesis] =
+    await Promise.all([
+      readPairOrderState(
+        checkedAccounts,
+        [pair.base.address, pair.quote.address],
+        auxiliaryMints?.mints.map((m) => m.address) ?? [],
+        afterFloor,
+        rpc,
+        now,
+      ),
+      lookups
+        ? readSwapLookupAccounts(message, afterFloor, rpc)
+        : Promise.resolve(null),
+      rpc('isBlockhashValid', [
+        message.lifetimeToken,
+        { commitment: 'confirmed', minContextSlot: afterFloor },
+      ]),
+      rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
+      rpc('getGenesisHash', []),
+    ]);
+  const {
+    accounts: after,
+    mints: finalMints,
+    auxiliaryMints: finalAuxiliaryMints,
+  } = afterState;
   const identity = (a: PairOrderAccountSnapshot) => {
     if (a.raw === null) return [a.address, null];
     const r = a.raw as {

@@ -126,12 +126,17 @@ export async function pairWalletFixture(side: 'Buy' | 'Sell' = 'Buy') {
       const slot = (params[1] as { minContextSlot: number }).minContextSlot + 1;
       return {
         context: { slot: String(slot) },
-        value: (params[0] as string[]).map((a) =>
+        value: (params[0] as string[]).map((a, i, keys) =>
           a === wallet
             ? structuredClone(state.walletAccount)
             : a === PAIR_CLOCK
               ? pairQuoteClock(slot, String(Math.floor(clock.now / 1000)))
-              : structuredClone(accounts[atas.indexOf(a)] ?? null),
+              : keys.at(-1) === PAIR_CLOCK &&
+                  keys.length >= 5 &&
+                  i >= keys.length - 3 &&
+                  i < keys.length - 1
+                ? structuredClone(f.mints[i - (keys.length - 3)])
+                : structuredClone(accounts[atas.indexOf(a)] ?? null),
         ),
       };
     }

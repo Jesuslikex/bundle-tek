@@ -21,6 +21,31 @@ afterEach(() => {
 });
 const read = (v: NonNullable<typeof f>) =>
   readPairWalletEvidence(v.mintEvidence, v.wallet, v.rpc, v.clock.now);
+it.each(['policy', 'missing-mint'] as const)(
+  'checks fresh %s in the same bank as the wallet accounts',
+  async (mode) => {
+    const v = (f = await pairWalletFixture());
+    if (mode === 'policy') v.mints[0] = pairQuoteMint(7, v.mints[0].owner);
+    else {
+      const original = v.rpc.getMockImplementation()!;
+      v.rpc.mockImplementation(async (method, params) => {
+        const response = await original(method, params);
+        if (
+          method === 'getMultipleAccounts' &&
+          (params[0] as string[])[0] === v.wallet
+        ) {
+          const r = response as { value: unknown[] };
+          r.value[(params[0] as string[]).indexOf(v.baseMint)] = null;
+        }
+        return response;
+      });
+    }
+    await expect(read(v)).rejects.toThrow();
+    expect(
+      v.rpc.mock.calls.filter(([method]) => method === 'getMultipleAccounts'),
+    ).toHaveLength(1);
+  },
+);
 function mutate(
   v: NonNullable<typeof f>,
   index: number,

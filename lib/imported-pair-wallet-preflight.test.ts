@@ -62,6 +62,17 @@ it.each(['Buy', 'Sell'] as const)(
     });
     expect(result.contextSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(f.state.walletReads).toBe(2);
+    const snapshots = f.rpc.mock.calls.filter(
+      ([method]) => method === 'getMultipleAccounts',
+    );
+    expect(snapshots).toHaveLength(4);
+    for (const [, params] of snapshots.filter(
+      ([, params]) => (params[0] as string[])[0] === f!.wallet,
+    )) {
+      expect(params[0]).toEqual(
+        expect.arrayContaining([f.baseMint, f.asset.address]),
+      );
+    }
     for (const [input] of f.fetcher.mock.calls) {
       const url = new URL(
         typeof input === 'string' || input instanceof URL ? input : input.url,
@@ -124,25 +135,14 @@ it.each([
           "UPDATE imported_token_projects SET document=json_set(document,'$.token.symbol','CHANGED')",
         )
         .run();
+    if (mode === 'mint-policy') {
+      const bytes = Uint8Array.from(atob(fixture.mints[0].data[0]), (c) =>
+        c.charCodeAt(0),
+      );
+      bytes[44] = 7;
+      fixture.mints[0].data[0] = btoa(String.fromCharCode(...bytes));
+    }
   };
-  if (mode === 'mint-policy') {
-    const original = fixture.rpc.getMockImplementation()!;
-    let mintReads = 0;
-    fixture.rpc.mockImplementation(async (method, params) => {
-      if (
-        method === 'getMultipleAccounts' &&
-        (params[0] as string[])[0] === fixture.baseMint &&
-        ++mintReads === 4
-      ) {
-        const bytes = Uint8Array.from(atob(fixture.mints[0].data[0]), (c) =>
-          c.charCodeAt(0),
-        );
-        bytes[44] = 7;
-        fixture.mints[0].data[0] = btoa(String.fromCharCode(...bytes));
-      }
-      return original(method, params);
-    });
-  }
   await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
 });
 it('reports destination creation rent and insufficient source funds without pretending an order exists', async () => {

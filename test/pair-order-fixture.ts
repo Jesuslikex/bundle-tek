@@ -60,6 +60,7 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
       };
     if (
       method === 'getMultipleAccounts' &&
+      !(params[0] as string[]).includes(f.wallet) &&
       (params[0] as string[]).includes(PAIR_CLOCK) &&
       (params[0] as string[]).some((key) => state.auxiliaryMints.has(key))
     ) {
@@ -230,9 +231,15 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
     ) {
       const response = result as { value: unknown[] };
       response.value = (params[0] as string[]).map((key, i) =>
-        state.otherAccounts.has(key)
-          ? structuredClone(state.otherAccounts.get(key))
-          : response.value[i],
+        key === currentInput?.baseMint
+          ? structuredClone(f.mints[0])
+          : key === currentInput?.quoteMint
+            ? structuredClone(f.mints[1])
+            : state.auxiliaryMints.has(key)
+              ? structuredClone(state.auxiliaryMints.get(key))
+              : state.otherAccounts.has(key)
+                ? structuredClone(state.otherAccounts.get(key))
+                : response.value[i],
       );
     }
     return result;

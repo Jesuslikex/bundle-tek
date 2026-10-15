@@ -9,8 +9,6 @@ import {
 import { walletAddress } from './wallet-workspace';
 import { parseImportedPairQuote } from './imported-trade-pair';
 import {
-  readPairMintEvidence,
-  assertSamePairMintEvidence,
   PairMintPolicyError,
   type PairMintEvidence,
 } from './pair-mint-evidence';
@@ -138,32 +136,14 @@ export async function preflightOwnedImportedPairWallet(
           i === 0 ? pair.mintPolicy.baseSha256 : pair.mintPolicy.quoteSha256,
       })),
     };
-    const scope = {
-      inputMint: pair.base.address,
-      outputMint: pair.quote.address,
-    };
-    const beforeMints = await readPairMintEvidence(
-      scope,
-      quoted.slot,
-      checked,
-      now(),
-    );
-    assertSamePairMintEvidence(quoted, beforeMints);
     const before = await readPairWalletEvidence(
-      beforeMints,
+      quoted,
       input.wallet,
       checked,
       now(),
     );
-    const afterMints = await readPairMintEvidence(
-      scope,
-      before.slot,
-      checked,
-      now(),
-    );
-    assertSamePairMintEvidence(beforeMints, afterMints);
     const after = await readPairWalletEvidence(
-      afterMints,
+      { ...quoted, slot: before.slot, unixTimestamp: before.unixTimestamp },
       input.wallet,
       checked,
       now(),
@@ -171,9 +151,8 @@ export async function preflightOwnedImportedPairWallet(
     assertStablePairWalletEvidence(before, after);
     requireConsistentSolanaSlots([
       quoted.slot,
-      beforeMints.slot,
+      pair.mintPolicy.slot,
       before.slot,
-      afterMints.slot,
       after.slot,
     ]);
     if ((await checked('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
