@@ -13,7 +13,10 @@ import type { preparePumpLaunchGroupReview } from './pump-launch-group-review-se
 import type { PumpLaunchGroupConsent } from './pump-launch-group-review';
 import type { PumpGroupObservationPosition } from './pump-launch-group-observation-service';
 export type PumpGroupRequest =
-  | { action: 'broadcast-read' | 'broadcast-recover'; id: string }
+  | {
+      action: 'broadcast-read' | 'broadcast-recover' | 'chain-effects';
+      id: string;
+    }
   | {
       action: 'broadcast-prepare';
       id: string;
@@ -88,7 +91,8 @@ export function parsePumpGroupRequest(
     if (!pumpGroupIdValid(value.id)) return fail();
     if (
       value.action === 'broadcast-read' ||
-      value.action === 'broadcast-recover'
+      value.action === 'broadcast-recover' ||
+      value.action === 'chain-effects'
     ) {
       if (!keys(value, ['action', 'id'])) return fail();
       return { action: value.action, id: value.id };

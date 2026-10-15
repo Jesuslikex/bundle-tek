@@ -50,6 +50,13 @@ const mocks = vi.hoisted(() => ({
     group: {},
     broadcast: {},
   })),
+  chainEffects: vi.fn(async (..._args: unknown[]) => ({
+    complete: false,
+    reservationsChanged: false,
+  })),
+}));
+vi.mock('@/lib/pump-group-chain-effects-service', () => ({
+  readOwnedPumpGroupChainEffects: mocks.chainEffects,
 }));
 vi.mock('@/lib/pump-group-broadcast-service', () => ({
   readOwnedPumpGroupBroadcast: mocks.broadcastRead,
@@ -376,6 +383,27 @@ it('retains registration and unsigned cancellation without requiring a configure
   ).toBe(200);
   expect((await send({ action: 'cancel', id })).status).toBe(200);
   expect(mocks.rpc).not.toHaveBeenCalled();
+});
+it('scopes finalized wallet reads to the owner, exact group and read-only provider with an independent action gate', async () => {
+  const result = await send({ action: 'chain-effects', id });
+  expect(result.status).toBe(200);
+  expect(await result.json()).toEqual({
+    complete: false,
+    reservationsChanged: false,
+  });
+  expect(mocks.chainEffects.mock.calls[0].slice(0, 3)).toEqual([
+    mocks.db,
+    'alice',
+    id,
+  ]);
+  expect((await send({ action: 'chain-effects', id })).status).toBe(429);
+  expect(mocks.chainEffects).toHaveBeenCalledOnce();
+  // Ownership is checked by the real route, before the service.
+  mocks.user = { userId: 'bob' };
+  expect((await send({ action: 'chain-effects', id })).status).toBe(404);
+  expect(mocks.chainEffects).toHaveBeenCalledOnce();
+  mocks.user = null;
+  expect((await send({ action: 'chain-effects', id })).status).toBe(401);
 });
 it('bounds a stalled streamed body by its deadline before any action or provider read', async () => {
   const deadline = new AbortController(),

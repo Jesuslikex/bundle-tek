@@ -12,6 +12,7 @@ import { preflightOwnedPumpCreate } from '@/lib/owned-pump-preflight';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 import type { PumpLaunchRpc } from '@/lib/pump-launch-simulation';
 import type { readPumpLaunchGroupReview } from '@/lib/pump-launch-group-review-service';
+import { parsePumpGroupChainEffects } from '@/lib/pump-group-chain-effects';
 const context = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
   db: null as unknown as D1Database,
@@ -156,6 +157,36 @@ it('runs HTTP to owned SQL, complete preparation/approval/signature registration
       };
     throw new Error('Unexpected observation method');
   };
+  const beforeEffects = (
+    await f.client.execute({
+      sql: 'SELECT state,signed,signature,receipt FROM pump_launch_reviews WHERE id=?',
+      args: [id],
+    })
+  ).rows;
+  const effects = await send({ action: 'chain-effects', id });
+  expect(effects.status, await effects.clone().text()).toBe(200);
+  const walletReport = await parsePumpGroupChainEffects(
+    await effects.json(),
+    signedView,
+  );
+  expect(walletReport).toMatchObject({
+    complete: false,
+    knownNetworkFeeRaw: '5000',
+    economicSettlementVerified: false,
+    reservationsChanged: false,
+  });
+  expect(walletReport.packets[0]).toMatchObject({
+    outcome: 'success',
+    effectsAvailable: false,
+  });
+  expect(
+    (
+      await f.client.execute({
+        sql: 'SELECT state,signed,signature,receipt FROM pump_launch_reviews WHERE id=?',
+        args: [id],
+      })
+    ).rows,
+  ).toEqual(beforeEffects);
   const observed = await send({ action: 'observe', id });
   expect(observed.status, await observed.clone().text()).toBe(200);
   expect(

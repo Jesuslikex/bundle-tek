@@ -6,6 +6,8 @@ import { PumpGroupBroadcast } from './pump-group-broadcast';
 import { pumpGroupBroadcastClientFixture } from '../../test/pump-group-broadcast-client-fixture';
 import type { PumpGroupBroadcastState } from '@/lib/pump-group-broadcast';
 import type { PumpGroupTipSignAction } from '@/lib/pump-group-broadcast-client';
+import { collectPumpGroupChainEffects } from '@/lib/pump-group-chain-effects';
+import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 let f: Awaited<ReturnType<typeof pumpGroupBroadcastClientFixture>>,
   root: Root,
   container: HTMLDivElement,
@@ -97,6 +99,93 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+});
+async function unobservedWalletResults() {
+  return collectPumpGroupChainEffects(
+    f.group.review,
+    f.group.signedEvidence!,
+    new AbortController().signal,
+    async (method) => {
+      if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
+      if (method === 'getTransaction') return null;
+      throw new Error('Unexpected effects method');
+    },
+  );
+}
+it('reads finalized wallet results only on request, shows incomplete coverage and never signs or submits', async () => {
+  const report = await unobservedWalletResults();
+  const original = fetcher.getMockImplementation() as (
+    url: string,
+    init: RequestInit,
+  ) => Promise<Response>;
+  fetcher.mockImplementation(async (url: string, init: RequestInit) =>
+    JSON.parse(typeof init.body === 'string' ? init.body : '{}').action ===
+    'chain-effects'
+      ? Response.json(report)
+      : original(url, init),
+  );
+  expect(
+    fetcher.mock.calls.some(([, init]) =>
+      String(init.body).includes('chain-effects'),
+    ),
+  ).toBe(false);
+  await click('Read finalized wallet results');
+  expect(container.textContent).toContain(
+    'Receipt balance coverage incomplete',
+  );
+  expect(container.textContent).toContain('Known created-token subtotal');
+  expect(container.textContent).toContain('No finalized receipt observed');
+  expect(signer).not.toHaveBeenCalled();
+  expect(localStorage.length).toBe(0);
+  expect(
+    fetcher.mock.calls.every(([, init]) =>
+      ['broadcast-read', 'chain-effects'].includes(
+        JSON.parse(String(init.body)).action,
+      ),
+    ),
+  ).toBe(true);
+});
+it('discards a delayed wallet result when the visible launch context changes', async () => {
+  const report = await unobservedWalletResults();
+  const entered = Promise.withResolvers<void>(),
+    pending = Promise.withResolvers<Response>();
+  const original = fetcher.getMockImplementation() as (
+    url: string,
+    init: RequestInit,
+  ) => Promise<Response>;
+  fetcher.mockImplementation(async (url: string, init: RequestInit) => {
+    if (
+      JSON.parse(typeof init.body === 'string' ? init.body : '{}').action !==
+      'chain-effects'
+    )
+      return original(url, init);
+    entered.resolve();
+    return pending.promise;
+  });
+  await act(async () => {
+    button('Read finalized wallet results').click();
+    await entered.promise;
+  });
+  await act(async () =>
+    root.render(
+      <PumpGroupBroadcast
+        group={f.group}
+        contextKey="changed"
+        canSignTip
+        onSignTip={signer}
+        onGroup={vi.fn()}
+      />,
+    ),
+  );
+  await act(async () => pending.resolve(Response.json(report)));
+  await settle();
+  expect(container.textContent).not.toContain(
+    'Receipt balance coverage incomplete',
+  );
+  expect(container.textContent).toContain(
+    'Finalized wallet result context changed',
+  );
+  expect(signer).not.toHaveBeenCalled();
 });
 it('loads history without signing or submission and requires separate unchecked approvals for tip and broadcast', async () => {
   expect(signer).not.toHaveBeenCalled();

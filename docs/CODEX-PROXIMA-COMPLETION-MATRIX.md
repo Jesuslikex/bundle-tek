@@ -2,6 +2,14 @@
 
 Full goal: **make this product like Proxima**. Status: **not complete**. This matrix preserves the full goal rather than defining success around passing local tests or recently added features.
 
+## Current launch-group checkpoint, 15 October 2026
+
+Main includes `71e4ada` (explicit browser tip signing, one-attempt Jito group broadcast and tip-aware recovery) and `1dcdc09` (deterministic registration/UI-context regression tests). The current continuation adds an authenticated, manual finalized-wallet-results path into that launch UI. It reconstructs the exact signed packet group, reads finalized transaction metadata, reports per-wallet SOL/base/quote changes and saved token-target comparisons, preserves unknown/partial coverage, and supports JSON evidence export. It does not change approvals, reservations or history. The full 28-file local group regression passed 264 tests on frozen source. See `CODEX-GROUP-BROADCAST-WORK-20261015.md`, `CODEX-GROUP-TEST-CLOCKS-20261015.md`, and `CODEX-GROUP-WALLET-RESULTS-20261015.md` for exact checks and limits.
+
+REA was reconnected to the existing approved Chrome through its original loopback/stdio relay. A fresh read-only account-page inspection confirms launch statistics and net-P&L presentation, not Proxima's accounting correctness or backend internals. Complete private evidence remains outside Bundle; sanitized evidence IDs and coverage are in the wallet-results handoff.
+
+These are local source checkpoints. Hosted migration state for the newer group changes, release/browser qualification, actual funded delivery, partial-outcome resolution, gross economic reconciliation and audited P&L remain open. The wallet-results report explicitly does not prove current holdings, token authorities, hidden/withheld fees, pool state, transaction order or bundle atomicity. The complete Proxima objective still includes connected launch-to-chart/trading operation, StonkFun and other required launch/chain adapters, complete holder/history coverage, supported strategies and after-close behavior under user approval, marketplace/provider integration and integrated hosted/funded verification. Earlier dated entries below are historical and must not override these newer, narrowly evidenced changes or imply full completion.
+
 The latest combined local application source e33fc8f incorporates Claude's branding/sign-in changes, independent initial-buy simulation f97f9b7 and strict Solana signature checks e207e6f. Twenty-six focused files, 181 tests, type checking, lint and production build pass on that combined source. Nothing deployed; see CODEX-COMBINED-CHECKPOINT-20261014.md. This supersedes earlier wholly missing combined simulation/signature-hardening statements only within their precise source scopes. Owned initial-buy API/approval/signing, buyback split attestation, holder buys, funded proof and broader parity remain required.
 
 ## Atomic Pump developer-buy construction, 14 October 2026

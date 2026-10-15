@@ -26,6 +26,11 @@ import {
 import { canonicalPumpHolderJson } from '@/lib/pump-holder-review';
 import { holderDisplayRaw } from '@/lib/pump-holder-launch-client';
 import styles from './pump-launch-group-ui.module.css';
+import {
+  parsePumpGroupChainEffects,
+  type PumpGroupChainEffects,
+} from '@/lib/pump-group-chain-effects';
+import { PumpGroupChainEffectsPanel } from './pump-group-chain-effects-panel';
 type Props = {
   group: PumpGroupView;
   contextKey: string;
@@ -76,6 +81,10 @@ export function PumpGroupBroadcast({
   const [pending, setPending] = useState<PumpGroupBroadcastTip | null>(null),
     [storageProblem, setStorageProblem] = useState(false);
   const [sendUncertain, setSendUncertain] = useState(false);
+  const [walletResults, setWalletResults] = useState<{
+    contextKey: string;
+    report: PumpGroupChainEffects;
+  } | null>(null);
   const context = useRef(contextKey),
     active = useRef(true),
     running = useRef(false),
@@ -95,6 +104,10 @@ export function PumpGroupBroadcast({
       body: JSON.stringify({ ...body, id: group.review.id }),
     });
     current();
+    if (!response.ok && body.action === 'chain-effects')
+      throw new Error(
+        'Finalized wallet results are unavailable. Retained signatures and reservations were not changed; retry this read after checking saved history.',
+      );
     if (!response.ok)
       throw new Error(
         response.status === 429
@@ -164,7 +177,8 @@ export function PumpGroupBroadcast({
     } catch (e) {
       if (active.current)
         setError(
-          e instanceof Error && /^(Wait five|Group broadcast)/.test(e.message)
+          e instanceof Error &&
+            /^(Wait five|Group broadcast|Finalized wallet)/.test(e.message)
             ? e.message
             : 'Broadcast action did not complete. Keep retained signatures and reload the saved broadcast before continuing.',
         );
@@ -606,6 +620,35 @@ export function PumpGroupBroadcast({
             </output>
           )}
         </>
+      )}
+      {group.signedEvidence && (
+        <PumpGroupChainEffectsPanel
+          disabled={!!locked}
+          report={
+            walletResults?.contextKey === contextKey &&
+            walletResults.report.reviewId === group.review.id &&
+            walletResults.report.signedGroupSha256 ===
+              group.signedEvidence.signedGroupSha256
+              ? walletResults.report
+              : null
+          }
+          onRead={() =>
+            void run(async () => {
+              const selected = context.current;
+              setWalletResults(null);
+              const report = await parsePumpGroupChainEffects(
+                await request({ action: 'chain-effects' }),
+                group,
+              );
+              current();
+              if (selected !== context.current)
+                throw new Error(
+                  'Finalized wallet result context changed. Read the current saved group again.',
+                );
+              setWalletResults({ contextKey: selected, report });
+            })
+          }
+        />
       )}
       {busy && <output>Checking complete broadcast...</output>}
       {notice && <output>{notice}</output>}

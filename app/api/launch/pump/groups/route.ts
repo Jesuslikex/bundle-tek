@@ -33,6 +33,7 @@ import {
   submitOwnedPumpGroupBroadcast,
 } from '@/lib/pump-group-broadcast-service';
 import { recoverOwnedPumpGroupBroadcast } from '@/lib/pump-group-broadcast-recovery';
+import { readOwnedPumpGroupChainEffects } from '@/lib/pump-group-chain-effects-service';
 import type { PumpLaunchRpc } from '@/lib/pump-launch-simulation';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -283,6 +284,16 @@ export async function POST(request: Request) {
         ),
       );
     const rpc = configuredRpc();
+    if (action.action === 'chain-effects')
+      return json(
+        await readOwnedPumpGroupChainEffects(
+          db,
+          user.userId,
+          action.id,
+          signal,
+          rpc,
+        ),
+      );
     if (action.action === 'broadcast-prepare')
       return json(
         await prepareOwnedPumpGroupBroadcast(
