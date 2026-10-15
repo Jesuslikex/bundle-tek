@@ -1,2 +1,3 @@
 # Keep this append-only migration checksum stable across Windows checkouts.
 /drizzle/0081_pump_holder_reservations.sql text eol=lf
+/drizzle/0085_pump_group_observations.sql text eol=lf

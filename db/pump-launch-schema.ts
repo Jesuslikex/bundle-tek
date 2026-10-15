@@ -55,3 +55,29 @@ export const pumpGroupSignatures = sqliteTable(
   },
   (t) => [index('pump_group_signature_owner').on(t.ownerId, t.reviewId)],
 );
+export const pumpGroupObservations = sqliteTable(
+  'pump_group_observations',
+  {
+    id: text('id').primaryKey().notNull(),
+    ownerId: text('owner_id').notNull(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => pumpLaunchReviews.id),
+    contextSha256: text('context_sha256').notNull(),
+    manifestSha256: text('manifest_sha256').notNull(),
+    signedGroupSha256: text('signed_group_sha256'),
+    sourceState: text('source_state').notNull(),
+    observedState: text('observed_state').notNull(),
+    sha256: text('sha256').notNull(),
+    observation: text('observation').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    index('pump_group_observation_owner').on(
+      t.ownerId,
+      t.reviewId,
+      t.createdAt,
+      t.id,
+    ),
+  ],
+);
