@@ -4356,3 +4356,52 @@ body {
   font-size: 13px;
   line-height: 1.6;
 }
+/* Token stats strip: headline market numbers above the chart. */
+.token-stats-strip {
+  margin: 4px 0 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #13141c;
+}
+.token-stats-strip dl {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.token-stats-strip dt {
+  font: 500 11px var(--font-geist-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a90a3;
+}
+.token-stats-strip dd {
+  margin: 4px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #eef0ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.token-stats-strip dd[data-tone='up'] {
+  color: #4fa671;
+}
+.token-stats-strip dd[data-tone='down'] {
+  color: #ed5b5e;
+}
+.token-stats-source {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #8a90a3;
+}
+.token-stats-source[data-stale] {
+  color: #e0b25a;
+}
+@container imported-market (max-width: 560px) {
+  .token-stats-strip dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { ImportedPoolCandles } from './imported-pool-candles';
 import { ImportedPoolTrades } from './imported-pool-trades';
 import { MarketConditionReview } from './market-condition-review';
+import { TokenStatsStrip } from './token-stats-strip';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { ImportedSwapReceipt } from '@/lib/imported-approval-history';
 import { MARKET_CHAINS, type SavedTokenMarket } from '@/lib/token-market';
@@ -240,6 +241,13 @@ export function ImportedTokenMarket({
       aria-label="Imported token market"
     >
       <h3>Market observations</h3>
+      {latest && pair && (
+        <TokenStatsStrip
+          pair={pair}
+          symbol={project.document.token.symbol}
+          observedAt={latest.observedAt}
+        />
+      )}
       <details className="market-data-coverage">
         <summary>Market data coverage and feed behavior</summary>
         <p>
@@ -380,40 +388,12 @@ export function ImportedTokenMarket({
                     View on DEX Screener
                   </a>
                 </p>
-                <div className="live-strip">
-                  <span>
-                    <small>USD price</small>
-                    <strong>
-                      {pair.priceUsd === null
-                        ? 'Unavailable'
-                        : '$' + pair.priceUsd}
-                    </strong>
-                    <em>{pair.dex}</em>
-                  </span>
-                  <span>
-                    <small>Pool liquidity</small>
-                    <strong>{money(pair.liquidityUsd)}</strong>
-                    <em>PROVIDER USD</em>
-                  </span>
-                  <span>
-                    <small>24h volume</small>
-                    <strong>{money(pair.volume24hUsd)}</strong>
-                    <em>SELECTED PAIR</em>
-                  </span>
-                  <span>
-                    <small>24h price change</small>
-                    <strong>
-                      {pair.change24h === null
-                        ? 'Unavailable'
-                        : pair.change24h + '%'}
-                    </strong>
-                    <em>PROVIDER WINDOW</em>
-                  </span>
-                </div>
                 <p>
-                  Reported token market cap: {money(pair.marketCapUsd)}.
-                  Provider valuations and windows can lag. Read time does not
-                  establish when the provider last observed a trade.
+                  Exact USD price: {pair.priceUsd ?? 'unavailable'}. Reported
+                  market cap {money(pair.marketCapUsd)}, liquidity{' '}
+                  {money(pair.liquidityUsd)}. Provider valuations and windows
+                  can lag. Read time does not establish when the provider last
+                  observed a trade.
                 </p>
                 <MarketObservationChart
                   observations={observations}
