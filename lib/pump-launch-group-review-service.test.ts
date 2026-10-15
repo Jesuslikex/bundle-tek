@@ -467,6 +467,7 @@ it('persists and resumes a complete immutable owned review without enabling appr
     approvalRequired: true,
     signingAllowed: false,
     executionAllowed: false,
+    receipt: null,
   });
   f.calls.length = 0;
   expect(await f.prepare()).toEqual(result);
@@ -478,10 +479,17 @@ it('persists and resumes a complete immutable owned review without enabling appr
   await expect(getPumpLaunch(f.db, 'alice', result.review.id)).rejects.toThrow(
     'not found',
   );
+  const stored = await f.db
+    .prepare(
+      'SELECT created_at FROM pump_launch_reviews WHERE owner_id=? AND id=?',
+    )
+    .bind('alice', result.review.id)
+    .first<{ created_at: string }>();
+  expect(stored).not.toBeNull();
   expect(
     (await listPumpLaunchGroupPage(f.db, 'alice', 'group', { before: null }))
       .launches,
-  ).toEqual([result]);
+  ).toEqual([{ ...result, createdAt: stored!.created_at }]);
 }, 30000);
 it('revalidates original group bytes at a fresh bank without changing the saved manifest or history', async () => {
   const f = await fixture(),
