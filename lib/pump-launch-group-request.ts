@@ -1,3 +1,4 @@
+import type { PumpGroupCodeConsent } from './pump-group-runtime-authorization';
 import { PumpPreflightError } from './owned-pump-preflight';
 import { parsePumpHolderRequest } from './pump-holder-request';
 import {
@@ -12,6 +13,13 @@ export type PumpGroupRequest =
       action: 'prepare';
       terms: Parameters<typeof preparePumpLaunchGroupReview>[2];
     }
+  | {
+      action: 'authorize-signing';
+      id: string;
+      previewId: string;
+      consent: PumpLaunchGroupConsent;
+      codeConsent: PumpGroupCodeConsent;
+    }
   | { action: 'approve'; id: string; consent: PumpLaunchGroupConsent }
   | {
       action: 'register';
@@ -19,7 +27,15 @@ export type PumpGroupRequest =
       consent: PumpLaunchGroupConsent;
       transactions: string[];
     }
-  | { action: 'revalidate' | 'observe' | 'cancel'; id: string };
+  | {
+      action:
+        | 'revalidate'
+        | 'observe'
+        | 'recover'
+        | 'runtime-preview'
+        | 'cancel';
+      id: string;
+    };
 const fail = (): never => {
   throw new PumpPreflightError(
     'Review the exact complete-group action, context, simulation and limits.',
@@ -47,11 +63,60 @@ export function parsePumpGroupRequest(
       return parsed;
     }
     if (!pumpGroupIdValid(value.id)) return fail();
-    if (['revalidate', 'observe', 'cancel'].includes(value.action as string)) {
+    if (
+      [
+        'revalidate',
+        'observe',
+        'recover',
+        'runtime-preview',
+        'cancel',
+      ].includes(value.action as string)
+    ) {
       if (!keys(value, ['action', 'id'])) return fail();
       return {
-        action: value.action as 'revalidate' | 'observe' | 'cancel',
+        action: value.action as
+          | 'revalidate'
+          | 'observe'
+          | 'recover'
+          | 'runtime-preview'
+          | 'cancel',
         id: value.id,
+      };
+    }
+    if (value.action === 'authorize-signing') {
+      if (
+        !keys(value, ['action', 'id', 'previewId', 'consent', 'codeConsent']) ||
+        !pumpGroupIdValid(value.previewId) ||
+        !record(value.codeConsent)
+      )
+        return fail();
+      const c = value.codeConsent;
+      if (
+        !keys(c, [
+          'approved',
+          'previewId',
+          'identitySha256',
+          'acknowledgeUpgradeableCode',
+          'acknowledgeNoSemanticAudit',
+        ]) ||
+        c.approved !== true ||
+        c.previewId !== value.previewId ||
+        !digest(c.identitySha256) ||
+        c.acknowledgeUpgradeableCode !== true ||
+        c.acknowledgeNoSemanticAudit !== true
+      )
+        return fail();
+      const approved = parsePumpGroupRequest(
+        { action: 'approve', id: value.id, consent: value.consent },
+        origin,
+      );
+      if (approved.action !== 'approve') return fail();
+      return {
+        action: 'authorize-signing',
+        id: value.id,
+        previewId: value.previewId,
+        consent: approved.consent,
+        codeConsent: c as PumpGroupCodeConsent,
       };
     }
     if (value.action !== 'approve' && value.action !== 'register')

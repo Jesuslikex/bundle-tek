@@ -63,6 +63,7 @@ it('runs HTTP to owned SQL, complete preparation/approval/signature registration
     '0083_pump_group_approvals',
     '0084_pump_group_signatures',
     '0085_pump_group_observations',
+    '0086_pump_group_terminal_recovery',
   ])
     for (const sql of readFileSync('drizzle/' + file + '.sql', 'utf8').split(
       '--> statement-breakpoint',
@@ -216,4 +217,41 @@ it('runs HTTP to owned SQL, complete preparation/approval/signature registration
         method.startsWith('send') || method.includes('signTransaction'),
     ),
   ).toBe(false);
+  context.rpc = async (method, params) => {
+    if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
+    if (method === 'getTransaction') {
+      const i = signed.signedEvidence!.packets.findIndex(
+        (packet) => packet.signature === params[0],
+      );
+      return {
+        slot: String(210 + i),
+        transaction: [transactions[i], 'base64'],
+        meta: { err: { InstructionError: [0, 'Custom'] }, fee: '5000' },
+      };
+    }
+    throw new Error('Unexpected terminal method');
+  };
+  const terminal = await send({ action: 'recover', id });
+  expect(terminal.status, await terminal.clone().text()).toBe(200);
+  const terminalValue = (await terminal.json()) as {
+    group: unknown;
+    released: boolean;
+  };
+  const terminalView = await parsePumpGroupView(
+    terminalValue.group,
+    terms.projectId,
+  );
+  expect(terminalValue.released).toBe(true);
+  expect(terminalView.state).toBe('failed');
+  expect(terminalView.receipt?.kind).toBe('all-packets-failed');
+  await f.client.execute({
+    sql: 'INSERT INTO solana_execution_reservations VALUES(?,?,?,?,?)',
+    args: [
+      'alice',
+      f.input.holders[0].address,
+      'warmup',
+      'released',
+      'approved',
+    ],
+  });
 }, 120000);

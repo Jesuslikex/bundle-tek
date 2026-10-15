@@ -16,6 +16,46 @@ const consent = {
   approvedScope: 'complete-create-developer-holder-packet-group',
   acknowledgeSimulationLimits: true,
 };
+it('requires exact separate code consent and forbids authorization overrides', () => {
+  const previewId = crypto.randomUUID();
+  const codeConsent = {
+    approved: true,
+    previewId,
+    identitySha256: 'd'.repeat(64),
+    acknowledgeUpgradeableCode: true,
+    acknowledgeNoSemanticAudit: true,
+  };
+  const request = {
+    action: 'authorize-signing',
+    id,
+    previewId,
+    consent,
+    codeConsent,
+  };
+  expect(parsePumpGroupRequest(request, origin)).toEqual(request);
+  for (const patch of [
+    { approved: false },
+    { previewId: crypto.randomUUID() },
+    { acknowledgeUpgradeableCode: false },
+    { acknowledgeNoSemanticAudit: false },
+    { identitySha256: 'bad' },
+    { extra: true },
+  ])
+    expect(() =>
+      parsePumpGroupRequest(
+        { ...request, codeConsent: { ...codeConsent, ...patch } },
+        origin,
+      ),
+    ).toThrow();
+  for (const patch of [
+    { ownerId: 'other' },
+    { executionAllowed: true },
+    { rpcUrl: 'https://other.test' },
+  ])
+    expect(() =>
+      parsePumpGroupRequest({ ...request, ...patch }, origin),
+    ).toThrow();
+});
 let wallets: string[];
 beforeAll(async () => {
   wallets = await Promise.all(
@@ -78,7 +118,7 @@ it('requires exact complete-group consent and rejects caller-authored execution 
         origin,
       ),
     ).toThrow();
-  for (const action of ['submit', 'send', 'recover', 'sign'])
+  for (const action of ['submit', 'send', 'sign'])
     expect(() =>
       parsePumpGroupRequest(
         { action, id, consent, submitApproved: true },
@@ -122,7 +162,13 @@ it('accepts only complete bounded canonical packet vectors for registration', ()
   ).toThrow();
 });
 it('allows only exact review IDs for read-only revalidation/observation and unsigned cancellation', () => {
-  for (const action of ['revalidate', 'observe', 'cancel']) {
+  for (const action of [
+    'revalidate',
+    'observe',
+    'recover',
+    'runtime-preview',
+    'cancel',
+  ]) {
     expect(parsePumpGroupRequest({ action, id }, origin)).toEqual({
       action,
       id,

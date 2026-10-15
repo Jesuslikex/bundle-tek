@@ -81,3 +81,58 @@ export const pumpGroupObservations = sqliteTable(
     ),
   ],
 );
+export const pumpGroupTerminalRecoveries = sqliteTable(
+  'pump_group_terminal_recoveries',
+  {
+    reviewId: text('review_id')
+      .primaryKey()
+      .notNull()
+      .references(() => pumpLaunchReviews.id),
+    ownerId: text('owner_id').notNull(),
+    observationId: text('observation_id')
+      .notNull()
+      .unique()
+      .references(() => pumpGroupObservations.id),
+    receipt: text('receipt').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+);
+export const pumpGroupRuntimeReviews = sqliteTable(
+  'pump_group_runtime_reviews',
+  {
+    id: text('id').primaryKey().notNull(),
+    ownerId: text('owner_id').notNull(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => pumpLaunchReviews.id),
+    contextSha256: text('context_sha256').notNull(),
+    identitySha256: text('identity_sha256').notNull(),
+    preview: text('preview').notNull(),
+    createdAt: text('created_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+  },
+  (t) => [index('pump_group_runtime_owner').on(t.ownerId, t.reviewId, t.id)],
+);
+export const pumpGroupSigningAuthorizations = sqliteTable(
+  'pump_group_signing_authorizations',
+  {
+    id: text('id').primaryKey().notNull(),
+    ownerId: text('owner_id').notNull(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => pumpLaunchReviews.id),
+    previewId: text('preview_id')
+      .notNull()
+      .references(() => pumpGroupRuntimeReviews.id),
+    contextSha256: text('context_sha256').notNull(),
+    identitySha256: text('identity_sha256').notNull(),
+    consent: text('consent').notNull(),
+    codeConsent: text('code_consent').notNull(),
+    authorization: text('authorization').notNull(),
+    createdAt: text('created_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+  },
+  (t) => [
+    index('pump_group_signing_auth_owner').on(t.ownerId, t.reviewId, t.id),
+  ],
+);

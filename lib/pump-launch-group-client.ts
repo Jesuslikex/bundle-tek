@@ -1,3 +1,4 @@
+import type { PumpGroupTerminalReceipt } from './pump-launch-group-terminal';
 import {
   requirePumpLaunchGroupReview,
   type PumpLaunchGroupReview,
@@ -16,10 +17,11 @@ const idValid = (v: unknown): v is string =>
   /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const dateValid = (v: unknown): v is string =>
   typeof v === 'string' && v.length <= 32 && Number.isFinite(Date.parse(v));
-const states = ['review', 'approved', 'signed', 'cancelled'] as const;
+const states = ['review', 'approved', 'signed', 'cancelled', 'failed'] as const;
 export type PumpGroupView = {
   review: PumpLaunchGroupReview;
   quoteDecimals: number;
+  receipt: PumpGroupTerminalReceipt | null;
   state: (typeof states)[number];
   signedEvidence: Awaited<
     ReturnType<typeof verifyPumpLaunchGroupSignatures>
@@ -45,7 +47,11 @@ function summary(value: unknown, projectId: string) {
     value.executionAllowed !== false ||
     value.completeLaunch !== false ||
     value.approvalRequired !==
-      !['approved', 'signed'].includes(String(value.state))
+      !(
+        ['approved', 'signed', 'failed'].includes(String(value.state)) ||
+        (record(value.receipt) &&
+          value.receipt.format === 'pump-launch-group-terminal-recovery-v1')
+      )
   )
     return fail();
   return {
@@ -70,7 +76,11 @@ export async function parsePumpGroupView(
   );
   signal?.throwIfAborted();
   let signedEvidence: PumpGroupView['signedEvidence'] = null;
-  if (brief.state === 'signed') {
+  const terminal =
+    value.receipt === null || value.receipt === undefined
+      ? null
+      : value.receipt;
+  if (brief.state === 'signed' || (terminal && value.signedEvidence !== null)) {
     if (
       !record(value.signedEvidence) ||
       !Array.isArray(value.signedEvidence.packets)
@@ -89,9 +99,40 @@ export async function parsePumpGroupView(
     )
       return fail();
   } else if (value.signedEvidence !== null) return fail();
+  if (terminal) {
+    if (
+      !record(terminal) ||
+      !['cancelled', 'failed'].includes(brief.state) ||
+      terminal.format !== 'pump-launch-group-terminal-recovery-v1' ||
+      terminal.reviewId !== review.id ||
+      terminal.contextSha256 !== review.contextSha256 ||
+      terminal.manifestSha256 !== review.manifestSha256 ||
+      terminal.signedGroupSha256 !==
+        (signedEvidence?.signedGroupSha256 ?? null) ||
+      !idValid(terminal.observationId) ||
+      typeof terminal.observationSha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(terminal.observationSha256) ||
+      !dateValid(terminal.observedAt) ||
+      terminal.sourceState !== (signedEvidence ? 'signed' : 'approved') ||
+      terminal.reservationsReleased !== true ||
+      terminal.economicSettlementVerified !== false ||
+      terminal.signingAllowed !== false ||
+      terminal.executionAllowed !== false ||
+      terminal.completeLaunch !== false ||
+      typeof terminal.networkFeeUnresolved !== 'boolean' ||
+      !/^(0|[1-9]\d{0,22})$/.test(String(terminal.knownNetworkFeeRaw)) ||
+      (brief.state === 'failed'
+        ? terminal.kind !== 'all-packets-failed' ||
+          !signedEvidence ||
+          terminal.networkFeeUnresolved !== false
+        : terminal.kind !== 'expired-unobserved')
+    )
+      return fail();
+  } else if (brief.state === 'failed') return fail();
   signal?.throwIfAborted();
   return {
     review,
+    receipt: terminal as PumpGroupTerminalReceipt | null,
     quoteDecimals: built.quote.decimals,
     state: brief.state,
     signedEvidence,
@@ -140,7 +181,8 @@ export async function parsePumpGroupObservation(
   )
     return fail();
   const receipt = value.receipt;
-  if (!['approved', 'signed'].includes(view.state)) return fail();
+  if (!['approved', 'signed'].includes(view.state) && !view.receipt)
+    return fail();
   const signed = value.sourceState === 'signed' ? view.signedEvidence : null;
   if (value.sourceState === 'signed' && !signed) return fail();
   if (
@@ -251,4 +293,36 @@ export async function parsePumpGroupObservation(
   const core = { state: value.state, receipt };
   if ((await pumpHolderDigest(core)) !== value.sha256) return fail();
   return structuredClone(value) as PumpGroupObservationView;
+}
+
+export async function parsePumpGroupRecoveryResult(
+  value: unknown,
+  previous: PumpGroupView,
+  signal?: AbortSignal,
+) {
+  if (!record(value) || typeof value.released !== 'boolean') return fail();
+  const group = await parsePumpGroupView(
+    value.group,
+    previous.review.projectId,
+    signal,
+  );
+  if (
+    canonicalPumpHolderJson(group.review) !==
+      canonicalPumpHolderJson(previous.review) ||
+    value.released !== !!group.receipt
+  )
+    return fail();
+  const observation =
+    value.observation === null
+      ? null
+      : await parsePumpGroupObservation(value.observation, previous);
+  if (
+    (!observation && !value.released) ||
+    (observation &&
+      group.receipt &&
+      (group.receipt.observationId !== observation.id ||
+        group.receipt.observationSha256 !== observation.sha256))
+  )
+    return fail();
+  return { group, observation, released: value.released };
 }

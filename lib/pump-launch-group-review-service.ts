@@ -60,8 +60,10 @@ function publicReview(row: Row) {
     review: JSON.parse(row.review) as PumpLaunchGroupReview,
     simulation: JSON.parse(row.simulation) as Checked,
     state: row.state,
+    receipt: row.receipt ? (JSON.parse(row.receipt) as unknown) : null,
     durableReview: true as const,
-    approvalRequired: !['approved', 'signed'].includes(row.state),
+    approvalRequired:
+      !['approved', 'signed', 'failed'].includes(row.state) && !row.receipt,
     signedEvidence: row.signed
       ? (JSON.parse(row.signed) as Awaited<
           ReturnType<typeof verifyPumpLaunchGroupSignatures>

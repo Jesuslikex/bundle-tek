@@ -7,6 +7,10 @@ import { pumpHolderDigest } from '@/lib/pump-holder-review';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 import { PumpLaunchGroupReview } from './pump-launch-group-review';
 import { pumpLaunchGroupReviewFixture } from '../../test/pump-launch-group-review-fixture';
+import { pumpRuntimePreviewFixture } from '../../test/pump-runtime-preview-fixture';
+import { signSyntheticPumpGroup } from '../../test/pump-group-synthetic-signatures';
+import { verifyPumpLaunchGroupSignatures } from '@/lib/pump-launch-group-signatures';
+import type { PumpGroupSignAction } from '@/lib/pump-group-signing-scope';
 let f: Awaited<ReturnType<typeof pumpLaunchGroupReviewFixture>>;
 let observation: Record<string, unknown>;
 let root: Root,
@@ -36,7 +40,7 @@ const button = (text: string) =>
 async function settle() {
   for (
     let i = 0;
-    i < 400 &&
+    i < 4000 &&
     container.textContent?.includes('Checking complete launch group...');
     i++
   )
@@ -75,6 +79,7 @@ beforeAll(async () => {
   };
 }, 30000);
 beforeEach(async () => {
+  localStorage.clear();
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -124,6 +129,186 @@ beforeEach(async () => {
   });
   await settle();
 });
+async function signingSetup() {
+  const preview = await pumpRuntimePreviewFixture(f.review);
+  const transactions = await signSyntheticPumpGroup(f.review.packets, [
+    f.fixture.f.f.payerSigner,
+    f.fixture.f.f.mintSigner,
+    ...f.fixture.holderSigners,
+  ]);
+  const signed = await verifyPumpLaunchGroupSignatures(f.review, transactions);
+  const onSign = vi.fn<PumpGroupSignAction>(async ({ current }) => {
+    current();
+    return signed;
+  });
+  const renderSigning = async (contextKey = 'current') => {
+    await act(async () =>
+      root.render(
+        <PumpLaunchGroupReview
+          projectId={f.review.projectId}
+          contextKey={contextKey}
+          canPrepare
+          prepareRequest={prepareRequest}
+          canSign={() => true}
+          onSign={onSign}
+        />,
+      ),
+    );
+  };
+  const original = fetcher.getMockImplementation() as (
+    path: string,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  fetcher.mockImplementation(async (path: string, init?: RequestInit) => {
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {};
+    if (body.action === 'runtime-preview') return Response.json(preview);
+    if (body.action === 'authorize-signing') {
+      state = 'approved';
+      const now = Date.now();
+      return Response.json({
+        group: response(),
+        preview,
+        authorization: {
+          format: 'pump-group-signing-authorization-v1',
+          id: crypto.randomUUID(),
+          reviewId: f.review.id,
+          previewId: preview.id,
+          contextSha256: f.review.contextSha256,
+          manifestSha256: f.review.manifestSha256,
+          simulationSha256: f.review.simulationSha256,
+          identitySha256: preview.identitySha256,
+          createdAt: new Date(now).toISOString(),
+          expiresAt: new Date(now + 5000).toISOString(),
+          scope: 'sign-complete-group-only',
+          signingAllowed: true,
+          executionAllowed: false,
+          submissionAllowed: false,
+          semanticAuditEstablished: false,
+        },
+      });
+    }
+    if (body.action === 'register') {
+      expect(
+        JSON.parse(
+          localStorage.getItem('bundle.pump-group-signed.v1:' + f.review.id)!,
+        ).transactions,
+      ).toEqual(transactions);
+      return Response.json(
+        { error: 'Temporary registration failure' },
+        { status: 503 },
+      );
+    }
+    return original(path, init);
+  });
+  await renderSigning();
+  await click('Open complete group: ' + f.review.id);
+  await click('Read deployed group program identities');
+  expect(onSign).not.toHaveBeenCalled();
+  const checkboxes = [
+    ...container.querySelectorAll<HTMLInputElement>('input[type=checkbox]'),
+  ];
+  expect(checkboxes).toHaveLength(3);
+  expect(checkboxes.every((item) => !item.checked)).toBe(true);
+  expect(button('Approve and sign complete group locally').disabled).toBe(true);
+  for (const box of checkboxes) await act(async () => box.click());
+  return { onSign, signed, renderSigning };
+}
+it('requires three explicit approvals, retains the entire signed vector before registration and retries without resigning', async () => {
+  const { onSign } = await signingSetup();
+  await click('Approve and sign complete group locally');
+  expect(onSign).toHaveBeenCalledTimes(1);
+  expect(button('Download complete signed group')).toBeDefined();
+  await click('Save existing complete signed group');
+  expect(onSign).toHaveBeenCalledTimes(1);
+  expect(
+    fetcher.mock.calls.filter(([, init]) =>
+      String(init?.body).includes('"action":"register"'),
+    ),
+  ).toHaveLength(2);
+});
+it('refuses a changed UI context while server authorization is pending', async () => {
+  const { onSign, renderSigning } = await signingSetup();
+  const original = fetcher.getMockImplementation() as (
+    path: string,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  let release: ((response: Response) => void) | undefined;
+  let result: Response | undefined;
+  fetcher.mockImplementation(async (path: string, init?: RequestInit) => {
+    if (
+      typeof init?.body === 'string' &&
+      init.body.includes('"action":"authorize-signing"')
+    ) {
+      result = await original(path, init);
+      return new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+    }
+    return original(path, init);
+  });
+  await act(async () =>
+    button('Approve and sign complete group locally').click(),
+  );
+  for (let i = 0; i < 100 && !release; i++)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+  expect(release).toBeDefined();
+  await renderSigning('changed');
+  await act(async () => release!(result!));
+  await settle();
+  expect(onSign).not.toHaveBeenCalled();
+});
+it('rejects a partial signer result without saving or registering any packet', async () => {
+  const { onSign, signed } = await signingSetup();
+  onSign.mockResolvedValue({ ...signed, packets: signed.packets.slice(1) });
+  await click('Approve and sign complete group locally');
+  expect(onSign).toHaveBeenCalledTimes(1);
+  expect(localStorage.length).toBe(0);
+  expect(
+    fetcher.mock.calls.some(([, init]) =>
+      String(init?.body).includes('"action":"register"'),
+    ),
+  ).toBe(false);
+});
+it('refuses expired authorization before calling the browser signer', async () => {
+  const { onSign } = await signingSetup();
+  const original = fetcher.getMockImplementation() as (
+    path: string,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  fetcher.mockImplementation(async (path: string, init?: RequestInit) => {
+    const response = await original(path, init);
+    if (
+      typeof init?.body === 'string' &&
+      init.body.includes('"action":"authorize-signing"')
+    ) {
+      const result = (await response.json()) as {
+        authorization: { expiresAt: string };
+      };
+      result.authorization.expiresAt = new Date(Date.now() - 1).toISOString();
+      return Response.json(result);
+    }
+    return response;
+  });
+  await click('Approve and sign complete group locally');
+  expect(onSign).not.toHaveBeenCalled();
+  expect(localStorage.length).toBe(0);
+});
+it('recovers verified server-saved bytes when the browser backup is corrupt without signing again', async () => {
+  const { onSign, signed } = await signingSetup();
+  localStorage.setItem('bundle.pump-group-signed.v1:' + f.review.id, '{broken');
+  state = 'signed';
+  fetcher.mockResolvedValueOnce(
+    Response.json({ ...response(), signedEvidence: signed }),
+  );
+  await click('Open complete group: ' + f.review.id);
+  expect(button('Download complete signed group')).toBeDefined();
+  expect(container.textContent).toContain(
+    'verified complete group from saved history',
+  );
+  expect(onSign).not.toHaveBeenCalled();
+});
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
@@ -136,9 +321,7 @@ it('automatically reads saved groups without a write, key unlock or approval con
   );
   expect(fetcher.mock.calls[0][1]?.body).toBeUndefined();
   expect(container.querySelectorAll('input')).toHaveLength(0);
-  expect(container.textContent).toContain(
-    'Group signing and execution are unavailable',
-  );
+  expect(container.textContent).toContain('Group broadcasting is unavailable');
 });
 it('opens the full immutable review, lists every packet and every saved wallet limit, then explicitly discards unsigned state', async () => {
   await click('Open complete group: ' + f.review.id);

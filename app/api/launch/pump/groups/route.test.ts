@@ -23,6 +23,12 @@ const mocks = vi.hoisted(() => ({
   register: vi.fn(async (..._args: unknown[]) => ({ state: 'signed' })),
   cancel: vi.fn(async (..._args: unknown[]) => ({ state: 'cancelled' })),
   refresh: vi.fn(async (..._args: unknown[]) => ({ sourceRevalidated: true })),
+  runtime: vi.fn(async (..._args: unknown[]) => ({ signingAllowed: false })),
+  authorize: vi.fn(async (..._args: unknown[]) => ({
+    signingAllowed: true,
+    submissionAllowed: false,
+  })),
+  recover: vi.fn(async (..._args: unknown[]) => ({ released: false })),
   observe: vi.fn(async (..._args: unknown[]) => ({ state: 'partial' })),
   list: vi.fn(async (..._args: unknown[]) => ({
     launches: [],
@@ -51,6 +57,13 @@ vi.mock('@/lib/pump-launch-group-review-service', () => ({
 vi.mock('@/lib/pump-launch-group-observation-service', () => ({
   collectOwnedPumpGroupObservation: mocks.observe,
   listOwnedPumpGroupObservations: mocks.observations,
+}));
+vi.mock('@/lib/pump-group-runtime-service', () => ({
+  previewOwnedPumpGroupRuntime: mocks.runtime,
+  authorizeOwnedPumpGroupSigning: mocks.authorize,
+}));
+vi.mock('@/lib/pump-launch-group-terminal-service', () => ({
+  recoverOwnedPumpLaunchGroup: mocks.recover,
 }));
 vi.mock('@/lib/solana-rpc', () => ({
   getSolanaIndexerRpcEndpoint: () => mocks.endpoint,
@@ -149,6 +162,8 @@ it('injects only authenticated owner/site origin and routes all complete-group a
     ['register', mocks.register],
     ['revalidate', mocks.refresh],
     ['observe', mocks.observe],
+    ['recover', mocks.recover],
+    ['runtime-preview', mocks.runtime],
     ['cancel', mocks.cancel],
   ] as const) {
     const body = {
@@ -165,6 +180,36 @@ it('injects only authenticated owner/site origin and routes all complete-group a
       .status,
   ).toBe(400);
   expect(mocks.rpc).not.toHaveBeenCalled();
+});
+it('routes explicit code-identity consent to owned short-lived signing authorization', async () => {
+  const previewId = crypto.randomUUID();
+  const codeConsent = {
+    approved: true,
+    previewId,
+    identitySha256: 'd'.repeat(64),
+    acknowledgeUpgradeableCode: true,
+    acknowledgeNoSemanticAudit: true,
+  };
+  expect(
+    (
+      await send({
+        action: 'authorize-signing',
+        id,
+        previewId,
+        consent,
+        codeConsent,
+      })
+    ).status,
+  ).toBe(200);
+  expect(mocks.authorize.mock.calls[0].slice(0, 6)).toEqual([
+    mocks.db,
+    'alice',
+    id,
+    previewId,
+    consent,
+    codeConsent,
+  ]);
+  expect(mocks.register).not.toHaveBeenCalled();
 });
 it('rejects foreign owners/projects and malformed source/permission overrides before services', async () => {
   mocks.user = { userId: 'bob' };

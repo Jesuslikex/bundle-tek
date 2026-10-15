@@ -1,5 +1,19 @@
 'use client';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
+import {
+  requirePumpRuntimePreview,
+  requirePumpSigningAuthorization,
+  groupSigningConsent,
+  type PumpGroupRuntimePreview,
+} from '@/lib/pump-group-runtime-authorization';
+import type { PumpGroupSignAction } from '@/lib/pump-group-signing-scope';
+import { verifyPumpLaunchGroupSignatures } from '@/lib/pump-launch-group-signatures';
 import { Button } from '@/components/ui/button';
 import { readPanelJson } from '@/components/read-panel-json';
 import {
@@ -11,6 +25,7 @@ import {
   parsePumpGroupView,
   parsePumpGroupPage,
   parsePumpGroupObservation,
+  parsePumpGroupRecoveryResult,
   type PumpGroupView,
   type PumpGroupSummary,
   type PumpGroupObservationView,
@@ -20,9 +35,10 @@ import styles from './pump-launch-group-ui.module.css';
 const endpoint = '/api/launch/pump/groups';
 const labels = {
   review: 'Unsigned review',
-  approved: 'Approval saved, signing disabled',
+  approved: 'Approval saved, fresh signing authorization required',
   signed: 'Signed group retained',
-  cancelled: 'Discarded unsigned review',
+  cancelled: 'Closed review',
+  failed: 'All packets finalized as failures',
 };
 const observationLabels = {
   complete: 'Every packet finalized successfully',
@@ -32,6 +48,24 @@ const observationLabels = {
   unknown: 'Outcome unknown',
   pending: 'Awaiting finalized packet results',
 };
+type Pending = {
+  contextSha256: string;
+  transactions: string[];
+  signedGroupSha256: string;
+};
+const pendingKey = (id: string) => 'bundle.pump-group-signed.v1:' + id;
+function downloadGroup(review: PumpGroupView['review'], pending: Pending) {
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify({ review, ...pending })], {
+      type: 'application/json',
+    }),
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'bundle-complete-group-' + review.id + '.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 type Props = {
   projectId: string;
   contextKey: string;
@@ -39,6 +73,8 @@ type Props = {
   canPrepare: boolean;
   disabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
+  canSign?: (view: PumpGroupView) => boolean;
+  onSign?: PumpGroupSignAction;
 };
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -58,6 +94,8 @@ function Panel({
   canPrepare,
   disabled = false,
   onBusyChange,
+  canSign,
+  onSign,
 }: Props) {
   const [rows, setRows] = useState<PumpGroupSummary[]>([]),
     [cursor, setCursor] = useState<string | null>(null);
@@ -71,17 +109,142 @@ function Panel({
     [loaded, setLoaded] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState('');
+  const [runtimePreview, setRuntimePreview] =
+      useState<PumpGroupRuntimePreview | null>(null),
+    [previewContext, setPreviewContext] = useState('');
+  const [previewExpired, setPreviewExpired] = useState(true);
+  useEffect(() => {
+    const expires = runtimePreview ? Date.parse(runtimePreview.expiresAt) : 0;
+    const refresh = () => setPreviewExpired(expires <= Date.now());
+    const initial = setTimeout(refresh, 0);
+    const timer = setTimeout(refresh, Math.max(0, expires - Date.now()));
+    return () => {
+      clearTimeout(initial);
+      clearTimeout(timer);
+    };
+  }, [runtimePreview]);
+  const [approveAll, setApproveAll] = useState(false),
+    [simulationAck, setSimulationAck] = useState(false),
+    [codeApproval, setCodeApproval] = useState(false);
+  const [pending, setPending] = useState<Pending | null>(null),
+    [pendingProblem, setPendingProblem] = useState(false);
+  const signingState = useRef({
+    contextKey,
+    context: view?.review.contextSha256,
+    previewId: runtimePreview?.id,
+    approveAll,
+    simulationAck,
+    codeApproval,
+  });
+  useLayoutEffect(() => {
+    signingState.current = {
+      contextKey,
+      context: view?.review.contextSha256,
+      previewId: runtimePreview?.id,
+      approveAll,
+      simulationAck,
+      codeApproval,
+    };
+  }, [
+    contextKey,
+    view?.review.contextSha256,
+    runtimePreview?.id,
+    approveAll,
+    simulationAck,
+    codeApproval,
+  ]);
+  const resetSigning = () => {
+    setApproveAll(false);
+    setSimulationAck(false);
+    setCodeApproval(false);
+  };
+  async function retained(checked: PumpGroupView) {
+    const stored = localStorage.getItem(pendingKey(checked.review.id));
+    if (!stored) {
+      setPending(
+        checked.signedEvidence
+          ? {
+              contextSha256: checked.review.contextSha256,
+              transactions: checked.signedEvidence.packets.map(
+                (packet) => packet.transaction,
+              ),
+              signedGroupSha256: checked.signedEvidence.signedGroupSha256,
+            }
+          : null,
+      );
+      setPendingProblem(false);
+      return;
+    }
+    try {
+      if (stored.length > 40000) throw new Error();
+      const parsed = JSON.parse(stored) as Pending;
+      if (
+        parsed.contextSha256 !== checked.review.contextSha256 ||
+        !Array.isArray(parsed.transactions)
+      )
+        throw new Error();
+      const evidence = await verifyPumpLaunchGroupSignatures(
+        checked.review,
+        parsed.transactions,
+        controller.current!.signal,
+      );
+      if (evidence.signedGroupSha256 !== parsed.signedGroupSha256)
+        throw new Error();
+      current();
+      setPending(parsed);
+      setPendingProblem(false);
+    } catch {
+      if (checked.signedEvidence) {
+        setPending({
+          contextSha256: checked.review.contextSha256,
+          transactions: checked.signedEvidence.packets.map(
+            (packet) => packet.transaction,
+          ),
+          signedGroupSha256: checked.signedEvidence.signedGroupSha256,
+        });
+        setPendingProblem(false);
+        setNotice(
+          'The browser backup differs. The verified complete group from saved history is available for download.',
+        );
+        return;
+      }
+      setPendingProblem(true);
+      setNotice(
+        'The stored signed group could not be verified. Restore its original complete packet vector before signing again.',
+      );
+      throw new Error('Stored group differs.');
+    }
+  }
+  async function registerRetained(checked: PumpGroupView, captured: Pending) {
+    await verifyPumpLaunchGroupSignatures(
+      checked.review,
+      captured.transactions,
+      controller.current!.signal,
+    );
+    current();
+    const updated = await parsePumpGroupView(
+      await request('', {
+        action: 'register',
+        id: checked.review.id,
+        consent: groupSigningConsent(checked.review),
+        transactions: captured.transactions,
+      }),
+      projectId,
+      controller.current!.signal,
+    );
+    if (
+      updated.state !== 'signed' ||
+      updated.signedEvidence?.signedGroupSha256 !== captured.signedGroupSha256
+    )
+      throw new Error('Registered group differs.');
+    current();
+    setView(updated);
+    resetSigning();
+  }
   const active = useRef(true),
     running = useRef(false),
     controller = useRef<AbortController | null>(null);
-  useEffect(() => {
-    active.current = true;
-    return () => {
-      active.current = false;
-      controller.current?.abort();
-      onBusyChange?.(false);
-    };
-  }, [onBusyChange]);
+
   function current() {
     if (!active.current || controller.current?.signal.aborted)
       throw new Error('Group context changed.');
@@ -113,7 +276,7 @@ function Panel({
       );
     if (!response.ok)
       throw new Error(
-        'Complete launch group service is unavailable. Reload saved groups before retrying; no signing or broadcast occurred here.',
+        'Complete launch group service is unavailable. Keep any retained signed group and reload saved history before retrying.',
       );
     return readPanelJson(
       response,
@@ -148,6 +311,14 @@ function Panel({
       }
     }
   }
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      controller.current?.abort();
+      onBusyChange?.(false);
+    };
+  }, [onBusyChange]);
   async function history(older = false) {
     const previous = older ? cursor : null;
     if (older && !previous) return;
@@ -172,12 +343,16 @@ function Panel({
     setLoaded(true);
   }
   async function open(id: string) {
+    resetSigning();
+    setRuntimePreview(null);
     const checked = await parsePumpGroupView(
       await request('?id=' + encodeURIComponent(id)),
       projectId,
       controller.current!.signal,
     );
     if (checked.review.id !== id) throw new Error('Saved group differs.');
+    current();
+    await retained(checked);
     current();
     setView(checked);
     setPreparedContext(null);
@@ -241,15 +416,17 @@ function Panel({
         or safely recovered.
       </p>
       <p className="source-note">
-        Group signing and execution are unavailable while runtime, program
-        authority and submission policy checks are unfinished. No key unlock,
-        approval, signing or broadcast is offered here.
+        Group broadcasting is unavailable. Signing requires fresh source checks,
+        explicit approval of every packet and wallet limit, and approval of the
+        exact deployed code identities below. Keys stay in this browser.
       </p>
       <div className={styles.actions}>
         <Button
           type="button"
           disabled={
-            locked || !canPrepare || (!!view && view.state !== 'cancelled')
+            locked ||
+            !canPrepare ||
+            (!!view && !['cancelled', 'failed'].includes(view.state))
           }
           onClick={() =>
             void run(async () => {
@@ -262,6 +439,10 @@ function Panel({
               if (checked.state !== 'review' || checked.signedEvidence !== null)
                 throw new Error('Preparation state differs.');
               current();
+              setPending(null);
+              setPendingProblem(false);
+              setRuntimePreview(null);
+              resetSigning();
               setView(checked);
               setPreparedContext(capturedContext);
               setObservations([]);
@@ -434,6 +615,319 @@ function Panel({
               ))}
             </ul>
           </details>
+          {view.receipt && (
+            <output>
+              {view.receipt.kind === 'expired-unobserved'
+                ? 'Expired group closed after finalized mint absence.'
+                : 'Every packet finalized as a failure.'}{' '}
+              Wallet reservations were released by the saved recovery event.{' '}
+              {view.receipt.networkFeeUnresolved
+                ? 'Network fees remain unresolved.'
+                : 'Known network fees are retained.'}{' '}
+              Economic settlement is not established.
+            </output>
+          )}
+          {onSign && ['review', 'approved'].includes(view.state) && (
+            <section
+              aria-label="User-approved complete group signing"
+              className={styles.review}
+            >
+              <h4>Review and sign the complete group</h4>
+              <p>
+                Enter the mint and wallet vault passphrases in the fields above
+                and acknowledge the encrypted mint backup. The saved draft and
+                every wallet limit must still match this review. Signing does
+                not broadcast.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={locked || !!pending || pendingProblem}
+                onClick={() =>
+                  void run(async () => {
+                    resetSigning();
+                    setRuntimePreview(null);
+                    const captured = contextKey;
+                    const preview = await requirePumpRuntimePreview(
+                      await request('', {
+                        action: 'runtime-preview',
+                        id: review.id,
+                      }),
+                      review,
+                    );
+                    current();
+                    setRuntimePreview(preview);
+                    setPreviewContext(captured);
+                    void import('@/lib/pump-launch-group-signing').catch(
+                      () => undefined,
+                    );
+                  })
+                }
+              >
+                Read deployed group program identities
+              </Button>
+              {runtimePreview && (
+                <>
+                  <p>
+                    Exact code identities read at{' '}
+                    <time dateTime={runtimePreview.createdAt}>
+                      {new Date(runtimePreview.createdAt).toLocaleString()}
+                    </time>
+                    . This review expires{' '}
+                    <time dateTime={runtimePreview.expiresAt}>
+                      {new Date(runtimePreview.expiresAt).toLocaleString()}
+                    </time>
+                    . These identity checks do not establish a semantic code
+                    audit.
+                  </p>
+                  <ul>
+                    {runtimePreview.programs.map((program) => (
+                      <li key={program.address}>
+                        <a
+                          href={'https://solscan.io/account/' + program.address}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {program.address}
+                        </a>
+                        <div>
+                          {program.identityKind === 'native-system'
+                            ? 'Native System account identity SHA-256'
+                            : 'Deployed ELF code SHA-256'}
+                          : <code>{program.codeSha256}</code>
+                        </div>
+                        <div>
+                          Upgrade authority:{' '}
+                          <code>
+                            {program.upgradeAuthority ??
+                              'None reported for this executable'}
+                          </code>
+                          . Deployment slot:{' '}
+                          {program.deploymentSlot ??
+                            'Immutable or native executable'}
+                          .
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  {previewContext !== contextKey && (
+                    <p role="alert">
+                      The draft or limits changed. Restore the saved scope and
+                      refresh this runtime review.
+                    </p>
+                  )}
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={approveAll}
+                      disabled={
+                        locked || !!pending || previewContext !== contextKey
+                      }
+                      onChange={(event) => setApproveAll(event.target.checked)}
+                    />{' '}
+                    I approve signing every packet in this exact group, every
+                    active wallet buy and all displayed limits.
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={simulationAck}
+                      disabled={
+                        locked || !!pending || previewContext !== contextKey
+                      }
+                      onChange={(event) =>
+                        setSimulationAck(event.target.checked)
+                      }
+                    />{' '}
+                    I understand simulation does not prove funded execution,
+                    atomic inclusion or realized settlement.
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={codeApproval}
+                      disabled={
+                        locked || !!pending || previewContext !== contextKey
+                      }
+                      onChange={(event) =>
+                        setCodeApproval(event.target.checked)
+                      }
+                    />{' '}
+                    I approve these exact deployed code hashes and listed
+                    upgrade authorities. I understand code can be upgradeable
+                    and these checks are not a semantic audit.
+                  </label>
+                  <Button
+                    type="button"
+                    disabled={
+                      locked ||
+                      !!pending ||
+                      pendingProblem ||
+                      !approveAll ||
+                      !simulationAck ||
+                      !codeApproval ||
+                      previewContext !== contextKey ||
+                      previewExpired ||
+                      !canSign?.(view)
+                    }
+                    onClick={() =>
+                      void run(async () => {
+                        if (
+                          !approveAll ||
+                          !simulationAck ||
+                          !codeApproval ||
+                          !canSign?.(view) ||
+                          !onSign
+                        )
+                          throw new Error('Exact signing consent is required.');
+                        const selected = { ...signingState.current };
+                        const storedBefore = localStorage.getItem(
+                          pendingKey(review.id),
+                        );
+                        const consent = groupSigningConsent(review);
+                        try {
+                          const preview = await requirePumpRuntimePreview(
+                            runtimePreview,
+                            review,
+                          );
+                          const result = await request('', {
+                            action: 'authorize-signing',
+                            id: review.id,
+                            previewId: preview.id,
+                            consent,
+                            codeConsent: {
+                              approved: true,
+                              previewId: preview.id,
+                              identitySha256: preview.identitySha256,
+                              acknowledgeUpgradeableCode: true,
+                              acknowledgeNoSemanticAudit: true,
+                            },
+                          });
+                          if (!record(result)) throw new Error();
+                          const approved = await parsePumpGroupView(
+                            result.group,
+                            projectId,
+                            controller.current!.signal,
+                          );
+                          if (
+                            approved.state !== 'approved' ||
+                            canonicalPumpHolderJson(approved.review) !==
+                              canonicalPumpHolderJson(review)
+                          )
+                            throw new Error();
+                          const returnedPreview =
+                            await requirePumpRuntimePreview(
+                              result.preview,
+                              review,
+                              false,
+                            );
+                          if (
+                            canonicalPumpHolderJson(returnedPreview) !==
+                            canonicalPumpHolderJson(preview)
+                          )
+                            throw new Error();
+                          const authorization = requirePumpSigningAuthorization(
+                            result.authorization,
+                            preview,
+                            review,
+                          );
+                          const guard = () => {
+                            current();
+                            requirePumpSigningAuthorization(
+                              authorization,
+                              preview,
+                              review,
+                            );
+                            if (
+                              canonicalPumpHolderJson(signingState.current) !==
+                                canonicalPumpHolderJson(selected) ||
+                              localStorage.getItem(pendingKey(review.id)) !==
+                                storedBefore
+                            )
+                              throw new Error('Signing context changed.');
+                          };
+                          guard();
+                          setView(approved);
+                          const signingSignal = controller.current!.signal;
+                          const signed = await onSign({
+                            view: approved,
+                            consent,
+                            preview,
+                            authorization,
+                            current: guard,
+                            signal: signingSignal,
+                          });
+                          const verified =
+                            await verifyPumpLaunchGroupSignatures(
+                              review,
+                              signed.packets.map(
+                                (packet) => packet.transaction,
+                              ),
+                              controller.current!.signal,
+                            );
+                          if (
+                            canonicalPumpHolderJson(verified) !==
+                            canonicalPumpHolderJson(signed)
+                          )
+                            throw new Error('Signed group differs.');
+                          current();
+                          const captured: Pending = {
+                            contextSha256: review.contextSha256,
+                            transactions: verified.packets.map(
+                              (packet) => packet.transaction,
+                            ),
+                            signedGroupSha256: verified.signedGroupSha256,
+                          };
+                          setPending(captured);
+                          try {
+                            localStorage.setItem(
+                              pendingKey(review.id),
+                              JSON.stringify(captured),
+                            );
+                          } catch {
+                            setNotice(
+                              'The complete signed group is in memory. Download it before leaving.',
+                            );
+                          }
+                          await registerRetained(approved, captured);
+                        } finally {
+                          resetSigning();
+                        }
+                      })
+                    }
+                  >
+                    Approve and sign complete group locally
+                  </Button>
+                  {!canSign?.(view) && (
+                    <p>
+                      Signing needs the exact saved draft and limits, the
+                      acknowledged mint backup, and both passphrases above.
+                    </p>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+          {pending && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={locked}
+              onClick={() => downloadGroup(review, pending)}
+            >
+              Download complete signed group
+            </Button>
+          )}
+          {pending && view.state === 'approved' && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={locked}
+              onClick={() => void run(() => registerRetained(view, pending))}
+            >
+              Save existing complete signed group
+            </Button>
+          )}
           <div className={styles.actions}>
             {['review', 'approved'].includes(view.state) && (
               <Button
@@ -505,6 +999,35 @@ function Panel({
                 }
               >
                 Discard unsigned complete group
+              </Button>
+            )}
+            {['approved', 'signed'].includes(view.state) && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={locked}
+                onClick={() =>
+                  void run(async () => {
+                    const result = await parsePumpGroupRecoveryResult(
+                      await request('', { action: 'recover', id: review.id }),
+                      view,
+                      controller.current!.signal,
+                    );
+                    current();
+                    setView(result.group);
+                    if (result.observation)
+                      setObservations([result.observation]);
+                    setObservationCursor(null);
+                    await history();
+                    setNotice(
+                      result.released
+                        ? 'Safe terminal group recovery saved. Wallet reservations released; economic settlement remains unverified.'
+                        : 'Recovery observation saved. Pending, partial, unknown or unreconciled successful groups retain reservations.',
+                    );
+                  })
+                }
+              >
+                Recover group reservations
               </Button>
             )}
             {['approved', 'signed'].includes(view.state) && (

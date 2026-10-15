@@ -603,6 +603,20 @@
       "when": 1792024609855,
       "tag": "0085_pump_group_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "6",
+      "when": 1792029110131,
+      "tag": "0086_pump_group_terminal_recovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "6",
+      "when": 1792030633758,
+      "tag": "0087_pump_group_runtime_authorization",
+      "breakpoints": true
     }
   ]
 }

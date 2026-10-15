@@ -1,6 +1,18 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { useEffectEvent, useEffect, useId, useRef, useState } from 'react';
+import {
+  pumpGroupMatchesCurrentPrepare,
+  type PumpGroupSignAction,
+} from '@/lib/pump-group-signing-scope';
+import { requirePumpSigningAuthorization } from '@/lib/pump-group-runtime-authorization';
+import {
+  useEffectEvent,
+  useEffect,
+  useLayoutEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import styles from './pump-launch-ui.module.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +104,20 @@ function PumpHolderLaunchReviewContent({
     [groupsOpen, setGroupsOpen] = useState(false),
     [error, setError] = useState(''),
     [now, setNow] = useState(() => Date.now());
+  const groupContextRef = useRef('');
+  const groupContext = JSON.stringify([
+    project,
+    releaseId,
+    mint,
+    fee,
+    developerCap,
+    targets,
+    limits,
+    backedUp,
+  ]);
+  useLayoutEffect(() => {
+    groupContextRef.current = groupContext;
+  }, [groupContext]);
   const busy = actionBusy || groupBusy;
   const document = project.document,
     plan = document?.plan;
@@ -189,6 +215,107 @@ function PumpHolderLaunchReviewContent({
     current();
     return value;
   }
+  function groupTerms() {
+    return {
+      ...ownTerms(),
+      ...(plan!.developerBuy > 0
+        ? {
+            developerMaximumQuoteCostRaw: holderAmountRaw(
+              developerCap,
+              quote!.decimals,
+            ),
+          }
+        : {}),
+      holderLimits: requestLimits(),
+    };
+  }
+  function groupSignReady(view: Parameters<PumpGroupSignAction>[0]['view']) {
+    try {
+      return (
+        !!mint &&
+        canonicalPumpHolderJson(view.review.document) ===
+          canonicalPumpHolderJson(document) &&
+        backedUp &&
+        !!password &&
+        !!vaultPassword &&
+        !(launch && !terminal(launch.state)) &&
+        pumpGroupMatchesCurrentPrepare(
+          view,
+          groupTerms(),
+          window.location.origin,
+        )
+      );
+    } catch {
+      return false;
+    }
+  }
+  const signGroup: PumpGroupSignAction = async ({
+    view,
+    consent,
+    preview,
+    authorization,
+    current: uiCurrent,
+    signal,
+  }) => {
+    if (!groupSignReady(view) || !mint)
+      throw new Error(
+        'Restore the exact saved group limits and enter both passphrases first.',
+      );
+    requirePumpSigningAuthorization(authorization, preview, view.review);
+    const capturedContext = groupContextRef.current,
+      backup = mint,
+      mintPass = password,
+      walletPass = vaultPassword;
+    const vault = localStorage.getItem(VAULT_STORAGE_KEY);
+    if (!vault)
+      throw new Error(
+        'Import every required wallet into this browser vault first.',
+      );
+    setPassword('');
+    setVaultPassword('');
+    const guard = () => {
+      current();
+      uiCurrent();
+      signal.throwIfAborted();
+      requirePumpSigningAuthorization(authorization, preview, view.review);
+      if (
+        groupContextRef.current !== capturedContext ||
+        localStorage.getItem(VAULT_STORAGE_KEY) !== vault ||
+        localStorage.getItem(pumpMintStorageKey(project.id)) !==
+          JSON.stringify(backup)
+      )
+        throw new Error('Group draft, limits or stored vault changed.');
+    };
+    let wallets: VaultSession | undefined,
+      mintSession: VaultSession | undefined;
+    try {
+      guard();
+      wallets = await unlockVault(vault, walletPass);
+      guard();
+      mintSession = await unlockPumpMint(backup, mintPass);
+      guard();
+      const sessions = new Map(
+        [
+          ...new Set(
+            view.review.packets.flatMap((packet) => packet.requiredSigners),
+          ),
+        ].map((key) => [key, key === backup.mint ? mintSession! : wallets!]),
+      );
+      const { signPumpLaunchGroup } =
+        await import('@/lib/pump-launch-group-signing');
+      guard();
+      return await signPumpLaunchGroup(
+        sessions,
+        view.review,
+        consent,
+        guard,
+        signal,
+      );
+    } finally {
+      if (wallets) clearMintSession(wallets);
+      if (mintSession) clearMintSession(mintSession);
+    }
+  };
   function requestLimits() {
     if (!targets.length || limits.length !== targets.length || !quote)
       throw new Error('Read current holder targets and review every limit.');
@@ -872,37 +999,33 @@ function PumpHolderLaunchReviewContent({
           : 'Open complete launch groups'}
       </Button>
       {groupsOpen && (
+        <label htmlFor={id + '-group-vault'}>
+          Wallet vault passphrase for group signing
+          <Input
+            id={id + '-group-vault'}
+            type="password"
+            autoComplete="current-password"
+            value={vaultPassword}
+            disabled={busy}
+            onChange={(event) => setVaultPassword(event.target.value)}
+          />
+        </label>
+      )}
+      {groupsOpen && (
         <PumpLaunchGroupReview
           projectId={project.id}
-          contextKey={JSON.stringify([
-            project,
-            releaseId,
-            mint?.mint,
-            fee,
-            developerCap,
-            targets,
-            limits,
-          ])}
+          contextKey={groupContext}
           disabled={actionBusy}
           onBusyChange={setGroupBusy}
+          canSign={groupSignReady}
+          onSign={signGroup}
           canPrepare={
             !actionBusy &&
             backedUp &&
             !!targets.length &&
             targetReasons.length === 0
           }
-          prepareRequest={() => ({
-            ...ownTerms(),
-            ...(plan!.developerBuy > 0
-              ? {
-                  developerMaximumQuoteCostRaw: holderAmountRaw(
-                    developerCap,
-                    quote!.decimals,
-                  ),
-                }
-              : {}),
-            holderLimits: requestLimits(),
-          })}
+          prepareRequest={groupTerms}
         />
       )}
       {launch && (

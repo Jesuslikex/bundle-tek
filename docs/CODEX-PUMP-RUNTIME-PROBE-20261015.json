@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-10-15T02:44:21.971Z",
+  "operation": "unsigned-nonempty-v1-replay-profile",
+  "classification": "nonempty-v1-sequential-profile-verified",
+  "userWallets": 0,
+  "broadcasts": 0,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "referenceSource": "public-validator-identity",
+  "format": "pump-v1-replay-profile-probe-v1",
+  "bankSlot": 457075624,
+  "packetCount": 2,
+  "networkFeesRaw": [
+    "5000",
+    "5000"
+  ],
+  "reads": 5,
+  "originalBlockhashRetained": true,
+  "programAttestationRequired": true
+}

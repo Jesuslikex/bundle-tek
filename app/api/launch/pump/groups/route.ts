@@ -1,3 +1,8 @@
+import {
+  previewOwnedPumpGroupRuntime,
+  authorizeOwnedPumpGroupSigning,
+} from '@/lib/pump-group-runtime-service';
+import { recoverOwnedPumpLaunchGroup } from '@/lib/pump-launch-group-terminal-service';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { PumpPreflightError } from '@/lib/owned-pump-preflight';
@@ -251,6 +256,39 @@ export async function POST(request: Request) {
         ),
       );
     const rpc = configuredRpc();
+    if (action.action === 'runtime-preview')
+      return json(
+        await previewOwnedPumpGroupRuntime(
+          db,
+          user.userId,
+          action.id,
+          signal,
+          rpc,
+        ),
+      );
+    if (action.action === 'authorize-signing')
+      return json(
+        await authorizeOwnedPumpGroupSigning(
+          db,
+          user.userId,
+          action.id,
+          action.previewId,
+          action.consent,
+          action.codeConsent,
+          signal,
+          rpc,
+        ),
+      );
+    if (action.action === 'recover')
+      return json(
+        await recoverOwnedPumpLaunchGroup(
+          db,
+          user.userId,
+          action.id,
+          signal,
+          rpc,
+        ),
+      );
     if (action.action === 'prepare')
       return json(
         await preparePumpLaunchGroupReview(
