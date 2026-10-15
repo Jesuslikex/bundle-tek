@@ -1,6 +1,7 @@
 import schema from './jupiter-route-schema.json';
 import type { SwapInstructionReview } from './swap-instruction-review';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
+import { supportedSwapTokenProgram } from './swap-token-program-evidence';
 const JUPITER = 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4';
 const labels: Record<string, string> = {
   inputAmount: 'input amount',
@@ -224,6 +225,8 @@ export function assessJupiterRoute(
         destinationAccount: string;
         inputMint: string | null;
         outputMint: string;
+        inputTokenProgram?: string;
+        outputTokenProgram?: string;
       })
     | null = null;
   let status: 'Matched fields' | 'Mismatch' | 'Unavailable' = 'Unavailable';
@@ -305,6 +308,12 @@ export function assessJupiterRoute(
             destinationAccount: destination.address,
             inputMint,
             outputMint,
+            ...(value.v2
+              ? {
+                  inputTokenProgram: accounts[value.shared ? 8 : 5].address,
+                  outputTokenProgram: accounts[value.shared ? 9 : 6].address,
+                }
+              : {}),
           };
           const reached = new Set([0]);
           const outgoing = new Set<number>();
@@ -368,11 +377,15 @@ export function assessJupiterRoute(
             noPositiveSlippageFee: value.positiveSlippageBps === 0,
             ...(value.v2
               ? {
-                  tokenPrograms:
-                    accounts[value.shared ? 8 : 5].address ===
-                      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' &&
-                    accounts[value.shared ? 9 : 6].address ===
-                      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+                  tokenPrograms: [
+                    accounts[value.shared ? 8 : 5],
+                    accounts[value.shared ? 9 : 6],
+                  ].every(
+                    (account) =>
+                      supportedSwapTokenProgram(account.address) &&
+                      !account.signer &&
+                      !account.writable,
+                  ),
                   tokenDestination:
                     value.shared ||
                     accounts[7].address === JUPITER ||

@@ -54,19 +54,37 @@ it.each([
   { side: 'Sell' as const, keepWrapped: true },
   { side: 'Buy' as const, v2: true, fee: 2, lookup: true, shared: false },
   { side: 'Sell' as const, v2: true, fee: 2, lookup: true },
+  { side: 'Buy' as const, v2: true, token2022: true },
+  {
+    side: 'Buy' as const,
+    v2: true,
+    token2022: true,
+    lookup: true,
+    shared: false,
+    seed: true,
+  },
+  { side: 'Sell' as const, v2: true, token2022: true },
+  {
+    side: 'Sell' as const,
+    v2: true,
+    token2022: true,
+    lookup: true,
+    shared: false,
+    existing: true,
+  },
 ])(
   'reviews exact wrapping, account rent and cleanup for %j, and verifies its signed final receipt',
   async (options) => {
     const f = await nativeWarmupFixture(options),
       settlement = await requireWarmupSigningReview(f.order, f.simulation);
     expect(settlement).toMatchObject({
-      version: 1,
+      version: options.token2022 ? 2 : 1,
       wrappedFromNativeRaw:
         options.side === 'Buy' && !options.existing ? '1000000' : '0',
       closesWrappedAccount: !options.keepWrapped,
     });
     expect(BigInt(settlement.maximumNativeDebitLamports)).toBeLessThanOrEqual(
-      5083560n,
+      options.token2022 ? 5118360n : 5083560n,
     );
     expect(settlement.lookupTables.length).toBe(options.lookup ? 1 : 0);
     const prep = saved(f);
@@ -101,6 +119,7 @@ it.each([
       prep,
       f.signed.signature,
       options.side,
+      options.token2022 ? review : undefined,
     );
     expect(receipt.acquiredRaw).toBe('1000');
     expect(receipt.nativeSettlementRaw).toBe(
@@ -108,6 +127,53 @@ it.each([
     );
   },
 );
+it('requires independent Token-2022 program, precision, rent and post-state proof through signing and receipt recovery', async () => {
+  const f = await nativeWarmupFixture({
+    side: 'Buy',
+    v2: true,
+    token2022: true,
+  });
+  const edits: ((s: typeof f.simulation) => void)[] = [
+    (s) => {
+      delete s.token2022Evidence;
+    },
+    (s) => {
+      s.token2022Evidence!.mints[1].program =
+        '11111111111111111111111111111111';
+    },
+    (s) => {
+      s.token2022Evidence!.mints[1].decimals = 7;
+    },
+    (s) => {
+      s.token2022Evidence!.recheckSlot = s.simulationSlot - 1;
+    },
+    (s) => {
+      s.token2022Evidence!.rentLamports = '2039280';
+    },
+    (s) => {
+      s.routeAssessment.decoded!.outputTokenProgram =
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+    },
+    (s) => {
+      (s.settlementEvidence!.postAccounts![1] as { owner: string }).owner =
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+    },
+    (s) => {
+      const raw = s.settlementEvidence!.postAccounts![1] as { data: string[] };
+      const bytes = Uint8Array.from(atob(raw.data[0]), (c) => c.charCodeAt(0));
+      bytes[108] = 2;
+      raw.data[0] = btoa(String.fromCharCode(...bytes));
+    },
+  ];
+  for (const edit of edits) {
+    const s = structuredClone(f.simulation);
+    edit(s);
+    await expect(requireWarmupSigningReview(f.order, s)).rejects.toThrow();
+  }
+  await expect(
+    decodeWarmupReceipt(f.receipt, saved(f), f.signed.signature, 'Buy'),
+  ).rejects.toThrow();
+});
 it.each([
   {},
   { existing: true },

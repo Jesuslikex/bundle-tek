@@ -1,10 +1,14 @@
 import bs58 from 'bs58';
 import type { JupiterRouteAssessment } from './jupiter-route-assessment';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
+import { swapTokenBytes } from './swap-token-program-evidence';
 const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
 type AccountBinding = {
+  tokenProgram?: string;
+  byteLength?: number;
+  expectedProgram?: string;
   exists?: boolean;
   lamports?: string;
   amountRaw?: string;
@@ -30,7 +34,7 @@ export async function readSwapTokenAccountBindings(
   rpc: Rpc,
 ) {
   const limitations =
-    'Confirmed chain account bindings only, not simulated post-state. Newly created or temporary wrapped SOL accounts can be absent. Token-2022 extensions, mint authenticity, other instructions, route graph and total debits remain unverified. No signing clearance.';
+    'Confirmed chain account bindings only, not simulated post-state. Newly created or temporary wrapped SOL accounts can be absent. Token-2022 accounts accept only canonical immutable-owner extensions; mint extensions need separate fresh evidence. Mint authenticity, other instructions, route graph and total debits remain unverified. No signing clearance.';
   if (!route.decoded)
     return {
       slot: null,
@@ -45,11 +49,13 @@ export async function readSwapTokenAccountBindings(
       role: 'Source' as const,
       address: route.decoded.sourceAccount,
       expectedMint: order.inputMint,
+      expectedProgram: route.decoded.inputTokenProgram ?? TOKEN,
     },
     {
       role: 'Destination' as const,
       address: route.decoded.destinationAccount,
       expectedMint: order.outputMint,
+      expectedProgram: route.decoded.outputTokenProgram ?? TOKEN,
     },
   ];
   const addresses = [...new Set(selections.map((a) => a.address))];
@@ -102,29 +108,13 @@ export async function readSwapTokenAccountBindings(
     };
     if (typeof account.owner !== 'string' || account.executable !== false)
       throw new Error('Invalid token account metadata.');
-    if (account.owner === TOKEN2022)
-      return {
-        ...base,
-        reason: 'Token-2022 account extensions are outside this binding check.',
-      };
-    if (account.owner !== TOKEN)
+    if (account.owner !== TOKEN && account.owner !== TOKEN2022)
       return {
         ...base,
         status: 'Mismatch',
         reason: 'Account is not owned by a supported token program.',
       };
-    if (
-      !Array.isArray(account.data) ||
-      account.data.length !== 2 ||
-      account.data[1] !== 'base64' ||
-      typeof account.data[0] !== 'string' ||
-      account.data[0].length !== 220
-    )
-      throw new Error('Invalid standard token account data.');
-    const text = atob(account.data[0]);
-    if (btoa(text) !== account.data[0] || text.length !== 165)
-      throw new Error('Invalid standard token account encoding.');
-    const bytes = Uint8Array.from(text, (c) => c.charCodeAt(0));
+    const { bytes, program } = swapTokenBytes(account, false);
     const view = new DataView(bytes.buffer);
     const key = (offset: number) =>
       bs58.encode(bytes.slice(offset, offset + 32));
@@ -142,12 +132,15 @@ export async function readSwapTokenAccountBindings(
     const mint = key(0),
       walletOwner = key(32);
     const matches =
+      program === selection.expectedProgram &&
       mint === selection.expectedMint &&
       walletOwner === order.preparation.wallet &&
       bytes[108] === 1;
     return {
       ...base,
       exists: true,
+      tokenProgram: program,
+      byteLength: bytes.length,
       ...(typeof account.lamports === 'string' &&
       /^(0|[1-9]\d{0,19})$/.test(account.lamports)
         ? { lamports: account.lamports }
@@ -163,7 +156,7 @@ export async function readSwapTokenAccountBindings(
       status: matches ? 'Matched bindings' : 'Mismatch',
       reason: matches
         ? 'Mint, wallet owner and initialized state match.'
-        : 'Mint, wallet owner or initialized state differs from the selected order.',
+        : 'Token program, mint, wallet owner or initialized state differs from the selected order.',
     };
   });
   return {

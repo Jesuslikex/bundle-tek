@@ -19,6 +19,7 @@ import { transactionSignature } from './tracked-wallet-transaction';
 import { walletAddress } from './wallet-workspace';
 import type { SavedWarmupPreparation } from './warmup-preparation-history';
 import type { UnsignedSwapPreparationSummary } from './imported-swap-preparation-history';
+import { swapToken2022Programs } from './swap-token-program-evidence';
 const WRAPPED = 'So11111111111111111111111111111111111111112';
 const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const object = (value: unknown): Record<string, unknown> => {
@@ -189,6 +190,9 @@ export async function decodeWarmupReceipt(
     after.map(String),
     meta.preTokenBalances,
     meta.postTokenBalances,
+    approval?.settlement?.version === 2
+      ? swapToken2022Programs(approval.settlement.token2022Evidence!, saved)
+      : undefined,
   );
   const nativeOutput =
     after[0] -
@@ -206,7 +210,18 @@ export async function decodeWarmupReceipt(
   if (
     !tokens.complete ||
     matches.length !== 1 ||
-    matches[0].program !== TOKEN ||
+    matches[0].program !==
+      (approval?.settlement?.version === 2
+        ? swapToken2022Programs(
+            approval.settlement.token2022Evidence!,
+            saved,
+          ).get(mint)
+        : TOKEN) ||
+    (approval?.settlement?.version === 2 &&
+      matches[0].decimals !==
+        approval.settlement.token2022Evidence?.mints.find(
+          (m) => m.address === mint,
+        )?.decimals) ||
     (side === 'Buy'
       ? BigInt(matches[0].changeRaw) <= 0n ||
         BigInt(matches[0].changeRaw) > (1n << 64n) - 1n ||

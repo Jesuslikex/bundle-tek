@@ -18,6 +18,14 @@ import {
   requireConsistentSolanaSlots,
 } from './solana-rpc';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
+import {
+  SWAP_TOKEN_2022,
+  SWAP_TOKEN,
+  SWAP_TOKEN_2022_ACCOUNT_SIZE,
+  readSwapMintEvidence,
+  assertSameSwapMintEvidence,
+  type SwapToken2022Evidence,
+} from './swap-token-program-evidence';
 const integer = (value: unknown) => {
   if (
     typeof value !== 'string' ||
@@ -101,6 +109,36 @@ export async function simulateImportedSwap(
         rpc,
       )
     : null;
+  const routePrograms = routeAssessment.decoded;
+  const token2022 =
+    signingEvidence &&
+    routePrograms?.v2 &&
+    [
+      routePrograms.inputTokenProgram,
+      routePrograms.outputTokenProgram,
+    ].includes(SWAP_TOKEN_2022);
+  const mintBefore =
+    signingEvidence && routePrograms
+      ? await readSwapMintEvidence(order, beforeBindings?.slot ?? feeSlot, rpc)
+      : null;
+  if (
+    mintBefore &&
+    (mintBefore.mints[0].program !==
+      (routePrograms?.v2 ? routePrograms.inputTokenProgram : SWAP_TOKEN) ||
+      mintBefore.mints[1].program !==
+        (routePrograms?.v2 ? routePrograms.outputTokenProgram : SWAP_TOKEN))
+  )
+    throw new Error(
+      'Route token programs differ from independently observed mints.',
+    );
+  const token2022Rent = token2022
+    ? integer(
+        await rpc('getMinimumBalanceForRentExemption', [
+          SWAP_TOKEN_2022_ACCOUNT_SIZE,
+          { commitment: 'confirmed' },
+        ]),
+      ).toString()
+    : null;
   const rent = signingEvidence
     ? integer(
         await rpc('getMinimumBalanceForRentExemption', [
@@ -117,7 +155,10 @@ export async function simulateImportedSwap(
       sigVerify: false,
       replaceRecentBlockhash: false,
       minContextSlot:
-        beforeBindings?.slot ?? lookupAccounts?.observedSlot ?? feeSlot,
+        mintBefore?.slot ??
+        beforeBindings?.slot ??
+        lookupAccounts?.observedSlot ??
+        feeSlot,
       ...(signingEvidence && routeAssessment.decoded
         ? {
             accounts: {
@@ -148,6 +189,7 @@ export async function simulateImportedSwap(
   const simulationSlot = slot(result.context.slot);
   if (
     simulationSlot < feeSlot ||
+    (mintBefore !== null && simulationSlot < mintBefore.slot) ||
     (beforeBindings?.slot != null && simulationSlot < beforeBindings.slot) ||
     result.value.replacementBlockhash != null
   )
@@ -260,6 +302,31 @@ export async function simulateImportedSwap(
   ]);
   if (Date.parse(order.expiresAt) <= Date.now())
     throw new Error('Order expired during account observation.');
+  let token2022Evidence: SwapToken2022Evidence | undefined;
+  if (mintBefore) {
+    const mintAfter = await readSwapMintEvidence(
+      order,
+      lookupRecheckSlot ?? simulationSlot,
+      rpc,
+    );
+    assertSameSwapMintEvidence(mintBefore, mintAfter);
+    requireConsistentSolanaSlots([
+      feeSlot,
+      simulationSlot,
+      mintBefore.slot,
+      mintAfter.slot,
+    ]);
+    if (token2022)
+      token2022Evidence = {
+        format: 'swap-token-2022-evidence-v1',
+        ...mintBefore,
+        recheckSlot: mintAfter.slot,
+        accountSize: SWAP_TOKEN_2022_ACCOUNT_SIZE,
+        rentLamports: token2022Rent!,
+      };
+    if (Date.parse(order.expiresAt) <= Date.now())
+      throw new Error('Order expired during mint recheck.');
+  }
   return {
     executionAllowed: false as const,
     instructionsVerified: false as const,
@@ -281,6 +348,7 @@ export async function simulateImportedSwap(
     instructionReview,
     routeAssessment,
     accountBindings,
+    ...(token2022Evidence ? { token2022Evidence } : {}),
     settlementEvidence: signingEvidence
       ? {
           keys: [

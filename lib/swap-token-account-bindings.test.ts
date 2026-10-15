@@ -35,7 +35,7 @@ it('binds both actual accounts to selected mints and wallet owner with bounded c
   ]);
   expect(bindings.limitations).toContain('not simulated post-state');
 });
-it('reports wrong mint, wallet, frozen state and non-token program as mismatches; missing and Token-2022 remain unavailable', async () => {
+it('reports wrong mint, wallet, frozen state and non-token program as mismatches; missing accounts remain unavailable', async () => {
   for (const raw of [
     tokenAccountFixture(routeOrder.outputMint),
     tokenAccountFixture(routeOrder.inputMint, routeOrder.outputMint),
@@ -51,13 +51,7 @@ it('reports wrong mint, wallet, frozen state and non-token program as mismatches
     );
     expect(result.status).toBe('Mismatch');
   }
-  for (const raw of [
-    null,
-    {
-      ...tokenAccountFixture(),
-      owner: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
-    },
-  ]) {
+  for (const raw of [null]) {
     expect(
       (
         await readSwapTokenAccountBindings(
@@ -81,6 +75,38 @@ it('reports wrong mint, wallet, frozen state and non-token program as mismatches
     ).slot,
   ).toBeNull();
   expect(rpc).not.toHaveBeenCalled();
+});
+it('reads canonical Token-2022 base bindings without claiming independent mint-extension or signing clearance', async () => {
+  const raw = {
+    ...tokenAccountFixture(routeOrder.outputMint),
+    owner: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+  };
+  const review = routeReview({ v2: true });
+  review.instructions[0].accounts[9].address = raw.owner;
+  const result = await readSwapTokenAccountBindings(
+    assessJupiterRoute(review, routeOrder),
+    routeOrder,
+    101,
+    response([tokenAccountFixture(), raw]),
+  );
+  expect(result.accounts[1]).toMatchObject({
+    status: 'Matched bindings',
+    tokenProgram: raw.owner,
+    byteLength: 165,
+  });
+  expect(result.limitations).toContain(
+    'mint extensions need separate fresh evidence',
+  );
+  expect(
+    (
+      await readSwapTokenAccountBindings(
+        route,
+        routeOrder,
+        101,
+        response([tokenAccountFixture(), raw]),
+      )
+    ).status,
+  ).toBe('Mismatch');
 });
 it('rejects malformed binary layouts, option tags, account metadata and stale or distant contexts', async () => {
   const valid = tokenAccountFixture();

@@ -6,6 +6,12 @@ import {
   assessJupiterExactOutRoute,
   type JupiterExactOutOrder,
 } from './jupiter-exact-out-assessment';
+import {
+  swapTokenBytes,
+  swapToken2022Programs,
+  SWAP_TOKEN_2022,
+  type SwapToken2022Evidence,
+} from './swap-token-program-evidence';
 export const WARMUP_TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 export const WARMUP_NATIVE = 'So11111111111111111111111111111111111111112';
 const SYSTEM = '11111111111111111111111111111111';
@@ -20,12 +26,18 @@ const uint = (v: unknown) => {
     throw new Error('Signing requires complete account integers.');
   return BigInt(v);
 };
-type Token = { mint: string; amount: bigint; decimals: number };
+type Token = {
+  mint: string;
+  amount: bigint;
+  decimals: number;
+  program: string;
+};
 // Preserve each account identity instead of relying on a mint-level net balance.
 export function warmupAccountTokens(
   keys: readonly string[],
   wallet: string,
   raw: unknown,
+  programs?: ReadonlyMap<string, string>,
 ) {
   if (!Array.isArray(raw) || raw.length > 256)
     throw new Error('Signing requires complete account token metadata.');
@@ -40,7 +52,7 @@ export function warmupAccountTokens(
       throw new Error('Signing requires token ownership metadata.');
     if (entry.owner !== wallet) continue;
     if (
-      entry.programId !== WARMUP_TOKEN ||
+      entry.programId !== (programs?.get(entry.mint) ?? WARMUP_TOKEN) ||
       bs58.decode(entry.mint).length !== 32
     )
       throw new Error('Signing requires standard SPL tokens.');
@@ -51,6 +63,7 @@ export function warmupAccountTokens(
       mint: entry.mint,
       amount: uint(entry.uiTokenAmount?.amount),
       decimals,
+      program: entry.programId,
     });
   }
   return values;
@@ -62,6 +75,7 @@ export function warmupRentChange(
   after: readonly string[],
   preTokens: unknown,
   postTokens: unknown,
+  programs?: ReadonlyMap<string, string>,
 ) {
   if (
     before.length !== keys.length ||
@@ -70,8 +84,8 @@ export function warmupRentChange(
     new Set(keys).size !== keys.length
   )
     throw new Error('Signing requires complete native account balances.');
-  const pre = warmupAccountTokens(keys, wallet, preTokens),
-    post = warmupAccountTokens(keys, wallet, postTokens);
+  const pre = warmupAccountTokens(keys, wallet, preTokens, programs),
+    post = warmupAccountTokens(keys, wallet, postTokens, programs);
   let rentChange = 0n;
   for (const index of new Set([...pre.keys(), ...post.keys()])) {
     const first = pre.get(index),
@@ -80,7 +94,9 @@ export function warmupRentChange(
     if (
       first &&
       last &&
-      (first.mint !== last.mint || first.decimals !== last.decimals)
+      (first.mint !== last.mint ||
+        first.decimals !== last.decimals ||
+        first.program !== last.program)
     )
       throw new Error('Signing requires stable account mint identities.');
     const start = uint(before[index]),
@@ -104,6 +120,7 @@ function postToken(
   wallet: string,
   amount: bigint,
   lamports: bigint,
+  program: string,
 ) {
   const account = raw as {
     owner?: unknown;
@@ -113,7 +130,7 @@ function postToken(
   };
   if (
     !account ||
-    account.owner !== WARMUP_TOKEN ||
+    account.owner !== program ||
     account.executable !== false ||
     uint(account.lamports) !== lamports ||
     !Array.isArray(account.data) ||
@@ -122,10 +139,8 @@ function postToken(
     typeof account.data[0] !== 'string'
   )
     throw new Error('Signing requires simulated standard token post-state.');
-  const text = atob(account.data[0]);
-  if (text.length !== 165 || btoa(text) !== account.data[0])
-    throw new Error('Signing requires canonical token post-state.');
-  const bytes = Uint8Array.from(text, (c) => c.charCodeAt(0)),
+  const decoded = swapTokenBytes(account, false);
+  const bytes = decoded.bytes,
     view = new DataView(bytes.buffer);
   if (
     bs58.encode(bytes.slice(0, 32)) !== mint ||
@@ -145,6 +160,7 @@ function postToken(
     (native === 1 && view.getBigUint64(113, true) !== lamports - amount)
   )
     throw new Error('Signing requires matched native reserve.');
+  return decoded;
 }
 export async function warmupAccountKeysHash(keys: readonly string[]) {
   return Array.from(
@@ -159,7 +175,8 @@ export async function warmupAccountKeysHash(keys: readonly string[]) {
 }
 export type WarmupSettlement = {
   accountKeysSha256: string;
-  version: 1;
+  version: 1 | 2;
+  token2022Evidence?: SwapToken2022Evidence;
   wrappedFromNativeRaw: string;
   maximumRentLamports: string;
   maximumNativeDebitLamports: string;
@@ -193,9 +210,16 @@ export type NativeSettlementSimulation = Pick<
   | 'networkFeeLamports'
   | 'lookupObservation'
   | 'simulationSlot'
+  | 'token2022Evidence'
 > & {
   routeAssessment: {
-    decoded: { sourceAccount: string; destinationAccount: string } | null;
+    decoded: {
+      sourceAccount: string;
+      destinationAccount: string;
+      v2?: boolean;
+      inputTokenProgram?: string;
+      outputTokenProgram?: string;
+    } | null;
   };
 };
 export async function reviewWarmupSettlement(
@@ -332,6 +356,26 @@ async function reviewNativeSettlement(
     throw new Error('Signing requires fresh setup and settlement evidence.');
   const { keys, before, after } = evidence,
     wallet = order.preparation.wallet;
+  const token2022Proof = simulation.token2022Evidence;
+  if (
+    [route.inputTokenProgram, route.outputTokenProgram].includes(
+      SWAP_TOKEN_2022,
+    ) &&
+    !token2022Proof
+  )
+    throw new Error('Signing requires independent Token-2022 mint evidence.');
+  const programs = token2022Proof
+    ? swapToken2022Programs(token2022Proof, order, simulation.simulationSlot)
+    : undefined;
+  if (
+    programs &&
+    (route.v2 !== true ||
+      route.inputTokenProgram !== programs.get(order.inputMint) ||
+      route.outputTokenProgram !== programs.get(order.outputMint))
+  )
+    throw new Error(
+      'Signing requires independently bound route token programs.',
+    );
   if (
     simulation.nativeChangeRaw !== (uint(after[0]) - uint(before[0])).toString()
   )
@@ -350,6 +394,7 @@ async function reviewNativeSettlement(
     after,
     evidence.preTokens,
     evidence.postTokens,
+    programs,
   );
   if (
     !Array.isArray(evidence.postAccounts) ||
@@ -359,7 +404,12 @@ async function reviewNativeSettlement(
   const states = simulation.accountBindings.accounts.map(
     (binding, position) => {
       const index = keys.indexOf(binding.address),
-        mint = position === 0 ? order.inputMint : order.outputMint;
+        mint = position === 0 ? order.inputMint : order.outputMint,
+        program = programs?.get(mint) ?? WARMUP_TOKEN,
+        accountRent =
+          program === SWAP_TOKEN_2022
+            ? uint(token2022Proof!.rentLamports)
+            : rent;
       if (
         binding.address !==
           (position === 0 ? route.sourceAccount : route.destinationAccount) ||
@@ -382,6 +432,7 @@ async function reviewNativeSettlement(
             binding.delegatedAmountRaw !== '0' ||
             uint(binding.lamports) !== start ||
             !initial ||
+            (binding.tokenProgram ?? WARMUP_TOKEN) !== program ||
             uint(binding.amountRaw) !== initial.amount
       )
         throw new Error(
@@ -389,6 +440,14 @@ async function reviewNativeSettlement(
         );
       if ((initial && initial.mint !== mint) || (final && final.mint !== mint))
         throw new Error('Signing requires matching simulated mint bindings.');
+      const declaredDecimals = token2022Proof?.mints.find(
+        (m) => m.address === mint,
+      )?.decimals;
+      if (
+        declaredDecimals !== undefined &&
+        [initial, final].some((t) => t && t.decimals !== declaredDecimals)
+      )
+        throw new Error('Signing requires observed mint precision.');
       const firstRent =
         start - (mint === WARMUP_NATIVE ? (initial?.amount ?? 0n) : 0n);
       if (
@@ -417,16 +476,27 @@ async function reviewNativeSettlement(
       if (closed ? end !== 0n || final !== undefined : !final)
         throw new Error('Signing requires complete cleanup metadata.');
       if (!closed) {
-        postToken(
+        const decodedPost = postToken(
           evidence.postAccounts![position],
           mint,
           wallet,
           final!.amount,
           end,
+          program,
         );
         if (
+          program === SWAP_TOKEN_2022 &&
+          (absent
+            ? decodedPost.bytes.length !== token2022Proof!.accountSize ||
+              !decodedPost.extensions.includes('ImmutableOwner')
+            : decodedPost.bytes.length !== binding.byteLength)
+        )
+          throw new Error(
+            'Signing requires stable Token-2022 account allocation.',
+          );
+        if (
           end - (mint === WARMUP_NATIVE ? final!.amount : 0n) !==
-          (absent ? rent : firstRent)
+          (absent ? accountRent : firstRent)
         )
           throw new Error('Signing requires unchanged account rent.');
       }
@@ -434,6 +504,8 @@ async function reviewNativeSettlement(
         binding,
         index,
         mint,
+        program,
+        accountRent,
         absent,
         closed,
         initial,
@@ -507,7 +579,7 @@ async function reviewNativeSettlement(
         a[2]?.address !== wallet ||
         !readonly(3, s.mint) ||
         !readonly(4, SYSTEM) ||
-        !readonly(5, WARMUP_TOKEN) ||
+        !readonly(5, s.program) ||
         (a.length === 7 && !readonly(6, RENT)) ||
         !(bytes.length === 0 || (bytes.length === 1 && bytes[0] <= 1)) ||
         s.createdAt !== -1
@@ -517,7 +589,7 @@ async function reviewNativeSettlement(
         programAddress: address(ATA),
         seeds: [
           bs58.decode(wallet),
-          bs58.decode(WARMUP_TOKEN),
+          bs58.decode(s.program),
           bs58.decode(s.mint),
         ],
       });
@@ -528,7 +600,7 @@ async function reviewNativeSettlement(
         fail();
       s.createdAt = instruction.index;
       s.initializedAt = instruction.index;
-      if (s.absent) setupDebit += rent;
+      if (s.absent) setupDebit += s.accountRent;
     } else if (
       program === SYSTEM &&
       bytes.length === 12 &&
@@ -706,7 +778,7 @@ async function reviewNativeSettlement(
       'Network debit or minimum native output differs from the signing limit.',
     );
   const maximumRent = states.reduce(
-    (sum, s) => sum + (s.absent ? rent : 0n),
+    (sum, s) => sum + (s.absent ? s.accountRent : 0n),
     0n,
   );
   if (
@@ -730,7 +802,10 @@ async function reviewNativeSettlement(
   )
     throw new Error('Signing requires rechecked lookup tables.');
   const settlement: WarmupSettlement = {
-    version: 1,
+    version: token2022Proof ? 2 : 1,
+    ...(token2022Proof
+      ? { token2022Evidence: structuredClone(token2022Proof) }
+      : {}),
     accountKeysSha256: await warmupAccountKeysHash(keys),
     wrappedFromNativeRaw: wrapped.funding.toString(),
     maximumRentLamports: maximumRent.toString(),

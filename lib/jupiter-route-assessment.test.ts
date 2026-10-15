@@ -2,6 +2,26 @@ import { expect, it } from 'vitest';
 import { routeOrder, routeReview } from '../test/jupiter-route-fixture';
 import { assessJupiterRoute } from './jupiter-route-assessment';
 import schema from './jupiter-route-schema.json';
+it('recognizes V2 Token-2022 program declarations but refuses signer or writable token programs', () => {
+  for (const shared of [false, true]) {
+    const review = routeReview({ v2: true, shared }),
+      index = shared ? 9 : 6;
+    review.instructions[0].accounts[index].address =
+      'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+    expect(assessJupiterRoute(review, routeOrder)).toMatchObject({
+      status: 'Matched fields',
+      decoded: {
+        outputTokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+      },
+      executionAllowed: false,
+    });
+    for (const privilege of ['signer', 'writable'] as const) {
+      const altered = structuredClone(review);
+      altered.instructions[0].accounts[index][privilege] = true;
+      expect(assessJupiterRoute(altered, routeOrder).status).toBe('Mismatch');
+    }
+  }
+});
 it('matches V2 ordinary and shared layouts with declared capped fees and rejects changed fees, native receivers and excess fees', () => {
   for (const shared of [false, true]) {
     const order = {

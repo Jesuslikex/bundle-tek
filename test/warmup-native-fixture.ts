@@ -19,6 +19,8 @@ import {
 } from '../lib/warmup-native-settlement';
 import schema from '../lib/jupiter-route-schema.json';
 import type { SolanaSwapPreparation } from '../lib/warmup-swap-quote';
+import { SWAP_TOKEN_2022 } from '../lib/swap-token-program-evidence';
+import { getExtensionEncoder } from '@solana-program/token-2022';
 const SYSTEM = '11111111111111111111111111111111';
 const ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
 const JUPITER = 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4';
@@ -40,13 +42,20 @@ export async function nativeWarmupFixture(
     initializer?: 1 | 16 | 18;
     walletSeed?: number;
     seedRentOnly?: boolean;
+    token2022?: boolean;
   } = {},
 ) {
   const origin = options.slot ?? 100;
+  if (options.token2022 && !options.v2)
+    throw new Error('Token-2022 fixture requires a V2 route.');
+  const mintProgram = options.token2022 ? SWAP_TOKEN_2022 : TOKEN,
+    mintRent = options.token2022 ? 2074080n : RENT;
   const side = options.side ?? 'Buy',
     seeded = options.seed === true,
     existing = options.existing === true;
-  const pair = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(options.walletSeed ?? 7)),
+  const pair = nacl.sign.keyPair.fromSeed(
+      new Uint8Array(32).fill(options.walletSeed ?? 7),
+    ),
     wallet = bs58.encode(pair.publicKey),
     mint = key(3);
   const [nativeAta] = await getProgramDerivedAddress({
@@ -55,7 +64,7 @@ export async function nativeWarmupFixture(
   });
   const [tokenAta] = await getProgramDerivedAddress({
     programAddress: address(ATA),
-    seeds: [bs58.decode(wallet), bs58.decode(TOKEN), bs58.decode(mint)],
+    seeds: [bs58.decode(wallet), bs58.decode(mintProgram), bs58.decode(mint)],
   });
   const seed = new TextEncoder().encode('warmup-test');
   const temporary = bs58.encode(
@@ -135,7 +144,7 @@ export async function nativeWarmupFixture(
     }
   }
   if (side === 'Buy')
-    add(ATA, [wallet, tokenAta, wallet, mint, SYSTEM, TOKEN], [1]);
+    add(ATA, [wallet, tokenAta, wallet, mint, SYSTEM, mintProgram], [1]);
   const variant = schema.variants.findIndex(
     (v) =>
       v.name ===
@@ -159,8 +168,8 @@ export async function nativeWarmupFixture(
             destination,
             side === 'Buy' ? NATIVE : mint,
             side === 'Buy' ? mint : NATIVE,
-            TOKEN,
-            TOKEN,
+            side === 'Buy' ? TOKEN : mintProgram,
+            side === 'Buy' ? mintProgram : TOKEN,
             JUPITER,
             'D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf',
             JUPITER,
@@ -174,8 +183,8 @@ export async function nativeWarmupFixture(
             destination,
             side === 'Buy' ? NATIVE : mint,
             side === 'Buy' ? mint : NATIVE,
-            TOKEN,
-            TOKEN,
+            side === 'Buy' ? TOKEN : mintProgram,
+            side === 'Buy' ? mintProgram : TOKEN,
             'D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf',
             JUPITER,
           ]
@@ -285,20 +294,30 @@ export async function nativeWarmupFixture(
     limitations: 'Controlled fixture only.',
   };
   const tokenAccount = (tokenMint: string, amount: bigint) => {
-    const bytes = new Uint8Array(165),
+    const modern = options.token2022 && tokenMint === mint;
+    const bytes = new Uint8Array(modern ? 170 : 165),
       view = new DataView(bytes.buffer);
     bytes.set(bs58.decode(tokenMint), 0);
     bytes.set(bs58.decode(wallet), 32);
     view.setBigUint64(64, amount, true);
     bytes[108] = 1;
+    if (modern) {
+      bytes[165] = 2;
+      bytes.set(
+        getExtensionEncoder().encode({ __kind: 'ImmutableOwner' }),
+        166,
+      );
+    }
     if (tokenMint === NATIVE) {
       view.setUint32(109, 1, true);
       view.setBigUint64(113, RENT, true);
     }
     return {
-      owner: TOKEN,
+      owner: modern ? SWAP_TOKEN_2022 : TOKEN,
       executable: false,
-      lamports: (RENT + (tokenMint === NATIVE ? amount : 0n)).toString(),
+      lamports: (
+        (modern ? mintRent : RENT) + (tokenMint === NATIVE ? amount : 0n)
+      ).toString(),
       data: [wire(bytes), 'base64'],
     };
   };
@@ -360,7 +379,11 @@ export async function nativeWarmupFixture(
               accountIndex: String(accountIndex[n]),
               mint: n === 0 ? order.inputMint : order.outputMint,
               owner: wallet,
-              programId: TOKEN,
+              programId:
+                options.token2022 &&
+                (n === 0 ? order.inputMint : order.outputMint) === mint
+                  ? SWAP_TOKEN_2022
+                  : TOKEN,
               uiTokenAmount: {
                 amount: (n === 0
                   ? side === 'Buy'
@@ -415,6 +438,16 @@ export async function nativeWarmupFixture(
     },
     accounts: last,
   };
+  const mints = [order.inputMint, order.outputMint].map((tokenMint) => {
+    const bytes = new Uint8Array(82);
+    bytes[44] = tokenMint === NATIVE ? 9 : 6;
+    bytes[45] = 1;
+    return {
+      owner: tokenMint === NATIVE ? TOKEN : mintProgram,
+      executable: false,
+      data: [wire(bytes), 'base64'],
+    };
+  });
   const fetcher = async (_url: unknown, init?: RequestInit) => {
     const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}');
     let result: unknown;
@@ -429,14 +462,19 @@ export async function nativeWarmupFixture(
         result = { context: { slot: origin }, value: 5000 };
         break;
       case 'getMinimumBalanceForRentExemption':
-        result = Number(RENT);
+        result = Number(body.params[0] === 170 ? mintRent : RENT);
         break;
       case 'getMultipleAccounts':
         result = {
           context: {
             slot: Math.max(origin, Number(body.params[1].minContextSlot)),
           },
-          value: body.params[0][0] === key(9) ? [lookupAccount] : first,
+          value:
+            body.params[0][0] === key(9)
+              ? [lookupAccount]
+              : body.params[0][0] === order.inputMint
+                ? mints
+                : first,
         };
         break;
       case 'simulateTransaction':
@@ -487,5 +525,6 @@ export async function nativeWarmupFixture(
     wallet,
     mint,
     rent: RENT.toString(),
+    mints,
   };
 }

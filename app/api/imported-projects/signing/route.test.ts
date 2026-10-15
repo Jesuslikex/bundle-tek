@@ -182,7 +182,9 @@ beforeEach(async () => {
   mocks.balance.mockReset();
   // IF EXISTS: a test that fails after dropping a trigger must not cascade into later tests.
   await mocks.db
-    .prepare('DROP TRIGGER IF EXISTS imported_swap_signing_events_immutable_delete')
+    .prepare(
+      'DROP TRIGGER IF EXISTS imported_swap_signing_events_immutable_delete',
+    )
     .run();
   await mocks.db.prepare('DELETE FROM imported_swap_signing_events').run();
   await mocks.db
@@ -308,17 +310,27 @@ it('reserves one wallet across warmup and imported approvals, including INSERT O
       .first(),
   ).toEqual({ state: 'cancelled' });
 });
-it.each(['Buy', 'Sell'] as const)(
-  'registers and submits %s once, then atomically recovers the exact finalized receipt across archives',
-  async (side) => {
-    if (side === 'Sell') {
+it.each([
+  { side: 'Buy' as const, token2022: false },
+  { side: 'Sell' as const, token2022: false },
+  { side: 'Buy' as const, token2022: true },
+  { side: 'Sell' as const, token2022: true },
+])(
+  'registers and submits $side once (Token-2022 $token2022), then atomically recovers the exact finalized receipt across archives',
+  async ({ side, token2022 }) => {
+    if (side === 'Sell' || token2022) {
       for (const table of [
         'imported_token_projects',
         'imported_swap_preparations',
         'workspace_wallets',
       ])
         await mocks.db.prepare(`DELETE FROM ${table}`).run();
-      f = await nativeWarmupFixture({ side, lookup: true, v2: true });
+      f = await nativeWarmupFixture({
+        side,
+        lookup: true,
+        v2: true,
+        token2022,
+      });
       await store(f);
       mocks.simulate.mockResolvedValue(f.simulation);
     }
