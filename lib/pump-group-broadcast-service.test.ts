@@ -39,11 +39,18 @@ const clients: Client[] = [],
 afterEach(() => {
   for (const c of clients.splice(0)) c.close();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 async function setup() {
+  const clock = new Date('2026-10-15T12:00:00.000Z');
+  // CPU/SQL setup time must not age synthetic authorization evidence. Native
+  // AbortSignal deadlines and all other timers remain real and enforced.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(clock);
   const f = await pumpGroupBroadcastFixture(
     vi.mocked(preflightOwnedPumpCreate),
     clients,
+    clock,
   );
   const preview = await f.preview();
   await authorizeOwnedPumpGroupSigning(

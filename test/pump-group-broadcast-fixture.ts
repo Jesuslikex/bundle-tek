@@ -25,6 +25,7 @@ import type { PumpLaunchGroupConsent } from '../lib/pump-launch-group-review';
 export async function pumpGroupBroadcastFixture(
   mocked: MockedFunction<typeof preflightOwnedPumpCreate>,
   clients: Client[],
+  sqlClock?: Date,
 ) {
   async function fixture(
     installed = true,
@@ -54,7 +55,17 @@ export async function pumpGroupBroadcastFixture(
       for (const sql of readFileSync(`drizzle/${file}.sql`, 'utf8').split(
         '--> statement-breakpoint',
       ))
-        if (sql.trim()) await f.client.execute(sql);
+        if (sql.trim())
+          // The optional clock is only for disposable timing-independent tests.
+          // Keep production trigger conditions and all freshness limits intact.
+          await f.client.execute(
+            sqlClock
+              ? sql.replaceAll(
+                  "julianday('now')",
+                  `julianday('${sqlClock.toISOString()}')`,
+                )
+              : sql,
+          );
     const signal = () => new AbortController().signal;
     const saved = await preparePumpLaunchGroupReview(
       f.db,
