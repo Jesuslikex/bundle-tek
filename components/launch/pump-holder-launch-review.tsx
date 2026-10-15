@@ -1,4 +1,5 @@
 'use client';
+import dynamic from 'next/dynamic';
 import { useEffectEvent, useEffect, useId, useRef, useState } from 'react';
 import styles from './pump-launch-ui.module.css';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,13 @@ import {
   type HolderProject,
   type HolderSizing,
 } from '@/lib/pump-holder-launch-client';
+const PumpLaunchGroupReview = dynamic(
+  () =>
+    import('./pump-launch-group-review').then(
+      (loaded) => loaded.PumpLaunchGroupReview,
+    ),
+  { loading: () => <p>Loading complete launch groups...</p> },
+);
 type Limit = { address: string; fee: string; quote: string; minimum: string };
 const endpoint = '/api/launch/pump/holders';
 const pendingKey = (id: string) => 'bundle.pump-holders-signed.v1:' + id;
@@ -79,9 +87,12 @@ function PumpHolderLaunchReviewContent({
     [limitsConsent, setLimitsConsent] = useState(false),
     [broadcast, setBroadcast] = useState(false);
   const [pending, setPending] = useState(''),
-    [busy, setBusy] = useState(false),
+    [actionBusy, setBusy] = useState(false),
+    [groupBusy, setGroupBusy] = useState(false),
+    [groupsOpen, setGroupsOpen] = useState(false),
     [error, setError] = useState(''),
     [now, setNow] = useState(() => Date.now());
+  const busy = actionBusy || groupBusy;
   const document = project.document,
     plan = document?.plan;
   let quote: ReturnType<typeof holderQuote> | undefined;
@@ -567,8 +578,9 @@ function PumpHolderLaunchReviewContent({
       <p className="source-note">
         Quote: {plan?.currency ?? 'Save a quote asset'} ·{' '}
         <code className={styles.wrap}>{quote?.address ?? 'Unavailable'}</code>.
-        Stock-token issuer controls still apply. Scheduling and groups exceeding
-        one packet are unavailable.
+        Stock-token issuer controls still apply. Scheduling is unavailable.
+        Complete launch groups below can review multiple packets; group signing
+        and execution remain disabled.
       </p>
       {(!document || !project.payer || plan?.scheduled) && (
         <p>
@@ -848,6 +860,50 @@ function PumpHolderLaunchReviewContent({
             Simulate complete holder launch
           </Button>
         </fieldset>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        disabled={actionBusy || groupBusy}
+        onClick={() => setGroupsOpen((open) => !open)}
+      >
+        {groupsOpen
+          ? 'Close complete launch groups'
+          : 'Open complete launch groups'}
+      </Button>
+      {groupsOpen && (
+        <PumpLaunchGroupReview
+          projectId={project.id}
+          contextKey={JSON.stringify([
+            project,
+            releaseId,
+            mint?.mint,
+            fee,
+            developerCap,
+            targets,
+            limits,
+          ])}
+          disabled={actionBusy}
+          onBusyChange={setGroupBusy}
+          canPrepare={
+            !actionBusy &&
+            backedUp &&
+            !!targets.length &&
+            targetReasons.length === 0
+          }
+          prepareRequest={() => ({
+            ...ownTerms(),
+            ...(plan!.developerBuy > 0
+              ? {
+                  developerMaximumQuoteCostRaw: holderAmountRaw(
+                    developerCap,
+                    quote!.decimals,
+                  ),
+                }
+              : {}),
+            holderLimits: requestLimits(),
+          })}
+        />
       )}
       {launch && (
         <div className={styles.review}>

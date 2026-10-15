@@ -500,3 +500,68 @@ it('shows saved review steps while leaving signing and broadcast consent uncheck
   expect(mocks.sign).not.toHaveBeenCalled();
   expect(calls).toHaveLength(0);
 });
+
+it('passes every current raw wallet limit to the complete-group endpoint and blocks competing preparation during its request', async () => {
+  input('Deployer maximum', '0.01');
+  input(
+    'Maximum developer buy spend',
+    holderDisplayRaw('100000000', f.built.quote.decimals),
+  );
+  await click('Read current holder targets');
+  input(
+    'Holder 1 maximum quote spend',
+    holderDisplayRaw('100000000', f.built.quote.decimals),
+  );
+  input(
+    'Holder 2 maximum quote spend',
+    holderDisplayRaw('100000000', f.built.quote.decimals),
+  );
+  check('I saved');
+  const fetcher = vi.mocked(fetch),
+    original = fetcher.getMockImplementation()!;
+  let finish!: () => void;
+  fetcher.mockImplementation(async (path, init) => {
+    if (typeof path === 'string' && path.includes('/groups')) {
+      if (!init?.body) return Response.json({ launches: [], nextCursor: null });
+      calls.push(JSON.parse(typeof init.body === 'string' ? init.body : '{}'));
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      return new Response('fixture unavailable', { status: 503 });
+    }
+    return original(path, init);
+  });
+  await click('Open complete launch groups');
+  for (let i = 0; i < 300 && !button('Simulate complete launch group'); i++)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+  await settle();
+  await act(async () => button('Simulate complete launch group').click());
+  expect(button('Simulate complete holder launch').disabled).toBe(true);
+  expect(button('Read current holder targets').disabled).toBe(true);
+  const submitted = calls.at(-1)!;
+  expect(submitted).toMatchObject({
+    action: 'prepare',
+    projectId: f.project.id,
+    mint: f.launch.review.input.create.mint,
+    feeAndRentLimitRaw: '10000000',
+    developerMaximumQuoteCostRaw: '100000000',
+  });
+  expect(submitted.holderLimits).toEqual(
+    f.launch.review.allowances.holders.map((limit) => ({
+      address: limit.address,
+      feeAndRentLimitRaw: limit.feeAndRentLimitRaw,
+      ...(limit.maximumQuoteCostRaw === null
+        ? {}
+        : { maximumQuoteCostRaw: limit.maximumQuoteCostRaw }),
+    })),
+  );
+  await act(async () => finish());
+  await settle();
+  expect(button('Simulate complete holder launch').disabled).toBe(false);
+  expect(container.textContent).toContain(
+    'Complete launch group service is unavailable',
+  );
+  expect(mocks.sign).not.toHaveBeenCalled();
+});

@@ -1,3 +1,8 @@
+import {
+  parsePumpGroupView,
+  parsePumpGroupPage,
+  parsePumpGroupObservation,
+} from '@/lib/pump-launch-group-client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { Client } from '@libsql/client';
@@ -79,6 +84,9 @@ it('runs HTTP to owned SQL, complete preparation/approval/signature registration
   const saved = (await prepared.json()) as Awaited<
     ReturnType<typeof readPumpLaunchGroupReview>
   >;
+  expect((await parsePumpGroupView(saved, terms.projectId)).review).toEqual(
+    saved.review,
+  );
   expect(saved.review.input.holders).toHaveLength(18);
   expect(saved.review.packets.length).toBeGreaterThan(1);
   expect(saved).toMatchObject({
@@ -115,6 +123,8 @@ it('runs HTTP to owned SQL, complete preparation/approval/signature registration
   const signed = (await registered.json()) as Awaited<
     ReturnType<typeof readPumpLaunchGroupReview>
   >;
+  const signedView = await parsePumpGroupView(signed, terms.projectId);
+  expect(signedView.signedEvidence).toEqual(signed.signedEvidence);
   expect(signed.state).toBe('signed');
   expect(signed.signedEvidence!.packets.map((p) => p.transaction)).toEqual(
     transactions,
@@ -147,6 +157,10 @@ it('runs HTTP to owned SQL, complete preparation/approval/signature registration
   };
   const observed = await send({ action: 'observe', id });
   expect(observed.status, await observed.clone().text()).toBe(200);
+  expect(
+    (await parsePumpGroupObservation(await observed.clone().json(), signedView))
+      .state,
+  ).toBe('partial');
   expect(await observed.json()).toMatchObject({
     state: 'partial',
     sourceState: 'signed',
@@ -166,6 +180,14 @@ it('runs HTTP to owned SQL, complete preparation/approval/signature registration
   expect(
     (await GET(new Request(url + '?projectId=' + terms.projectId))).status,
   ).toBe(200);
+  const groupPage = await GET(
+    new Request(url + '?projectId=' + terms.projectId + '&page=1'),
+  );
+  expect(
+    parsePumpGroupPage(await groupPage.json(), terms.projectId).rows.map(
+      (row) => row.id,
+    ),
+  ).toEqual([id]);
   context.user = { userId: 'bob' };
   expect((await GET(new Request(url + '?id=' + id))).status).toBe(404);
   expect(
