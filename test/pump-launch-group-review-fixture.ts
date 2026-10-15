@@ -13,14 +13,24 @@ import {
   type PumpLaunchGroupConsent,
 } from '../lib/pump-launch-group-review';
 
-export async function pumpLaunchGroupReviewFixture() {
+export async function pumpLaunchGroupReviewFixture(
+  stock = false,
+  token22 = false,
+) {
   // Uses actual collector and independent controlled accounting. No real RPC/BPF/signing.
-  const f = await pumpLaunchGroupSimulationFixture(false, false, false, false),
+  const f = await pumpLaunchGroupSimulationFixture(
+      stock,
+      token22,
+      false,
+      false,
+    ),
     simulation = await f.run();
 
   const document = validateProjectDocument({
     plan: {
       ...DEFAULT_LAUNCH_PLAN,
+      currency: stock ? 'TSLAX' : 'SOL',
+      quoteAddress: f.input.create.quoteMint,
       tokenName: f.input.create.name,
       ticker: f.input.create.symbol,
       developerBuy: 0.1,
