@@ -13,6 +13,8 @@ import { quoteOwnedImportedPair } from './imported-pair-quote-service';
 import { SWAP_TOKEN } from './swap-token-program-evidence';
 import { readPairMintEvidence } from './pair-mint-evidence';
 import { pairQuoteMint } from '../test/imported-pair-quote-fixture';
+import { PAIR_RENT } from './pair-rent-evidence';
+import { pairRentAccount } from '../test/pair-rent-fixture';
 import { address } from '@solana/kit';
 let f: Awaited<ReturnType<typeof pairWalletFixture>> | undefined;
 afterEach(() => {
@@ -84,10 +86,17 @@ it('checks actual stock-required account extensions and independent scaled/raw b
     signingAllowed: false,
     executionAllowed: false,
   });
-  expect(f.rpc).toHaveBeenCalledWith('getMinimumBalanceForRentExemption', [
-    179,
-    { commitment: 'confirmed' },
-  ]);
+  expect(evidence.accounts[1].rentMinimumRaw).toBe('3070');
+  expect(
+    f.rpc.mock.calls.some(
+      ([method]) => method === 'getMinimumBalanceForRentExemption',
+    ),
+  ).toBe(false);
+  expect(
+    f.rpc.mock.calls.find(
+      ([method]) => method === 'getMultipleAccounts',
+    )![1][0],
+  ).toContain(PAIR_RENT);
 });
 it('displays a non-unit scale from raw account units without changing raw spendable balance', async () => {
   f = await pairWalletFixture();
@@ -120,11 +129,12 @@ it('displays a non-unit scale from raw account units without changing raw spenda
     amount: '10',
   });
 });
-it.each(['zero', 'invalid'] as const)(
+it.each(['unsupported', 'missing'] as const)(
   'rejects %s rent evidence instead of reporting sufficient reserves',
   async (mode) => {
     f = await pairWalletFixture();
-    f.state.rentBySize.set(179, mode === 'zero' ? '0' : '-1');
+    if (mode === 'unsupported') f.state.rentAccount = pairRentAccount(10n, 1.5);
+    else f.state.rentAccount.data = [];
     await expect(read(f)).rejects.toThrow();
   },
 );

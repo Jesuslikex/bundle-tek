@@ -23,6 +23,11 @@ import {
 } from './swap-token-program-evidence';
 import { pairUiAmount, activePairMultiplier } from './pair-ui-amount';
 import type { ImportedPairQuote } from './imported-trade-pair';
+import {
+  PAIR_RENT,
+  inspectPairRentAccount,
+  pairRentMinimumRaw,
+} from './pair-rent-evidence';
 const SYSTEM = '11111111111111111111111111111111';
 const MAX = (1n << 64n) - 1n;
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
@@ -291,6 +296,7 @@ export async function readPairWalletEvidence(
     wallet,
     ...atas.filter((a): a is string => a !== null),
     ...mints.mints.map((m) => m.address),
+    PAIR_RENT,
     PAIR_CLOCK,
   ];
   if (new Set(requested).size !== requested.length)
@@ -311,6 +317,9 @@ export async function readPairWalletEvidence(
   )
     throw new Error('Pair wallet account context differs.');
   const unix = pairClockUnixTimestamp(result.value.at(-1), Number(s), now);
+  const rent = inspectPairRentAccount(
+    result.value[requested.indexOf(PAIR_RENT)],
+  );
   const observedMints: PairMintEvidence = {
     slot: Number(s),
     unixTimestamp: unix,
@@ -390,19 +399,7 @@ export async function readPairWalletEvidence(
     ]),
   ];
   const rents = new Map(
-    await Promise.all(
-      sizes.map(async (size) => {
-        const rent = pairWalletUint(
-          await rpc('getMinimumBalanceForRentExemption', [
-            size,
-            { commitment: 'confirmed' },
-          ]),
-        );
-        if (rent < 1n)
-          throw new Error('Pair wallet rent minimum is unavailable.');
-        return [size, rent.toString()] as const;
-      }),
-    ),
+    sizes.map((size) => [size, pairRentMinimumRaw(rent, size)]),
   );
   for (const a of accounts) {
     a.rentMinimumRaw = rents.get(

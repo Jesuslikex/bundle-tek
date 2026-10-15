@@ -1,5 +1,6 @@
 import {
   ImportedPairQuoteError,
+  importedPairProviderError,
   importedPairQuoteRequest,
   quoteOwnedImportedPair,
   configuredPairQuoteDependencies,
@@ -104,7 +105,16 @@ export async function preflightOwnedImportedPairWallet(
       now = provider.now ?? Date.now;
     const checked = async (method: string, params: unknown[]) => {
       signal.throwIfAborted();
-      const result = await provider.rpc(method, params);
+      let result: unknown;
+      try {
+        result = await provider.rpc(method, params);
+      } catch (error) {
+        signal.throwIfAborted();
+        throw importedPairProviderError(
+          error,
+          'Pair wallet provider reads are unavailable.',
+        );
+      }
       signal.throwIfAborted();
       return result;
     };

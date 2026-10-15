@@ -3,6 +3,7 @@ import { balanceRpc } from './wallet-balances';
 import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
 import {
   ImportedPairQuoteError,
+  importedPairProviderError,
   configuredPairQuoteDependencies,
 } from './imported-pair-quote-service';
 import {
@@ -82,11 +83,11 @@ export async function previewOwnedImportedPairRuntime(
           const result = await fn(method, params);
           signal.throwIfAborted();
           return result;
-        } catch {
+        } catch (error) {
           if (signal.aborted) signal.throwIfAborted();
-          throw new ImportedPairQuoteError(
+          throw importedPairProviderError(
+            error,
             'Pair runtime provider reads are unavailable.',
-            502,
           );
         }
       };

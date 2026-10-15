@@ -34,7 +34,7 @@ it('funds a native SOL quote from the system balance while retaining input, user
     inputAccount: null,
     inputRaw: '500000000',
     availableInputRaw: '1000000000',
-    requiredNativeBalanceRaw: '510001000',
+    requiredNativeBalanceRaw: '510001280',
     canRequestUnsignedOrder: true,
   });
   expect(result.evidence.accounts[1].kind).toBe('native-sol');
@@ -151,7 +151,7 @@ it('reports destination creation rent and insufficient source funds without pret
   const result = await run(f);
   expect(result.funding).toMatchObject({
     createDestinationAccount: true,
-    destinationAccountRentRaw: '2700',
+    destinationAccountRentRaw: '2980',
     canRequestUnsignedOrder: true,
   });
   expect(result.transactionPrepared).toBe(false);

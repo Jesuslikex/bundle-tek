@@ -22,6 +22,7 @@ import { requireConsistentSolanaSlots } from './solana-rpc';
 import { reviewUnsignedSwapEnvelope } from './unsigned-swap-order';
 import { assessJupiterRoute } from './jupiter-route-assessment';
 import { discoverPairAuxiliaryAccounts } from './pair-order-auxiliary';
+import { PAIR_RENT, inspectPairRentAccount } from './pair-rent-evidence';
 import type { prepareOwnedImportedPairOrder } from './imported-pair-order-candidate';
 type Candidate = Pick<
   Awaited<ReturnType<typeof prepareOwnedImportedPairOrder>>,
@@ -212,7 +213,9 @@ export async function collectPairRuntimePreview(
     ),
   );
   selected.push(...auxiliary.map((a) => a.address));
-  const beforeAccounts = await read(selected, false);
+  const protectedState = [...selected, PAIR_RENT];
+  const beforeAccounts = await read(protectedState, false);
+  inspectPairRentAccount(beforeAccounts.at(-1));
   async function identities(evidence: Awaited<ReturnType<typeof inventory>>) {
     const programs = evidence.programs.filter((p) => p !== COMPUTE);
     const code = await collectPumpProgramIdentities(
@@ -294,7 +297,7 @@ export async function collectPairRuntimePreview(
   const afterFloor = floor();
   const [afterAccounts, recheck, rawValidity, rawHeight, genesis] =
     await Promise.all([
-      read(selected, false),
+      read(protectedState, false),
       lookups
         ? readSwapLookupAccounts(message, afterFloor, call)
         : Promise.resolve(null),
@@ -302,7 +305,9 @@ export async function collectPairRuntimePreview(
         message.lifetimeToken,
         { commitment: 'confirmed', minContextSlot: afterFloor },
       ]),
-      call('getBlockHeight', [{ commitment: 'confirmed' }]),
+      call('getBlockHeight', [
+        { commitment: 'confirmed', minContextSlot: afterFloor },
+      ]),
       call('getGenesisHash', []),
     ]);
   const stateIdentity = (accounts: typeof beforeAccounts) =>

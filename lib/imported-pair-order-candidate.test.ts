@@ -16,6 +16,7 @@ import {
 } from './imported-pair-order-candidate';
 import { SWAP_TOKEN, SWAP_WRAPPED_SOL } from './swap-token-program-evidence';
 import { PAIR_CLOCK } from './pair-mint-evidence';
+import { pairRentAccount } from '../test/pair-rent-fixture';
 type Fixture = Awaited<ReturnType<typeof pairOrderFixture>>;
 type Message = Awaited<ReturnType<Fixture['makeMessage']>>;
 let f: Fixture | undefined;
@@ -44,6 +45,29 @@ function addReadonly(m: Message, key: string) {
   }
   return index;
 }
+it.each(['rate', 'burn'] as const)(
+  'rejects a changed Rent %s after the original-packet simulation',
+  async (mode) => {
+    const v = (f = await pairOrderFixture());
+    v.orderState.onSimulation = () => {
+      v.state.rentAccount = pairRentAccount(
+        mode === 'rate' ? 11n : 10n,
+        1,
+        mode === 'burn' ? 51 : 50,
+      );
+    };
+    await expect(run(v)).rejects.toMatchObject({ status: 409 });
+  },
+);
+it('uses only bank-bound Rent snapshots throughout an unsigned order review', async () => {
+  const v = (f = await pairOrderFixture());
+  expect((await run(v)).executionAllowed).toBe(false);
+  expect(
+    v.rpc.mock.calls.some(
+      ([method]) => method === 'getMinimumBalanceForRentExemption',
+    ),
+  ).toBe(false);
+});
 it.each(['valid', 'below-floor', 'too-old'] as const)(
   'retains individual request floors for parallel final observations: %s',
   async (mode) => {
@@ -435,10 +459,10 @@ it.each(nativeCases)(
         SWAP_TOKEN,
         '10000000',
       );
-      token.lamports = '10002650';
+      token.lamports = '10002930';
       editToken(token, (_b, view) => {
         view.setUint32(109, 1, true);
-        view.setBigUint64(113, 2650n, true);
+        view.setBigUint64(113, 2930n, true);
       });
       fixture.orderState.otherAccounts.set(ata, token);
     }
@@ -501,7 +525,7 @@ it.each(nativeCases)(
             keys.indexOf(fixture.wallet)
           ] as PostAccount;
           wallet.lamports = (
-            BigInt(wallet.lamports) - (bad === 'refund' ? 10002650n : 5001n)
+            BigInt(wallet.lamports) - (bad === 'refund' ? 10002930n : 5001n)
           ).toString();
         } else {
           if (bad === 'reserve') {
@@ -537,7 +561,7 @@ it.each(nativeCases)(
     const result = await run(fixture);
     expect(result.review.assessment).toMatchObject({
       nativeWrappingRaw: side === 'Buy' ? '500000000' : '0',
-      accountCreationRentRaw: existing ? '0' : '2650',
+      accountCreationRentRaw: existing ? '0' : '2930',
       networkFeeRaw: '5000',
     });
     expect(
@@ -546,7 +570,7 @@ it.each(nativeCases)(
     ).toBe(!retain);
     expect(result.review.simulation).toMatchObject({
       nativeTradeDeltaRaw: side === 'Buy' ? '-500000000' : '1000000',
-      retainedAccountRentRaw: retain && !existing ? '2650' : '0',
+      retainedAccountRentRaw: retain && !existing ? '2930' : '0',
       economicSimulationVerified: true,
     });
   },
@@ -579,7 +603,7 @@ it('validates seeded SOL wrapping, initializer ownership and wallet-bound cleanu
     data.set(bs58.decode(fixture.wallet), 4);
     v.setBigUint64(36, BigInt(seed.length), true);
     data.set(seed, 44);
-    v.setBigUint64(offset, 500002650n, true);
+    v.setBigUint64(offset, 500002930n, true);
     v.setBigUint64(offset + 8, 165n, true);
     data.set(bs58.decode(SWAP_TOKEN), offset + 16);
     m.instructions = [

@@ -8,7 +8,11 @@ import {
   pairUiAmount,
   pairAmountLifetimeMs,
 } from './pair-ui-amount';
-import { balanceRpc, SOLANA_MAINNET_GENESIS } from './wallet-balances';
+import {
+  balanceRpc,
+  SOLANA_MAINNET_GENESIS,
+  WalletRpcError,
+} from './wallet-balances';
 import {
   getSolanaIndexerRpcEndpoint,
   requireConsistentSolanaSlots,
@@ -32,6 +36,13 @@ export class ImportedPairQuoteError extends Error {
   ) {
     super(message);
   }
+}
+/** Preserve the bounded API backoff signal without exposing provider details or retrying. */
+export function importedPairProviderError(error: unknown, message: string) {
+  return new ImportedPairQuoteError(
+    message,
+    error instanceof WalletRpcError && error.status === 429 ? 429 : 502,
+  );
 }
 export type ImportedPairQuoteRequest = {
   id: string;
@@ -205,7 +216,16 @@ export async function quoteOwnedImportedPair(
       );
     const checked = async (method: string, params: unknown[]) => {
       signal.throwIfAborted();
-      const result = await provider.rpc(method, params);
+      let result: unknown;
+      try {
+        result = await provider.rpc(method, params);
+      } catch (error) {
+        signal.throwIfAborted();
+        throw importedPairProviderError(
+          error,
+          'Pair quote provider reads are unavailable.',
+        );
+      }
       signal.throwIfAborted();
       return result;
     };

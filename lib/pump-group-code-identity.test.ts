@@ -5,7 +5,7 @@ import {
   matchesPumpProgramPolicy,
 } from './pump-group-code-identity';
 import { PUMP_UPGRADEABLE_LOADER } from './pump-launch-group-deployments';
-import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
+import { SOLANA_MAINNET_GENESIS, WalletRpcError } from './wallet-balances';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 const program = bs58.encode(new Uint8Array(32).fill(2)),
   dataKey = bs58.encode(new Uint8Array(32).fill(3)),
@@ -78,6 +78,36 @@ function fixture(kind = 'ok', space = true, size = 300000) {
   };
   return { rpc, calls, code };
 }
+it('stops after one bounded four-slice batch when the provider rate limits code reads', async () => {
+  const f = fixture('ok', true, 3 * 1024 * 1024),
+    failure = new WalletRpcError(429);
+  let slices = 0;
+  const rpc: PumpLaunchRpc = async (method, params, signal) => {
+    const config = params[1] as
+      | { dataSlice?: { offset: number; length: number } }
+      | undefined;
+    if (
+      method === 'getMultipleAccounts' &&
+      config?.dataSlice &&
+      config.dataSlice.offset >= 45 &&
+      config.dataSlice.length > 45
+    ) {
+      slices++;
+      throw failure;
+    }
+    return f.rpc(method, params, signal);
+  };
+  await expect(
+    collectPumpProgramIdentities(
+      [program],
+      100,
+      new AbortController().signal,
+      rpc,
+      4,
+    ),
+  ).rejects.toBe(failure);
+  expect(slices).toBe(4);
+});
 it.each(['ok', 'cancel', 'truncate'] as const)(
   'bounds parallel code slices and retains exact ordered bytes: %s',
   async (mode) => {

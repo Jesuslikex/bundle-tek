@@ -2,6 +2,8 @@ import { expect, it, vi } from 'vitest';
 import bs58 from 'bs58';
 import { readPairOrderState } from './pair-order-state';
 import { PAIR_CLOCK } from './pair-mint-evidence';
+import { PAIR_RENT } from './pair-rent-evidence';
+import { pairRentAccount } from '../test/pair-rent-fixture';
 import {
   pairQuoteClock,
   pairQuoteMint,
@@ -40,11 +42,12 @@ function fixture() {
     [mints[1], pairQuoteMint(8, SWAP_TOKEN_2022)],
     [auxiliary[0], pairQuoteMint(6, SWAP_TOKEN)],
     [PAIR_CLOCK, pairQuoteClock(100, String(clock / 1000))],
+    [PAIR_RENT, pairRentAccount()],
   ]);
   const response = {
     context: { slot: '100' as unknown },
-    value: [...accounts, ...mints, ...auxiliary, PAIR_CLOCK].map((k) =>
-      structuredClone(values.get(k)),
+    value: [...accounts, ...mints, ...auxiliary, PAIR_RENT, PAIR_CLOCK].map(
+      (k) => structuredClone(values.get(k)),
     ),
   };
   const rpc = vi.fn(async (_method: string, _params: unknown[]) => response);
@@ -56,7 +59,7 @@ it('reads all protected accounts, mint policies and Clock in one exact bounded c
   const f = fixture(),
     r = await f.run();
   expect(f.rpc).toHaveBeenCalledExactlyOnceWith('getMultipleAccounts', [
-    [...f.accounts, ...f.mints, ...f.auxiliary, PAIR_CLOCK],
+    [...f.accounts, ...f.mints, ...f.auxiliary, PAIR_RENT, PAIR_CLOCK],
     { encoding: 'base64', commitment: 'confirmed', minContextSlot: 100 },
   ]);
   expect(r.slot).toBe(100);
@@ -81,6 +84,7 @@ it.each([
   'wrong-mint-owner',
   'wrong-clock-bank',
   'stale-clock',
+  'missing-rent',
 ] as const)('rejects a coalesced response with %s', async (mode) => {
   const f = fixture();
   if (mode === 'numeric-slot') f.response.context.slot = 100;
@@ -90,24 +94,26 @@ it.each([
   if (mode === 'long') f.response.value.push(null);
   if (mode === 'hole') f.response.value[2] = undefined;
   if (mode === 'missing-mint') f.response.value[4] = null;
+  if (mode === 'missing-rent') f.response.value[7] = null;
   if (mode === 'wrong-mint-owner')
     f.response.value[4] = pairQuoteMint(6, '11111111111111111111111111111111');
   if (mode === 'wrong-clock-bank')
-    f.response.value[7] = pairQuoteClock(101, String(f.clock / 1000));
+    f.response.value[8] = pairQuoteClock(101, String(f.clock / 1000));
   if (mode === 'stale-clock')
-    f.response.value[7] = pairQuoteClock(100, String(f.clock / 1000 - 31));
+    f.response.value[8] = pairQuoteClock(100, String(f.clock / 1000 - 31));
   await expect(f.run()).rejects.toThrow();
 });
 it('admits exactly 32 slots only when the response Clock names the same bank', async () => {
   const f = fixture();
   f.response.context.slot = '132';
-  f.response.value[7] = pairQuoteClock(132, String(f.clock / 1000));
+  f.response.value[8] = pairQuoteClock(132, String(f.clock / 1000));
   expect((await f.run()).slot).toBe(132);
 });
 it.each([
   'overlap',
   'duplicate-mint',
   'clock-key',
+  'rent-key',
   'too-many',
   'too-few',
   'invalid-floor',
@@ -117,6 +123,7 @@ it.each([
   if (mode === 'overlap') f.accounts[1] = f.mints[0];
   if (mode === 'duplicate-mint') f.auxiliary[0] = f.mints[0];
   if (mode === 'clock-key') f.accounts[1] = PAIR_CLOCK;
+  if (mode === 'rent-key') f.accounts[1] = PAIR_RENT;
   if (mode === 'too-many')
     f.accounts.push(...Array.from({ length: 8 }, (_, i) => key(i + 20)));
   if (mode === 'too-few') f.accounts.splice(0, 2);

@@ -6,6 +6,7 @@ import {
   type PairMintEvidence,
 } from './pair-mint-evidence';
 import type { PairOrderAccountSnapshot } from './pair-order-review';
+import { PAIR_RENT, inspectPairRentAccount } from './pair-rent-evidence';
 /** One bounded bank response binds full protected accounts and their mint/Clock evidence. */
 export async function readPairOrderState(
   protectedAccounts: string[],
@@ -18,7 +19,13 @@ export async function readPairOrderState(
   const accounts = [...protectedAccounts],
     selected = [...selectedMints],
     auxiliary = [...intermediateMints];
-  const requested = [...accounts, ...selected, ...auxiliary, PAIR_CLOCK];
+  const requested = [
+    ...accounts,
+    ...selected,
+    ...auxiliary,
+    PAIR_RENT,
+    PAIR_CLOCK,
+  ];
   if (
     accounts.length < 3 ||
     accounts.length > 11 ||
@@ -54,6 +61,7 @@ export async function readPairOrderState(
     throw Error('Pair order state bank or mapping differs.');
   const slot = Number(s),
     unixTimestamp = pairClockUnixTimestamp(response.value.at(-1), slot, now());
+  const rent = inspectPairRentAccount(response.value.at(-2));
   const metadata = await Promise.all(
     [...selected, ...auxiliary].map((mint, i) =>
       inspectPairMintAccount(response.value![accounts.length + i], mint),
@@ -78,5 +86,6 @@ export async function readPairOrderState(
     ),
     mints,
     auxiliaryMints,
+    rent,
   };
 }

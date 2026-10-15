@@ -20,6 +20,7 @@ import {
 import { getTokenSize } from '@solana-program/token-2022';
 import { discoverPairAuxiliaryAccounts } from './pair-order-auxiliary';
 import { readPairOrderState } from './pair-order-state';
+import { pairRentMinimumRaw } from './pair-rent-evidence';
 import {
   assertSamePairMintEvidence,
   type PairMintEvidence,
@@ -96,7 +97,9 @@ export async function collectPairOrderReview(
   if (message.version !== 0) throw Error('Pair candidate version differs.');
   const [genesis, initialHeight] = await Promise.all([
     rpc('getGenesisHash', []),
-    rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
+    rpc('getBlockHeight', [
+      { commitment: 'confirmed', minContextSlot: floor() },
+    ]),
   ]);
   if (genesis !== SOLANA_MAINNET_GENESIS)
     throw Error('Pair candidate provider is not mainnet.');
@@ -258,18 +261,10 @@ export async function collectPairOrderReview(
   );
   const rentSizes = [...new Set([0, ...assetSizes.map((a) => a.size)])];
   const observedRents = new Map(
-    await Promise.all(
-      rentSizes.map(async (size) => {
-        const rent = pairWalletUint(
-          await rpc('getMinimumBalanceForRentExemption', [
-            size,
-            { commitment: 'confirmed' },
-          ]),
-        );
-        if (rent < 1n) throw Error('Pair candidate rent is unavailable.');
-        return [size, rent] as const;
-      }),
-    ),
+    rentSizes.map((size) => [
+      size,
+      BigInt(pairRentMinimumRaw(beforeState.rent, size)),
+    ]),
   );
   if (
     observedRents.get(0)!.toString() !== preflight.evidence.systemRentMinimumRaw
@@ -358,13 +353,16 @@ export async function collectPairOrderReview(
         message.lifetimeToken,
         { commitment: 'confirmed', minContextSlot: afterFloor },
       ]),
-      rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
+      rpc('getBlockHeight', [
+        { commitment: 'confirmed', minContextSlot: afterFloor },
+      ]),
       rpc('getGenesisHash', []),
     ]);
   const {
     accounts: after,
     mints: finalMints,
     auxiliaryMints: finalAuxiliaryMints,
+    rent: finalRent,
   } = afterState;
   const identity = (a: PairOrderAccountSnapshot) => {
     if (a.raw === null) return [a.address, null];
@@ -377,7 +375,9 @@ export async function collectPairOrderReview(
     return [a.address, r.owner, r.executable, r.lamports, r.data];
   };
   if (
-    JSON.stringify(before.map(identity)) !== JSON.stringify(after.map(identity))
+    JSON.stringify(before.map(identity)) !==
+      JSON.stringify(after.map(identity)) ||
+    finalRent.dataBase64 !== beforeState.rent.dataBase64
   )
     throw Error('Pair candidate selected balances or custody changed.');
   if (lookups) {

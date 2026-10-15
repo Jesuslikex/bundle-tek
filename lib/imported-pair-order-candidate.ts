@@ -1,6 +1,7 @@
 import { env } from './server-env';
 import {
   ImportedPairQuoteError,
+  importedPairProviderError,
   configuredPairQuoteDependencies,
   type ImportedPairQuoteDependencies,
 } from './imported-pair-quote-service';
@@ -104,10 +105,11 @@ export async function inspectOwnedImportedPairOrder<Review>(
       let result: unknown;
       try {
         result = await provider!.rpc(method, params);
-      } catch {
-        throw new ImportedPairQuoteError(
+      } catch (error) {
+        signal.throwIfAborted();
+        throw importedPairProviderError(
+          error,
           'Pair candidate provider reads are unavailable.',
-          502,
         );
       }
       signal.throwIfAborted();

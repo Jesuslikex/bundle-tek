@@ -90,7 +90,7 @@ async function fixture(
     requiredPairAccountExtensions(metadata),
   );
   if (options.native) {
-    const reserve = 2650n;
+    const reserve = 2930n;
     prior.lamports = (
       reserve + BigInt(options.amount ?? '50000000')
     ).toString();
@@ -120,7 +120,7 @@ async function fixture(
     return m;
   };
   const size = atob(prior.data[0]).length,
-    rent = String(1000 + size * 10);
+    rent = String((128 + size) * 10);
   v.orderState.onSimulation = (response, keys) => {
     if (!options.missing && !options.close) return;
     const wallet = response.value.accounts[keys.indexOf(v.wallet)] as Raw;
@@ -216,7 +216,7 @@ it.each([false, true])(
 it('accounts for a created and closed intermediate without retaining rent', async () => {
   const { v } = await fixture({ missing: true, close: true, amount: '0' }),
     result = await run(v);
-  expect(result.review.assessment.accountCreationRentRaw).toBe('2650');
+  expect(result.review.assessment.accountCreationRentRaw).toBe('2930');
   expect(result.review.simulation.retainedAccountRentRaw).toBe('0');
 });
 it.each([

@@ -9,6 +9,8 @@ import {
   pairQuoteClock,
 } from './imported-pair-quote-fixture';
 import { readPairMintEvidence, PAIR_CLOCK } from '../lib/pair-mint-evidence';
+import { PAIR_RENT } from '../lib/pair-rent-evidence';
+import { pairRentAccount } from './pair-rent-fixture';
 import {
   pairAssociatedAddress,
   requiredPairAccountExtensions,
@@ -109,13 +111,13 @@ export async function pairWalletFixture(side: 'Buy' | 'Sell' = 'Buy') {
     } | null,
     walletReads: 0,
     onWalletRead: null as null | ((read: number) => void),
-    rentBySize: new Map<number, string>(),
+    rentAccount: pairRentAccount(),
   };
   const original = f.rpc.getMockImplementation()!;
   f.rpc.mockImplementation(async (method, params) => {
     if (method === 'getMinimumBalanceForRentExemption') {
       const size = params[0] as number;
-      return state.rentBySize.get(size) ?? String(1000 + size * 10);
+      return String((128 + size) * 10);
     }
     if (
       method === 'getMultipleAccounts' &&
@@ -131,12 +133,14 @@ export async function pairWalletFixture(side: 'Buy' | 'Sell' = 'Buy') {
             ? structuredClone(state.walletAccount)
             : a === PAIR_CLOCK
               ? pairQuoteClock(slot, String(Math.floor(clock.now / 1000)))
-              : keys.at(-1) === PAIR_CLOCK &&
-                  keys.length >= 5 &&
-                  i >= keys.length - 3 &&
-                  i < keys.length - 1
-                ? structuredClone(f.mints[i - (keys.length - 3)])
-                : structuredClone(accounts[atas.indexOf(a)] ?? null),
+              : a === PAIR_RENT
+                ? structuredClone(state.rentAccount)
+                : keys.at(-1) === PAIR_CLOCK &&
+                    keys.length >= 6 &&
+                    i >= keys.length - 4 &&
+                    i < keys.length - 2
+                  ? structuredClone(f.mints[i - (keys.length - 4)])
+                  : structuredClone(accounts[atas.indexOf(a)] ?? null),
         ),
       };
     }

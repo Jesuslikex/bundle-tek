@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { pairRuntimeFixture } from '../../../../test/pair-runtime-fixture';
+import { WalletRpcError } from '@/lib/wallet-balances';
 import type { ImportedPairRuntimeDependencies } from '@/lib/imported-pair-runtime';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
@@ -45,6 +46,41 @@ beforeEach(async () => {
   mocks.getDb.mockClear();
 });
 afterEach(() => f.close());
+it.each(['quote', 'wallet', 'simulation', 'code'] as const)(
+  'returns bounded backoff for a %s provider 429 without retrying',
+  async (stage) => {
+    let failures = 0;
+    const original = f.rpc.getMockImplementation()!;
+    if (stage === 'code')
+      mocks.dependencies.programRpc = async () => {
+        failures++;
+        throw new WalletRpcError(429);
+      };
+    else
+      f.rpc.mockImplementation(async (method, params) => {
+        const fail =
+          stage === 'quote'
+            ? method === 'getSlot'
+            : stage === 'wallet'
+              ? method === 'getMultipleAccounts' &&
+                (params[0] as string[])[0] === f.wallet
+              : method === 'simulateTransaction';
+        if (fail) {
+          failures++;
+          throw new WalletRpcError(429);
+        }
+        return original(method, params);
+      });
+    const response = await POST(request());
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('15');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(failures).toBe(stage === 'code' ? 2 : 1);
+    const body = await response.json();
+    expect(body).not.toHaveProperty('runtime');
+    expect(body).not.toHaveProperty('candidate');
+  },
+);
 const request = (
   body: unknown = f.runtimeRequest,
   headers: Record<string, string> = {},

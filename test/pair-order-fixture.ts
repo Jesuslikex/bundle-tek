@@ -166,8 +166,7 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
               : requiredPairAccountExtensions(metadata),
           );
           const size = atob(next.data[0]).length;
-          next.lamports =
-            f.state.rentBySize.get(size) ?? String(1000 + size * 10);
+          next.lamports = String((128 + size) * 10);
           walletDelta -= BigInt(next.lamports);
           if (native) {
             const bytes = Uint8Array.from(atob(next.data[0]), (c) =>

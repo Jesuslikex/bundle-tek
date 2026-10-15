@@ -4,6 +4,8 @@ import { address } from '@solana/kit';
 import { pairRuntimeFixture } from '../test/pair-runtime-fixture';
 import { pairIntermediate } from '../test/pair-intermediate-fixture';
 import { SWAP_TOKEN } from './swap-token-program-evidence';
+import { WalletRpcError } from './wallet-balances';
+import { pairRentAccount } from '../test/pair-rent-fixture';
 import {
   importedPairRuntimeRequest,
   previewOwnedImportedPairRuntime,
@@ -25,6 +27,59 @@ const run = (
     signal,
     v.runtimeDependencies,
   );
+it.each([false, true])(
+  'binds every block-height read to its current slot floor, lagging=%s',
+  async (lagging) => {
+    const v = (f = await pairRuntimeFixture()),
+      original = v.rpc.getMockImplementation()!;
+    const floors: number[] = [];
+    v.rpc.mockImplementation(async (method, params) => {
+      if (method === 'getBlockHeight') {
+        const config = params[0] as {
+          commitment: string;
+          minContextSlot: number;
+        };
+        expect(config.commitment).toBe('confirmed');
+        expect(config.minContextSlot).toBeGreaterThanOrEqual(100);
+        floors.push(config.minContextSlot);
+        if (lagging && floors.length === 3)
+          throw Error('Minimum context slot has not been reached');
+      }
+      return original(method, params);
+    });
+    if (lagging) await expect(run(v)).rejects.toMatchObject({ status: 502 });
+    else expect((await run(v)).signingAllowed).toBe(false);
+    expect(floors).toHaveLength(3);
+    expect(floors).toEqual([...floors].sort((a, b) => a - b));
+  },
+);
+it('does not retry a rate-limited code read or publish a runtime review', async () => {
+  const v = (f = await pairRuntimeFixture());
+  let calls = 0;
+  v.runtimeDependencies.programRpc = async () => {
+    calls++;
+    throw new WalletRpcError(429);
+  };
+  await expect(run(v)).rejects.toMatchObject({
+    status: 429,
+    message: 'Pair runtime provider reads are unavailable.',
+  });
+  // The initial code stage starts two independent reads. Neither is retried.
+  expect(calls).toBe(2);
+  expect(
+    v.rpc.mock.calls.some(([method]) => method === 'simulateTransaction'),
+  ).toBe(false);
+});
+it('refuses a changed Rent profile after the simulation during final code reads', async () => {
+  const v = (f = await pairRuntimeFixture());
+  v.runtimeState.onTrace = (trace) => {
+    v.runtimeState.onCodeRead = () => {
+      v.state.rentAccount = pairRentAccount(11n);
+    };
+    return trace;
+  };
+  await expect(run(v)).rejects.toMatchObject({ status: 409 });
+});
 it.each([false, true])(
   'protects intermediate custody across the final runtime code observation, lateChange=%s',
   async (lateChange) => {
