@@ -1,3 +1,5 @@
 # Keep this append-only migration checksum stable across Windows checkouts.
 /drizzle/0081_pump_holder_reservations.sql text eol=lf
 /drizzle/0085_pump_group_observations.sql text eol=lf
+# SQL checksums normalize physical EOL outside quotes; keep fresh checkouts stable.
+/drizzle/*.sql text eol=lf

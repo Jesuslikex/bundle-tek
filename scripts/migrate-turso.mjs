@@ -2,7 +2,10 @@ import { createClient } from '@libsql/client';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
+import {
+  sqlMigrationChecksum,
+  sqlMigrationChecksumMatches,
+} from './migration-checksums.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [mode, target] = process.argv.slice(2);
 if (
@@ -41,6 +44,12 @@ try {
   const entries = JSON.parse(
     readFileSync(resolve(root, 'drizzle/meta/_journal.json'), 'utf8'),
   ).entries;
+  const checksumAliases = JSON.parse(
+    readFileSync(
+      resolve(root, 'drizzle/meta/sql-checksum-aliases.json'),
+      'utf8',
+    ),
+  );
   const applied = (
     await db.execute(
       'SELECT idx,tag,sha256 FROM bundle_migration_ledger ORDER BY idx',
@@ -52,12 +61,17 @@ try {
   for (const [idx, e] of entries.entries()) {
     if (e.idx !== idx) throw new Error('Migration journal is not sequential.');
     const bytes = readFileSync(resolve(root, 'drizzle', e.tag + '.sql')),
-      sha256 = createHash('sha256').update(bytes).digest('hex');
+      sha256 = sqlMigrationChecksum(bytes);
     if (applied[idx]) {
       if (
         applied[idx].idx !== idx ||
         applied[idx].tag !== e.tag ||
-        applied[idx].sha256 !== sha256
+        !sqlMigrationChecksumMatches(
+          bytes,
+          applied[idx].sha256,
+          e.tag,
+          checksumAliases,
+        )
       )
         throw new Error('Applied migration checksum differs: ' + e.tag);
       continue;

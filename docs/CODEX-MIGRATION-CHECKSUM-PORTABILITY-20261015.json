@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-10-15T00:51:38.304Z",
+  "readOnly": true,
+  "sourceBase": "87812ea",
+  "applied": 85,
+  "cleanGitChecksumsMatch": true,
+  "pending": [
+    "0085_pump_group_observations"
+  ],
+  "ledgerRewritten": false
+}

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "migrations": {
+    "0082_pump_group_reviews": {
+      "canonicalSha256": "741a0a3005e7d4a2eebc0f0b25e0039dc0ee5b2711e48df5efb58545c3bfc724",
+      "legacySha256": [
+        "47b873c78da763c1d5dc282cdad68ef6b44e9eee79ae905b122ad6f9050c6b96"
+      ]
+    },
+    "0083_pump_group_approvals": {
+      "canonicalSha256": "f36fe3bb226fa9b49279ccac433d318d1f26227667c6a9894b7296d3557f96e2",
+      "legacySha256": [
+        "858fe3800f04057bf0006b73d06003b6f5d9d4602a2ab77b04bbd7c7e2e4dab5"
+      ]
+    },
+    "0084_pump_group_signatures": {
+      "canonicalSha256": "6ebf75ca92946c98723cca55341532957da369f2d92918b021c6b41a8b5e36a3",
+      "legacySha256": [
+        "5546b11898803b9bda4a6cf06b6fe4037c29f1d36179f07c1e02ca4ac66cf634"
+      ]
+    }
+  }
+}
