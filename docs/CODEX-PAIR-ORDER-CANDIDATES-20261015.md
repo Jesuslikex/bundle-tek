@@ -1,0 +1,27 @@
+# Wallet-bound stock-pair unsigned candidates
+
+15 October 2026. This checkpoint extends the committed pair quote and wallet preflight into an independently reviewed unsigned order. It remains an intermediate stage of the requested stock-pair workflow. Production remains source 34bcd9a; this checkpoint is local only.
+
+## Implemented
+
+`POST /api/imported-projects/pair-order-candidates` requires the current owned saved project and wallet revisions, selected quote mint, side, exact amount, explicit raw SOL fee/rent limit and `prepareUnsigned: true`. Authentication, same-origin enforcement, exact JSON MIME, no query overrides, bounded UTF-8 streaming input and cancellation precede database/provider work. Caller-supplied transactions, quotes, owners or signing authorities are rejected. A fresh server quote and wallet preflight must pass before requesting the wallet-bound Jupiter Metis order. Saved project and wallet state are checked again before publication. Provider failures are sanitized.
+
+The new raw-amount pair preparation wrapper leaves existing SOL-only preparation/signing adapters unchanged. The candidate must remain canonical unsigned v0 with one saved-wallet payer/signer. Independent RPC collection binds resolved lookup-table hashes, selected account balances/custody, fresh mint policies and scaling time, actual account-size rent, observed message network fee, mainnet identity, slot bounds and the original blockhash/remaining height. Selected account and lookup evidence is checked again. The result binds the packet, pair and preflight identities to a bounded expiry.
+
+Top-level instruction checks permit the existing decoded Jupiter shared/ordinary route forms, V2 with the selected actual token programs, and V1 only for legacy-token pairs. The source raw amount and output protection must match the reviewed pair. Selected nonnative accounts must be canonical ATAs with accepted custody and required extensions. Selected native SOL may use canonical WSOL accounts or verified seeded temporary accounts. Exact ATA creation, seeded WSOL creation/initialization, wrapping, synchronization and wallet-refund cleanup ordering are checked. Independent rent and network fee must fit the user's raw SOL allowance and available balance. Compute-budget instructions have bounded distinct limit/price controls and independently checked priority-fee arithmetic. Unknown top-level transfers/authority changes and unrelated writable wallet-controlled token accounts or mints reject.
+
+This is **top-level review, not complete instruction or economic verification**. A Jupiter call's inner effects, post-account ownership/custody, exact asset deltas and complete native refunds still need independent simulation. The explicit native debit bound is gross known setup/funding plus fee, not a CPI spending proof or realized expense. Program code is not attested. Application reservations are not checked or created. The response reports candidatePrepared=true but economicSimulationVerified=false, approvalCreated=false, reservationCreated=false, signingAllowed=false and executionAllowed=false. No approval or signature endpoint consumes this result.
+
+## Qualification
+
+All 24 selected test files and 559 tests passed together. These include 37 new service/actual API Request-Response cases using local SQL, real v0 binary envelopes and controlled provider evidence. Actual-source TypeScript, ten-file typed lint, formatting/whitespace checks and production Next webpack build passed. All 1,262 implementation/configuration/style source files retained their frozen hashes through verification and release interruption. The full repository suite was not rerun.
+
+Cases include both Buy/Sell V2 shared/ordinary stock routes; actual captured TSLAX mint/account extension profiles; canonical and seeded WSOL setup/cleanup; legacy V1 compatibility and Token-2022 V1 refusal; lookup stability, altered balances/context/authority/route/raw amounts; excessive fees, priority-price bounds, insufficient funding, invalid/near-expiry blockhashes, reversing block height; ownership/revision/explicit-intent, MIME/body/query limits, provider sanitization, cancellation and rate-gate handling. Synthetic routes do not prove executable AMM behavior. No live wallet-bound provider or funded test was performed for this checkpoint. Earlier quote-only and public empty-account probes remain scoped to the preceding commits.
+
+Ignored receipts are `work/pair-order-{tests,types,lint,build}.log`, `work/pair-order-test-files.json` and `work/pair-order-source-freeze.json`.
+
+## Next required work
+
+Collect standard simulateTransaction post-account data with the original blockhash, independently verify selected raw token deltas and native fee/rent/refund conservation, and reject ownership/custody or unrelated wallet-account changes. Follow with currency-aware durable reservations, explicit approval, browser signing, registration, broadcast/recovery and exact quote-asset accounting. Protected token-workspace UI and stock-launch budget scaling remain separate required work. This checkpoint does not complete stock-pair trading or Proxima parity.
+
+No protected UI, migration, remote SQL, provider/credential setting, cron or deployment changed for this checkpoint. No real wallet was unlocked, no signing or submission occurred. The intervening approved release deployed only the preceding committed main source; it excluded all these unsigned-candidate files. Main's two unrelated dirty files remain protected.

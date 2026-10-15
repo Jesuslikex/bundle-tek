@@ -356,6 +356,33 @@ export async function quoteSolanaPair(
     fetcher,
   );
 }
+/** Wallet-bound candidate only. Asset precision and funding must be independently observed. */
+export async function prepareSolanaPair(
+  input: Parameters<typeof quoteSolanaPair>[0] & { wallet: string },
+  apiKey: string | undefined,
+  signal: AbortSignal,
+  fetcher: typeof fetch = fetch,
+) {
+  const taker = walletAddress(input.wallet, 'Solana');
+  const order = await quoteSolanaSwap(
+    {
+      tokenMint: input.baseMint,
+      quoteMint: input.quoteMint,
+      amountRaw: input.amountRaw,
+      side: input.side,
+      taker,
+    },
+    apiKey,
+    signal,
+    fetcher,
+  );
+  if (!order.preparation)
+    throw new WarmupQuoteError('Unsigned pair preparation unavailable.');
+  return { ...order, preparation: order.preparation };
+}
+export type SolanaPairPreparation = Awaited<
+  ReturnType<typeof prepareSolanaPair>
+>;
 export type SolanaSwapPreparation = Awaited<
   ReturnType<typeof prepareSolanaSwap>
 >;

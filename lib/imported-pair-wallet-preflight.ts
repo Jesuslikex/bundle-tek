@@ -62,6 +62,9 @@ export function importedPairWalletRequest(
     );
   }
 }
+export type ImportedPairWalletPreflight = Awaited<
+  ReturnType<typeof preflightOwnedImportedPairWallet>
+>;
 /** Fresh owned quote and selected-account funding review; no order, signature, reservation or send. */
 export async function preflightOwnedImportedPairWallet(
   db: D1Database,

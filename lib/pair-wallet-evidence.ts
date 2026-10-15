@@ -125,7 +125,7 @@ function bytes(raw: unknown, owner: string, minimum: number) {
     lamports: pairWalletUint(a.lamports).toString(),
   };
 }
-async function token(
+export async function inspectPairTokenAccount(
   raw: unknown,
   mint: PairMintMetadata,
   wallet: string,
@@ -356,7 +356,7 @@ export async function readPairWalletEvidence(
               sourceSha256: null,
               mintPolicySha256: m.policySha256,
             })
-          : token(
+          : inspectPairTokenAccount(
               result.value![requested.indexOf(atas[i]!)],
               m,
               wallet,
