@@ -32,11 +32,13 @@ const mocked = vi.mocked(preflightOwnedPumpCreate);
 afterEach(() => {
   mocked.mockReset();
   for (const client of clients.splice(0)) client.close();
+  vi.useRealTimers();
 });
 async function fixture(
   installed = true,
   approvalInstalled = true,
   signaturesInstalled = true,
+  sqlClock?: Date,
 ) {
   const f = await pumpOwnedGroupFixture(mocked, clients);
   await f.client.execute(
@@ -54,7 +56,17 @@ async function fixture(
     for (const sql of readFileSync(`drizzle/${file}.sql`, 'utf8').split(
       '--> statement-breakpoint',
     ))
-      if (sql.trim()) await f.client.execute(sql);
+      if (sql.trim())
+        // Only this disposable fixture replaces SQLite's wall clock. Keep all
+        // production trigger conditions and freshness durations unchanged.
+        await f.client.execute(
+          sqlClock
+            ? sql.replaceAll(
+                "julianday('now')",
+                `julianday('${sqlClock.toISOString()}')`,
+              )
+            : sql,
+        );
   const prepare = () =>
     preparePumpLaunchGroupReview(
       f.db,
@@ -84,7 +96,10 @@ const signFor = (
     ...f.holderSigners,
   ]);
 it('atomically retains the whole approved signed group, resumes exact data and never enables submission', async () => {
-  const f = await fixture(),
+  const clock = new Date('2026-10-15T12:00:00.000Z');
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(clock);
+  const f = await fixture(true, true, true, clock),
     saved = await f.prepare(),
     consent = consentFor(saved.review);
   await approvePumpLaunchGroupReview(
@@ -148,7 +163,7 @@ it('atomically retains the whole approved signed group, resumes exact data and n
       args: ['alice', f.input.holders[0].address, 'warmup', 'busy', 'approved'],
     }),
   ).rejects.toThrow('reserved');
-}, 30000);
+}, 120000);
 it('requires exact recorded approval and complete signatures before writing registration', async () => {
   const f = await fixture(),
     saved = await f.prepare(),

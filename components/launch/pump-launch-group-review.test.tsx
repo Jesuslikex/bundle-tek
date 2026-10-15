@@ -130,6 +130,10 @@ beforeEach(async () => {
   await settle();
 });
 async function signingSetup() {
+  // Only Date is controlled; real timers still drive React/network settling.
+  // The fixture's live review must not age while synthetic crypto waits for CPU.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.parse(f.review.simulation.observedAt));
   const preview = await pumpRuntimePreviewFixture(f.review);
   const transactions = await signSyntheticPumpGroup(f.review.packets, [
     f.fixture.f.f.payerSigner,
@@ -232,32 +236,43 @@ it('refuses a changed UI context while server authorization is pending', async (
     path: string,
     init?: RequestInit,
   ) => Promise<Response>;
-  let release: ((response: Response) => void) | undefined;
-  let result: Response | undefined;
+  const pending = Promise.withResolvers<Response>();
+  const entered = Promise.withResolvers<Response>();
   fetcher.mockImplementation(async (path: string, init?: RequestInit) => {
     if (
       typeof init?.body === 'string' &&
       init.body.includes('"action":"authorize-signing"')
     ) {
-      result = await original(path, init);
-      return new Promise<Response>((resolve) => {
-        release = resolve;
-      });
+      const response = await original(path, init);
+      entered.resolve(response);
+      return pending.promise;
     }
     return original(path, init);
   });
-  await act(async () =>
-    button('Approve and sign complete group locally').click(),
+  expect(button('Approve and sign complete group locally').disabled).toBe(
+    false,
   );
-  for (let i = 0; i < 100 && !release; i++)
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    });
-  expect(release).toBeDefined();
+  let result!: Response;
+  await act(async () => {
+    button('Approve and sign complete group locally').click();
+    result = await entered.promise;
+  });
+  const { authorization } = (await result.clone().json()) as {
+    authorization: { expiresAt: string };
+  };
+  vi.setSystemTime(Date.now() + 4999);
+  // Prove the context change, rather than an expired authorization, blocks signing.
+  expect(Date.parse(authorization.expiresAt) - Date.now()).toBe(1);
   await renderSigning('changed');
-  await act(async () => release!(result!));
+  await act(async () => pending.resolve(result));
   await settle();
   expect(onSign).not.toHaveBeenCalled();
+  expect(localStorage.length).toBe(0);
+  expect(
+    fetcher.mock.calls.some(([, init]) =>
+      String(init?.body).includes('"action":"register"'),
+    ),
+  ).toBe(false);
 });
 it('rejects a partial signer result without saving or registering any packet', async () => {
   const { onSign, signed } = await signingSetup();
@@ -313,6 +328,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 it('automatically reads saved groups without a write, key unlock or approval control', () => {
   expect(fetcher.mock.calls).toHaveLength(1);
