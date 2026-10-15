@@ -34,6 +34,7 @@ import {
 } from '@/lib/pump-group-broadcast-service';
 import { recoverOwnedPumpGroupBroadcast } from '@/lib/pump-group-broadcast-recovery';
 import { readOwnedPumpGroupChainEffects } from '@/lib/pump-group-chain-effects-service';
+import { openOwnedPumpTokenWorkspace } from '@/lib/pump-launch-token-workspace-service';
 import type { PumpLaunchRpc } from '@/lib/pump-launch-simulation';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -282,6 +283,10 @@ export async function POST(request: Request) {
           action.transaction,
           signal,
         ),
+      );
+    if (action.action === 'token-workspace')
+      return json(
+        await openOwnedPumpTokenWorkspace(db, user.userId, action.id, signal),
       );
     const rpc = configuredRpc();
     if (action.action === 'chain-effects')

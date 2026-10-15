@@ -23,6 +23,9 @@ import type { PumpLaunchRpc } from './pump-launch-simulation';
 import { parsePumpGroupView } from './pump-launch-group-client';
 import { parsePumpGroupBroadcastState } from './pump-group-broadcast-client';
 import * as broadcastSimulation from './pump-group-broadcast-simulation';
+import { readFileSync } from 'node:fs';
+import { openOwnedPumpTokenWorkspace } from './pump-launch-token-workspace-service';
+import type { ImportedToken } from './token-import';
 vi.mock('./owned-pump-preflight', async (original) => ({
   ...(await original<typeof import('./owned-pump-preflight')>()),
   preflightOwnedPumpCreate: vi.fn(),
@@ -301,6 +304,160 @@ it('reviews additional costs, retains the exact tip, sends the fully revalidated
       'approved',
     ],
   });
+  for (const sql of readFileSync(
+    'drizzle/0024_imported_token_projects.sql',
+    'utf8',
+  ).split('--> statement-breakpoint'))
+    if (sql.trim()) await f.client.execute(sql);
+  const token: ImportedToken = {
+    chain: 'Solana',
+    address: view.review.input.create.mint,
+    name: 'Created token',
+    symbol: 'CREATED',
+    decimals: 6,
+    totalSupplyRaw: '1000000000000000',
+    metadataUri: view.review.input.create.uri,
+    observedAt: new Date().toISOString(),
+    source: 'https://controlled-fixture.example',
+    contextSlot: 250,
+    tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+    metadataKind: 'Token-2022',
+  };
+  const inspect = vi.fn(async () => structuredClone(token));
+  await expect(
+    openOwnedPumpTokenWorkspace(f.db, 'bob', view.review.id, signal(), inspect),
+  ).rejects.toThrow('not found');
+  expect(inspect).not.toHaveBeenCalled();
+  await expect(
+    openOwnedPumpTokenWorkspace(
+      f.db,
+      'alice',
+      view.review.id,
+      signal(),
+      async () => ({ ...token, contextSlot: 249 }),
+    ),
+  ).rejects.toThrow('caught up');
+  await expect(
+    openOwnedPumpTokenWorkspace(
+      f.db,
+      'alice',
+      view.review.id,
+      signal(),
+      async () => ({ ...token, source: `https://${'a'.repeat(254)}.example` }),
+    ),
+  ).rejects.toThrow('Token workspace response differs');
+  expect(
+    (
+      await f.client.execute(
+        'SELECT count(*) AS n FROM imported_token_projects',
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  await f.client.execute(
+    "CREATE TRIGGER test_workspace_history_failure BEFORE INSERT ON imported_token_project_events BEGIN SELECT RAISE(ABORT,'Controlled workspace history failure'); END;",
+  );
+  await expect(
+    openOwnedPumpTokenWorkspace(
+      f.db,
+      'alice',
+      view.review.id,
+      signal(),
+      inspect,
+    ),
+  ).rejects.toThrow('history failure');
+  expect(
+    (
+      await f.client.execute(
+        'SELECT count(*) AS n FROM imported_token_projects',
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  await f.client.execute('DROP TRIGGER test_workspace_history_failure');
+  await f.client.batch(
+    Array.from({ length: 100 }, (_, i) => ({
+      sql: "INSERT INTO imported_token_projects(owner_id,id,chain,address,document,mutation_id,updated_at) VALUES('alice',?,'Solana',?,'{}','capacity',?)",
+      args: ['capacity-' + i, 'capacity-' + i, token.observedAt],
+    })),
+    'write',
+  );
+  await expect(
+    openOwnedPumpTokenWorkspace(
+      f.db,
+      'alice',
+      view.review.id,
+      signal(),
+      inspect,
+    ),
+  ).rejects.toThrow('100-project limit');
+  await f.client.execute(
+    "DELETE FROM imported_token_projects WHERE mutation_id='capacity'",
+  );
+  const workspaces = await Promise.all(
+    [1, 2].map(() =>
+      openOwnedPumpTokenWorkspace(
+        f.db,
+        'alice',
+        view.review.id,
+        signal(),
+        inspect,
+      ),
+    ),
+  );
+  expect(new Set(workspaces.map((w) => w.project.id)).size).toBe(1);
+  expect(workspaces[0].project.id).not.toBe(view.review.id);
+  expect(workspaces.filter((w) => w.created)).toHaveLength(1);
+  expect(
+    (
+      await f.client.execute(
+        'SELECT count(*) AS n FROM imported_token_project_events',
+      )
+    ).rows[0].n,
+  ).toBe(1);
+  expect(workspaces[0]).toMatchObject({
+    executionAllowed: false,
+    signingAllowed: false,
+    reservationsChanged: false,
+  });
+  const project = workspaces[0].project;
+  const settings = {
+    side: 'Sell',
+    amount: '10',
+    wallet: f.group.review.input.create.payer,
+    walletRevision: 1,
+  };
+  await f.client.execute({
+    sql: 'UPDATE imported_token_projects SET revision=2,archived=1,document=? WHERE owner_id=? AND id=?',
+    args: [
+      JSON.stringify({ ...project.document, tradeSettings: settings }),
+      'alice',
+      project.id,
+    ],
+  });
+  inspect.mockClear();
+  const reused = await openOwnedPumpTokenWorkspace(
+    f.db,
+    'alice',
+    view.review.id,
+    signal(),
+    inspect,
+  );
+  expect(reused).toMatchObject({
+    created: false,
+    project: {
+      id: project.id,
+      archived: true,
+      revision: 2,
+      document: { tradeSettings: settings },
+    },
+  });
+  expect(inspect).not.toHaveBeenCalled();
+  expect(
+    (
+      await f.client.execute(
+        'SELECT count(*) AS n FROM imported_token_project_events',
+      )
+    ).rows[0].n,
+  ).toBe(1);
 }, 120000);
 it('consumes exactly one database attempt when two requests race after validated simulation', async () => {
   const f = await setup(),

@@ -8,6 +8,8 @@ import type { PumpGroupBroadcastState } from '@/lib/pump-group-broadcast';
 import type { PumpGroupTipSignAction } from '@/lib/pump-group-broadcast-client';
 import { collectPumpGroupChainEffects } from '@/lib/pump-group-chain-effects';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
+import { PumpTokenWorkspaceNavigation } from './pump-token-workspace-navigation';
+import { pumpTokenWorkspaceFixture } from '../../test/pump-launch-token-workspace-fixture';
 let f: Awaited<ReturnType<typeof pumpGroupBroadcastClientFixture>>,
   root: Root,
   container: HTMLDivElement,
@@ -185,6 +187,93 @@ it('discards a delayed wallet result when the visible launch context changes', a
   expect(container.textContent).toContain(
     'Finalized wallet result context changed',
   );
+  expect(signer).not.toHaveBeenCalled();
+});
+async function renderWorkspaceNavigation(
+  contextKey = 'current',
+  onOpen = vi.fn(),
+) {
+  const handoff = pumpTokenWorkspaceFixture(f.group);
+  fetcher.mockImplementation(async (_url: string, init: RequestInit) => {
+    const action = JSON.parse(
+      typeof init.body === 'string' ? init.body : '{}',
+    ).action;
+    if (action === 'broadcast-read') return Response.json(null);
+    if (action === 'token-workspace') return Response.json(handoff.result);
+    throw new Error('Unexpected workspace handoff action');
+  });
+  const render = async (key = contextKey) => {
+    await act(async () =>
+      root.render(
+        <PumpTokenWorkspaceNavigation onOpen={onOpen}>
+          <PumpGroupBroadcast
+            group={handoff.group}
+            contextKey={key}
+            onSignTip={signer}
+            onGroup={vi.fn()}
+          />
+        </PumpTokenWorkspaceNavigation>,
+      ),
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await settle();
+  };
+  await render();
+  return { ...handoff, onOpen, render };
+}
+it('opens the exact finalized token workspace only after a click and does not sign or submit', async () => {
+  const handoff = await renderWorkspaceNavigation();
+  expect(handoff.onOpen).not.toHaveBeenCalled();
+  expect(
+    fetcher.mock.calls.every(
+      ([, init]) => !String(init.body).includes('token-workspace'),
+    ),
+  ).toBe(true);
+  await click('Open token workspace and chart');
+  expect(handoff.onOpen).toHaveBeenCalledExactlyOnceWith(
+    handoff.result.project,
+  );
+  expect(signer).not.toHaveBeenCalled();
+  expect(localStorage.length).toBe(0);
+  expect(
+    fetcher.mock.calls.every(([, init]) =>
+      ['broadcast-read', 'token-workspace'].includes(
+        JSON.parse(String(init.body)).action,
+      ),
+    ),
+  ).toBe(true);
+});
+it('does not navigate after a delayed workspace response when the launch context changes', async () => {
+  const handoff = await renderWorkspaceNavigation();
+  const entered = Promise.withResolvers<void>(),
+    pending = Promise.withResolvers<Response>();
+  fetcher.mockImplementation(async () => {
+    entered.resolve();
+    return pending.promise;
+  });
+  await act(async () => {
+    button('Open token workspace and chart').click();
+    await entered.promise;
+  });
+  // Keep the same tree mounted; changing the context must invalidate its pending callback.
+  await act(async () =>
+    root.render(
+      <PumpTokenWorkspaceNavigation onOpen={handoff.onOpen}>
+        <PumpGroupBroadcast
+          group={handoff.group}
+          contextKey="changed"
+          onSignTip={signer}
+          onGroup={vi.fn()}
+        />
+      </PumpTokenWorkspaceNavigation>,
+    ),
+  );
+  await act(async () => pending.resolve(Response.json(handoff.result)));
+  await settle();
+  expect(handoff.onOpen).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('Token workspace context changed');
   expect(signer).not.toHaveBeenCalled();
 });
 it('loads history without signing or submission and requires separate unchecked approvals for tip and broadcast', async () => {

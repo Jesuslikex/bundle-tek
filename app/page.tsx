@@ -87,6 +87,7 @@ import { WalletTracker } from '@/components/wallet-tracker';
 import { WorkspaceActivity } from '@/components/workspace-activity';
 import { ImportedTokenProjects } from '@/components/imported-token-projects';
 import { useImportedProjects } from '@/components/use-imported-projects';
+import { PumpTokenWorkspaceNavigation } from '@/components/launch/pump-token-workspace-navigation';
 import {
   DEFAULT_VENUE_OPTIONS,
   EMPTY_IDENTITY,
@@ -1714,45 +1715,55 @@ export default function Home() {
                   onNext={() => setView('token')}
                 />
               ) : view === 'token' ? (
-                <TokenDetailsForm
-                  key={projectId ?? 'new-project'}
-                  validationError={planValidation.error}
-                  metadataProject={
-                    projectId &&
-                    projectVersion &&
-                    !hasEdits &&
-                    !saveBusy &&
-                    persistenceState === 'ready' &&
-                    projects.some(
-                      (project) =>
-                        project.id === projectId && !project.archived,
-                    )
-                      ? {
-                          id: projectId,
-                          updatedAt: projectVersion,
-                          document: {
-                            plan: launchPlan,
-                            identity,
-                            options: venueOptions,
-                          },
-                          payer: venueOptions.wallets?.deployer
-                            ? {
-                                address: venueOptions.wallets.deployer.address,
-                                revision:
-                                  venueOptions.wallets.deployer.revision,
-                              }
-                            : undefined,
-                        }
-                      : null
+                <PumpTokenWorkspaceNavigation
+                  onOpen={(project) =>
+                    guardDraft(() => {
+                      importedProjects.accept([project]);
+                      openImportedProject(project.id);
+                    })
                   }
-                  onSave={() => void saveLaunchPlan()}
-                  saving={saveBusy}
-                  identity={identity}
-                  onIdentityChange={updateIdentity}
-                  plan={launchPlan}
-                  onChange={updateLaunchPlan}
-                  onNext={() => setView('launch')}
-                />
+                >
+                  <TokenDetailsForm
+                    key={projectId ?? 'new-project'}
+                    validationError={planValidation.error}
+                    metadataProject={
+                      projectId &&
+                      projectVersion &&
+                      !hasEdits &&
+                      !saveBusy &&
+                      persistenceState === 'ready' &&
+                      projects.some(
+                        (project) =>
+                          project.id === projectId && !project.archived,
+                      )
+                        ? {
+                            id: projectId,
+                            updatedAt: projectVersion,
+                            document: {
+                              plan: launchPlan,
+                              identity,
+                              options: venueOptions,
+                            },
+                            payer: venueOptions.wallets?.deployer
+                              ? {
+                                  address:
+                                    venueOptions.wallets.deployer.address,
+                                  revision:
+                                    venueOptions.wallets.deployer.revision,
+                                }
+                              : undefined,
+                          }
+                        : null
+                    }
+                    onSave={() => void saveLaunchPlan()}
+                    saving={saveBusy}
+                    identity={identity}
+                    onIdentityChange={updateIdentity}
+                    plan={launchPlan}
+                    onChange={updateLaunchPlan}
+                    onNext={() => setView('launch')}
+                  />
+                </PumpTokenWorkspaceNavigation>
               ) : view === 'funding' ? (
                 <FundingForm
                   plan={launchPlan}

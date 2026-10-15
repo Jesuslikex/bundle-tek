@@ -54,6 +54,13 @@ const mocks = vi.hoisted(() => ({
     complete: false,
     reservationsChanged: false,
   })),
+  tokenWorkspace: vi.fn(async (..._args: unknown[]) => ({
+    created: false,
+    executionAllowed: false,
+  })),
+}));
+vi.mock('@/lib/pump-launch-token-workspace-service', () => ({
+  openOwnedPumpTokenWorkspace: mocks.tokenWorkspace,
 }));
 vi.mock('@/lib/pump-group-chain-effects-service', () => ({
   readOwnedPumpGroupChainEffects: mocks.chainEffects,
@@ -404,6 +411,24 @@ it('scopes finalized wallet reads to the owner, exact group and read-only provid
   expect(mocks.chainEffects).toHaveBeenCalledOnce();
   mocks.user = null;
   expect((await send({ action: 'chain-effects', id })).status).toBe(401);
+});
+it('scopes token workspace creation to the finalized owned group and never requires a signing RPC or accepts a client mint', async () => {
+  mocks.endpoint = 'not-a-provider-url';
+  const result = await send({ action: 'token-workspace', id });
+  expect(result.status).toBe(200);
+  expect(mocks.tokenWorkspace.mock.calls[0].slice(0, 3)).toEqual([
+    mocks.db,
+    'alice',
+    id,
+  ]);
+  expect((await send({ action: 'token-workspace', id })).status).toBe(429);
+  expect(
+    (await send({ action: 'token-workspace', id, mint: wallets[1] })).status,
+  ).toBe(400);
+  mocks.user = { userId: 'bob' };
+  expect((await send({ action: 'token-workspace', id })).status).toBe(404);
+  expect(mocks.tokenWorkspace).toHaveBeenCalledOnce();
+  expect(mocks.rpc).not.toHaveBeenCalled();
 });
 it('bounds a stalled streamed body by its deadline before any action or provider read', async () => {
   const deadline = new AbortController(),

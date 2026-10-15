@@ -31,6 +31,11 @@ import {
   type PumpGroupChainEffects,
 } from '@/lib/pump-group-chain-effects';
 import { PumpGroupChainEffectsPanel } from './pump-group-chain-effects-panel';
+import { usePumpTokenWorkspaceNavigation } from './pump-token-workspace-navigation';
+import {
+  parsePumpLaunchTokenWorkspace,
+  pumpLaunchWorkspaceReady,
+} from '@/lib/pump-launch-token-workspace';
 type Props = {
   group: PumpGroupView;
   contextKey: string;
@@ -70,6 +75,7 @@ export function PumpGroupBroadcast({
   onPreparedChange,
 }: Props) {
   const id = useId();
+  const openTokenWorkspace = usePumpTokenWorkspaceNavigation();
   const [state, setState] = useState<PumpGroupBroadcastState | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -104,6 +110,12 @@ export function PumpGroupBroadcast({
       body: JSON.stringify({ ...body, id: group.review.id }),
     });
     current();
+    if (!response.ok && body.action === 'token-workspace')
+      throw new Error(
+        response.status === 429
+          ? 'Wait five seconds before opening this token workspace again.'
+          : 'Token workspace opening did not finish. It may already have been saved; retry this same finalized group to recover it.',
+      );
     if (!response.ok && body.action === 'chain-effects')
       throw new Error(
         'Finalized wallet results are unavailable. Retained signatures and reservations were not changed; retry this read after checking saved history.',
@@ -178,7 +190,9 @@ export function PumpGroupBroadcast({
       if (active.current)
         setError(
           e instanceof Error &&
-            /^(Wait five|Group broadcast|Finalized wallet)/.test(e.message)
+            /^(Wait five|Group broadcast|Finalized wallet|Token workspace)/.test(
+              e.message,
+            )
             ? e.message
             : 'Broadcast action did not complete. Keep retained signatures and reload the saved broadcast before continuing.',
         );
@@ -620,6 +634,36 @@ export function PumpGroupBroadcast({
             </output>
           )}
         </>
+      )}
+      {openTokenWorkspace && pumpLaunchWorkspaceReady(group) && (
+        <div className={styles.actions}>
+          <Button
+            type="button"
+            disabled={locked}
+            onClick={() =>
+              void run(async () => {
+                const selected = context.current;
+                const result = parsePumpLaunchTokenWorkspace(
+                  await request({ action: 'token-workspace' }),
+                  group,
+                );
+                current();
+                if (selected !== context.current)
+                  throw new Error(
+                    'Token workspace context changed. Reopen the current saved group.',
+                  );
+                setNotice(
+                  result.project.archived
+                    ? 'The existing workspace is archived. Restore it explicitly there before making changes.'
+                    : 'Token workspace ready. Market data may take time to index; trading still needs separate review and approval.',
+                );
+                openTokenWorkspace(result.project);
+              })
+            }
+          >
+            Open token workspace and chart
+          </Button>
+        </div>
       )}
       {group.signedEvidence && (
         <PumpGroupChainEffectsPanel

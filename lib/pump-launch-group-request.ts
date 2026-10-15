@@ -14,7 +14,11 @@ import type { PumpLaunchGroupConsent } from './pump-launch-group-review';
 import type { PumpGroupObservationPosition } from './pump-launch-group-observation-service';
 export type PumpGroupRequest =
   | {
-      action: 'broadcast-read' | 'broadcast-recover' | 'chain-effects';
+      action:
+        | 'broadcast-read'
+        | 'broadcast-recover'
+        | 'chain-effects'
+        | 'token-workspace';
       id: string;
     }
   | {
@@ -92,7 +96,8 @@ export function parsePumpGroupRequest(
     if (
       value.action === 'broadcast-read' ||
       value.action === 'broadcast-recover' ||
-      value.action === 'chain-effects'
+      value.action === 'chain-effects' ||
+      value.action === 'token-workspace'
     ) {
       if (!keys(value, ['action', 'id'])) return fail();
       return { action: value.action, id: value.id };
