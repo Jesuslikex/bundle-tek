@@ -22,6 +22,10 @@ The first unfiltered `npm run check` finished its test phase with 397 passing fi
 
 The fixture correction also passes a new nonincremental TypeScript run and scoped type-aware lint. This local code checkpoint is ready for inspection; full-chain qualification is still pending and will be recorded in a follow-up verification commit.
 
+Code checkpoint `ec41031` is on local main. Main's installed dependencies were refreshed, its ordinary `npm run typecheck` passed again, its file list resolves native Next declarations without Vinext, and only the original two unrelated dirty files remain.
+
+A subsequent four-worker diagnostic run exposed three load-sensitive group service cases that passed in the completed two-worker run: terminal recovery with retained signed history, uncertain broadcast recovery and changed-code/consent rejection. That failed diagnostic was stopped, not accepted as qualification. Their production freshness and expiry checks remain unchanged, and this cleanup does not claim to make those fixtures deterministic at higher concurrency. The standard package test script now declares `--maxWorkers=2` so ordinary `npm run check` uses the known resource profile without an environment override. All test files and assertions still execute; Claude-owned `vitest.config.mjs` is untouched. The final complete check is being rerun on that committed default profile.
+
 When updating another existing checkout, install the updated lockfile and run `npx next typegen` once to replace any ignored Vinext-generated entrypoint. Normal Next dev/build commands also regenerate it. Neither historical `.vinext` artifact ignore rules nor old deployment notes need to be deleted to fix compiler resolution.
 
 Nothing is pushed or deployed. No hosted database, credentials or wallet actions are involved. Main's pre-existing `docs/CODEX-JITO-ATOMIC-BUNDLES.md` and `drizzle/0068_remarkable_frightful_four.sql` remain outside this commit.
