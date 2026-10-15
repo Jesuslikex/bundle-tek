@@ -5,11 +5,27 @@ import { routeMessage } from './jupiter-route-fixture';
 import { prepareSolanaPair } from '../lib/warmup-swap-quote';
 import { pairAssociatedAddress } from '../lib/pair-wallet-evidence';
 import { PAIR_CLOCK } from '../lib/pair-mint-evidence';
+import { pairWalletTokenAccount } from './pair-wallet-fixture';
+import { requiredPairAccountExtensions } from '../lib/pair-wallet-evidence';
+import {
+  SWAP_TOKEN,
+  SWAP_WRAPPED_SOL,
+} from '../lib/swap-token-program-evidence';
 import type {
   ImportedPairOrderRequest,
   ImportedPairOrderDependencies,
 } from '../lib/imported-pair-order-candidate';
 type Message = ReturnType<typeof routeMessage>;
+type Simulated = {
+  context: { slot: string };
+  value: {
+    err: unknown;
+    unitsConsumed: string;
+    fee?: string;
+    replacementBlockhash: unknown;
+    accounts: unknown[];
+  };
+};
 export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
   const f = await pairWalletFixture(side);
   const state = {
@@ -18,9 +34,13 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
     feeRaw: '5000',
     height: '100',
     valid: true,
+    closedAsNull: false,
     otherAccounts: new Map<string, unknown>(),
     transform: null as null | ((m: Message) => Message),
     responsePatch: {} as Record<string, unknown>,
+    onSimulation: null as
+      | null
+      | ((response: Simulated, addresses: string[]) => void),
   };
   const originalRpc = f.rpc.getMockImplementation()!;
   f.rpc.mockImplementation(async (method, params) => {
@@ -36,6 +56,144 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
         context: { slot: String(config!.minContextSlot! + 1) },
         value: state.valid,
       };
+    if (method === 'simulateTransaction') {
+      const settings = params[1] as {
+        minContextSlot: number;
+        accounts: { addresses: string[] };
+      };
+      const addresses = settings.accounts.addresses;
+      const inputMint =
+        currentInput.side === 'Buy'
+          ? currentInput.quoteMint
+          : currentInput.baseMint;
+      const outputMint =
+        currentInput.side === 'Buy'
+          ? currentInput.baseMint
+          : currentInput.quoteMint;
+      const raw = (key: string) =>
+        key === f.wallet
+          ? f.state.walletAccount
+          : (f.accounts[f.atas.indexOf(key)] ??
+            state.otherAccounts.get(key) ??
+            null);
+      const post = new Map(
+        addresses.map((key) => [key, structuredClone(raw(key))]),
+      );
+      let walletDelta = -BigInt(state.feeRaw);
+      for (const [i, mint] of [inputMint, outputMint].entries()) {
+        const program =
+          mint === SWAP_WRAPPED_SOL
+            ? SWAP_TOKEN
+            : mint === currentInput.baseMint
+              ? f.mints[0].owner
+              : f.mints[1].owner;
+        const key =
+          mint === SWAP_WRAPPED_SOL
+            ? String(lastMessage.staticAccounts[i + 1])
+            : await pairAssociatedAddress(
+                { ...f.mintEvidence.mints[0], address: mint, program },
+                f.wallet,
+              );
+        const prior = raw(key) as ReturnType<
+          typeof pairWalletTokenAccount
+        > | null;
+        const closed = lastMessage.instructions.some(
+          (instruction) =>
+            String(
+              lastMessage.staticAccounts[instruction.programAddressIndex],
+            ) === SWAP_TOKEN &&
+            instruction.data?.length === 1 &&
+            instruction.data[0] === 9 &&
+            String(
+              lastMessage.staticAccounts[instruction.accountIndices![0]],
+            ) === key,
+        );
+        const native = mint === SWAP_WRAPPED_SOL;
+        let next = structuredClone(prior);
+        if (native) {
+          walletDelta +=
+            i === 0 ? -BigInt(lastOrder.inAmount) : BigInt(lastOrder.outAmount);
+          if (closed) {
+            post.set(
+              key,
+              state.closedAsNull
+                ? null
+                : {
+                    owner: '11111111111111111111111111111111',
+                    executable: false,
+                    lamports: '0',
+                    data: ['', 'base64'],
+                  },
+            );
+            walletDelta += BigInt(prior?.lamports ?? '0');
+            continue;
+          }
+        }
+        if (!next) {
+          const metadata = f.mintEvidence.mints.find(
+            (m) => m.address === mint,
+          )!;
+          const program = native
+            ? SWAP_TOKEN
+            : mint === currentInput.baseMint
+              ? f.mints[0].owner
+              : f.mints[1].owner;
+          next = pairWalletTokenAccount(
+            mint,
+            f.wallet,
+            program,
+            '0',
+            program === SWAP_TOKEN
+              ? []
+              : requiredPairAccountExtensions(metadata),
+          );
+          const size = atob(next.data[0]).length;
+          next.lamports =
+            f.state.rentBySize.get(size) ?? String(1000 + size * 10);
+          walletDelta -= BigInt(next.lamports);
+          if (native) {
+            const bytes = Uint8Array.from(atob(next.data[0]), (c) =>
+              c.charCodeAt(0),
+            );
+            const v = new DataView(bytes.buffer);
+            v.setUint32(109, 1, true);
+            v.setBigUint64(113, BigInt(next.lamports), true);
+            next.data[0] = btoa(String.fromCharCode(...bytes));
+          }
+        }
+        if (!native) {
+          const bytes = Uint8Array.from(atob(next.data[0]), (c) =>
+            c.charCodeAt(0),
+          );
+          const v = new DataView(bytes.buffer);
+          v.setBigUint64(
+            64,
+            v.getBigUint64(64, true) +
+              (i === 0
+                ? -BigInt(lastOrder.inAmount)
+                : BigInt(lastOrder.outAmount)),
+            true,
+          );
+          next.data[0] = btoa(String.fromCharCode(...bytes));
+        }
+        post.set(key, next);
+      }
+      const wallet = post.get(f.wallet) as NonNullable<
+        typeof f.state.walletAccount
+      >;
+      wallet.lamports = (BigInt(wallet.lamports) + walletDelta).toString();
+      const response: Simulated = {
+        context: { slot: String(settings.minContextSlot + 1) },
+        value: {
+          err: null,
+          unitsConsumed: '100000',
+          replacementBlockhash: null,
+          accounts: addresses.map((key) => post.get(key)),
+        },
+      };
+      state.onSimulation?.(response, addresses);
+      return response;
+    }
     if (
       method === 'getMultipleAccounts' &&
       (params[0] as string[])[0] !== f.wallet &&
@@ -48,9 +206,23 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
         ),
       };
     }
-    return originalRpc(method, params);
+    const result = await originalRpc(method, params);
+    if (
+      method === 'getMultipleAccounts' &&
+      (params[0] as string[])[0] === f.wallet
+    ) {
+      const response = result as { value: unknown[] };
+      response.value = (params[0] as string[]).map((key, i) =>
+        state.otherAccounts.has(key)
+          ? structuredClone(state.otherAccounts.get(key))
+          : response.value[i],
+      );
+    }
+    return result;
   });
   let currentInput: Parameters<typeof prepareSolanaPair>[0];
+  let lastMessage: Message;
+  let lastOrder: Awaited<ReturnType<typeof prepareSolanaPair>>;
   const makeMessage = async (
     input: Parameters<typeof prepareSolanaPair>[0],
   ) => {
@@ -111,6 +283,7 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
     async (_url: Parameters<typeof fetch>[0], _init?: RequestInit) => {
       const input = currentInput,
         message = await makeMessage(input);
+      lastMessage = message;
       const transaction = btoa(
         String.fromCharCode(
           ...Uint8Array.from([
@@ -156,6 +329,7 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
         signal,
         fetcher as typeof fetch,
       );
+      lastOrder = order;
       return {
         ...order,
         observedAt: new Date(f.clock.now).toISOString(),

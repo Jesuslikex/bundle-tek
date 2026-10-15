@@ -175,7 +175,7 @@ export async function prepareOwnedImportedPairOrder(
       order,
       review,
       candidatePrepared: true as const,
-      economicSimulationVerified: false as const,
+      economicSimulationVerified: true as const,
       approvalCreated: false as const,
       reservationCreated: false as const,
       signingAllowed: false as const,
@@ -200,7 +200,7 @@ export async function prepareOwnedImportedPairOrder(
   } catch (error) {
     if (error instanceof ImportedPairQuoteError) throw error;
     throw new ImportedPairQuoteError(
-      'Unsigned pair candidate did not pass independent account, instruction, fee or lifetime review. No approval or signature was created.',
+      'Unsigned pair candidate did not pass independent account, instruction, simulation, fee or lifetime review. No approval or signature was created.',
     );
   } finally {
     signal.removeEventListener('abort', abort);

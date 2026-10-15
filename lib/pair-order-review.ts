@@ -427,6 +427,7 @@ export async function reviewPairOrderInstructions(
     minimumOutputRaw: order.minimumOutAmount,
     networkFeeRaw: fee.toString(),
     priorityFeeUpperBoundRaw: priority.toString(),
+    computeUnitLimitRaw: (limit ?? 1400000n).toString(),
     accountCreationRentRaw: setupRent.toString(),
     nativeWrappingRaw: wrappedInput.toString(),
     maximumExplicitNativeDebitRaw: (wrappedInput + fee + setupRent).toString(),

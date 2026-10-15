@@ -24,6 +24,7 @@ import {
   type PairOrderAccountSnapshot,
 } from './pair-order-review';
 import { SWAP_WRAPPED_SOL } from './swap-token-program-evidence';
+import { reviewPairOrderSimulation } from './pair-order-simulation';
 import type { ImportedPairWalletPreflight } from './imported-pair-wallet-preflight';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
@@ -38,7 +39,7 @@ function slot(value: unknown, floor: number) {
     throw Error('Pair candidate RPC context differs.');
   return Number(value);
 }
-/** Reads and reviews an unsigned candidate. It does not simulate, sign, send or create a reservation. */
+/** Reviews and simulates an unsigned candidate, without signing, sending or reserving funds. */
 export async function collectPairOrderReview(
   preflight: ImportedPairWalletPreflight,
   order: SolanaPairPreparation,
@@ -237,6 +238,31 @@ export async function collectPairOrderReview(
     networkFee,
   );
   fresh();
+  const simulationResponse = await rpc('simulateTransaction', [
+    order.preparation.transaction,
+    {
+      encoding: 'base64',
+      commitment: 'confirmed',
+      sigVerify: false,
+      replaceRecentBlockhash: false,
+      minContextSlot: floor(),
+      accounts: { encoding: 'base64', addresses: writable },
+    },
+  ]);
+  slots.push(
+    slot(
+      (simulationResponse as { context?: { slot?: unknown } })?.context?.slot,
+      floor(),
+    ),
+  );
+  const simulation = await reviewPairOrderSimulation(
+    preflight,
+    assessment,
+    snapshots,
+    writable,
+    simulationResponse,
+  );
+  fresh();
   const after = await readAccounts(selected, false);
   const identity = (a: PairOrderAccountSnapshot) => {
     if (a.raw === null) return [a.address, null];
@@ -299,6 +325,7 @@ export async function collectPairOrderReview(
     pairSha256: pair.sha256,
     preflightSha256: preflight.contextSha256,
     assessment,
+    simulation,
     lookupTables:
       lookups?.tables.map((t) => ({
         address: t.address,
@@ -316,7 +343,7 @@ export async function collectPairOrderReview(
     expiresAt: new Date(
       Math.min(Date.parse(preflight.expiresAt), Date.parse(order.expiresAt)),
     ).toISOString(),
-    economicSimulationVerified: false as const,
+    economicSimulationVerified: true as const,
     programCodeAttested: false as const,
     applicationReservationsChecked: false as const,
     signingAllowed: false as const,

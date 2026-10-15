@@ -67,7 +67,7 @@ it('constructs and independently checks a real decoded wallet-bound candidate wi
   expect(await response.json()).toMatchObject({
     format: 'imported-pair-order-candidate-v1',
     candidatePrepared: true,
-    economicSimulationVerified: false,
+    economicSimulationVerified: true,
     approvalCreated: false,
     reservationCreated: false,
     signingAllowed: false,
@@ -166,3 +166,31 @@ it('cancels a stalled request body without a database read or unsigned provider 
   expect(mocks.getDb).not.toHaveBeenCalled();
   expect(f.prepare).not.toHaveBeenCalled();
 });
+it.each(['economic', 'provider'] as const)(
+  'rejects %s simulation failure without leaking provider data or approval',
+  async (mode) => {
+    if (mode === 'economic')
+      f.orderState.onSimulation = (response) => {
+        response.value.accounts.pop();
+      };
+    else {
+      const original = f.rpc.getMockImplementation()!;
+      f.rpc.mockImplementation(async (method, params) => {
+        if (method === 'simulateTransaction')
+          throw Error('private rpc endpoint');
+        return original(method, params);
+      });
+    }
+    const response = await POST(request());
+    expect(response.status).toBe(mode === 'economic' ? 409 : 502);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toContain('private rpc');
+    expect(body).not.toHaveProperty('order');
+    expect(
+      f.sqlite
+        .prepare('SELECT count(*) AS n FROM imported_token_project_events')
+        .get(),
+    ).toMatchObject({ n: 0 });
+  },
+);

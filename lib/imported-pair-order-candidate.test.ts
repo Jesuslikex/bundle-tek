@@ -68,7 +68,7 @@ it.each([
     expect(result).toMatchObject({
       format: 'imported-pair-order-candidate-v1',
       candidatePrepared: true,
-      economicSimulationVerified: false,
+      economicSimulationVerified: true,
       approvalCreated: false,
       reservationCreated: false,
       signingAllowed: false,
@@ -86,6 +86,31 @@ it.each([
       },
     });
     expect(result.order.preparation.sha256).toBe(result.review.packetSha256);
+    expect(result.review.simulation).toMatchObject({
+      economicSimulationVerified: true,
+      signatureVerified: false,
+      providerObservationOnly: true,
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+    expect(
+      f.rpc.mock.calls.find(
+        ([method]) => method === 'simulateTransaction',
+      )?.[1],
+    ).toEqual([
+      result.order.preparation.transaction,
+      {
+        encoding: 'base64',
+        commitment: 'confirmed',
+        sigVerify: false,
+        replaceRecentBlockhash: false,
+        minContextSlot: expect.any(Number),
+        accounts: {
+          encoding: 'base64',
+          addresses: result.review.writableAccounts,
+        },
+      },
+    ]);
     expect(f.prepare).toHaveBeenCalledOnce();
     const url = new URL(f.orderFetcher.mock.calls[0][0] as URL);
     expect(url.searchParams.get('taker')).toBe(f.wallet);
@@ -298,12 +323,64 @@ async function nativeStock(v: Fixture, side: 'Buy' | 'Sell') {
   v.orderRequest.quoteMint = SWAP_WRAPPED_SOL;
   v.orderRequest.amount = side === 'Buy' ? '0.5' : '0.1';
 }
-it.each(['Buy', 'Sell'] as const)(
-  'checks canonical automatic SOL wrapping/unwrapping for %s with captured TSLAX extensions',
-  async (side) => {
+const nativeCases: {
+  side: 'Buy' | 'Sell';
+  existing: boolean;
+  retain?: boolean;
+  nullClosed?: boolean;
+  bad?:
+    | 'refund'
+    | 'output'
+    | 'cleanup'
+    | 'residual'
+    | 'closed-owner'
+    | 'closed-executable'
+    | 'closed-data'
+    | 'reserve';
+}[] = [
+  { side: 'Buy' as const, existing: false },
+  { side: 'Sell' as const, existing: false },
+  { side: 'Buy' as const, existing: true },
+  { side: 'Sell' as const, existing: true },
+  { side: 'Buy', existing: false, retain: true },
+  { side: 'Buy', existing: true, retain: true },
+  { side: 'Buy', existing: true, bad: 'refund' },
+  { side: 'Sell', existing: true, bad: 'output' },
+  { side: 'Buy', existing: false, bad: 'cleanup' },
+  { side: 'Buy', existing: true, retain: true, bad: 'residual' },
+  { side: 'Buy', existing: false, nullClosed: true },
+  { side: 'Buy', existing: false, bad: 'closed-owner' },
+  { side: 'Buy', existing: false, bad: 'closed-executable' },
+  { side: 'Buy', existing: false, bad: 'closed-data' },
+  { side: 'Buy', existing: true, retain: true, bad: 'reserve' },
+];
+it.each(nativeCases)(
+  'checks SOL simulation for $side existing=$existing retain=$retain bad=$bad',
+  async ({ side, existing, retain, bad, nullClosed }) => {
     f = await pairOrderFixture(side);
     const fixture = f;
+    fixture.orderState.closedAsNull = nullClosed ?? false;
     await nativeStock(fixture, side);
+    if (existing) {
+      const mint = {
+        ...fixture.mintEvidence.mints[0],
+        address: SWAP_WRAPPED_SOL,
+        program: SWAP_TOKEN,
+      };
+      const ata = await pairAssociatedAddress(mint, fixture.wallet);
+      const token = pairWalletTokenAccount(
+        SWAP_WRAPPED_SOL,
+        fixture.wallet,
+        SWAP_TOKEN,
+        '10000000',
+      );
+      token.lamports = '10002650';
+      editToken(token, (_b, view) => {
+        view.setUint32(109, 1, true);
+        view.setBigUint64(113, 2650n, true);
+      });
+      fixture.orderState.otherAccounts.set(ata, token);
+    }
     fixture.orderState.transform = (m) => {
       const system = addReadonly(m, '11111111111111111111111111111111'),
         ata = addReadonly(m, 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
@@ -336,24 +413,81 @@ it.each(['Buy', 'Sell'] as const)(
       m.instructions = [
         ...setup,
         ...m.instructions,
-        {
-          programAddressIndex: token,
-          accountIndices: [target, 0, 0],
-          data: Uint8Array.from([9]),
-        },
+        ...(!retain
+          ? [
+              {
+                programAddressIndex: token,
+                accountIndices: [target, 0, 0],
+                data: Uint8Array.from([9]),
+              },
+            ]
+          : []),
       ];
       return m;
     };
+    if (bad) {
+      const nativeKey = await pairAssociatedAddress(
+        {
+          ...fixture.mintEvidence.mints[0],
+          address: SWAP_WRAPPED_SOL,
+          program: SWAP_TOKEN,
+        },
+        fixture.wallet,
+      );
+      fixture.orderState.onSimulation = (response, keys) => {
+        if (bad === 'refund' || bad === 'output') {
+          const wallet = response.value.accounts[
+            keys.indexOf(fixture.wallet)
+          ] as PostAccount;
+          wallet.lamports = (
+            BigInt(wallet.lamports) - (bad === 'refund' ? 10002650n : 5001n)
+          ).toString();
+        } else {
+          if (bad === 'reserve') {
+            const token = response.value.accounts[
+              keys.indexOf(nativeKey)
+            ] as PostAccount;
+            const wallet = response.value.accounts[
+              keys.indexOf(fixture.wallet)
+            ] as PostAccount;
+            token.lamports = (BigInt(token.lamports) + 1n).toString();
+            wallet.lamports = (BigInt(wallet.lamports) - 1n).toString();
+            editToken(token, (_b, view) => view.setBigUint64(113, 2651n, true));
+          } else if (bad.startsWith('closed-')) {
+            const closed = response.value.accounts[
+              keys.indexOf(nativeKey)
+            ] as PostAccount;
+            if (bad === 'closed-owner') closed.owner = SWAP_TOKEN;
+            if (bad === 'closed-executable') closed.executable = true;
+            if (bad === 'closed-data') closed.data[0] = 'AA==';
+          } else if (bad === 'cleanup')
+            response.value.accounts[keys.indexOf(nativeKey)] =
+              fixture.state.walletAccount;
+          else
+            editToken(
+              response.value.accounts[keys.indexOf(nativeKey)],
+              (_b, view) => view.setBigUint64(64, 10000001n, true),
+            );
+        }
+      };
+      await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+      return;
+    }
     const result = await run(fixture);
     expect(result.review.assessment).toMatchObject({
       nativeWrappingRaw: side === 'Buy' ? '500000000' : '0',
-      accountCreationRentRaw: '2650',
+      accountCreationRentRaw: existing ? '0' : '2650',
       networkFeeRaw: '5000',
     });
     expect(
       result.review.assessment.accounts.find((a) => a.mint === SWAP_WRAPPED_SOL)
         ?.closed,
-    ).toBe(true);
+    ).toBe(!retain);
+    expect(result.review.simulation).toMatchObject({
+      nativeTradeDeltaRaw: side === 'Buy' ? '-500000000' : '1000000',
+      retainedAccountRentRaw: retain && !existing ? '2650' : '0',
+      economicSimulationVerified: true,
+    });
   },
 );
 it('validates seeded SOL wrapping, initializer ownership and wallet-bound cleanup', async () => {
@@ -515,6 +649,249 @@ it('cancels a stalled wallet-bound provider without storing approval or signed m
   await expect(pending).rejects.toMatchObject({ status: 408 });
   expect(
     f.sqlite
+      .prepare('SELECT count(*) AS n FROM imported_token_project_events')
+      .get(),
+  ).toMatchObject({ n: 0 });
+});
+
+type PostAccount = {
+  owner: string;
+  executable: boolean;
+  lamports: string;
+  data: string[];
+};
+function editToken(
+  raw: unknown,
+  edit: (bytes: Uint8Array, view: DataView) => void,
+) {
+  const a = raw as PostAccount;
+  const bytes = Uint8Array.from(atob(a.data[0]), (c) => c.charCodeAt(0));
+  edit(bytes, new DataView(bytes.buffer));
+  a.data[0] = btoa(String.fromCharCode(...bytes));
+}
+it.each(['Buy', 'Sell'] as const)(
+  'independently verifies %s raw token amounts and SOL conservation',
+  async (side) => {
+    const fixture = (f = await pairOrderFixture(side));
+    const result = await run(fixture);
+    const simulation = result.review.simulation;
+    expect(simulation.nativeTradeDeltaRaw).toBe('0');
+    expect(simulation.walletLamportsBeforeRaw).toBe('1000000000');
+    expect(simulation.walletLamportsAfterRaw).toBe('999995000');
+    expect(
+      simulation.tokenDeltas.find((a) => a.mint === result.order.inputMint)
+        ?.deltaRaw,
+    ).toBe('-1');
+    expect(
+      simulation.tokenDeltas.find((a) => a.mint === result.order.outputMint)
+        ?.deltaRaw,
+    ).toBe('1000000');
+    expect(simulation.postAccountsSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.review.sha256).toMatch(/^[a-f0-9]{64}$/);
+  },
+);
+it.each(['Buy', 'Sell'] as const)(
+  'preserves %s u64 balances beyond Number precision',
+  async (side) => {
+    const fixture = (f = await pairOrderFixture(side));
+    for (const account of fixture.accounts)
+      editToken(account, (_b, view) =>
+        view.setBigUint64(64, 9007199254740993n, true),
+      );
+    const result = await run(fixture);
+    expect(result.review.simulation.tokenDeltas[0]).toMatchObject({
+      beforeRaw: '9007199254740993',
+      afterRaw: '9007199254740992',
+      deltaRaw: '-1',
+    });
+  },
+);
+it.each([
+  'source-over',
+  'source-under',
+  'output-under',
+  'delegate',
+  'owner',
+  'freeze',
+  'close-authority',
+  'rent',
+  'extensions',
+] as const)(
+  'refuses simulated %s despite valid top-level instructions',
+  async (mode) => {
+    const fixture = (f = await pairOrderFixture());
+    fixture.orderState.onSimulation = (response, keys) => {
+      const sourceKey = fixture.atas[1],
+        destinationKey = fixture.atas[0];
+      const index = keys.indexOf(
+        mode === 'output-under' ? destinationKey : sourceKey,
+      );
+      const token = response.value.accounts[index] as PostAccount;
+      if (mode === 'owner') token.owner = '11111111111111111111111111111111';
+      else if (mode === 'rent')
+        token.lamports = (BigInt(token.lamports) + 1n).toString();
+      else
+        editToken(token, (bytes, view) => {
+          if (mode === 'source-over')
+            view.setBigUint64(64, view.getBigUint64(64, true) - 1n, true);
+          if (mode === 'source-under')
+            view.setBigUint64(64, view.getBigUint64(64, true) + 1n, true);
+          if (mode === 'output-under')
+            view.setBigUint64(64, 20000000n + 994999n, true);
+          if (mode === 'delegate') {
+            view.setUint32(72, 1, true);
+            bytes.set(bs58.decode(fixture.wallet), 76);
+          }
+          if (mode === 'close-authority') {
+            view.setUint32(129, 1, true);
+            bytes.set(bs58.decode(fixture.wallet), 133);
+          }
+          if (mode === 'freeze') bytes[108] = 2;
+          if (mode === 'extensions') bytes[170] = 0xff;
+        });
+    };
+    await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+  },
+);
+it.each(['fee-drain', 'unexpected-credit'] as const)(
+  'rejects %s in simulated SOL balances',
+  async (mode) => {
+    const fixture = (f = await pairOrderFixture());
+    fixture.orderState.onSimulation = (response, keys) => {
+      const wallet = response.value.accounts[
+        keys.indexOf(fixture.wallet)
+      ] as PostAccount;
+      wallet.lamports = (
+        BigInt(wallet.lamports) + (mode === 'fee-drain' ? -1n : 1n)
+      ).toString();
+    };
+    await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+  },
+);
+it.each([
+  'err',
+  'missing',
+  'null-wallet',
+  'replacement',
+  'compute-zero',
+  'compute-excess',
+  'stale-slot',
+  'distant-slot',
+  'encoding',
+] as const)(
+  'refuses incomplete or altered simulation evidence: %s',
+  async (mode) => {
+    const fixture = (f = await pairOrderFixture());
+    fixture.orderState.onSimulation = (response, keys) => {
+      if (mode === 'err') response.value.err = 'fixture error';
+      if (mode === 'missing') response.value.accounts.pop();
+      if (mode === 'null-wallet')
+        response.value.accounts[keys.indexOf(fixture.wallet)] = null;
+      if (mode === 'replacement')
+        response.value.replacementBlockhash = { blockhash: 'unexpected' };
+      if (mode === 'compute-zero') response.value.unitsConsumed = '0';
+      if (mode === 'compute-excess') response.value.unitsConsumed = '1400001';
+      if (mode === 'stale-slot') response.context.slot = '1';
+      if (mode === 'distant-slot') response.context.slot = '10000000';
+      if (mode === 'encoding')
+        (response.value.accounts[0] as PostAccount).data = ['', 'jsonParsed'];
+    };
+    await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+  },
+);
+it('verifies creation rent and exact output for a previously missing destination ATA', async () => {
+  const fixture = (f = await pairOrderFixture());
+  fixture.accounts[0] = null;
+  fixture.orderState.transform = (m) => {
+    const system = addReadonly(m, '11111111111111111111111111111111');
+    const ata = addReadonly(m, 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+    const program = m.staticAccounts.findIndex(
+      (a) => a === fixture.mints[0].owner,
+    );
+    m.instructions.unshift({
+      programAddressIndex: ata,
+      accountIndices: [0, 2, 0, 4, system, program],
+      data: Uint8Array.from([1]),
+    });
+    return m;
+  };
+  const result = await run(fixture);
+  expect(result.review.simulation.retainedAccountRentRaw).toBe(
+    result.review.assessment.accountCreationRentRaw,
+  );
+  expect(
+    result.review.simulation.tokenDeltas.find(
+      (a) => a.mint === result.order.outputMint,
+    ),
+  ).toMatchObject({ beforeRaw: '0', afterRaw: '1000000' });
+});
+it.each(['token', 'mint'] as const)(
+  'rejects newly introduced unrelated wallet %s authority in post-state',
+  async (mode) => {
+    const fixture = (f = await pairOrderFixture());
+    const extra = bs58.encode(new Uint8Array(32).fill(33));
+    fixture.orderState.transform = (m) => {
+      addWritable(m, extra);
+      return m;
+    };
+    fixture.orderState.onSimulation = (response, keys) => {
+      const token = pairWalletTokenAccount(
+        fixture.baseMint,
+        fixture.wallet,
+        SWAP_TOKEN,
+        '0',
+      );
+      if (mode === 'mint') {
+        const bytes = new Uint8Array(82);
+        new DataView(bytes.buffer).setUint32(0, 1, true);
+        bytes.set(bs58.decode(fixture.wallet), 4);
+        token.data[0] = btoa(String.fromCharCode(...bytes));
+      }
+      response.value.accounts[keys.indexOf(extra)] = token;
+    };
+    await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+  },
+);
+it('rejects an expiry reached during simulation', async () => {
+  const fixture = (f = await pairOrderFixture());
+  fixture.orderState.onSimulation = () => {
+    fixture.clock.now += 30001;
+  };
+  await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+});
+it.each(['match', 'mismatch'] as const)(
+  'checks optional simulation fee metadata: %s',
+  async (mode) => {
+    const fixture = (f = await pairOrderFixture());
+    fixture.orderState.onSimulation = (response) => {
+      response.value.fee = mode === 'match' ? '5000' : '5001';
+    };
+    if (mode === 'match')
+      expect((await run(fixture)).review.simulation.networkFeeRaw).toBe('5000');
+    else await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+  },
+);
+it('cancels a stalled simulation without storing approval or signature material', async () => {
+  const fixture = (f = await pairOrderFixture());
+  let start: () => void = () => {};
+  const started = new Promise<void>((resolve) => {
+    start = resolve;
+  });
+  const rpc = fixture.rpc.getMockImplementation()!;
+  fixture.rpc.mockImplementation(async (method, params) => {
+    if (method === 'simulateTransaction') {
+      start();
+      return new Promise(() => {});
+    }
+    return rpc(method, params);
+  });
+  const controller = new AbortController();
+  const pending = run(fixture, 'alice', controller.signal);
+  await started;
+  controller.abort();
+  await expect(pending).rejects.toMatchObject({ status: 408 });
+  expect(
+    fixture.sqlite
       .prepare('SELECT count(*) AS n FROM imported_token_project_events')
       .get(),
   ).toMatchObject({ n: 0 });
