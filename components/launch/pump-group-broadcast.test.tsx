@@ -1,0 +1,209 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { beforeAll, beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { PumpGroupBroadcast } from './pump-group-broadcast';
+import { pumpGroupBroadcastClientFixture } from '../../test/pump-group-broadcast-client-fixture';
+import type { PumpGroupBroadcastState } from '@/lib/pump-group-broadcast';
+import type { PumpGroupTipSignAction } from '@/lib/pump-group-broadcast-client';
+let f: Awaited<ReturnType<typeof pumpGroupBroadcastClientFixture>>,
+  root: Root,
+  container: HTMLDivElement,
+  state: PumpGroupBroadcastState;
+let fetcher: ReturnType<typeof vi.fn>,
+  signer: ReturnType<typeof vi.fn<PumpGroupTipSignAction>>,
+  lost = false,
+  registrationFailure = false;
+const button = (text: string) =>
+  [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (b) => b.textContent === text,
+  )!;
+async function settle() {
+  for (
+    let i = 0;
+    i < 4000 &&
+    container.textContent?.includes('Checking complete broadcast...');
+    i++
+  )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+}
+async function click(text: string) {
+  await act(async () => button(text).click());
+  await settle();
+}
+beforeAll(async () => {
+  f = await pumpGroupBroadcastClientFixture();
+}, 30000);
+beforeEach(async () => {
+  (
+    globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
+  localStorage.clear();
+  state = structuredClone(f.state);
+  lost = false;
+  registrationFailure = false;
+  signer = vi.fn<PumpGroupTipSignAction>(async (_r, _g, current) => {
+    current();
+    return f.tip;
+  });
+  fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(typeof init.body === 'string' ? init.body : '{}');
+    if (body.action === 'broadcast-read') return Response.json(state);
+    if (body.action === 'broadcast-register-tip') {
+      expect(
+        JSON.parse(
+          localStorage.getItem('bundle.pump-group-tip.v1:' + f.review.id)!,
+        ).tip,
+      ).toEqual(f.tip);
+      if (registrationFailure)
+        return new Response('<html>error</html>', { status: 503 });
+      state = { ...state, tip: f.tip };
+      return Response.json(state);
+    }
+    if (body.action === 'broadcast-submit') {
+      state = {
+        ...state,
+        attempted: true,
+        result: { bundleId: null, outcome: 'unknown' },
+      };
+      if (lost) throw new Error('Lost response');
+      return Response.json(state);
+    }
+    throw new Error('Unexpected broadcast action');
+  });
+  vi.stubGlobal('fetch', fetcher);
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () =>
+    root.render(
+      <PumpGroupBroadcast
+        group={f.group}
+        contextKey="same"
+        canSignTip
+        onSignTip={signer}
+        onGroup={vi.fn()}
+      />,
+    ),
+  );
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
+  await settle();
+});
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+});
+it('loads history without signing or submission and requires separate unchecked approvals for tip and broadcast', async () => {
+  expect(signer).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls).toHaveLength(1);
+  expect(button('Approve and sign the reviewed tip locally').disabled).toBe(
+    true,
+  );
+  let checks = [
+    ...container.querySelectorAll<HTMLInputElement>('input[type=checkbox]'),
+  ];
+  expect(checks).toHaveLength(1);
+  expect(checks[0].checked).toBe(false);
+  await act(async () => checks[0].click());
+  await click('Approve and sign the reviewed tip locally');
+  expect(signer).toHaveBeenCalledTimes(1);
+  expect(button('Broadcast this complete group once').disabled).toBe(true);
+  checks = [
+    ...container.querySelectorAll<HTMLInputElement>('input[type=checkbox]'),
+  ];
+  expect(checks).toHaveLength(1);
+  expect(checks[0].checked).toBe(false);
+  await act(async () => checks[0].click());
+  await click('Broadcast this complete group once');
+  expect(container.textContent).toContain('One send attempt has been consumed');
+  expect(button('Broadcast this complete group once')).toBeUndefined();
+  expect(
+    fetcher.mock.calls.filter(
+      ([, init]) =>
+        typeof init.body === 'string' &&
+        init.body.includes('"action":"broadcast-submit"'),
+    ),
+  ).toHaveLength(1);
+});
+it('retains a complete signed tip before failed registration and retries existing bytes without resigning', async () => {
+  registrationFailure = true;
+  await act(async () =>
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(),
+  );
+  await click('Approve and sign the reviewed tip locally');
+  expect(localStorage.length).toBe(1);
+  expect(button('Download retained signed tip')).toBeDefined();
+  expect(container.textContent).not.toContain('Unexpected token');
+  registrationFailure = false;
+  await click('Save existing signed tip without resigning');
+  expect(signer).toHaveBeenCalledTimes(1);
+  expect(button('Broadcast this complete group once').disabled).toBe(true);
+});
+it('removes the send control on a lost response and only reloads the consumed attempt', async () => {
+  await act(async () =>
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(),
+  );
+  await click('Approve and sign the reviewed tip locally');
+  lost = true;
+  await act(async () =>
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(),
+  );
+  await click('Broadcast this complete group once');
+  expect(container.textContent).toContain('Delivery has not been confirmed');
+  expect(button('Broadcast this complete group once')).toBeUndefined();
+  await click('Reload saved broadcast');
+  expect(container.textContent).toContain('One send attempt has been consumed');
+  expect(signer).toHaveBeenCalledTimes(1);
+  expect(
+    fetcher.mock.calls.filter(
+      ([, init]) =>
+        typeof init.body === 'string' &&
+        init.body.includes('"action":"broadcast-submit"'),
+    ),
+  ).toHaveLength(1);
+});
+it('blocks re-signing when an unregistered browser backup is corrupt', async () => {
+  localStorage.setItem('bundle.pump-group-tip.v1:' + f.review.id, '{broken');
+  await click('Reload saved broadcast');
+  expect(button('Approve and sign the reviewed tip locally').disabled).toBe(
+    true,
+  );
+  expect(signer).not.toHaveBeenCalled();
+  await click('Discard corrupt local tip backup');
+  expect(localStorage.length).toBe(0);
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+  expect(button('Approve and sign the reviewed tip locally').disabled).toBe(
+    true,
+  );
+});
+it('restores the original signed tip file without unlocking keys, signing or submitting', async () => {
+  const input = container.querySelector<HTMLInputElement>('input[type=file]')!;
+  const file = {
+    size: 1200,
+    text: async () => JSON.stringify({ review: f.review, tip: f.tip }),
+  };
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  await act(async () =>
+    input.dispatchEvent(new Event('change', { bubbles: true })),
+  );
+  await settle();
+  expect(signer).not.toHaveBeenCalled();
+  expect(button('Save existing signed tip without resigning')).toBeDefined();
+  await click('Save existing signed tip without resigning');
+  expect(signer).not.toHaveBeenCalled();
+  expect(state.tip).toEqual(f.tip);
+  expect(
+    fetcher.mock.calls.some(
+      ([, init]) =>
+        typeof init.body === 'string' &&
+        init.body.includes('"action":"broadcast-submit"'),
+    ),
+  ).toBe(false);
+});

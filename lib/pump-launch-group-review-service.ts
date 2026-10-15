@@ -257,6 +257,7 @@ export async function refreshPumpLaunchGroupReview(
   id: string,
   signal: AbortSignal,
   rpc: PumpLaunchRpc,
+  mode: 'unsigned' | 'signed-broadcast' = 'unsigned',
 ) {
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(60000)]);
   deadline.throwIfAborted();
@@ -271,9 +272,13 @@ export async function refreshPumpLaunchGroupReview(
   const row = await read();
   if (!row) return fail('Owned complete-group review not found.', 404);
   if (
-    !['review', 'approved'].includes(row.state) ||
-    row.signed !== null ||
-    row.signature !== null ||
+    (mode === 'unsigned'
+      ? !['review', 'approved'].includes(row.state) ||
+        row.signed !== null ||
+        row.signature !== null
+      : row.state !== 'signed' ||
+        row.signed === null ||
+        row.signature === null) ||
     row.receipt !== null
   )
     return fail(

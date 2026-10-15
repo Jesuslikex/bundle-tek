@@ -5,6 +5,8 @@ import {
   type PumpGroupSignAction,
 } from '@/lib/pump-group-signing-scope';
 import { requirePumpSigningAuthorization } from '@/lib/pump-group-runtime-authorization';
+import { signPumpGroupTip } from '@/lib/pump-group-broadcast';
+import type { PumpGroupTipSignAction } from '@/lib/pump-group-broadcast-client';
 import {
   useEffectEvent,
   useEffect,
@@ -314,6 +316,60 @@ function PumpHolderLaunchReviewContent({
     } finally {
       if (wallets) clearMintSession(wallets);
       if (mintSession) clearMintSession(mintSession);
+    }
+  };
+  function tipSignReady() {
+    return !!vaultPassword && !actionBusy && !!mint && backedUp;
+  }
+  const signGroupTip: PumpGroupTipSignAction = async (
+    review,
+    view,
+    uiCurrent,
+    signal,
+  ) => {
+    if (
+      !tipSignReady() ||
+      view.state !== 'signed' ||
+      canonicalPumpHolderJson(view.review.document) !==
+        canonicalPumpHolderJson(document) ||
+      !pumpGroupMatchesCurrentPrepare(
+        view,
+        groupTerms(),
+        window.location.origin,
+      )
+    )
+      throw new Error(
+        'Restore the exact group draft and limits and enter the wallet vault passphrase.',
+      );
+    const encrypted = localStorage.getItem(VAULT_STORAGE_KEY),
+      captured = groupContextRef.current,
+      passphrase = vaultPassword;
+    if (!encrypted) throw new Error('Browser wallet vault is unavailable.');
+    setVaultPassword('');
+    let session: VaultSession | undefined;
+    const guard = () => {
+      current();
+      uiCurrent();
+      signal.throwIfAborted();
+      if (
+        groupContextRef.current !== captured ||
+        localStorage.getItem(VAULT_STORAGE_KEY) !== encrypted
+      )
+        throw new Error('Group or vault changed.');
+    };
+    try {
+      guard();
+      session = await unlockVault(encrypted, passphrase);
+      guard();
+      return await signPumpGroupTip(
+        session,
+        review,
+        view.review,
+        guard,
+        signal,
+      );
+    } finally {
+      if (session) clearMintSession(session);
     }
   };
   function requestLimits() {
@@ -1019,6 +1075,8 @@ function PumpHolderLaunchReviewContent({
           onBusyChange={setGroupBusy}
           canSign={groupSignReady}
           onSign={signGroup}
+          canSignTip={tipSignReady()}
+          onSignTip={signGroupTip}
           canPrepare={
             !actionBusy &&
             backedUp &&

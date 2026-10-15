@@ -40,6 +40,25 @@ const mocks = vi.hoisted(() => ({
     nextPosition: null,
   })),
   rpc: vi.fn(async (..._args: unknown[]) => ({})),
+  broadcastRead: vi.fn(async (..._args: unknown[]) => null),
+  broadcastPrepare: vi.fn(async (..._args: unknown[]) => ({
+    attempted: false,
+  })),
+  broadcastTip: vi.fn(async (..._args: unknown[]) => ({ tip: {} })),
+  broadcastSubmit: vi.fn(async (..._args: unknown[]) => ({ attempted: true })),
+  broadcastRecover: vi.fn(async (..._args: unknown[]) => ({
+    group: {},
+    broadcast: {},
+  })),
+}));
+vi.mock('@/lib/pump-group-broadcast-service', () => ({
+  readOwnedPumpGroupBroadcast: mocks.broadcastRead,
+  prepareOwnedPumpGroupBroadcast: mocks.broadcastPrepare,
+  registerOwnedPumpGroupTip: mocks.broadcastTip,
+  submitOwnedPumpGroupBroadcast: mocks.broadcastSubmit,
+}));
+vi.mock('@/lib/pump-group-broadcast-recovery', () => ({
+  recoverOwnedPumpGroupBroadcast: mocks.broadcastRecover,
 }));
 vi.mock('@/app/chatgpt-auth', () => ({
   getChatGPTUser: async () => mocks.user,
@@ -210,6 +229,64 @@ it('routes explicit code-identity consent to owned short-lived signing authoriza
     codeConsent,
   ]);
   expect(mocks.register).not.toHaveBeenCalled();
+});
+it('routes separate tip retention, one-attempt broadcast consent and read-only recovery with the authenticated owner', async () => {
+  const broadcastId = crypto.randomUUID(),
+    sha256 = 'd'.repeat(64),
+    broadcastConsent = {
+      approved: true,
+      reviewId: id,
+      broadcastId,
+      broadcastSha256: sha256,
+      signedGroupSha256: 'e'.repeat(64),
+      scope: 'one-attempt-jito-complete-group-and-tip',
+      acknowledgeUncertainOutcome: true,
+    };
+  const actions = [
+    [{ action: 'broadcast-read', id }, mocks.broadcastRead],
+    [
+      {
+        action: 'broadcast-prepare',
+        id,
+        tipRaw: '1000',
+        tipFeeLimitRaw: '5000',
+      },
+      mocks.broadcastPrepare,
+    ],
+    [
+      {
+        action: 'broadcast-register-tip',
+        id,
+        broadcastId,
+        sha256,
+        transaction: 'AQ==',
+      },
+      mocks.broadcastTip,
+    ],
+    [
+      { action: 'broadcast-submit', id, consent: broadcastConsent },
+      mocks.broadcastSubmit,
+    ],
+    [{ action: 'broadcast-recover', id }, mocks.broadcastRecover],
+  ] as const;
+  for (const [body, service] of actions) {
+    expect((await send(body)).status).toBe(200);
+    expect(service.mock.calls[0].slice(0, 3)).toEqual([mocks.db, 'alice', id]);
+  }
+  expect(mocks.broadcastSubmit.mock.calls[0][3]).toEqual(broadcastConsent);
+  expect((await send({ action: 'broadcast-read', id })).status).toBe(200);
+  expect(
+    (
+      await send({
+        action: 'broadcast-register-tip',
+        id,
+        broadcastId,
+        sha256,
+        transaction: 'AQ==',
+      })
+    ).status,
+  ).toBe(200);
+  expect(mocks.rpc).not.toHaveBeenCalled();
 });
 it('rejects foreign owners/projects and malformed source/permission overrides before services', async () => {
   mocks.user = { userId: 'bob' };

@@ -1,4 +1,5 @@
 import type { PumpGroupTerminalReceipt } from './pump-launch-group-terminal';
+import type { PumpGroupBroadcastTerminalReceipt } from './pump-group-broadcast';
 import {
   requirePumpLaunchGroupReview,
   type PumpLaunchGroupReview,
@@ -17,11 +18,18 @@ const idValid = (v: unknown): v is string =>
   /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const dateValid = (v: unknown): v is string =>
   typeof v === 'string' && v.length <= 32 && Number.isFinite(Date.parse(v));
-const states = ['review', 'approved', 'signed', 'cancelled', 'failed'] as const;
+const states = [
+  'review',
+  'approved',
+  'signed',
+  'cancelled',
+  'failed',
+  'finalized',
+] as const;
 export type PumpGroupView = {
   review: PumpLaunchGroupReview;
   quoteDecimals: number;
-  receipt: PumpGroupTerminalReceipt | null;
+  receipt: PumpGroupTerminalReceipt | PumpGroupBroadcastTerminalReceipt | null;
   state: (typeof states)[number];
   signedEvidence: Awaited<
     ReturnType<typeof verifyPumpLaunchGroupSignatures>
@@ -48,9 +56,14 @@ function summary(value: unknown, projectId: string) {
     value.completeLaunch !== false ||
     value.approvalRequired !==
       !(
-        ['approved', 'signed', 'failed'].includes(String(value.state)) ||
+        ['approved', 'signed', 'failed', 'finalized'].includes(
+          String(value.state),
+        ) ||
         (record(value.receipt) &&
-          value.receipt.format === 'pump-launch-group-terminal-recovery-v1')
+          [
+            'pump-launch-group-terminal-recovery-v1',
+            'pump-launch-group-broadcast-terminal-v1',
+          ].includes(String(value.receipt.format)))
       )
   )
     return fail();
@@ -99,7 +112,50 @@ export async function parsePumpGroupView(
     )
       return fail();
   } else if (value.signedEvidence !== null) return fail();
-  if (terminal) {
+  if (
+    record(terminal) &&
+    terminal.format === 'pump-launch-group-broadcast-terminal-v1'
+  ) {
+    if (
+      !signedEvidence ||
+      !['finalized', 'failed', 'cancelled'].includes(brief.state) ||
+      terminal.kind !==
+        (brief.state === 'cancelled' ? 'expired-unobserved' : brief.state) ||
+      terminal.reviewId !== review.id ||
+      terminal.contextSha256 !== review.contextSha256 ||
+      terminal.manifestSha256 !== review.manifestSha256 ||
+      terminal.signedGroupSha256 !== signedEvidence.signedGroupSha256 ||
+      !idValid(terminal.broadcastId) ||
+      !/^[a-f0-9]{64}$/.test(String(terminal.broadcastSha256)) ||
+      !idValid(terminal.observationId) ||
+      !/^[a-f0-9]{64}$/.test(String(terminal.observationSha256)) ||
+      !dateValid(terminal.observedAt) ||
+      terminal.sourceState !== 'signed' ||
+      terminal.reservationsReleased !== true ||
+      terminal.economicSettlementVerified !== false ||
+      terminal.completeLaunch !== false ||
+      terminal.executionAllowed !== false ||
+      terminal.signingAllowed !== false ||
+      terminal.atomicity !== 'jito-transport-requested-not-proven' ||
+      !/^(0|[1-9]\d{0,22})$/.test(String(terminal.groupNetworkFeeRaw)) ||
+      (terminal.tipNetworkFeeRaw !== null &&
+        (typeof terminal.tipNetworkFeeRaw !== 'string' ||
+          !/^(0|[1-9]\d{0,22})$/.test(terminal.tipNetworkFeeRaw))) ||
+      (terminal.tipDebitRaw !== null &&
+        (typeof terminal.tipDebitRaw !== 'string' ||
+          !/^(0|[1-9]\d{0,22})$/.test(terminal.tipDebitRaw))) ||
+      terminal.knownNetworkFeeRaw !==
+        (
+          BigInt(String(terminal.groupNetworkFeeRaw)) +
+          BigInt((terminal.tipNetworkFeeRaw as string | null) ?? '0')
+        ).toString() ||
+      typeof terminal.networkFeeUnresolved !== 'boolean' ||
+      (brief.state !== 'cancelled' &&
+        (terminal.networkFeeUnresolved !== false ||
+          terminal.tipNetworkFeeRaw === null))
+    )
+      return fail();
+  } else if (terminal) {
     if (
       !record(terminal) ||
       !['cancelled', 'failed'].includes(brief.state) ||
@@ -128,11 +184,12 @@ export async function parsePumpGroupView(
         : terminal.kind !== 'expired-unobserved')
     )
       return fail();
-  } else if (brief.state === 'failed') return fail();
+  } else if (brief.state === 'failed' || brief.state === 'finalized')
+    return fail();
   signal?.throwIfAborted();
   return {
     review,
-    receipt: terminal as PumpGroupTerminalReceipt | null,
+    receipt: terminal as PumpGroupView['receipt'],
     quoteDecimals: built.quote.decimals,
     state: brief.state,
     signedEvidence,

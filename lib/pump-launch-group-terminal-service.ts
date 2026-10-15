@@ -25,6 +25,24 @@ export async function recoverOwnedPumpLaunchGroup(
       503,
     );
   const before = await readPumpLaunchGroupReview(db, owner, id);
+  const broadcastTable = await db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='pump_group_broadcast_reviews'",
+    )
+    .first();
+  if (
+    broadcastTable &&
+    (await db
+      .prepare(
+        'SELECT 1 FROM pump_group_broadcast_reviews WHERE owner_id=? AND review_id=?',
+      )
+      .bind(owner, id)
+      .first())
+  )
+    throw new PumpPreflightError(
+      'Recover this complete broadcast including its signed tip.',
+      409,
+    );
   if (['cancelled', 'failed'].includes(before.state) && before.receipt) {
     const closed = await db
       .prepare(

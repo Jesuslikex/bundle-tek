@@ -321,7 +321,9 @@ it('automatically reads saved groups without a write, key unlock or approval con
   );
   expect(fetcher.mock.calls[0][1]?.body).toBeUndefined();
   expect(container.querySelectorAll('input')).toHaveLength(0);
-  expect(container.textContent).toContain('Group broadcasting is unavailable');
+  expect(container.textContent).toContain(
+    'Group broadcasting requires separate approval',
+  );
 });
 it('opens the full immutable review, lists every packet and every saved wallet limit, then explicitly discards unsigned state', async () => {
   await click('Open complete group: ' + f.review.id);

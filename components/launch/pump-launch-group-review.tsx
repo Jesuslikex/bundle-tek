@@ -5,6 +5,7 @@ import {
   useEffectEvent,
   useRef,
   useState,
+  useCallback,
 } from 'react';
 import {
   requirePumpRuntimePreview,
@@ -31,6 +32,8 @@ import {
   type PumpGroupObservationView,
 } from '@/lib/pump-launch-group-client';
 import styles from './pump-launch-group-ui.module.css';
+import { PumpGroupBroadcast } from './pump-group-broadcast';
+import type { PumpGroupTipSignAction } from '@/lib/pump-group-broadcast-client';
 
 const endpoint = '/api/launch/pump/groups';
 const labels = {
@@ -39,6 +42,7 @@ const labels = {
   signed: 'Signed group retained',
   cancelled: 'Closed review',
   failed: 'All packets finalized as failures',
+  finalized: 'Launch packets and tip finalized',
 };
 const observationLabels = {
   complete: 'Every packet finalized successfully',
@@ -75,6 +79,8 @@ type Props = {
   onBusyChange?: (busy: boolean) => void;
   canSign?: (view: PumpGroupView) => boolean;
   onSign?: PumpGroupSignAction;
+  canSignTip?: boolean;
+  onSignTip?: PumpGroupTipSignAction;
 };
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -96,9 +102,20 @@ function Panel({
   onBusyChange,
   canSign,
   onSign,
+  canSignTip,
+  onSignTip,
 }: Props) {
   const [rows, setRows] = useState<PumpGroupSummary[]>([]),
     [cursor, setCursor] = useState<string | null>(null);
+  const [broadcastBusy, setBroadcastBusy] = useState(false);
+  const [broadcastExists, setBroadcastExists] = useState(false);
+  const broadcastBusyChanged = useCallback(
+    (value: boolean) => {
+      setBroadcastBusy(value);
+      onBusyChange?.(value);
+    },
+    [onBusyChange],
+  );
   const [view, setView] = useState<PumpGroupView | null>(null),
     [preparedContext, setPreparedContext] = useState<string | null>(null);
   const [observations, setObservations] = useState<PumpGroupObservationView[]>(
@@ -401,7 +418,7 @@ function Panel({
     const timer = setTimeout(() => loadOnOpen(), 0);
     return () => clearTimeout(timer);
   }, []);
-  const locked = disabled || busy;
+  const locked = disabled || busy || broadcastBusy;
   const review = view?.review;
   return (
     <section
@@ -416,9 +433,10 @@ function Panel({
         or safely recovered.
       </p>
       <p className="source-note">
-        Group broadcasting is unavailable. Signing requires fresh source checks,
-        explicit approval of every packet and wallet limit, and approval of the
-        exact deployed code identities below. Keys stay in this browser.
+        Group broadcasting requires separate approval of the complete bundle and
+        tip. Signing requires fresh source checks, explicit approval of every
+        packet and wallet limit, and approval of the exact deployed code
+        identities below. Keys stay in this browser.
       </p>
       <div className={styles.actions}>
         <Button
@@ -426,7 +444,8 @@ function Panel({
           disabled={
             locked ||
             !canPrepare ||
-            (!!view && !['cancelled', 'failed'].includes(view.state))
+            (!!view &&
+              !['cancelled', 'failed', 'finalized'].includes(view.state))
           }
           onClick={() =>
             void run(async () => {
@@ -617,9 +636,11 @@ function Panel({
           </details>
           {view.receipt && (
             <output>
-              {view.receipt.kind === 'expired-unobserved'
-                ? 'Expired group closed after finalized mint absence.'
-                : 'Every packet finalized as a failure.'}{' '}
+              {view.receipt.format === 'pump-launch-group-broadcast-terminal-v1'
+                ? 'Complete broadcast pending-execution proof saved. '
+                : view.receipt.kind === 'expired-unobserved'
+                  ? 'Expired group closed after finalized mint absence.'
+                  : 'Every packet finalized as a failure.'}{' '}
               Wallet reservations were released by the saved recovery event.{' '}
               {view.receipt.networkFeeUnresolved
                 ? 'Network fees remain unresolved.'
@@ -908,6 +929,19 @@ function Panel({
               )}
             </section>
           )}
+          {onSignTip && view.signedEvidence && (
+            <PumpGroupBroadcast
+              key={review.id}
+              group={view}
+              contextKey={contextKey}
+              disabled={disabled || busy}
+              canSignTip={canSignTip}
+              onSignTip={onSignTip}
+              onBusyChange={broadcastBusyChanged}
+              onGroup={setView}
+              onPreparedChange={setBroadcastExists}
+            />
+          )}
           {pending && (
             <Button
               type="button"
@@ -1005,7 +1039,7 @@ function Panel({
               <Button
                 type="button"
                 variant="outline"
-                disabled={locked}
+                disabled={locked || broadcastExists}
                 onClick={() =>
                   void run(async () => {
                     const result = await parsePumpGroupRecoveryResult(
@@ -1027,7 +1061,9 @@ function Panel({
                   })
                 }
               >
-                Recover group reservations
+                {broadcastExists
+                  ? 'Recover the broadcast including its tip above'
+                  : 'Recover group reservations'}
               </Button>
             )}
             {['approved', 'signed'].includes(view.state) && (

@@ -617,6 +617,13 @@
       "when": 1792030633758,
       "tag": "0087_pump_group_runtime_authorization",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "6",
+      "when": 1792030633759,
+      "tag": "0088_pump_group_broadcast",
+      "breakpoints": true
     }
   ]
 }

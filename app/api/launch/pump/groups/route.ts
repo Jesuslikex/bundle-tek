@@ -26,6 +26,13 @@ import {
 } from '@/lib/pump-launch-group-observation-service';
 import { getSolanaIndexerRpcEndpoint } from '@/lib/solana-rpc';
 import { balanceRpc } from '@/lib/wallet-balances';
+import {
+  readOwnedPumpGroupBroadcast,
+  prepareOwnedPumpGroupBroadcast,
+  registerOwnedPumpGroupTip,
+  submitOwnedPumpGroupBroadcast,
+} from '@/lib/pump-group-broadcast-service';
+import { recoverOwnedPumpGroupBroadcast } from '@/lib/pump-group-broadcast-recovery';
 import type { PumpLaunchRpc } from '@/lib/pump-launch-simulation';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -215,7 +222,11 @@ export async function POST(request: Request) {
         );
       projectId = row.project_id;
     }
-    if (action.action !== 'register') {
+    if (
+      !['register', 'broadcast-read', 'broadcast-register-tip'].includes(
+        action.action,
+      )
+    ) {
       const now = Date.now(),
         key = JSON.stringify([
           'pump-groups-v1',
@@ -255,7 +266,56 @@ export async function POST(request: Request) {
           signal,
         ),
       );
+    if (action.action === 'broadcast-read')
+      return json(
+        await readOwnedPumpGroupBroadcast(db, user.userId, action.id),
+      );
+    if (action.action === 'broadcast-register-tip')
+      return json(
+        await registerOwnedPumpGroupTip(
+          db,
+          user.userId,
+          action.id,
+          action.broadcastId,
+          action.sha256,
+          action.transaction,
+          signal,
+        ),
+      );
     const rpc = configuredRpc();
+    if (action.action === 'broadcast-prepare')
+      return json(
+        await prepareOwnedPumpGroupBroadcast(
+          db,
+          user.userId,
+          action.id,
+          action.tipRaw,
+          action.tipFeeLimitRaw,
+          signal,
+          rpc,
+        ),
+      );
+    if (action.action === 'broadcast-submit')
+      return json(
+        await submitOwnedPumpGroupBroadcast(
+          db,
+          user.userId,
+          action.id,
+          action.consent,
+          signal,
+          rpc,
+        ),
+      );
+    if (action.action === 'broadcast-recover')
+      return json(
+        await recoverOwnedPumpGroupBroadcast(
+          db,
+          user.userId,
+          action.id,
+          signal,
+          rpc,
+        ),
+      );
     if (action.action === 'runtime-preview')
       return json(
         await previewOwnedPumpGroupRuntime(

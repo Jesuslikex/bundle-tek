@@ -1,4 +1,8 @@
 import type { PumpGroupCodeConsent } from './pump-group-runtime-authorization';
+import {
+  broadcastBudgets,
+  type PumpGroupBroadcastConsent,
+} from './pump-group-broadcast';
 import { PumpPreflightError } from './owned-pump-preflight';
 import { parsePumpHolderRequest } from './pump-holder-request';
 import {
@@ -9,6 +13,25 @@ import type { preparePumpLaunchGroupReview } from './pump-launch-group-review-se
 import type { PumpLaunchGroupConsent } from './pump-launch-group-review';
 import type { PumpGroupObservationPosition } from './pump-launch-group-observation-service';
 export type PumpGroupRequest =
+  | { action: 'broadcast-read' | 'broadcast-recover'; id: string }
+  | {
+      action: 'broadcast-prepare';
+      id: string;
+      tipRaw: string;
+      tipFeeLimitRaw: string;
+    }
+  | {
+      action: 'broadcast-register-tip';
+      id: string;
+      broadcastId: string;
+      sha256: string;
+      transaction: string;
+    }
+  | {
+      action: 'broadcast-submit';
+      id: string;
+      consent: PumpGroupBroadcastConsent;
+    }
   | {
       action: 'prepare';
       terms: Parameters<typeof preparePumpLaunchGroupReview>[2];
@@ -63,6 +86,82 @@ export function parsePumpGroupRequest(
       return parsed;
     }
     if (!pumpGroupIdValid(value.id)) return fail();
+    if (
+      value.action === 'broadcast-read' ||
+      value.action === 'broadcast-recover'
+    ) {
+      if (!keys(value, ['action', 'id'])) return fail();
+      return { action: value.action, id: value.id };
+    }
+    if (value.action === 'broadcast-prepare') {
+      if (
+        !keys(value, ['action', 'id', 'tipRaw', 'tipFeeLimitRaw']) ||
+        typeof value.tipRaw !== 'string' ||
+        typeof value.tipFeeLimitRaw !== 'string'
+      )
+        return fail();
+      broadcastBudgets(value.tipRaw, value.tipFeeLimitRaw);
+      return {
+        action: value.action,
+        id: value.id,
+        tipRaw: value.tipRaw,
+        tipFeeLimitRaw: value.tipFeeLimitRaw,
+      };
+    }
+    if (value.action === 'broadcast-register-tip') {
+      if (
+        !keys(value, [
+          'action',
+          'id',
+          'broadcastId',
+          'sha256',
+          'transaction',
+        ]) ||
+        !pumpGroupIdValid(value.broadcastId) ||
+        !digest(value.sha256) ||
+        typeof value.transaction !== 'string' ||
+        value.transaction.length > 600 ||
+        !value.transaction ||
+        btoa(atob(value.transaction)) !== value.transaction
+      )
+        return fail();
+      return {
+        action: value.action,
+        id: value.id,
+        broadcastId: value.broadcastId,
+        sha256: value.sha256 as string,
+        transaction: value.transaction,
+      };
+    }
+    if (value.action === 'broadcast-submit') {
+      const c = value.consent;
+      if (
+        !keys(value, ['action', 'id', 'consent']) ||
+        !record(c) ||
+        !keys(c, [
+          'approved',
+          'reviewId',
+          'broadcastId',
+          'broadcastSha256',
+          'signedGroupSha256',
+          'scope',
+          'acknowledgeUncertainOutcome',
+        ]) ||
+        c.approved !== true ||
+        c.reviewId !== value.id ||
+        !pumpGroupIdValid(c.broadcastId) ||
+        !digest(c.broadcastSha256) ||
+        !digest(c.signedGroupSha256) ||
+        c.scope !== 'one-attempt-jito-complete-group-and-tip' ||
+        c.acknowledgeUncertainOutcome !== true
+      )
+        return fail();
+      return {
+        action: value.action,
+        id: value.id,
+        consent: c as PumpGroupBroadcastConsent,
+      };
+    }
     if (
       [
         'revalidate',
