@@ -58,7 +58,14 @@ function fixture(kind = 'ok', space = true) {
               : PUMP_UPGRADEABLE_LOADER,
           executable: key !== dataKey,
           lamports: '1000000',
-          ...(space ? { space: String(bytes.length) } : {}),
+          ...(space
+            ? {
+                space: String(
+                  bytes.length +
+                    (kind === 'truncated' && key === dataKey ? 1 : 0),
+                ),
+              }
+            : {}),
           data: [
             Buffer.from(
               bytes.slice(slice.offset, slice.offset + slice.length),
@@ -108,7 +115,7 @@ it.each([true, false])(
     ).toBe(true);
   },
 );
-it.each(['drift', 'authority', 'not-elf'])(
+it.each(['drift', 'authority', 'not-elf', 'truncated'])(
   'rejects %s code evidence',
   async (kind) => {
     const f = fixture(kind);

@@ -94,7 +94,13 @@ export async function collectPumpProgramIdentities(
         `Program identity bank/mapping differs: min=${minimumSlot}, latest=${Math.max(...slots)}, got=${slot}, accounts=${value.value?.length ?? -1}/${keys.length}, reads=${reads}.`,
       );
     slots.push(slot);
-    return value.value.map(pumpRpcAccount);
+    return value.value.map((raw) => {
+      const account = pumpRpcAccount(raw);
+      const declared = (raw as { space?: unknown } | null)?.space;
+      return account && declared !== undefined
+        ? { ...account, space: pumpUnsignedInteger(declared).toString() }
+        : account;
+    });
   }
   if ((await call('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
     throw new Error('Program identity requires mainnet.');

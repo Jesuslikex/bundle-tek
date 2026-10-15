@@ -25,6 +25,8 @@ import {
 } from './pair-order-review';
 import { SWAP_WRAPPED_SOL } from './swap-token-program-evidence';
 import { reviewPairOrderSimulation } from './pair-order-simulation';
+import { reviewPairRuntimeTrace } from './pair-runtime-trace';
+import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
 import type { ImportedPairWalletPreflight } from './imported-pair-wallet-preflight';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
@@ -45,6 +47,7 @@ export async function collectPairOrderReview(
   order: SolanaPairPreparation,
   rpc: Rpc,
   now: () => number = Date.now,
+  captureRuntimeTrace = false,
 ) {
   const observedAt = now(),
     slots = [
@@ -247,6 +250,7 @@ export async function collectPairOrderReview(
       replaceRecentBlockhash: false,
       minContextSlot: floor(),
       accounts: { encoding: 'base64', addresses: writable },
+      ...(captureRuntimeTrace ? { innerInstructions: true } : {}),
     },
   ]);
   slots.push(
@@ -262,6 +266,19 @@ export async function collectPairOrderReview(
     writable,
     simulationResponse,
   );
+  const runtimeTrace = captureRuntimeTrace
+    ? await reviewPairRuntimeTrace(
+        (simulationResponse as { value?: { innerInstructions?: unknown } })
+          ?.value?.innerInstructions,
+        instructions,
+        keys,
+        writable,
+      )
+    : null;
+  if (captureRuntimeTrace)
+    (
+      simulationResponse as { value: { accounts: unknown[] } }
+    ).value.accounts.forEach(assertPairRuntimeWritableAccount);
   fresh();
   const after = await readAccounts(selected, false);
   const identity = (a: PairOrderAccountSnapshot) => {
@@ -326,6 +343,7 @@ export async function collectPairOrderReview(
     preflightSha256: preflight.contextSha256,
     assessment,
     simulation,
+    runtimeTrace,
     lookupTables:
       lookups?.tables.map((t) => ({
         address: t.address,
