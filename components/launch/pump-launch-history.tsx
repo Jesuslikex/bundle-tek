@@ -1,15 +1,22 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffectEvent, useEffect, useRef, useState } from 'react';
+import styles from './pump-launch-ui.module.css';
 import { Button } from '@/components/ui/button';
 import { readPanelJson } from '@/components/read-panel-json';
-
 const sources = [
   { name: 'Create only', path: '/api/launch/pump' },
   { name: 'Developer buy', path: '/api/launch/pump/initial-buy' },
   { name: 'Holder buys', path: '/api/launch/pump/holders' },
 ] as const;
 type Source = (typeof sources)[number];
+export type SavedLaunchSelection = { source: Source['path']; value: unknown };
+type HistoryProps = {
+  projectId: string;
+  onOpenReview?: (selection: SavedLaunchSelection) => void;
+};
 type Entry = {
+  value: unknown;
+  createdAt: string | null;
   id: string;
   state: string;
   signature: string | null;
@@ -44,6 +51,12 @@ function entry(value: unknown, source: Source, projectId: string): Entry {
   )
     throw new Error('Saved launch summary is invalid.');
   return {
+    value,
+    createdAt:
+      typeof value.createdAt === 'string' &&
+      Number.isFinite(Date.parse(value.createdAt))
+        ? value.createdAt
+        : null,
     id: value.review.id,
     state: value.state,
     signature: value.signature,
@@ -52,12 +65,12 @@ function entry(value: unknown, source: Source, projectId: string): Entry {
       record(value.receipt) && value.receipt.kind === 'expired-unobserved',
   };
 }
-
-function History({ projectId }: { projectId: string }) {
+function History({ projectId, onOpenReview }: HistoryProps) {
   const [rows, setRows] = useState<Entry[]>([]),
     [errors, setErrors] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
-    [loaded, setLoaded] = useState(false);
+    [loaded, setLoaded] = useState(false),
+    [copyStatus, setCopyStatus] = useState('');
   const [cursors, setCursors] = useState<Record<string, string | null>>({});
   const active = useRef(true),
     running = useRef(false),
@@ -69,6 +82,17 @@ function History({ projectId }: { projectId: string }) {
       abort.current?.abort();
     };
   }, []);
+  async function copySignature(signature: string) {
+    try {
+      await navigator.clipboard.writeText(signature);
+      if (active.current) setCopyStatus('Signature copied.');
+    } catch {
+      if (active.current)
+        setCopyStatus(
+          'Copy unavailable. Open the explorer to copy the signature.',
+        );
+    }
+  }
   async function request(
     source: Source,
     body?: { action: 'recover'; id: string },
@@ -187,10 +211,15 @@ function History({ projectId }: { projectId: string }) {
     setRows((all) => [...all, ...page.entries]);
     setCursors((all) => ({ ...all, [source.path]: page.next }));
   }
+  const loadOnOpen = useEffectEvent(() => void run(load));
+  useEffect(() => {
+    const timer = setTimeout(() => loadOnOpen(), 0);
+    return () => clearTimeout(timer);
+  }, []);
   return (
     <section
       aria-label="Saved launch recovery"
-      style={{ marginTop: 20, minWidth: 0, overflowWrap: 'anywhere' }}
+      className={styles.createPanelPanel}
     >
       <h3>Saved launch recovery</h3>
       <p>
@@ -209,60 +238,131 @@ function History({ projectId }: { projectId: string }) {
         <p>No saved launch reviews.</p>
       )}
       <ul>
-        {rows.map((row) => (
-          <li key={row.source.path + ':' + row.id} style={{ marginBlock: 12 }}>
-            <strong>
-              {row.source.name}: {row.state}
-            </strong>
-            <div>Review: {row.id}</div>
-            {row.signature && <div>Signature: {row.signature}</div>}
-            {row.unresolved && (
-              <p>
-                No finalized receipt was observed. Network fees remain
-                unresolved.
-              </p>
-            )}
-            {row.state === 'review' && (
-              <p>
-                Unsigned review. Open its launch review to continue or discard
-                it.
-              </p>
-            )}
-            {row.state !== 'review' && !terminal.has(row.state) && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                aria-label={`Check ${row.source.name.toLowerCase()} status: ${row.id}`}
-                onClick={() =>
-                  void run(async () => {
-                    const updated = entry(
-                      await request(row.source, {
-                        action: 'recover',
-                        id: row.id,
-                      }),
-                      row.source,
-                      projectId,
-                    );
-                    if (updated.id !== row.id) throw new Error();
-                    if (active.current)
-                      setRows((all) =>
-                        all.map((r) =>
-                          r.id === row.id && r.source.path === row.source.path
-                            ? updated
-                            : r,
-                        ),
-                      );
-                  })
+        {[...rows]
+          .sort(
+            (a, b) =>
+              (Date.parse(b.createdAt ?? '') || 0) -
+                (Date.parse(a.createdAt ?? '') || 0) ||
+              a.id.localeCompare(b.id),
+          )
+          .map((row) => (
+            <li
+              key={row.source.path + ':' + row.id}
+              className={styles.createPanelEntry}
+            >
+              <strong>
+                {row.source.name}:{' '}
+                {
+                  (
+                    {
+                      review: 'Waiting for signature',
+                      approved: 'Approved, waiting for signature',
+                      signed: 'Signed, awaiting broadcast approval',
+                      submitting: 'Submission in progress',
+                      submitted: 'Submitted',
+                      finalized: 'Finalized',
+                      failed: 'Failed',
+                      cancelled: 'Cancelled',
+                    } as Record<string, string>
+                  )[row.state]
                 }
-              >
-                Check saved status
-              </Button>
-            )}
-          </li>
-        ))}
+              </strong>
+              <div>Review: {row.id}</div>
+              <div>
+                {row.createdAt ? (
+                  <time dateTime={row.createdAt}>
+                    Saved {new Date(row.createdAt).toLocaleString()}
+                  </time>
+                ) : (
+                  'Saved date unavailable'
+                )}
+              </div>
+              {row.signature && (
+                <div className={styles.actions}>
+                  <a
+                    href={`https://solscan.io/tx/${row.signature}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={row.signature}
+                  >
+                    {row.signature.slice(0, 8)}…{row.signature.slice(-8)}
+                  </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-label={`Copy signature: ${row.id}`}
+                    onClick={() => void copySignature(row.signature!)}
+                  >
+                    Copy signature
+                  </Button>
+                </div>
+              )}
+              {row.unresolved && (
+                <p>
+                  No finalized receipt was observed. Network fees remain
+                  unresolved.
+                </p>
+              )}
+              {['review', 'approved'].includes(row.state) &&
+                (onOpenReview ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    aria-label={`Open ${row.source.name.toLowerCase()} review: ${row.id}`}
+                    onClick={() =>
+                      onOpenReview({
+                        source: row.source.path,
+                        value: row.value,
+                      })
+                    }
+                  >
+                    Open saved review
+                  </Button>
+                ) : (
+                  <p>
+                    Unsigned review. Reopen this project’s launch screen to
+                    review it.
+                  </p>
+                ))}
+              {row.state !== 'review' && !terminal.has(row.state) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  aria-label={`Check ${row.source.name.toLowerCase()} status: ${row.id}`}
+                  onClick={() =>
+                    void run(async () => {
+                      const updated = entry(
+                        await request(row.source, {
+                          action: 'recover',
+                          id: row.id,
+                        }),
+                        row.source,
+                        projectId,
+                      );
+                      if (updated.id !== row.id) throw new Error();
+                      if (active.current)
+                        setRows((all) =>
+                          all.map((r) =>
+                            r.id === row.id && r.source.path === row.source.path
+                              ? {
+                                  ...updated,
+                                  createdAt: updated.createdAt ?? r.createdAt,
+                                }
+                              : r,
+                          ),
+                        );
+                    })
+                  }
+                >
+                  Check saved status
+                </Button>
+              )}
+            </li>
+          ))}
       </ul>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div className={styles.actions}>
         {sources.map(
           (source) =>
             cursors[source.path] && (
@@ -280,6 +380,7 @@ function History({ projectId }: { projectId: string }) {
       </div>
       <div aria-live="polite">
         {busy && <p>Checking saved launches…</p>}
+        {copyStatus && <p>{copyStatus}</p>}
         {errors.map((error) => (
           <p role="alert" key={error}>
             {error}
@@ -289,6 +390,6 @@ function History({ projectId }: { projectId: string }) {
     </section>
   );
 }
-export function PumpLaunchHistory({ projectId }: { projectId: string }) {
-  return <History key={projectId} projectId={projectId} />;
+export function PumpLaunchHistory(props: HistoryProps) {
+  return <History key={props.projectId} {...props} />;
 }

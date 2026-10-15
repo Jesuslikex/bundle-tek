@@ -20,7 +20,7 @@ const click = async (text: string) => {
       .click(),
   );
 };
-beforeEach(() => {
+beforeEach(async () => {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -43,7 +43,13 @@ beforeEach(() => {
     });
   });
   vi.stubGlobal('fetch', fetcher);
-  act(() => root.render(<PumpLaunchHistory projectId="project" />));
+  await act(async () => {
+    root.render(<PumpLaunchHistory projectId="project" />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
 });
 it('appends older records with the selected type cursor and preserves the first page on failure', async () => {
   fetcher.mockImplementation(async (path: string) =>
@@ -98,10 +104,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('lists every returned launch type and older records without an automatic request', async () => {
-  expect(fetcher).not.toHaveBeenCalled();
-  await click('Reload all saved launches');
+it('loads all launch types automatically without signing or submitting', async () => {
   expect(fetcher).toHaveBeenCalledTimes(3);
+  expect(fetcher.mock.calls.every(([, init]) => !init?.body)).toBe(true);
   for (const id of ['older', 'newest', 'developer', 'create'])
     expect(container.textContent).toContain('Review: ' + id);
   expect(container.querySelectorAll('input')).toHaveLength(0);
@@ -118,7 +123,7 @@ it('recovers the selected older packet on its own route, without signing or subm
       id: 'older',
     },
   );
-  expect(container.textContent).toContain('Holder buys: cancelled');
+  expect(container.textContent).toContain('Holder buys: Cancelled');
   expect(container.textContent).toContain('Network fees remain unresolved');
   expect(container.textContent).toContain('Review: newest');
 });
@@ -176,4 +181,64 @@ it('aborts and clears the previous project history when the project changes', as
   await act(async () => finish());
   expect(container.textContent).not.toContain('Review: older');
   expect(container.textContent).not.toContain('finalized');
+});
+
+it('sorts mixed launch types by saved date and exposes shortened explorer signatures and copy', async () => {
+  const signature = '2'.repeat(88);
+  fetcher.mockImplementation(async (path: string) =>
+    Response.json({
+      nextCursor: null,
+      launches: [
+        {
+          ...row(
+            path.includes('holders')
+              ? 'middle'
+              : path.includes('initial-buy')
+                ? 'latest'
+                : 'earliest',
+          ),
+          signature,
+          createdAt: path.includes('holders')
+            ? '2026-10-14T12:00:00Z'
+            : path.includes('initial-buy')
+              ? '2026-10-15T12:00:00Z'
+              : '2026-10-13T12:00:00Z',
+        },
+      ],
+    }),
+  );
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+  await click('Reload all saved launches');
+  const items = [...container.querySelectorAll('li')];
+  expect(items.map((item) => item.querySelector('time')?.dateTime)).toEqual([
+    '2026-10-15T12:00:00Z',
+    '2026-10-14T12:00:00Z',
+    '2026-10-13T12:00:00Z',
+  ]);
+  expect(items[0].querySelector('a')?.href).toBe(
+    'https://solscan.io/tx/' + signature,
+  );
+  expect(items[0].querySelector('a')?.textContent).toBe('22222222…22222222');
+  await click('Copy signature: latest');
+  expect(writeText).toHaveBeenCalledWith(signature);
+  expect(container.textContent).toContain('Signature copied.');
+});
+it('opens the selected unsigned saved review through the owning screen callback without a transaction request', async () => {
+  const onOpenReview = vi.fn();
+  await act(async () =>
+    root.render(
+      <PumpLaunchHistory projectId="project" onOpenReview={onOpenReview} />,
+    ),
+  );
+  const before = fetcher.mock.calls.length;
+  await click('Open holder buys review: newest');
+  expect(onOpenReview).toHaveBeenCalledWith({
+    source: '/api/launch/pump/holders',
+    value: row('newest', 'review'),
+  });
+  expect(fetcher).toHaveBeenCalledTimes(before);
 });

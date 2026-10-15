@@ -1,0 +1,92 @@
+.panel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+.wrap {
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.limits {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.walletGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+}
+.wallet {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.review {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.table {
+  width: 100%;
+  font-size: 12px;
+}
+.createPanel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+.savedReview {
+  display: grid;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.historyPanel {
+  margin-top: 20px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.historyEntry {
+  margin-block: 12px;
+}
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+.steps li {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.steps small {
+  color: var(--muted-foreground);
+}
+.steps li[aria-current='step'] {
+  border-color: var(--primary);
+  background: var(--accent);
+}
+.steps li[data-state='completed'] {
+  border-color: var(--muted-foreground);
+}

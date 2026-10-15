@@ -78,10 +78,12 @@ it('pages actual authenticated routes through timestamp ties without omissions, 
       expect(response.status).toBe(200);
       expect(response.headers.get('cache-control')).toBe('no-store');
       const page = (await response.json()) as {
-        launches: { review: { id: string } }[];
+        launches: { review: { id: string }; createdAt: string }[];
         nextCursor: string | null;
       };
       expect(page.launches.length).toBeLessThanOrEqual(20);
+      for (const launch of page.launches)
+        expect(Number.isFinite(Date.parse(launch.createdAt))).toBe(true);
       ids.push(...page.launches.map((r) => r.review.id));
       cursor = page.nextCursor;
       if (ids.length === 20) await insert(kind, `${kind}-newer`);
@@ -156,7 +158,7 @@ it('treats a cursor only as position and returns no other owner data even if reu
     'project',
     'holders',
     { before: null },
-    (r: { id: string }) => r.id,
+    (r: { id: string }) => ({ id: r.id }),
   );
   const params = new URLSearchParams({ page: '1', cursor: page.nextCursor! });
   expect(
@@ -167,9 +169,9 @@ it('treats a cursor only as position and returns no other owner data even if reu
         'project',
         'holders',
         pumpHistoryPageRequest(params, 'project', 'holders')!,
-        (r: { id: string }) => r.id,
+        (r: { id: string }) => ({ id: r.id }),
       )
-    ).launches,
+    ).launches.map((launch) => launch.id),
   ).toEqual(['foreign-owner']);
   expect(() =>
     pumpHistoryPageRequest(

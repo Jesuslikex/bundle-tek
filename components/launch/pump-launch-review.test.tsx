@@ -164,7 +164,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 it('never prepares or signs automatically, and separates signing from broadcast consent', async () => {
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.body)).toHaveLength(0);
   expect(button('Simulate and prepare launch').disabled).toBe(true);
   check('I saved');
   await click('Simulate and prepare launch');
@@ -241,6 +241,7 @@ async function atomicSetup() {
   };
   const payloads: Record<string, unknown>[] = [];
   fetcher.mockImplementation(async (path: string, init?: RequestInit) => {
+    if (!init?.body) return Response.json({ launches: [], nextCursor: null });
     expect(path).toContain('/api/launch/pump/initial-buy');
     if (init?.body) {
       const b = JSON.parse(
@@ -277,11 +278,11 @@ async function atomicSetup() {
 }
 it('requires the separate quote cap, exact atomic scope and limits consent before dual signing, then distinct broadcast consent', async () => {
   const { payloads } = await atomicSetup();
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.body)).toHaveLength(0);
   expect(container.textContent).toContain('No holder buys are included');
   check('I saved');
   await click('Simulate and prepare launch');
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.body)).toHaveLength(0);
   expect(container.textContent).toContain('positive maximum quote spend');
   input('Maximum developer buy spend', '0.1');
   await click('Simulate and prepare launch');
@@ -348,7 +349,7 @@ it('rejects excess quote precision and prevents a stale async sign after project
   check('I saved');
   input('Maximum developer buy spend', '0.0000000001');
   await click('Simulate and prepare launch');
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.body)).toHaveLength(0);
   expect(container.textContent).toContain('asset precision');
   input('Maximum developer buy spend', '0.1');
   await click('Simulate and prepare launch');
@@ -426,7 +427,7 @@ it('routes a holder plan to the complete holder flow instead of omitting its buy
   expect(container.textContent).toContain(
     'Save the complete unscheduled holder selection',
   );
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.body)).toHaveLength(0);
 });
 
 it('renders an expired unobserved recovery without calling it a finalized failure', async () => {
@@ -452,4 +453,32 @@ it('renders an expired unobserved recovery without calling it a finalized failur
     container.querySelector('[aria-label="Saved launch recovery"]'),
   ).not.toBeNull();
   expect(container.textContent).not.toContain('Finalized transaction failure');
+});
+
+it('opens an unsigned history review in the real review screen without approving or signing it', async () => {
+  fetcher.mockImplementation(async (path: string, init?: RequestInit) => {
+    if (init?.body) throw new Error('Opening a review must not mutate it.');
+    return Response.json({
+      launches:
+        path.includes('initial-buy') || path.includes('holders') ? [] : [saved],
+      nextCursor: null,
+    });
+  });
+  await click('Reload all saved launches');
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>(
+        '[aria-label="Open create only review: review"]',
+      )!
+      .click(),
+  );
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 15));
+  });
+  expect(container.textContent).toContain('Status: review');
+  expect(container.textContent).toContain('Return to current launch');
+  expect(label('I approve signing').checked).toBe(false);
+  expect(button('Approve and sign creation').disabled).toBe(true);
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(requests).toHaveLength(0);
 });

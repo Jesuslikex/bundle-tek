@@ -63,7 +63,7 @@ export function pumpHistoryPageRequest(
     );
   }
 }
-export async function readPumpHistoryPage<T, R>(
+export async function readPumpHistoryPage<T, R extends object>(
   db: D1Database,
   owner: string,
   projectId: string,
@@ -87,7 +87,10 @@ export async function readPumpHistoryPage<T, R>(
   if (last && (!validId(last.id) || !validDate(last.created_at)))
     throw new Error('Saved launch history position is unavailable.');
   return {
-    launches: visible.map(convert),
+    launches: visible.map((row) => ({
+      ...convert(row),
+      createdAt: row.created_at,
+    })),
     nextCursor:
       results.length > 20 && last
         ? encode(kind, projectId, last.created_at, last.id)

@@ -1,9 +1,13 @@
 'use client';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffectEvent, useEffect, useId, useRef, useState } from 'react';
 import { PumpHolderLaunchReview } from './pump-holder-launch-review';
-import { PumpLaunchHistory } from './pump-launch-history';
+import {
+  PumpLaunchHistory,
+  type SavedLaunchSelection,
+} from './pump-launch-history';
 import { holdersBuyUnit } from '@/lib/launch-buy';
 import type { ProjectDocument } from '@/lib/workspace-project';
+import styles from './pump-launch-ui.module.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { readPanelJson } from '@/components/read-panel-json';
@@ -131,7 +135,6 @@ function parseLaunch(value: unknown, atomic: boolean): Launch {
     throw new Error('Invalid launch response.');
   return value as Launch;
 }
-
 type Project = {
   document?: ProjectDocument;
   id: string;
@@ -153,17 +156,20 @@ function PumpLaunchReviewContent({
   plan,
   releaseId,
   onCreateOnly,
+  savedReview,
 }: {
   project: Project;
   plan: LaunchPlanInput;
   releaseId: string;
   onCreateOnly?: () => void;
+  savedReview?: SavedLaunchSelection;
 }) {
   const fieldId = useId();
   const mounted = useRef(true),
     running = useRef(false);
   const [mint, setMint] = useState<PumpMintBackup | null>(null),
     [password, setPassword] = useState(''),
+    [restoreFile, setRestoreFile] = useState<File | null>(null),
     [payerPassword, setPayerPassword] = useState(''),
     [allowance, setAllowance] = useState('0.05'),
     [quoteCap, setQuoteCap] = useState(''),
@@ -185,7 +191,9 @@ function PumpLaunchReviewContent({
     if (!mounted.current) throw new Error('Launch context changed.');
   };
   const pendingKey = (id: string) => 'bundle.pump-signed.v1:' + id;
-  const atomic = plan.developerBuy > 0;
+  const atomic = savedReview
+    ? savedReview.source === '/api/launch/pump/initial-buy'
+    : plan.developerBuy > 0;
   const endpoint = atomic ? '/api/launch/pump/initial-buy' : '/api/launch/pump';
   const hasBuys =
     plan.scheduled ||
@@ -263,6 +271,7 @@ function PumpLaunchReviewContent({
       clearTimeout(load);
     };
   }, [project.id]);
+
   async function api(body: Record<string, unknown>): Promise<Launch> {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -330,6 +339,7 @@ function PumpLaunchReviewContent({
     }
   }
   const validScope =
+    atomic === plan.developerBuy > 0 &&
     launch &&
     launch.review.projectUpdatedAt === project.updatedAt &&
     launch.review.releaseId === releaseId &&
@@ -454,18 +464,17 @@ function PumpLaunchReviewContent({
       if (mintSession) clearMintSession(mintSession);
     }
   }
+  const openSavedReview = useEffectEvent(() => {
+    if (savedReview)
+      void run(async () => accept(parseLaunch(savedReview.value, atomic)));
+  });
+  useEffect(() => {
+    if (!savedReview) return;
+    const timer = setTimeout(() => openSavedReview(), 0);
+    return () => clearTimeout(timer);
+  }, [savedReview]);
   return (
-    <section
-      aria-label="PumpFun launch review"
-      style={{
-        display: 'grid',
-        gap: 12,
-        minWidth: 0,
-        borderTop: '1px solid var(--border)',
-        paddingTop: 20,
-        marginTop: 20,
-      }}
-    >
+    <section aria-label="PumpFun launch review" className={styles.createPanel}>
       <h3>
         {atomic ? 'Create coin with developer buy' : 'Create your PumpFun coin'}
       </h3>
@@ -478,7 +487,7 @@ function PumpLaunchReviewContent({
           : 'initial buys are included.'}{' '}
         Signing and broadcasting require separate approval.
       </p>
-      <p className="source-note" style={{ overflowWrap: 'anywhere' }}>
+      <p className={`source-note ${styles.wrap}`}>
         Exact quote mint: {quote?.address ?? 'Choose an asset'}. Stock-labelled
         tokens have issuer controls; a label is not proof of backing or
         redemption rights.
@@ -546,7 +555,7 @@ function PumpLaunchReviewContent({
         </Button>
       ) : (
         <>
-          <p style={{ overflowWrap: 'anywhere' }}>
+          <p className={styles.wrap}>
             New coin address: <code>{mint.mint}</code>
           </p>
           <Button
@@ -574,15 +583,23 @@ function PumpLaunchReviewContent({
         </>
       )}
       {!mint && (
-        <label htmlFor={fieldId + '-restore'}>
-          Restore encrypted mint backup
-          <Input
-            id={fieldId + '-restore'}
-            type="file"
-            accept="application/json,.json"
-            disabled={busy}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
+        <>
+          <label htmlFor={fieldId + '-restore'}>
+            Restore encrypted mint backup
+            <Input
+              id={fieldId + '-restore'}
+              type="file"
+              accept="application/json,.json"
+              disabled={busy}
+              onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || !restoreFile || !password}
+            onClick={() => {
+              const file = restoreFile;
               if (file)
                 void run(async () => {
                   if (file.size > 400000)
@@ -597,10 +614,17 @@ function PumpLaunchReviewContent({
                   current();
                   setMint(backup);
                   setPassword('');
+                  setRestoreFile(null);
                 });
             }}
-          />
-        </label>
+          >
+            Restore selected mint backup
+          </Button>
+          <p>
+            Choose the encrypted backup and enter its passphrase above, then
+            select Restore. Selecting a file alone does not unlock it.
+          </p>
+        </>
       )}
       <label htmlFor={fieldId + '-allowance'}>
         Maximum network fee and rent (SOL, up to 1)
@@ -640,7 +664,7 @@ function PumpLaunchReviewContent({
             creation and the developer buy will execute.
           </p>
         )}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className={styles.actions}>
         <Button
           type="button"
           disabled={
@@ -692,7 +716,7 @@ function PumpLaunchReviewContent({
         </Button>
       </div>
       {launch && (
-        <div style={{ display: 'grid', gap: 10, overflowWrap: 'anywhere' }}>
+        <div className={styles.savedReview}>
           <strong>Status: {launch.state}</strong>
           <p>
             {creation(launch.review).name} ({creation(launch.review).symbol}) ·
@@ -930,29 +954,80 @@ function PumpLaunchReviewContent({
     </section>
   );
 }
-
-export function PumpLaunchReview(
+function PumpLaunchReviewWorkspace(
   props: Parameters<typeof PumpLaunchReviewContent>[0],
 ) {
-  const holder =
-    holdersBuyUnit(props.plan) === 'supply'
+  const [selected, setSelected] = useState<SavedLaunchSelection | null>(null);
+  const reviewPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected) {
+      reviewPanel.current?.focus();
+      reviewPanel.current?.scrollIntoView?.({
+        block: 'start',
+        behavior: 'smooth',
+      });
+    }
+  }, [selected]);
+  const holder = selected
+    ? selected.source === '/api/launch/pump/holders'
+    : holdersBuyUnit(props.plan) === 'supply'
       ? props.plan.holdersBuy > 0
       : /[1-9]/.test(props.plan.holdersBuyQuote ?? '');
   return (
     <>
-      {holder ? (
-        <PumpHolderLaunchReview
-          key={JSON.stringify([props.project, props.plan, props.releaseId])}
-          project={props.project}
-          releaseId={props.releaseId}
-        />
-      ) : (
-        <PumpLaunchReviewContent
-          key={JSON.stringify([props.project, props.plan, props.releaseId])}
-          {...props}
-        />
+      {selected && (
+        <output>
+          Viewing a saved review. Its original scope is checked against this
+          draft before signing.{' '}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setSelected(null)}
+          >
+            Return to current launch
+          </Button>
+        </output>
       )}
-      <PumpLaunchHistory projectId={props.project.id} />
+      <div ref={reviewPanel} tabIndex={-1} aria-label="Active launch review">
+        {holder ? (
+          <PumpHolderLaunchReview
+            key={JSON.stringify([
+              props.project,
+              props.plan,
+              props.releaseId,
+              selected,
+            ])}
+            project={props.project}
+            releaseId={props.releaseId}
+            savedReview={selected?.value}
+          />
+        ) : (
+          <PumpLaunchReviewContent
+            key={JSON.stringify([
+              props.project,
+              props.plan,
+              props.releaseId,
+              selected,
+            ])}
+            {...props}
+            savedReview={selected ?? undefined}
+          />
+        )}
+      </div>
+      <PumpLaunchHistory
+        projectId={props.project.id}
+        onOpenReview={setSelected}
+      />
     </>
+  );
+}
+export function PumpLaunchReview(
+  props: Parameters<typeof PumpLaunchReviewContent>[0],
+) {
+  return (
+    <PumpLaunchReviewWorkspace
+      key={JSON.stringify([props.project, props.plan, props.releaseId])}
+      {...props}
+    />
   );
 }

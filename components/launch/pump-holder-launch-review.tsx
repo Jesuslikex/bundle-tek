@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffectEvent, useEffect, useId, useRef, useState } from 'react';
+import styles from './pump-launch-ui.module.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { readPanelJson } from '@/components/read-panel-json';
@@ -36,7 +37,6 @@ import {
   type HolderProject,
   type HolderSizing,
 } from '@/lib/pump-holder-launch-client';
-
 type Limit = { address: string; fee: string; quote: string; minimum: string };
 const endpoint = '/api/launch/pump/holders';
 const pendingKey = (id: string) => 'bundle.pump-holders-signed.v1:' + id;
@@ -55,9 +55,11 @@ function download(name: string, text: string) {
 function PumpHolderLaunchReviewContent({
   project,
   releaseId,
+  savedReview,
 }: {
   project: HolderProject;
   releaseId: string;
+  savedReview?: unknown;
 }) {
   const id = useId(),
     mounted = useRef(true),
@@ -65,6 +67,7 @@ function PumpHolderLaunchReviewContent({
     controller = useRef<AbortController | null>(null);
   const [mint, setMint] = useState<PumpMintBackup | null>(null),
     [password, setPassword] = useState(''),
+    [restoreFile, setRestoreFile] = useState<File | null>(null),
     [vaultPassword, setVaultPassword] = useState('');
   const [fee, setFee] = useState('0.05'),
     [developerCap, setDeveloperCap] = useState(''),
@@ -116,6 +119,7 @@ function PumpHolderLaunchReviewContent({
       clearInterval(timer);
     };
   }, [project.id]);
+
   async function run(fn: () => Promise<void>) {
     if (running.current) return;
     running.current = true;
@@ -458,19 +462,103 @@ function PumpHolderLaunchReviewContent({
         })),
       ]
     : [];
+  const targetReasons = [
+    busy && 'Wait for the current action to finish.',
+    !mint && 'Generate or restore this project’s mint key.',
+    !project.payer && 'Save a verified deployer wallet.',
+    (!document || !plan) && 'Save the complete launch plan.',
+    !releaseId && 'Publish and select the approved metadata release.',
+    plan?.scheduled && 'Use an unscheduled launch plan.',
+    !!(launch && !terminal(launch.state)) &&
+      'Finish or discard the active saved launch before reading new targets.',
+  ].filter((reason): reason is string => typeof reason === 'string');
+  const stage = launch
+    ? ['review', 'approved'].includes(launch.state)
+      ? !mint || !backedUp
+        ? 0
+        : !valid
+          ? 1
+          : launch.state === 'review'
+            ? 4
+            : pending
+              ? 6
+              : 5
+      : launch.state === 'signed'
+        ? 6
+        : 7
+    : !mint || !backedUp
+      ? 0
+      : !fee || (plan?.developerBuy && !developerCap)
+        ? 1
+        : !targets.length
+          ? 2
+          : 3;
+  const completed = (index: number) =>
+    [
+      !!mint && backedUp,
+      !!launch || (!!fee && (!plan?.developerBuy || !!developerCap)),
+      !!launch || targets.length > 0,
+      !!launch,
+      !!launch && !['review', 'cancelled'].includes(launch.state),
+      !!pending || !!launch?.signature,
+      !!launch && ['submitted', 'finalized', 'failed'].includes(launch.state),
+      !!launch?.receipt,
+    ][index];
+  const steps = [
+    'Mint key',
+    'Limits',
+    'Targets',
+    'Simulation',
+    'Approval',
+    'Signing',
+    'Broadcast',
+    'Recovery',
+  ];
+  const openSavedReview = useEffectEvent(() => {
+    if (savedReview)
+      void run(async () =>
+        accept(await parseHolderLaunch(savedReview, project.id)),
+      );
+  });
+  useEffect(() => {
+    if (!savedReview) return;
+    const timer = setTimeout(() => openSavedReview(), 0);
+    return () => clearTimeout(timer);
+  }, [savedReview]);
   return (
-    <section
-      aria-label="PumpFun holder launch review"
-      style={{
-        display: 'grid',
-        gap: 14,
-        minWidth: 0,
-        borderTop: '1px solid var(--border)',
-        paddingTop: 20,
-        marginTop: 20,
-      }}
-    >
+    <section aria-label="PumpFun holder launch review" className={styles.panel}>
       <h3>Create coin with holder buys</h3>
+      <ol aria-label="Holder launch steps" className={styles.steps}>
+        {steps.map((step, index) => (
+          <li
+            key={step}
+            aria-current={index === stage ? 'step' : undefined}
+            data-state={
+              index === stage
+                ? 'current'
+                : completed(index)
+                  ? 'completed'
+                  : 'upcoming'
+            }
+          >
+            <span>
+              {index + 1}. {step}
+            </span>
+            <small>
+              {index === stage
+                ? 'Current'
+                : completed(index)
+                  ? 'Completed'
+                  : 'Upcoming'}
+            </small>
+          </li>
+        ))}
+      </ol>
+      <p className="source-note">
+        Steps describe the saved workflow state. Finalized or expired status
+        must be checked in Recovery; progress does not prove a successful
+        launch.
+      </p>
       <p>
         Creates one PumpFun mainnet transaction with the saved developer buy and
         every active holder buy. Review each wallet’s limits and simulated
@@ -478,11 +566,9 @@ function PumpHolderLaunchReviewContent({
       </p>
       <p className="source-note">
         Quote: {plan?.currency ?? 'Save a quote asset'} ·{' '}
-        <code style={{ overflowWrap: 'anywhere' }}>
-          {quote?.address ?? 'Unavailable'}
-        </code>
-        . Stock-token issuer controls still apply. Scheduling and groups
-        exceeding one packet are unavailable.
+        <code className={styles.wrap}>{quote?.address ?? 'Unavailable'}</code>.
+        Stock-token issuer controls still apply. Scheduling and groups exceeding
+        one packet are unavailable.
       </p>
       {(!document || !project.payer || plan?.scheduled) && (
         <p>
@@ -526,31 +612,44 @@ function PumpHolderLaunchReviewContent({
               type="file"
               accept="application/json,.json"
               disabled={busy}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file)
-                  void run(async () => {
-                    if (file.size > 400000)
-                      throw new Error('Mint backup is too large.');
-                    const backup = parsePumpMintBackup(
-                      await file.text(),
-                      project.id,
-                    );
-                    const session = await unlockPumpMint(backup, password);
-                    clearMintSession(session);
-                    await persistPumpMint(backup, () => mounted.current);
-                    current();
-                    setMint(backup);
-                    setPassword('');
-                    setBackedUp(false);
-                  });
-              }}
+              onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
             />
           </label>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || !restoreFile || !password}
+            onClick={() => {
+              const file = restoreFile;
+              if (file)
+                void run(async () => {
+                  if (file.size > 400000)
+                    throw new Error('Mint backup is too large.');
+                  const backup = parsePumpMintBackup(
+                    await file.text(),
+                    project.id,
+                  );
+                  const session = await unlockPumpMint(backup, password);
+                  clearMintSession(session);
+                  await persistPumpMint(backup, () => mounted.current);
+                  current();
+                  setMint(backup);
+                  setPassword('');
+                  setBackedUp(false);
+                  setRestoreFile(null);
+                });
+            }}
+          >
+            Restore selected mint backup
+          </Button>
+          <p>
+            Choose the encrypted backup and enter its passphrase above, then
+            select Restore. Selecting a file alone does not unlock it.
+          </p>
         </>
       ) : (
         <>
-          <p style={{ overflowWrap: 'anywhere' }}>
+          <p className={styles.wrap}>
             Coin address: <code>{mint.mint}</code>
           </p>
           <Button
@@ -604,9 +703,10 @@ function PumpHolderLaunchReviewContent({
           />
         </label>
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div className={styles.actions}>
         <Button
           variant="outline"
+          aria-describedby={id + '-target-reasons'}
           disabled={
             busy ||
             !mint ||
@@ -650,42 +750,32 @@ function PumpHolderLaunchReviewContent({
           Reload saved holder launch
         </Button>
       </div>
+      <div id={id + '-target-reasons'} aria-live="polite">
+        {targetReasons.length ? (
+          <ul>
+            {targetReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        ) : (
+          <p>Ready to read current holder targets.</p>
+        )}
+      </div>
       {targets.length > 0 && (
-        <fieldset
-          disabled={busy}
-          style={{ display: 'grid', gap: 12, minWidth: 0 }}
-        >
+        <fieldset disabled={busy} className={styles.limits}>
           <legend>Per-wallet limits</legend>
           <p>
             Targets come from the saved allocation and observed supply. Full
             preparation rechecks every target. Zero allocations stay visible and
             do not sign.
           </p>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns:
-                'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
-              gap: 12,
-            }}
-          >
+          <div className={styles.walletGrid}>
             {targets.map((target, i) => (
-              <div
-                key={target.address}
-                style={{
-                  display: 'grid',
-                  gap: 8,
-                  padding: 12,
-                  border: '1px solid var(--border)',
-                  minWidth: 0,
-                }}
-              >
+              <div key={target.address} className={styles.wallet}>
                 <strong>
                   Holder {i + 1} {target.kind === 'none' ? '· No buy' : ''}
                 </strong>
-                <code style={{ overflowWrap: 'anywhere' }}>
-                  {target.address}
-                </code>
+                <code className={styles.wrap}>{target.address}</code>
                 <p>
                   {target.kind === 'exact-quote-input'
                     ? `Saved quote budget: ${amount(target.raw, quote?.decimals ?? 9)} ${plan?.currency}`
@@ -760,14 +850,7 @@ function PumpHolderLaunchReviewContent({
         </fieldset>
       )}
       {launch && (
-        <div
-          style={{
-            display: 'grid',
-            gap: 12,
-            minWidth: 0,
-            overflowWrap: 'anywhere',
-          }}
-        >
+        <div className={styles.review}>
           <strong>Status: {launch.state}</strong>
           <p>
             Network fee: {amount(sim!.networkFeeRaw, 9)} SOL. Total buys:{' '}
@@ -780,9 +863,9 @@ function PumpHolderLaunchReviewContent({
           </p>
           <section
             aria-label="Simulated wallet costs"
-            style={{ overflowX: 'auto', maxWidth: '100%' }}
+            className={styles.scroll}
           >
-            <table style={{ width: '100%', fontSize: 12 }}>
+            <table className={styles.table}>
               <caption>
                 Complete packet: wallet limits and simulated settlement
               </caption>
@@ -1074,13 +1157,12 @@ function PumpHolderLaunchReviewContent({
     </section>
   );
 }
-
 export function PumpHolderLaunchReview(
   props: Parameters<typeof PumpHolderLaunchReviewContent>[0],
 ) {
   return (
     <PumpHolderLaunchReviewContent
-      key={JSON.stringify([props.project, props.releaseId])}
+      key={JSON.stringify([props.project, props.releaseId, props.savedReview])}
       {...props}
     />
   );

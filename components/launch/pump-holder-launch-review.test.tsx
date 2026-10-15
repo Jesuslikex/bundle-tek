@@ -414,3 +414,89 @@ it('uses saved quote budgets with explicit minimum outputs instead of percentage
   await click('Approve and sign complete holder launch');
   expect(mocks.sign).toHaveBeenCalledTimes(1);
 });
+
+it('explains every missing target requirement and keeps the read button closed', async () => {
+  await act(async () =>
+    root.render(
+      <PumpHolderLaunchReview
+        project={{
+          ...f.project,
+          payer: undefined,
+          document: {
+            ...f.project.document!,
+            plan: { ...f.project.document!.plan, scheduled: true },
+          },
+        }}
+        releaseId=""
+      />,
+    ),
+  );
+  expect(button('Read current holder targets').disabled).toBe(true);
+  expect(container.textContent).toContain('Save a verified deployer wallet.');
+  expect(container.textContent).toContain(
+    'Publish and select the approved metadata release.',
+  );
+  expect(container.textContent).toContain('Use an unscheduled launch plan.');
+  expect(
+    button('Read current holder targets').getAttribute('aria-describedby'),
+  ).toBeTruthy();
+});
+it('accepts backup file before passphrase but only decrypts on explicit Restore', async () => {
+  localStorage.clear();
+  await act(async () =>
+    root.render(
+      <PumpHolderLaunchReview
+        project={{ ...f.project, id: 'restore-project' }}
+        releaseId={f.releaseId}
+      />,
+    ),
+  );
+  const file = {
+    size: 20,
+    text: async () =>
+      JSON.stringify({ projectId: 'restore-project', mint: 'synthetic' }),
+  };
+  const field = container.querySelector('input[type=file]')!;
+  Object.defineProperty(field, 'files', { value: [file] });
+  await act(async () => {
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(mocks.mint).not.toHaveBeenCalled();
+  expect(button('Restore selected mint backup').disabled).toBe(true);
+  input('Mint backup passphrase', 'local test passphrase');
+  expect(mocks.mint).not.toHaveBeenCalled();
+  await click('Restore selected mint backup');
+  expect(mocks.mint).toHaveBeenCalledWith(
+    { projectId: 'restore-project', mint: 'synthetic' },
+    'local test passphrase',
+  );
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(calls).toHaveLength(0);
+  expect(
+    container.querySelector('[aria-current="step"]')?.textContent,
+  ).toContain('Mint key');
+});
+it('shows saved review steps while leaving signing and broadcast consent unchecked', async () => {
+  await act(async () =>
+    root.render(
+      <PumpHolderLaunchReview
+        project={f.project}
+        releaseId={f.releaseId}
+        savedReview={saved}
+      />,
+    ),
+  );
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  await settle();
+  expect(container.textContent).toContain('Status: review');
+  expect(
+    container.querySelector('[aria-current="step"]')?.textContent,
+  ).toContain('Mint key');
+  expect(label('I approve signing').checked).toBe(false);
+  expect(label('I understand simulation').checked).toBe(false);
+  expect(button('Approve and sign complete holder launch').disabled).toBe(true);
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(calls).toHaveLength(0);
+});
