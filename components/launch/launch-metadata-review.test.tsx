@@ -2,6 +2,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+// History intentionally loads three sources on mount and has its own integration
+// suite. Keep those independent GETs out of this publisher's consent/retry queue.
+vi.mock('./pump-launch-history', () => ({ PumpLaunchHistory: () => null }));
 import { LaunchMetadataReview } from './launch-metadata-review';
 import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
 import { EMPTY_IDENTITY } from '@/lib/workspace-project';
@@ -71,7 +74,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
-it('shows the saved public identity with explicit unchecked consent and makes no background request', () => {
+it('shows the saved public identity with explicit unchecked consent and makes no publication request', () => {
   render();
   expect(container.textContent).toContain('Reviewed identity');
   expect(container.textContent).toContain('does not create a coin');
@@ -175,7 +178,7 @@ it('rejects a mismatched public URL or metadata instead of presenting a successf
     );
   }
 });
-it('sanitizes HTML errors and permits an explicit same-draft retry without another background request', async () => {
+it('sanitizes HTML errors and retries metadata publication only on explicit same-draft approval', async () => {
   fetcher
     .mockResolvedValueOnce(
       new Response('<html>secret diagnostic</html>', { status: 503 }),
