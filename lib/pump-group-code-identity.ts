@@ -28,7 +28,7 @@ export type PumpProgramIdentity = {
   codeBytes: number;
   identityKind: 'native-system' | 'elf-code';
 };
-/** Full executable identity, never a semantic audit. Sliced reads bound memory and coherent headers detect upgrades during collection. */
+/** Bounded full-byte identity, never a semantic audit or atomic bank snapshot. Header checks detect changed metadata, but cannot rule out same-slot rewrites between chunks. Authorization compares a second complete collection with the approved vector. */
 export async function collectPumpProgramIdentities(
   programs: string[],
   minimumSlot: number,

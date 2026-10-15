@@ -196,6 +196,7 @@ async function recheckHeaders(
     }
   }
   signal.throwIfAborted();
+  return bank;
 }
 export async function authorizeOwnedPumpGroupSigning(
   db: D1Database,
@@ -246,7 +247,20 @@ export async function authorizeOwnedPumpGroupSigning(
       canonicalPumpHolderJson(saved.review)
   )
     return fail('Group approval changed.');
-  await recheckHeaders(preview, signal, rpc);
+  const currentBank = await recheckHeaders(preview, signal, rpc);
+  const currentCode = await collectPumpProgramIdentities(
+    keys,
+    currentBank,
+    signal,
+    rpc,
+  );
+  if (
+    canonicalPumpHolderJson(currentCode.programs) !==
+    canonicalPumpHolderJson(preview.programs)
+  )
+    return fail(
+      'Deployed group code changed after explicit code approval. Read and approve its new identities.',
+    );
   await requirePumpRuntimePreview(preview, saved.review);
   const now = Date.now();
   const authorization: PumpGroupSigningAuthorization = {

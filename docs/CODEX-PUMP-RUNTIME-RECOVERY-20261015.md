@@ -21,3 +21,5 @@ Codex owns these changes. Planned edits: runtime/deployment qualification and te
 - Claude's shell/token/holder/supply/timeline/performance files and shared CSS/config were untouched. Main's two unrelated dirty files must remain intact when fast-forwarding.
 
 This local checkpoint implements user-approved sign-only integration. A hosted release needs migrations 0086/0087 and a deployment. Funded end-to-end proof, broadcast transport, successful economic reconciliation and broad Proxima parity remain open. Do not treat this checkpoint as a completed launch or production execution clearance.
+
+Follow-up: direct Claude review identified a same-slot code-change gap in the final header-only recheck. Authorization now additionally recollects and compares the full approved code-identity vector before issuance. Chunked collection is not an atomic-bank proof. See `CODEX-CLAUDE-RUNTIME-REVIEW-20261015.md` for the two-way discussion, remaining observation limits and the 14-test regression checkpoint.

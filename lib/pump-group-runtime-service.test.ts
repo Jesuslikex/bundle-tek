@@ -320,6 +320,35 @@ it('requires explicit exact code consent and creates a five-second sign-only aut
     f.client.execute('DELETE FROM pump_group_signing_authorizations'),
   ).rejects.toThrow('retained');
 });
+it('rejects changed full code even when deployment headers remain unchanged', async () => {
+  const f = await runtimeFixture();
+  const preview = await f.preview();
+  const original = collect.getMockImplementation()!;
+  collect.mockImplementation(async (...args) => {
+    const measured = await original(...args);
+    measured.programs[0].codeSha256 = 'f'.repeat(64);
+    return measured;
+  });
+  await expect(
+    authorizeOwnedPumpGroupSigning(
+      f.db,
+      'alice',
+      f.saved.review.id,
+      preview.id,
+      f.consent,
+      codeConsent(preview),
+      new AbortController().signal,
+      f.provider,
+    ),
+  ).rejects.toThrow('code changed');
+  expect(
+    (
+      await f.client.execute(
+        'SELECT count(*) AS n FROM pump_group_signing_authorizations',
+      )
+    ).rows[0].n,
+  ).toBe(0);
+});
 it('refuses mismatched code consent before recording group approval', async () => {
   const f = await runtimeFixture();
   const preview = await f.preview();
