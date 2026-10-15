@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { pairOrderFixture } from '../../../../test/pair-order-fixture';
+import { pairIntermediate } from '../../../../test/pair-intermediate-fixture';
 import type { ImportedPairOrderDependencies } from '@/lib/imported-pair-order-candidate';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
@@ -60,6 +61,21 @@ const request = (
       body: JSON.stringify(body),
     },
   );
+it('reviews a protected wallet intermediate through the actual authenticated route', async () => {
+  const { key, mint } = await pairIntermediate(f);
+  const response = await POST(request());
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    signingAllowed: false,
+    executionAllowed: false,
+    review: {
+      assessment: {
+        auxiliaryAccounts: [{ address: key, mint, maximumNetDebitRaw: '0' }],
+      },
+      simulation: { auxiliaryTokenDeltas: [{ account: key, deltaRaw: '0' }] },
+    },
+  });
+});
 it('constructs and independently checks a real decoded wallet-bound candidate without creating approval', async () => {
   const response = await POST(request());
   expect(response.status).toBe(200);

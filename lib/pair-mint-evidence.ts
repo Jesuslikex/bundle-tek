@@ -141,7 +141,10 @@ function extensions(bytes: Uint8Array, program: string): Extension[] {
   }
   return result;
 }
-async function mint(raw: unknown, address: string): Promise<PairMintMetadata> {
+export async function inspectPairMintAccount(
+  raw: unknown,
+  address: string,
+): Promise<PairMintMetadata> {
   const { bytes, program } = accountBytes(raw);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (
@@ -256,8 +259,8 @@ export async function readPairMintEvidence(
     slot: Number(rawSlot),
     unixTimestamp,
     mints: await Promise.all([
-      mint(result.value[0], pair.inputMint),
-      mint(result.value[1], pair.outputMint),
+      inspectPairMintAccount(result.value[0], pair.inputMint),
+      inspectPairMintAccount(result.value[1], pair.outputMint),
     ]),
   };
 }

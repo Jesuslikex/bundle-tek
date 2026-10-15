@@ -2,6 +2,8 @@ import { afterEach, expect, it } from 'vitest';
 import bs58 from 'bs58';
 import { address } from '@solana/kit';
 import { pairRuntimeFixture } from '../test/pair-runtime-fixture';
+import { pairIntermediate } from '../test/pair-intermediate-fixture';
+import { SWAP_TOKEN } from './swap-token-program-evidence';
 import {
   importedPairRuntimeRequest,
   previewOwnedImportedPairRuntime,
@@ -23,6 +25,31 @@ const run = (
     signal,
     v.runtimeDependencies,
   );
+it.each([false, true])(
+  'protects intermediate custody across the final runtime code observation, lateChange=%s',
+  async (lateChange) => {
+    const v = (f = await pairRuntimeFixture()),
+      { prior, key } = await pairIntermediate(v);
+    const program = structuredClone([...v.programs.values()][0]);
+    v.programs.set(SWAP_TOKEN, program);
+    let simulations = 0;
+    v.orderState.onSimulation = () => {
+      if (++simulations === 2 && lateChange)
+        v.runtimeState.onCodeRead = () => {
+          prior.lamports = '20000001';
+        };
+    };
+    if (lateChange) await expect(run(v)).rejects.toMatchObject({ status: 409 });
+    else {
+      const result = await run(v);
+      expect(
+        result.candidate.review.assessment.auxiliaryAccounts[0].address,
+      ).toBe(key);
+      expect(result.runtime.codeIdentityObserved).toBe(true);
+      expect(result.signingAllowed).toBe(false);
+    }
+  },
+);
 function extraAccount(
   fixture: NonNullable<typeof f>,
   key: string,

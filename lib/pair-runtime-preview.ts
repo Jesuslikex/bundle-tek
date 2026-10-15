@@ -143,6 +143,7 @@ export async function collectPairRuntimePreview(
   const selected = [
     candidate.preflight.wallet,
     ...candidate.review.assessment.accounts.map((a) => a.address),
+    ...candidate.review.assessment.auxiliaryAccounts.map((a) => a.address),
   ];
   const beforeAccounts = await read(selected, false);
   const beforeInventory = await inventory();

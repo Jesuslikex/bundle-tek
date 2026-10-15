@@ -13,7 +13,15 @@ import {
 import { assessJupiterRoute } from './jupiter-route-assessment';
 import { requireConsistentSolanaSlots } from './solana-rpc';
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
-import { pairWalletUint } from './pair-wallet-evidence';
+import {
+  pairWalletUint,
+  requiredPairAccountExtensions,
+} from './pair-wallet-evidence';
+import { getTokenSize } from '@solana-program/token-2022';
+import {
+  discoverPairAuxiliaryAccounts,
+  readPairAuxiliaryMints,
+} from './pair-order-auxiliary';
 import {
   readPairMintEvidence,
   assertSamePairMintEvidence,
@@ -23,7 +31,7 @@ import {
   reviewPairOrderInstructions,
   type PairOrderAccountSnapshot,
 } from './pair-order-review';
-import { SWAP_WRAPPED_SOL } from './swap-token-program-evidence';
+import { SWAP_TOKEN, SWAP_WRAPPED_SOL } from './swap-token-program-evidence';
 import { reviewPairOrderSimulation } from './pair-order-simulation';
 import { reviewPairRuntimeTrace } from './pair-runtime-trace';
 import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
@@ -166,12 +174,23 @@ export async function collectPairOrderReview(
     }));
   };
   const other = await readAccounts(
-      writable.filter((a) => !selected.includes(a)),
-      true,
-    ),
-    before = await readAccounts(selected, false),
-    snapshots = [...before, ...other];
+    writable.filter((a) => !selected.includes(a)),
+    true,
+  );
   const pair = preflight.quote.pair;
+  const discovered = discoverPairAuxiliaryAccounts(
+    preflight.wallet,
+    selected,
+    [pair.base.address, pair.quote.address],
+    instructions,
+    other,
+  );
+  const checkedAccounts = [...selected, ...discovered.map((a) => a.address)];
+  const before = await readAccounts(checkedAccounts, false),
+    snapshots = [
+      ...before,
+      ...other.filter((a) => !checkedAccounts.includes(a.address)),
+    ];
   const quoted: PairMintEvidence = {
     slot: pair.mintPolicy.recheckSlot,
     unixTimestamp: pair.mintPolicy.recheckUnixTimestamp,
@@ -194,6 +213,19 @@ export async function collectPairOrderReview(
   );
   slots.push(mints.slot);
   assertSamePairMintEvidence(quoted, mints);
+  const auxiliaryMints = discovered.length
+    ? await readPairAuxiliaryMints(
+        [...new Set(discovered.map((a) => a.mint))],
+        floor(),
+        rpc,
+        now,
+      )
+    : null;
+  if (auxiliaryMints) slots.push(auxiliaryMints.slot);
+  const auxiliary = discovered.map((a) => ({
+    ...a,
+    mint: auxiliaryMints!.mints.find((m) => m.address === a.mint)!,
+  }));
   const rentByMint: Record<string, string> = {};
   if (
     pairWalletUint(
@@ -204,14 +236,36 @@ export async function collectPairOrderReview(
     ).toString() !== preflight.evidence.systemRentMinimumRaw
   )
     throw Error('Pair candidate system-wallet rent changed.');
-  for (const asset of [pair.base, pair.quote]) {
+  for (const asset of [...mints.mints, ...auxiliary.map((a) => a.mint)]) {
     const account = preflight.evidence.accounts.find(
       (a) => a.mint === asset.address,
-    )!;
+    );
+    const extra = auxiliary.find((a) => a.mint.address === asset.address);
+    const raw = extra
+      ? (before.find((a) => a.address === extra.address)!.raw as {
+          data?: unknown;
+        } | null)
+      : null;
+    let extraSize =
+      asset.program === SWAP_TOKEN
+        ? 165
+        : getTokenSize(requiredPairAccountExtensions(asset));
+    if (extra && raw !== null) {
+      if (
+        !Array.isArray(raw?.data) ||
+        typeof raw.data[0] !== 'string' ||
+        raw.data[0].length > 5464
+      )
+        throw Error('Auxiliary account layout is unsupported.');
+      extraSize = atob(raw.data[0]).length;
+      if (extraSize > 4096) throw Error('Auxiliary account size differs.');
+    }
     const size =
       asset.address === SWAP_WRAPPED_SOL
         ? 165
-        : account.byteLength || account.expectedByteLength;
+        : account
+          ? account.byteLength || account.expectedByteLength
+          : extraSize;
     const rent = pairWalletUint(
       await rpc('getMinimumBalanceForRentExemption', [
         size,
@@ -221,6 +275,7 @@ export async function collectPairOrderReview(
     if (rent < 1n) throw Error('Pair candidate rent is unavailable.');
     rentByMint[asset.address] = rent.toString();
     if (
+      account &&
       asset.address !== SWAP_WRAPPED_SOL &&
       rent.toString() !== account.rentMinimumRaw
     )
@@ -239,6 +294,7 @@ export async function collectPairOrderReview(
     snapshots,
     rentByMint,
     networkFee,
+    auxiliary,
   );
   fresh();
   const simulationResponse = await rpc('simulateTransaction', [
@@ -280,7 +336,7 @@ export async function collectPairOrderReview(
       simulationResponse as { value: { accounts: unknown[] } }
     ).value.accounts.forEach(assertPairRuntimeWritableAccount);
   fresh();
-  const after = await readAccounts(selected, false);
+  const after = await readAccounts(checkedAccounts, false);
   const identity = (a: PairOrderAccountSnapshot) => {
     if (a.raw === null) return [a.address, null];
     const r = a.raw as {
@@ -308,6 +364,25 @@ export async function collectPairOrderReview(
   );
   slots.push(finalMints.slot);
   assertSamePairMintEvidence(mints, finalMints);
+  const finalAuxiliaryMints = auxiliaryMints
+    ? await readPairAuxiliaryMints(
+        auxiliaryMints.mints.map((m) => m.address),
+        floor(),
+        rpc,
+        now,
+      )
+    : null;
+  if (finalAuxiliaryMints) {
+    slots.push(finalAuxiliaryMints.slot);
+    for (const [i, m] of auxiliaryMints!.mints.entries())
+      assertSamePairMintEvidence(
+        { ...auxiliaryMints!, mints: [m, mints.mints[0]] },
+        {
+          ...finalAuxiliaryMints,
+          mints: [finalAuxiliaryMints.mints[i], finalMints.mints[0]],
+        },
+      );
+  }
   const validity = (await rpc('isBlockhashValid', [
     message.lifetimeToken,
     { commitment: 'confirmed', minContextSlot: floor() },
@@ -342,6 +417,7 @@ export async function collectPairOrderReview(
     pairSha256: pair.sha256,
     preflightSha256: preflight.contextSha256,
     assessment,
+    auxiliaryMintEvidence: finalAuxiliaryMints,
     simulation,
     runtimeTrace,
     lookupTables:

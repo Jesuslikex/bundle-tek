@@ -110,7 +110,9 @@ export async function reviewPairOrderSimulation(
   const outputMint = assessment.accounts[1].mint;
   let nativeDelta = newWallet.lamports - oldWallet.lamports,
     nonnativeRent = 0n,
-    retainedNativeRent = 0n;
+    retainedNativeRent = 0n,
+    refundedNonNativeRent = 0n,
+    auxiliaryNativeGain = 0n;
   const tokenDeltas: {
     mint: string;
     account: string;
@@ -118,14 +120,24 @@ export async function reviewPairOrderSimulation(
     afterRaw: string;
     deltaRaw: string;
   }[] = [];
-  for (const selected of assessment.accounts) {
+  const auxiliaryTokenDeltas: typeof tokenDeltas = [];
+  for (const selected of [
+    ...assessment.accounts.map((a) => ({ ...a, mintEvidence: null })),
+    ...assessment.auxiliaryAccounts,
+  ]) {
+    const auxiliary = selected.mintEvidence !== null;
     if (!post.has(selected.address) || !initial.has(selected.address))
       throw Error('Pair simulation selected account is absent.');
     const prior = initial.get(selected.address),
       next = post.get(selected.address);
     if (selected.mint === SWAP_WRAPPED_SOL) {
       const oldLamports = prior === null ? 0n : account(prior).lamports;
+      let afterAmount = 0n;
       if (selected.closed) {
+        if (auxiliary && selected.beforeAmountRaw !== '0')
+          throw Error(
+            'Pair simulation cannot close an auxiliary token holding.',
+          );
         if (next !== null) {
           const closed = account(next);
           if (
@@ -158,26 +170,63 @@ export async function reviewPairOrderSimulation(
           v.getUint32(109, true) !== 1 ||
           a.lamports - v.getBigUint64(64, true) !== v.getBigUint64(113, true) ||
           v.getBigUint64(113, true) !== expectedReserve ||
-          v.getBigUint64(64, true) !== BigInt(selected.beforeAmountRaw)
+          (auxiliary
+            ? v.getBigUint64(64, true) < BigInt(selected.beforeAmountRaw)
+            : v.getBigUint64(64, true) !== BigInt(selected.beforeAmountRaw))
         )
           throw Error(
             'Pair simulation native custody or residual amount differs.',
           );
         nativeDelta += a.lamports - oldLamports;
+        afterAmount = v.getBigUint64(64, true);
         if (prior === null) retainedNativeRent += expectedReserve;
+        if (auxiliary)
+          auxiliaryNativeGain +=
+            v.getBigUint64(64, true) - BigInt(selected.beforeAmountRaw);
       }
+      if (auxiliary)
+        auxiliaryTokenDeltas.push({
+          mint: selected.mint,
+          account: selected.address,
+          beforeRaw: selected.beforeAmountRaw,
+          afterRaw: afterAmount.toString(),
+          deltaRaw: (afterAmount - BigInt(selected.beforeAmountRaw)).toString(),
+        });
       continue;
     }
     const mint = selected.mint === pair.base.address ? pair.base : pair.quote;
-    if (mint.address !== selected.mint)
+    if (!auxiliary && mint.address !== selected.mint)
       throw Error('Pair simulation asset differs.');
-    const metadata = {
+    const metadata = selected.mintEvidence ?? {
       ...mint,
       policySha256:
         mint.address === pair.base.address
           ? pair.mintPolicy.baseSha256
           : pair.mintPolicy.quoteSha256,
     };
+    if (auxiliary && selected.closed) {
+      if (selected.beforeAmountRaw !== '0')
+        throw Error('Pair simulation cannot close an auxiliary holding.');
+      if (next !== null) {
+        const closed = account(next);
+        if (
+          closed.owner !== SYSTEM ||
+          closed.executable ||
+          closed.bytes.length ||
+          closed.lamports !== 0n
+        )
+          throw Error('Pair simulation auxiliary cleanup failed.');
+      }
+      if (prior !== null) refundedNonNativeRent += account(prior).lamports;
+      auxiliaryTokenDeltas.push({
+        mint: selected.mint,
+        account: selected.address,
+        beforeRaw: '0',
+        afterRaw: '0',
+        deltaRaw: '0',
+      });
+      continue;
+    }
     const observed = await inspectPairTokenAccount(
       next,
       metadata,
@@ -200,14 +249,16 @@ export async function reviewPairOrderSimulation(
     if (prior === null) nonnativeRent += cost;
     const delta = afterAmount - oldAmount;
     if (
-      selected.mint === inputMint
-        ? delta !== -BigInt(assessment.rawInput)
-        : delta < BigInt(assessment.minimumOutputRaw)
+      auxiliary
+        ? delta < 0n
+        : selected.mint === inputMint
+          ? delta !== -BigInt(assessment.rawInput)
+          : delta < BigInt(assessment.minimumOutputRaw)
     )
       throw Error(
         'Pair simulation raw token spending or output protection differs.',
       );
-    tokenDeltas.push({
+    (auxiliary ? auxiliaryTokenDeltas : tokenDeltas).push({
       mint: selected.mint,
       account: selected.address,
       beforeRaw: oldAmount.toString(),
@@ -216,13 +267,23 @@ export async function reviewPairOrderSimulation(
     });
   }
   const fee = BigInt(assessment.networkFeeRaw);
-  const tradeNativeDelta = nativeDelta + fee + nonnativeRent;
+  const tradeNativeDelta =
+    nativeDelta +
+    fee +
+    nonnativeRent -
+    refundedNonNativeRent -
+    auxiliaryNativeGain;
+  const closedAuxiliaryNative = assessment.auxiliaryAccounts.some(
+    (a) => a.mint === SWAP_WRAPPED_SOL && a.closed,
+  );
   if (
     inputMint === SWAP_WRAPPED_SOL
       ? tradeNativeDelta !== -BigInt(assessment.rawInput)
       : outputMint === SWAP_WRAPPED_SOL
         ? tradeNativeDelta < BigInt(assessment.minimumOutputRaw)
-        : tradeNativeDelta !== 0n
+        : closedAuxiliaryNative
+          ? tradeNativeDelta < 0n
+          : tradeNativeDelta !== 0n
   )
     throw Error(
       'Pair simulation SOL spending, fees, rent or refund conservation differs.',
@@ -231,7 +292,9 @@ export async function reviewPairOrderSimulation(
   for (const key of writable) {
     if (
       key === wallet ||
-      assessment.accounts.some((a) => a.address === key) ||
+      [...assessment.accounts, ...assessment.auxiliaryAccounts].some(
+        (a) => a.address === key,
+      ) ||
       post.get(key) === null
     )
       continue;
@@ -270,6 +333,7 @@ export async function reviewPairOrderSimulation(
   return {
     format: 'pair-order-simulation-v1' as const,
     tokenDeltas,
+    auxiliaryTokenDeltas,
     walletLamportsBeforeRaw: oldWallet.lamports.toString(),
     walletLamportsAfterRaw: newWallet.lamports.toString(),
     nativeTradeDeltaRaw: tradeNativeDelta.toString(),
@@ -277,6 +341,8 @@ export async function reviewPairOrderSimulation(
     retainedAccountRentRaw: (nonnativeRent + retainedNativeRent).toString(),
     retainedNonNativeAccountRentRaw: nonnativeRent.toString(),
     retainedNativeAccountRentRaw: retainedNativeRent.toString(),
+    refundedNonNativeAccountRentRaw: refundedNonNativeRent.toString(),
+    auxiliaryWrappedSolGainRaw: auxiliaryNativeGain.toString(),
     unitsConsumed: units.toString(),
     postAccountsSha256: Array.from(new Uint8Array(fingerprint), (b) =>
       b.toString(16).padStart(2, '0'),

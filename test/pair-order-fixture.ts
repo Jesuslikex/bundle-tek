@@ -5,6 +5,7 @@ import { routeMessage } from './jupiter-route-fixture';
 import { prepareSolanaPair } from '../lib/warmup-swap-quote';
 import { pairAssociatedAddress } from '../lib/pair-wallet-evidence';
 import { PAIR_CLOCK } from '../lib/pair-mint-evidence';
+import { pairQuoteClock } from './imported-pair-quote-fixture';
 import { pairWalletTokenAccount } from './pair-wallet-fixture';
 import { requiredPairAccountExtensions } from '../lib/pair-wallet-evidence';
 import {
@@ -36,6 +37,7 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
     valid: true,
     closedAsNull: false,
     otherAccounts: new Map<string, unknown>(),
+    auxiliaryMints: new Map<string, unknown>(),
     transform: null as null | ((m: Message) => Message),
     responsePatch: {} as Record<string, unknown>,
     onSimulation: null as
@@ -56,6 +58,21 @@ export async function pairOrderFixture(side: 'Buy' | 'Sell' = 'Buy') {
         context: { slot: String(config!.minContextSlot! + 1) },
         value: state.valid,
       };
+    if (
+      method === 'getMultipleAccounts' &&
+      (params[0] as string[]).includes(PAIR_CLOCK) &&
+      (params[0] as string[]).some((key) => state.auxiliaryMints.has(key))
+    ) {
+      const slot = config!.minContextSlot! + 1;
+      return {
+        context: { slot: String(slot) },
+        value: (params[0] as string[]).map((key) =>
+          key === PAIR_CLOCK
+            ? pairQuoteClock(slot, String(Math.floor(f.clock.now / 1000)))
+            : structuredClone(state.auxiliaryMints.get(key) ?? null),
+        ),
+      };
+    }
     if (method === 'simulateTransaction') {
       const settings = params[1] as {
         minContextSlot: number;

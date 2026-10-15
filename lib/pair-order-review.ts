@@ -8,6 +8,8 @@ import {
 import type { ImportedPairWalletPreflight } from './imported-pair-wallet-preflight';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 import type { SwapInstructionReview } from './swap-instruction-review';
+import { pairAssociatedAddress } from './pair-wallet-evidence';
+import type { PairAuxiliaryAccount } from './pair-order-auxiliary';
 import {
   SWAP_TOKEN,
   SWAP_TOKEN_2022,
@@ -56,6 +58,7 @@ export async function reviewPairOrderInstructions(
   snapshots: PairOrderAccountSnapshot[],
   rentByMint: Record<string, string>,
   networkFeeRaw: string,
+  auxiliary: PairAuxiliaryAccount[] = [],
 ) {
   const fail = (): never => {
     throw Error(
@@ -94,37 +97,79 @@ export async function reviewPairOrderInstructions(
   if (new Set(snapshots.map((a) => a.address)).size !== snapshots.length)
     fail();
   const raw = new Map(snapshots.map((a) => [a.address, a.raw]));
-  if (raw.has(input.address) || raw.has(output.address)) fail();
+  if (
+    auxiliary.length > 8 ||
+    new Set(auxiliary.map((a) => a.mint.address)).size !== auxiliary.length ||
+    auxiliary.some((a) =>
+      [input.address, output.address].includes(a.mint.address),
+    ) ||
+    [
+      input.address,
+      output.address,
+      ...auxiliary.map((a) => a.mint.address),
+    ].some((m) => raw.has(m))
+  )
+    fail();
   const fee = pairWalletUint(networkFeeRaw);
   if (fee < 1n) fail();
   const state = await Promise.all(
-    [input, output].map(async (asset, i) => {
+    [input, output, ...auxiliary.map((a) => a.mint)].map(async (asset, i) => {
       const selected = preflight.evidence.accounts.find(
         (a) => a.mint === asset.address,
       );
-      if (!selected) fail();
+      const extra = i >= 2 ? auxiliary[i - 2] : null;
+      if (!selected && !extra) fail();
       const target =
-        i === 0 ? decoded.sourceAccount : decoded.destinationAccount;
+        i === 0
+          ? decoded.sourceAccount
+          : i === 1
+            ? decoded.destinationAccount
+            : extra!.address;
       if (!raw.has(target)) fail();
       const native = asset.address === SWAP_WRAPPED_SOL,
         existing = raw.get(target) !== null;
+      if (
+        native &&
+        (asset.program !== SWAP_TOKEN ||
+          asset.decimals !== 9 ||
+          asset.amountPolicy.kind !== 'unscaled')
+      )
+        fail();
+      if (
+        extra &&
+        (extra.seededCandidate
+          ? !native || existing
+          : target !== (await pairAssociatedAddress(extra.mint, wallet)))
+      )
+        fail();
       const rent = pairWalletUint(rentByMint[asset.address]);
       if (rent < 1n) fail();
       let beforeAmount = 0n;
       if (!native) {
-        if (selected!.address !== target) fail();
+        if (selected && selected.address !== target) fail();
         const observed = await inspectPairTokenAccount(
           raw.get(target),
-          { ...asset, policySha256: selected!.mintPolicySha256 },
+          {
+            ...asset,
+            policySha256:
+              selected?.mintPolicySha256 ?? extra!.mint.policySha256,
+          },
           wallet,
           target,
           preflight.evidence.unixTimestamp,
         );
         if (
-          observed.sourceSha256 !== selected!.sourceSha256 ||
-          observed.lamportsRaw !== selected!.lamportsRaw ||
-          observed.status !== selected!.status ||
-          observed.amountRaw !== selected!.amountRaw
+          selected &&
+          (observed.sourceSha256 !== selected!.sourceSha256 ||
+            observed.lamportsRaw !== selected!.lamportsRaw ||
+            observed.status !== selected!.status ||
+            observed.amountRaw !== selected!.amountRaw)
+        )
+          fail();
+        if (
+          extra &&
+          existing &&
+          (observed.status !== 'Ready' || BigInt(observed.lamportsRaw) < rent)
         )
           fail();
         beforeAmount = BigInt(observed.amountRaw);
@@ -159,6 +204,8 @@ export async function reviewPairOrderInstructions(
         existing,
         rent,
         beforeAmount,
+        auxiliary: i >= 2,
+        mintEvidence: extra?.mint ?? null,
         created: -1,
         initialized: -1,
         funded: -1,
@@ -169,7 +216,7 @@ export async function reviewPairOrderInstructions(
       };
     }),
   );
-  if (state[0].target === state[1].target) fail();
+  if (new Set(state.map((s) => s.target)).size !== state.length) fail();
   const w = rawAccount(raw.get(wallet));
   if (
     w.owner !== SYSTEM ||
@@ -178,7 +225,9 @@ export async function reviewPairOrderInstructions(
     w.lamports !== BigInt(preflight.evidence.nativeBalanceRaw)
   )
     fail();
-  // The route must not receive another wallet-owned/delegated writable token account.
+  // Every wallet-controlled token account must belong to the selected pair or
+  // the explicitly protected intermediate set. Delegated/close-only custody
+  // remains unsupported.
   for (const snapshot of snapshots) {
     if (
       snapshot.raw === null ||
@@ -366,9 +415,15 @@ export async function reviewPairOrderInstructions(
       )
         fail();
       selected.synced = instruction.index;
-    } else if (p === SWAP_TOKEN && b.length === 1 && b[0] === 9) {
+    } else if (
+      p === s!.asset.program &&
+      [SWAP_TOKEN, SWAP_TOKEN_2022].includes(p) &&
+      b.length === 1 &&
+      b[0] === 9
+    ) {
       if (
-        !selected.native ||
+        (!selected.native && !selected.auxiliary) ||
+        (selected.auxiliary && selected.beforeAmount !== 0n) ||
         a.length !== 3 ||
         !writable(0) ||
         !payer(1) ||
@@ -383,6 +438,12 @@ export async function reviewPairOrderInstructions(
   }
   for (const s of state) {
     if (!s.existing && (s.created === -1 || s.initialized === -1)) fail();
+    if (
+      s.auxiliary &&
+      auxiliary.find((a) => a.address === s.target)?.seededCandidate &&
+      !s.seeded
+    )
+      fail();
     if (s.native && s.asset.address === input.address) {
       if (
         s.funding !== BigInt(order.inAmount) ||
@@ -412,7 +473,7 @@ export async function reviewPairOrderInstructions(
   return {
     format: 'pair-order-instruction-review-v1' as const,
     route,
-    accounts: state.map((s) => ({
+    accounts: state.slice(0, 2).map((s) => ({
       mint: s.asset.address,
       program: s.asset.program,
       address: s.target,
@@ -422,6 +483,19 @@ export async function reviewPairOrderInstructions(
       seeded: s.seeded,
       closed: s.closed !== -1,
       rentRaw: s.rent.toString(),
+    })),
+    auxiliaryAccounts: state.slice(2).map((s) => ({
+      mint: s.asset.address,
+      program: s.asset.program,
+      address: s.target,
+      existing: s.existing,
+      beforeAmountRaw: s.beforeAmount.toString(),
+      created: s.created !== -1,
+      seeded: s.seeded,
+      closed: s.closed !== -1,
+      rentRaw: s.rent.toString(),
+      mintEvidence: s.mintEvidence!,
+      maximumNetDebitRaw: '0' as const,
     })),
     rawInput: order.inAmount,
     minimumOutputRaw: order.minimumOutAmount,
