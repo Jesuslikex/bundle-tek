@@ -89,7 +89,9 @@ export type ImportedPairQuoteDependencies = {
   ) => Promise<Quote>;
   now?: () => number;
 };
-function configured(signal: AbortSignal): ImportedPairQuoteDependencies {
+export function configuredPairQuoteDependencies(
+  signal: AbortSignal,
+): ImportedPairQuoteDependencies {
   const key = (env as unknown as Record<string, unknown>).JUPITER_API_KEY;
   if (
     typeof key !== 'string' ||
@@ -186,7 +188,7 @@ export async function quoteOwnedImportedPair(
         400,
       );
     }
-    const provider = dependencies ?? configured(signal),
+    const provider = dependencies ?? configuredPairQuoteDependencies(signal),
       now = provider.now ?? Date.now,
       start = now();
     const gate = await db

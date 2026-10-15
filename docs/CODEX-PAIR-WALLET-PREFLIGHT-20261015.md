@@ -1,0 +1,33 @@
+# Owned stock-pair wallet preflight
+
+15 October 2026. This local checkpoint connects fresh pair quotes to saved-wallet funding evidence. It is an intermediate step toward currency-aware transaction preparation and user-approved execution, not completion of those features. Production remains source `61591c9`.
+
+## Implemented
+
+`POST /api/imported-projects/pair-wallet-preflight` accepts only the saved project/revision, quote mint, side, exact UI amount, saved wallet/revision and positive raw SOL fee/rent allowance. Authentication, same origin, exact JSON MIME, no query overrides, bounded UTF-8 body and cancellation are enforced before database/provider work. The wallet must belong to the authenticated workspace and retain its active revision. The existing pair quote service supplies a fresh server-derived quote, catalog identity, mint policy and shared manual-read gate; client-supplied quote, provider or authority fields are rejected.
+
+The new selected-account reader derives each asset's canonical ATA under its actual token program. Native SOL uses the ordinary system-wallet balance rather than silently counting a wrapped-SOL ATA. The wallet, selected token accounts and Clock are collected together. Slot/clock bounds and mainnet identity remain checked, with fresh mint policy checks surrounding wallet observations. Two wallet snapshots must retain exact account bytes, amounts, SOL balances and rent values. Project document/revision and wallet metadata are checked again before publication; the quote must still be valid.
+
+Stock account support is separate from the existing native signing whitelist. Initialized, nondelegated public-transfer accounts accept canonical ImmutableOwner, PausableAccount and inactive TransferHookAccount extensions. Required account extensions are derived from the mint policy; missing setup, frozen/restricted custody, insufficient rent or unavailable source accounts withhold preparation eligibility. Wrong mint/wallet/program, malformed/unknown extensions and an in-progress hook reject. Confidential account extensions and arbitrary alternate token accounts are not admitted by this profile. The returned scope is explicitly `canonical-associated-accounts`, not total wallet inventory.
+
+The official Token-2022 initialization mapping requires TransferHookAccount for TransferHook and PausableAccount for Pausable; this remains true for an inactive hook: https://github.com/solana-program/token-2022/blob/main/interface/src/extension/mod.rs . ATA creation also includes ImmutableOwner for Token-2022. The installed SDK computes the corresponding account size, rather than assuming every Token-2022 ATA is 170 bytes. The captured TSLAX profile requires 179 bytes.
+
+Funding keeps currencies separate. The source asset's raw balance funds trade input; SOL funds native input when applicable, the user-selected fee/rent allowance and the system-wallet rent floor. Missing destination ATA rent is queried at the derived layout size and must fit the selected allowance. Scaled UI balance display uses the mint's active multiplier while raw units remain authoritative.
+
+The result binds the quote, saved wallet revision, final account evidence, allowance, expiry and context digest. It reports `transactionPrepared=false`, `signingAllowed=false`, `executionAllowed=false`. `canRequestUnsignedOrder` describes selected-account funding conditions only. Actual route fees/additional account rent, application reservations and wallet ownership remain explicitly unverified; the user allowance is a limit, not a fee estimate. The digest is an identity check, not a server signature or signing authorization. No preparation, approval or reservation is stored by this endpoint; only the existing manual quote gate changes.
+
+## Qualification
+
+Final qualification passed: 22 selected test files and all 522 tests, actual-source TypeScript, nine-file type-aware lint, formatting/whitespace checks and production Next webpack build. All 1,255 implementation/configuration/style files in the source freeze remained unchanged through verification. The complete repository-wide suite was not rerun for this checkpoint.
+
+Focused cases cover both trade directions, non-unit scaled balance display, the native SOL input budget, actual TSLAX account requirements, missing destination rent, missing/insufficient source funds, frozen/delegated/close-authority custody, malformed/native/unknown account state, wrong identities, changed balances/project/wallet/mint policy, final network substitution, expiry, cancellation and API ownership/input boundaries. Existing native quote, preparation, signing, atomic receipt and recovery regressions remain in the selection. No tests or Vitest configuration owned by Claude were edited.
+
+At 20:42:27 UTC, a read-only mainnet probe of the implemented reader used only the fixed public test address `US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx`, with no private key or user wallet access. At slot 457374711, its system wallet and USDC/TSLAX ATAs were absent and correctly reported zero balances. Live rent queries returned 650240 lamports for the zero-data wallet floor, 1488440 for a 165-byte USDC ATA and 1559560 for a 179-byte TSLAX ATA. These dated provider observations demonstrate the live empty-account/layout path, not funded custody, ownership or successful execution. Populated stock-account cases use controlled binary fixtures.
+
+Ignored local receipts: `work/pair-wallet-{tests,types,lint,build}.log`, `work/pair-wallet-test-files.json`, `work/pair-wallet-source-freeze.json` and `work/pair-wallet-live-public.json`. Initial focused failures were a fixture counter that incremented only when a callback existed; it was corrected without changing production behavior. Static lint findings were corrected with consistently async ATA derivation and URL-aware assertions. The final regression batch runs on the resulting frozen source.
+
+## Remaining workflow
+
+The next step is to request and independently assess a wallet-bound unsigned stock-pair order against this evidence, including actual fees, temporary account rent and every instruction/debit. Currency-aware durable reservations, user approval, signed registration, broadcast/recovery, exact quote-asset settlement and accounting must follow. Existing SOL-only signing/settlement is unchanged and cannot consume this preflight as authorization. Stock launch budget scaling and protected UI wiring also remain required.
+
+No UI file, migration, remote SQL, provider/credential setting, cron, push or deployment changed. Claude retains ownership of `app/page.tsx`. No real wallet was unlocked, no signing/transaction submission occurred, and main's two unrelated dirty files must remain intact during handoff.

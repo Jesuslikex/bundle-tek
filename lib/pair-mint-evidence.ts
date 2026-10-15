@@ -57,6 +57,26 @@ export class PairMintPolicyError extends Error {
     this.name = 'PairMintPolicyError';
   }
 }
+export function pairClockUnixTimestamp(
+  raw: unknown,
+  slot: number,
+  now = Date.now(),
+) {
+  if (!Number.isSafeInteger(slot) || slot < 1)
+    throw new Error('Pair chain clock slot is invalid.');
+  const clock = accountBytes(raw, true).bytes;
+  const view = new DataView(clock.buffer);
+  const unix = view.getBigInt64(32, true);
+  if (
+    view.getBigUint64(0, true) !== BigInt(slot) ||
+    unix < 1n ||
+    unix > BigInt(Number.MAX_SAFE_INTEGER) ||
+    !Number.isFinite(now) ||
+    Math.abs(Number(unix) * 1000 - now) > 30000
+  )
+    throw new Error('Pair chain clock is inconsistent or stale.');
+  return unix.toString();
+}
 function accountBytes(raw: unknown, clock = false) {
   const a = raw as { owner?: unknown; executable?: unknown; data?: unknown };
   if (
@@ -227,20 +247,14 @@ export async function readPairMintEvidence(
     result.value.length !== 3
   )
     throw new Error('Pair identity RPC context is unavailable.');
-  const clock = accountBytes(result.value[2], true).bytes;
-  const clockView = new DataView(clock.buffer);
-  const unixTimestamp = clockView.getBigInt64(32, true);
-  if (
-    clockView.getBigUint64(0, true) !== BigInt(rawSlot) ||
-    unixTimestamp < 1n ||
-    unixTimestamp > BigInt(Number.MAX_SAFE_INTEGER) ||
-    !Number.isFinite(now) ||
-    Math.abs(Number(unixTimestamp) * 1000 - now) > 30000
-  )
-    throw new Error('Pair chain clock is inconsistent or stale.');
+  const unixTimestamp = pairClockUnixTimestamp(
+    result.value[2],
+    Number(rawSlot),
+    now,
+  );
   return {
     slot: Number(rawSlot),
-    unixTimestamp: unixTimestamp.toString(),
+    unixTimestamp,
     mints: await Promise.all([
       mint(result.value[0], pair.inputMint),
       mint(result.value[1], pair.outputMint),
@@ -251,12 +265,31 @@ export function assertSamePairMintEvidence(
   before: PairMintEvidence,
   after: PairMintEvidence,
 ) {
+  const identity = (m: PairMintMetadata) => [
+    m.address,
+    m.program,
+    m.decimals,
+    m.policySha256,
+    m.amountPolicy.kind === 'unscaled'
+      ? ['unscaled']
+      : [
+          m.amountPolicy.kind,
+          m.amountPolicy.multiplierHex,
+          m.amountPolicy.nextMultiplierHex,
+          m.amountPolicy.effectiveTimestamp,
+        ],
+    m.extensions,
+    m.issuerControls,
+  ];
   if (
+    before.mints.length !== 2 ||
+    after.mints.length !== 2 ||
     after.slot < before.slot ||
     after.slot > before.slot + 32 ||
     BigInt(after.unixTimestamp) < BigInt(before.unixTimestamp) ||
     BigInt(after.unixTimestamp) > BigInt(before.unixTimestamp) + 60n ||
-    JSON.stringify(before.mints) !== JSON.stringify(after.mints) ||
+    JSON.stringify(before.mints.map(identity)) !==
+      JSON.stringify(after.mints.map(identity)) ||
     before.mints.some(
       (m, i) =>
         activePairMultiplier(m.amountPolicy, before.unixTimestamp) !==
