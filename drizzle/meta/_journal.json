@@ -589,6 +589,13 @@
       "when": 1792017213804,
       "tag": "0083_pump_group_approvals",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "6",
+      "when": 1792020709116,
+      "tag": "0084_pump_group_signatures",
+      "breakpoints": true
     }
   ]
 }

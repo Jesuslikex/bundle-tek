@@ -1,0 +1,15 @@
+{
+  "sourceBase": "8d19fad",
+  "startedAt": "2026-10-15T00:06:25.539Z",
+  "finishedAt": "2026-10-15T00:08:07.541Z",
+  "wranglerVersion": "4.127.1",
+  "migrationCount": 85,
+  "appliedCount": 85,
+  "applyExit": 0,
+  "ledgerExit": 0,
+  "passed": true,
+  "previousJournalEntriesUnchanged": true,
+  "priorTableDefinitionsUnchanged": 94,
+  "testedWorkingCopySha256": "5546b11898803b9bda4a6cf06b6fe4037c29f1d36179f07c1e02ca4ac66cf634",
+  "remoteDatabaseTouched": false
+}

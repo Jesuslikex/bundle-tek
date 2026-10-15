@@ -20,6 +20,7 @@ import {
 } from './pump-launch-history-page';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 import type { PumpHolderMessageInput } from './pump-holder-message';
+import { verifyPumpLaunchGroupSignatures } from './pump-launch-group-signatures';
 
 type Terms = Parameters<typeof preflightOwnedPumpLaunchGroup>[2];
 type Checked = Awaited<ReturnType<typeof preflightOwnedPumpLaunchGroup>>;
@@ -60,7 +61,12 @@ function publicReview(row: Row) {
     simulation: JSON.parse(row.simulation) as Checked,
     state: row.state,
     durableReview: true as const,
-    approvalRequired: row.state !== 'approved',
+    approvalRequired: !['approved', 'signed'].includes(row.state),
+    signedEvidence: row.signed
+      ? (JSON.parse(row.signed) as Awaited<
+          ReturnType<typeof verifyPumpLaunchGroupSignatures>
+        >)
+      : null,
     signingAllowed: false as const,
     executionAllowed: false as const,
     completeLaunch: false as const,
@@ -445,6 +451,117 @@ export async function approvePumpLaunchGroupReview(
   } catch {
     return fail(
       'Group approval ownership, review or source freshness changed. Reload before approving again.',
+    );
+  }
+  return readPumpLaunchGroupReview(db, owner, id);
+}
+
+/** Retains a complete already-signed group, including expiry recovery. Never accesses keys, authorizes signing or sends. */
+export async function registerPumpLaunchGroupSignatures(
+  db: D1Database,
+  owner: string,
+  id: string,
+  suppliedConsent: PumpLaunchGroupConsent,
+  transactions: string[],
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  await requireGuards(db);
+  const installed = await db
+    .prepare(
+      "SELECT count(*) AS installed FROM sqlite_master WHERE type='trigger' AND name IN ('pump_group_signature_insert','pump_group_signature_apply','pump_group_signature_no_update','pump_group_signature_no_delete')",
+    )
+    .first<{ installed: number }>();
+  if (installed?.installed !== 4)
+    return fail(
+      'Group signature migration is not installed. Registration remains disabled.',
+      503,
+    );
+  const row = await db
+    .prepare(
+      "SELECT * FROM pump_launch_reviews WHERE owner_id=? AND id=? AND json_extract(review,'$.format')=?",
+    )
+    .bind(owner, id, FORMAT)
+    .first<Row>();
+  if (!row) return fail('Owned complete-group review not found.', 404);
+  const { review } = await requirePumpLaunchGroupReview(
+    JSON.parse(row.review),
+    false,
+  );
+  const consent = structuredClone(suppliedConsent);
+  try {
+    requirePumpLaunchGroupConsent(review, consent);
+  } catch {
+    return fail('Exact recorded complete-group approval is required.', 400);
+  }
+  const approved = await db
+    .prepare(
+      'SELECT consent,context_sha256 FROM pump_group_approvals WHERE owner_id=? AND review_id=?',
+    )
+    .bind(owner, id)
+    .first<{ consent: string; context_sha256: string }>();
+  if (
+    !approved ||
+    approved.consent !== canonicalPumpHolderJson(consent) ||
+    approved.context_sha256 !== review.contextSha256 ||
+    !['approved', 'signed'].includes(row.state)
+  )
+    return fail(
+      'Approve the exact complete group before registering signatures.',
+    );
+  let verified: Awaited<ReturnType<typeof verifyPumpLaunchGroupSignatures>>;
+  try {
+    verified = await verifyPumpLaunchGroupSignatures(
+      review,
+      transactions,
+      signal,
+    );
+  } catch {
+    signal.throwIfAborted();
+    return fail(
+      'Every exact signed packet and reviewed wallet signature is required.',
+      400,
+    );
+  }
+  signal.throwIfAborted();
+  const encoded = canonicalPumpHolderJson(verified),
+    signature = verified.packets[0].signature;
+  if (row.state === 'signed') {
+    const existing = await db
+      .prepare(
+        'SELECT signed FROM pump_group_signatures WHERE owner_id=? AND review_id=?',
+      )
+      .bind(owner, id)
+      .first<{ signed: string }>();
+    if (
+      existing?.signed === encoded &&
+      row.signed === encoded &&
+      row.signature === signature
+    )
+      return readPumpLaunchGroupReview(db, owner, id);
+    return fail(
+      'The immutable signed group differs. Recover its original packets.',
+    );
+  }
+  try {
+    await db
+      .prepare(
+        'INSERT INTO pump_group_signatures(review_id,owner_id,context_sha256,manifest_sha256,signed_group_sha256,signature,signed,created_at) VALUES(?,?,?,?,?,?,?,?)',
+      )
+      .bind(
+        id,
+        owner,
+        review.contextSha256,
+        review.manifestSha256,
+        verified.signedGroupSha256,
+        signature,
+        encoded,
+        new Date().toISOString(),
+      )
+      .run();
+  } catch {
+    return fail(
+      'Group signature state changed before registration. Reload its history.',
     );
   }
   return readPumpLaunchGroupReview(db, owner, id);

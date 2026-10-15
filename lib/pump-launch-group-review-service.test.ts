@@ -14,9 +14,11 @@ import {
   listPumpLaunchGroupPage,
   refreshPumpLaunchGroupReview,
   approvePumpLaunchGroupReview,
+  registerPumpLaunchGroupSignatures,
 } from './pump-launch-group-review-service';
 import { listPumpLaunches, getPumpLaunch } from './pump-launch-service';
 import { pumpHistoryPageRequest } from './pump-launch-history-page';
+import { signSyntheticPumpGroup } from '../test/pump-group-synthetic-signatures';
 import type {
   PumpLaunchGroupReview,
   PumpLaunchGroupConsent,
@@ -31,7 +33,11 @@ afterEach(() => {
   mocked.mockReset();
   for (const client of clients.splice(0)) client.close();
 });
-async function fixture(installed = true, approvalInstalled = true) {
+async function fixture(
+  installed = true,
+  approvalInstalled = true,
+  signaturesInstalled = true,
+) {
   const f = await pumpOwnedGroupFixture(mocked, clients);
   await f.client.execute(
     'CREATE TABLE solana_execution_reservations(owner_id TEXT,wallet_address TEXT,scope TEXT,intent_id TEXT,state TEXT,PRIMARY KEY(owner_id,wallet_address))',
@@ -41,6 +47,9 @@ async function fixture(installed = true, approvalInstalled = true) {
     '0081_pump_holder_reservations',
     ...(installed ? ['0082_pump_group_reviews'] : []),
     ...(installed && approvalInstalled ? ['0083_pump_group_approvals'] : []),
+    ...(installed && approvalInstalled && signaturesInstalled
+      ? ['0084_pump_group_signatures']
+      : []),
   ])
     for (const sql of readFileSync(`drizzle/${file}.sql`, 'utf8').split(
       '--> statement-breakpoint',
@@ -65,6 +74,221 @@ const consentFor = (review: PumpLaunchGroupReview): PumpLaunchGroupConsent => ({
   approvedScope: 'complete-create-developer-holder-packet-group',
   acknowledgeSimulationLimits: true,
 });
+const signFor = (
+  f: Awaited<ReturnType<typeof fixture>>,
+  review: PumpLaunchGroupReview,
+) =>
+  signSyntheticPumpGroup(review.packets, [
+    f.f.f.payerSigner,
+    f.f.f.mintSigner,
+    ...f.holderSigners,
+  ]);
+it('atomically retains the whole approved signed group, resumes exact data and never enables submission', async () => {
+  const f = await fixture(),
+    saved = await f.prepare(),
+    consent = consentFor(saved.review);
+  await approvePumpLaunchGroupReview(
+    f.db,
+    'alice',
+    saved.review.id,
+    consent,
+    new AbortController().signal,
+    f.rpc,
+  );
+  const transactions = await signFor(f, saved.review);
+  f.calls.length = 0;
+  const registered = await registerPumpLaunchGroupSignatures(
+    f.db,
+    'alice',
+    saved.review.id,
+    consent,
+    transactions,
+    new AbortController().signal,
+  );
+  expect(registered).toMatchObject({
+    state: 'signed',
+    approvalRequired: false,
+    signingAllowed: false,
+    executionAllowed: false,
+    completeLaunch: false,
+  });
+  expect(
+    registered.signedEvidence!.packets.map((packet) => packet.transaction),
+  ).toEqual(transactions);
+  expect(
+    await registerPumpLaunchGroupSignatures(
+      f.db,
+      'alice',
+      saved.review.id,
+      consent,
+      transactions,
+      new AbortController().signal,
+    ),
+  ).toEqual(registered);
+  expect(
+    (await f.client.execute('SELECT count(*) AS n FROM pump_group_signatures'))
+      .rows[0].n,
+  ).toBe(1);
+  expect(f.calls).toHaveLength(0);
+  await expect(
+    f.client.execute("UPDATE pump_group_signatures SET signed='{}'"),
+  ).rejects.toThrow('Immutable');
+  await expect(
+    f.client.execute('DELETE FROM pump_group_signatures'),
+  ).rejects.toThrow('history retained');
+  await expect(
+    f.client.execute({
+      sql: "UPDATE pump_launch_reviews SET state='submitting' WHERE id=?",
+      args: [saved.review.id],
+    }),
+  ).rejects.toThrow('not enabled');
+  await expect(
+    f.client.execute({
+      sql: 'INSERT INTO solana_execution_reservations VALUES(?,?,?,?,?)',
+      args: ['alice', f.input.holders[0].address, 'warmup', 'busy', 'approved'],
+    }),
+  ).rejects.toThrow('reserved');
+}, 30000);
+it('requires exact recorded approval and complete signatures before writing registration', async () => {
+  const f = await fixture(),
+    saved = await f.prepare(),
+    consent = consentFor(saved.review),
+    transactions = await signFor(f, saved.review);
+  await expect(
+    registerPumpLaunchGroupSignatures(
+      f.db,
+      'alice',
+      saved.review.id,
+      consent,
+      transactions,
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('Approve the exact');
+  await approvePumpLaunchGroupReview(
+    f.db,
+    'alice',
+    saved.review.id,
+    consent,
+    new AbortController().signal,
+    f.rpc,
+  );
+  await expect(
+    registerPumpLaunchGroupSignatures(
+      f.db,
+      'bob',
+      saved.review.id,
+      consent,
+      transactions,
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('not found');
+  await expect(
+    registerPumpLaunchGroupSignatures(
+      f.db,
+      'alice',
+      saved.review.id,
+      consent,
+      transactions.slice(1),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('Every exact');
+  expect(
+    (await f.client.execute('SELECT count(*) AS n FROM pump_group_signatures'))
+      .rows[0].n,
+  ).toBe(0);
+}, 30000);
+it('rolls back signature evidence when its atomic parent transition fails', async () => {
+  const f = await fixture(),
+    saved = await f.prepare(),
+    consent = consentFor(saved.review);
+  await approvePumpLaunchGroupReview(
+    f.db,
+    'alice',
+    saved.review.id,
+    consent,
+    new AbortController().signal,
+    f.rpc,
+  );
+  const transactions = await signFor(f, saved.review);
+  await f.client.execute(
+    "CREATE TRIGGER test_signed_transition_failure BEFORE UPDATE OF state ON pump_launch_reviews WHEN NEW.state='signed' BEGIN SELECT RAISE(ABORT,'Controlled signed transition failure'); END;",
+  );
+  await expect(
+    registerPumpLaunchGroupSignatures(
+      f.db,
+      'alice',
+      saved.review.id,
+      consent,
+      transactions,
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('signature state changed');
+  expect(
+    (await f.client.execute('SELECT count(*) AS n FROM pump_group_signatures'))
+      .rows[0].n,
+  ).toBe(0);
+  expect(
+    (await readPumpLaunchGroupReview(f.db, 'alice', saved.review.id)).state,
+  ).toBe('approved');
+}, 30000);
+it('requires signature migration without generating permission or calling a provider', async () => {
+  const f = await fixture(true, true, false),
+    saved = await f.prepare(),
+    consent = consentFor(saved.review);
+  await approvePumpLaunchGroupReview(
+    f.db,
+    'alice',
+    saved.review.id,
+    consent,
+    new AbortController().signal,
+    f.rpc,
+  );
+  f.calls.length = 0;
+  await expect(
+    registerPumpLaunchGroupSignatures(
+      f.db,
+      'alice',
+      saved.review.id,
+      consent,
+      [],
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('signature migration');
+  expect(f.calls).toHaveLength(0);
+}, 30000);
+it('uses historical review validation for registration when the application clock crosses expiry', async () => {
+  const f = await fixture(),
+    saved = await f.prepare(),
+    consent = consentFor(saved.review);
+  await approvePumpLaunchGroupReview(
+    f.db,
+    'alice',
+    saved.review.id,
+    consent,
+    new AbortController().signal,
+    f.rpc,
+  );
+  const transactions = await signFor(f, saved.review);
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Date.parse(saved.review.expiresAt) + 1);
+  try {
+    expect(
+      (
+        await registerPumpLaunchGroupSignatures(
+          f.db,
+          'alice',
+          saved.review.id,
+          consent,
+          transactions,
+          new AbortController().signal,
+        )
+      ).state,
+    ).toBe('signed');
+  } finally {
+    clock.mockRestore();
+  }
+}, 30000);
 it('atomically records exact consent and approval while retaining all reservations and disabled signing', async () => {
   const f = await fixture(),
     saved = await f.prepare();
