@@ -3,10 +3,17 @@ export const SWAP_TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 export const SWAP_TOKEN_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 export const SWAP_WRAPPED_SOL = 'So11111111111111111111111111111111111111112';
 export const SWAP_TOKEN_2022_ACCOUNT_SIZE = 170;
+/** A mint observation decoded locally but cannot satisfy the supported policy. */
+export class SwapMintIdentityError extends Error {
+  constructor() {
+    super('Swap mint identity or extension policy is unsupported or invalid.');
+    this.name = 'SwapMintIdentityError';
+  }
+}
 export function supportedSwapTokenProgram(value: unknown): value is string {
   return value === SWAP_TOKEN || value === SWAP_TOKEN_2022;
 }
-export function swapTokenBytes(raw: unknown, mint: boolean) {
+function swapTokenWireBytes(raw: unknown, mint: boolean) {
   const account = raw as {
     owner?: unknown;
     executable?: unknown;
@@ -31,7 +38,11 @@ export function swapTokenBytes(raw: unknown, mint: boolean) {
   )
     throw new Error('Noncanonical swap token account bytes.');
   const bytes = Uint8Array.from(text, (c) => c.charCodeAt(0));
-  const extensions = withdrawalExtensions(bytes, account.owner, mint);
+  return { bytes, program: account.owner };
+}
+export function swapTokenBytes(raw: unknown, mint: boolean) {
+  const { bytes, program } = swapTokenWireBytes(raw, mint);
+  const extensions = withdrawalExtensions(bytes, program, mint);
   if (
     extensions.some(
       (e) =>
@@ -45,7 +56,7 @@ export function swapTokenBytes(raw: unknown, mint: boolean) {
     );
   return {
     bytes,
-    program: account.owner,
+    program,
     extensions: extensions.map((e) => e.__kind),
   };
 }
@@ -94,7 +105,16 @@ export async function readSwapMintEvidence(
     throw new Error('Inconsistent swap mint observation.');
   const mints = await Promise.all(
     result.value.map(async (raw, index) => {
-      const { bytes, program } = swapTokenBytes(raw, true),
+      // RPC envelope/encoding failures are availability errors, not decoded
+      // token-policy decisions. Validate these outside the typed policy catch.
+      swapTokenWireBytes(raw, true);
+      let decoded: ReturnType<typeof swapTokenBytes>;
+      try {
+        decoded = swapTokenBytes(raw, true);
+      } catch {
+        throw new SwapMintIdentityError();
+      }
+      const { bytes, program } = decoded,
         view = new DataView(bytes.buffer);
       if (
         bytes[45] !== 1 ||
@@ -104,7 +124,7 @@ export async function readSwapMintEvidence(
         (addresses[index] === SWAP_WRAPPED_SOL &&
           (program !== SWAP_TOKEN || bytes[44] !== 9))
       )
-        throw new Error('Unsupported swap mint identity.');
+        throw new SwapMintIdentityError();
       // Supply changes do not change transfer policy. Keep program, precision,
       // authorities and every extension byte bound while allowing routine mint/burns.
       const policy = Uint8Array.from(bytes);

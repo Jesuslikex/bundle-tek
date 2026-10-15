@@ -107,6 +107,7 @@ async function quoteSolanaSwap(
     amountRaw: string;
     side: 'Buy' | 'Sell';
     taker?: string;
+    quoteMint?: string;
   },
   apiKey: string | undefined,
   signal: AbortSignal,
@@ -116,8 +117,19 @@ async function quoteSolanaSwap(
     chain: 'Solana',
     address: input.tokenMint,
   });
+  const quoteMint = validateTokenSource({
+    chain: 'Solana',
+    address: input.quoteMint ?? WRAPPED_SOL,
+  }).address;
+  if (
+    !['Buy', 'Sell'].includes(input.side) ||
+    !/^[1-9]\d{0,19}$/.test(input.amountRaw)
+  )
+    throw new WarmupQuoteError(
+      'Choose an exact positive input amount in token atomic units.',
+    );
   const amount = BigInt(input.amountRaw);
-  if (outputMint === WRAPPED_SOL || amount > (1n << 64n) - 1n)
+  if (outputMint === quoteMint || amount > (1n << 64n) - 1n)
     throw new WarmupQuoteError(
       'Choose a distinct token and an amount within Solana limits.',
     );
@@ -125,8 +137,8 @@ async function quoteSolanaSwap(
     throw new WarmupQuoteError(
       'Jupiter quote service is not configured or has invalid configuration.',
     );
-  const inputMint = input.side === 'Buy' ? WRAPPED_SOL : outputMint;
-  const destinationMint = input.side === 'Buy' ? outputMint : WRAPPED_SOL;
+  const inputMint = input.side === 'Buy' ? quoteMint : outputMint;
+  const destinationMint = input.side === 'Buy' ? outputMint : quoteMint;
   const url = new URL('https://api.jup.ag/swap/v2/order');
   url.search = new URLSearchParams({
     inputMint,
@@ -315,6 +327,34 @@ export async function prepareSolanaSwap(
   if (!order.preparation)
     throw new WarmupQuoteError('Unsigned swap preparation unavailable.');
   return { ...order, preparation: order.preparation };
+}
+/** Quote-only pair endpoint. No taker, wallet, transaction or signing permission. */
+export async function quoteSolanaPair(
+  input: {
+    baseMint: string;
+    quoteMint: string;
+    amountRaw: string;
+    side: 'Buy' | 'Sell';
+  },
+  apiKey: string | undefined,
+  signal: AbortSignal,
+  fetcher: typeof fetch = fetch,
+) {
+  const quoteMint = validateTokenSource({
+    chain: 'Solana',
+    address: input.quoteMint,
+  }).address;
+  return quoteSolanaSwap(
+    {
+      tokenMint: input.baseMint,
+      quoteMint,
+      amountRaw: input.amountRaw,
+      side: input.side,
+    },
+    apiKey,
+    signal,
+    fetcher,
+  );
 }
 export type SolanaSwapPreparation = Awaited<
   ReturnType<typeof prepareSolanaSwap>
