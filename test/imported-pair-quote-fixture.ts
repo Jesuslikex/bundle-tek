@@ -6,12 +6,53 @@ import { importedTokenDocument } from '../lib/imported-token-project';
 import { SWAP_TOKEN_2022 } from '../lib/swap-token-program-evidence';
 import { SOLANA_MAINNET_GENESIS } from '../lib/wallet-balances';
 import { quoteSolanaPair } from '../lib/warmup-swap-quote';
+import {
+  getExtensionEncoder,
+  type ExtensionArgs,
+} from '@solana-program/token-2022';
+import { PAIR_SYSVAR_OWNER } from '../lib/pair-mint-evidence';
 import type {
   ImportedPairQuoteDependencies,
   ImportedPairQuoteRequest,
 } from '../lib/imported-pair-quote-service';
 import type { ImportedPairQuoteSelection } from '../lib/imported-trade-pair';
 const baseMint = 'CktRuQ2mttgRGs5rGzYfih6myG3u5ksHhwRPPsRF2fAM';
+export function pairQuoteMint(
+  decimals: number,
+  owner: string,
+  extensions: ExtensionArgs[] = [],
+) {
+  const encoded = extensions.map((e) => getExtensionEncoder().encode(e));
+  const bytes = new Uint8Array(
+    encoded.length ? 166 + encoded.reduce((n, e) => n + e.length, 0) : 82,
+  );
+  bytes[44] = decimals;
+  bytes[45] = 1;
+  if (encoded.length) {
+    bytes[165] = 1;
+    let offset = 166;
+    for (const e of encoded) {
+      bytes.set(e, offset);
+      offset += e.length;
+    }
+  }
+  return {
+    owner,
+    executable: false,
+    data: [btoa(String.fromCharCode(...bytes)), 'base64'],
+  };
+}
+export function pairQuoteClock(slot: number, unixTimestamp: string) {
+  const bytes = new Uint8Array(40),
+    view = new DataView(bytes.buffer);
+  view.setBigUint64(0, BigInt(slot), true);
+  view.setBigInt64(32, BigInt(unixTimestamp), true);
+  return {
+    owner: PAIR_SYSVAR_OWNER,
+    executable: false,
+    data: [btoa(String.fromCharCode(...bytes)), 'base64'],
+  };
+}
 export function importedPairQuoteFixture(
   side: 'Buy' | 'Sell' = 'Buy',
   quoteProgram = SWAP_TOKEN_2022,
@@ -72,17 +113,11 @@ export function importedPairQuoteFixture(
     },
   };
   const db = adapter as unknown as D1Database;
-  const mint = (decimals: number, owner: string) => {
-    const bytes = new Uint8Array(82);
-    bytes[44] = decimals;
-    bytes[45] = 1;
-    return {
-      owner,
-      executable: false,
-      data: [btoa(String.fromCharCode(...bytes)), 'base64'],
-    };
-  };
-  const mints = [mint(6, SWAP_TOKEN_2022), mint(asset.decimals, quoteProgram)];
+  const mints = [
+    pairQuoteMint(6, SWAP_TOKEN_2022),
+    pairQuoteMint(asset.decimals, quoteProgram),
+  ];
+  const clockState = { unixTimestamp: null as string | null };
   const rpc = vi.fn(
     async (method: string, params: unknown[]): Promise<unknown> => {
       if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
@@ -91,7 +126,16 @@ export function importedPairQuoteFixture(
         const options = params[1] as { minContextSlot: number };
         return {
           context: { slot: String(options.minContextSlot + 1) },
-          value: structuredClone(mints),
+          value: [
+            ...structuredClone(mints),
+            pairQuoteClock(
+              options.minContextSlot + 1,
+              clockState.unixTimestamp ??
+                Math.floor(
+                  (dependencies.now?.() ?? Date.now()) / 1000,
+                ).toString(),
+            ),
+          ],
         };
       }
       throw new Error('Unexpected quote-only RPC ' + method);
@@ -152,6 +196,7 @@ export function importedPairQuoteFixture(
     asset,
     document,
     mints,
+    clockState,
     rpc,
     fetcher,
     quote,

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { importedPairQuoteFixture } from '../../../../test/imported-pair-quote-fixture';
+import {
+  importedPairQuoteFixture,
+  pairQuoteClock,
+} from '../../../../test/imported-pair-quote-fixture';
 import type { ImportedPairQuoteDependencies } from '@/lib/imported-pair-quote-service';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
@@ -73,17 +76,21 @@ it('uses the real owned route and SQL gate for an explicitly labelled quote with
   expect((await POST(request())).status).toBe(429);
   expect(f.quote).toHaveBeenCalledOnce();
 });
-it('reports real stock mint incompatibility as 409 before requesting a quote', async () => {
+it('returns scaled real-stock metadata while retaining quote-only authority', async () => {
   const snapshot = JSON.parse(
     readFileSync('test/tslax-mainnet-mint-20261015.json', 'utf8'),
   );
   f.mints[1] = snapshot.account;
   const response = await POST(request());
-  expect(response.status).toBe(409);
-  expect(await response.json()).toEqual({
-    error: expect.stringContaining('scaled amounts'),
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    format: 'imported-pair-quote-v2',
+    signingAllowed: false,
+    executionAllowed: false,
+    balancesChecked: false,
+    pair: { quote: { amountPolicy: { kind: 'scaled-ui-v1' } } },
   });
-  expect(f.quote).not.toHaveBeenCalled();
+  expect(f.quote).toHaveBeenCalledOnce();
 });
 it('keeps transport failures separate from unsupported policy responses', async () => {
   f.rpc.mockRejectedValueOnce(new Error('private provider text'));
@@ -110,6 +117,7 @@ it.each(['missing', 'base64'] as const)(
                   ...f.mints[1],
                   data: ['invalid-base64%', 'base64'],
                 },
+            pairQuoteClock(101, Math.floor(Date.now() / 1000).toString()),
           ],
         };
       return original(method, params);

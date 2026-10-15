@@ -1,7 +1,15 @@
 import { afterEach, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { quoteOwnedImportedPair } from './imported-pair-quote-service';
-import { importedPairQuoteFixture } from '../test/imported-pair-quote-fixture';
+import {
+  importedPairQuoteFixture,
+  pairQuoteMint,
+} from '../test/imported-pair-quote-fixture';
+import { address } from '@solana/kit-v1';
+import {
+  parseImportedPairQuote,
+  importedPairSha256,
+} from './imported-trade-pair';
 import { SWAP_TOKEN, SWAP_TOKEN_2022 } from './swap-token-program-evidence';
 let fixture: ReturnType<typeof importedPairQuoteFixture> | undefined;
 afterEach(() => {
@@ -9,8 +17,107 @@ afterEach(() => {
   fixture = undefined;
 });
 const signal = () => new AbortController().signal;
+it.each(['stable', 'crossed'] as const)(
+  'bounds a scheduled stock multiplier transition when the quote is %s',
+  async (mode) => {
+    const f = (fixture = importedPairQuoteFixture());
+    const now = Math.floor(Date.now() / 1000) * 1000;
+    f.dependencies.now = () => now;
+    f.clockState.unixTimestamp = String(now / 1000);
+    f.mints[1] = pairQuoteMint(8, SWAP_TOKEN_2022, [
+      {
+        __kind: 'ScaledUiAmountConfig',
+        authority: address('11111111111111111111111111111111'),
+        multiplier: 1,
+        newMultiplier: 2,
+        newMultiplierEffectiveTimestamp: BigInt(now / 1000 + 10),
+      },
+    ]);
+    if (mode === 'crossed') {
+      const original = f.quote.getMockImplementation()!;
+      f.quote.mockImplementation(async (...args) => {
+        const q = await original(...args);
+        f.clockState.unixTimestamp = String(now / 1000 + 10);
+        return q;
+      });
+    }
+    const pending = quoteOwnedImportedPair(
+      f.db,
+      'alice',
+      f.request,
+      signal(),
+      f.dependencies,
+    );
+    if (mode === 'crossed')
+      await expect(pending).rejects.toMatchObject({ status: 409 });
+    else {
+      const result = await pending;
+      expect(
+        Date.parse(result.pair.expiresAt) - Date.parse(result.pair.observedAt),
+      ).toBe(9000);
+    }
+  },
+);
+it.each(['Buy', 'Sell'] as const)(
+  'quotes %s with independent base and quote scales and binds the original UI budget',
+  async (side) => {
+    const f = (fixture = importedPairQuoteFixture(side));
+    const extension = (multiplier: number) => ({
+      __kind: 'ScaledUiAmountConfig' as const,
+      authority: address('11111111111111111111111111111111'),
+      multiplier,
+      newMultiplier: multiplier,
+      newMultiplierEffectiveTimestamp: 0n,
+    });
+    f.mints[0] = pairQuoteMint(6, SWAP_TOKEN_2022, [extension(0.5)]);
+    f.mints[1] = pairQuoteMint(8, SWAP_TOKEN_2022, [extension(2)]);
+    const result = await quoteOwnedImportedPair(
+      f.db,
+      'alice',
+      { ...f.request, amount: '1' },
+      signal(),
+      f.dependencies,
+    );
+    expect(result).toMatchObject({
+      inputRaw: side === 'Buy' ? '50000000' : '2000000',
+      inputAmount: '1',
+      requestedInputAmount: '1',
+      inputRounding: 'conservative-down-v1',
+      outputAmount: side === 'Buy' ? '0.5' : '0.02',
+      minimumOutputAmount: side === 'Buy' ? '0.4975' : '0.0199',
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+    expect(
+      await parseImportedPairQuote(result, { ...f.selection, amount: '1' }),
+    ).toEqual(result);
+    for (const change of [
+      (v: typeof result) => {
+        v.requestedInputAmount = '2';
+      },
+      (v: typeof result) => {
+        v.inputAmount = '2';
+      },
+      (v: typeof result) => {
+        v.pair.quote.amountPolicy = { kind: 'unscaled' };
+      },
+      (v: typeof result) => {
+        v.pair.mintPolicy.recheckUnixTimestamp = String(
+          BigInt(v.pair.mintPolicy.unixTimestamp) - 1n,
+        );
+      },
+    ]) {
+      const mutated = structuredClone(result);
+      change(mutated);
+      mutated.pair.sha256 = await importedPairSha256(mutated.pair);
+      await expect(
+        parseImportedPairQuote(mutated, { ...f.selection, amount: '1' }),
+      ).rejects.toThrow();
+    }
+  },
+);
 it.each(['initial', 'recheck'] as const)(
-  'refuses the public mainnet TSLAX extension profile at the %s boundary without treating raw units as stock UI amounts',
+  'binds the public mainnet TSLAX extension profile at the %s boundary without authorizing execution',
   async (boundary) => {
     const f = (fixture = importedPairQuoteFixture());
     const snapshot = JSON.parse(
@@ -27,19 +134,29 @@ it.each(['initial', 'recheck'] as const)(
         return quote;
       });
     }
-    await expect(
-      quoteOwnedImportedPair(
-        f.db,
-        'alice',
-        f.request,
-        signal(),
-        f.dependencies,
-      ),
-    ).rejects.toMatchObject({
-      status: 409,
-      message: expect.stringContaining('scaled amounts'),
-    });
-    expect(f.quote.mock.calls.length).toBe(boundary === 'initial' ? 0 : 1);
+    const pending = quoteOwnedImportedPair(
+      f.db,
+      'alice',
+      f.request,
+      signal(),
+      f.dependencies,
+    );
+    if (boundary === 'initial')
+      expect(await pending).toMatchObject({
+        format: 'imported-pair-quote-v2',
+        signingAllowed: false,
+        executionAllowed: false,
+        pair: {
+          issuerVerified: false,
+          quote: { amountPolicy: { kind: 'scaled-ui-v1' } },
+        },
+      });
+    else
+      await expect(pending).rejects.toMatchObject({
+        status: 409,
+        message: expect.stringContaining('policy'),
+      });
+    expect(f.quote).toHaveBeenCalledOnce();
     expect(
       f.sqlite
         .prepare('SELECT count(*) AS n FROM imported_token_project_events')
@@ -134,9 +251,9 @@ it('rejects foreign, changed, archived and unknown-quote contexts before any pro
   expect(f.rpc).not.toHaveBeenCalled();
   expect(f.quote).not.toHaveBeenCalled();
 });
-it('checks stock precision and u64 input exactly before provider reads', async () => {
-  const f = (fixture = importedPairQuoteFixture());
-  for (const amount of ['0', '0.000000001', '184467440737.09551616'])
+it('checks UI precision before reads and raw u64 limits after reading the multiplier', async () => {
+  let f = (fixture = importedPairQuoteFixture());
+  for (const amount of ['0', '0.000000001'])
     await expect(
       quoteOwnedImportedPair(
         f.db,
@@ -147,6 +264,19 @@ it('checks stock precision and u64 input exactly before provider reads', async (
       ),
     ).rejects.toMatchObject({ status: 400 });
   expect(f.rpc).not.toHaveBeenCalled();
+  await expect(
+    quoteOwnedImportedPair(
+      f.db,
+      'alice',
+      { ...f.request, amount: '184467440737.09551616' },
+      signal(),
+      f.dependencies,
+    ),
+  ).rejects.toMatchObject({ status: 400 });
+  expect(f.rpc).toHaveBeenCalledTimes(3);
+  expect(f.quote).not.toHaveBeenCalled();
+  f.close();
+  f = fixture = importedPairQuoteFixture();
   const result = await quoteOwnedImportedPair(
     f.db,
     'alice',

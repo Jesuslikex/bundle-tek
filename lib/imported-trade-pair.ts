@@ -1,18 +1,42 @@
 import { UUID } from './wallet-operation';
 import { walletAddress } from './wallet-workspace';
-import { solanaTokenAtoms } from './solana-token-amount';
-import { formatNativeBalance } from './wallet-balance-format';
-import { supportedSwapTokenProgram } from './swap-token-program-evidence';
+import {
+  supportedSwapTokenProgram,
+  SWAP_TOKEN,
+  SWAP_TOKEN_2022,
+} from './swap-token-program-evidence';
+import {
+  pairUiAtoms,
+  pairUiAmount,
+  validPairAmountPolicy,
+  activePairMultiplier,
+  pairAmountLifetimeMs,
+  type PairAmountPolicy,
+} from './pair-ui-amount';
+import {
+  PAIR_QUOTE_EXTENSIONS,
+  PAIR_ISSUER_CONTROLS,
+  type PairIssuerControl,
+} from './pair-mint-evidence';
 import type { quoteSolanaPair } from './warmup-swap-quote';
+export type ImportedPairAsset = {
+  address: string;
+  symbol: string;
+  decimals: number;
+  program: string;
+  amountPolicy: PairAmountPolicy;
+  extensions: string[];
+  issuerControls: PairIssuerControl[];
+};
 export type ImportedTradePair = {
-  format: 'imported-trade-pair-v1';
+  format: 'imported-trade-pair-v2';
   projectId: string;
   projectRevision: number;
   projectDocumentSha256: string;
   chain: 'Solana';
   network: 'mainnet';
-  base: { address: string; symbol: string; decimals: number; program: string };
-  quote: { address: string; symbol: string; decimals: number; program: string };
+  base: ImportedPairAsset;
+  quote: ImportedPairAsset;
   catalogSnapshot: '2026-10-09';
   issuerVerified: false;
   mintPolicy: {
@@ -20,16 +44,20 @@ export type ImportedTradePair = {
     recheckSlot: number;
     baseSha256: string;
     quoteSha256: string;
+    unixTimestamp: string;
+    recheckUnixTimestamp: string;
   };
   observedAt: string;
   expiresAt: string;
   sha256: string;
 };
 export type ImportedPairQuote = {
-  format: 'imported-pair-quote-v1';
+  format: 'imported-pair-quote-v2';
   pair: ImportedTradePair;
   side: 'Buy' | 'Sell';
   inputRaw: string;
+  requestedInputAmount: string;
+  inputRounding: 'conservative-down-v1';
   inputAmount: string;
   outputAmount: string;
   minimumOutputAmount: string;
@@ -64,6 +92,22 @@ const uint = (v: unknown) =>
 export async function importedPairSha256(
   value: Omit<ImportedTradePair, 'sha256'>,
 ) {
+  const asset = (a: ImportedPairAsset) => [
+    a.address,
+    a.symbol,
+    a.decimals,
+    a.program,
+    a.amountPolicy.kind === 'unscaled'
+      ? ['unscaled']
+      : [
+          a.amountPolicy.kind,
+          a.amountPolicy.multiplierHex,
+          a.amountPolicy.nextMultiplierHex,
+          a.amountPolicy.effectiveTimestamp,
+        ],
+    a.extensions,
+    a.issuerControls,
+  ];
   const bytes = new TextEncoder().encode(
     JSON.stringify([
       value.format,
@@ -72,18 +116,8 @@ export async function importedPairSha256(
       value.projectDocumentSha256,
       value.chain,
       value.network,
-      [
-        value.base.address,
-        value.base.symbol,
-        value.base.decimals,
-        value.base.program,
-      ],
-      [
-        value.quote.address,
-        value.quote.symbol,
-        value.quote.decimals,
-        value.quote.program,
-      ],
+      asset(value.base),
+      asset(value.quote),
       value.catalogSnapshot,
       value.issuerVerified,
       [
@@ -91,6 +125,8 @@ export async function importedPairSha256(
         value.mintPolicy.recheckSlot,
         value.mintPolicy.baseSha256,
         value.mintPolicy.quoteSha256,
+        value.mintPolicy.unixTimestamp,
+        value.mintPolicy.recheckUnixTimestamp,
       ],
       value.observedAt,
       value.expiresAt,
@@ -128,7 +164,7 @@ export async function parseImportedTradePair(
       'expiresAt',
       'sha256',
     ]) ||
-    value.format !== 'imported-trade-pair-v1' ||
+    value.format !== 'imported-trade-pair-v2' ||
     typeof value.projectId !== 'string' ||
     !UUID.test(value.projectId) ||
     !Number.isSafeInteger(value.projectRevision) ||
@@ -141,22 +177,52 @@ export async function parseImportedTradePair(
     value.issuerVerified !== false ||
     !hash(value.sha256) ||
     !date(value.observedAt) ||
-    !date(value.expiresAt) ||
-    Date.parse(String(value.expiresAt)) !==
-      Date.parse(String(value.observedAt)) + 30000
+    !date(value.expiresAt)
   )
     return fail();
   for (const asset of [value.base, value.quote]) {
     if (
       !object(asset) ||
-      !exact(asset, ['address', 'symbol', 'decimals', 'program']) ||
+      !exact(asset, [
+        'address',
+        'symbol',
+        'decimals',
+        'program',
+        'amountPolicy',
+        'extensions',
+        'issuerControls',
+      ]) ||
       typeof asset.symbol !== 'string' ||
       !asset.symbol.trim() ||
       asset.symbol.length > 64 ||
       !Number.isInteger(asset.decimals) ||
       Number(asset.decimals) < 0 ||
       Number(asset.decimals) > 18 ||
-      !supportedSwapTokenProgram(asset.program)
+      !supportedSwapTokenProgram(asset.program) ||
+      !validPairAmountPolicy(asset.amountPolicy) ||
+      !Array.isArray(asset.extensions) ||
+      asset.extensions.some(
+        (e) => !(PAIR_QUOTE_EXTENSIONS as readonly unknown[]).includes(e),
+      ) ||
+      new Set(asset.extensions).size !== asset.extensions.length ||
+      asset.extensions.join(',') !==
+        asset.extensions.map(String).sort().join(',') ||
+      !Array.isArray(asset.issuerControls) ||
+      asset.issuerControls.some(
+        (e) => !(PAIR_ISSUER_CONTROLS as readonly unknown[]).includes(e),
+      ) ||
+      new Set(asset.issuerControls).size !== asset.issuerControls.length ||
+      asset.issuerControls.join(',') !==
+        asset.issuerControls.map(String).sort().join(',') ||
+      (asset.program === SWAP_TOKEN &&
+        (asset.extensions.length > 0 ||
+          asset.issuerControls.some(
+            (e) => !['mintable', 'freezable'].includes(e),
+          ))) ||
+      (asset.amountPolicy.kind === 'scaled-ui-v1' &&
+        asset.program !== SWAP_TOKEN_2022) ||
+      asset.extensions.includes('ScaledUiAmountConfig') !==
+        (asset.amountPolicy.kind === 'scaled-ui-v1')
     )
       return fail();
     try {
@@ -173,17 +239,68 @@ export async function parseImportedTradePair(
   const policy = value.mintPolicy;
   if (
     !object(policy) ||
-    !exact(policy, ['slot', 'recheckSlot', 'baseSha256', 'quoteSha256']) ||
+    !exact(policy, [
+      'slot',
+      'recheckSlot',
+      'baseSha256',
+      'quoteSha256',
+      'unixTimestamp',
+      'recheckUnixTimestamp',
+    ]) ||
     !Number.isSafeInteger(policy.slot) ||
     Number(policy.slot) < 1 ||
     !Number.isSafeInteger(policy.recheckSlot) ||
     Number(policy.recheckSlot) < Number(policy.slot) ||
     Number(policy.recheckSlot) > Number(policy.slot) + 32 ||
     !hash(policy.baseSha256) ||
-    !hash(policy.quoteSha256)
+    !hash(policy.quoteSha256) ||
+    typeof policy.unixTimestamp !== 'string' ||
+    !/^[1-9]\d{0,15}$/.test(policy.unixTimestamp) ||
+    typeof policy.recheckUnixTimestamp !== 'string' ||
+    !/^[1-9]\d{0,15}$/.test(policy.recheckUnixTimestamp) ||
+    !Number.isSafeInteger(Number(policy.unixTimestamp)) ||
+    !Number.isSafeInteger(Number(policy.recheckUnixTimestamp)) ||
+    BigInt(policy.recheckUnixTimestamp) < BigInt(policy.unixTimestamp) ||
+    BigInt(policy.recheckUnixTimestamp) > BigInt(policy.unixTimestamp) + 60n ||
+    Math.abs(
+      Number(policy.unixTimestamp) * 1000 -
+        Date.parse(String(value.observedAt)),
+    ) > 30000 ||
+    Math.abs(
+      Number(policy.recheckUnixTimestamp) * 1000 -
+        Date.parse(String(value.observedAt)),
+    ) > 30000
   )
     return fail();
   const pair = value as unknown as ImportedTradePair;
+  for (const a of [pair.base, pair.quote]) {
+    if (
+      activePairMultiplier(a.amountPolicy, policy.unixTimestamp) !==
+      activePairMultiplier(a.amountPolicy, policy.recheckUnixTimestamp)
+    )
+      return fail();
+    for (const [control, extension] of [
+      ['pausable', 'PausableConfig'],
+      ['permanent-delegate', 'PermanentDelegate'],
+      ['transfer-hook-upgradable', 'TransferHook'],
+      ['ui-multiplier-upgradable', 'ScaledUiAmountConfig'],
+    ] as const)
+      if (
+        a.issuerControls.includes(control) &&
+        !a.extensions.includes(extension)
+      )
+        return fail();
+  }
+  const lifetime = pairAmountLifetimeMs(
+    [pair.base.amountPolicy, pair.quote.amountPolicy],
+    pair.mintPolicy.recheckUnixTimestamp,
+    Date.parse(pair.observedAt),
+  );
+  if (
+    lifetime < 1 ||
+    Date.parse(pair.expiresAt) !== Date.parse(pair.observedAt) + lifetime
+  )
+    return fail();
   if ((await importedPairSha256(pair)) !== pair.sha256) return fail();
   return structuredClone(pair);
 }
@@ -204,6 +321,8 @@ export async function parseImportedPairQuote(
       'pair',
       'side',
       'inputRaw',
+      'requestedInputAmount',
+      'inputRounding',
       'inputAmount',
       'outputAmount',
       'minimumOutputAmount',
@@ -212,7 +331,10 @@ export async function parseImportedPairQuote(
       'executionAllowed',
       'balancesChecked',
     ]) ||
-    value.format !== 'imported-pair-quote-v1' ||
+    value.format !== 'imported-pair-quote-v2' ||
+    !['Buy', 'Sell'].includes(String(value.side)) ||
+    value.requestedInputAmount !== expected.amount ||
+    value.inputRounding !== 'conservative-down-v1' ||
     value.side !== expected.side ||
     value.signingAllowed !== false ||
     value.executionAllowed !== false ||
@@ -235,7 +357,13 @@ export async function parseImportedPairQuote(
     return fail();
   const input = expected.side === 'Buy' ? pair.quote : pair.base,
     output = expected.side === 'Buy' ? pair.base : pair.quote;
-  const raw = solanaTokenAtoms(expected.amount, input.decimals).toString(),
+  const clock = pair.mintPolicy.recheckUnixTimestamp;
+  const raw = pairUiAtoms(
+      expected.amount,
+      input.decimals,
+      input.amountPolicy,
+      clock,
+    ).toString(),
     quote = value.quote;
   if (
     !object(quote) ||
@@ -263,11 +391,22 @@ export async function parseImportedPairQuote(
     BigInt(String(quote.minimumOutAmount)) > BigInt(String(quote.outAmount)) ||
     BigInt(String(quote.minimumOutAmount)) <
       (BigInt(String(quote.outAmount)) * 9950n) / 10000n ||
-    value.inputAmount !== formatNativeBalance(raw, input.decimals) ||
+    value.inputAmount !==
+      pairUiAmount(raw, input.decimals, input.amountPolicy, clock) ||
     value.outputAmount !==
-      formatNativeBalance(String(quote.outAmount), output.decimals) ||
+      pairUiAmount(
+        String(quote.outAmount),
+        output.decimals,
+        output.amountPolicy,
+        clock,
+      ) ||
     value.minimumOutputAmount !==
-      formatNativeBalance(String(quote.minimumOutAmount), output.decimals)
+      pairUiAmount(
+        String(quote.minimumOutAmount),
+        output.decimals,
+        output.amountPolicy,
+        clock,
+      )
   )
     return fail();
   if (

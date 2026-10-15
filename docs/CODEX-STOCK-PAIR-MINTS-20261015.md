@@ -1,0 +1,32 @@
+# Stock-pair mint and amount evidence
+
+15 October 2026. This is a local backend checkpoint toward stock-denominated trading. It is not stock signing, settlement or full Proxima parity. Production remains source `61591c9`, deployment `dpl_FLu8zpXqYaKvHCC3aYaEomP261Jf`.
+
+## Change
+
+The owned pair quote API now uses a dedicated Token-2022 policy reader instead of the native SOL signing whitelist. The reader accepts the observed public-transfer TSLAX profile: MetadataPointer, TokenMetadata, PermanentDelegate, DefaultAccountState, ScaledUiAmountConfig, PausableConfig, ConfidentialTransferMint and an inactive TransferHook. Frozen defaults, paused mints, active hooks, unknown/duplicate/malformed extensions and mismatched metadata mint identities are rejected. Exposed issuer-control flags describe configuration, not backing, eligibility or issuer verification.
+
+Both mints and the Clock sysvar are read in the same confirmed bank. Clock owner/layout, exact bank slot, bounded slot drift and time freshness are checked. Before/after observations must retain the policy and active multiplier; supply changes alone are excluded from the policy hash. The existing mainnet and owned-project revision rechecks remain.
+
+The transient quote protocol advances to v2. Each asset carries its amount policy, extension names and issuer controls; the pair binds before/after chain timestamps. Scaled multipliers retain canonical f64 bits rather than lossy JSON numeric identities. User-entered UI budgets are converted into exact raw units conservatively using both the exact binary multiplier bound and the native SPL conversion/display convention. Rounding can leave dust. Original requested amounts and raw amounts remain separate, and minimum output is still enforced in raw units. A scheduled multiplier change shortens validity against both the observed chain clock and local observation time.
+
+The protocol remains quote-only: `signingAllowed=false`, `executionAllowed=false`, `balancesChecked=false`, `issuerVerified=false`. There are no production UI callers or persisted pair quote records to migrate. The native SOL signer, settlement, receipt and accounting adapters are unchanged and continue to reject this actual extended mint. The pair digest binds the returned snapshot; it is not an issuer attestation or signing authorization.
+
+Solana's integration guidance requires scaled UI display/input while retaining raw units for calculations and transfers, and selects the active multiplier with chain time: https://solana.com/docs/tokens/extensions/scaled-ui-amount/integration-guide . Native display/conversion behavior was checked against installed `@solana-program/token-2022` 0.15.0, including its f64 display rounding. The extension profile also matches the existing Pump quote-policy decoder; that launch decoder was not changed.
+
+## Verification
+
+- Final 19 selected files passed all 477 tests with Node 24 and two file workers, on an unchanged 1,248-file implementation/configuration/style snapshot. The selection includes the new reader/converter/model/real owned API tests and existing native quote, account-binding, simulation, signing, receipt and recovery regressions. Ignored `work/**` scratch copies are excluded from test discovery, without changing Claude's Vitest configuration.
+- Actual-source `tsc --noEmit`, nine-file type-aware lint, formatting/whitespace checks and the production Next webpack build passed. Initial static findings were corrected: TokenMetadata's extra fields use the SDK's Map type, and validated extension/control arrays use explicit string conversion before canonical sorting. The final regression batch was rerun afterward.
+- Converter tests cover independent base/quote scales, buy/sell raw budgets, native display rounding, conservative dust, u64 limits, non-unit multipliers, exact effective-time boundaries and bounded expiry. Mutation tests retain ownership/context, output-protection and execution-authority checks. Unknown/frozen/paused/hooked and malformed policy fixtures reject.
+- At 20:20:53 UTC, the implemented reader observed actual mainnet SOL/TSLAX policies at slots 457368759 and 457368760, with the same active TSLAX multiplier 1 and stable policy hash. TSLAX exposed all eight captured extensions and six issuer controls.
+- At approximately 20:27 UTC, the actual quote adapter used the existing Jupiter server key, without displaying it, to request both directions of USDC/TSLAX. Both returned HTTP 200 Metis quotes with validated raw output protection. Inputs were 0.01 TSLAX and 1 USDC respectively. These were expiring quote observations, not trades or current price promises. Public mainnet mint/Clock evidence was stable across the requests, ending at slot 457370465.
+- Those provider requests supplied no wallet address or taker. No transaction preparation material was accepted, and no sign or execute request occurred. Initial private QA harness attempts failed before contacting Jupiter because a CJS external-import wrapper misread the base58 default export; native ESM imports resolved the harness problem. The production quote adapter was not weakened or changed for the live check.
+
+Local receipts: `work/stock-pair-{tests,types,lint,build}.log`, `work/stock-pair-test-files.json`, `work/stock-pair-source-freeze.json`, `work/stock-pair-live-public.json` and `work/stock-pair-live-quote.json`. Runtime configuration remains private and is not part of the receipts or commit.
+
+## Still required for the requested end state
+
+Stock wallet preparation must validate both assets' account balances, Token-2022 account extensions and custody restrictions, then construct and independently assess currency-aware transactions. User approval, signed registration, broadcast/recovery, exact settlement and receipt/accounting must operate in the quote asset rather than assume SOL lamports. The token workspace must expose the selected quote asset, scaled amounts, rounding and issuer controls. Stock launch budgets also need their own scaling review. These capabilities and funded proof are not established by quotes.
+
+No UI file, migration, provider/credential setting, cron or production release changed in this checkpoint. No Git remote push, real wallet unlock, signature or transaction submission occurred. Claude's ownership of `app/page.tsx` remains intact. Main's two existing dirty files must retain their original bytes during the fast-forward handoff.

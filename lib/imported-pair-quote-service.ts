@@ -2,18 +2,22 @@ import { env } from './server-env';
 import { chainQuoteAssets } from './quote-catalog';
 import { walletAddress } from './wallet-workspace';
 import { UUID } from './wallet-operation';
-import { solanaTokenAtoms } from './solana-token-amount';
-import { formatNativeBalance } from './wallet-balance-format';
+import {
+  pairUiBudget,
+  pairUiAtoms,
+  pairUiAmount,
+  pairAmountLifetimeMs,
+} from './pair-ui-amount';
 import { balanceRpc, SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import {
   getSolanaIndexerRpcEndpoint,
   requireConsistentSolanaSlots,
 } from './solana-rpc';
 import {
-  readSwapMintEvidence,
-  assertSameSwapMintEvidence,
-  SwapMintIdentityError,
-} from './swap-token-program-evidence';
+  readPairMintEvidence,
+  assertSamePairMintEvidence,
+  PairMintPolicyError,
+} from './pair-mint-evidence';
 import { quoteSolanaPair, WarmupQuoteError } from './warmup-swap-quote';
 import {
   importedPairSha256,
@@ -171,12 +175,11 @@ export async function quoteOwnedImportedPair(
         'Choose a distinct exact quote asset from the supported catalog.',
         400,
       );
-    let amountRaw: string;
     try {
-      amountRaw = solanaTokenAtoms(
+      pairUiBudget(
         input.amount,
         input.side === 'Buy' ? quoteAsset.decimals : token.decimals,
-      ).toString();
+      );
     } catch {
       throw new ImportedPairQuoteError(
         'Use a positive amount within the selected input asset decimals and Solana limits.',
@@ -222,16 +225,17 @@ export async function quoteOwnedImportedPair(
     const scope = { inputMint: saved.address, outputMint: quoteAsset.address };
     const readMints = async (slot: number) => {
       try {
-        return await readSwapMintEvidence(scope, slot, checked);
+        return await readPairMintEvidence(scope, slot, checked, now());
       } catch (error) {
-        if (error instanceof SwapMintIdentityError)
+        if (error instanceof PairMintPolicyError)
           throw new ImportedPairQuoteError(
-            'This pair has an unsupported or invalid mint policy. Stock-token scaled amounts and compliance extensions require a separate adapter. No trading approval was created.',
+            error.message + ' No trading approval was created.',
           );
         throw error;
       }
     };
     const before = await readMints(Number(rawSlot));
+    signal.throwIfAborted();
     if (
       before.mints[0].decimals !== token.decimals ||
       (token.tokenProgram !== undefined &&
@@ -241,6 +245,21 @@ export async function quoteOwnedImportedPair(
       throw new ImportedPairQuoteError(
         'Saved token or quote-asset precision/program differs from the current chain identity.',
       );
+    let amountRaw: string;
+    try {
+      const source = before.mints[input.side === 'Buy' ? 1 : 0];
+      amountRaw = pairUiAtoms(
+        input.amount,
+        source.decimals,
+        source.amountPolicy,
+        before.unixTimestamp,
+      ).toString();
+    } catch {
+      throw new ImportedPairQuoteError(
+        'The UI amount cannot be converted conservatively within the selected mint precision and Solana raw-unit limits.',
+        400,
+      );
+    }
     let quote: Quote;
     try {
       quote = await provider.quote(
@@ -262,10 +281,10 @@ export async function quoteOwnedImportedPair(
     signal.throwIfAborted();
     const after = await readMints(before.slot);
     try {
-      assertSameSwapMintEvidence(before, after);
+      assertSamePairMintEvidence(before, after);
     } catch {
       throw new ImportedPairQuoteError(
-        'Token or quote-asset transfer policy changed during the quote. Request a fresh observation.',
+        'Token or quote-asset policy or active UI multiplier changed during the quote. Request a fresh observation.',
       );
     }
     requireConsistentSolanaSlots([Number(rawSlot), before.slot, after.slot]);
@@ -280,11 +299,16 @@ export async function quoteOwnedImportedPair(
     const providerExpiry = Date.parse(quote.expiresAt);
     if (!Number.isFinite(providerExpiry))
       throw new ImportedPairQuoteError('Quote lifetime is unavailable.', 502);
+    const pairLifetime = pairAmountLifetimeMs(
+      before.mints.map((m) => m.amountPolicy),
+      after.unixTimestamp,
+      start,
+    );
     const fresh = () => {
       const timestamp = now();
       if (
         !Number.isFinite(timestamp) ||
-        timestamp >= start + 30000 ||
+        timestamp >= start + pairLifetime ||
         timestamp < start - 1000 ||
         providerExpiry <= timestamp
       )
@@ -299,7 +323,7 @@ export async function quoteOwnedImportedPair(
       new TextEncoder().encode(saved.document),
     );
     const context: Omit<ImportedTradePair, 'sha256'> = {
-      format: 'imported-trade-pair-v1',
+      format: 'imported-trade-pair-v2',
       projectId: input.id,
       projectRevision: input.revision,
       projectDocumentSha256: Array.from(new Uint8Array(documentHash), (b) =>
@@ -312,12 +336,18 @@ export async function quoteOwnedImportedPair(
         symbol: token.symbol,
         decimals: token.decimals,
         program: before.mints[0].program,
+        amountPolicy: before.mints[0].amountPolicy,
+        extensions: before.mints[0].extensions,
+        issuerControls: before.mints[0].issuerControls,
       },
       quote: {
         address: quoteAsset.address,
         symbol: quoteAsset.symbol,
         decimals: quoteAsset.decimals,
         program: before.mints[1].program,
+        amountPolicy: before.mints[1].amountPolicy,
+        extensions: before.mints[1].extensions,
+        issuerControls: before.mints[1].issuerControls,
       },
       catalogSnapshot: '2026-10-09',
       issuerVerified: false,
@@ -326,9 +356,11 @@ export async function quoteOwnedImportedPair(
         recheckSlot: after.slot,
         baseSha256: before.mints[0].policySha256,
         quoteSha256: before.mints[1].policySha256,
+        unixTimestamp: before.unixTimestamp,
+        recheckUnixTimestamp: after.unixTimestamp,
       },
       observedAt: new Date(start).toISOString(),
-      expiresAt: new Date(start + 30000).toISOString(),
+      expiresAt: new Date(start + pairLifetime).toISOString(),
     };
     const pair = { ...context, sha256: await importedPairSha256(context) };
     const boundedQuote = {
@@ -339,21 +371,35 @@ export async function quoteOwnedImportedPair(
     };
     const result = await parseImportedPairQuote(
       {
-        format: 'imported-pair-quote-v1',
+        format: 'imported-pair-quote-v2',
         pair,
         side: input.side,
         inputRaw: amountRaw,
-        inputAmount: formatNativeBalance(
+        requestedInputAmount: input.amount,
+        inputRounding: 'conservative-down-v1',
+        inputAmount: pairUiAmount(
           amountRaw,
           input.side === 'Buy' ? pair.quote.decimals : pair.base.decimals,
+          input.side === 'Buy'
+            ? pair.quote.amountPolicy
+            : pair.base.amountPolicy,
+          after.unixTimestamp,
         ),
-        outputAmount: formatNativeBalance(
+        outputAmount: pairUiAmount(
           quote.outAmount,
           input.side === 'Buy' ? pair.base.decimals : pair.quote.decimals,
+          input.side === 'Buy'
+            ? pair.base.amountPolicy
+            : pair.quote.amountPolicy,
+          after.unixTimestamp,
         ),
-        minimumOutputAmount: formatNativeBalance(
+        minimumOutputAmount: pairUiAmount(
           quote.minimumOutAmount,
           input.side === 'Buy' ? pair.base.decimals : pair.quote.decimals,
+          input.side === 'Buy'
+            ? pair.base.amountPolicy
+            : pair.quote.amountPolicy,
+          after.unixTimestamp,
         ),
         quote: boundedQuote,
         signingAllowed: false,
