@@ -22,7 +22,13 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-  if (process.argv.length !== 3 || process.argv[2] !== '--live-readonly')
+  const referenceArg = process.argv[3];
+  if (
+    ![3, 4].includes(process.argv.length) ||
+    process.argv[2] !== '--live-readonly' ||
+    (referenceArg !== undefined &&
+      !referenceArg.startsWith('--reference-file='))
+  )
     throw Error(
       'Use --live-readonly. No signing, send, retry or deployment mode exists.',
     );
@@ -37,6 +43,7 @@ if (
       'scripts/qualify-stock-pair-runtime.mjs',
       '--live-readonly',
       '--idle-reference',
+      ...(referenceArg === undefined ? [] : [referenceArg]),
       ...(asset === 'USDC' ? ['--quote-usdc', '--one-unit'] : []),
     ];
     const result = await new Promise((accept, reject) => {

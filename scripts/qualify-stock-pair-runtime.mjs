@@ -9,8 +9,18 @@ import {
   referenceActivity,
   unchangedQuietReference,
 } from './stock-reference-activity.mjs';
+import { stockReferenceFixture } from './stock-reference-fixture.mjs';
 
 const args = new Set(process.argv.slice(2));
+const referenceArg = [...args].filter((a) => a.startsWith('--reference-file='));
+if (
+  referenceArg.length > 1 ||
+  (referenceArg.length && !args.has('--idle-reference'))
+)
+  throw Error('A pinned fixture requires idle-before-and-after checks.');
+const referenceText = referenceArg.length
+  ? readFileSync(referenceArg[0].slice('--reference-file='.length), 'utf8')
+  : null;
 if (
   !args.has('--live-readonly') ||
   [
@@ -27,7 +37,7 @@ if (
         '--one-unit',
         '--reserve-reference',
         '--idle-reference',
-      ].includes(a),
+      ].includes(a) && !a.startsWith('--reference-file='),
   )
 )
   throw Error(
@@ -65,6 +75,7 @@ const files = [
   'scripts/qualify-stock-pair-runtime.mjs',
   'scripts/run-stock-repeatability.mjs',
   'scripts/stock-reference-activity.mjs',
+  'scripts/stock-reference-fixture.mjs',
 ];
 const sourceFiles = Object.fromEntries(
   files.map((p) => [p, hash(readFileSync(p))]),
@@ -97,6 +108,7 @@ const receipt = {
   readOnly: true,
   sourceFiles,
   sourceUnchanged: false,
+  referenceFixtureSha256: referenceText === null ? null : hash(referenceText),
   publicReferenceKind: args.has('--reserve-reference')
     ? 'public-largest-system-accounts'
     : args.has('--known-public-reference')
@@ -270,7 +282,9 @@ try {
   if ((await rpc('getGenesisHash', [])) !== lib.SOLANA_MAINNET_GENESIS)
     throw Error('Provider network differs.');
   let keys;
-  if (args.has('--reserve-reference')) {
+  if (referenceText !== null) {
+    keys = [stockReferenceFixture(referenceText, receipt.quoteAsset)];
+  } else if (args.has('--reserve-reference')) {
     const accounts = await rpc('getLargestAccounts', [
       { commitment: 'confirmed', filter: 'circulating' },
     ]);

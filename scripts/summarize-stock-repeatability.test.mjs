@@ -2,6 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { summarizeStockRepeatability } from './summarize-stock-repeatability.mjs';
 
+test('rejects rotating or dropping a pinned fixture even for refused runs', () => {
+  const rows = samples();
+  for (const r of rows)
+    Object.assign(r, {
+      passed: false,
+      publicReferenceKind: 'idle-public-transaction-reference',
+      referenceFixtureSha256: 'c'.repeat(64),
+      publicReferenceSha256: (r.quoteAsset === 'SOL' ? 'a' : 'b').repeat(64),
+    });
+  assert.equal(summarizeStockRepeatability(rows).repeatableInThisSample, false);
+  const changed = structuredClone(rows);
+  changed[2].publicReferenceSha256 = 'd'.repeat(64);
+  assert.throws(() => summarizeStockRepeatability(changed), /identity changed/);
+  const omitted = structuredClone(rows);
+  delete omitted[4].referenceFixtureSha256;
+  assert.throws(() => summarizeStockRepeatability(omitted), /fixture changed/);
+});
+
 test('counts setup and runtime methods together and rejects omitted or under-reported setup admissions', () => {
   const rows = samples();
   for (const r of rows) {

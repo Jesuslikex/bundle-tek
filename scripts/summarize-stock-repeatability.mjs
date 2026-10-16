@@ -10,8 +10,28 @@ export function summarizeStockRepeatability(receipts) {
     throw Error('Exactly three alternating SOL/USDC rounds are required.');
   const seen = new Set();
   const source = JSON.stringify(receipts[0].sourceFiles);
+  const fixture = receipts[0].referenceFixtureSha256 ?? null;
+  const referenceByAsset = new Map();
   const attempts = receipts.map((r, i) => {
     const asset = i % 2 === 0 ? 'SOL' : 'USDC';
+    if (
+      (r.referenceFixtureSha256 ?? null) !== fixture ||
+      (fixture !== null &&
+        (!/^[a-f0-9]{64}$/.test(fixture) ||
+          r.publicReferenceKind !== 'idle-public-transaction-reference'))
+    )
+      throw Error(
+        'Pinned fixture changed or omitted its quiet-reference policy.',
+      );
+    if (fixture !== null && r.publicReferenceSha256) {
+      if (
+        !/^[a-f0-9]{64}$/.test(r.publicReferenceSha256) ||
+        (referenceByAsset.has(asset) &&
+          referenceByAsset.get(asset) !== r.publicReferenceSha256)
+      )
+        throw Error('Pinned reference identity changed within the sample.');
+      referenceByAsset.set(asset, r.publicReferenceSha256);
+    }
     if (
       r.format !== 'stock-pair-live-qualification-v1' ||
       r.quoteAsset !== asset ||
