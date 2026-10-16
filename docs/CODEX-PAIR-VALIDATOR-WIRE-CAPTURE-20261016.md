@@ -1,0 +1,5 @@
+# Raw Clock capture on the separate validator endpoint
+
+The unsigned qualifier's raw duplicate-Clock logger previously matched only the existing indexer URL, even though runtime evidence reads can now use the separately configured stock endpoint. It now captures eligible Clock responses from either of the two already admitted endpoints. This adds no request, provider, retry or accepted Clock case. The exact response is still passed through unchanged, with the existing bounded raw parser and batch-ID correlation. Mainnet, owner, context floor, duplicate agreement, equal/+1, wall time, pacing, byte limits, final recheck, 32 slots and the signing gate are unchanged.
+
+Verified before the new live campaign: Node24 syntax check and 21 offline tests for raw Clock parsing, campaign stop-on-429, runtime identity, pinned references, quiet-reference audit and six-attempt summaries pass. No live call, UI, provider configuration, credential, SQL, deploy, signature or send in this diagnostic patch. The ensuing fixed sample must retain outcomes and raw observations from the newly configured validator; do not treat this logging correction as qualification.

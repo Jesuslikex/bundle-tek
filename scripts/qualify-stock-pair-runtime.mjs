@@ -248,7 +248,9 @@ try {
     const response = await fetch(url, { ...init, redirect: 'manual' });
     row.status = response.status;
     row.headerMs = clock() - row.startMs;
-    if (u.href === new URL(endpoint).href) {
+    if (
+      [new URL(endpoint).href, new URL(runtimeEndpoint).href].includes(u.href)
+    ) {
       const request = JSON.parse(init.body);
       if (hasStockClockRequest(request)) {
         const observationStart = clock();
