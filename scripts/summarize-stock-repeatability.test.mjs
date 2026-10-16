@@ -34,6 +34,55 @@ function expectValid(rows) {
   assert.equal(summarizeStockRepeatability(rows).repeatableInThisSample, true);
 }
 
+test('requires unchanged quiet activity and includes its audit in the 32-slot qualification span', () => {
+  const rows = samples();
+  for (const r of rows)
+    Object.assign(r, {
+      publicReferenceKind: 'idle-public-transaction-reference',
+      runtime: { ...r.runtime, minimumSlot: 1000, maximumSlot: 1030 },
+      qualificationElapsedSlots: 31,
+      quietReferenceObserved: true,
+      referenceActivity: {
+        before: {
+          observedSlot: 990,
+          latestActivitySlot: '700',
+          latestSignatureSha256: 'a'.repeat(64),
+          idleSlots: 290,
+        },
+        after: {
+          observedSlot: 1031,
+          latestActivitySlot: '700',
+          latestSignatureSha256: 'a'.repeat(64),
+          idleSlots: 331,
+        },
+        outcome: 'no-new-observed-activity',
+      },
+    });
+  expectValid(rows);
+  for (const mutate of [
+    (r) => {
+      r.referenceActivity.after.latestSignatureSha256 = 'b'.repeat(64);
+    },
+    (r) => {
+      r.referenceActivity.after = null;
+    },
+    (r) => {
+      r.referenceActivity.after.observedSlot = 1033;
+      r.qualificationElapsedSlots = 33;
+    },
+    (r) => {
+      r.quietReferenceObserved = false;
+    },
+  ]) {
+    const changed = structuredClone(rows);
+    mutate(changed[0]);
+    assert.throws(
+      () => summarizeStockRepeatability(changed),
+      /Quiet reference/,
+    );
+  }
+});
+
 const samples = () =>
   Array.from({ length: 6 }, (_, i) => ({
     format: 'stock-pair-live-qualification-v1',

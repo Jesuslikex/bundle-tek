@@ -5,6 +5,10 @@ import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import {
+  referenceActivity,
+  unchangedQuietReference,
+} from './stock-reference-activity.mjs';
 
 const args = new Set(process.argv.slice(2));
 if (
@@ -60,6 +64,7 @@ const files = [
   'lib/pair-order-quote-bounds.ts',
   'scripts/qualify-stock-pair-runtime.mjs',
   'scripts/run-stock-repeatability.mjs',
+  'scripts/stock-reference-activity.mjs',
 ];
 const sourceFiles = Object.fromEntries(
   files.map((p) => [p, hash(readFileSync(p))]),
@@ -120,6 +125,7 @@ const receipt = {
 };
 const sqlite = new DatabaseSync(':memory:');
 let reader,
+  auditReference,
   publicKey,
   pipelineStart,
   simulated = false;
@@ -142,7 +148,7 @@ try {
     'getLargestAccounts',
     'getTransaction',
   ]);
-  const fetcher = async (url, init) => {
+  const fetcher = async (url, init, admit = !reader) => {
     signal.throwIfAborted();
     const u = new URL(url),
       row = { startMs: clock(), pipeline: pipelineStart !== undefined };
@@ -171,7 +177,7 @@ try {
       // Runtime dispatch already admits the exact batch size to this profile.
       // Setup balanceRpc calls do not, so admit them here after ordinary pacing.
       // Both phases share one budget without enrolling other wallet callers.
-      if (!reader) await lib.paceWalletRpc(endpoint, signal, batch.length);
+      if (admit) await lib.paceWalletRpc(endpoint, signal, batch.length);
       row.rpcUnits = batch.length;
     } else {
       if (
@@ -308,6 +314,7 @@ try {
     ];
   }
   if (!keys.length) throw Error('No public reference candidates.');
+  const activityByKey = new Map();
   if (args.has('--idle-reference')) {
     const currentSlot = Number(
       await rpc('getSlot', [{ commitment: 'confirmed' }]),
@@ -318,23 +325,31 @@ try {
       keys.map((key) =>
         rpc('getSignaturesForAddress', [
           key,
-          { commitment: 'confirmed', limit: 1 },
+          { commitment: 'confirmed', limit: 1, minContextSlot: currentSlot },
         ]),
       ),
     );
+    const selectionSlot = Number(
+      await rpc('getSlot', [
+        { commitment: 'confirmed', minContextSlot: currentSlot },
+      ]),
+    );
+    let unavailable = 0;
     const eligible = keys.filter((_, i) => {
-      const slot = activity[i]?.[0]?.slot;
-      return (
-        typeof slot === 'string' &&
-        /^[1-9]\d{0,15}$/.test(slot) &&
-        Number.isSafeInteger(Number(slot)) &&
-        Number(slot) <= currentSlot - 256
-      );
+      try {
+        const snapshot = referenceActivity(activity[i], selectionSlot);
+        activityByKey.set(keys[i], snapshot);
+        return snapshot.idleSlots >= 256;
+      } catch {
+        unavailable++;
+        return false;
+      }
     });
     receipt.referenceSelection = {
       minimumIdleSlots: 256,
       checked: keys.length,
       eligible: eligible.length,
+      unavailable,
     };
     keys = eligible;
     if (!keys.length)
@@ -393,6 +408,83 @@ try {
     );
   publicKey = keys[index];
   receipt.publicReferenceSha256 = hash(publicKey);
+  if (args.has('--idle-reference')) {
+    const beforeActivity = activityByKey.get(publicKey);
+    receipt.referenceActivity = {
+      before: beforeActivity,
+      after: null,
+      outcome: 'pending',
+    };
+    auditReference = async () => {
+      const floor = Math.max(
+        beforeActivity.observedSlot,
+        ...receipt.logicalReads
+          .map((r) => Number(r.slot))
+          .filter(Number.isSafeInteger),
+      );
+      const audit = (method, params) =>
+        lib.balanceRpc(endpoint, method, params, signal, (url, init) =>
+          fetcher(url, init, true),
+        );
+      const signatures = await audit('getSignaturesForAddress', [
+        publicKey,
+        { commitment: 'confirmed', minContextSlot: floor, limit: 1 },
+      ]);
+      const observedSlot = Number(
+        await audit('getSlot', [
+          { commitment: 'confirmed', minContextSlot: floor },
+        ]),
+      );
+      const afterActivity = referenceActivity(signatures, observedSlot);
+      const quiet = unchangedQuietReference(beforeActivity, afterActivity);
+      receipt.referenceActivity.after = afterActivity;
+      receipt.referenceActivity.outcome = quiet
+        ? 'no-new-observed-activity'
+        : 'activity-changed';
+      receipt.quietReferenceObserved = quiet;
+      if (!quiet) {
+        if (receipt.passed)
+          receipt.diagnosis = {
+            check: 'reference-activity',
+            classification: 'reference-activity-changed',
+            valuesAvailable: true,
+            comparisons: ['latestActivitySlot', 'latestSignatureSha256'].map(
+              (field) => ({
+                field,
+                before: String(beforeActivity[field]),
+                after: String(afterActivity[field]),
+              }),
+            ),
+          };
+        receipt.passed = false;
+        receipt.reason ??=
+          'Public reference activity changed; qualification refused.';
+      }
+      if (receipt.runtime) {
+        receipt.qualificationElapsedSlots =
+          Math.max(observedSlot, receipt.runtime.maximumSlot) -
+          receipt.runtime.minimumSlot;
+        if (receipt.qualificationElapsedSlots > 32) {
+          if (receipt.passed)
+            receipt.diagnosis = {
+              check: 'reference-audit-slot-window',
+              classification: 'freshness-window',
+              valuesAvailable: true,
+              comparisons: [
+                {
+                  field: 'maximumSlots',
+                  before: '32',
+                  after: String(receipt.qualificationElapsedSlots),
+                },
+              ],
+            };
+          receipt.passed = false;
+          receipt.reason ??=
+            'Post-attempt activity audit crossed the unchanged 32-slot limit.';
+        }
+      }
+    };
+  }
   receipt.stage = 'mint-identity';
   const slot = Number(await rpc('getSlot', [{ commitment: 'confirmed' }]));
   const mints = await lib.readPairMintEvidence(
@@ -668,8 +760,24 @@ try {
 } finally {
   receipt.pipelineMs =
     pipelineStart === undefined ? null : clock() - pipelineStart;
-  stop.abort();
   reader?.close();
+  if (auditReference) {
+    if (!signal.aborted) {
+      try {
+        await auditReference();
+      } catch {
+        receipt.referenceActivity.outcome = 'unavailable';
+        receipt.quietReferenceObserved = false;
+        receipt.passed = false;
+        receipt.reason ??= 'Public reference activity could not be rechecked.';
+      }
+    } else {
+      receipt.referenceActivity.outcome = 'unavailable';
+      receipt.quietReferenceObserved = false;
+      receipt.passed = false;
+    }
+  }
+  stop.abort();
   sqlite.close();
   receipt.sourceUnchanged = files.every(
     (p) => sourceFiles[p] === hash(readFileSync(p)),

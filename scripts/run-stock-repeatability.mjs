@@ -36,6 +36,7 @@ if (
       '--env-file=.env.local',
       'scripts/qualify-stock-pair-runtime.mjs',
       '--live-readonly',
+      '--idle-reference',
       ...(asset === 'USDC' ? ['--quote-usdc', '--one-unit'] : []),
     ];
     const result = await new Promise((accept, reject) => {
@@ -93,6 +94,7 @@ if (
     JSON.parse(readFileSync(row.receipt, 'utf8')),
   );
   const evidence = {
+    referencePolicy: 'idle-before-and-after',
     format: 'stock-pair-bounded-campaign-v1',
     ...campaign,
     // An incomplete campaign is never padded into a successful six-run sample.

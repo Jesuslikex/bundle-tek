@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
+import { unchangedQuietReference } from './stock-reference-activity.mjs';
 
 export function summarizeStockRepeatability(receipts) {
   if (!Array.isArray(receipts) || receipts.length !== 6)
@@ -118,6 +119,31 @@ export function summarizeStockRepeatability(receipts) {
       throw Error(
         `Attempt ${i + 1} claims completion without the full bounded runtime.`,
       );
+    if (
+      r.passed &&
+      r.publicReferenceKind === 'idle-public-transaction-reference'
+    ) {
+      const activity = r.referenceActivity;
+      const fullSpan =
+        activity?.after && r.runtime
+          ? Math.max(activity.after.observedSlot, r.runtime.maximumSlot) -
+            r.runtime.minimumSlot
+          : null;
+      if (
+        !activity?.before ||
+        !activity.after ||
+        !unchangedQuietReference(activity.before, activity.after) ||
+        r.quietReferenceObserved !== true ||
+        activity.outcome !== 'no-new-observed-activity' ||
+        !Number.isSafeInteger(fullSpan) ||
+        fullSpan > 32 ||
+        fullSpan < span ||
+        r.qualificationElapsedSlots !== fullSpan
+      )
+        throw Error(
+          'Quiet reference or full qualification span is not verified.',
+        );
+    }
     const phases = ['before-simulation', 'after-simulation'].map((phase) => {
       const reads = r.logicalReads.filter((x) => x.phase === phase);
       const slots = reads
