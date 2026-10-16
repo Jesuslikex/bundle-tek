@@ -57,6 +57,11 @@ export type CounterDecision = {
   draw: number | null;
   contributionTokenRaw: string;
   proposalTokenRaw: string | null;
+  /** Absent only on legacy history, which cannot authorize a fresh preview. */
+  source?: {
+    context: PoolTradeMovementContext;
+    movement: PoolTradeMovement;
+  };
 };
 export type CounterLedger = {
   format: 'counter-evaluation-ledger-v1';
@@ -128,6 +133,28 @@ export function counterProbabilityDraw() {
   } while (words[0] >= cutoff);
   return words[0] % bound;
 }
+function movementIdentity(movement: PoolTradeMovement) {
+  return JSON.stringify([
+    movement.projectId,
+    movement.mint,
+    movement.wallet,
+    movement.signature,
+  ]);
+}
+function movementFingerprint(movement: PoolTradeMovement) {
+  return JSON.stringify([
+    movement.revision,
+    movement.slot,
+    movement.providerSide,
+    movement.failed,
+    movement.walletSigner,
+    movement.blockAgrees,
+    movement.sideAgrees,
+    movement.tokenChange,
+    movement.classification,
+    movement.providerBlock,
+  ]);
+}
 export function validateCounterLedger(
   rules: CounterRules,
   ledger: CounterLedger,
@@ -145,6 +172,24 @@ export function validateCounterLedger(
   let reconciled = 0n;
   const identities = new Set<string>();
   for (const prior of ledger.decisions) {
+    if (prior.source !== undefined) {
+      const { context, movement } = prior.source;
+      requirePoolTradeMovement(movement, context);
+      walletAddress(context.pool, 'Solana');
+      if (
+        context.projectId !== ledger.scope.projectId ||
+        context.revision !== ledger.scope.revision ||
+        context.mint !== ledger.scope.mint ||
+        context.decimals !== ledger.scope.decimals ||
+        typeof context.trade.id !== 'string' ||
+        !context.trade.id ||
+        context.trade.id.length > 256 ||
+        !Number.isFinite(Date.parse(context.tapeObservedAt)) ||
+        prior.identity !== movementIdentity(movement) ||
+        prior.fingerprint !== movementFingerprint(movement)
+      )
+        throw new Error('Retained Counter source context differs.');
+    }
     if (
       prior.draw !== null &&
       (!Number.isSafeInteger(prior.draw) ||
@@ -233,24 +278,8 @@ export function evaluateCounterTrade(
   )
     throw new Error('Counter ledger project scope differs.');
   const queued = raw(ledger.queuedTokenRaw);
-  const identity = JSON.stringify([
-    movement.projectId,
-    movement.mint,
-    movement.wallet,
-    movement.signature,
-  ]);
-  const fingerprint = JSON.stringify([
-    movement.revision,
-    movement.slot,
-    movement.providerSide,
-    movement.failed,
-    movement.walletSigner,
-    movement.blockAgrees,
-    movement.sideAgrees,
-    movement.tokenChange,
-    movement.classification,
-    movement.providerBlock,
-  ]);
+  const identity = movementIdentity(movement);
+  const fingerprint = movementFingerprint(movement);
   const matches = ledger.decisions.filter((d) => d.identity === identity);
   if (matches.length > 1)
     throw new Error('Repeated Counter decision identity.');
@@ -273,6 +302,7 @@ export function evaluateCounterTrade(
     draw: null,
     contributionTokenRaw: '0',
     proposalTokenRaw: null,
+    source: structuredClone({ context, movement }),
   };
   let nextQueued = queued;
   const opposite = rules.responseSide === 'Sell' ? 'buy' : 'sell';

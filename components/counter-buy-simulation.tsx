@@ -190,8 +190,8 @@ export function CounterBuySimulation({
     <section className={styles.panel} aria-label="Counter settlement preview">
       <h4>Preview wallet settlement</h4>
       <p>
-        Simulate this retained Buy target with a verified wallet. This does not
-        revalidate the original trade signal or approve a transaction.
+        Recheck the contributing source trades, then simulate this retained Buy
+        target with a verified wallet. This does not approve a transaction.
       </p>
       <Button
         type="button"
@@ -309,10 +309,14 @@ export function CounterBuySimulation({
                 </div>
               </dl>
               <p>
+                {current.sourceTradeCount} contributing source{' '}
+                {current.sourceTradeCount === 1 ? 'trade' : 'trades'} rechecked
+                at {new Date(current.sourceRecheckedAt).toLocaleTimeString()}.
+              </p>
+              <p>
                 Expires {new Date(current.expiresAt).toLocaleTimeString()}.
-                Preview only. Source eligibility, program admission and a
-                separate execution review are still required. Signing is
-                unavailable here.
+                Preview only. Program admission and a separate execution review
+                are still required. Signing is unavailable here.
               </p>
             </>
           ))}

@@ -8,6 +8,11 @@ import { reviewCounterBuySettlement } from './counter-buy-settlement';
 import { balanceRpc } from './wallet-balances';
 import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
 import { WRAPPED_SOL } from './warmup-swap-quote';
+import {
+  reviewCounterBuySources,
+  CounterSourceReviewError,
+} from './counter-source-review';
+import { observePoolTradeMovement } from './pool-trade-movement-server';
 
 export type CounterPreviewRequest = {
   projectId: string;
@@ -80,6 +85,7 @@ type Context = {
   wallet_updated_at: string;
 };
 type Dependencies = {
+  observeSource: typeof observePoolTradeMovement;
   prepare: (
     plan: Parameters<typeof prepareCounterBuyProposal>[0],
     decision: string,
@@ -165,6 +171,7 @@ export async function previewOwnedCounterBuy(
   const provider =
     supplied ??
     ({
+      observeSource: observePoolTradeMovement,
       prepare: (plan, decision, budget, wallet, s) => {
         const endpoint = getSolanaIndexerRpcEndpoint();
         return prepareCounterBuyProposal(
@@ -184,6 +191,13 @@ export async function previewOwnedCounterBuy(
     } satisfies Dependencies);
   try {
     signal.throwIfAborted();
+    await reviewCounterBuySources(
+      plan,
+      input.decisionIdentity,
+      signal,
+      provider.observeSource,
+    );
+    await unchanged();
     const prepared = await provider.prepare(
       plan,
       input.decisionIdentity,
@@ -253,6 +267,17 @@ export async function previewOwnedCounterBuy(
         'Counter settlement is stale or differs from the owned preview.',
       );
     await unchanged();
+    const sourceReview = await reviewCounterBuySources(
+      plan,
+      input.decisionIdentity,
+      signal,
+      provider.observeSource,
+    );
+    await unchanged();
+    if (Date.parse(prepared.expiresAt) <= Date.now())
+      throw new CounterPreviewError(
+        'Counter packet preview expired during source verification. Request a fresh preview.',
+      );
     return {
       format: 'owned-counter-buy-preview-v1' as const,
       ...input,
@@ -265,20 +290,28 @@ export async function previewOwnedCounterBuy(
       actualSimulatedInputRaw: settlement.actualInputRaw,
       networkFeeLamports: simulation.networkFeeLamports,
       observedAt: simulation.observedAt,
-      expiresAt: prepared.expiresAt,
+      expiresAt: new Date(
+        Math.min(
+          Date.parse(prepared.expiresAt),
+          Date.parse(sourceReview.sourceValidUntil),
+        ),
+      ).toISOString(),
       ownershipContextRechecked: true as const,
       grossSettlementReviewed: true as const,
-      sourceRevalidated: false as const,
+      sourceRevalidated: true as const,
+      ...sourceReview,
       programCodeAttested: false as const,
       reservationCreated: false as const,
       approvalAllowed: false as const,
       signingAllowed: false as const,
       executionAllowed: false as const,
       limitations:
-        'Read-only preview of a retained Counter proposal. Fresh trigger-source admission, durable packet/budget storage, reservations, code admission and separate approval/signing/recovery remain required.',
+        'Read-only preview with contributing source trades rechecked. Durable packet/budget storage, reservations, code admission and separate approval/signing/recovery remain required.',
     };
   } catch (error) {
     signal.throwIfAborted();
+    if (error instanceof CounterSourceReviewError)
+      throw new CounterPreviewError(error.message);
     if (error instanceof CounterPreviewError) throw error;
     throw new CounterPreviewError(
       'Counter preparation, simulation or settlement could not be verified. No approval was created.',

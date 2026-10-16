@@ -1,9 +1,10 @@
 import { counterBuyFixture } from './counter-buy-fixture';
 import { routeWallet } from './jupiter-route-fixture';
 import { initialCounterLedger } from '../lib/counter-trade';
+import { supplyWallet } from './supply-history-fixture';
 import type { CounterPreviewView } from '../lib/counter-preview-view';
 export function counterPreviewUiFixture() {
-  const { plan, identity } = counterBuyFixture();
+  const { plan, identity } = counterBuyFixture(supplyWallet(9));
   plan.rules.ignoredWallets = [routeWallet];
   plan.ledger.rulesKey = initialCounterLedger(
     plan.rules,
@@ -35,7 +36,10 @@ export function counterPreviewUiFixture() {
     expiresAt: new Date(Date.now() + 30000).toISOString(),
     ownershipContextRechecked: true,
     grossSettlementReviewed: true,
-    sourceRevalidated: false,
+    sourceRevalidated: true,
+    sourceTradeCount: 1,
+    sourceRecheckedAt: new Date().toISOString(),
+    sourceValidUntil: new Date(Date.now() + 60000).toISOString(),
     programCodeAttested: false,
     reservationCreated: false,
     approvalAllowed: false,

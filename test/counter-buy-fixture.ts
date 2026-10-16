@@ -12,9 +12,20 @@ import type {
 } from '../lib/pool-trade-movement';
 import { directMovementFixture } from './direct-movement-fixture';
 import { classifyWalletMovement } from '../lib/wallet-movement-classification';
-export function counterBuyFixture() {
-  const tx = directMovementFixture(0, 0),
-    token = tx.tokenChanges[0],
+export function counterBuyFixture(sourceWallet?: string) {
+  const tx = directMovementFixture(0, 0);
+  if (sourceWallet) {
+    const original = tx.address;
+    Object.assign(
+      tx,
+      JSON.parse(
+        JSON.stringify(tx, (_key, value: unknown) =>
+          value === original ? sourceWallet : value,
+        ),
+      ) as typeof tx,
+    );
+  }
+  const token = tx.tokenChanges[0],
     signature = bs58.encode(new Uint8Array(64).fill(1));
   const context: PoolTradeMovementContext = {
     projectId: '00000000-0000-4000-8000-000000000001',

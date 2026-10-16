@@ -11,13 +11,15 @@ import type { prepareCounterBuyProposal } from './counter-buy-preparation';
 import type { simulateCounterBuyPreparation } from './counter-buy-simulation';
 import type { reviewCounterBuySettlement } from './counter-buy-settlement';
 import { WRAPPED_SOL } from './warmup-swap-quote';
+import { supplyWallet } from '../test/supply-history-fixture';
 
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
+  vi.useRealTimers();
 });
 function fixture() {
-  const { plan, identity } = counterBuyFixture(),
+  const { plan, identity } = counterBuyFixture(supplyWallet(9)),
     sqlite = new DatabaseSync(':memory:');
   databases.push(sqlite);
   plan.projectDocument = JSON.stringify({
@@ -32,6 +34,11 @@ function fixture() {
     plan.rules,
     plan.ledger.scope,
   ).rulesKey;
+  plan.createdAt = new Date(Date.now() - 2000).toISOString();
+  plan.updatedAt = new Date().toISOString();
+  const source = plan.ledger.decisions[0].source!;
+  source.movement.blockTime = Math.floor(Date.now() / 1000) - 1;
+  source.movement.observedAt = new Date().toISOString();
   sqlite.exec(`CREATE TABLE counter_trade_plans(owner_id TEXT,project_id TEXT,id TEXT,revision INTEGER,state TEXT,document TEXT);
   CREATE TABLE imported_token_projects(owner_id TEXT,id TEXT,chain TEXT,address TEXT,revision INTEGER,archived INTEGER,document TEXT);
   CREATE TABLE workspace_wallets(owner_id TEXT,chain TEXT,address TEXT,revision INTEGER,archived INTEGER,role TEXT,updated_at TEXT);
@@ -137,6 +144,10 @@ function fixture() {
   } as unknown as Awaited<ReturnType<typeof reviewCounterBuySettlement>>;
   // These stage doubles exercise the owned boundary, not the underlying chain verification.
   const dependencies = {
+    observeSource: vi.fn(async () => ({
+      ...structuredClone(source.movement),
+      observedAt: new Date().toISOString(),
+    })),
     prepare: vi.fn(async () => structuredClone(prepared)),
     simulate: vi.fn(async () => structuredClone(simulation)),
     settle: vi.fn(async () => structuredClone(proof)),
@@ -153,7 +164,8 @@ it('joins owned preparation, simulation and gross settlement while returning no 
     packetSha256: 'a'.repeat(64),
     ownershipContextRechecked: true,
     grossSettlementReviewed: true,
-    sourceRevalidated: false,
+    sourceRevalidated: true,
+    sourceTradeCount: 1,
     programCodeAttested: false,
     signingAllowed: false,
     executionAllowed: false,
@@ -173,6 +185,7 @@ it('joins owned preparation, simulation and gross settlement while returning no 
     expect.any(AbortSignal),
   );
   expect(JSON.stringify(result)).not.toContain('PRIVATE-UNSIGNED-PACKET');
+  expect(f.dependencies.observeSource).toHaveBeenCalledTimes(2);
 });
 it.each([
   'other-owner',
@@ -260,4 +273,53 @@ it('rejects client authority flags, invalid raw amounts and pre-aborted requests
   stop.abort();
   await expect(f.run('alice', stop.signal)).rejects.toThrow();
   expect(f.dependencies.prepare).not.toHaveBeenCalled();
+});
+it('keeps legacy history readable but refuses its missing source before preparation', async () => {
+  const f = fixture();
+  delete f.plan.ledger.decisions[0].source;
+  f.sqlite
+    .prepare('UPDATE counter_trade_plans SET document=?')
+    .run(JSON.stringify(f.plan));
+  await expect(f.run()).rejects.toMatchObject({ status: 409 });
+  expect(f.dependencies.observeSource).not.toHaveBeenCalled();
+  expect(f.dependencies.prepare).not.toHaveBeenCalled();
+});
+it('rechecks sources after settlement and rejects a changed final observation', async () => {
+  const f = fixture(),
+    observe = f.dependencies.observeSource.getMockImplementation()!;
+  f.dependencies.observeSource
+    .mockImplementationOnce(observe)
+    .mockImplementationOnce(async () => {
+      const movement = await observe();
+      movement.classification.reason += ' changed';
+      return movement;
+    });
+  await expect(f.run()).rejects.toMatchObject({ status: 409 });
+  expect(f.dependencies.settle).toHaveBeenCalledOnce();
+  expect(f.dependencies.observeSource).toHaveBeenCalledTimes(2);
+});
+it('rechecks owned context after source reads before preparing a packet', async () => {
+  const f = fixture(),
+    observe = f.dependencies.observeSource.getMockImplementation()!;
+  f.dependencies.observeSource.mockImplementationOnce(async () => {
+    f.sqlite.exec('UPDATE workspace_wallets SET revision=2');
+    return observe();
+  });
+  await expect(f.run()).rejects.toMatchObject({ status: 409 });
+  expect(f.dependencies.prepare).not.toHaveBeenCalled();
+});
+it('does not publish a packet that expires during the final source reads', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  const f = fixture(),
+    observe = f.dependencies.observeSource.getMockImplementation()!;
+  f.dependencies.observeSource
+    .mockImplementationOnce(observe)
+    .mockImplementationOnce(async () => {
+      vi.setSystemTime(Date.now() + 31000);
+      return observe();
+    });
+  await expect(f.run()).rejects.toMatchObject({
+    status: 409,
+    message: expect.stringContaining('expired during source'),
+  });
 });

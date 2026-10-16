@@ -1,5 +1,9 @@
 # Proxima reconstruction completion matrix
 
+## 16 October contributing Counter source admission
+
+New decisions retain source context/movement; owned Buy previews now reobserve every buffered contributor before preparation and after settlement, preserving exact fingerprints, block times, rules and historical probability draws. Missing legacy evidence stays readable but cannot pass current-source admission; five-minute activation/freshness checks apply to all contributors and cap preview expiry. The UI validates/displays source count/time. Twenty related files/223 tests, TypeScript, typed lint and formatting pass; Chrome desktop/phone checks use synthetic responses. See CODEX-COUNTER-SOURCE-RECHECK-20261016.md. Finalized pool-membership proof, code admission and durable execution/recovery remain open. No stock gate, provider or deploy change.
+
 ## 16 October Counter preview controls
 
 The owned read-only Counter preview API is now connected to explicit verified-wallet selection and separate swap/fee-rent limits in Codex-owned Counter controls. It validates exact response context and false authority flags, clears changed/cancelled/expired evidence and shows costs with execution limitations. Final scoped verification: 16 files/182 tests, TypeScript, typed lint and format; desktop/375px Chrome rendering uses labelled synthetic responses, not live provider proof. See CODEX-COUNTER-PREVIEW-UI-UPDATE-20261016.md. Fresh source/code admission and durable approval/execution/recovery remain open; Counter execution and stock signing are not enabled. No provider change or deploy.

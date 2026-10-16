@@ -113,7 +113,7 @@ export function counterPreviewView(
     !/^[a-f0-9]{64}$/.test(p.packetSha256) ||
     p.ownershipContextRechecked !== true ||
     p.grossSettlementReviewed !== true ||
-    p.sourceRevalidated !== false ||
+    p.sourceRevalidated !== true ||
     p.programCodeAttested !== false ||
     p.reservationCreated !== false ||
     p.approvalAllowed !== false ||
@@ -144,7 +144,18 @@ export function counterPreviewView(
   )
     throw Error('Counter simulation exceeds the selected limits.');
   const observed = Date.parse(p.observedAt),
-    expires = Date.parse(p.expiresAt);
+    expires = Date.parse(p.expiresAt),
+    sourceChecked = Date.parse(p.sourceRecheckedAt),
+    sourceExpires = Date.parse(p.sourceValidUntil);
+  const end = plan.ledger.decisions.findIndex(
+    (d) => d.identity === request.decisionIdentity,
+  );
+  let start = end;
+  while (start > 0 && plan.ledger.decisions[start - 1].outcome !== 'proposal')
+    start--;
+  const sourceCount = plan.ledger.decisions
+    .slice(start, end + 1)
+    .filter((d) => uint(d.contributionTokenRaw) > 0n).length;
   if (
     !Number.isFinite(now) ||
     !Number.isFinite(observed) ||
@@ -153,7 +164,17 @@ export function counterPreviewView(
     now - observed > 30000 ||
     expires <= now ||
     expires <= observed ||
-    expires - observed > 30000
+    expires - observed > 30000 ||
+    !Number.isFinite(sourceChecked) ||
+    !Number.isFinite(sourceExpires) ||
+    sourceChecked < observed - 1000 ||
+    sourceChecked > now + 1000 ||
+    now - sourceChecked > 30000 ||
+    sourceExpires < expires ||
+    sourceExpires > sourceChecked + 301000 ||
+    !Number.isSafeInteger(p.sourceTradeCount) ||
+    p.sourceTradeCount < 1 ||
+    p.sourceTradeCount !== sourceCount
   )
     throw Error('Counter simulation expired. Request a fresh preview.');
   return p;

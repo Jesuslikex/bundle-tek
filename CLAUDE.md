@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October Counter contributing source checks
+
+Read docs/CODEX-COUNTER-SOURCE-RECHECK-20261016.md. New decisions retain detached context/movement; owned Buy previews reobserve every buffered contributor before preparation and after settlement, then recheck ownership. Exact fingerprint/time/decision terms and retained probability draws, no reroll; five-minute activation/freshness applied to all contributors, preview expiry capped and late packet refused. Legacy missing source remains readable but cannot preview. UI validates/shows source count/time. Final20 files/223 tests, TypeScript/typed lint/format pass; desktop/375px Chrome uses synthetic responses, no live/build/full-suite claim. Program/pool finality admission and durable approval/execution/recovery remain open. No Claude files, stock gate/provider/credential/cron/SQL/push/deploy/wallet action. Preserve main dirty files.
+
 ## 16 October Counter preview UI
 
 Read docs/CODEX-COUNTER-PREVIEW-UI-UPDATE-20261016.md. Codex-owned Counter pricing now mounts an explicit verified-wallet/fee-limit read-only settlement preview. Exact response/authority/freshness validation, context invalidation, cancellation and local expiry; no auto fetch/retry or sign/send controls. Final16 files/182 tests, TypeScript/typed lint/format pass. Existing Chrome desktop/375px synthetic harness renders costs without horizontal phone overflow; no live provider, authenticated production, build or full-suite proof. Only Codex files, no globalCSS rewrite or Claude shell/token files. No stock gate/provider/credential/cron/SQL/push/deploy/wallet action. Preserve main dirty files.
