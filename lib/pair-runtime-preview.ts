@@ -42,7 +42,10 @@ export async function collectPairRuntimePreview(
   signal: AbortSignal,
   now: () => number = Date.now,
   quoteBoundsMode: PairQuoteBoundsMode = 'strict',
+  inventoryAccountLimit: 5 | 100 = 100,
 ) {
+  if (![5, 100].includes(inventoryAccountLimit))
+    throw Error('Pair runtime inventory account limit differs.');
   const controller = new AbortController();
   try {
     return await inspectPairRuntime(
@@ -52,6 +55,7 @@ export async function collectPairRuntimePreview(
       AbortSignal.any([signal, controller.signal]),
       now,
       quoteBoundsMode,
+      inventoryAccountLimit,
     );
   } finally {
     controller.abort();
@@ -64,6 +68,7 @@ async function inspectPairRuntime(
   signal: AbortSignal,
   now: () => number,
   quoteBoundsMode: PairQuoteBoundsMode,
+  inventoryAccountLimit: 5 | 100,
 ) {
   const started = now(),
     slots = [
@@ -228,10 +233,12 @@ async function inspectPairRuntime(
   ) {
     const accounts = [];
     const observedSlots: number[] = [];
-    for (let offset = 0; offset < keys.length; offset += 100)
+    for (let offset = 0; offset < keys.length; offset += inventoryAccountLimit)
       accounts.push(
-        ...(await read(keys.slice(offset, offset + 100), true, (slot) =>
-          observedSlots.push(slot),
+        ...(await read(
+          keys.slice(offset, offset + inventoryAccountLimit),
+          true,
+          (slot) => observedSlots.push(slot),
         )),
       );
     for (const [i, a] of accounts.entries())
@@ -239,7 +246,7 @@ async function inspectPairRuntime(
         assertPairRuntimeWritableAccount(a, {
           address: keys[i],
           phase,
-          slot: observedSlots[Math.floor(i / 100)],
+          slot: observedSlots[Math.floor(i / inventoryAccountLimit)],
           before: previous?.[i],
           packetScope: () =>
             pairAccountProvenance(
@@ -249,10 +256,11 @@ async function inspectPairRuntime(
               keys[i],
               envelope.sha256,
             ),
-          rpcAccountPosition: i % 100,
+          rpcAccountPosition: i % inventoryAccountLimit,
           rpcAccountCount: Math.min(
-            100,
-            keys.length - Math.floor(i / 100) * 100,
+            inventoryAccountLimit,
+            keys.length -
+              Math.floor(i / inventoryAccountLimit) * inventoryAccountLimit,
           ),
         });
     const programs = accounts

@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October capped runtime inventory provenance
+
+Read docs/CODEX-PAIR-INVENTORY-ACCOUNT-CAP-20261016.md. Runtime collector has optional inventory5/default100; every actual sliced chunk keeps its own floor/slot and original account order. Custody diagnostics use that chunk size for real response slot/position/count while compiled packet index stays unchanged. Seven files/88 tests, TypeScript/scoped typed lint/format pass, including advancing second-chunk custody refusal and existing code/simulation ordering. No API/script caller selects the setting; full-state, lookup, candidate/wallet and transport integration remain separate. No live qualification result, UI/provider/credential/SQL/cron/deploy/wallet action. Signing off; preserve main dirty files.
+
 ## 16 October stock code identity account cap
 
 Read docs/CODEX-PAIR-CODE-ACCOUNT-CAP-20261016.md. Explicit4-read stock code collection can opt into five accounts per actual request, covering initial/final program and deployment headers plus all sliced bytes. Each chunk retains its actual floor/slot/read-budget unit; complete vectors and final header recheck unchanged. Serial/group refuses this setting and keeps default100; trace tests and printer comparison preserve the original read body. Real bounded-transport mocked-HTTP composition stays within5. Final17 files/332 tests across two disjoint runs, plain TypeScript and scoped typed lint pass. No runtime/script call site selects the new cap, no live qualification result. Runtime inventory/provenance and whole-path integration still pending review. No UI/provider/credential/SQL/cron/deploy/wallet action, signing off. Preserve main dirty files.
