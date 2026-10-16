@@ -1,6 +1,7 @@
 'use client';
 import { subscribeImportedWalletReview } from '@/lib/imported-wallet-review-events';
 import { ImportedTradeSessions } from './imported-trade-sessions';
+import { ImportedPairTradeWalletReview } from './imported-pair-trade-wallet-review';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -329,6 +330,15 @@ export function ImportedSwapWallet({
           amount={amount}
           locked={locked || saving}
           onAmountChange={onAmountChange}
+        />
+      )}
+      {wallet && project.document.token.chain === 'Solana' && (
+        <ImportedPairTradeWalletReview
+          key={`pair:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}`}
+          project={project}
+          wallet={wallet}
+          side={side}
+          locked={locked || saving || loading}
         />
       )}
       <details className="imported-project-wallet-inventory" open>
