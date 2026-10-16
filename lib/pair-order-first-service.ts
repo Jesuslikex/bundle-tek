@@ -97,12 +97,7 @@ export async function qualifyOwnedPairOrderFirstRuntime(
   signal = AbortSignal.any([signal, child.signal, AbortSignal.timeout(45000)]);
   const reads = dependencies
     ? undefined
-    : createPairReadRpc(
-        getSolanaIndexerRpcEndpoint(),
-        signal,
-        fetch,
-        'unsigned-helius-qualification',
-      );
+    : createPairReadRpc(getSolanaIndexerRpcEndpoint(), signal);
   try {
     const provider = dependencies ?? {
       ...configuredPairQuoteDependencies(signal),

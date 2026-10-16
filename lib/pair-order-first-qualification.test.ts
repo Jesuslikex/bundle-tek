@@ -1,4 +1,6 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import * as pairReads from './pair-read-rpc';
+import * as solanaRpc from './solana-rpc';
 import { readFileSync } from 'node:fs';
 import { pairRuntimeFixture } from '../test/pair-runtime-fixture';
 import {
@@ -7,6 +9,7 @@ import {
 } from './pair-order-first-service';
 let fixture: Awaited<ReturnType<typeof pairRuntimeFixture>> | undefined;
 afterEach(() => {
+  vi.restoreAllMocks();
   fixture?.close();
   fixture = undefined;
 });
@@ -107,4 +110,29 @@ it('has no client-selectable qualification or signing flag', async () => {
   expect(() =>
     pairOrderFirstRequest({ ...request, qualifyRuntime: true }),
   ).toThrow();
+});
+
+it('uses configured pacing by default even on a non-Helius provider', async () => {
+  const { f, request } = await setup();
+  vi.spyOn(solanaRpc, 'getSolanaIndexerRpcEndpoint').mockReturnValue(
+    'https://rpc.example.test/',
+  );
+  // Stop at reader construction; no real provider request or environment key is needed.
+  const reader = vi
+    .spyOn(pairReads, 'createPairReadRpc')
+    .mockImplementation(() => {
+      throw Error('reader construction boundary');
+    });
+  await expect(
+    qualifyOwnedPairOrderFirstRuntime(
+      f.db,
+      'alice',
+      request,
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('reader construction boundary');
+  expect(reader).toHaveBeenCalledExactlyOnceWith(
+    'https://rpc.example.test/',
+    expect.any(AbortSignal),
+  );
 });

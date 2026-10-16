@@ -4,7 +4,7 @@ const nextReads = new Map<string, number>();
 type Admission = { at: number; units: number };
 const qualification = new Map<
   string,
-  { tail: Promise<void>; sent: Admission[] }
+  { tail: Promise<void>; sent: Admission[]; nextRead: number }
 >();
 async function waitUntil(at: number, signal: AbortSignal) {
   signal.throwIfAborted();
@@ -35,8 +35,7 @@ export async function paceWalletRpc(
     .SOLANA_RPC_MIN_INTERVAL_MS;
   if (
     (configured === undefined || configured === '') &&
-    qualificationMethods === undefined &&
-    !qualification.has(endpoint)
+    qualificationMethods === undefined
   )
     return;
   if (
@@ -59,14 +58,23 @@ export async function paceWalletRpc(
     if (!qualification.has(endpoint)) {
       if (qualification.size >= 64)
         throw Error('Wallet RPC provider capacity reached.');
-      qualification.set(endpoint, { tail: Promise.resolve(), sent: [] });
+      qualification.set(endpoint, {
+        tail: Promise.resolve(),
+        sent: [],
+        nextRead: 0,
+      });
     }
   }
-  const profile = qualification.get(endpoint);
+  // Qualification is explicit per call. Its admissions and scheduling never
+  // mutate the ordinary endpoint queue or enroll unrelated wallet reads.
+  const profile =
+    qualificationMethods === undefined
+      ? undefined
+      : qualification.get(endpoint);
   if (profile) {
     // Actual admissions, not scheduled timer targets: delayed timers cannot bunch
-    // requests into a burst. Mixed ordinary callers count conservatively as two.
-    const units = qualificationMethods ?? 2;
+    // requests into a burst. Only explicitly opted-in calls share this budget.
+    const units = qualificationMethods!;
     const pending = profile.tail.then(async () => {
       for (;;) {
         signal.throwIfAborted();
@@ -76,19 +84,14 @@ export async function paceWalletRpc(
           profile.sent.reduce((sum, entry) => sum + entry.units, 0) + units > 9
             ? profile.sent[0].at + 1000
             : now;
-        const at = Math.max(now, nextReads.get(endpoint) ?? now, budgetAt);
+        const at = Math.max(now, profile.nextRead, budgetAt);
         if (at > now) {
           await waitUntil(at, signal);
           continue;
         }
         profile.sent.push({ at: now, units });
-        nextReads.set(
-          endpoint,
-          now +
-            (qualificationMethods === undefined
-              ? interval
-              : Math.max(112 * units, interval > 200 ? interval : 0)),
-        );
+        profile.nextRead =
+          now + Math.max(112 * units, interval > 200 ? interval : 0);
         return;
       }
     });

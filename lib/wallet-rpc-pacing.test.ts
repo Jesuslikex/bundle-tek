@@ -145,3 +145,49 @@ it('rejects an unsupported qualification provider or invalid method count', asyn
     ).rejects.toThrow('qualification');
   }
 });
+
+it('does not enroll ordinary reads in an existing qualification profile without configured pacing', async () => {
+  vi.useFakeTimers();
+  const endpoint = 'https://mainnet.helius-rpc.com/isolated-unconfigured';
+  const signal = new AbortController().signal;
+  await paceWalletRpc(endpoint, signal, 2);
+  const at = Date.now();
+  await Promise.all(
+    Array.from({ length: 12 }, () => paceWalletRpc(endpoint, signal)),
+  );
+  expect(Date.now()).toBe(at);
+  let admitted = false;
+  const qualified = paceWalletRpc(endpoint, signal, 1).then(() => {
+    admitted = true;
+  });
+  await vi.advanceTimersByTimeAsync(223);
+  expect(admitted).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await qualified;
+});
+
+it('keeps configured and qualification schedules independent on the same endpoint', async () => {
+  vi.useFakeTimers();
+  (env as Record<string, unknown>).SOLANA_RPC_MIN_INTERVAL_MS = '300';
+  const endpoint = 'https://mainnet.helius-rpc.com/isolated-configured';
+  const signal = new AbortController().signal;
+  await paceWalletRpc(endpoint, signal, 2);
+  const at = Date.now();
+  await paceWalletRpc(endpoint, signal);
+  expect(Date.now()).toBe(at);
+  const ordinaryTimes: number[] = [],
+    qualificationTimes: number[] = [];
+  const ordinary = Promise.all(
+    [1, 2, 3].map(async () => {
+      await paceWalletRpc(endpoint, signal);
+      ordinaryTimes.push(Date.now() - at);
+    }),
+  );
+  const qualified = paceWalletRpc(endpoint, signal, 1).then(() => {
+    qualificationTimes.push(Date.now() - at);
+  });
+  await vi.runAllTimersAsync();
+  await Promise.all([ordinary, qualified]);
+  expect(ordinaryTimes).toEqual([300, 600, 900]);
+  expect(qualificationTimes).toEqual([300]);
+});
