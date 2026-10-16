@@ -1,3 +1,5 @@
+import { readPairPartitionObservation } from './pair-partition-observation';
+import { stockPairRpcScope } from './pair-stock-clock';
 import { collectPairAccountPartitions } from './pair-account-partitions';
 import { pairEvidenceClock } from './pair-stock-clock';
 import bs58 from 'bs58';
@@ -278,6 +280,25 @@ export async function readPairWalletEvidence(
   rpc: Rpc,
   now = Date.now(),
 ): Promise<PairWalletEvidence> {
+  const scope = stockPairRpcScope(rpc);
+  if (scope?.accountLimit === 5) {
+    if (!scope.signal) throw Error('Stock lifecycle signal is missing.');
+    return collectPairWalletEvidence(
+      mints,
+      wallet,
+      now,
+      async (requested, floor) => {
+        const observed = await readPairPartitionObservation(
+          requested,
+          floor,
+          rpc,
+          scope.signal!,
+          scope.now,
+        );
+        return { response: observed.clockResponse, values: observed.values };
+      },
+    );
+  }
   return collectPairWalletEvidence(
     mints,
     wallet,
@@ -291,7 +312,7 @@ export async function readPairWalletEvidence(
     },
   );
 }
-/** Offline review composition only. No production service opts into partitioned wallet evidence. */
+/** Explicit partition composition using the same wallet parser and custody checks. */
 export async function readPartitionedPairWalletEvidence(
   mints: PairMintEvidence,
   wallet: string,
@@ -307,36 +328,15 @@ export async function readPartitionedPairWalletEvidence(
     wallet,
     now(),
     async (requested, floor) => {
-      partitions = await collectPairAccountPartitions(
+      const observed = await readPairPartitionObservation(
         requested,
-        { encoding: 'base64', commitment: 'confirmed', minContextSlot: floor },
+        floor,
         rpc,
         signal,
         now,
       );
-      const values: unknown[] = Array(requested.length);
-      const seen = new Set<number>();
-      for (const partition of partitions.partitions) {
-        for (const [local, original] of partition.originalPositions.entries()) {
-          if (
-            seen.has(original) ||
-            requested[original] !== partition.accountKeys[local]
-          )
-            throw Error('Partitioned wallet account mapping differs.');
-          seen.add(original);
-          values[original] = partition.response.value[local];
-        }
-      }
-      const response = partitions.partitions[0].response;
-      const clockIndex = requested.indexOf(PAIR_CLOCK);
-      if (
-        clockIndex < 0 ||
-        seen.has(clockIndex) ||
-        seen.size !== requested.length - 1
-      )
-        throw Error('Partitioned wallet account coverage differs.');
-      values[clockIndex] = response.value.at(-1);
-      return { response, values };
+      partitions = observed.partitions;
+      return { response: observed.clockResponse, values: observed.values };
     },
   );
   signal.throwIfAborted();

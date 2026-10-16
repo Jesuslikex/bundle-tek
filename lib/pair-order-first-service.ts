@@ -1,3 +1,4 @@
+import { stockPairAccountLimit } from './pair-stock-clock';
 import { env } from './server-env';
 import { createStockPairEvidenceRpc } from './pair-stock-clock';
 import { walletAddress } from './wallet-workspace';
@@ -99,7 +100,13 @@ export async function qualifyOwnedPairOrderFirstRuntime(
   signal = AbortSignal.any([signal, child.signal, AbortSignal.timeout(45000)]);
   const reads = dependencies
     ? undefined
-    : createPairReadRpc(getSolanaStockRuntimeRpcEndpoint(), signal);
+    : createPairReadRpc(
+        getSolanaStockRuntimeRpcEndpoint(),
+        signal,
+        fetch,
+        'configured',
+        stockPairAccountLimit(getSolanaStockRuntimeRpcEndpoint()),
+      );
   try {
     const provider = dependencies ?? {
       ...configuredPairQuoteDependencies(
@@ -167,6 +174,7 @@ async function preparePairOrderFirst(
     provider.rpc,
     programRpc ?? provider.rpc,
     provider.now,
+    { endpoint: getSolanaStockRuntimeRpcEndpoint(), signal },
   );
   provider.rpc = stockReads.rpc;
   if (programRpc) programRpc = stockReads.programRpc;

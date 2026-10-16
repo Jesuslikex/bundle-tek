@@ -79,6 +79,8 @@ const files = [
   'lib/pair-order-simulation.ts',
   'lib/pair-order-collector.ts',
   'lib/pair-read-rpc.ts',
+  'lib/pair-account-partitions.ts',
+  'lib/pair-partition-observation.ts',
   'lib/wallet-rpc-pacing.ts',
   'lib/pair-order-state.ts',
   'lib/pair-rent-evidence.ts',
@@ -106,7 +108,7 @@ mkdirSync(folder, { recursive: true });
 const bundle = join(folder, 'reader.mjs');
 await build({
   stdin: {
-    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint,getSolanaStockRuntimeRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
+    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint,getSolanaStockRuntimeRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc,stockPairAccountLimit} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
     resolveDir: process.cwd(),
     sourcefile: 'unsigned-stock-qualification.ts',
   },
@@ -563,8 +565,13 @@ try {
   useRuntimeEndpoint = true;
   if ((await rpc('getGenesisHash', [])) !== lib.SOLANA_MAINNET_GENESIS)
     throw Error('Runtime evidence provider network differs.');
-  const stockReads = lib.createStockPairEvidenceRpc(rpc, programRpc);
+  const stockReads = lib.createStockPairEvidenceRpc(rpc, programRpc, Date.now, {
+    endpoint: runtimeEndpoint,
+    signal,
+  });
   receipt.clockObservations = stockReads.observations;
+  receipt.partitionCollections = stockReads.partitions;
+  receipt.runtimeAccountLimit = stockReads.accountLimit;
   receipt.stage = 'mint-identity';
   const slot = Number(await rpc('getSlot', [{ commitment: 'confirmed' }]));
   const mints = await lib.readPairMintEvidence(
@@ -667,6 +674,7 @@ try {
     signal,
     fetcher,
     'unsigned-stock-qualification',
+    lib.stockPairAccountLimit(runtimeEndpoint),
   );
   const result = await lib.qualifyOwnedPairOrderFirstRuntime(
     db,

@@ -18,6 +18,13 @@ import { pairRuntimeDigest } from './pair-runtime-trace';
 import { collectPairOrderReview } from './pair-order-collector';
 import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
 import type { PairQuoteBoundsMode } from './pair-order-quote-bounds';
+import {
+  PAIR_CLOCK,
+  stockPairRpcScope,
+  inheritStockPairRpcScope,
+  type StockPairRpc,
+} from './pair-stock-clock';
+import { readPairPartitionObservation } from './pair-partition-observation';
 import { pairAccountProvenance } from './pair-account-provenance';
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import { requireConsistentSolanaSlots } from './solana-rpc';
@@ -31,7 +38,7 @@ type Candidate = Pick<
   Awaited<ReturnType<typeof prepareOwnedImportedPairOrder>>,
   'preflight' | 'order'
 >;
-type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
+type Rpc = StockPairRpc;
 const COMPUTE = 'ComputeBudget111111111111111111111111111111',
   NATIVE = 'NativeLoader1111111111111111111111111111111';
 /** Two full code observations bracket the traced simulation. This establishes identity evidence, not a trusted program policy or semantic audit. */
@@ -42,9 +49,21 @@ export async function collectPairRuntimePreview(
   signal: AbortSignal,
   now: () => number = Date.now,
   quoteBoundsMode: PairQuoteBoundsMode = 'strict',
-  inventoryAccountLimit: 5 | 100 = 100,
+  inventoryAccountLimit?: 5 | 100,
 ) {
-  if (![5, 100].includes(inventoryAccountLimit))
+  const scopedLimit = stockPairRpcScope(rpc)?.accountLimit === 5 ? 5 : 100;
+  if (
+    scopedLimit === 5 &&
+    stockPairRpcScope(programRpc) !== stockPairRpcScope(rpc)
+  )
+    throw Error('Stock runtime account and code RPC scopes differ.');
+  if (
+    (inventoryAccountLimit !== undefined &&
+      ![5, 100].includes(inventoryAccountLimit)) ||
+    (scopedLimit === 5 &&
+      inventoryAccountLimit !== undefined &&
+      inventoryAccountLimit !== 5)
+  )
     throw Error('Pair runtime inventory account limit differs.');
   const controller = new AbortController();
   try {
@@ -55,7 +74,7 @@ export async function collectPairRuntimePreview(
       AbortSignal.any([signal, controller.signal]),
       now,
       quoteBoundsMode,
-      inventoryAccountLimit,
+      scopedLimit === 5 ? 5 : (inventoryAccountLimit ?? 100),
     );
   } finally {
     controller.abort();
@@ -76,7 +95,12 @@ async function inspectPairRuntime(
       candidate.preflight.quote.pair.mintPolicy.recheckSlot,
       candidate.preflight.evidence.slot,
     ],
-    floor = () => Math.max(...slots);
+    floor = () => {
+      const effective = stockPairRpcScope(rpc)?.latest() ?? 0;
+      if (effective > Math.max(...slots)) slots.push(effective);
+      requireConsistentSolanaSlots(slots);
+      return Math.max(...slots);
+    };
   const fresh = () => {
     signal.throwIfAborted();
     const time = now();
@@ -99,48 +123,54 @@ async function inspectPairRuntime(
     requireConsistentSolanaSlots(slots);
     return slot;
   };
-  const call: Rpc = async (method, params) => {
-    fresh();
-    const config = params[1] as { minContextSlot?: number } | undefined;
-    const scoped =
-      config && typeof config.minContextSlot === 'number'
-        ? [
-            params[0],
-            {
-              ...config,
-              minContextSlot: Math.max(config.minContextSlot, floor()),
-            },
-            ...params.slice(2),
-          ]
-        : params;
-    const result = await rpc(method, scoped);
-    fresh();
-    const requestedFloor = (
-      scoped[1] as { minContextSlot?: number } | undefined
-    )?.minContextSlot;
-    if (
-      typeof requestedFloor === 'number' &&
-      [
-        'getMultipleAccounts',
-        'getFeeForMessage',
-        'isBlockhashValid',
-        'simulateTransaction',
-      ].includes(method)
-    )
-      context(
-        (result as { context?: { slot?: unknown } })?.context?.slot,
-        requestedFloor,
-      );
-    return result;
-  };
-  const codeCall: Rpc = async (method, params) => {
-    fresh();
-    if (!['getMultipleAccounts', 'getGenesisHash'].includes(method))
-      throw Error('Pair code reader method differs.');
-    const result = await programRpc(method, params);
-    fresh();
-    return result;
-  };
+  const call: Rpc = inheritStockPairRpcScope(
+    rpc,
+    async (method, params, requestSignal) => {
+      fresh();
+      const config = params[1] as { minContextSlot?: number } | undefined;
+      const scoped =
+        config && typeof config.minContextSlot === 'number'
+          ? [
+              params[0],
+              {
+                ...config,
+                minContextSlot: Math.max(config.minContextSlot, floor()),
+              },
+              ...params.slice(2),
+            ]
+          : params;
+      const result = await rpc(method, scoped, requestSignal);
+      fresh();
+      const requestedFloor = (
+        scoped[1] as { minContextSlot?: number } | undefined
+      )?.minContextSlot;
+      if (
+        typeof requestedFloor === 'number' &&
+        [
+          'getMultipleAccounts',
+          'getFeeForMessage',
+          'isBlockhashValid',
+          'simulateTransaction',
+        ].includes(method)
+      )
+        context(
+          (result as { context?: { slot?: unknown } })?.context?.slot,
+          requestedFloor,
+        );
+      return result;
+    },
+  );
+  const codeCall: Rpc = inheritStockPairRpcScope(
+    programRpc,
+    async (method, params, requestSignal) => {
+      fresh();
+      if (!['getMultipleAccounts', 'getGenesisHash'].includes(method))
+        throw Error('Pair code reader method differs.');
+      const result = await programRpc(method, params, requestSignal);
+      fresh();
+      return result;
+    },
+  );
   fresh();
   assertPairOrderQuoteBounds(
     candidate.preflight.quote,
@@ -200,20 +230,40 @@ async function inspectPairRuntime(
     onContext?: (slot: number) => void,
   ) {
     const requestedFloor = floor();
-    const response = (await call('getMultipleAccounts', [
-      keys,
-      {
-        encoding: 'base64',
-        commitment: 'confirmed',
-        minContextSlot: requestedFloor,
-        ...(sliced ? { dataSlice: { offset: 0, length: 166 } } : {}),
-      },
-    ])) as { context?: { slot?: unknown }; value?: unknown[] };
+    let response: { context?: { slot?: unknown }; value?: unknown[] },
+      values: unknown;
+    const scope = stockPairRpcScope(call);
+    if (
+      !sliced &&
+      scope?.accountLimit === 5 &&
+      keys.length + (keys.includes(PAIR_CLOCK) ? 1 : 0) > 5
+    ) {
+      const observation = await readPairPartitionObservation(
+        keys,
+        requestedFloor,
+        call,
+        signal,
+        now,
+      );
+      response = observation.clockResponse;
+      values = observation.values;
+    } else {
+      response = (await call('getMultipleAccounts', [
+        keys,
+        {
+          encoding: 'base64',
+          commitment: 'confirmed',
+          minContextSlot: requestedFloor,
+          ...(sliced ? { dataSlice: { offset: 0, length: 166 } } : {}),
+        },
+      ])) as { context?: { slot?: unknown }; value?: unknown[] };
+      values = response?.value;
+    }
     const observedSlot = context(response?.context?.slot, requestedFloor);
     onContext?.(observedSlot);
-    if (!Array.isArray(response.value) || response.value.length !== keys.length)
+    if (!Array.isArray(values) || values.length !== keys.length)
       throw Error('Pair runtime account snapshot is incomplete.');
-    return response.value.map((raw) => {
+    return values.map((raw) => {
       const a = pumpRpcAccount(raw),
         declared = (raw as { space?: unknown } | null)?.space;
       return (
@@ -327,6 +377,7 @@ async function inspectPairRuntime(
       signal,
       (method, params) => codeCall(method, params),
       4,
+      stockPairRpcScope(programRpc)?.accountLimit === 5 ? 5 : 100,
     );
     context(String(code.maximumSlot), requestedFloor);
     return code;

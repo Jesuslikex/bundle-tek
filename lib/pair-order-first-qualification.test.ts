@@ -219,5 +219,8 @@ it('uses configured pacing by default even on a non-Helius provider', async () =
   expect(reader).toHaveBeenCalledExactlyOnceWith(
     'https://rpc.example.test/',
     expect.any(AbortSignal),
+    fetch,
+    'configured',
+    100,
   );
 });

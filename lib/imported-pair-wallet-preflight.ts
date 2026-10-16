@@ -1,4 +1,8 @@
 import {
+  inheritStockPairRpcScope,
+  type StockPairRpc,
+} from './pair-stock-clock';
+import {
   ImportedPairQuoteError,
   importedPairProviderError,
   importedPairQuoteRequest,
@@ -103,21 +107,32 @@ export async function preflightOwnedImportedPairWallet(
       );
     const provider = dependencies ?? configuredPairQuoteDependencies(signal),
       now = provider.now ?? Date.now;
-    const checked = async (method: string, params: unknown[]) => {
-      signal.throwIfAborted();
-      let result: unknown;
-      try {
-        result = await provider.rpc(method, params);
-      } catch (error) {
+    const checked = inheritStockPairRpcScope(
+      provider!.rpc,
+      async (
+        method: string,
+        params: unknown[],
+        requestSignal?: AbortSignal,
+      ) => {
         signal.throwIfAborted();
-        throw importedPairProviderError(
-          error,
-          'Pair wallet provider reads are unavailable.',
-        );
-      }
-      signal.throwIfAborted();
-      return result;
-    };
+        let result: unknown;
+        try {
+          result = await (provider.rpc as StockPairRpc)(
+            method,
+            params,
+            requestSignal,
+          );
+        } catch (error) {
+          signal.throwIfAborted();
+          throw importedPairProviderError(
+            error,
+            'Pair wallet provider reads are unavailable.',
+          );
+        }
+        signal.throwIfAborted();
+        return result;
+      },
+    );
     const quote = await quoteOwnedImportedPair(
       db,
       owner,

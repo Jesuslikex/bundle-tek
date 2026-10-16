@@ -1,3 +1,5 @@
+import { stockPairRpcScope } from './pair-stock-clock';
+import { readPairPartitionObservation } from './pair-partition-observation';
 import bs58 from 'bs58';
 import type { getCompiledTransactionMessageDecoder } from '@solana/kit';
 type Message = ReturnType<
@@ -29,21 +31,38 @@ export async function readSwapLookupAccounts(
     new Set(lookups.map((t) => t.lookupTableAddress)).size !== lookups.length
   )
     throw new Error('Invalid lookup table selection.');
-  const result = (await rpc('getMultipleAccounts', [
-    lookups.map((t) => t.lookupTableAddress),
-    { encoding: 'base64', commitment: 'confirmed', minContextSlot },
-  ])) as { context?: { slot?: unknown }; value?: unknown[] };
+  let result: { context?: { slot?: unknown }; value?: unknown[] },
+    values: unknown;
+  const scope = stockPairRpcScope(rpc);
+  if (scope?.accountLimit === 5 && lookups.length > 5) {
+    if (!scope.signal) throw Error('Stock lifecycle signal is missing.');
+    const observation = await readPairPartitionObservation(
+      lookups.map((t) => String(t.lookupTableAddress)),
+      minContextSlot,
+      rpc,
+      scope.signal,
+      scope.now,
+    );
+    result = observation.clockResponse;
+    values = observation.values;
+  } else {
+    result = (await rpc('getMultipleAccounts', [
+      lookups.map((t) => t.lookupTableAddress),
+      { encoding: 'base64', commitment: 'confirmed', minContextSlot },
+    ])) as { context?: { slot?: unknown }; value?: unknown[] };
+    values = result?.value;
+  }
   const observedSlot = slot(result?.context?.slot);
   if (
     observedSlot < minContextSlot ||
     observedSlot - minContextSlot > 32 ||
-    !Array.isArray(result.value) ||
-    result.value.length !== lookups.length
+    !Array.isArray(values) ||
+    values.length !== lookups.length
   )
     throw new Error('Inconsistent lookup observations.');
   const tables = [];
   for (let i = 0; i < lookups.length; i++) {
-    const account = result.value[i] as {
+    const account = values[i] as {
       owner?: unknown;
       executable?: unknown;
       data?: unknown;

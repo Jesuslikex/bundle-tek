@@ -7,11 +7,54 @@ import {
   createStockPairEvidenceRpc,
   PAIR_CLOCK,
   pairClockUnixTimestamp,
+  inheritStockPairRpcScope,
+  stockPairRpcScope,
 } from './pair-stock-clock';
+import { readPairPartitionObservation } from './pair-partition-observation';
 import { readPairMintEvidence } from './pair-mint-evidence';
 import { SWAP_TOKEN } from './swap-token-program-evidence';
 
 const now = 1792161668000;
+it('shares the promoted Clock floor and observation budget across checked partition readers', async () => {
+  const source = vi.fn(async (_method: string, params: unknown[]) => ({
+    context: { slot: '101' },
+    value: (params[0] as string[]).map((key) =>
+      key === PAIR_CLOCK ? pairQuoteClock(102, String(now / 1000)) : null,
+    ),
+  }));
+  const signal = new AbortController().signal;
+  const scope = createStockPairEvidenceRpc(source, source, () => now, {
+    endpoint: 'https://fixture.quiknode.pro/',
+    signal,
+  });
+  const checked = inheritStockPairRpcScope(
+    scope.rpc,
+    async (m: string, p: unknown[], s?: AbortSignal) => scope.rpc(m, p, s),
+  );
+  expect(stockPairRpcScope(checked)).toBe(scope);
+  expect(createStockPairEvidenceRpc(checked, scope.programRpc)).toBe(scope);
+  await readPairPartitionObservation(
+    ['11111111111111111111111111111111'],
+    100,
+    checked,
+    signal,
+    () => now,
+  );
+  expect(scope.latest()).toBe(102);
+  expect(scope.observations).toHaveLength(1);
+  expect(scope.partitions).toHaveLength(1);
+  await expect(
+    readPairPartitionObservation(
+      ['11111111111111111111111111111111'],
+      100,
+      checked,
+      signal,
+      () => now,
+    ),
+  ).rejects.toThrow();
+  expect(source.mock.calls[1][1][1]).toMatchObject({ minContextSlot: 102 });
+  expect(scope.observations).toHaveLength(1);
+});
 const pair = {
   inputMint: 'So11111111111111111111111111111111111111112',
   outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',

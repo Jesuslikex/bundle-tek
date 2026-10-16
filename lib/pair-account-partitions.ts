@@ -1,4 +1,11 @@
-import { createStockPairEvidenceRpc, PAIR_CLOCK } from './pair-stock-clock';
+import {
+  createStockPairEvidenceRpc,
+  PAIR_CLOCK,
+  pairEvidenceClock,
+  stockPairRpcScope,
+  trimStockPairClockResponse,
+  type PairClockObservation,
+} from './pair-stock-clock';
 
 type Rpc = (
   method: string,
@@ -11,9 +18,9 @@ type AccountConfig = {
   minContextSlot: number;
 };
 
-/** Review prototype only. Returns actual partition responses, never a fabricated RPC snapshot.
+/** Returns actual partition responses, never a fabricated RPC snapshot.
  * The caller must provide a request-scoped, bounded, paced transport capped at five accounts.
- * No production call site uses this collector yet. */
+ * The explicit QuickNode stock scope shares its existing Clock lifecycle. */
 export async function collectPairAccountPartitions(
   keys: readonly string[],
   config: AccountConfig,
@@ -62,6 +69,8 @@ export async function collectPairAccountPartitions(
   const requestKeys = [...keys],
     requestConfig = { ...config };
   const providerResponses: { params: unknown[]; response: unknown }[] = [];
+  const shared = stockPairRpcScope(source);
+  const localObservations: PairClockObservation[] = [];
   const scope = createStockPairEvidenceRpc(
     async (method, params) => {
       lifecycle.throwIfAborted();
@@ -92,10 +101,39 @@ export async function collectPairAccountPartitions(
       ...originalPositions.map((i) => requestKeys[i]),
       PAIR_CLOCK,
     ];
-    const response = (await scope.rpc('getMultipleAccounts', [
-      accountKeys,
-      { ...requestConfig },
-    ])) as {
+    const params: unknown[] = [accountKeys, { ...requestConfig }];
+    let observed: unknown;
+    if (shared) {
+      params[0] = [...accountKeys, PAIR_CLOCK];
+      params[1] = {
+        ...requestConfig,
+        minContextSlot: Math.max(requestConfig.minContextSlot, shared.latest()),
+      };
+      const record = {
+        params: structuredClone(params),
+        response: undefined as unknown,
+      };
+      providerResponses.push(record);
+      const raw = (await cancellable(
+        source('getMultipleAccounts', params, lifecycle),
+      )) as { context?: { slot?: unknown }; value?: unknown[] };
+      lifecycle.throwIfAborted();
+      record.response = raw;
+      const observation = pairEvidenceClock(
+        raw,
+        raw.value?.at(-1),
+        Number(raw.context?.slot),
+        now(),
+      );
+      if (
+        observation.contextSlot < requestConfig.minContextSlot ||
+        observation.slot > requestConfig.minContextSlot + 32
+      )
+        throw Error('Stock partition effective context differs.');
+      localObservations.push(observation);
+      observed = trimStockPairClockResponse(raw);
+    } else observed = await scope.rpc('getMultipleAccounts', params);
+    const response = observed as {
       context: { slot: string };
       value: unknown[];
     };
@@ -134,7 +172,7 @@ export async function collectPairAccountPartitions(
     requestedFloor: requestConfig.minContextSlot,
     partitions,
     providerResponses,
-    observations: [...scope.observations],
+    observations: shared ? localObservations : [...scope.observations],
     signingAllowed: false as const,
     executionAllowed: false as const,
   };

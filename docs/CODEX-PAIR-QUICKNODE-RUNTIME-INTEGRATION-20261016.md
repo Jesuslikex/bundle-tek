@@ -1,0 +1,11 @@
+# QuickNode stock runtime integration, 16 October 2026
+
+The configured HTTPS QuickNode stock endpoint now selects the five-account profile through the unsigned order-first qualification and owned runtime-preview paths. Other endpoint hosts retain the ordinary 100-account profile and configured pacing. No provider settings were changed.
+
+Full wallet, protected state and large lookup reads use retained actual partitions. Each partition has two real Clock accounts, identical context and complete Clock across its collection, positional coverage and the existing aggregate byte bound. There is no merged JSON-RPC snapshot. Checked RPC wrappers preserve a single request-scoped Clock floor, observation budget and cancellation lifecycle; the promoted +1 Clock slot contributes to later floors and the runtime span. Inventory and both full program scans select the same cap. A mixed account/code scope is refused before runtime reads. Group code defaults remain unchanged; this patch does not edit the group collector or signing policy.
+
+The qualifier records its account profile and partition collections, including actual request parameters and raw responses. Its source vector now includes both partition helpers. Signing and execution remain off, including after a successful unsigned qualification.
+
+Validation: 19 distinct Vitest files, 385 tests passing across the final 14-file/235-test and six-file/160-test runs (the ten qualification tests overlap). The real bounded transport is used against a synthetic HTTP provider enforcing five accounts: owned preparation, wallet checks, both code observations and one simulation complete; post-simulation wallet balance or program-byte changes refuse. Host scoping and promoted shared-floor tests pass. Existing ordering, account/custody, partition, lookup, quote-bound and group code-identity tests are included. All 21 offline qualification/campaign harness tests pass. Plain TypeScript and scoped typed lint pass. No build, full-app suite or live repeatability claim.
+
+Next: run the pinned SOL/USDC campaign, three each, stopping the entire sample on its first 429 and retaining every outcome. Same-context partition refusals remain refusals; do not retry or loosen checks. No deploy, signing, transaction, remote SQL, cron, credentials or Claude UI edits.

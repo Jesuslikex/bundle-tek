@@ -1,5 +1,9 @@
 import { collectPairAccountPartitions } from './pair-account-partitions';
-import { PAIR_CLOCK, pairEvidenceClock } from './pair-stock-clock';
+import {
+  PAIR_CLOCK,
+  pairEvidenceClock,
+  stockPairRpcScope,
+} from './pair-stock-clock';
 
 /** Explicit account/Clock observation, never a synthetic merged JSON-RPC result. */
 export async function readPairPartitionObservation(
@@ -52,6 +56,12 @@ export async function readPairPartitionObservation(
       Number(partition.response.context.slot),
       now(),
     );
+  const scope = stockPairRpcScope(rpc);
+  if (scope?.accountLimit === 5) {
+    if (scope.partitions.length >= 300)
+      throw Error('Stock partition collection budget exceeded.');
+    scope.partitions.push(partitions);
+  }
   return {
     values: hasClock ? mapped : mapped.slice(0, keys.length),
     clockResponse,

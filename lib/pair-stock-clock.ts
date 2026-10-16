@@ -13,8 +13,60 @@ export type PairClockObservation = {
   unixTimestamp: string;
 };
 export class StockPairEvidenceError extends Error {}
-type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
+export type StockPairRpc = (
+  method: string,
+  params: unknown[],
+  signal?: AbortSignal,
+) => Promise<unknown>;
+type Rpc = StockPairRpc;
 const stockResponses = new WeakMap<object, PairClockObservation>();
+type StockScope = {
+  rpc: Rpc;
+  programRpc: Rpc;
+  observations: PairClockObservation[];
+  accountLimit: 5 | 100;
+  signal?: AbortSignal;
+  now: () => number;
+  latest: () => number;
+  partitions: unknown[];
+};
+const stockScopes = new WeakMap<Rpc, StockScope>();
+export function stockPairRpcScope(rpc: Rpc) {
+  return stockScopes.get(rpc);
+}
+export function inheritStockPairRpcScope<T extends Rpc>(
+  source: Rpc,
+  target: T,
+): T {
+  const scope = stockScopes.get(source);
+  if (scope) stockScopes.set(target, scope);
+  return target;
+}
+export function stockPairAccountLimit(endpoint: string): 5 | 100 {
+  const url = new URL(endpoint);
+  return url.protocol === 'https:' &&
+    !url.username &&
+    !url.password &&
+    url.hostname.endsWith('.quiknode.pro')
+    ? 5
+    : 100;
+}
+/** Only removes the final redundant Clock from an already verified real response. */
+export function trimStockPairClockResponse(response: {
+  context?: { slot?: unknown };
+  value?: unknown[];
+}) {
+  const observation = stockResponses.get(response);
+  if (
+    !observation ||
+    !Array.isArray(response.value) ||
+    response.value.length < 2
+  )
+    throw Error('Verified stock Clock response required.');
+  const result = { ...response, value: response.value.slice(0, -1) };
+  stockResponses.set(result, observation);
+  return result;
+}
 
 function inspectClock(
   raw: unknown,
@@ -108,7 +160,14 @@ export function createStockPairEvidenceRpc(
   rpc: Rpc,
   codeRpc: Rpc = rpc,
   now: () => number = Date.now,
+  options?: { endpoint: string; signal: AbortSignal },
 ) {
+  const existing = stockScopes.get(rpc);
+  if (existing?.accountLimit === 5) {
+    if (codeRpc !== rpc && stockScopes.get(codeRpc) !== existing)
+      throw Error('Stock RPC scopes differ.');
+    return existing;
+  }
   let latest = 0;
   const observations: PairClockObservation[] = [];
   const stockClock = (raw: unknown, slot: number) => {
@@ -125,7 +184,9 @@ export function createStockPairEvidenceRpc(
   };
   const wrap =
     (source: Rpc): Rpc =>
-    async (method, params) => {
+    async (method, params, requestSignal) => {
+      requestSignal?.throwIfAborted();
+      options?.signal.throwIfAborted();
       const configIndex = ['getSlot', 'getBlockHeight'].includes(method)
         ? 0
         : 1;
@@ -145,10 +206,12 @@ export function createStockPairEvidenceRpc(
         scoped[configIndex] = { ...config, minContextSlot: floor };
       // Obtain two actual Clock values in the same response, without hiding duplicate disagreement.
       if (clocks.length === 1) scoped[0] = [...keys, PAIR_CLOCK];
-      const result = (await source(method, scoped)) as {
+      const result = (await source(method, scoped, requestSignal)) as {
         context?: { slot?: unknown };
         value?: unknown[];
       };
+      requestSignal?.throwIfAborted();
+      options?.signal.throwIfAborted();
       if (
         config?.minContextSlot !== undefined &&
         [
@@ -217,5 +280,17 @@ export function createStockPairEvidenceRpc(
       stockResponses.set(published, observation);
       return published;
     };
-  return { rpc: wrap(rpc), programRpc: wrap(codeRpc), observations };
+  const scope: StockScope = {
+    rpc: wrap(rpc),
+    programRpc: wrap(codeRpc),
+    observations,
+    accountLimit: options ? stockPairAccountLimit(options.endpoint) : 100,
+    signal: options?.signal,
+    now,
+    latest: () => latest,
+    partitions: [],
+  };
+  stockScopes.set(scope.rpc, scope);
+  stockScopes.set(scope.programRpc, scope);
+  return scope;
 }

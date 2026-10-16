@@ -1,3 +1,4 @@
+import { stockPairRpcScope } from './pair-stock-clock';
 import {
   getBase64Encoder,
   getBase64Decoder,
@@ -68,7 +69,12 @@ export async function collectPairOrderReview(
       preflight.quote.pair.mintPolicy.recheckSlot,
       preflight.evidence.slot,
     ],
-    floor = () => Math.max(...slots);
+    floor = () => {
+      const effective = stockPairRpcScope(rpc)?.latest() ?? 0;
+      if (effective > Math.max(...slots)) slots.push(effective);
+      requireConsistentSolanaSlots(slots);
+      return Math.max(...slots);
+    };
   const fresh = () => {
     const timestamp = now();
     if (
@@ -162,26 +168,34 @@ export async function collectPairOrderReview(
     slice: boolean,
   ): Promise<PairOrderAccountSnapshot[]> => {
     if (!addresses.length) return [];
-    const requestedFloor = floor();
-    const response = (await rpc('getMultipleAccounts', [
-      addresses,
-      {
-        encoding: 'base64',
-        commitment: 'confirmed',
-        minContextSlot: requestedFloor,
-        ...(slice ? { dataSlice: { offset: 0, length: 166 } } : {}),
-      },
-    ])) as { context?: { slot?: unknown }; value?: unknown[] };
-    slots.push(slot(response?.context?.slot, requestedFloor));
-    if (
-      !Array.isArray(response.value) ||
-      response.value.length !== addresses.length
-    )
-      throw Error('Pair candidate writable snapshot is incomplete.');
-    return addresses.map((address, i) => ({
-      address,
-      raw: response.value![i],
-    }));
+    const snapshots: PairOrderAccountSnapshot[] = [];
+    const limit = stockPairRpcScope(rpc)?.accountLimit === 5 ? 5 : 100;
+    for (let offset = 0; offset < addresses.length; offset += limit) {
+      const chunk = addresses.slice(offset, offset + limit);
+      const requestedFloor = floor();
+      const response = (await rpc('getMultipleAccounts', [
+        chunk,
+        {
+          encoding: 'base64',
+          commitment: 'confirmed',
+          minContextSlot: requestedFloor,
+          ...(slice ? { dataSlice: { offset: 0, length: 166 } } : {}),
+        },
+      ])) as { context?: { slot?: unknown }; value?: unknown[] };
+      slots.push(slot(response?.context?.slot, requestedFloor));
+      if (
+        !Array.isArray(response.value) ||
+        response.value.length !== chunk.length
+      )
+        throw Error('Pair candidate writable snapshot is incomplete.');
+      snapshots.push(
+        ...chunk.map((address, i) => ({
+          address,
+          raw: response.value![i],
+        })),
+      );
+    }
+    return snapshots;
   };
   const other = await readAccounts(
     writable.filter((a) => !selected.includes(a)),

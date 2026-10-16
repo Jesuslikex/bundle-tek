@@ -1,3 +1,7 @@
+import {
+  inheritStockPairRpcScope,
+  type StockPairRpc,
+} from './pair-stock-clock';
 import { env } from './server-env';
 import {
   ImportedPairQuoteError,
@@ -106,21 +110,32 @@ export async function inspectOwnedImportedPairOrder<Review>(
         prepare: (input, s) => prepareSolanaPair(input, env.JUPITER_API_KEY, s),
       };
     }
-    const checked = async (method: string, params: unknown[]) => {
-      signal.throwIfAborted();
-      let result: unknown;
-      try {
-        result = await provider!.rpc(method, params);
-      } catch (error) {
+    const checked = inheritStockPairRpcScope(
+      provider!.rpc,
+      async (
+        method: string,
+        params: unknown[],
+        requestSignal?: AbortSignal,
+      ) => {
         signal.throwIfAborted();
-        throw importedPairProviderError(
-          error,
-          'Pair candidate provider reads are unavailable.',
-        );
-      }
-      signal.throwIfAborted();
-      return result;
-    };
+        let result: unknown;
+        try {
+          result = await (provider!.rpc as StockPairRpc)(
+            method,
+            params,
+            requestSignal,
+          );
+        } catch (error) {
+          signal.throwIfAborted();
+          throw importedPairProviderError(
+            error,
+            'Pair candidate provider reads are unavailable.',
+          );
+        }
+        signal.throwIfAborted();
+        return result;
+      },
+    );
     const { prepareUnsigned: _consent, ...walletRequest } = input;
     const preflight = await preflightOwnedImportedPairWallet(
       db,

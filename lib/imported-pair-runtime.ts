@@ -1,5 +1,10 @@
 import { env } from './server-env';
-import { createStockPairEvidenceRpc } from './pair-stock-clock';
+import {
+  createStockPairEvidenceRpc,
+  stockPairAccountLimit,
+  inheritStockPairRpcScope,
+  type StockPairRpc,
+} from './pair-stock-clock';
 import { createPairReadRpc } from './pair-read-rpc';
 import { getSolanaStockRuntimeRpcEndpoint } from './solana-rpc';
 import {
@@ -65,7 +70,13 @@ export async function previewOwnedImportedPairRuntime(
       );
     const quote = dependencies ?? configuredPairQuoteDependencies(signal);
     if (!dependencies)
-      reads = createPairReadRpc(getSolanaStockRuntimeRpcEndpoint(), signal);
+      reads = createPairReadRpc(
+        getSolanaStockRuntimeRpcEndpoint(),
+        signal,
+        fetch,
+        'configured',
+        stockPairAccountLimit(getSolanaStockRuntimeRpcEndpoint()),
+      );
     const provider: ImportedPairRuntimeDependencies = {
       ...(dependencies ?? {
         ...quote,
@@ -78,25 +89,36 @@ export async function previewOwnedImportedPairRuntime(
       provider.rpc,
       provider.programRpc ?? provider.rpc,
       provider.now,
+      { endpoint: getSolanaStockRuntimeRpcEndpoint(), signal },
     );
     provider.rpc = stockReads.rpc;
     provider.programRpc = stockReads.programRpc;
-    const checked =
-      (fn: typeof provider.rpc) =>
-      async (method: string, params: unknown[]) => {
-        signal.throwIfAborted();
-        try {
-          const result = await fn(method, params);
+    const checked = (fn: typeof provider.rpc) =>
+      inheritStockPairRpcScope(
+        fn,
+        async (
+          method: string,
+          params: unknown[],
+          requestSignal?: AbortSignal,
+        ) => {
           signal.throwIfAborted();
-          return result;
-        } catch (error) {
-          if (signal.aborted) signal.throwIfAborted();
-          throw importedPairProviderError(
-            error,
-            'Pair runtime provider reads are unavailable.',
-          );
-        }
-      };
+          try {
+            const result = await (fn as StockPairRpc)(
+              method,
+              params,
+              requestSignal,
+            );
+            signal.throwIfAborted();
+            return result;
+          } catch (error) {
+            if (signal.aborted) signal.throwIfAborted();
+            throw importedPairProviderError(
+              error,
+              'Pair runtime provider reads are unavailable.',
+            );
+          }
+        },
+      );
     const { inspectRuntime: _intent, ...orderRequest } = input;
     const inspected = await inspectOwnedImportedPairOrder(
       db,

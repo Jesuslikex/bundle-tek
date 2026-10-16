@@ -1,3 +1,4 @@
+import { stockPairRpcScope } from './pair-stock-clock';
 import { readPairPartitionObservation } from './pair-partition-observation';
 import { pairEvidenceClock } from './pair-stock-clock';
 import { address } from '@solana/kit';
@@ -17,6 +18,21 @@ export async function readPairOrderState(
   rpc: (method: string, params: unknown[]) => Promise<unknown>,
   now: () => number = Date.now,
 ) {
+  const scope = stockPairRpcScope(rpc);
+  if (scope?.accountLimit === 5) {
+    if (!scope.signal) throw Error('Stock lifecycle signal is missing.');
+    return (
+      await readPartitionedPairOrderState(
+        protectedAccounts,
+        selectedMints,
+        intermediateMints,
+        minimumSlot,
+        rpc,
+        scope.signal,
+        now,
+      )
+    ).state;
+  }
   return collectPairOrderState(
     protectedAccounts,
     selectedMints,
@@ -32,7 +48,7 @@ export async function readPairOrderState(
     now,
   );
 }
-/** Offline composition only; production callers retain their original single-read entry point. */
+/** Explicit partition composition; ordinary unscoped callers keep a single read. */
 export async function readPartitionedPairOrderState(
   protectedAccounts: string[],
   selectedMints: [string, string],
