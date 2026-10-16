@@ -37,6 +37,35 @@ const run = (
     signal,
     v.orderDependencies,
   );
+it('identifies a changed system balance as custody churn rather than accepting or misclassifying instruction bytes', async () => {
+  const v = (f = await pairOrderFixture());
+  const original = v.rpc.getMockImplementation()!;
+  let walletReads = 0;
+  v.rpc.mockImplementation(async (method, params) => {
+    const result = await original(method, params);
+    if (
+      method === 'getMultipleAccounts' &&
+      (params[0] as string[])[0] === v.wallet &&
+      ++walletReads === 3
+    ) {
+      const wallet = (result as { value: { lamports: string }[] }).value[0];
+      wallet.lamports = (BigInt(wallet.lamports) - 1n).toString();
+    }
+    return result;
+  });
+  await expect(run(v)).rejects.toMatchObject({
+    status: 409,
+    cause: {
+      pairDiagnostic: {
+        check: 'system-wallet-state',
+        nativeBalanceChanged: true,
+        systemOwnerChanged: false,
+        systemExecutable: false,
+        systemDataChanged: false,
+      },
+    },
+  });
+});
 function addReadonly(m: Message, key: string) {
   let index = m.staticAccounts.findIndex((a) => a === key);
   if (index < 0) {

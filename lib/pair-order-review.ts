@@ -62,12 +62,16 @@ export async function reviewPairOrderInstructions(
   networkFeeRaw: string,
   auxiliary: PairAuxiliaryAccount[] = [],
 ) {
-  const fail = (check: string): never => {
+  const fail = (
+    check: string,
+    details: Record<string, boolean> = {},
+  ): never => {
     throw pairReviewDiagnostic(
       Error(
         'Pair candidate instructions, accounts or raw spending limits differ.',
       ),
       check,
+      details,
     );
   };
   const original = preflight.quote,
@@ -219,7 +223,13 @@ export async function reviewPairOrderInstructions(
     w.bytes.length ||
     w.lamports !== BigInt(preflight.evidence.nativeBalanceRaw)
   )
-    fail('system-wallet-state');
+    fail('system-wallet-state', {
+      nativeBalanceChanged:
+        w.lamports !== BigInt(preflight.evidence.nativeBalanceRaw),
+      systemOwnerChanged: w.owner !== SYSTEM,
+      systemExecutable: w.executable,
+      systemDataChanged: w.bytes.length !== 0,
+    });
   // Every wallet-controlled token account must belong to the selected pair or
   // the explicitly protected intermediate set. Delegated/close-only custody
   // remains unsupported.
