@@ -225,7 +225,13 @@ export async function collectPumpProgramIdentities(
               String(item.declared)
           )
             throw new Error('Program identity changed during code read.');
-          const chunk = pumpAccountBytes(part);
+          // The envelope has already passed pumpRpcAccount's canonical base64,
+          // owner and u64 validation. Avoid a JS callback per byte for the
+          // explicit pair-only four-read profile. Own the bytes just as before.
+          const chunk =
+            maxConcurrentCodeReads === 4
+              ? Uint8Array.from(Buffer.from(part.data[0], 'base64'))
+              : pumpAccountBytes(part);
           if (
             chunk.length > batch.chunkSize ||
             (item.space !== null &&

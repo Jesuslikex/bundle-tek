@@ -15,6 +15,8 @@ function fixture(kind = 'ok', space = true, size = 300000) {
   const calls: string[] = [];
   const code = new Uint8Array(size);
   code.set([127, 69, 76, 70]);
+  if (kind === 'binary')
+    for (let i = 4; i < code.length; i++) code[i] = i % 256;
   const link = new Uint8Array(36);
   new DataView(link.buffer).setUint32(0, 2, true);
   link.set(new Uint8Array(32).fill(3), 4);
@@ -78,6 +80,54 @@ function fixture(kind = 'ok', space = true, size = 300000) {
   };
   return { rpc, calls, code };
 }
+it('retains all binary bytes and hashes in the pair-only fast decoder with the serial default unchanged', async () => {
+  const f = fixture('binary', true, 740000);
+  const serial = await collectPumpProgramIdentities(
+    [program, system],
+    100,
+    new AbortController().signal,
+    f.rpc,
+  );
+  const fast = await collectPumpProgramIdentities(
+    [program, system],
+    100,
+    new AbortController().signal,
+    f.rpc,
+    4,
+  );
+  expect(fast.programs).toEqual(serial.programs);
+  expect(fast.programs[0].codeSha256).toBe(
+    Buffer.from(await crypto.subtle.digest('SHA-256', f.code)).toString('hex'),
+  );
+});
+it.each(['newline', 'invalid-symbol', 'extra-padding'] as const)(
+  'still rejects noncanonical %s base64 before the fast decoder',
+  async (mode) => {
+    const f = fixture();
+    const rpc: PumpLaunchRpc = async (method, params, signal) => {
+      const result = (await f.rpc(method, params, signal)) as {
+        value?: { data: string[] }[];
+      };
+      const slice = (
+        params[1] as { dataSlice?: { length: number } } | undefined
+      )?.dataSlice;
+      if (method === 'getMultipleAccounts' && slice && slice.length > 45)
+        for (const a of result.value ?? [])
+          a.data[0] +=
+            mode === 'newline' ? '\n' : mode === 'invalid-symbol' ? '!' : '=';
+      return result;
+    };
+    await expect(
+      collectPumpProgramIdentities(
+        [program],
+        100,
+        new AbortController().signal,
+        rpc,
+        4,
+      ),
+    ).rejects.toThrow();
+  },
+);
 it.each([4096, 100 * 1024])(
   'packs unequal declared code sizes with fewer calls and the same complete hashes, short size=%i',
   async (shortSize) => {
