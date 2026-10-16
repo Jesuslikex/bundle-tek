@@ -12,6 +12,7 @@ import { pairQuoteMint } from '../test/imported-pair-quote-fixture';
 import { pairQuoteClock } from '../test/imported-pair-quote-fixture';
 import {
   prepareOwnedImportedPairOrder,
+  inspectOwnedImportedPairOrder,
   importedPairOrderRequest,
 } from './imported-pair-order-candidate';
 import { SWAP_TOKEN, SWAP_WRAPPED_SOL } from './swap-token-program-evidence';
@@ -980,4 +981,29 @@ it('cancels a stalled simulation without storing approval or signature material'
       .prepare('SELECT count(*) AS n FROM imported_token_project_events')
       .get(),
   ).toMatchObject({ n: 0 });
+});
+
+it('retains a private diagnostic cause without exposing it in the public candidate refusal', async () => {
+  const v = (f = await pairOrderFixture());
+  const cause = new Error('private diagnostic fixture');
+  const error = (await inspectOwnedImportedPairOrder(
+    v.db,
+    'alice',
+    v.orderRequest,
+    new AbortController().signal,
+    v.orderDependencies,
+    async () => {
+      throw cause;
+    },
+  ).catch((e: unknown) => e)) as Error & {
+    status: number;
+    cause: unknown;
+  };
+  expect(error.status).toBe(409);
+  expect(error.message).toBe(
+    'Unsigned pair candidate did not pass independent account, instruction, simulation, fee or lifetime review. No approval or signature was created.',
+  );
+  expect(error.cause).toBe(cause);
+  expect(Object.keys(error)).not.toContain('cause');
+  expect(JSON.stringify(error)).not.toContain('private diagnostic fixture');
 });
