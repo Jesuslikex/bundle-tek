@@ -290,6 +290,9 @@ async function quoteSolanaSwap(
     minimumOutAmount: minimum.toString(),
     slippageBps: 50,
     router: data.router,
+    ...(input.taker && data.priceImpactPct !== undefined
+      ? { priceImpactPct: validOrderPriceImpact(data.priceImpactPct) }
+      : {}),
     ...(platformFee ? { platformFee } : {}),
     source: 'api.jup.ag',
     observedAt: new Date().toISOString(),
@@ -383,6 +386,18 @@ export async function prepareSolanaPair(
 export type SolanaPairPreparation = Awaited<
   ReturnType<typeof prepareSolanaPair>
 >;
+/** Preserve only bounded provider estimates. Never silently present missing impact as zero. */
+function validOrderPriceImpact(value: unknown): string {
+  const text =
+    typeof value === 'number' && Number.isFinite(value) ? String(value) : value;
+  if (
+    typeof text !== 'string' ||
+    !/^-?\d{1,3}(?:\.\d{1,18})?$/.test(text) ||
+    Math.abs(Number(text)) > 100
+  )
+    throw new WarmupQuoteError('Invalid order price impact estimate.');
+  return text;
+}
 export type SolanaSwapPreparation = Awaited<
   ReturnType<typeof prepareSolanaSwap>
 >;
