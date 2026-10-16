@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { pairOrderMarketBound } from './pair-order-market-bound';
+import {
+  pairOrderMarketBound,
+  readPairOrderMarketBound,
+} from './pair-order-market-bound';
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import type { ImportedPairQuote } from './imported-trade-pair';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 import type { SavedTokenMarket } from './token-market';
@@ -123,4 +127,69 @@ it('allows exactly five minutes and retains the earlier USD-source expiry', () =
     available: true,
     expiresAt: stamp,
   });
+});
+it('reads the stats collection for the current owner/revisions and never substitutes another owner or archived quote', async () => {
+  const { q, order, base, counter } = setup();
+  q.pair.projectId = 'base-project';
+  const sqlite = new DatabaseSync(':memory:');
+  try {
+    sqlite.exec(
+      'CREATE TABLE imported_token_projects(owner_id TEXT,id TEXT,chain TEXT,address TEXT,revision INTEGER,archived INTEGER); CREATE TABLE imported_market_observations(owner_id TEXT,project_id TEXT,document TEXT,observed_at TEXT)',
+    );
+    for (const [owner, id, obs] of [
+      ['alice', 'base-project', base],
+      ['alice', 'quote-project', counter],
+      [
+        'bob',
+        'other-project',
+        { ...counter, pairs: [{ ...counter.pairs[0], priceUsd: '10000' }] },
+      ],
+    ] as const) {
+      sqlite
+        .prepare('INSERT INTO imported_token_projects VALUES(?,?,?,?,?,0)')
+        .run(owner, id, 'Solana', obs.address, 1);
+      sqlite
+        .prepare('INSERT INTO imported_market_observations VALUES(?,?,?,?)')
+        .run(owner, id, JSON.stringify([obs]), obs.observedAt);
+    }
+    const db = {
+      prepare(sql: string) {
+        let values: SQLInputValue[] = [];
+        return {
+          bind(...args: SQLInputValue[]) {
+            values = args;
+            return this;
+          },
+          async first() {
+            return sqlite.prepare(sql).get(...values) ?? null;
+          },
+        };
+      },
+    } as unknown as D1Database;
+    expect(
+      await readPairOrderMarketBound(db, 'alice', q, order, now),
+    ).toMatchObject({
+      available: true,
+      quotePriceUsd: '1',
+      orderImpliedBasePriceUsd: '10.000000000000000000',
+      acknowledgementRequired: false,
+    });
+    sqlite.exec(
+      "UPDATE imported_token_projects SET archived=1 WHERE id='quote-project'",
+    );
+    expect(
+      await readPairOrderMarketBound(db, 'alice', q, order, now),
+    ).toMatchObject({
+      available: false,
+      reason: expect.stringContaining('exact pair asset'),
+    });
+    sqlite.exec(
+      "UPDATE imported_token_projects SET revision=2 WHERE id='base-project'",
+    );
+    expect(
+      await readPairOrderMarketBound(db, 'alice', q, order, now),
+    ).toMatchObject({ available: false });
+  } finally {
+    sqlite.close();
+  }
 });
