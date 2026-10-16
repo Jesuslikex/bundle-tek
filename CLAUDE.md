@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October five-account stock evidence prototype
+
+Read docs/CODEX-PAIR-ACCOUNT-CAP-20261016.md and docs/CODEX-PAIR-ACCOUNT-PARTITIONS-20261016.md. f3e6f0f adds an opt-in actual transport account cap, default100 unchanged. Separate unconnected partition collector keeps original positions and actual five-account responses with two Clocks each; requires identical raw context and full Clock across partitions, no mixed-slot merge/retry. Seven files/137 tests, plain TypeScript, scoped typed lint and formatting pass. Review before wiring wallet/runtime consumers; sliced inventory/code compatibility and a new fixed live campaign remain open. No production call site opts in, no UI/provider/credential/SQL/cron/deploy/wallet action. Signing stays off; preserve main dirty files.
+
 ## 16 October fixed QuickNode qualification diagnosis
 
 Read docs/CODEX-PAIR-QUICKNODE-FIXED-SAMPLE-20261016.md/.json. ebdcba6 first fixes raw Clock capture for both admitted endpoints without new calls/rule changes (21 offline tests, syntax/lint/format pass). One fixed Node24 campaign: SOL0/3, USDC0/3, all reference audits unchanged, no429/retry/replacement. Four HTTP413 wallet reads at7/8 accounts; separate two-call probe proves trial max5 (5success,6refusal-32615). Two strict initial-minimum refusals retained. All26 Clocks equal and raw duplicate hashes correlate; maxskew1570ms. No simulation/code scan/32slot pass. All six source vectors/hashes and summary verify. Need reviewed context-preserving count-limited reads, never concatenate different slots as one snapshot. No app/UI/provider/credential/SQL/cron/push/deploy/wallet action, signing off. Private transfer files removed. Preserve main dirty files.
