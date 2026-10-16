@@ -314,12 +314,11 @@ export async function collectPairOrderReview(
       ...(captureRuntimeTrace ? { innerInstructions: true } : {}),
     },
   ]);
-  slots.push(
-    slot(
-      (simulationResponse as { context?: { slot?: unknown } })?.context?.slot,
-      floor(),
-    ),
+  const simulationSlot = slot(
+    (simulationResponse as { context?: { slot?: unknown } })?.context?.slot,
+    floor(),
   );
+  slots.push(simulationSlot);
   const simulation = await reviewPairOrderSimulation(
     preflight,
     assessment,
@@ -339,7 +338,14 @@ export async function collectPairOrderReview(
   if (captureRuntimeTrace)
     (
       simulationResponse as { value: { accounts: unknown[] } }
-    ).value.accounts.forEach(assertPairRuntimeWritableAccount);
+    ).value.accounts.forEach((raw, i) =>
+      assertPairRuntimeWritableAccount(raw, {
+        address: writable[i],
+        phase: 'simulation-post-state',
+        slot: simulationSlot,
+        before: snapshots.find((a) => a.address === writable[i])?.raw,
+      }),
+    );
   fresh();
   const afterFloor = floor();
   const afterSimulation = barriers?.afterSimulation?.(afterFloor);

@@ -11,6 +11,10 @@ import {
 } from './stock-reference-activity.mjs';
 import { stockReferenceFixture } from './stock-reference-fixture.mjs';
 import {
+  hasStockClockRequest,
+  captureStockClockWire,
+} from './stock-clock-wire.mjs';
+import {
   measureStockProvider,
   stockQuoteGaps,
 } from './stock-provider-timing.mjs';
@@ -66,6 +70,8 @@ const files = [
   'lib/imported-pair-wallet-preflight.ts',
   'lib/imported-pair-quote-service.ts',
   'lib/pair-runtime-preview.ts',
+  'lib/pair-runtime-exposure.ts',
+  'lib/pair-order-simulation.ts',
   'lib/pair-order-collector.ts',
   'lib/pair-read-rpc.ts',
   'lib/wallet-rpc-pacing.ts',
@@ -81,6 +87,7 @@ const files = [
   'scripts/stock-reference-activity.mjs',
   'scripts/stock-reference-fixture.mjs',
   'scripts/stock-provider-timing.mjs',
+  'scripts/stock-clock-wire.mjs',
 ];
 const sourceFiles = Object.fromEntries(
   files.map((p) => [p, hash(readFileSync(p))]),
@@ -216,6 +223,18 @@ try {
     const response = await fetch(url, { ...init, redirect: 'manual' });
     row.status = response.status;
     row.headerMs = clock() - row.startMs;
+    if (u.href === new URL(endpoint).href) {
+      const request = JSON.parse(init.body);
+      if (hasStockClockRequest(request)) {
+        const observationStart = clock();
+        try {
+          row.clockWire = await captureStockClockWire(response, request);
+        } catch {
+          row.clockWireUnavailable = true;
+        }
+        row.clockWireObservationMs = clock() - observationStart;
+      }
+    }
     if (response.status === 429) {
       receipt.rateLimited = true;
       stop.abort(Error('Provider rate limit; no retry.'));
@@ -262,6 +281,7 @@ try {
         const bytes = Buffer.from(raw?.data?.[0] ?? '', 'base64');
         if (bytes.length === 40) {
           row.clockSlot = bytes.readBigUInt64LE(0).toString();
+          row.clockDataSha256 = hash(bytes);
           row.chainUnix = bytes.readBigInt64LE(32).toString();
           row.clockSkewMs = Date.now() - Number(row.chainUnix) * 1000;
           row.receivedServerTimeMs = Date.now();
@@ -703,6 +723,7 @@ try {
       'unixDelta',
       'evaluatedServerTimeMs',
       'instructionIndex',
+      'accountDataBytes',
     ])
       if (Number.isSafeInteger(d[key])) receipt.diagnostic[key] = d[key];
     for (const key of [
@@ -711,6 +732,9 @@ try {
       'instructionProgram',
       'instructionDataHex',
       'instructionAccounts',
+      'accountAddress',
+      'accountOwner',
+      'observationPhase',
     ])
       if (
         typeof d[key] === 'string' &&

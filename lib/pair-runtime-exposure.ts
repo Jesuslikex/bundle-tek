@@ -1,4 +1,8 @@
 import { pumpAccountBytes, pumpRpcAccount } from './pump-launch-simulation';
+import {
+  pairReviewDiagnostic,
+  pairDiagnosticComparisons,
+} from './pair-review-diagnostic';
 const UNSUPPORTED_WRITABLE_OWNERS = new Set([
   'Stake11111111111111111111111111111111111111',
   'Vote111111111111111111111111111111111111111',
@@ -9,7 +13,15 @@ const UNSUPPORTED_WRITABLE_OWNERS = new Set([
   'BPFLoader1111111111111111111111111111111111',
 ]);
 /** Trading runtime profile only; apply to both observed and simulated writable state. */
-export function assertPairRuntimeWritableAccount(raw: unknown) {
+export function assertPairRuntimeWritableAccount(
+  raw: unknown,
+  observation?: {
+    address: string;
+    phase: 'before-inventory' | 'after-inventory' | 'simulation-post-state';
+    slot: number;
+    before?: unknown;
+  },
+) {
   const a = pumpRpcAccount(raw);
   if (
     a &&
@@ -17,8 +29,60 @@ export function assertPairRuntimeWritableAccount(raw: unknown) {
       UNSUPPORTED_WRITABLE_OWNERS.has(a.owner) ||
       (a.owner === '11111111111111111111111111111111' &&
         pumpAccountBytes(a).length))
-  )
-    throw Error(
-      'Pair runtime exposes unsupported writable custody or executable state.',
+  ) {
+    // Diagnostic metadata only. Keep the rejection condition above unchanged.
+    const dataBytes = pumpAccountBytes(a).length;
+    let before: ReturnType<typeof pumpRpcAccount> | undefined;
+    try {
+      if (observation?.before !== undefined)
+        before = pumpRpcAccount(observation.before);
+    } catch {
+      /* Unavailable historical evidence is never reconstructed. */
+    }
+    throw pairReviewDiagnostic(
+      Error(
+        'Pair runtime exposes unsupported writable custody or executable state.',
+      ),
+      'writable-runtime-state',
+      {
+        ...(observation
+          ? {
+              accountAddress: observation.address,
+              observationPhase: observation.phase,
+              contextSlot: observation.slot,
+            }
+          : {}),
+        accountOwner: a.owner,
+        accountDataBytes: dataBytes,
+        comparisons: pairDiagnosticComparisons(
+          {
+            executable: false,
+            blockedOwner: false,
+            systemDataBytes: 0,
+            priorOwner:
+              before === undefined
+                ? '<unavailable>'
+                : (before?.owner ?? '<absent>'),
+            priorExecutable:
+              before === undefined
+                ? '<unavailable>'
+                : (before?.executable ?? '<absent>'),
+            priorLamports:
+              before === undefined
+                ? '<unavailable>'
+                : (before?.lamports ?? '<absent>'),
+          },
+          {
+            executable: a.executable,
+            blockedOwner: UNSUPPORTED_WRITABLE_OWNERS.has(a.owner),
+            systemDataBytes:
+              a.owner === '11111111111111111111111111111111' ? dataBytes : 0,
+            priorOwner: a.owner,
+            priorExecutable: a.executable,
+            priorLamports: a.lamports,
+          },
+        ),
+      },
     );
+  }
 }

@@ -183,7 +183,11 @@ async function inspectPairRuntime(
   const route = assessJupiterRoute(top, candidate.order);
   if (route.status !== 'Matched fields' || !route.decoded)
     throw Error('Pair runtime route fields differ.');
-  async function read(keys: string[], sliced: boolean) {
+  async function read(
+    keys: string[],
+    sliced: boolean,
+    onContext?: (slot: number) => void,
+  ) {
     const requestedFloor = floor();
     const response = (await call('getMultipleAccounts', [
       keys,
@@ -194,7 +198,8 @@ async function inspectPairRuntime(
         ...(sliced ? { dataSlice: { offset: 0, length: 166 } } : {}),
       },
     ])) as { context?: { slot?: unknown }; value?: unknown[] };
-    context(response?.context?.slot, requestedFloor);
+    const observedSlot = context(response?.context?.slot, requestedFloor);
+    onContext?.(observedSlot);
     if (!Array.isArray(response.value) || response.value.length !== keys.length)
       throw Error('Pair runtime account snapshot is incomplete.');
     return response.value.map((raw) => {
@@ -211,12 +216,26 @@ async function inspectPairRuntime(
       );
     });
   }
-  async function inventory() {
+  async function inventory(
+    phase: 'before-inventory' | 'after-inventory',
+    previous?: unknown[],
+  ) {
     const accounts = [];
+    const observedSlots: number[] = [];
     for (let offset = 0; offset < keys.length; offset += 100)
-      accounts.push(...(await read(keys.slice(offset, offset + 100), true)));
+      accounts.push(
+        ...(await read(keys.slice(offset, offset + 100), true, (slot) =>
+          observedSlots.push(slot),
+        )),
+      );
     for (const [i, a] of accounts.entries())
-      if (writable.includes(keys[i])) assertPairRuntimeWritableAccount(a);
+      if (writable.includes(keys[i]))
+        assertPairRuntimeWritableAccount(a, {
+          address: keys[i],
+          phase,
+          slot: observedSlots[Math.floor(i / 100)],
+          before: previous?.[i],
+        });
     const programs = accounts
       .flatMap((a, i) => (a?.executable ? [keys[i]] : []))
       .sort();
@@ -239,7 +258,7 @@ async function inspectPairRuntime(
   )
     throw Error('Pair runtime selected privileges differ.');
   async function initialEvidence() {
-    const beforeInventory = await inventory();
+    const beforeInventory = await inventory('before-inventory');
     // Reuse the bounded account inventory for intermediate discovery.
     const auxiliary = discoverPairAuxiliaryAccounts(
       candidate.preflight.wallet,
@@ -404,7 +423,7 @@ async function inspectPairRuntime(
     const { beforeInventory, protectedState, beforeCode, beforeAccounts } =
       state;
     const [afterInventory, observation] = await Promise.all([
-      inventory(),
+      inventory('after-inventory', beforeInventory.accounts),
       observeCode(beforeInventory),
     ]);
     if (

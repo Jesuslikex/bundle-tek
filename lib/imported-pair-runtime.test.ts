@@ -300,6 +300,54 @@ it.each(['nonce', 'stake', 'loader', 'executable'] as const)(
     await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
   },
 );
+it.each(['before-inventory', 'simulation-post-state'] as const)(
+  'preserves a private account/phase diagnostic through the public 409: %s',
+  async (phase) => {
+    const fixture = (f = await pairRuntimeFixture());
+    const key = bs58.encode(new Uint8Array(32).fill(33));
+    extraAccount(fixture, key, true);
+    const safe = {
+      owner: '11111111111111111111111111111111',
+      executable: false,
+      lamports: '1000000',
+      data: ['', 'base64'],
+    };
+    const blocked = {
+      ...safe,
+      owner: 'Stake11111111111111111111111111111111111111',
+    };
+    fixture.orderState.otherAccounts.set(
+      key,
+      phase === 'before-inventory' ? blocked : safe,
+    );
+    if (phase === 'simulation-post-state')
+      fixture.orderState.onSimulation = (response, addresses) => {
+        response.value.accounts[addresses.indexOf(key)] = blocked;
+      };
+    let caught: unknown;
+    try {
+      await run(fixture);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toMatchObject({ status: 409 });
+    expect(JSON.stringify(caught)).not.toContain(key);
+    const diagnostics: unknown[] = [];
+    for (let depth = 0; caught && depth < 8; depth++) {
+      const current = caught as { cause?: unknown; pairDiagnostic?: unknown };
+      if (current.pairDiagnostic) diagnostics.push(current.pairDiagnostic);
+      caught = current.cause;
+    }
+    expect(diagnostics).toContainEqual(
+      expect.objectContaining({
+        check: 'writable-runtime-state',
+        accountAddress: key,
+        observationPhase: phase,
+        accountOwner: blocked.owner,
+      }),
+    );
+  },
+);
 it('rechecks saved ownership context after the complete code observations', async () => {
   const fixture = (f = await pairRuntimeFixture());
   fixture.runtimeState.onTrace = (trace) => {
