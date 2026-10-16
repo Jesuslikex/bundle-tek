@@ -9,6 +9,11 @@ import { pathToFileURL } from 'node:url';
 const args = new Set(process.argv.slice(2));
 if (
   !args.has('--live-readonly') ||
+  [
+    '--known-public-reference',
+    '--reserve-reference',
+    '--idle-reference',
+  ].filter((a) => args.has(a)).length > 1 ||
   [...args].some(
     (a) =>
       ![
@@ -17,11 +22,12 @@ if (
         '--quote-usdc',
         '--one-unit',
         '--reserve-reference',
+        '--idle-reference',
       ].includes(a),
   )
 )
   throw Error(
-    'Use --live-readonly; optional --known-public-reference, --quote-usdc, --one-unit. No signing or send mode exists.',
+    'Use --live-readonly; optional --idle-reference, --quote-usdc, --one-unit. Reference selection modes are exclusive. No signing or send mode exists.',
   );
 const baseMint = 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB',
   quoteMint = args.has('--quote-usdc')
@@ -30,6 +36,11 @@ const baseMint = 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB',
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const files = [
   'lib/pair-order-first-service.ts',
+  'lib/pair-order-review.ts',
+  'lib/pair-review-diagnostic.ts',
+  'lib/pair-wallet-evidence.ts',
+  'lib/pair-mint-evidence.ts',
+  'lib/imported-pair-wallet-preflight.ts',
   'lib/pair-order-first-review.ts',
   'lib/pair-order-market-bound.ts',
   'lib/token-market.ts',
@@ -84,7 +95,9 @@ const receipt = {
     ? 'public-largest-system-accounts'
     : args.has('--known-public-reference')
       ? 'retained-public-transaction-reference'
-      : 'fresh-public-transaction-reference',
+      : args.has('--idle-reference')
+        ? 'idle-public-transaction-reference'
+        : 'fresh-public-transaction-reference',
   userWallets: 0,
   privateKeys: 0,
   signatures: 0,
@@ -294,6 +307,38 @@ try {
     ];
   }
   if (!keys.length) throw Error('No public reference candidates.');
+  if (args.has('--idle-reference')) {
+    const currentSlot = Number(
+      await rpc('getSlot', [{ commitment: 'confirmed' }]),
+    );
+    // Bounded reference selection, not a retry of a refused trade. Never use a
+    // live user wallet or relax custody checks to accommodate a busy reference.
+    const activity = await Promise.all(
+      keys.map((key) =>
+        rpc('getSignaturesForAddress', [
+          key,
+          { commitment: 'confirmed', limit: 1 },
+        ]),
+      ),
+    );
+    const eligible = keys.filter((_, i) => {
+      const slot = activity[i]?.[0]?.slot;
+      return (
+        typeof slot === 'string' &&
+        /^[1-9]\d{0,15}$/.test(slot) &&
+        Number.isSafeInteger(Number(slot)) &&
+        Number(slot) <= currentSlot - 256
+      );
+    });
+    receipt.referenceSelection = {
+      minimumIdleSlots: 256,
+      checked: keys.length,
+      eligible: eligible.length,
+    };
+    keys = eligible;
+    if (!keys.length)
+      throw Error('No idle public reference; no custody check was relaxed.');
+  }
   const atas = args.has('--quote-usdc')
     ? await Promise.all(
         keys.map((key) =>
@@ -522,6 +567,34 @@ try {
   receipt.stage = 'complete';
   receipt.passed = true;
 } catch (error) {
+  for (
+    let current = error, depth = 0;
+    current && depth < 8;
+    current = current.cause, depth++
+  ) {
+    const d = current.pairDiagnostic;
+    if (!d || !/^[a-z-]{1,64}$/.test(d.check)) continue;
+    receipt.diagnostic = { check: d.check };
+    for (const key of [
+      'contextSlot',
+      'clockSlot',
+      'wallSkewMs',
+      'slotDelta',
+      'unixDelta',
+    ])
+      if (Number.isSafeInteger(d[key])) receipt.diagnostic[key] = d[key];
+    if (typeof d.nativeBalanceChanged === 'boolean')
+      receipt.diagnostic.nativeBalanceChanged = d.nativeBalanceChanged;
+    if (
+      Array.isArray(d.changedAccountFields) &&
+      d.changedAccountFields.length <= 32 &&
+      d.changedAccountFields.every(
+        (k) => typeof k === 'string' && /^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(k),
+      )
+    )
+      receipt.diagnostic.changedAccountFields = d.changedAccountFields;
+    break;
+  }
   receipt.errorName = error.name;
   receipt.status = typeof error.status === 'number' ? error.status : null;
   const message = String(error.cause?.message ?? error.message ?? '');
