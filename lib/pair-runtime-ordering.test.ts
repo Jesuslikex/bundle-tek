@@ -16,6 +16,72 @@ function latch() {
   });
   return { promise, resolve };
 }
+it('overlaps post-simulation candidate checks with fresh final code, then retains a custody tail check', async () => {
+  const f = (fixture = await pairRuntimeFixture()),
+    blocked = latch(),
+    release = latch(),
+    candidateFinal = latch();
+  const normal = f.runtimeDependencies.rpc,
+    code = f.runtimeDependencies.programRpc!;
+  let simulated = false,
+    held = false,
+    published = false,
+    tailAfterRelease = false,
+    released = false;
+  f.runtimeState.onTrace = (trace) => {
+    simulated = true;
+    return trace;
+  };
+  f.runtimeDependencies.programRpc = async (method, params) => {
+    if (simulated && !held && method === 'getMultipleAccounts') {
+      held = true;
+      blocked.resolve();
+      await release.promise;
+    }
+    return code(method, params);
+  };
+  f.runtimeDependencies.rpc = async (method, params) => {
+    if (simulated && method === 'isBlockhashValid') candidateFinal.resolve();
+    const keys = params[0] as string[],
+      config = params[1] as { dataSlice?: unknown } | undefined;
+    if (
+      simulated &&
+      method === 'getMultipleAccounts' &&
+      !config?.dataSlice &&
+      keys.includes(PAIR_RENT) &&
+      !keys.includes(PAIR_CLOCK)
+    )
+      tailAfterRelease = released;
+    return normal(method, params);
+  };
+  const work = previewOwnedImportedPairRuntime(
+    f.db,
+    'alice',
+    f.runtimeRequest,
+    new AbortController().signal,
+    f.runtimeDependencies,
+  );
+  void work.then(
+    () => {
+      published = true;
+    },
+    () => {},
+  );
+  try {
+    await Promise.all([blocked.promise, candidateFinal.promise]);
+    expect(published).toBe(false);
+    released = true;
+    release.resolve();
+    expect(await work).toMatchObject({
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+    expect(tailAfterRelease).toBe(true);
+  } finally {
+    release.resolve();
+    await work.catch(() => {});
+  }
+});
 it.each(['code', 'accounts'] as const)(
   'overlaps static fee checks with initial %s and waits before simulation',
   async (held) => {

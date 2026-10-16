@@ -272,7 +272,7 @@ async function inspectPairRuntime(
       beforeAccounts,
     };
   }
-  async function identities(evidence: Awaited<ReturnType<typeof inventory>>) {
+  async function observeCode(evidence: Awaited<ReturnType<typeof inventory>>) {
     const programs = evidence.programs.filter((p) => p !== COMPUTE);
     const requestedFloor = floor();
     const code = await collectPumpProgramIdentities(
@@ -283,6 +283,13 @@ async function inspectPairRuntime(
       4,
     );
     context(String(code.maximumSlot), requestedFloor);
+    return code;
+  }
+  async function identities(
+    evidence: Awaited<ReturnType<typeof inventory>>,
+    observation = observeCode(evidence),
+  ) {
+    const code = await observation;
     const result = code.programs.map((p) => ({
       ...p,
       identityKind: p.identityKind as string,
@@ -316,11 +323,10 @@ async function inspectPairRuntime(
       a.address < b.address ? -1 : a.address > b.address ? 1 : 0,
     );
   }
+  let finalEvidence: ReturnType<typeof collectFinalEvidence> | undefined;
+  let simulationFloor: number | undefined;
   const initial = initialEvidence();
-  const [
-    { beforeInventory, auxiliary, protectedState, beforeCode, beforeAccounts },
-    review,
-  ] = await Promise.all([
+  const [{ beforeInventory, auxiliary }, review] = await Promise.all([
     initial,
     collectPairOrderReview(
       candidate.preflight,
@@ -333,10 +339,19 @@ async function inspectPairRuntime(
           await initial;
           fresh();
         },
+        afterSimulation: async (observedFloor) => {
+          simulationFloor = observedFloor;
+          const state = await initial;
+          fresh();
+          finalEvidence = collectFinalEvidence(state);
+          await finalEvidence;
+        },
       },
     ),
   ]);
-  context(String(review.maximumSlot));
+  if (simulationFloor === undefined || !finalEvidence)
+    throw Error('Pair runtime final evidence is missing.');
+  context(String(review.maximumSlot), simulationFloor);
   if (
     JSON.stringify(
       review.assessment.auxiliaryAccounts.map((a) => a.address),
@@ -352,55 +367,10 @@ async function inspectPairRuntime(
     throw Error(
       'Pair runtime inner program is not covered by executable identities.',
     );
-  const afterInventory = await inventory();
+  const { afterCode, height } = await finalEvidence;
   if (
-    JSON.stringify(beforeInventory.programs) !==
-    JSON.stringify(afterInventory.programs)
-  )
-    throw Error('Pair runtime executable coverage changed.');
-  const afterCode = await identities(afterInventory);
-  if (JSON.stringify(beforeCode) !== JSON.stringify(afterCode))
-    throw Error(
-      'Pair program code or upgrade authority changed around simulation.',
-    );
-  const afterFloor = floor();
-  const [afterAccounts, recheck, rawValidity, rawHeight, genesis] =
-    await Promise.all([
-      read(protectedState, false),
-      lookups
-        ? readSwapLookupAccounts(message, afterFloor, call)
-        : Promise.resolve(null),
-      call('isBlockhashValid', [
-        message.lifetimeToken,
-        { commitment: 'confirmed', minContextSlot: afterFloor },
-      ]),
-      call('getBlockHeight', [
-        { commitment: 'confirmed', minContextSlot: afterFloor },
-      ]),
-      call('getGenesisHash', []),
-    ]);
-  const stateIdentity = (accounts: typeof beforeAccounts) =>
-    accounts.map((a) => a && [a.owner, a.executable, a.lamports, a.data]);
-  if (
-    (await pairRuntimeDigest(stateIdentity(beforeAccounts))) !==
-    (await pairRuntimeDigest(stateIdentity(afterAccounts)))
-  )
-    throw Error('Pair runtime wallet custody or balances changed.');
-  if (lookups) {
-    assertSameSwapLookups(lookups, recheck, null);
-    context(String(recheck!.observedSlot), afterFloor);
-  }
-  const valid = rawValidity as {
-    context?: { slot?: unknown };
-    value?: unknown;
-  };
-  context(valid?.context?.slot, afterFloor);
-  const height = pumpUnsignedInteger(rawHeight);
-  if (
-    valid.value !== true ||
     height < BigInt(review.recheckBlockHeight) ||
-    height + 10n > BigInt(review.lastValidBlockHeight) ||
-    genesis !== SOLANA_MAINNET_GENESIS
+    height + 10n > BigInt(review.lastValidBlockHeight)
   )
     throw Error('Pair runtime lifetime or network changed.');
   fresh();
@@ -428,4 +398,70 @@ async function inspectPairRuntime(
   const sha256 = await pairRuntimeDigest(result);
   fresh();
   return { review, runtime: { ...result, sha256 } };
+  async function collectFinalEvidence(
+    state: Awaited<ReturnType<typeof initialEvidence>>,
+  ) {
+    const { beforeInventory, protectedState, beforeCode, beforeAccounts } =
+      state;
+    const [afterInventory, observation] = await Promise.all([
+      inventory(),
+      observeCode(beforeInventory),
+    ]);
+    if (
+      JSON.stringify(beforeInventory.programs) !==
+      JSON.stringify(afterInventory.programs)
+    )
+      throw Error('Pair runtime executable coverage changed.');
+    const afterCode = await identities(
+      afterInventory,
+      Promise.resolve(observation),
+    );
+    if (JSON.stringify(beforeCode) !== JSON.stringify(afterCode))
+      throw Error(
+        'Pair program code or upgrade authority changed around simulation.',
+      );
+    // Candidate final checks already ran alongside code. Preserve this last
+    // runtime observation to catch custody/Rent/lifetime changes during code IO.
+    const afterFloor = floor();
+    const [afterAccounts, recheck, rawValidity, rawHeight, genesis] =
+      await Promise.all([
+        read(protectedState, false),
+        lookups
+          ? readSwapLookupAccounts(message, afterFloor, call)
+          : Promise.resolve(null),
+        call('isBlockhashValid', [
+          message.lifetimeToken,
+          { commitment: 'confirmed', minContextSlot: afterFloor },
+        ]),
+        call('getBlockHeight', [
+          { commitment: 'confirmed', minContextSlot: afterFloor },
+        ]),
+        call('getGenesisHash', []),
+      ]);
+    const stateIdentity = (accounts: typeof beforeAccounts) =>
+      accounts.map((a) => a && [a.owner, a.executable, a.lamports, a.data]);
+    if (
+      (await pairRuntimeDigest(stateIdentity(beforeAccounts))) !==
+      (await pairRuntimeDigest(stateIdentity(afterAccounts)))
+    )
+      throw Error('Pair runtime wallet custody or balances changed.');
+    if (lookups) {
+      assertSameSwapLookups(lookups, recheck, null);
+      context(String(recheck!.observedSlot), afterFloor);
+    }
+    const valid = rawValidity as {
+      context?: { slot?: unknown };
+      value?: unknown;
+    };
+    context(valid?.context?.slot, afterFloor);
+    const height = pumpUnsignedInteger(rawHeight);
+    if (
+      valid.value !== true ||
+      height + 10n > BigInt(candidate.order.preparation.lastValidBlockHeight) ||
+      genesis !== SOLANA_MAINNET_GENESIS
+    )
+      throw Error('Pair runtime lifetime or network changed.');
+    fresh();
+    return { afterCode, height };
+  }
 }

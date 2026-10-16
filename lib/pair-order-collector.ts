@@ -54,7 +54,10 @@ export async function collectPairOrderReview(
   rpc: Rpc,
   now: () => number = Date.now,
   captureRuntimeTrace = false,
-  barriers?: { beforeSimulation?: () => Promise<void> },
+  barriers?: {
+    beforeSimulation?: () => Promise<void>;
+    afterSimulation?: (simulationFloor: number) => Promise<void>;
+  },
 ) {
   const observedAt = now(),
     slots = [
@@ -339,27 +342,31 @@ export async function collectPairOrderReview(
     ).value.accounts.forEach(assertPairRuntimeWritableAccount);
   fresh();
   const afterFloor = floor();
-  const [afterState, recheck, rawValidity, rawFinalHeight, finalGenesis] =
+  const afterSimulation = barriers?.afterSimulation?.(afterFloor);
+  const [[afterState, recheck, rawValidity, rawFinalHeight, finalGenesis]] =
     await Promise.all([
-      readPairOrderState(
-        checkedAccounts,
-        [pair.base.address, pair.quote.address],
-        auxiliaryMints?.mints.map((m) => m.address) ?? [],
-        afterFloor,
-        rpc,
-        now,
-      ),
-      lookups
-        ? readSwapLookupAccounts(message, afterFloor, rpc)
-        : Promise.resolve(null),
-      rpc('isBlockhashValid', [
-        message.lifetimeToken,
-        { commitment: 'confirmed', minContextSlot: afterFloor },
+      Promise.all([
+        readPairOrderState(
+          checkedAccounts,
+          [pair.base.address, pair.quote.address],
+          auxiliaryMints?.mints.map((m) => m.address) ?? [],
+          afterFloor,
+          rpc,
+          now,
+        ),
+        lookups
+          ? readSwapLookupAccounts(message, afterFloor, rpc)
+          : Promise.resolve(null),
+        rpc('isBlockhashValid', [
+          message.lifetimeToken,
+          { commitment: 'confirmed', minContextSlot: afterFloor },
+        ]),
+        rpc('getBlockHeight', [
+          { commitment: 'confirmed', minContextSlot: afterFloor },
+        ]),
+        rpc('getGenesisHash', []),
       ]),
-      rpc('getBlockHeight', [
-        { commitment: 'confirmed', minContextSlot: afterFloor },
-      ]),
-      rpc('getGenesisHash', []),
+      afterSimulation,
     ]);
   const {
     accounts: after,
