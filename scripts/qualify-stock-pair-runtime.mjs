@@ -928,6 +928,7 @@ try {
     : 0;
   if (receipt.maximumRollingRpcMethods > 9) {
     receipt.passed = false;
+    receipt.runtimeRefusalBeforePacing = receipt.reason ?? null;
     receipt.reason =
       'Qualification pacing exceeded nine RPC methods in a rolling second.';
   }

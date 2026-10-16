@@ -1,6 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runStockRepeatability } from './run-stock-repeatability.mjs';
+import {
+  runStockRepeatability,
+  stockCampaignSummary,
+} from './run-stock-repeatability.mjs';
+
+test('retains a failed summary without turning malformed or over-budget attempts into a pass', () => {
+  const receipts = [
+    { maximumRollingRpcMethods: 10, reason: 'private provider detail' },
+  ];
+  const result = stockCampaignSummary({ complete: true }, receipts);
+  assert.equal(result.summary, null);
+  assert.match(result.summaryError, /failed validation/);
+  assert.equal(result.summaryError.includes('private provider detail'), false);
+  assert.equal(receipts[0].maximumRollingRpcMethods, 10);
+  assert.deepEqual(stockCampaignSummary({ complete: false }, receipts), {
+    summary: null,
+    summaryError: null,
+  });
+});
 
 test('stops the entire campaign on a rate limit without another asset, retry or replacement attempt', async () => {
   const calls = [];

@@ -19,6 +19,24 @@ export async function runStockRepeatability(attempt) {
   return { complete: true, stoppedForRateLimit: false, results };
 }
 
+/** A rejected summary must never discard completed attempt evidence. */
+export function stockCampaignSummary(campaign, receipts) {
+  if (!campaign.complete) return { summary: null, summaryError: null };
+  try {
+    return {
+      summary: summarizeStockRepeatability(receipts),
+      summaryError: null,
+    };
+  } catch {
+    // Fixed text only: validator/provider details can contain private material.
+    return {
+      summary: null,
+      summaryError:
+        'Campaign evidence failed validation. All attempt receipts are retained; no repeatability claim is available.',
+    };
+  }
+}
+
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
@@ -110,7 +128,7 @@ if (
     format: 'stock-pair-bounded-campaign-v1',
     ...campaign,
     // An incomplete campaign is never padded into a successful six-run sample.
-    summary: campaign.complete ? summarizeStockRepeatability(receipts) : null,
+    ...stockCampaignSummary(campaign, receipts),
     retryNotBefore: campaign.stoppedForRateLimit
       ? new Date(Date.now() + 60000).toISOString()
       : null,
@@ -129,6 +147,8 @@ if (
       stoppedForRateLimit: campaign.stoppedForRateLimit,
       repeatableInThisSample: evidence.summary?.repeatableInThisSample ?? false,
       assets: evidence.summary?.assets ?? null,
+      summaryError: evidence.summaryError,
     }),
   );
+  if (evidence.summaryError) process.exitCode = 1;
 }
