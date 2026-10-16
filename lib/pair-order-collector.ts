@@ -33,6 +33,7 @@ import { SWAP_TOKEN, SWAP_WRAPPED_SOL } from './swap-token-program-evidence';
 import { reviewPairOrderSimulation } from './pair-order-simulation';
 import { reviewPairRuntimeTrace } from './pair-runtime-trace';
 import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
+import type { PairQuoteBoundsMode } from './pair-order-quote-bounds';
 import type { ImportedPairWalletPreflight } from './imported-pair-wallet-preflight';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
@@ -58,6 +59,7 @@ export async function collectPairOrderReview(
     beforeSimulation?: () => Promise<void>;
     afterSimulation?: (simulationFloor: number) => Promise<void>;
   },
+  quoteBoundsMode: PairQuoteBoundsMode = 'strict',
 ) {
   const observedAt = now(),
     slots = [
@@ -298,6 +300,7 @@ export async function collectPairOrderReview(
     rentByMint,
     networkFee,
     auxiliary,
+    quoteBoundsMode,
   );
   fresh();
   await barriers?.beforeSimulation?.();

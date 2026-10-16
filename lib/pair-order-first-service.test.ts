@@ -253,7 +253,7 @@ it('captures a server baseline, prepares once, then quotes again before review a
     ),
   ).rejects.toThrow(/new review/);
 });
-it('accepts an independent preview difference only as a new review, without weakening the fresh minimum', async () => {
+it('rejects a worse initial minimum even when preview-difference acknowledgement could be requested', async () => {
   const { v, run } = await setup();
   const quote = v.quote.getMockImplementation()!;
   let count = 0;
@@ -263,17 +263,16 @@ it('accepts an independent preview difference only as a new review, without weak
       ? { ...q, outAmount: '1100000', minimumOutAmount: '1094500' }
       : q;
   });
-  const saved = await run();
-  expect(saved.review.acknowledgementRequired).toBe(true);
-  expect(saved.review.minimumOutputRaw).toBe('995000');
+  await expect(run()).rejects.toThrow(/original minimum/);
+  expect(v.quote).toHaveBeenCalledOnce();
 });
-it('rejects one unit below the fresh reference, with no saved review', async () => {
+it('rejects just outside the fresh-reference tolerance, with no saved review', async () => {
   const { v, run } = await setup();
   const quote = v.quote.getMockImplementation()!;
   let count = 0;
   v.quote.mockImplementation(async (...args) => {
     const q = await quote(...args);
-    return ++count === 2 ? { ...q, minimumOutAmount: '995001' } : q;
+    return ++count === 2 ? { ...q, minimumOutAmount: '995996' } : q;
   });
   await expect(run()).rejects.toMatchObject({ status: 409 });
   expect(
@@ -300,6 +299,7 @@ it.each([
   { absoluteMinimumRaw: '18446744073709551616' },
   { absoluteMinimumRaw: 1 },
   { absoluteMinimumRaw: null, enableSigning: true },
+  { absoluteMinimumRaw: null, quoteBoundsMode: 'fresh-reference' },
 ])('rejects malformed or extra request fields', async (extra) => {
   const { v } = await setup();
   expect(() =>

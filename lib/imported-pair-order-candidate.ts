@@ -16,6 +16,7 @@ import { parseImportedPairQuote } from './imported-trade-pair';
 import {
   assertPairOrderQuoteBounds,
   PairOrderQuoteBoundsError,
+  type PairQuoteBoundsMode,
 } from './pair-order-quote-bounds';
 export type ImportedPairOrderRequest = ImportedPairWalletRequest & {
   prepareUnsigned: true;
@@ -56,6 +57,7 @@ export async function inspectOwnedImportedPairOrder<Review>(
     rpc: ImportedPairOrderDependencies['rpc'],
     now: () => number,
   ) => Promise<Review>,
+  quoteBoundsMode: PairQuoteBoundsMode = 'strict',
 ) {
   const input = importedPairOrderRequest(value);
   signal = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
@@ -151,7 +153,12 @@ export async function inspectOwnedImportedPairOrder<Review>(
       );
     }
     signal.throwIfAborted();
-    assertPairOrderQuoteBounds(preflight.quote, order, preflight.wallet);
+    assertPairOrderQuoteBounds(
+      preflight.quote,
+      order,
+      preflight.wallet,
+      quoteBoundsMode,
+    );
     const review = await inspect(
       preflight,
       order,

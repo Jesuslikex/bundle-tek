@@ -15,7 +15,10 @@ import type { SolanaPairPreparation } from './warmup-swap-quote';
 import type { SwapInstructionReview } from './swap-instruction-review';
 import { pairAssociatedAddress } from './pair-wallet-evidence';
 import type { PairAuxiliaryAccount } from './pair-order-auxiliary';
-import { assertPairOrderQuoteBounds } from './pair-order-quote-bounds';
+import {
+  assertPairOrderQuoteBounds,
+  type PairQuoteBoundsMode,
+} from './pair-order-quote-bounds';
 import {
   SWAP_TOKEN,
   SWAP_TOKEN_2022,
@@ -65,6 +68,7 @@ export async function reviewPairOrderInstructions(
   rentByMint: Record<string, string>,
   networkFeeRaw: string,
   auxiliary: PairAuxiliaryAccount[] = [],
+  quoteBoundsMode: PairQuoteBoundsMode = 'strict',
 ) {
   let activeInstruction: (typeof review.instructions)[number] | undefined;
   const fail = (check: string, details: PairDiagnosticDetails = {}): never => {
@@ -91,7 +95,7 @@ export async function reviewPairOrderInstructions(
     pair = original.pair;
   const input = original.side === 'Buy' ? pair.quote : pair.base,
     output = original.side === 'Buy' ? pair.base : pair.quote;
-  assertPairOrderQuoteBounds(original, order, wallet);
+  assertPairOrderQuoteBounds(original, order, wallet, quoteBoundsMode);
   if (review.unresolvedAccountCount) fail('unresolved-accounts');
   const route = assessJupiterRoute(review, order);
   if (route.status !== 'Matched fields' || !route.decoded) fail('route-decode');

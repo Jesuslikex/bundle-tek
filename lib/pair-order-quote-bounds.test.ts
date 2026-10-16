@@ -70,4 +70,74 @@ it.each([
   expect(() =>
     assertPairOrderQuoteBounds(c.preflight.quote, order, f.wallet),
   ).toThrow();
+  expect(() =>
+    assertPairOrderQuoteBounds(
+      c.preflight.quote,
+      order,
+      f.wallet,
+      'fresh-reference',
+    ),
+  ).toThrow();
+});
+it.each([
+  ['999000', true],
+  ['998999', false],
+  ['1000001', true],
+] as const)(
+  'fresh reference boundary accepts %s only when within 0.1%%: %s',
+  async (minimum, accepted) => {
+    const f = (fixture = await pairOrderFixture());
+    const c = await prepareOwnedImportedPairOrder(
+      f.db,
+      'alice',
+      f.orderRequest,
+      new AbortController().signal,
+      f.orderDependencies,
+    );
+    c.preflight.quote.quote.minimumOutAmount = '1000000';
+    c.order.minimumOutAmount = minimum;
+    const check = () =>
+      assertPairOrderQuoteBounds(
+        c.preflight.quote,
+        c.order,
+        f.wallet,
+        'fresh-reference',
+      );
+    if (accepted) expect(check).not.toThrow();
+    else expect(check).toThrow(PairOrderQuoteBoundsError);
+    if (minimum === '999000')
+      expect(() =>
+        assertPairOrderQuoteBounds(c.preflight.quote, c.order, f.wallet),
+      ).toThrow(PairOrderQuoteBoundsError);
+  },
+);
+it('uses the exact cross-product beyond safe Number precision', async () => {
+  const f = (fixture = await pairOrderFixture());
+  const c = await prepareOwnedImportedPairOrder(
+    f.db,
+    'alice',
+    f.orderRequest,
+    new AbortController().signal,
+    f.orderDependencies,
+  );
+  const reference = 18446744073709551615n;
+  c.preflight.quote.quote.minimumOutAmount = reference.toString();
+  c.order.minimumOutAmount = ((reference * 9990n + 9999n) / 10000n).toString();
+  expect(() =>
+    assertPairOrderQuoteBounds(
+      c.preflight.quote,
+      c.order,
+      f.wallet,
+      'fresh-reference',
+    ),
+  ).not.toThrow();
+  c.order.minimumOutAmount = (BigInt(c.order.minimumOutAmount) - 1n).toString();
+  expect(() =>
+    assertPairOrderQuoteBounds(
+      c.preflight.quote,
+      c.order,
+      f.wallet,
+      'fresh-reference',
+    ),
+  ).toThrow();
 });

@@ -24,6 +24,7 @@ import { pairRuntimeDigest } from './pair-runtime-trace';
 import { pairStockSigningPolicy } from './pair-stock-signing-policy';
 import { authorizePairOrderAfterRecheck } from './pair-order-authorization';
 import { collectPairRuntimePreview } from './pair-runtime-preview';
+import { assertPairOrderQuoteBounds } from './pair-order-quote-bounds';
 import { createPairReadRpc } from './pair-read-rpc';
 import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
 import {
@@ -204,7 +205,8 @@ async function preparePairOrderFirst(
   );
   signal.throwIfAborted();
   // Existing owned lifecycle now fetches its fresh quote AFTER packet preparation.
-  // Its unchanged lower-bound check and independent decoder/simulation still run.
+  // Protect the initial preview strictly before requesting the fresh reference.
+  assertPairOrderQuoteBounds(initial, order, request.wallet);
   let runtime:
     | Awaited<ReturnType<typeof collectPairRuntimePreview>>['runtime']
     | undefined;
@@ -231,17 +233,27 @@ async function preparePairOrderFirst(
     },
     async (preflight, packet, rpc, clock) => {
       if (!programRpc)
-        return collectPairOrderReview(preflight, packet, rpc, clock);
+        return collectPairOrderReview(
+          preflight,
+          packet,
+          rpc,
+          clock,
+          false,
+          undefined,
+          'fresh-reference',
+        );
       const collected = await collectPairRuntimePreview(
         { preflight, order: packet },
         rpc,
         programRpc,
         signal,
         clock,
+        'fresh-reference',
       );
       runtime = collected.runtime;
       return collected.review;
     },
+    'fresh-reference',
   );
   const quoteObservation = await quoteObservationPending;
   const market = await readPairOrderMarketBound(

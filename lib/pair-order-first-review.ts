@@ -1,6 +1,9 @@
 import type { prepareOwnedImportedPairOrder } from './imported-pair-order-candidate';
 import type { ImportedPairQuote } from './imported-trade-pair';
-import { assertPairOrderQuoteBounds } from './pair-order-quote-bounds';
+import {
+  assertPairOrderQuoteBounds,
+  PAIR_FRESH_REFERENCE_MINIMUM_TOLERANCE_BPS,
+} from './pair-order-quote-bounds';
 import { pairRuntimeDigest } from './pair-runtime-trace';
 import { pairWalletUint } from './pair-wallet-evidence';
 import { pairUiAmount } from './pair-ui-amount';
@@ -57,7 +60,13 @@ export async function buildPairOrderFirstReview(
 ) {
   const { preflight, order, review } = candidate,
     reference = preflight.quote;
-  assertPairOrderQuoteBounds(reference, order, preflight.wallet);
+  assertPairOrderQuoteBounds(initialPreview, order, preflight.wallet);
+  assertPairOrderQuoteBounds(
+    reference,
+    order,
+    preflight.wallet,
+    'fresh-reference',
+  );
   const minimum = pairWalletUint(order.minimumOutAmount),
     absolute =
       absoluteMinimumRaw === null ? null : pairWalletUint(absoluteMinimumRaw);
@@ -149,6 +158,7 @@ export async function buildPairOrderFirstReview(
     slippageBps: 50 as const,
     freshReferenceOutputRaw: reference.quote.outAmount,
     freshReferenceMinimumRaw: reference.quote.minimumOutAmount,
+    freshReferenceToleranceBps: PAIR_FRESH_REFERENCE_MINIMUM_TOLERANCE_BPS,
     freshReferenceObservedAt: reference.quote.observedAt,
     previewComparison: {
       ...pairIndependentDifference(

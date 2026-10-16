@@ -17,6 +17,7 @@ import { reviewSwapInstructions } from './swap-instruction-review';
 import { pairRuntimeDigest } from './pair-runtime-trace';
 import { collectPairOrderReview } from './pair-order-collector';
 import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
+import type { PairQuoteBoundsMode } from './pair-order-quote-bounds';
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import { requireConsistentSolanaSlots } from './solana-rpc';
 import { reviewUnsignedSwapEnvelope } from './unsigned-swap-order';
@@ -39,6 +40,7 @@ export async function collectPairRuntimePreview(
   programRpc: Rpc,
   signal: AbortSignal,
   now: () => number = Date.now,
+  quoteBoundsMode: PairQuoteBoundsMode = 'strict',
 ) {
   const controller = new AbortController();
   try {
@@ -48,6 +50,7 @@ export async function collectPairRuntimePreview(
       programRpc,
       AbortSignal.any([signal, controller.signal]),
       now,
+      quoteBoundsMode,
     );
   } finally {
     controller.abort();
@@ -59,6 +62,7 @@ async function inspectPairRuntime(
   programRpc: Rpc,
   signal: AbortSignal,
   now: () => number,
+  quoteBoundsMode: PairQuoteBoundsMode,
 ) {
   const started = now(),
     slots = [
@@ -136,6 +140,7 @@ async function inspectPairRuntime(
     candidate.preflight.quote,
     candidate.order,
     candidate.preflight.wallet,
+    quoteBoundsMode,
   );
   const envelope = await reviewUnsignedSwapEnvelope(
     candidate.order.preparation.transaction,
@@ -366,6 +371,7 @@ async function inspectPairRuntime(
           await finalEvidence;
         },
       },
+      quoteBoundsMode,
     ),
   ]);
   if (simulationFloor === undefined || !finalEvidence)

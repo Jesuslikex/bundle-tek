@@ -130,7 +130,7 @@ it.each([
 ] as const)('rejects changed %s bounds', async (mode) => {
   const { v, candidate: c, initial } = await setup();
   if (mode === 'fresh-minimum')
-    c.preflight.quote.quote.minimumOutAmount = '995001';
+    c.preflight.quote.quote.minimumOutAmount = '996000';
   if (mode === 'decode') c.review.assessment.minimumOutputRaw = '994999';
   if (mode === 'input')
     initial.inputRaw = (BigInt(initial.inputRaw) + 1n).toString();

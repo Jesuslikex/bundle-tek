@@ -69,6 +69,55 @@ it('qualifies the exact order-first lifecycle with one simulation, fresh full co
   });
   expect(result.review.minimumOutputRaw).toBe('995000');
 });
+it.each(['995995', '995996'] as const)(
+  'enforces fresh-reference tolerance through every runtime review at %s',
+  async (referenceMinimum) => {
+    const { f, run } = await setup();
+    f.runtimeState.onCodeRead = () => {};
+    const quote = f.quote.getMockImplementation()!;
+    let calls = 0;
+    f.quote.mockImplementation(async (...args) => {
+      const result = await quote(...args);
+      return ++calls === 2
+        ? { ...result, minimumOutAmount: referenceMinimum }
+        : result;
+    });
+    if (referenceMinimum === '995995') {
+      const result = await run();
+      expect(result.review).toMatchObject({
+        minimumOutputRaw: '995000',
+        freshReferenceMinimumRaw: referenceMinimum,
+        freshReferenceToleranceBps: 10,
+        signingAllowed: false,
+      });
+      expect(f.runtimeState.codeReads).toBe(f.programs.size * 6);
+      expect(
+        f.rpc.mock.calls.filter(([m]) => m === 'simulateTransaction'),
+      ).toHaveLength(1);
+    } else {
+      await expect(run()).rejects.toThrow(/fresh-reference tolerance/);
+      expect(f.runtimeState.codeReads).toBe(0);
+      expect(f.rpc.mock.calls.some(([m]) => m === 'simulateTransaction')).toBe(
+        false,
+      );
+    }
+  },
+);
+it('keeps a one-unit worse initial order strict before the fresh quote and code scan', async () => {
+  const { f, run } = await setup();
+  f.runtimeState.onCodeRead = () => {};
+  const quote = f.quote.getMockImplementation()!;
+  f.quote.mockImplementation(async (...args) => ({
+    ...(await quote(...args)),
+    minimumOutAmount: '995001',
+  }));
+  await expect(run()).rejects.toThrow(/original minimum/);
+  expect(f.quote).toHaveBeenCalledOnce();
+  expect(f.runtimeState.codeReads).toBe(0);
+  expect(f.rpc.mock.calls.some(([m]) => m === 'simulateTransaction')).toBe(
+    false,
+  );
+});
 it.each(['changed-code', '33-slots', 'abort'] as const)(
   'refuses %s without publishing a qualification',
   async (mode) => {
