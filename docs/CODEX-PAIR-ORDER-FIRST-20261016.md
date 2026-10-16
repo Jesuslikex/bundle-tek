@@ -23,3 +23,13 @@ Prepare a server baseline, then exactly one unsigned order, then the fresh refer
 Append-only local migration 0089 stores immutable review evidence and hashes with owned project/wallet guards; no prior migration changed. Reads rebuild the economics contract and verify the full document hash. Cross-owner access returns 404. The approval boundary currently checks exact consent/expiry and refuses under the server-owned disabled stock signing gate. Next checkpoint adds the short authorization contract. No remote migration executed.
 
 Verification so far: three files / 56 tests including existing quote service; TypeScript caught a fixture adapter's omitted `success` flag and the final check now uses the actual exact one-row insert count, matching existing adapters.
+
+## Step 3: Claude's market-bound correction
+
+Supersedes step 1's independent-source and improvement-acknowledgement wording. The initial preview is explicitly another Jupiter reading. Only a deterioration strictly above 2% requires the additional acknowledgement; improvements are shown without blocking.
+
+The new saved-market comparison reads the same `imported_market_observations` collection used by the stats strip. It takes the latest observation and its default first/highest-liquidity pool, with the exact pool IDs and timestamps displayed. A user-selected alternate chart pool is not passed into the Codex-owned wallet panel, so this does not claim to mirror an alternate UI selection. Both base and exact quote-asset USD observations must be current revisions, at most five minutes old, not future-dated and in matching unscaled token UI units. Quote-asset USD conversion uses its saved price, never an assumed stablecoin peg. Scaled-token feeds lack unit provenance, so comparison is explicitly unavailable there. Missing/stale/priceless/nonmatching evidence produces an on-screen reason, not a fabricated zero difference.
+
+Expected order-implied base USD price is input/output times quote USD for buys, output/input times quote USD for sells. Exact rational cross-products decide worse-than-2%; rounded display never controls acknowledgement. The immutable review binds both comparisons. An available market reference shortens expiry to its five-minute boundary. Either worse comparison can require the extra consent; neither overrides the fresh Jupiter minimum or absolute floor.
+
+Verification: 18 market-bound tests (buys/sells, improvements, exact boundaries, micro prices, non-peg conversion and unavailable reasons) plus 20 review-contract tests pass. No provider requests or hosted changes.

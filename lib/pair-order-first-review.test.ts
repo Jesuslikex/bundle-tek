@@ -27,7 +27,7 @@ it.each([
   ['980000', false],
   ['979999', true],
   ['1020000', false],
-  ['1020001', true],
+  ['1020001', false],
 ])('uses exact two-percent comparison at %s', (minimum, required) => {
   expect(
     pairIndependentDifference(minimum, '1000000').acknowledgementRequired,

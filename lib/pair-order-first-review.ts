@@ -3,6 +3,8 @@ import type { ImportedPairQuote } from './imported-trade-pair';
 import { assertPairOrderQuoteBounds } from './pair-order-quote-bounds';
 import { pairRuntimeDigest } from './pair-runtime-trace';
 import { pairWalletUint } from './pair-wallet-evidence';
+import { pairUiAmount } from './pair-ui-amount';
+import type { PairOrderMarketBound } from './pair-order-market-bound';
 
 export type PairOrderCandidate = Awaited<
   ReturnType<typeof prepareOwnedImportedPairOrder>
@@ -18,7 +20,7 @@ export type PairOrderFirstConsent = {
   acknowledgeIndependentDifference: boolean;
 };
 
-/** Integer comparison: exactly 2% needs no extra acknowledgement; any amount above does. */
+/** Only deterioration above 2% requires acknowledgement. Improvements remain visible. */
 export function pairIndependentDifference(
   minimum: string,
   previewExpected: string,
@@ -27,15 +29,14 @@ export function pairIndependentDifference(
     baseline = pairWalletUint(previewExpected);
   if (actual < 1n || baseline < 1n)
     throw Error('Positive output evidence required.');
-  const delta = actual - baseline,
-    distance = delta < 0n ? -delta : delta;
+  const delta = actual - baseline;
   return {
-    source: 'initial-server-preview' as const,
+    source: 'initial-jupiter-preview' as const,
     baselineOutputRaw: baseline.toString(),
     differenceRaw: delta.toString(),
     // Truncation is display-only. The acknowledgement uses the exact cross-product.
     differenceBps: ((delta * 10000n) / baseline).toString(),
-    acknowledgementRequired: distance * 10000n > baseline * 200n,
+    acknowledgementRequired: delta < 0n && -delta * 10000n > baseline * 200n,
   };
 }
 
@@ -45,6 +46,11 @@ export async function buildPairOrderFirstReview(
   initialPreview: ImportedPairQuote,
   absoluteMinimumRaw: string | null,
   now: number,
+  market: PairOrderMarketBound = {
+    available: false,
+    reason: 'No fresh saved market observation is available.',
+    acknowledgementRequired: false,
+  },
 ) {
   const { preflight, order, review } = candidate,
     reference = preflight.quote;
@@ -90,6 +96,7 @@ export async function buildPairOrderFirstReview(
     Date.parse(review.expiresAt),
     Date.parse(order.expiresAt),
     Date.parse(initialPreview.quote.expiresAt),
+    market.available ? Date.parse(market.expiresAt) : Infinity,
   );
   if (!Number.isFinite(expiresAt) || now >= expiresAt)
     throw Error('Request a new order review.');
@@ -98,10 +105,40 @@ export async function buildPairOrderFirstReview(
     projectId: reference.pair.projectId,
     projectRevision: reference.pair.projectRevision,
     wallet: preflight.wallet,
+    walletRevision: preflight.walletRevision,
+    requestedInputAmount: reference.requestedInputAmount,
+    feeAndRentLimitRaw: preflight.funding.userFeeAndRentLimitRaw,
     side: reference.side,
     inputMint: order.inputMint,
     outputMint: order.outputMint,
     inputRaw: order.inAmount,
+    display: {
+      inputSymbol: (reference.side === 'Buy'
+        ? reference.pair.quote
+        : reference.pair.base
+      ).symbol,
+      outputSymbol: (reference.side === 'Buy'
+        ? reference.pair.base
+        : reference.pair.quote
+      ).symbol,
+      inputAmount: reference.inputAmount,
+      expectedOutputAmount: pairUiAmount(
+        order.outAmount,
+        (reference.side === 'Buy' ? reference.pair.base : reference.pair.quote)
+          .decimals,
+        (reference.side === 'Buy' ? reference.pair.base : reference.pair.quote)
+          .amountPolicy,
+        reference.pair.mintPolicy.recheckUnixTimestamp,
+      ),
+      minimumOutputAmount: pairUiAmount(
+        order.minimumOutAmount,
+        (reference.side === 'Buy' ? reference.pair.base : reference.pair.quote)
+          .decimals,
+        (reference.side === 'Buy' ? reference.pair.base : reference.pair.quote)
+          .amountPolicy,
+        reference.pair.mintPolicy.recheckUnixTimestamp,
+      ),
+    },
     expectedOutputRaw: order.outAmount,
     minimumOutputRaw: order.minimumOutAmount,
     absoluteMinimumRaw,
@@ -109,13 +146,19 @@ export async function buildPairOrderFirstReview(
     freshReferenceOutputRaw: reference.quote.outAmount,
     freshReferenceMinimumRaw: reference.quote.minimumOutAmount,
     freshReferenceObservedAt: reference.quote.observedAt,
-    independent: {
+    previewComparison: {
       ...pairIndependentDifference(
         order.minimumOutAmount,
         initialPreview.quote.outAmount,
       ),
       observedAt: initialPreview.quote.observedAt,
     },
+    marketComparison: market,
+    acknowledgementRequired:
+      pairIndependentDifference(
+        order.minimumOutAmount,
+        initialPreview.quote.outAmount,
+      ).acknowledgementRequired || market.acknowledgementRequired,
     route: review.assessment.route.decoded.steps.map((s) => ({
       venue: s.venue,
       bps: s.bps,
@@ -157,7 +200,7 @@ export async function requirePairOrderFirstConsent(
     consent.reviewSha256 !== sha256 ||
     consent.packetSha256 !== review.packetSha256 ||
     consent.approvedMinimumOutputRaw !== review.minimumOutputRaw ||
-    (review.independent.acknowledgementRequired &&
+    (review.acknowledgementRequired &&
       consent.acknowledgeIndependentDifference !== true)
   )
     throw Error(
