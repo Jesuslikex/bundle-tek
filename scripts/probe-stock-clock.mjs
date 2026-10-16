@@ -5,8 +5,14 @@ import { createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { captureStockClockWire } from './stock-clock-wire.mjs';
-if (process.argv.length !== 3 || process.argv[2] !== '--live-readonly')
-  throw Error('Use --live-readonly. No quote, signing or retry mode.');
+const validatorRpc = process.argv[3] === '--validator-rpc';
+if (
+  process.argv[2] !== '--live-readonly' ||
+  (validatorRpc ? process.argv.length !== 4 : process.argv.length !== 3)
+)
+  throw Error(
+    'Use --live-readonly [--validator-rpc]. No quote, signing or retry mode.',
+  );
 const hash = (v) => createHash('sha256').update(v).digest('hex');
 const files = [
   'scripts/probe-stock-clock.mjs',
@@ -36,12 +42,18 @@ await build({
   logLevel: 'silent',
 });
 const lib = await import(pathToFileURL(bundle).href);
-const endpoint = lib.getSolanaIndexerRpcEndpoint(),
+const endpoint = validatorRpc
+    ? 'https://api.mainnet-beta.solana.com'
+    : lib.getSolanaIndexerRpcEndpoint(),
   stop = new AbortController();
 const signal = AbortSignal.any([stop.signal, AbortSignal.timeout(40000)]);
 const evidence = {
   format: 'stock-clock-fixed-wire-probe-v1',
   readOnly: true,
+  rpcRole: validatorRpc
+    ? 'solana-public-validator-rpc'
+    : 'configured-indexer-rpc',
+  providerHost: new URL(endpoint).hostname,
   sourceFiles,
   sourceUnchanged: false,
   requests: [],
@@ -63,7 +75,7 @@ const fetcher = async (url, init) => {
     evidence.requests.length >= 20
   )
     throw Error('Diagnostic method/budget refused.');
-  await lib.paceWalletRpc(endpoint, signal, 1);
+  await lib.paceWalletRpc(endpoint, signal, validatorRpc ? undefined : 1);
   const row = { method: body.method, startMs: performance.now() };
   evidence.requests.push(row);
   const response = await fetch(url, { ...init, redirect: 'manual' });
