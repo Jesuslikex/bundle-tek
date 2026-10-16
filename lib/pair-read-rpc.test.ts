@@ -37,7 +37,12 @@ function fixture(
     const replies = messages.map((m) => ({
       jsonrpc: '2.0',
       id: m.id,
-      result: m.method === 'getBlockHeight' ? '123' : 'genesis',
+      result:
+        m.method === 'getMultipleAccounts'
+          ? { context: { slot: '123' }, value: [] }
+          : ['getBlockHeight', 'getSlot'].includes(m.method)
+            ? '123'
+            : 'genesis',
     }));
     return Response.json(
       transform
@@ -56,8 +61,8 @@ function fixture(
   pending.push(reader);
   return { reader, fetcher, bodies, controller };
 }
-it('batches two independent calls, preserves floors and reorders only by exact response ID', async () => {
-  const f = fixture((replies) => replies.reverse());
+it('batches two independent calls and preserves floors and exact response order', async () => {
+  const f = fixture();
   expect(
     await Promise.all([
       f.reader.rpc('getGenesisHash', []),
@@ -85,6 +90,7 @@ it.each([
   'wrong-version',
   'one-error',
   'not-array',
+  'reordered',
 ] as const)(
   'rejects the whole %s batch without retry or partial publication',
   async (mode) => {
@@ -100,6 +106,7 @@ it.each([
       if (mode === 'unknown') r[1].id = 'not-requested';
       if (mode === 'numeric-id') r[1].id = 2;
       if (mode === 'wrong-version') r[1].jsonrpc = '1.0';
+      if (mode === 'reordered') r.reverse();
       if (mode === 'one-error')
         r[1].error = { code: -32603, message: 'private provider detail' };
       return mode === 'not-array' ? r[0] : r;
@@ -142,6 +149,97 @@ it('retains exact u64 numeric spelling', async () => {
       f.reader.rpc('getSlot', [{}]),
     ]),
   ).toEqual(['18446744073709551615', '18446744073709551615']);
+});
+it.each(
+  [
+    'getSlot',
+    'getMultipleAccounts',
+    'getFeeForMessage',
+    'isBlockhashValid',
+  ].flatMap((method) =>
+    [99, 133, 'not-a-slot'].map((slot) => ({ method, slot })),
+  ),
+)(
+  'refuses the entire $method batch for its own invalid slot $slot',
+  async ({ method, slot }) => {
+    const f = fixture();
+    f.fetcher.mockImplementation(async (_url, init) => {
+      const messages = JSON.parse(requestBody(init)) as Message[];
+      return Response.json(
+        messages.map((m) => ({
+          jsonrpc: '2.0',
+          id: m.id,
+          result:
+            m.method === 'getGenesisHash'
+              ? 'genesis'
+              : m.method === 'getSlot'
+                ? slot
+                : { context: { slot }, value: [] },
+        })),
+      );
+    });
+    const config = {
+      encoding: 'base64',
+      commitment: 'confirmed',
+      minContextSlot: 100,
+      dataSlice: { offset: 0, length: 45 },
+    };
+    const params =
+      method === 'getSlot'
+        ? [config]
+        : method === 'getMultipleAccounts'
+          ? [['11111111111111111111111111111111'], config]
+          : ['message', config];
+    const results = await Promise.allSettled([
+      f.reader.rpc('getGenesisHash', []),
+      f.reader.rpc(method, params),
+    ]);
+    expect(results.every((x) => x.status === 'rejected')).toBe(true);
+    expect(f.fetcher).toHaveBeenCalledOnce();
+  },
+);
+it('validates each ordered response against its distinct floor, without replacing either floor', async () => {
+  const f = fixture();
+  f.fetcher.mockImplementation(async (_url, init) => {
+    const messages = JSON.parse(requestBody(init)) as Message[];
+    return Response.json(
+      messages.map((m, i) => ({
+        jsonrpc: '2.0',
+        id: m.id,
+        result: { context: { slot: i === 0 ? 105 : 112 }, value: true },
+      })),
+    );
+  });
+  const result = await Promise.all([
+    f.reader.rpc('getFeeForMessage', ['message', { minContextSlot: 100 }]),
+    f.reader.rpc('isBlockhashValid', ['blockhash', { minContextSlot: 110 }]),
+  ]);
+  expect(result).toMatchObject([
+    { context: { slot: '105' } },
+    { context: { slot: '112' } },
+  ]);
+  const body = JSON.parse(requestBody(f.fetcher.mock.calls[0][1])) as Message[];
+  expect(
+    body.map((m) => (m.params[1] as { minContextSlot: number }).minContextSlot),
+  ).toEqual([100, 110]);
+});
+it('checks the original-packet simulation response against its own floor', async () => {
+  const f = fixture();
+  f.fetcher.mockImplementation(async (_url, init) => {
+    const m = JSON.parse(requestBody(init)) as Message;
+    return Response.json({
+      jsonrpc: '2.0',
+      id: m.id,
+      result: { context: { slot: 99 }, value: { err: null } },
+    });
+  });
+  await expect(
+    f.reader.rpc('simulateTransaction', [
+      'packet',
+      { minContextSlot: 100, sigVerify: false, replaceRecentBlockhash: false },
+    ]),
+  ).rejects.toThrow('Pair RPC batch read failed.');
+  expect(f.fetcher).toHaveBeenCalledOnce();
 });
 it('uses at most two methods in an HTTP request', async () => {
   const f = fixture();
@@ -429,7 +527,7 @@ it.each([false, true])(
           };
         }),
       );
-      return Response.json(Array.isArray(body) ? values.reverse() : values[0]);
+      return Response.json(Array.isArray(body) ? values : values[0]);
     };
     const control = new AbortController(),
       reader = createPairReadRpc(endpoint, control.signal, fetcher);

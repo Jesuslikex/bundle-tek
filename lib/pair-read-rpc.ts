@@ -231,7 +231,7 @@ export function createPairReadRpc(
     if (!Array.isArray(replies) || replies.length !== batch.length)
       throw Error('Pair RPC response mapping differs.');
     const results = new Map<string, unknown>();
-    for (const raw of replies) {
+    for (const [index, raw] of replies.entries()) {
       const reply = raw as {
         jsonrpc?: unknown;
         id?: unknown;
@@ -242,12 +242,41 @@ export function createPairReadRpc(
         !reply ||
         reply.jsonrpc !== '2.0' ||
         typeof reply.id !== 'string' ||
+        reply.id !== batch[index].id ||
         !batch.some((item) => item.id === reply.id) ||
         results.has(reply.id) ||
         reply.error ||
         reply.result === undefined
       )
         throw Error('Pair RPC response mapping differs.');
+      const item = batch[index];
+      const config = item.params[
+        ['getSlot', 'getBlockHeight'].includes(item.method) ? 0 : 1
+      ] as { minContextSlot?: number } | undefined;
+      if (
+        config?.minContextSlot !== undefined &&
+        [
+          'getSlot',
+          'getMultipleAccounts',
+          'getFeeForMessage',
+          'isBlockhashValid',
+          'simulateTransaction',
+        ].includes(item.method)
+      ) {
+        const rawSlot =
+          item.method === 'getSlot'
+            ? reply.result
+            : (reply.result as { context?: { slot?: unknown } } | null)?.context
+                ?.slot;
+        if (
+          typeof rawSlot !== 'string' ||
+          !/^\d{1,16}$/.test(rawSlot) ||
+          !Number.isSafeInteger(Number(rawSlot)) ||
+          Number(rawSlot) < config.minContextSlot ||
+          Number(rawSlot) > config.minContextSlot + 32
+        )
+          throw Error('Pair RPC response context differs.');
+      }
       results.set(reply.id, reply.result);
     }
     signal.throwIfAborted();
@@ -312,6 +341,15 @@ export function createPairReadRpc(
       if (new TextEncoder().encode(serialized).byteLength > 32768)
         throw Error('Pair RPC request exceeds bounds.');
       const copy = JSON.parse(serialized) as unknown[];
+      const config = copy[
+        ['getSlot', 'getBlockHeight'].includes(method) ? 0 : 1
+      ] as { minContextSlot?: unknown } | undefined;
+      if (
+        config?.minContextSlot !== undefined &&
+        (!Number.isSafeInteger(config.minContextSlot) ||
+          Number(config.minContextSlot) < 0)
+      )
+        throw Error('Pair RPC context floor differs.');
       if (method === 'getMultipleAccounts') {
         const keys = copy[0] as unknown[],
           config = copy[1] as {
