@@ -631,6 +631,13 @@
       "when": 1792114800000,
       "tag": "0089_pair_order_first_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "6",
+      "when": 1792114800001,
+      "tag": "0090_pair_order_first_authorizations",
+      "breakpoints": true
     }
   ]
 }

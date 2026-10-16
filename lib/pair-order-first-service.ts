@@ -20,6 +20,14 @@ import {
 } from './pair-order-first-review';
 import { pairRuntimeDigest } from './pair-runtime-trace';
 import { pairStockSigningPolicy } from './pair-stock-signing-policy';
+import { authorizePairOrderAfterRecheck } from './pair-order-authorization';
+import { collectPairRuntimePreview } from './pair-runtime-preview';
+import { createPairReadRpc } from './pair-read-rpc';
+import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
+import {
+  readPairOrderMarketBound,
+  type PairOrderMarketBound,
+} from './pair-order-market-bound';
 
 export type PairOrderFirstRequest = ImportedPairOrderRequest & {
   absoluteMinimumRaw: string | null;
@@ -59,6 +67,14 @@ export async function prepareOwnedPairOrderFirstReview(
     }),
     quoteScope: createPairOrderQuoteScope(),
   };
+  const ownedSnapshot = () =>
+    db
+      .prepare(
+        "SELECT p.document,p.revision,p.archived,w.revision AS wallet_revision,w.archived AS wallet_archived,w.role,w.updated_at AS wallet_updated_at FROM imported_token_projects p JOIN workspace_wallets w ON w.owner_id=p.owner_id AND w.chain='Solana' AND w.address=? WHERE p.owner_id=? AND p.id=?",
+      )
+      .bind(request.wallet, owner, request.id)
+      .first();
+  const originalOwned = await ownedSnapshot();
   const now = provider.now ?? Date.now;
   // Server-created independent baseline, never an arbitrary client-supplied number.
   const {
@@ -113,14 +129,31 @@ export async function prepareOwnedPairOrderFirstReview(
     (preflight, packet, rpc, clock) =>
       collectPairOrderReview(preflight, packet, rpc, clock),
   );
+  const market = await readPairOrderMarketBound(
+    db,
+    owner,
+    candidate.preflight.quote,
+    candidate.order,
+    now(),
+  );
   const review = await buildPairOrderFirstReview(
     candidate,
     initial,
     absoluteMinimumRaw,
     now(),
+    market,
   );
   const id = crypto.randomUUID();
-  const record = { request: value, initial, candidate, review };
+  if (JSON.stringify(originalOwned) !== JSON.stringify(await ownedSnapshot()))
+    throw new ImportedPairQuoteError('Owned review context changed.');
+  const record = {
+    request: { ...request, absoluteMinimumRaw },
+    initial,
+    candidate,
+    review,
+    ownedSnapshot: originalOwned,
+    market,
+  };
   const document = JSON.stringify(record),
     digest = await pairRuntimeDigest(record);
   if (document.length > 400000)
@@ -170,6 +203,8 @@ export async function readOwnedPairOrderFirstReview(
     initial: Parameters<typeof buildPairOrderFirstReview>[1];
     candidate: Parameters<typeof buildPairOrderFirstReview>[0];
     review: Awaited<ReturnType<typeof buildPairOrderFirstReview>>;
+    ownedSnapshot: unknown;
+    market: PairOrderMarketBound;
   };
   if ((await pairRuntimeDigest(record)) !== row.sha256)
     throw new ImportedPairQuoteError('Saved order evidence changed.');
@@ -178,6 +213,7 @@ export async function readOwnedPairOrderFirstReview(
     record.initial,
     record.request.absoluteMinimumRaw,
     Date.parse(record.review.createdAt),
+    record.market,
   );
   if (JSON.stringify(rebuilt) !== JSON.stringify(record.review))
     throw new ImportedPairQuoteError('Saved order review changed.');
@@ -191,14 +227,130 @@ export async function approveOwnedPairOrderFirstReview(
   id: string,
   consent: PairOrderFirstConsent,
   now = Date.now(),
+  signal: AbortSignal = new AbortController().signal,
 ) {
   const record = await readOwnedPairOrderFirstReview(db, owner, id);
   await requirePairOrderFirstConsent(record.review, consent, now);
+  const market = await readPairOrderMarketBound(
+    db,
+    owner,
+    record.candidate.preflight.quote,
+    record.candidate.order,
+    now,
+  );
+  if (JSON.stringify(market) !== JSON.stringify(record.market))
+    throw new ImportedPairQuoteError(
+      'Saved market comparison changed. Request a new review.',
+    );
   const policy = pairStockSigningPolicy();
   if (!policy.qualified) throw new ImportedPairQuoteError(policy.reason);
-  // Deliberate second stop: qualification alone must never bypass the as-yet
-  // unavailable trusted-code/reservation/browser-signing implementation.
-  throw new ImportedPairQuoteError(
-    'Fresh runtime authorization and signing are not released. Request a new review when available.',
-  );
+  const controller = new AbortController();
+  signal = AbortSignal.any([
+    signal,
+    controller.signal,
+    AbortSignal.timeout(5000),
+  ]);
+  const reads = createPairReadRpc(getSolanaIndexerRpcEndpoint(), signal);
+  const owned = () =>
+    db
+      .prepare(
+        "SELECT p.document,p.revision,p.archived,w.revision AS wallet_revision,w.archived AS wallet_archived,w.role,w.updated_at AS wallet_updated_at,o.address AS proven_address FROM imported_token_projects p JOIN workspace_wallets w ON w.owner_id=p.owner_id AND w.chain='Solana' AND w.address=? LEFT JOIN wallet_ownership_proofs o ON o.owner_id=w.owner_id AND o.chain=w.chain AND o.address=w.address WHERE p.owner_id=? AND p.id=?",
+      )
+      .bind(record.request.wallet, owner, record.request.id)
+      .first<{
+        document: string;
+        revision: number;
+        archived: number;
+        wallet_revision: number;
+        wallet_archived: number;
+        role: string;
+        wallet_updated_at: string;
+        proven_address: string | null;
+      }>();
+  try {
+    const before = await owned();
+    if (
+      !before ||
+      before.archived ||
+      before.wallet_archived ||
+      before.revision !== record.request.revision ||
+      before.wallet_revision !== record.request.walletRevision ||
+      before.proven_address !== record.request.wallet ||
+      !['Recipient', 'Funder', 'Deployer'].includes(before.role)
+    )
+      throw new ImportedPairQuoteError(
+        'Saved pair, wallet or ownership proof changed. Request a new review.',
+      );
+    const { proven_address: _proof, ...ownedBefore } = before;
+    if (
+      (await pairRuntimeDigest(ownedBefore)) !==
+      (await pairRuntimeDigest(record.ownedSnapshot))
+    )
+      throw new ImportedPairQuoteError(
+        'Owned context changed since review. Request a new review.',
+      );
+    const auth = await authorizePairOrderAfterRecheck(
+      record.review,
+      consent,
+      record.candidate.review,
+      async () => {
+        // Original packet/lifetime and full code observations, never a new order or reused scan.
+        const fresh = await collectPairRuntimePreview(
+          record.candidate,
+          reads.rpc,
+          reads.programRpc,
+          signal,
+        );
+        const after = await owned();
+        return {
+          packetSha256: fresh.review.packetSha256,
+          sourceSnapshotSha256: fresh.review.sourceSnapshotSha256,
+          runtimeSha256: fresh.runtime.sha256,
+          minimumSlot: fresh.runtime.minimumSlot,
+          maximumSlot: fresh.runtime.maximumSlot,
+          ownedContextUnchanged:
+            JSON.stringify(before) === JSON.stringify(after),
+          custodyAndBalancesUnchanged:
+            fresh.review.sourceSnapshotSha256 ===
+            record.candidate.review.sourceSnapshotSha256,
+          originalLifetimeValid:
+            Date.now() < Date.parse(fresh.runtime.expiresAt),
+          twoCompleteCodeScansMatched: fresh.runtime.codeIdentityObserved,
+          // Both remain false today: no preview alone establishes these policies.
+          trustedProgramPolicyEstablished: Boolean(
+            fresh.runtime.trustedProgramPolicyEstablished,
+          ),
+          applicationReservationsChecked: Boolean(
+            fresh.review.applicationReservationsChecked,
+          ),
+        };
+      },
+      signal,
+      Date.now,
+      now,
+    );
+    signal.throwIfAborted();
+    const saved = await db
+      .prepare(
+        'INSERT INTO pair_order_first_authorizations (id,review_id,owner_id,document,created_at,expires_at) VALUES (?,?,?,?,?,?)',
+      )
+      .bind(
+        auth.id,
+        id,
+        owner,
+        JSON.stringify(auth),
+        auth.createdAt,
+        auth.expiresAt,
+      )
+      .run();
+    signal.throwIfAborted();
+    if (saved.meta.changes !== 1 || Date.now() >= Date.parse(auth.expiresAt))
+      throw new ImportedPairQuoteError(
+        'Signing authorization expired. Request a new review.',
+      );
+    return auth;
+  } finally {
+    controller.abort();
+    reads.close();
+  }
 }

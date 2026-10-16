@@ -26,9 +26,10 @@ export async function pairRuntimeDigest(value: unknown) {
   const encoded = new TextEncoder().encode(JSON.stringify(canonical(value)));
   if (encoded.length > 524288)
     throw Error('Pair runtime evidence is too large.');
-  return Buffer.from(await crypto.subtle.digest('SHA-256', encoded)).toString(
-    'hex',
-  );
+  return Array.from(
+    new Uint8Array(await crypto.subtle.digest('SHA-256', encoded)),
+    (b) => b.toString(16).padStart(2, '0'),
+  ).join('');
 }
 /** RPC reports compiled, partially decoded, or parsed inner instructions. Parsed labels are evidence, never raw instruction verification. */
 export async function reviewPairRuntimeTrace(

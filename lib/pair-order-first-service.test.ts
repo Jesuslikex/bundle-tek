@@ -1,6 +1,7 @@
 import { afterEach, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { pairOrderFixture } from '../test/pair-order-fixture';
+import { authorizePairOrderAfterRecheck } from './pair-order-authorization';
 import {
   quoteOwnedImportedPair,
   createPairOrderQuoteScope,
@@ -76,6 +77,9 @@ it.each(['third', 'changed-request', 'expired', 'forged'] as const)(
 async function setup() {
   const v = (f = await pairOrderFixture());
   v.sqlite.exec(
+    'CREATE TABLE imported_market_observations(owner_id TEXT,project_id TEXT,document TEXT,observed_at TEXT)',
+  );
+  v.sqlite.exec(
     readFileSync(
       new URL('../drizzle/0089_pair_order_first_reviews.sql', import.meta.url),
       'utf8',
@@ -92,6 +96,92 @@ async function setup() {
     );
   return { v, request, run };
 }
+it('enforces exact owned consent and one authorization per review in the local database', async () => {
+  const { v, run } = await setup();
+  for (const file of [
+    '0013_fresh_sandman',
+    '0090_pair_order_first_authorizations',
+  ])
+    v.sqlite.exec(
+      readFileSync(
+        new URL(`../drizzle/${file}.sql`, import.meta.url),
+        'utf8',
+      ).replaceAll('--> statement-breakpoint', ''),
+    );
+  v.sqlite
+    .prepare('INSERT INTO wallet_ownership_proofs VALUES (?,?,?,?,?)')
+    .run(
+      'alice',
+      'Solana',
+      v.wallet,
+      new Date(v.clock.now).toISOString(),
+      'test-proof',
+    );
+  const saved = await run(),
+    record = await readOwnedPairOrderFirstReview(v.db, 'alice', saved.id),
+    r = saved.review;
+  const consent = {
+    reviewSha256: r.sha256,
+    packetSha256: r.packetSha256,
+    approvedMinimumOutputRaw: r.minimumOutputRaw,
+    approveExactOrder: true as const,
+    acknowledgeIndependentDifference: false,
+  };
+  const auth = await authorizePairOrderAfterRecheck(
+    r,
+    consent,
+    record.candidate.review,
+    async () => ({
+      packetSha256: r.packetSha256,
+      sourceSnapshotSha256: record.candidate.review.sourceSnapshotSha256,
+      runtimeSha256: 'a'.repeat(64),
+      minimumSlot: record.candidate.review.minimumSlot,
+      maximumSlot: record.candidate.review.maximumSlot,
+      ownedContextUnchanged: true,
+      custodyAndBalancesUnchanged: true,
+      originalLifetimeValid: true,
+      twoCompleteCodeScansMatched: true,
+      trustedProgramPolicyEstablished: true,
+      applicationReservationsChecked: true,
+    }),
+    new AbortController().signal,
+    () => v.clock.now,
+  );
+  const insert = (doc: typeof auth, owner = 'alice') =>
+    v.sqlite
+      .prepare(
+        'INSERT INTO pair_order_first_authorizations VALUES (?,?,?,?,?,?)',
+      )
+      .run(
+        doc.id,
+        saved.id,
+        owner,
+        JSON.stringify(doc),
+        doc.createdAt,
+        doc.expiresAt,
+      );
+  expect(() => insert({ ...auth, minimumOutputRaw: '1' })).toThrow(/ownership/);
+  expect(() =>
+    insert({
+      ...auth,
+      consent: { ...auth.consent, approvedMinimumOutputRaw: '1' },
+    }),
+  ).toThrow(/consent/);
+  expect(() => insert(auth, 'bob')).toThrow(/ownership/);
+  expect(() =>
+    insert({ ...auth, expiresAt: new Date(v.clock.now + 5001).toISOString() }),
+  ).toThrow();
+  insert(auth);
+  expect(() => insert({ ...auth, id: crypto.randomUUID() })).toThrow(/UNIQUE/);
+  expect(() =>
+    v.sqlite.exec(
+      'UPDATE pair_order_first_authorizations SET owner_id=owner_id',
+    ),
+  ).toThrow(/Immutable/);
+  expect(() =>
+    v.sqlite.exec('DELETE FROM pair_order_first_authorizations'),
+  ).toThrow(/Immutable/);
+});
 it('captures a server baseline, prepares once, then quotes again before review and stores immutable owned evidence', async () => {
   const { v, run } = await setup();
   const stages: string[] = [];
@@ -160,7 +250,7 @@ it('accepts an independent preview difference only as a new review, without weak
       : q;
   });
   const saved = await run();
-  expect(saved.review.independent.acknowledgementRequired).toBe(true);
+  expect(saved.review.acknowledgementRequired).toBe(true);
   expect(saved.review.minimumOutputRaw).toBe('995000');
 });
 it('rejects one unit below the fresh reference, with no saved review', async () => {
