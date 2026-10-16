@@ -345,7 +345,10 @@ export async function quoteOwnedImportedPair(
       throw error;
     }
     signal.throwIfAborted();
-    const after = await readMints(before.slot);
+    const [after, finalGenesis] = await Promise.all([
+      readMints(before.slot),
+      checked('getGenesisHash', []),
+    ]);
     try {
       assertSamePairMintEvidence(before, after);
     } catch {
@@ -354,7 +357,7 @@ export async function quoteOwnedImportedPair(
       );
     }
     requireConsistentSolanaSlots([Number(rawSlot), before.slot, after.slot]);
-    if ((await checked('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+    if (finalGenesis !== SOLANA_MAINNET_GENESIS)
       throw new ImportedPairQuoteError('Quote identity network changed.', 502);
     const current = await read();
     signal.throwIfAborted();

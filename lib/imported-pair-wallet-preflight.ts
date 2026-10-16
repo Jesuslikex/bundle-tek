@@ -152,12 +152,24 @@ export async function preflightOwnedImportedPairWallet(
       checked,
       now(),
     );
-    const after = await readPairWalletEvidence(
-      { ...quoted, slot: before.slot, unixTimestamp: before.unixTimestamp },
-      input.wallet,
-      checked,
-      now(),
-    );
+    const [after, finalGenesis] = await Promise.all([
+      readPairWalletEvidence(
+        { ...quoted, slot: before.slot, unixTimestamp: before.unixTimestamp },
+        input.wallet,
+        checked,
+        now(),
+      ),
+      checked('getGenesisHash', []),
+    ]).catch((error) => {
+      if (
+        now() >=
+        Math.min(Date.parse(pair.expiresAt), Date.parse(quote.quote.expiresAt))
+      )
+        throw new ImportedPairQuoteError(
+          'Pair quote expired during wallet/network observations. Request a fresh preflight.',
+        );
+      throw error;
+    });
     assertStablePairWalletEvidence(before, after);
     requireConsistentSolanaSlots([
       quoted.slot,
@@ -165,7 +177,7 @@ export async function preflightOwnedImportedPairWallet(
       before.slot,
       after.slot,
     ]);
-    if ((await checked('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+    if (finalGenesis !== SOLANA_MAINNET_GENESIS)
       throw new ImportedPairQuoteError(
         'Pair wallet provider network changed.',
         502,
