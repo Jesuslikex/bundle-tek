@@ -368,7 +368,7 @@ it('enforces the original normal bound on a whole mixed-profile batch', async ()
   expect(f.fetcher).toHaveBeenCalledOnce();
   expect(cancel).toHaveBeenCalled();
 });
-it('keeps full normal responses separate instead of increasing their byte bound', async () => {
+it('packs a small full-account read while preserving its whole-envelope byte bound', async () => {
   const f = fixture();
   await Promise.all([
     f.reader.rpc('getMultipleAccounts', [
@@ -377,7 +377,33 @@ it('keeps full normal responses separate instead of increasing their byte bound'
     ]),
     f.reader.rpc('getGenesisHash', []),
   ]);
-  expect(f.bodies.map((x) => x.length)).toEqual([1, 1]);
+  expect(f.bodies.map((x) => x.length)).toEqual([2]);
+});
+it('cancels an underestimated full-account batch before publishing either result', async () => {
+  const f = fixture(),
+    cancel = vi.fn();
+  f.fetcher.mockResolvedValue(
+    new Response(
+      new ReadableStream({
+        start(c) {
+          c.enqueue(new Uint8Array(524289).fill(32));
+        },
+        cancel,
+      }),
+    ),
+  );
+  const results = await Promise.allSettled([
+    f.reader.rpc('getMultipleAccounts', [
+      ['11111111111111111111111111111111'],
+      { encoding: 'base64' },
+    ]),
+    f.reader.rpc('getGenesisHash', []),
+  ]);
+  expect(f.bodies).toHaveLength(0); // mock records no bodies; fetch count proves one envelope.
+  expect(f.fetcher).toHaveBeenCalledOnce();
+  expect(JSON.parse(requestBody(f.fetcher.mock.calls[0][1]))).toHaveLength(2);
+  expect(results.every((r) => r.status === 'rejected')).toBe(true);
+  expect(cancel).toHaveBeenCalledOnce();
 });
 it.each([360, 720])(
   'preserves the 1-MiB raw envelope cap for two %i-KiB slices',

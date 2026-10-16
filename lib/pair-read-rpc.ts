@@ -150,7 +150,19 @@ export function createPairReadRpc(
       config = item.params[1] as {
         dataSlice?: { offset: number; length: number };
       };
-    if (!config.dataSlice) return item.maxBytes;
+    if (!config.dataSlice) {
+      // Packing hint only: selected wallet/Clock/Rent accounts are usually
+      // small. The original whole-envelope limits remain unchanged and fail
+      // closed if this estimate is low, before publishing any result.
+      return Math.min(
+        item.maxBytes,
+        keys.reduce(
+          (sum, key) =>
+            sum + Math.ceil((lengths.get(key) ?? 65536) / 3) * 4 + 512,
+          1024,
+        ),
+      );
+    }
     const slice = config.dataSlice;
     const bytes = keys.reduce((sum, key) => {
       const size = lengths.get(key),
