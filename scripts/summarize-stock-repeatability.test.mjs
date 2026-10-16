@@ -2,6 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { summarizeStockRepeatability } from './summarize-stock-repeatability.mjs';
 
+test('binds new sample runtime evidence without relabelling historical receipts', () => {
+  const rows = samples();
+  assert.equal(summarizeStockRepeatability(rows).harnessRuntime, undefined);
+  for (const r of rows)
+    r.harnessRuntime = { nodeVersion: '24.19.0', requiredNodeMajor: 24 };
+  assert.deepEqual(
+    summarizeStockRepeatability(rows).harnessRuntime,
+    rows[0].harnessRuntime,
+  );
+  const missing = structuredClone(rows);
+  delete missing[2].harnessRuntime;
+  assert.throws(() => summarizeStockRepeatability(missing), /runtime changed/);
+  const changed = structuredClone(rows);
+  changed[1].harnessRuntime.nodeVersion = '24.20.0';
+  assert.throws(() => summarizeStockRepeatability(changed), /runtime changed/);
+  for (const r of rows) r.harnessRuntime.nodeVersion = '26.4.0';
+  assert.throws(() => summarizeStockRepeatability(rows), /production Node 24/);
+});
+
 test('rejects rotating or dropping a pinned fixture even for refused runs', () => {
   const rows = samples();
   for (const r of rows)

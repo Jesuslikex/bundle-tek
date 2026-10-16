@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { summarizeStockRepeatability } from './summarize-stock-repeatability.mjs';
+import { requireStockQualificationRuntime } from './stock-qualification-runtime.mjs';
 
 export async function runStockRepeatability(attempt) {
   const results = [];
@@ -22,6 +23,7 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
+  const runtime = requireStockQualificationRuntime();
   const referenceArg = process.argv[3];
   if (
     ![3, 4].includes(process.argv.length) ||
@@ -72,6 +74,8 @@ if (
           const row = JSON.parse(text.trim().split(/\r?\n/).at(-1));
           const receipt = JSON.parse(readFileSync(row.receipt, 'utf8'));
           if (
+            JSON.stringify(receipt.harnessRuntime) !==
+              JSON.stringify(runtime) ||
             receipt.quoteAsset !== asset ||
             receipt.readOnly !== true ||
             receipt.signatures !== 0 ||
@@ -102,6 +106,7 @@ if (
   );
   const evidence = {
     referencePolicy: 'idle-before-and-after',
+    harnessRuntime: runtime,
     format: 'stock-pair-bounded-campaign-v1',
     ...campaign,
     // An incomplete campaign is never padded into a successful six-run sample.

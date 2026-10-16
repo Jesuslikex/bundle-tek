@@ -4,15 +4,28 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { unchangedQuietReference } from './stock-reference-activity.mjs';
+import { requireStockQualificationRuntime } from './stock-qualification-runtime.mjs';
 
 export function summarizeStockRepeatability(receipts) {
   if (!Array.isArray(receipts) || receipts.length !== 6)
     throw Error('Exactly three alternating SOL/USDC rounds are required.');
   const seen = new Set();
   const source = JSON.stringify(receipts[0].sourceFiles);
+  const harnessRuntime = receipts[0].harnessRuntime;
   const fixture = receipts[0].referenceFixtureSha256 ?? null;
   const referenceByAsset = new Map();
   const attempts = receipts.map((r, i) => {
+    if (JSON.stringify(r.harnessRuntime) !== JSON.stringify(harnessRuntime))
+      throw Error(
+        'Qualification runtime changed or was omitted within the sample.',
+      );
+    if (harnessRuntime !== undefined) {
+      const expected = requireStockQualificationRuntime(
+        harnessRuntime?.nodeVersion,
+      );
+      if (JSON.stringify(expected) !== JSON.stringify(harnessRuntime))
+        throw Error('Qualification runtime evidence differs.');
+    }
     const asset = i % 2 === 0 ? 'SOL' : 'USDC';
     if (
       (r.referenceFixtureSha256 ?? null) !== fixture ||
@@ -205,6 +218,7 @@ export function summarizeStockRepeatability(receipts) {
     format: 'stock-pair-repeatability-v1',
     sample: 'three fixed alternating rounds; no replacement attempts',
     sourceFiles: receipts[0].sourceFiles,
+    ...(harnessRuntime === undefined ? {} : { harnessRuntime }),
     maximumSlots: 32,
     repeatableInThisSample: attempts.every((x) => x.passed),
     assets: ['SOL', 'USDC'].map((asset) => ({

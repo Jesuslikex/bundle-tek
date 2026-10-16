@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { requireStockQualificationRuntime } from './stock-qualification-runtime.mjs';
 import {
   referenceActivity,
   unchangedQuietReference,
@@ -19,6 +20,7 @@ import {
   stockQuoteGaps,
 } from './stock-provider-timing.mjs';
 
+const runtime = requireStockQualificationRuntime();
 const args = new Set(process.argv.slice(2));
 const referenceArg = [...args].filter((a) => a.startsWith('--reference-file='));
 if (
@@ -88,6 +90,7 @@ const files = [
   'scripts/stock-reference-fixture.mjs',
   'scripts/stock-provider-timing.mjs',
   'scripts/stock-clock-wire.mjs',
+  'scripts/stock-qualification-runtime.mjs',
 ];
 const sourceFiles = Object.fromEntries(
   files.map((p) => [p, hash(readFileSync(p))]),
@@ -118,6 +121,7 @@ const receipt = {
   format: 'stock-pair-live-qualification-v1',
   checkedAt: new Date().toISOString(),
   readOnly: true,
+  harnessRuntime: runtime,
   sourceFiles,
   sourceUnchanged: false,
   referenceFixtureSha256: referenceText === null ? null : hash(referenceText),
