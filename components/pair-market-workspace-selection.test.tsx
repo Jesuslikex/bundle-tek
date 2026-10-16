@@ -96,7 +96,8 @@ it('publishes the real chart selection into the review and invalidates checked c
   };
   const selected: string[] = [];
   const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
-    if (String(url).startsWith('/api/imported-projects/market?'))
+    if (typeof url !== 'string') throw Error('Expected a local API URL');
+    if (url.startsWith('/api/imported-projects/market?'))
       return Response.json({
         id: project.id,
         revision: 1,
@@ -105,7 +106,9 @@ it('publishes the real chart selection into the review and invalidates checked c
       });
     if (url !== '/api/imported-projects/pair-order-reviews')
       throw Error('Unexpected request');
-    const body = JSON.parse(String(init?.body));
+    if (typeof init?.body !== 'string')
+      throw Error('Expected JSON request body');
+    const body = JSON.parse(init.body);
     expect(body.action).toBe('prepare');
     selected.push(body.request.marketPair);
     const { sha256: _old, ...terms } = saved.review;
@@ -124,9 +127,9 @@ it('publishes the real chart selection into the review and invalidates checked c
       </>,
     ),
   );
-  const market = node.querySelector<HTMLSelectElement>(
+  const market = node.querySelector(
     'select[aria-label="Market pair"]',
-  )!;
+  ) as unknown as { value: string; dispatchEvent(event: Event): boolean };
   expect(market.value).toBe(poolA);
   await act(async () => button('Prepare order review').click());
   expect(selected).toEqual([poolA]);
@@ -136,11 +139,7 @@ it('publishes the real chart selection into the review and invalidates checked c
   });
   expect(button('Request signing authorization').disabled).toBe(false);
   await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(
-      HTMLSelectElement.prototype,
-      'value',
-    )!.set!;
-    setter.call(market, poolB);
+    market.value = poolB;
     market.dispatchEvent(new Event('change', { bubbles: true }));
   });
   expect(boxes()).toHaveLength(0);
