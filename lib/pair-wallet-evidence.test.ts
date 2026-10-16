@@ -238,6 +238,18 @@ it('compares exact rechecked balances and does not pool other accounts or native
   expect(() => assertStablePairWalletEvidence(before, changed)).toThrow(
     'changed',
   );
+  try {
+    assertStablePairWalletEvidence(before, changed);
+  } catch (error) {
+    expect(error).toMatchObject({
+      pairDiagnostic: {
+        check: 'wallet-stability',
+        nativeBalanceChanged: false,
+        changedAccountFields: ['amountRaw', 'spendableRaw'],
+      },
+    });
+    expect(JSON.stringify(error)).not.toContain('changedAccountFields');
+  }
   const noSol = structuredClone(before);
   noSol.nativeBalanceRaw = '0';
   expect(

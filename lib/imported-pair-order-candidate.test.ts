@@ -704,7 +704,18 @@ it.each(['valid', 'duplicate', 'excessive-price'] as const)(
       expect((await run(f)).review.assessment.priorityFeeUpperBoundRaw).toBe(
         '2',
       );
-    else await expect(run(f)).rejects.toMatchObject({ status: 409 });
+    else
+      await expect(run(f)).rejects.toMatchObject({
+        status: 409,
+        cause: {
+          message:
+            'Pair candidate instructions, accounts or raw spending limits differ.',
+          pairDiagnostic: {
+            check:
+              mode === 'duplicate' ? 'compute-placement' : 'native-fee-budget',
+          },
+        },
+      });
   },
 );
 it('refuses a block-height observation that moves backwards', async () => {

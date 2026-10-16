@@ -1,4 +1,5 @@
 import bs58 from 'bs58';
+import { pairReviewDiagnostic } from './pair-review-diagnostic';
 import { address, getProgramDerivedAddress } from '@solana/kit';
 import { assessJupiterRoute } from './jupiter-route-assessment';
 import {
@@ -61,9 +62,12 @@ export async function reviewPairOrderInstructions(
   networkFeeRaw: string,
   auxiliary: PairAuxiliaryAccount[] = [],
 ) {
-  const fail = (): never => {
-    throw Error(
-      'Pair candidate instructions, accounts or raw spending limits differ.',
+  const fail = (check: string): never => {
+    throw pairReviewDiagnostic(
+      Error(
+        'Pair candidate instructions, accounts or raw spending limits differ.',
+      ),
+      check,
     );
   };
   const original = preflight.quote,
@@ -72,9 +76,9 @@ export async function reviewPairOrderInstructions(
   const input = original.side === 'Buy' ? pair.quote : pair.base,
     output = original.side === 'Buy' ? pair.base : pair.quote;
   assertPairOrderQuoteBounds(original, order, wallet);
-  if (review.unresolvedAccountCount) fail();
+  if (review.unresolvedAccountCount) fail('unresolved-accounts');
   const route = assessJupiterRoute(review, order);
-  if (route.status !== 'Matched fields' || !route.decoded) fail();
+  if (route.status !== 'Matched fields' || !route.decoded) fail('route-decode');
   const decoded = route.decoded!;
   if (
     decoded.v2
@@ -82,9 +86,9 @@ export async function reviewPairOrderInstructions(
         decoded.outputTokenProgram !== output.program
       : [input.program, output.program].some((p) => p !== SWAP_TOKEN)
   )
-    fail();
+    fail('route-token-program');
   if (new Set(snapshots.map((a) => a.address)).size !== snapshots.length)
-    fail();
+    fail('duplicate-snapshots');
   const raw = new Map(snapshots.map((a) => [a.address, a.raw]));
   if (
     auxiliary.length > 8 ||
@@ -98,23 +102,23 @@ export async function reviewPairOrderInstructions(
       ...auxiliary.map((a) => a.mint.address),
     ].some((m) => raw.has(m))
   )
-    fail();
+    fail('auxiliary-scope');
   const fee = pairWalletUint(networkFeeRaw);
-  if (fee < 1n) fail();
+  if (fee < 1n) fail('network-fee');
   const state = await Promise.all(
     [input, output, ...auxiliary.map((a) => a.mint)].map(async (asset, i) => {
       const selected = preflight.evidence.accounts.find(
         (a) => a.mint === asset.address,
       );
       const extra = i >= 2 ? auxiliary[i - 2] : null;
-      if (!selected && !extra) fail();
+      if (!selected && !extra) fail('missing-selected-state');
       const target =
         i === 0
           ? decoded.sourceAccount
           : i === 1
             ? decoded.destinationAccount
             : extra!.address;
-      if (!raw.has(target)) fail();
+      if (!raw.has(target)) fail('missing-snapshot');
       const native = asset.address === SWAP_WRAPPED_SOL,
         existing = raw.get(target) !== null;
       if (
@@ -123,19 +127,20 @@ export async function reviewPairOrderInstructions(
           asset.decimals !== 9 ||
           asset.amountPolicy.kind !== 'unscaled')
       )
-        fail();
+        fail('native-mint-policy');
       if (
         extra &&
         (extra.seededCandidate
           ? !native || existing
           : target !== (await pairAssociatedAddress(extra.mint, wallet)))
       )
-        fail();
+        fail('auxiliary-target');
       const rent = pairWalletUint(rentByMint[asset.address]);
-      if (rent < 1n) fail();
+      if (rent < 1n) fail('rent-minimum');
       let beforeAmount = 0n;
       if (!native) {
-        if (selected && selected.address !== target) fail();
+        if (selected && selected.address !== target)
+          fail('selected-token-target');
         const observed = await inspectPairTokenAccount(
           raw.get(target),
           {
@@ -154,13 +159,13 @@ export async function reviewPairOrderInstructions(
             observed.status !== selected!.status ||
             observed.amountRaw !== selected!.amountRaw)
         )
-          fail();
+          fail('selected-token-state');
         if (
           extra &&
           existing &&
           (observed.status !== 'Ready' || BigInt(observed.lamportsRaw) < rent)
         )
-          fail();
+          fail('auxiliary-existing-state');
         beforeAmount = BigInt(observed.amountRaw);
       } else if (existing) {
         const a = rawAccount(raw.get(target)),
@@ -178,13 +183,13 @@ export async function reviewPairOrderInstructions(
           v.getUint32(129, true) !== 0 ||
           v.getUint32(109, true) !== 1
         )
-          fail();
+          fail('native-existing-state');
         beforeAmount = v.getBigUint64(64, true);
         if (
           a.lamports - beforeAmount !== v.getBigUint64(113, true) ||
           a.lamports - beforeAmount < rent
         )
-          fail();
+          fail('native-existing-rent');
       }
       return {
         asset,
@@ -205,7 +210,8 @@ export async function reviewPairOrderInstructions(
       };
     }),
   );
-  if (new Set(state.map((s) => s.target)).size !== state.length) fail();
+  if (new Set(state.map((s) => s.target)).size !== state.length)
+    fail('overlapping-targets');
   const w = rawAccount(raw.get(wallet));
   if (
     w.owner !== SYSTEM ||
@@ -213,7 +219,7 @@ export async function reviewPairOrderInstructions(
     w.bytes.length ||
     w.lamports !== BigInt(preflight.evidence.nativeBalanceRaw)
   )
-    fail();
+    fail('system-wallet-state');
   // Every wallet-controlled token account must belong to the selected pair or
   // the explicitly protected intermediate set. Delegated/close-only custody
   // remains unsupported.
@@ -237,19 +243,19 @@ export async function reviewPairOrderInstructions(
         (v.getUint32(129, true) === 1 &&
           bs58.encode(b.slice(133, 165)) === wallet)
       )
-        fail();
+        fail('unexpected-wallet-token-custody');
     } else if (
       b.length >= 82 &&
       ((v.getUint32(0, true) === 1 && bs58.encode(b.slice(4, 36)) === wallet) ||
         (v.getUint32(46, true) === 1 &&
           bs58.encode(b.slice(50, 82)) === wallet))
     )
-      fail();
+      fail('unexpected-wallet-mint-custody');
   }
   const calls = review.instructions.filter(
     (i) => i.program.address === JUPITER,
   );
-  if (calls.length !== 1) fail();
+  if (calls.length !== 1) fail('route-count');
   const routeIndex = calls[0].index,
     budgetTags = new Set<number>();
   let limit: bigint | null = null,
@@ -259,7 +265,8 @@ export async function reviewPairOrderInstructions(
   for (const instruction of review.instructions) {
     const p = instruction.program.address,
       a = instruction.accounts;
-    if (instruction.program.signer || instruction.program.writable) fail();
+    if (instruction.program.signer || instruction.program.writable)
+      fail('program-privileges');
     const b = Uint8Array.from(instruction.dataHex.match(/../g) ?? [], (x) =>
         parseInt(x, 16),
       ),
@@ -267,19 +274,19 @@ export async function reviewPairOrderInstructions(
     if (p === JUPITER) continue;
     if (p === COMPUTE) {
       if (a.length || budgetTags.has(b[0]) || instruction.index >= routeIndex)
-        fail();
+        fail('compute-placement');
       budgetTags.add(b[0]);
       if (b.length === 5 && b[0] === 2) {
         limit = BigInt(v.getUint32(1, true));
-        if (limit < 1n || limit > 1400000n) fail();
+        if (limit < 1n || limit > 1400000n) fail('compute-limit');
       } else if (b.length === 9 && b[0] === 3) price = v.getBigUint64(1, true);
-      else fail();
+      else fail('compute-instruction');
       continue;
     }
     const s = state.find(
       (s) => s.target === a[p === SYSTEM || p === ATA ? 1 : 0]?.address,
     );
-    if (!s) fail();
+    if (!s) fail('setup-target');
     const selected = s!;
     const payer = (i: number) =>
       a[i]?.address === wallet && a[i].signer && a[i].writable;
@@ -300,7 +307,7 @@ export async function reviewPairOrderInstructions(
         !(b.length === 0 || (b.length === 1 && b[0] <= 1)) ||
         selected.created !== -1
       )
-        fail();
+        fail('ata-instruction');
       const [canonical] = await getProgramDerivedAddress({
         programAddress: address(ATA),
         seeds: [
@@ -313,7 +320,7 @@ export async function reviewPairOrderInstructions(
         canonical !== selected.target ||
         (selected.existing && !(b.length === 1 && b[0] === 1))
       )
-        fail();
+        fail('ata-target');
       selected.created = instruction.index;
       selected.initialized = instruction.index;
       if (!selected.existing) setupRent += selected.rent;
@@ -328,7 +335,7 @@ export async function reviewPairOrderInstructions(
         selected.funded !== -1 ||
         (!selected.existing && selected.initialized === -1)
       )
-        fail();
+        fail('native-transfer');
       selected.funding = v.getBigUint64(4, true);
       selected.funded = instruction.index;
       wrappedInput += selected.funding;
@@ -350,7 +357,7 @@ export async function reviewPairOrderInstructions(
         v.getBigUint64(offset + 8, true) !== 165n ||
         bs58.encode(b.slice(offset + 16)) !== SWAP_TOKEN
       )
-        fail();
+        fail('seeded-create-instruction');
       const target = bs58.encode(
         new Uint8Array(
           await crypto.subtle.digest(
@@ -364,7 +371,8 @@ export async function reviewPairOrderInstructions(
         ),
       );
       const funding = v.getBigUint64(offset, true);
-      if (target !== selected.target || funding < selected.rent) fail();
+      if (target !== selected.target || funding < selected.rent)
+        fail('seeded-target-rent');
       selected.created = instruction.index;
       selected.funded = instruction.index;
       selected.seeded = true;
@@ -389,7 +397,7 @@ export async function reviewPairOrderInstructions(
           : bs58.encode(b.slice(1)) !== wallet ||
             (b[0] === 16 && !readonly(2, RENT)))
       )
-        fail();
+        fail('native-initialize');
       selected.initialized = instruction.index;
     } else if (p === SWAP_TOKEN && b.length === 1 && b[0] === 17) {
       if (
@@ -402,7 +410,7 @@ export async function reviewPairOrderInstructions(
         instruction.index >= routeIndex ||
         (!selected.existing && selected.initialized === -1)
       )
-        fail();
+        fail('native-sync');
       selected.synced = instruction.index;
     } else if (
       p === s!.asset.program &&
@@ -421,33 +429,34 @@ export async function reviewPairOrderInstructions(
         instruction.index <= routeIndex ||
         selected.closed !== -1
       )
-        fail();
+        fail('token-close');
       selected.closed = instruction.index;
-    } else fail();
+    } else fail('unsupported-setup');
   }
   for (const s of state) {
-    if (!s.existing && (s.created === -1 || s.initialized === -1)) fail();
+    if (!s.existing && (s.created === -1 || s.initialized === -1))
+      fail('missing-account-creation');
     if (
       s.auxiliary &&
       auxiliary.find((a) => a.address === s.target)?.seededCandidate &&
       !s.seeded
     )
-      fail();
+      fail('missing-seeded-creation');
     if (s.native && s.asset.address === input.address) {
       if (
         s.funding !== BigInt(order.inAmount) ||
         (s.synced === -1 && (!s.seeded || s.funded >= s.initialized))
       )
-        fail();
-    } else if (s.funding !== 0n) fail();
+        fail('native-input-funding');
+    } else if (s.funding !== 0n) fail('unexpected-funding');
     if (
       s.native &&
       (s.asset.address === output.address || s.seeded) &&
       s.closed === -1
     )
-      fail();
+      fail('missing-native-close');
   }
-  if (price !== null && limit === null) fail();
+  if (price !== null && limit === null) fail('compute-price-without-limit');
   const priority = price === null ? 0n : (price * limit! + 999999n) / 1000000n;
   if (
     fee <= priority ||
@@ -458,7 +467,7 @@ export async function reviewPairOrderInstructions(
       BigInt(preflight.evidence.systemRentMinimumRaw) >
       w.lamports
   )
-    fail();
+    fail('native-fee-budget');
   return {
     format: 'pair-order-instruction-review-v1' as const,
     route,

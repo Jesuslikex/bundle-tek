@@ -3,6 +3,7 @@ import {
   getExtensionEncoder,
   type Extension,
 } from '@solana-program/token-2022';
+import { pairReviewDiagnostic } from './pair-review-diagnostic';
 import {
   SWAP_TOKEN,
   SWAP_TOKEN_2022,
@@ -74,7 +75,15 @@ export function pairClockUnixTimestamp(
     !Number.isFinite(now) ||
     Math.abs(Number(unix) * 1000 - now) > 30000
   )
-    throw new Error('Pair chain clock is inconsistent or stale.');
+    throw pairReviewDiagnostic(
+      new Error('Pair chain clock is inconsistent or stale.'),
+      'chain-clock',
+      {
+        contextSlot: slot,
+        clockSlot: Number(view.getBigUint64(0, true)),
+        wallSkewMs: now - Number(unix) * 1000,
+      },
+    );
   return unix.toString();
 }
 function accountBytes(raw: unknown, clock = false) {

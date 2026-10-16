@@ -284,8 +284,11 @@ export async function preflightOwnedImportedPairWallet(
       }),
     ]);
   } catch (error) {
-    if (error instanceof PairMintPolicyError)
-      throw new ImportedPairQuoteError(error.message);
+    if (error instanceof PairMintPolicyError) {
+      const failure = new ImportedPairQuoteError(error.message);
+      Object.defineProperty(failure, 'cause', { value: error });
+      throw failure;
+    }
     throw error;
   } finally {
     signal.removeEventListener('abort', abort);

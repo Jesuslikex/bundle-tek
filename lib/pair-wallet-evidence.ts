@@ -1,4 +1,5 @@
 import bs58 from 'bs58';
+import { pairReviewDiagnostic } from './pair-review-diagnostic';
 import { address } from '@solana/kit';
 import { findAssociatedTokenPda } from '@solana-program/token';
 import {
@@ -512,7 +513,29 @@ export function assertStablePairWalletEvidence(
     BigInt(after.unixTimestamp) > BigInt(before.unixTimestamp) + 30n ||
     JSON.stringify(identity(before)) !== JSON.stringify(identity(after))
   )
-    throw new PairMintPolicyError(
-      'Selected wallet balances, custody or rent changed. Request a new preflight.',
+    throw pairReviewDiagnostic(
+      new PairMintPolicyError(
+        'Selected wallet balances, custody or rent changed. Request a new preflight.',
+      ),
+      'wallet-stability',
+      {
+        slotDelta: after.slot - before.slot,
+        unixDelta: Number(
+          BigInt(after.unixTimestamp) - BigInt(before.unixTimestamp),
+        ),
+        nativeBalanceChanged:
+          before.nativeBalanceRaw !== after.nativeBalanceRaw,
+        changedAccountFields: [
+          ...new Set(
+            before.accounts.flatMap((a, i) =>
+              (Object.keys(a) as (keyof PairWalletAccount)[]).filter(
+                (key) =>
+                  JSON.stringify(a[key]) !==
+                  JSON.stringify(after.accounts[i]?.[key]),
+              ),
+            ),
+          ),
+        ],
+      },
     );
 }

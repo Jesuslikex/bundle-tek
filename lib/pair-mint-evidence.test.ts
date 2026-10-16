@@ -11,6 +11,7 @@ import {
   PAIR_CLOCK,
   readPairMintEvidence,
   assertSamePairMintEvidence,
+  pairClockUnixTimestamp,
 } from './pair-mint-evidence';
 import {
   SWAP_TOKEN_2022,
@@ -36,6 +37,33 @@ const setup = () => {
     read: () => readPairMintEvidence(pair, 100, fixture.rpc, now),
   };
 };
+it('distinguishes bank mismatch from wall-clock staleness without exposing private diagnostics in JSON', () => {
+  const now = 1792161668000;
+  for (const [clockSlot, unix, expected] of [
+    [
+      101,
+      String(now / 1000),
+      { contextSlot: 100, clockSlot: 101, wallSkewMs: 0 },
+    ],
+    [
+      100,
+      String(now / 1000 - 31),
+      { contextSlot: 100, clockSlot: 100, wallSkewMs: 31000 },
+    ],
+  ] as const) {
+    try {
+      pairClockUnixTimestamp(pairQuoteClock(clockSlot, unix), 100, now);
+      throw Error('must reject incoherent or stale clock');
+    } catch (error) {
+      expect(error).toMatchObject({
+        message: 'Pair chain clock is inconsistent or stale.',
+        pairDiagnostic: { check: 'chain-clock', ...expected },
+      });
+      expect(Object.keys(error as object)).not.toContain('pairDiagnostic');
+      expect(JSON.stringify(error)).not.toContain('clockSlot');
+    }
+  }
+});
 it('reads the captured actual TSLAX controls with a same-bank Clock while native signing remains restricted', async () => {
   const { fixture, read, pair } = setup();
   fixture.mints[1] = JSON.parse(
