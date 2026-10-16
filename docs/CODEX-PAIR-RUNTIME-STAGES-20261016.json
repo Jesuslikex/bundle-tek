@@ -1,0 +1,758 @@
+{
+  "format": "pair-runtime-stage-handoff-v1",
+  "sourceCommit": "3ef640e3f970a2d8f13db9b6d88e1a9246b00620",
+  "capturedAt": "2026-10-16T00:13:07.759Z",
+  "scope": "Public-reference unsigned runtime profiling; not a funded trade or qualified signing path.",
+  "publicReference": "2k5hrzuykwyTbUe8L7UriYAQhr5hijNLgBvEB4B9pP5y",
+  "readOnly": true,
+  "userWallets": 0,
+  "privateKeys": 0,
+  "signatures": 0,
+  "broadcasts": 0,
+  "passed": false,
+  "reason": "Solana RPC snapshot crossed too many slots (457433146-457433183)",
+  "status": 409,
+  "measurement": {
+    "slotMeaning": "Slot costs are observed response high-water advances. No extra slot reads are made; time without slot-bearing responses is charged when a later bank is observed.",
+    "policyMinimumSlot": 457433146,
+    "policyMaximumSlot": 457433183,
+    "policySlotSpan": 37,
+    "seedGetSlot": 457433145,
+    "allObservedSlotSpan": 38,
+    "pipelineMs": 8648.0993,
+    "rows": [
+      {
+        "name": "quote",
+        "status": "completed",
+        "startMs": 0.02419999999983702,
+        "entrySlot": null,
+        "firstResponseSlot": 457433145,
+        "lastResponseSlot": 457433148,
+        "endMs": 1296.4274999999998,
+        "exitSlot": 457433148,
+        "slotAdvance": 3,
+        "elapsedMs": 1296.4033,
+        "rpcCalls": 5,
+        "policySlotAdvance": 2
+      },
+      {
+        "name": "wallet-check",
+        "status": "completed",
+        "startMs": 1296.4364999999998,
+        "entrySlot": 457433148,
+        "firstResponseSlot": 457433150,
+        "lastResponseSlot": 457433151,
+        "endMs": 1915.5747000000001,
+        "exitSlot": 457433151,
+        "slotAdvance": 3,
+        "elapsedMs": 619.1382000000003,
+        "rpcCalls": 3,
+        "policySlotAdvance": 3
+      },
+      {
+        "name": "unsigned-order",
+        "status": "completed",
+        "startMs": 1915.5792999999999,
+        "entrySlot": 457433151,
+        "firstResponseSlot": null,
+        "lastResponseSlot": null,
+        "endMs": 2156.8782,
+        "exitSlot": 457433151,
+        "slotAdvance": 0,
+        "elapsedMs": 241.29890000000023,
+        "rpcCalls": 0,
+        "policySlotAdvance": 0
+      },
+      {
+        "name": "inventory-before",
+        "status": "completed",
+        "startMs": 2156.8828,
+        "entrySlot": 457433151,
+        "firstResponseSlot": 457433153,
+        "lastResponseSlot": 457433155,
+        "endMs": 2670.3267,
+        "exitSlot": 457433155,
+        "slotAdvance": 4,
+        "elapsedMs": 513.4439000000002,
+        "rpcCalls": 3,
+        "policySlotAdvance": 4
+      },
+      {
+        "name": "code-before",
+        "status": "completed",
+        "startMs": 2670.3298,
+        "entrySlot": 457433155,
+        "firstResponseSlot": 457433157,
+        "lastResponseSlot": 457433171,
+        "endMs": 6240.919,
+        "exitSlot": 457433171,
+        "slotAdvance": 16,
+        "elapsedMs": 3570.5892,
+        "rpcCalls": 14,
+        "policySlotAdvance": 16
+      },
+      {
+        "name": "candidate-static",
+        "status": "completed",
+        "startMs": 6240.925499999999,
+        "entrySlot": 457433171,
+        "firstResponseSlot": 457433175,
+        "lastResponseSlot": 457433177,
+        "endMs": 7463.2456,
+        "exitSlot": 457433177,
+        "slotAdvance": 6,
+        "elapsedMs": 1222.3201000000008,
+        "rpcCalls": 6,
+        "policySlotAdvance": 6
+      },
+      {
+        "name": "simulation",
+        "status": "completed",
+        "startMs": 7463.2508,
+        "entrySlot": 457433177,
+        "firstResponseSlot": 457433179,
+        "lastResponseSlot": 457433179,
+        "endMs": 7695.770999999999,
+        "exitSlot": 457433179,
+        "slotAdvance": 2,
+        "elapsedMs": 232.52019999999902,
+        "rpcCalls": 1,
+        "policySlotAdvance": 2
+      },
+      {
+        "name": "candidate-final-checks",
+        "status": "failed",
+        "startMs": 7695.777099999999,
+        "entrySlot": 457433179,
+        "firstResponseSlot": 457433180,
+        "lastResponseSlot": 457433183,
+        "endMs": 8648.072,
+        "exitSlot": 457433183,
+        "slotAdvance": 4,
+        "elapsedMs": 952.2949000000008,
+        "rpcCalls": 5,
+        "policySlotAdvance": 4
+      },
+      {
+        "name": "inventory-after",
+        "status": "not-reached",
+        "slotAdvance": null,
+        "elapsedMs": null,
+        "rpcCalls": 0,
+        "policySlotAdvance": null
+      },
+      {
+        "name": "code-after",
+        "status": "not-reached",
+        "slotAdvance": null,
+        "elapsedMs": null,
+        "rpcCalls": 0,
+        "policySlotAdvance": null
+      },
+      {
+        "name": "runtime-final-checks",
+        "status": "not-reached",
+        "slotAdvance": null,
+        "elapsedMs": null,
+        "rpcCalls": 0,
+        "policySlotAdvance": null
+      },
+      {
+        "name": "publication-final-checks",
+        "status": "not-reached",
+        "slotAdvance": null,
+        "elapsedMs": null,
+        "rpcCalls": 0,
+        "policySlotAdvance": null
+      }
+    ],
+    "rpc": [
+      {
+        "stage": "quote",
+        "method": "getGenesisHash",
+        "startMs": 1.386299999999892,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 242.00369999999975
+      },
+      {
+        "stage": "quote",
+        "method": "getSlot",
+        "startMs": 242.02149999999983,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 381.1432,
+        "observedSlot": 457433145
+      },
+      {
+        "stage": "quote",
+        "method": "getMultipleAccounts",
+        "startMs": 381.27070000000003,
+        "minContextSlot": 457433145,
+        "accountCount": 3,
+        "clockIndex": 2,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 598.5374000000002,
+        "clockSlot": "457433146",
+        "clockUnixSeconds": "1792109588",
+        "localUnixSeconds": 1792109589,
+        "observedSlot": 457433146
+      },
+      {
+        "stage": "quote",
+        "method": "getMultipleAccounts",
+        "startMs": 1013.9321,
+        "minContextSlot": 457433146,
+        "accountCount": 3,
+        "clockIndex": 2,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1157.9897999999998,
+        "clockSlot": "457433148",
+        "clockUnixSeconds": "1792109589",
+        "localUnixSeconds": 1792109590,
+        "observedSlot": 457433148
+      },
+      {
+        "stage": "quote",
+        "method": "getGenesisHash",
+        "startMs": 1165.0519,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1293.9542999999999
+      },
+      {
+        "stage": "wallet-check",
+        "method": "getMultipleAccounts",
+        "startMs": 1298.5160999999998,
+        "minContextSlot": 457433148,
+        "accountCount": 6,
+        "clockIndex": 5,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1518.1668999999997,
+        "clockSlot": "457433150",
+        "clockUnixSeconds": "1792109589",
+        "localUnixSeconds": 1792109590,
+        "observedSlot": 457433150
+      },
+      {
+        "stage": "wallet-check",
+        "method": "getMultipleAccounts",
+        "startMs": 1527.5519,
+        "minContextSlot": 457433150,
+        "accountCount": 6,
+        "clockIndex": 5,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1714.1122,
+        "clockSlot": "457433151",
+        "clockUnixSeconds": "1792109589",
+        "localUnixSeconds": 1792109590,
+        "observedSlot": 457433151
+      },
+      {
+        "stage": "wallet-check",
+        "method": "getGenesisHash",
+        "startMs": 1721.7507999999998,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1914.0713
+      },
+      {
+        "stage": "inventory-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2161.4465,
+        "minContextSlot": 457433151,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 2250.5816999999997,
+        "observedSlot": 457433153
+      },
+      {
+        "stage": "inventory-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2258.3115999999995,
+        "minContextSlot": 457433153,
+        "accountCount": 32,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 166
+        },
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 2470.3012000000003,
+        "observedSlot": 457433154
+      },
+      {
+        "stage": "inventory-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2473.1092000000003,
+        "minContextSlot": 457433154,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 2669.9903,
+        "observedSlot": 457433155
+      },
+      {
+        "stage": "code-before",
+        "method": "getGenesisHash",
+        "startMs": 2671.8149,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 2870.4674
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2671.8682000000003,
+        "minContextSlot": 457433155,
+        "accountCount": 7,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 3070.2153000000003,
+        "observedSlot": 457433157
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3070.7228,
+        "minContextSlot": 457433157,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 3266.9351,
+        "observedSlot": 457433158
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3267.5081999999998,
+        "minContextSlot": 457433158,
+        "accountCount": 1,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 3562.8999,
+        "observedSlot": 457433159
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3574.5117999999998,
+        "minContextSlot": 457433159,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 45,
+          "length": 233472
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4075.5512999999996,
+        "observedSlot": 457433160
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3574.5366,
+        "minContextSlot": 457433159,
+        "accountCount": 4,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 233517,
+          "length": 262144
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4277.001,
+        "observedSlot": 457433161
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3574.5822999999996,
+        "minContextSlot": 457433159,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 495661,
+          "length": 348160
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4464.7649,
+        "observedSlot": 457433162
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3574.6092999999996,
+        "minContextSlot": 457433159,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 843821,
+          "length": 348160
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4460.267099999999,
+        "observedSlot": 457433162
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 4897.962299999999,
+        "minContextSlot": 457433162,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 1191981,
+          "length": 716800
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 5197.1294,
+        "observedSlot": 457433166
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 4898.019899999999,
+        "minContextSlot": 457433162,
+        "accountCount": 1,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 1908781,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 5370.8292,
+        "observedSlot": 457433167
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 4898.062400000001,
+        "minContextSlot": 457433162,
+        "accountCount": 1,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 2646061,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 5499.0753,
+        "observedSlot": 457433168
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 5735.7392,
+        "minContextSlot": 457433168,
+        "accountCount": 7,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 5827.2657,
+        "observedSlot": 457433170
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 5735.7659,
+        "minContextSlot": 457433168,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 6105.7685,
+        "observedSlot": 457433171
+      },
+      {
+        "stage": "code-before",
+        "method": "getGenesisHash",
+        "startMs": 5735.796899999999,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 6238.9012
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getGenesisHash",
+        "startMs": 6245.4524,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 6441.662199999999
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getBlockHeight",
+        "startMs": 6245.602499999999,
+        "minContextSlot": 457433151,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 6628.875099999999
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getMultipleAccounts",
+        "startMs": 6628.937599999999,
+        "minContextSlot": 457433171,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 6942.4067,
+        "observedSlot": 457433175
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getMultipleAccounts",
+        "startMs": 6950.422199999999,
+        "minContextSlot": 457433175,
+        "accountCount": 15,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 166
+        },
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7086.4583,
+        "observedSlot": 457433176
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getMultipleAccounts",
+        "startMs": 7087.970299999999,
+        "minContextSlot": 457433176,
+        "accountCount": 9,
+        "clockIndex": 8,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7262.008,
+        "clockSlot": "457433177",
+        "clockUnixSeconds": "1792109595",
+        "localUnixSeconds": 1792109596,
+        "observedSlot": 457433177
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getFeeForMessage",
+        "startMs": 7267.7966,
+        "minContextSlot": 457433177,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7454.766399999999,
+        "observedSlot": 457433177
+      },
+      {
+        "stage": "simulation",
+        "method": "simulateTransaction",
+        "startMs": 7463.3066,
+        "minContextSlot": 457433177,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7683.133399999999,
+        "observedSlot": 457433179
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "getMultipleAccounts",
+        "startMs": 7696.0062,
+        "minContextSlot": 457433179,
+        "accountCount": 9,
+        "clockIndex": 8,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7853.8634999999995,
+        "clockSlot": "457433180",
+        "clockUnixSeconds": "1792109596",
+        "localUnixSeconds": 1792109596,
+        "observedSlot": 457433180
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "getMultipleAccounts",
+        "startMs": 7696.0983,
+        "minContextSlot": 457433179,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 8142.6682,
+        "observedSlot": 457433182
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "isBlockhashValid",
+        "startMs": 7696.125,
+        "minContextSlot": 457433179,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 8258.338899999999,
+        "observedSlot": 457433183
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "getBlockHeight",
+        "startMs": 7696.143699999999,
+        "minContextSlot": 457433179,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 8441.2523
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "getGenesisHash",
+        "startMs": 7696.1579,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 8646.223699999999
+      }
+    ]
+  },
+  "http": {
+    "requests": 45,
+    "statuses": [
+      200
+    ],
+    "rateLimitedRequests": 0
+  },
+  "observers": {
+    "imported-pair-wallet-preflight.ts": {
+      "sha256": "8be1983bb63c902cce22007eb542080beb7a3cadadb353ad39d784835e1a45ef",
+      "stages": [
+        "quote",
+        "wallet-check"
+      ],
+      "onlyObserverStatementsAdded": true
+    },
+    "imported-pair-order-candidate.ts": {
+      "sha256": "16e01566cf01d699f06c437069638afed1c434d20978fa1766c77a55a028f959",
+      "stages": [
+        "unsigned-order",
+        "inventory-before"
+      ],
+      "onlyObserverStatementsAdded": true
+    },
+    "pair-runtime-preview.ts": {
+      "sha256": "723725691ec65f2e517ac3d09953dd157dbf55f9ba6e97d6a294b5c2bf04eb54",
+      "stages": [
+        "code-before",
+        "candidate-static",
+        "inventory-after",
+        "code-after",
+        "runtime-final-checks"
+      ],
+      "onlyObserverStatementsAdded": true
+    },
+    "pair-order-collector.ts": {
+      "sha256": "fc4d0d42b8a3d0517395419083c83a5a58aa57c1ab5b5531d0b751ac2c877c5c",
+      "stages": [
+        "simulation",
+        "candidate-final-checks"
+      ],
+      "onlyObserverStatementsAdded": true
+    },
+    "imported-pair-runtime.ts": {
+      "sha256": "52ca1412c49c81ee6ceb8ce76a80363d552caa92ff493bdb94ce13613d2facd5",
+      "stages": [
+        "publication-final-checks"
+      ],
+      "onlyObserverStatementsAdded": true
+    }
+  },
+  "recorderSha256": "573107d6e69e45de147dc2176711ed0b35ee1699dd43c6db34d942d7b57f54f9",
+  "observerGeneratorSha256": "71cd8fee87f76fc5b04cf0862b32b7831b80b2d5f2386ec91cb7142b413ad4f3",
+  "sourceReceiptSha256": "2f96583a2bce243f003b99ad71b7d65750d1db4e2effcd3ca772257c172d1221"
+}

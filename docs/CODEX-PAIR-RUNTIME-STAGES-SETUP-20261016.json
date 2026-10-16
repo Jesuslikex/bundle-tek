@@ -1,0 +1,106 @@
+{
+  "format": "pair-runtime-stage-setup-refusal-v1",
+  "sourceCommit": "3ef640e3f970a2d8f13db9b6d88e1a9246b00620",
+  "capturedAt": "2026-10-16T00:12:27.126Z",
+  "stage": "mint-identity",
+  "passed": false,
+  "reason": "Pair chain clock is inconsistent or stale.",
+  "readOnly": true,
+  "userWallets": 0,
+  "privateKeys": 0,
+  "signatures": 0,
+  "broadcasts": 0,
+  "httpRequests": 5,
+  "httpStatuses": [
+    200
+  ],
+  "runtimeStages": [
+    {
+      "name": "quote",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "wallet-check",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "unsigned-order",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "inventory-before",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "code-before",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "candidate-static",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "simulation",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "candidate-final-checks",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "inventory-after",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "code-after",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "runtime-final-checks",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    },
+    {
+      "name": "publication-final-checks",
+      "status": "not-reached",
+      "slotAdvance": null,
+      "elapsedMs": null,
+      "rpcCalls": 0
+    }
+  ],
+  "policySlotSpan": null,
+  "exactClockMismatchNotCaptured": true,
+  "sourceReceiptSha256": "9d386dcf0b1d039268137866f866a1c93bc95fdef791299125aa7bfed67b8f7c"
+}
