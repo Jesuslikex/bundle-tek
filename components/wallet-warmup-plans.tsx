@@ -1,4 +1,5 @@
 'use client';
+import { readPanelJson } from './read-panel-json';
 import { ImportedPreparationHistory } from './imported-preparation-history';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -45,12 +46,19 @@ export function WalletWarmupPlans({
       cache: 'no-store',
       signal,
     });
-    const data = (await response.json()) as {
+    const data = (await readPanelJson(
+      response,
+      'Warmup plans unavailable.',
+    )) as {
       plans?: SavedWarmup[];
       error?: string;
-    };
-    if (!response.ok || !Array.isArray(data.plans))
-      throw new Error(data.error || 'Warmup plans unavailable.');
+    } | null;
+    if (!data || !response.ok || !Array.isArray(data.plans))
+      throw new Error(
+        typeof data?.error === 'string' && data.error
+          ? data.error
+          : 'Warmup plans unavailable.',
+      );
     if (!signal.aborted) setSaved(data.plans);
     return data.plans;
   }
@@ -62,12 +70,19 @@ export function WalletWarmupPlans({
       signal: c.signal,
     })
       .then(async (response) => {
-        const data = (await response.json()) as {
+        const data = (await readPanelJson(
+          response,
+          'Warmup plans unavailable.',
+        )) as {
           plans?: SavedWarmup[];
           error?: string;
-        };
-        if (!response.ok || !Array.isArray(data.plans))
-          throw new Error(data.error || 'Warmup plans unavailable.');
+        } | null;
+        if (!data || !response.ok || !Array.isArray(data.plans))
+          throw new Error(
+            typeof data?.error === 'string' && data.error
+              ? data.error
+              : 'Warmup plans unavailable.',
+          );
         if (!c.signal.aborted) setSaved(data.plans);
       })
       .catch((e) => {
@@ -118,8 +133,15 @@ export function WalletWarmupPlans({
               : undefined,
         }),
       });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error || 'Warmup save failed.');
+      const data = (await readPanelJson(response, 'Warmup save failed.')) as {
+        error?: string;
+      } | null;
+      if (!response.ok)
+        throw new Error(
+          typeof data?.error === 'string' && data.error
+            ? data.error
+            : 'Warmup save failed.',
+        );
       const plans = await read(c.signal);
       if (!c.signal.aborted) {
         if (action === 'save')
