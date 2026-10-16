@@ -46,6 +46,55 @@ export function summarizeStockRepeatability(receipts) {
         `Attempt ${i + 1} has inconsistent identity, source or safety evidence.`,
       );
     seen.add(r.checkedAt);
+    if (r.rpcPacingScope === 'setup-and-runtime') {
+      const methods = new Set([
+        'getGenesisHash',
+        'getSlot',
+        'getMultipleAccounts',
+        'getBlockHeight',
+        'getFeeForMessage',
+        'isBlockhashValid',
+        'simulateTransaction',
+        'getSignaturesForAddress',
+        'getLargestAccounts',
+        'getTransaction',
+      ]);
+      const rpc = [];
+      for (const row of r.requests) {
+        if (
+          !Array.isArray(row.methods) ||
+          row.methods.length < 1 ||
+          row.methods.length > 2 ||
+          !Number.isFinite(row.startMs) ||
+          row.startMs < 0
+        )
+          throw Error('Invalid actual request admission.');
+        if (row.methods.every((m) => methods.has(m))) {
+          if (row.rpcUnits !== row.methods.length)
+            throw Error('RPC method count omitted or changed.');
+          rpc.push(row);
+        } else if (
+          row.rpcUnits !== undefined ||
+          row.methods.length !== 1 ||
+          !['quote', 'unsigned-order'].includes(row.methods[0])
+        )
+          throw Error('Unknown read scope.');
+      }
+      const maximum = Math.max(
+        0,
+        ...rpc.map((row) =>
+          rpc
+            .filter(
+              (other) =>
+                other.startMs <= row.startMs &&
+                other.startMs > row.startMs - 1000,
+            )
+            .reduce((total, other) => total + other.rpcUnits, 0),
+        ),
+      );
+      if (maximum !== r.maximumRollingRpcMethods)
+        throw Error('Actual setup/runtime pacing does not match its receipt.');
+    }
     const span = r.runtime
       ? r.runtime.maximumSlot - r.runtime.minimumSlot
       : null;

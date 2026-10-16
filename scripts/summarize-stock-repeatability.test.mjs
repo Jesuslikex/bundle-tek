@@ -2,6 +2,38 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { summarizeStockRepeatability } from './summarize-stock-repeatability.mjs';
 
+test('counts setup and runtime methods together and rejects omitted or under-reported setup admissions', () => {
+  const rows = samples();
+  for (const r of rows) {
+    Object.assign(r, {
+      rpcPacingScope: 'setup-and-runtime',
+      maximumRollingRpcMethods: 3,
+      requests: [
+        { status: 200, startMs: 0, methods: ['getTransaction'], rpcUnits: 1 },
+        {
+          status: 200,
+          startMs: 500,
+          methods: ['getSlot', 'getBlockHeight'],
+          rpcUnits: 2,
+        },
+      ],
+    });
+  }
+  expectValid(rows);
+  const underReported = structuredClone(rows);
+  underReported[0].maximumRollingRpcMethods = 2;
+  assert.throws(
+    () => summarizeStockRepeatability(underReported),
+    /setup\/runtime pacing/,
+  );
+  const missing = structuredClone(rows);
+  delete missing[0].requests[0].rpcUnits;
+  assert.throws(() => summarizeStockRepeatability(missing), /method count/);
+});
+function expectValid(rows) {
+  assert.equal(summarizeStockRepeatability(rows).repeatableInThisSample, true);
+}
+
 const samples = () =>
   Array.from({ length: 6 }, (_, i) => ({
     format: 'stock-pair-live-qualification-v1',

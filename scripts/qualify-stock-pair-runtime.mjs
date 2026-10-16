@@ -59,6 +59,7 @@ const files = [
   'lib/warmup-swap-quote.ts',
   'lib/pair-order-quote-bounds.ts',
   'scripts/qualify-stock-pair-runtime.mjs',
+  'scripts/run-stock-repeatability.mjs',
 ];
 const sourceFiles = Object.fromEntries(
   files.map((p) => [p, hash(readFileSync(p))]),
@@ -71,7 +72,7 @@ mkdirSync(folder, { recursive: true });
 const bundle = join(folder, 'reader.mjs');
 await build({
   stdin: {
-    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy';`,
+    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
     resolveDir: process.cwd(),
     sourcefile: 'unsigned-stock-qualification.ts',
   },
@@ -112,6 +113,7 @@ const receipt = {
   quoteAsset: args.has('--quote-usdc') ? 'USDC' : 'SOL',
   inputUiAmount: args.has('--one-unit') ? '1' : '0.001',
   qualificationPacing: 'unsigned-helius-qualification-nine-methods-per-second',
+  rpcPacingScope: 'setup-and-runtime',
   rpcPacingMs: /^\d{1,4}$/.test(process.env.SOLANA_RPC_MIN_INTERVAL_MS ?? '')
     ? Number(process.env.SOLANA_RPC_MIN_INTERVAL_MS)
     : null,
@@ -122,15 +124,6 @@ let reader,
   pipelineStart,
   simulated = false;
 const clock = () => performance.now();
-const methodsForReceipt = new Set([
-  'getGenesisHash',
-  'getSlot',
-  'getBlockHeight',
-  'getMultipleAccounts',
-  'getFeeForMessage',
-  'isBlockhashValid',
-  'simulateTransaction',
-]);
 try {
   if (lib.pairStockSigningPolicy().qualified !== false)
     throw Error('Signing gate must remain disabled.');
@@ -175,6 +168,11 @@ try {
           'Simulation must retain original unsigned packet and lifetime.',
         );
       row.methods = batch.map((r) => r.method);
+      // Runtime dispatch already admits the exact batch size to this profile.
+      // Setup balanceRpc calls do not, so admit them here after ordinary pacing.
+      // Both phases share one budget without enrolling other wallet callers.
+      if (!reader) await lib.paceWalletRpc(endpoint, signal, batch.length);
+      row.rpcUnits = batch.length;
     } else {
       if (
         u.origin !== 'https://api.jup.ag' ||
@@ -186,6 +184,8 @@ try {
         throw Error('Non-quote provider request rejected.');
       row.methods = [u.searchParams.has('taker') ? 'unsigned-order' : 'quote'];
     }
+    signal.throwIfAborted();
+    row.startMs = clock();
     receipt.requests.push(row);
     if (receipt.requests.length > 160)
       throw Error('Read-only request budget exhausted.');
@@ -583,8 +583,13 @@ try {
       'unixDelta',
     ])
       if (Number.isSafeInteger(d[key])) receipt.diagnostic[key] = d[key];
-    if (typeof d.nativeBalanceChanged === 'boolean')
-      receipt.diagnostic.nativeBalanceChanged = d.nativeBalanceChanged;
+    for (const key of [
+      'nativeBalanceChanged',
+      'systemOwnerChanged',
+      'systemExecutable',
+      'systemDataChanged',
+    ])
+      if (typeof d[key] === 'boolean') receipt.diagnostic[key] = d[key];
     if (
       Array.isArray(d.changedAccountFields) &&
       d.changedAccountFields.length <= 32 &&
@@ -620,21 +625,16 @@ try {
     (r) => r.method === 'simulateTransaction',
   ).length;
   receipt.http429 = receipt.requests.filter((r) => r.status === 429).length;
-  const pipelineRpc = receipt.requests.filter(
-    (r) =>
-      pipelineStart !== undefined &&
-      r.startMs >= pipelineStart &&
-      r.methods.every((method) => methodsForReceipt.has(method)),
-  );
-  receipt.maximumRollingRpcMethods = pipelineRpc.length
+  const allRpc = receipt.requests.filter((r) => r.rpcUnits !== undefined);
+  receipt.maximumRollingRpcMethods = allRpc.length
     ? Math.max(
-        ...pipelineRpc.map((r) =>
-          pipelineRpc
+        ...allRpc.map((r) =>
+          allRpc
             .filter(
               (other) =>
                 other.startMs <= r.startMs && other.startMs > r.startMs - 1000,
             )
-            .reduce((sum, other) => sum + other.methods.length, 0),
+            .reduce((sum, other) => sum + other.rpcUnits, 0),
         ),
       )
     : 0;
