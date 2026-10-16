@@ -151,13 +151,7 @@ export async function inspectOwnedImportedPairOrder<Review>(
       );
     }
     signal.throwIfAborted();
-    try {
-      assertPairOrderQuoteBounds(preflight.quote, order, preflight.wallet);
-    } catch (error) {
-      if (error instanceof PairOrderQuoteBoundsError)
-        throw new ImportedPairQuoteError(error.message);
-      throw error;
-    }
+    assertPairOrderQuoteBounds(preflight.quote, order, preflight.wallet);
     const review = await inspect(
       preflight,
       order,
@@ -218,6 +212,8 @@ export async function inspectOwnedImportedPairOrder<Review>(
       }),
     ]);
   } catch (error) {
+    if (error instanceof PairOrderQuoteBoundsError)
+      throw new ImportedPairQuoteError(error.message);
     if (error instanceof ImportedPairQuoteError) throw error;
     throw new ImportedPairQuoteError(
       'Unsigned pair candidate did not pass independent account, instruction, simulation, fee or lifetime review. No approval or signature was created.',

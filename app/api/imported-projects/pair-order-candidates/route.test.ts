@@ -61,6 +61,47 @@ const request = (
       body: JSON.stringify(body),
     },
   );
+it.each(['early', 'instruction-review'] as const)(
+  'returns the same fresh-quote 409 for %s minimum deterioration',
+  async (stage) => {
+    let order: Awaited<ReturnType<typeof f.prepare>> | undefined;
+    const prepare = f.prepare.getMockImplementation()!,
+      rpc = f.rpc.getMockImplementation()!;
+    f.prepare.mockImplementation(async (...args) => {
+      order = await prepare(...args);
+      if (stage === 'early')
+        order.minimumOutAmount = (
+          BigInt(order.minimumOutAmount) - 1n
+        ).toString();
+      return order;
+    });
+    f.rpc.mockImplementation(async (method, params) => {
+      if (method === 'getFeeForMessage' && stage === 'instruction-review')
+        order!.minimumOutAmount = (
+          BigInt(order!.minimumOutAmount) - 1n
+        ).toString();
+      return rpc(method, params);
+    });
+    const response = await POST(request());
+    expect(response.status).toBe(409);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toEqual({
+      error:
+        'The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.',
+    });
+    expect(
+      f.rpc.mock.calls.filter(([method]) => method === 'getFeeForMessage'),
+    ).toHaveLength(stage === 'early' ? 0 : 1);
+    expect(
+      f.rpc.mock.calls.some(([method]) => method === 'simulateTransaction'),
+    ).toBe(false);
+    expect(
+      f.sqlite
+        .prepare('SELECT count(*) AS n FROM imported_token_project_events')
+        .get(),
+    ).toMatchObject({ n: 0 });
+  },
+);
 it('reviews a protected wallet intermediate through the actual authenticated route', async () => {
   const { key, mint } = await pairIntermediate(f);
   const response = await POST(request());
