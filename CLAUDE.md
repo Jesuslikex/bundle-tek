@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October mixed-packing live sample
+
+Read docs/CODEX-PAIR-MIXED-PACKING-LIVE-20261016.md and JSON. One fixed sample at5dded0c on Node24: SOL pass29 runtime/32 audited slots, one simulation and both14-read collections; USDC429 after simulation/first13 reads, final scan incomplete. Stopped entire campaign after two attempts; four unrun, summary null, no retry/replacement. All17 accepted Clocks equal; each raw duplicate correlates. 102HTTP200/one429, both current source vectors verified. This is a single SOL pass with no slot margin, not repeatability or a provider/causal latency claim. Standard endpoint still unset; no fresh executable-writable refusal. No source edit or repeated unchanged suite; prior589/24 tests remain prior checkpoint evidence. Signing off; no provider/UI/cron/SQL/push/deploy/wallet action. Preserve main dirty files.
+
 ## 16 October mixed-loader stock code packing
 
 Read docs/CODEX-PAIR-MIXED-CODE-PACKING-20261016.md and EVIDENCE JSON. Explicit4-read mixed/fully-declared profiles now align legacy code and upgradeable data at absolute0; first45 upgrade bytes must match the deployment header before hashing all ELF bytes. Default1 group reads and unknown/single-loader schedules stay unchanged; full final scan and all caps remain. Offline synthetic bytes using the retained pass geometry reduce body reads9to8, total15to14 per scan, identical full identities/7,783,420 ELF bytes and identical baseline c40140f default request trace. 32files/589 tests,24 harness tests, TypeScript/lint/format pass. No live latency/pass claim, no provider call after429, no provider/UI/consent/custody/Clock/minimum/signing change, no push/deploy/SQL/wallet action. Preserve main dirty files.
