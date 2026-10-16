@@ -18,6 +18,13 @@ test('rejects rotating or dropping a pinned fixture even for refused runs', () =
   const omitted = structuredClone(rows);
   delete omitted[4].referenceFixtureSha256;
   assert.throws(() => summarizeStockRepeatability(omitted), /fixture changed/);
+  const missingIdentity = structuredClone(rows);
+  missingIdentity[0].passed = true;
+  delete missingIdentity[0].publicReferenceSha256;
+  assert.throws(
+    () => summarizeStockRepeatability(missingIdentity),
+    /identity missing/,
+  );
 });
 
 test('counts setup and runtime methods together and rejects omitted or under-reported setup admissions', () => {

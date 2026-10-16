@@ -23,6 +23,8 @@ export function summarizeStockRepeatability(receipts) {
       throw Error(
         'Pinned fixture changed or omitted its quiet-reference policy.',
       );
+    if (fixture !== null && r.passed && !r.publicReferenceSha256)
+      throw Error('Pinned reference identity missing from a claimed pass.');
     if (fixture !== null && r.publicReferenceSha256) {
       if (
         !/^[a-f0-9]{64}$/.test(r.publicReferenceSha256) ||
