@@ -1,0 +1,4217 @@
+{
+  "format": "stock-quicknode-fixed-sample-v1",
+  "sourceCommit": "ebdcba6",
+  "sample": "one fixed three-round SOL/USDC campaign; no replacement or retry",
+  "campaignSha256": "034cc50d5f1d7b8a23bdb1efa9b08c9685b6cb8758d9878fb53d993ae3999c2c",
+  "complete": true,
+  "sourceVectorsVerified": 6,
+  "rawClockCorrelationsVerified": 26,
+  "acceptedClockRelations": {
+    "equal": 26,
+    "+1": 0
+  },
+  "maximumObservedClockSkewMs": 1570,
+  "transportStatuses": {
+    "200": 118,
+    "413": 4
+  },
+  "transportByRole": {
+    "indexer-fallback": {
+      "200": 48
+    },
+    "stock-runtime": {
+      "200": 54,
+      "413": 4
+    },
+    "jupiter": {
+      "200": 16
+    }
+  },
+  "receiptSha256": [
+    "2c7dae7248e5fa2d39e85ce40a71b932c0b25b0d733fa5e8a80d7bbfe5de9a8e",
+    "5c594fd90baaa9998bdae0ef34456cd3fb3089742eb985c423d896beeee1246c",
+    "7296d29f9c3c1c8085e75693de0927809451648b481caa74e761aafef99e9ed7",
+    "786049b2a48533c9cfe6b13a2917919c71053aa6b7f52689000cd4e01ef9a0c9",
+    "035db42090b1f82779be23dd34afb7fc927b6997db5faed666bdb9462d58ed9b",
+    "aac9ce1e1596d12f8d66c4db2c28ea386b3a52e6bf956416c048015b12a6dd56"
+  ],
+  "accountCountProbe": {
+    "format": "stock-validator-account-count-probe-v1",
+    "checkedAt": "2026-10-16T18:47:44.911Z",
+    "readOnly": true,
+    "requests": [
+      {
+        "accountCount": 5,
+        "requestBytes": 345,
+        "status": 200,
+        "resultCount": 5,
+        "errorCode": null,
+        "errorMessage": null
+      },
+      {
+        "accountCount": 6,
+        "requestBytes": 391,
+        "status": 413,
+        "resultCount": null,
+        "errorCode": -32615,
+        "errorMessage": "getMultipleAccounts is limited to a 5 range, upgrade from discover plan at [URL] to increase the limit"
+      }
+    ],
+    "signingAllowed": false
+  },
+  "summary": {
+    "format": "stock-pair-repeatability-v1",
+    "sample": "three fixed alternating rounds; no replacement attempts",
+    "sourceFiles": {
+      "lib/pair-order-first-service.ts": "2711ca97ac56c31a5bf2c51c5b46c72c03c40f89a266cd405d246547aabe7d8f",
+      "lib/pair-order-review.ts": "3fdf683af7fddea02843deb171583db2b7206114207f33c08bd31de6d686883b",
+      "lib/pair-review-diagnostic.ts": "7cb687f59c47a37faadf731a0ba12db212eca94b89831b44608ddfe10f989b9e",
+      "lib/pair-wallet-evidence.ts": "b001bf1d4f0c2e940007200ce6ee85058d2ff1d0df42a985b7f5950ca680feef",
+      "lib/pair-mint-evidence.ts": "83cdbabd4243273cf74ce8c669ced2148d46a3796bdf5f489caa7277d6300d5c",
+      "lib/pair-stock-clock.ts": "aada775f60447080d87bc15a0dee0e0eecd9f4f09e3ed398ee8bbe5de976dbb6",
+      "lib/solana-rpc.ts": "1d262934e01150e737c2f8a8fdf470cfc3298a6bc370c5c7a2500b51d30916e3",
+      "lib/imported-pair-wallet-preflight.ts": "2748f7cfa6bafddb18f9bfe5cd907b96094af1f48565b8922366193dee5efa2b",
+      "lib/pair-order-first-review.ts": "f3a05013909fab0f412d6bc352349bc1c39f9d875aff1089642baa3c082a2601",
+      "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+      "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+      "lib/imported-pair-order-candidate.ts": "2077f0679b0ce300fe45ffc3e2e560f6c36e88d448633e182eb5d95d210f2c08",
+      "lib/imported-pair-quote-service.ts": "66a28f776833ac2999471ae982a43c3b6dbdb03ef085d07aa1dd59f50a049a73",
+      "lib/pair-runtime-preview.ts": "e74213b667bfad8f64420554ccc4db0072d37cf01941c89a9cc78136bf913f8e",
+      "lib/pair-runtime-exposure.ts": "1cbf837feb2cfcaa353b75a8f52735bd52beb5da37f154e4d4f529db334e8676",
+      "lib/pair-account-provenance.ts": "c3bb9429df31ff7cff7d0e600f112cfe75ca680483ce93b496546eb53dcda34f",
+      "lib/pair-order-simulation.ts": "93bebc5a9ca3552ec051ad7d8cd57add88b1f912119835f1cc07345d2f7e413f",
+      "lib/pair-order-collector.ts": "c9f4bd85ca03f1d9d8b4084d6e99639c09348ce520da011b949a36dd99d092c9",
+      "lib/pair-read-rpc.ts": "5c429c9a6cdb95deb690d6dac260a9bb48c1bd5f484daf20b7155f385d766c39",
+      "lib/wallet-rpc-pacing.ts": "e0ad1ae3760bc7905b1c25be07541ecda529e6496d67aca7f9a21a34a59eb7b4",
+      "lib/pair-order-state.ts": "fc4fef53ff8b4558e4ae81f4033e83d8472f322fb00100b26971fbca11f16f82",
+      "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+      "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+      "lib/pump-group-code-identity.ts": "8d1e17eee146a5f49931731615caad7f63ec31aa53a4f27e556047245937a126",
+      "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+      "lib/warmup-swap-quote.ts": "5592661eaba07131486a340d513fc18e998acaf2e1cacab7f7c399b33d3b2c0d",
+      "lib/pair-order-quote-bounds.ts": "2fd6760ec3d80eedea19f670c9be315e0e3f6ab942af5b5491d2a8d770f600ba",
+      "scripts/qualify-stock-pair-runtime.mjs": "a281e9bff029208cd15dc89fdcace35875acbb05da5efe253c73f19a8c79905b",
+      "scripts/run-stock-repeatability.mjs": "0b6a1fc8c6257d2dd4296269d90f8a921f4c8bc96e6a6258927b69c90c7a535f",
+      "scripts/stock-reference-activity.mjs": "49805948e32e3f1d16314ffffd25546bd0d748acd19934aeb0ece8196c5a0785",
+      "scripts/stock-reference-fixture.mjs": "c800e6555125acff33938179a28804b17a8b3c305d39ebf9521a6692713e5c58",
+      "scripts/stock-provider-timing.mjs": "59097bee1cfb6831f81c7a4d5a2f9a20b5a7b0ad4823658d086aea77f6bb4895",
+      "scripts/stock-clock-wire.mjs": "fa750d05a30e8841766f68dca4c8f1627cd0685935ed89f7e271be6a77b5ca84",
+      "scripts/stock-qualification-runtime.mjs": "9c8c11edf932af2b10780040719bac51ced8caa6aa4297a0f8cd8de56c43b9ae"
+    },
+    "harnessRuntime": {
+      "nodeVersion": "24.19.0",
+      "requiredNodeMajor": 24
+    },
+    "maximumSlots": 32,
+    "repeatableInThisSample": false,
+    "assets": [
+      {
+        "asset": "SOL",
+        "attempted": 3,
+        "passed": 0
+      },
+      {
+        "asset": "USDC",
+        "attempted": 3,
+        "passed": 0
+      }
+    ],
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "deployed": false,
+    "attempts": [
+      {
+        "round": 1,
+        "asset": "SOL",
+        "checkedAt": "2026-10-16T18:45:52.799Z",
+        "passed": false,
+        "stage": "order-first-runtime",
+        "reason": "Pair wallet provider reads are unavailable.",
+        "elapsedSlots": null,
+        "pipelineMs": 2496.1084,
+        "simulationCount": 0,
+        "firstCodeReads": 0,
+        "finalCodeReads": 0,
+        "http429": 0,
+        "maximumRollingRpcMethods": 6,
+        "phases": [
+          {
+            "phase": "before-simulation",
+            "logicalReads": 11,
+            "codeReads": 0,
+            "observedMinimumSlot": 457742168,
+            "observedMaximumSlot": 457742178
+          },
+          {
+            "phase": "after-simulation",
+            "logicalReads": 0,
+            "codeReads": 0,
+            "observedMinimumSlot": null,
+            "observedMaximumSlot": null
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "asset": "USDC",
+        "checkedAt": "2026-10-16T18:45:59.479Z",
+        "passed": false,
+        "stage": "order-first-runtime",
+        "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+        "elapsedSlots": null,
+        "pipelineMs": 1213.06,
+        "simulationCount": 0,
+        "firstCodeReads": 0,
+        "finalCodeReads": 0,
+        "http429": 0,
+        "maximumRollingRpcMethods": 6,
+        "phases": [
+          {
+            "phase": "before-simulation",
+            "logicalReads": 5,
+            "codeReads": 0,
+            "observedMinimumSlot": 457742199,
+            "observedMaximumSlot": 457742203
+          },
+          {
+            "phase": "after-simulation",
+            "logicalReads": 0,
+            "codeReads": 0,
+            "observedMinimumSlot": null,
+            "observedMaximumSlot": null
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "asset": "SOL",
+        "checkedAt": "2026-10-16T18:46:04.737Z",
+        "passed": false,
+        "stage": "order-first-runtime",
+        "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+        "elapsedSlots": null,
+        "pipelineMs": 1402.6752999999994,
+        "simulationCount": 0,
+        "firstCodeReads": 0,
+        "finalCodeReads": 0,
+        "http429": 0,
+        "maximumRollingRpcMethods": 6,
+        "phases": [
+          {
+            "phase": "before-simulation",
+            "logicalReads": 5,
+            "codeReads": 0,
+            "observedMinimumSlot": 457742224,
+            "observedMaximumSlot": 457742229
+          },
+          {
+            "phase": "after-simulation",
+            "logicalReads": 0,
+            "codeReads": 0,
+            "observedMinimumSlot": null,
+            "observedMaximumSlot": null
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "asset": "USDC",
+        "checkedAt": "2026-10-16T18:46:09.945Z",
+        "passed": false,
+        "stage": "order-first-runtime",
+        "reason": "Pair wallet provider reads are unavailable.",
+        "elapsedSlots": null,
+        "pipelineMs": 2343.3745000000004,
+        "simulationCount": 0,
+        "firstCodeReads": 0,
+        "finalCodeReads": 0,
+        "http429": 0,
+        "maximumRollingRpcMethods": 6,
+        "phases": [
+          {
+            "phase": "before-simulation",
+            "logicalReads": 11,
+            "codeReads": 0,
+            "observedMinimumSlot": 457742247,
+            "observedMaximumSlot": 457742256
+          },
+          {
+            "phase": "after-simulation",
+            "logicalReads": 0,
+            "codeReads": 0,
+            "observedMinimumSlot": null,
+            "observedMaximumSlot": null
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "asset": "SOL",
+        "checkedAt": "2026-10-16T18:46:16.187Z",
+        "passed": false,
+        "stage": "order-first-runtime",
+        "reason": "Pair wallet provider reads are unavailable.",
+        "elapsedSlots": null,
+        "pipelineMs": 2602.0824,
+        "simulationCount": 0,
+        "firstCodeReads": 0,
+        "finalCodeReads": 0,
+        "http429": 0,
+        "maximumRollingRpcMethods": 6,
+        "phases": [
+          {
+            "phase": "before-simulation",
+            "logicalReads": 11,
+            "codeReads": 0,
+            "observedMinimumSlot": 457742277,
+            "observedMaximumSlot": 457742287
+          },
+          {
+            "phase": "after-simulation",
+            "logicalReads": 0,
+            "codeReads": 0,
+            "observedMinimumSlot": null,
+            "observedMaximumSlot": null
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "asset": "USDC",
+        "checkedAt": "2026-10-16T18:46:22.802Z",
+        "passed": false,
+        "stage": "order-first-runtime",
+        "reason": "Pair wallet provider reads are unavailable.",
+        "elapsedSlots": null,
+        "pipelineMs": 2438.5007000000005,
+        "simulationCount": 0,
+        "firstCodeReads": 0,
+        "finalCodeReads": 0,
+        "http429": 0,
+        "maximumRollingRpcMethods": 6,
+        "phases": [
+          {
+            "phase": "before-simulation",
+            "logicalReads": 11,
+            "codeReads": 0,
+            "observedMinimumSlot": 457742307,
+            "observedMaximumSlot": 457742316
+          },
+          {
+            "phase": "after-simulation",
+            "logicalReads": 0,
+            "codeReads": 0,
+            "observedMinimumSlot": null,
+            "observedMaximumSlot": null
+          }
+        ]
+      }
+    ]
+  },
+  "receipts": [
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T18:45:52.799Z",
+      "readOnly": true,
+      "harnessRuntime": {
+        "nodeVersion": "24.19.0",
+        "requiredNodeMajor": 24
+      },
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "2711ca97ac56c31a5bf2c51c5b46c72c03c40f89a266cd405d246547aabe7d8f",
+        "lib/pair-order-review.ts": "3fdf683af7fddea02843deb171583db2b7206114207f33c08bd31de6d686883b",
+        "lib/pair-review-diagnostic.ts": "7cb687f59c47a37faadf731a0ba12db212eca94b89831b44608ddfe10f989b9e",
+        "lib/pair-wallet-evidence.ts": "b001bf1d4f0c2e940007200ce6ee85058d2ff1d0df42a985b7f5950ca680feef",
+        "lib/pair-mint-evidence.ts": "83cdbabd4243273cf74ce8c669ced2148d46a3796bdf5f489caa7277d6300d5c",
+        "lib/pair-stock-clock.ts": "aada775f60447080d87bc15a0dee0e0eecd9f4f09e3ed398ee8bbe5de976dbb6",
+        "lib/solana-rpc.ts": "1d262934e01150e737c2f8a8fdf470cfc3298a6bc370c5c7a2500b51d30916e3",
+        "lib/imported-pair-wallet-preflight.ts": "2748f7cfa6bafddb18f9bfe5cd907b96094af1f48565b8922366193dee5efa2b",
+        "lib/pair-order-first-review.ts": "f3a05013909fab0f412d6bc352349bc1c39f9d875aff1089642baa3c082a2601",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "2077f0679b0ce300fe45ffc3e2e560f6c36e88d448633e182eb5d95d210f2c08",
+        "lib/imported-pair-quote-service.ts": "66a28f776833ac2999471ae982a43c3b6dbdb03ef085d07aa1dd59f50a049a73",
+        "lib/pair-runtime-preview.ts": "e74213b667bfad8f64420554ccc4db0072d37cf01941c89a9cc78136bf913f8e",
+        "lib/pair-runtime-exposure.ts": "1cbf837feb2cfcaa353b75a8f52735bd52beb5da37f154e4d4f529db334e8676",
+        "lib/pair-account-provenance.ts": "c3bb9429df31ff7cff7d0e600f112cfe75ca680483ce93b496546eb53dcda34f",
+        "lib/pair-order-simulation.ts": "93bebc5a9ca3552ec051ad7d8cd57add88b1f912119835f1cc07345d2f7e413f",
+        "lib/pair-order-collector.ts": "c9f4bd85ca03f1d9d8b4084d6e99639c09348ce520da011b949a36dd99d092c9",
+        "lib/pair-read-rpc.ts": "5c429c9a6cdb95deb690d6dac260a9bb48c1bd5f484daf20b7155f385d766c39",
+        "lib/wallet-rpc-pacing.ts": "e0ad1ae3760bc7905b1c25be07541ecda529e6496d67aca7f9a21a34a59eb7b4",
+        "lib/pair-order-state.ts": "fc4fef53ff8b4558e4ae81f4033e83d8472f322fb00100b26971fbca11f16f82",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "8d1e17eee146a5f49931731615caad7f63ec31aa53a4f27e556047245937a126",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "5592661eaba07131486a340d513fc18e998acaf2e1cacab7f7c399b33d3b2c0d",
+        "lib/pair-order-quote-bounds.ts": "2fd6760ec3d80eedea19f670c9be315e0e3f6ab942af5b5491d2a8d770f600ba",
+        "scripts/qualify-stock-pair-runtime.mjs": "a281e9bff029208cd15dc89fdcace35875acbb05da5efe253c73f19a8c79905b",
+        "scripts/run-stock-repeatability.mjs": "0b6a1fc8c6257d2dd4296269d90f8a921f4c8bc96e6a6258927b69c90c7a535f",
+        "scripts/stock-reference-activity.mjs": "49805948e32e3f1d16314ffffd25546bd0d748acd19934aeb0ece8196c5a0785",
+        "scripts/stock-reference-fixture.mjs": "c800e6555125acff33938179a28804b17a8b3c305d39ebf9521a6692713e5c58",
+        "scripts/stock-provider-timing.mjs": "59097bee1cfb6831f81c7a4d5a2f9a20b5a7b0ad4823658d086aea77f6bb4895",
+        "scripts/stock-clock-wire.mjs": "fa750d05a30e8841766f68dca4c8f1627cd0685935ed89f7e271be6a77b5ca84",
+        "scripts/stock-qualification-runtime.mjs": "9c8c11edf932af2b10780040719bac51ced8caa6aa4297a0f8cd8de56c43b9ae"
+      },
+      "sourceUnchanged": true,
+      "referenceFixtureSha256": "fa612cb1599c8d9e85457ee6dac6451d631a21b3fb661e0ad3e33b403958d211",
+      "publicReferenceKind": "idle-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 1786.2367,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 312.48759999999993
+        },
+        {
+          "startMs": 2104.2564,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 92.87279999999964
+        },
+        {
+          "startMs": 2319.2304,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 122.15390000000025
+        },
+        {
+          "startMs": 2517.1067,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 99.84840000000031
+        },
+        {
+          "startMs": 2713.9667,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 102.85109999999986
+        },
+        {
+          "startMs": 2913.3949,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 111.5036
+        },
+        {
+          "startMs": 3025.7032,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 694.7667000000001
+        },
+        {
+          "startMs": 3721.0009,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 664.4413000000004
+        },
+        {
+          "startMs": 4386.0544,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 223.0622000000003,
+          "clockWire": [
+            {
+              "requestId": "1",
+              "accountIndex": 2,
+              "contextSlot": "457742166",
+              "clockSlot": "457742166",
+              "unixTimestamp": "1792176355",
+              "clockDataSha256": "7d931a9386ca193db633347e13efc28049c8eabaf28de66d47652384ff7b11f9",
+              "receivedServerTimeMs": 1792176355633,
+              "commitment": "confirmed",
+              "requestedFloor": 457742165
+            },
+            {
+              "requestId": "1",
+              "accountIndex": 3,
+              "contextSlot": "457742166",
+              "clockSlot": "457742166",
+              "unixTimestamp": "1792176355",
+              "clockDataSha256": "7d931a9386ca193db633347e13efc28049c8eabaf28de66d47652384ff7b11f9",
+              "receivedServerTimeMs": 1792176355633,
+              "commitment": "confirmed",
+              "requestedFloor": 457742165
+            }
+          ],
+          "clockWireObservationMs": 1.1585999999997512
+        },
+        {
+          "startMs": 4679.6124,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 216.8805000000002
+        },
+        {
+          "startMs": 4940.7403,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 225.96579999999994
+        },
+        {
+          "startMs": 5167.796,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 209.04979999999978,
+          "clockWire": [
+            {
+              "requestId": "pair-3",
+              "accountIndex": 2,
+              "contextSlot": "457742170",
+              "clockSlot": "457742170",
+              "unixTimestamp": "1792176355",
+              "clockDataSha256": "363b1e9c2c22ee207250cd4720b81022721d5f2e68cfc02228d93602849dcc27",
+              "receivedServerTimeMs": 1792176356400,
+              "commitment": "confirmed",
+              "requestedFloor": 457742168
+            },
+            {
+              "requestId": "pair-3",
+              "accountIndex": 3,
+              "contextSlot": "457742170",
+              "clockSlot": "457742170",
+              "unixTimestamp": "1792176355",
+              "clockDataSha256": "363b1e9c2c22ee207250cd4720b81022721d5f2e68cfc02228d93602849dcc27",
+              "receivedServerTimeMs": 1792176356400,
+              "commitment": "confirmed",
+              "requestedFloor": 457742168
+            }
+          ],
+          "clockWireObservationMs": 0.41750000000047294
+        },
+        {
+          "startMs": 5387.2194,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 511.09259999999995
+        },
+        {
+          "startMs": 5899.1609,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 215.63460000000032,
+          "clockWire": [
+            {
+              "requestId": "pair-4",
+              "accountIndex": 2,
+              "contextSlot": "457742173",
+              "clockSlot": "457742173",
+              "unixTimestamp": "1792176356",
+              "clockDataSha256": "6faddf9b89738ae6270eb605fe80fb7d514ea8267e0c34d925496a91f4c73c6c",
+              "receivedServerTimeMs": 1792176357138,
+              "commitment": "confirmed",
+              "requestedFloor": 457742170
+            },
+            {
+              "requestId": "pair-4",
+              "accountIndex": 3,
+              "contextSlot": "457742173",
+              "clockSlot": "457742173",
+              "unixTimestamp": "1792176356",
+              "clockDataSha256": "6faddf9b89738ae6270eb605fe80fb7d514ea8267e0c34d925496a91f4c73c6c",
+              "receivedServerTimeMs": 1792176357138,
+              "commitment": "confirmed",
+              "requestedFloor": 457742170
+            }
+          ],
+          "clockWireObservationMs": 0.5471000000006825
+        },
+        {
+          "startMs": 6125.7278,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 217.34150000000045
+        },
+        {
+          "startMs": 6355.7813,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 194.3678
+        },
+        {
+          "startMs": 6591.0076,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 214.8730000000005,
+          "clockWire": [
+            {
+              "requestId": "pair-8",
+              "accountIndex": 2,
+              "contextSlot": "457742176",
+              "clockSlot": "457742176",
+              "unixTimestamp": "1792176357",
+              "clockDataSha256": "d38634669e9d4e651e431e29c57195b02cd4f834c40cb921d6f206472e4f56b6",
+              "receivedServerTimeMs": 1792176357829,
+              "commitment": "confirmed",
+              "requestedFloor": 457742175
+            },
+            {
+              "requestId": "pair-8",
+              "accountIndex": 3,
+              "contextSlot": "457742176",
+              "clockSlot": "457742176",
+              "unixTimestamp": "1792176357",
+              "clockDataSha256": "d38634669e9d4e651e431e29c57195b02cd4f834c40cb921d6f206472e4f56b6",
+              "receivedServerTimeMs": 1792176357829,
+              "commitment": "confirmed",
+              "requestedFloor": 457742175
+            }
+          ],
+          "clockWireObservationMs": 0.3276000000005297
+        },
+        {
+          "startMs": 6811.6791,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 197.98619999999937
+        },
+        {
+          "startMs": 7010.2106,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 215.40429999999924,
+          "clockWire": [
+            {
+              "requestId": "pair-9",
+              "accountIndex": 2,
+              "contextSlot": "457742178",
+              "clockSlot": "457742178",
+              "unixTimestamp": "1792176357",
+              "clockDataSha256": "3d7c23797b47fd292bc206b5b96752f9e0493b6d41d65c18d2ba5acffda8ba89",
+              "receivedServerTimeMs": 1792176358249,
+              "commitment": "confirmed",
+              "requestedFloor": 457742176
+            },
+            {
+              "requestId": "pair-9",
+              "accountIndex": 3,
+              "contextSlot": "457742178",
+              "clockSlot": "457742178",
+              "unixTimestamp": "1792176357",
+              "clockDataSha256": "3d7c23797b47fd292bc206b5b96752f9e0493b6d41d65c18d2ba5acffda8ba89",
+              "receivedServerTimeMs": 1792176358249,
+              "commitment": "confirmed",
+              "requestedFloor": 457742176
+            }
+          ],
+          "clockWireObservationMs": 0.34500000000025466
+        },
+        {
+          "startMs": 7236.811,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 413,
+          "headerMs": 192.28949999999986,
+          "clockWireUnavailable": true,
+          "clockWireObservationMs": 0.24549999999999272
+        },
+        {
+          "startMs": 7432.8587,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 169.1873999999998
+        },
+        {
+          "startMs": 7638.7227,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 90.47869999999966
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4939.6704,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 227.77869999999984
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4939.9079,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742168",
+          "returned": true,
+          "elapsedMs": 227.54349999999977
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5167.5839,
+          "minContextSlot": 457742168,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742170",
+          "clockSlot": "457742170",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742170",
+          "clockDataSha256": "363b1e9c2c22ee207250cd4720b81022721d5f2e68cfc02228d93602849dcc27",
+          "chainUnix": "1792176355",
+          "clockSkewMs": 1401,
+          "receivedServerTimeMs": 1792176356401,
+          "returned": true,
+          "elapsedMs": 210.07830000000013
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5898.8918,
+          "minContextSlot": 457742170,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742173",
+          "clockSlot": "457742173",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742173",
+          "clockDataSha256": "6faddf9b89738ae6270eb605fe80fb7d514ea8267e0c34d925496a91f4c73c6c",
+          "chainUnix": "1792176356",
+          "clockSkewMs": 1139,
+          "receivedServerTimeMs": 1792176357139,
+          "returned": true,
+          "elapsedMs": 216.8044
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5898.9826,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 216.71540000000005
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6355.6363,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 194.84909999999945
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6355.6742,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742175",
+          "returned": true,
+          "elapsedMs": 194.8123999999998
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6550.5515,
+          "minContextSlot": 457742175,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742176",
+          "clockSlot": "457742176",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742176",
+          "clockDataSha256": "d38634669e9d4e651e431e29c57195b02cd4f834c40cb921d6f206472e4f56b6",
+          "chainUnix": "1792176357",
+          "clockSkewMs": 829,
+          "receivedServerTimeMs": 1792176357829,
+          "returned": true,
+          "elapsedMs": 255.8801000000003
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 7010.0259,
+          "minContextSlot": 457742176,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742178",
+          "clockSlot": "457742178",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742178",
+          "clockDataSha256": "3d7c23797b47fd292bc206b5b96752f9e0493b6d41d65c18d2ba5acffda8ba89",
+          "chainUnix": "1792176357",
+          "clockSkewMs": 1249,
+          "receivedServerTimeMs": 1792176358249,
+          "returned": true,
+          "elapsedMs": 216.13360000000011
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 7010.1083,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 216.05249999999978
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 7236.7077,
+          "minContextSlot": 457742178,
+          "accountCount": 7,
+          "slice": null,
+          "returned": false,
+          "status": 413,
+          "elapsedMs": 193.6284999999998
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29322",
+          "minimumOutputRaw": "29175",
+          "observedAt": "2026-10-16T18:45:56.922Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29330",
+          "minimumOutputRaw": "29183",
+          "observedAt": "2026-10-16T18:45:58.033Z"
+        }
+      ],
+      "providerTimings": [
+        {
+          "phase": "initial-quote",
+          "startMs": 5385.7715,
+          "endMs": 5898.8321,
+          "outcome": "returned"
+        },
+        {
+          "phase": "wallet-bound-order",
+          "startMs": 6125.3995,
+          "endMs": 6353.8617,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fresh-quote",
+          "startMs": 6811.5098,
+          "endMs": 7009.9903,
+          "outcome": "returned"
+        }
+      ],
+      "quoteAsset": "SOL",
+      "inputUiAmount": "0.001",
+      "qualificationPacing": "unsigned-stock-qualification-nine-methods-per-second",
+      "rpcPacingScope": "setup-and-runtime",
+      "rpcPacingMs": 200,
+      "runtimeProviderRole": "configured-standard-validator",
+      "runtimeProviderHost": "bold-necessary-arm.solana-mainnet.quiknode.pro",
+      "referenceSelection": {
+        "minimumIdleSlots": 256,
+        "checked": 1,
+        "eligible": 1,
+        "unavailable": 0
+      },
+      "publicReferenceSha256": "69ae13aa52622db3ac8e7e60a26d9bc39e98d293fb14eb9218f8734ec5c62eb2",
+      "referenceActivity": {
+        "before": {
+          "observedSlot": 457742158,
+          "latestActivitySlot": "457465679",
+          "latestSignatureSha256": "906d6aaf090c81ba8382a9c83f7948382279bd1610358f4bee698865b898ffc4",
+          "idleSlots": 276479
+        },
+        "after": {
+          "observedSlot": 457742181,
+          "latestActivitySlot": "457465679",
+          "latestSignatureSha256": "906d6aaf090c81ba8382a9c83f7948382279bd1610358f4bee698865b898ffc4",
+          "idleSlots": 276502
+        },
+        "outcome": "no-new-observed-activity"
+      },
+      "clockObservations": [
+        {
+          "contextSlot": 457742166,
+          "clockSlot": 457742166,
+          "slot": 457742166,
+          "relation": "equal",
+          "unixTimestamp": "1792176355"
+        },
+        {
+          "contextSlot": 457742170,
+          "clockSlot": 457742170,
+          "slot": 457742170,
+          "relation": "equal",
+          "unixTimestamp": "1792176355"
+        },
+        {
+          "contextSlot": 457742173,
+          "clockSlot": 457742173,
+          "slot": 457742173,
+          "relation": "equal",
+          "unixTimestamp": "1792176356"
+        },
+        {
+          "contextSlot": 457742176,
+          "clockSlot": 457742176,
+          "slot": 457742176,
+          "relation": "equal",
+          "unixTimestamp": "1792176357"
+        },
+        {
+          "contextSlot": 457742178,
+          "clockSlot": 457742178,
+          "slot": 457742178,
+          "relation": "equal",
+          "unixTimestamp": "1792176357"
+        }
+      ],
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "29330",
+        "minimumOutputRaw": "29183",
+        "observedAt": "2026-10-16T18:45:57.377Z"
+      },
+      "errorName": "Error",
+      "status": 502,
+      "reason": "Pair wallet provider reads are unavailable.",
+      "diagnosis": {
+        "check": "unclassified-refusal",
+        "valuesAvailable": false,
+        "classification": "evidence-unavailable"
+      },
+      "pipelineMs": 2496.1084,
+      "quietReferenceObserved": true,
+      "quoteTiming": {
+        "measured": true,
+        "reached": 3,
+        "initialQuoteDurationMs": 513.0605999999998,
+        "initialQuoteToOrderDispatchMs": 226.56740000000082,
+        "initialQuoteToOrderCompletionMs": 455.02960000000076,
+        "orderDurationMs": 228.46219999999994,
+        "orderToFreshQuoteDispatchMs": 457.64809999999943,
+        "freshQuoteDurationMs": 198.48050000000057,
+        "orderToFreshQuoteCompletionMs": 656.1286
+      },
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 6,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T18:45:59.479Z",
+      "readOnly": true,
+      "harnessRuntime": {
+        "nodeVersion": "24.19.0",
+        "requiredNodeMajor": 24
+      },
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "2711ca97ac56c31a5bf2c51c5b46c72c03c40f89a266cd405d246547aabe7d8f",
+        "lib/pair-order-review.ts": "3fdf683af7fddea02843deb171583db2b7206114207f33c08bd31de6d686883b",
+        "lib/pair-review-diagnostic.ts": "7cb687f59c47a37faadf731a0ba12db212eca94b89831b44608ddfe10f989b9e",
+        "lib/pair-wallet-evidence.ts": "b001bf1d4f0c2e940007200ce6ee85058d2ff1d0df42a985b7f5950ca680feef",
+        "lib/pair-mint-evidence.ts": "83cdbabd4243273cf74ce8c669ced2148d46a3796bdf5f489caa7277d6300d5c",
+        "lib/pair-stock-clock.ts": "aada775f60447080d87bc15a0dee0e0eecd9f4f09e3ed398ee8bbe5de976dbb6",
+        "lib/solana-rpc.ts": "1d262934e01150e737c2f8a8fdf470cfc3298a6bc370c5c7a2500b51d30916e3",
+        "lib/imported-pair-wallet-preflight.ts": "2748f7cfa6bafddb18f9bfe5cd907b96094af1f48565b8922366193dee5efa2b",
+        "lib/pair-order-first-review.ts": "f3a05013909fab0f412d6bc352349bc1c39f9d875aff1089642baa3c082a2601",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "2077f0679b0ce300fe45ffc3e2e560f6c36e88d448633e182eb5d95d210f2c08",
+        "lib/imported-pair-quote-service.ts": "66a28f776833ac2999471ae982a43c3b6dbdb03ef085d07aa1dd59f50a049a73",
+        "lib/pair-runtime-preview.ts": "e74213b667bfad8f64420554ccc4db0072d37cf01941c89a9cc78136bf913f8e",
+        "lib/pair-runtime-exposure.ts": "1cbf837feb2cfcaa353b75a8f52735bd52beb5da37f154e4d4f529db334e8676",
+        "lib/pair-account-provenance.ts": "c3bb9429df31ff7cff7d0e600f112cfe75ca680483ce93b496546eb53dcda34f",
+        "lib/pair-order-simulation.ts": "93bebc5a9ca3552ec051ad7d8cd57add88b1f912119835f1cc07345d2f7e413f",
+        "lib/pair-order-collector.ts": "c9f4bd85ca03f1d9d8b4084d6e99639c09348ce520da011b949a36dd99d092c9",
+        "lib/pair-read-rpc.ts": "5c429c9a6cdb95deb690d6dac260a9bb48c1bd5f484daf20b7155f385d766c39",
+        "lib/wallet-rpc-pacing.ts": "e0ad1ae3760bc7905b1c25be07541ecda529e6496d67aca7f9a21a34a59eb7b4",
+        "lib/pair-order-state.ts": "fc4fef53ff8b4558e4ae81f4033e83d8472f322fb00100b26971fbca11f16f82",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "8d1e17eee146a5f49931731615caad7f63ec31aa53a4f27e556047245937a126",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "5592661eaba07131486a340d513fc18e998acaf2e1cacab7f7c399b33d3b2c0d",
+        "lib/pair-order-quote-bounds.ts": "2fd6760ec3d80eedea19f670c9be315e0e3f6ab942af5b5491d2a8d770f600ba",
+        "scripts/qualify-stock-pair-runtime.mjs": "a281e9bff029208cd15dc89fdcace35875acbb05da5efe253c73f19a8c79905b",
+        "scripts/run-stock-repeatability.mjs": "0b6a1fc8c6257d2dd4296269d90f8a921f4c8bc96e6a6258927b69c90c7a535f",
+        "scripts/stock-reference-activity.mjs": "49805948e32e3f1d16314ffffd25546bd0d748acd19934aeb0ece8196c5a0785",
+        "scripts/stock-reference-fixture.mjs": "c800e6555125acff33938179a28804b17a8b3c305d39ebf9521a6692713e5c58",
+        "scripts/stock-provider-timing.mjs": "59097bee1cfb6831f81c7a4d5a2f9a20b5a7b0ad4823658d086aea77f6bb4895",
+        "scripts/stock-clock-wire.mjs": "fa750d05a30e8841766f68dca4c8f1627cd0685935ed89f7e271be6a77b5ca84",
+        "scripts/stock-qualification-runtime.mjs": "9c8c11edf932af2b10780040719bac51ced8caa6aa4297a0f8cd8de56c43b9ae"
+      },
+      "sourceUnchanged": true,
+      "referenceFixtureSha256": "fa612cb1599c8d9e85457ee6dac6451d631a21b3fb661e0ad3e33b403958d211",
+      "publicReferenceKind": "idle-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 661.802,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 200.95889999999997
+        },
+        {
+          "startMs": 867.4538,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 78.13660000000004
+        },
+        {
+          "startMs": 1073.3017,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 101.43599999999992
+        },
+        {
+          "startMs": 1273.497,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 100.11879999999996
+        },
+        {
+          "startMs": 1475.1457,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 99.75060000000008
+        },
+        {
+          "startMs": 1675.7186,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 97.87940000000003
+        },
+        {
+          "startMs": 1774.4178,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 640.0058999999999
+        },
+        {
+          "startMs": 2414.9404,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 590.3186000000001
+        },
+        {
+          "startMs": 3005.9716,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 212.05020000000013,
+          "clockWire": [
+            {
+              "requestId": "1",
+              "accountIndex": 2,
+              "contextSlot": "457742196",
+              "clockSlot": "457742196",
+              "unixTimestamp": "1792176361",
+              "clockDataSha256": "5e844d43064b8ab1e27c8692a0f78006a39b21981dbd334f5da58708456d8f60",
+              "receivedServerTimeMs": 1792176362037,
+              "commitment": "confirmed",
+              "requestedFloor": 457742193
+            },
+            {
+              "requestId": "1",
+              "accountIndex": 3,
+              "contextSlot": "457742196",
+              "clockSlot": "457742196",
+              "unixTimestamp": "1792176361",
+              "clockDataSha256": "5e844d43064b8ab1e27c8692a0f78006a39b21981dbd334f5da58708456d8f60",
+              "receivedServerTimeMs": 1792176362037,
+              "commitment": "confirmed",
+              "requestedFloor": 457742193
+            }
+          ],
+          "clockWireObservationMs": 0.9735999999998057
+        },
+        {
+          "startMs": 3254.9213,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 213.2165
+        },
+        {
+          "startMs": 3475.8054,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 210.4091999999996
+        },
+        {
+          "startMs": 3701.3234,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 232.2913999999996,
+          "clockWire": [
+            {
+              "requestId": "pair-3",
+              "accountIndex": 2,
+              "contextSlot": "457742200",
+              "clockSlot": "457742200",
+              "unixTimestamp": "1792176362",
+              "clockDataSha256": "4fa1c63230aa2e81584eac3faa4af6a5dd42dedec96e89d755588cecb5b2ebea",
+              "receivedServerTimeMs": 1792176362753,
+              "commitment": "confirmed",
+              "requestedFloor": 457742199
+            },
+            {
+              "requestId": "pair-3",
+              "accountIndex": 3,
+              "contextSlot": "457742200",
+              "clockSlot": "457742200",
+              "unixTimestamp": "1792176362",
+              "clockDataSha256": "4fa1c63230aa2e81584eac3faa4af6a5dd42dedec96e89d755588cecb5b2ebea",
+              "receivedServerTimeMs": 1792176362753,
+              "commitment": "confirmed",
+              "requestedFloor": 457742199
+            }
+          ],
+          "clockWireObservationMs": 0.4499000000000706
+        },
+        {
+          "startMs": 3943.8464,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 351.1100000000001
+        },
+        {
+          "startMs": 4295.816,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 199.01410000000033,
+          "clockWire": [
+            {
+              "requestId": "pair-4",
+              "accountIndex": 2,
+              "contextSlot": "457742203",
+              "clockSlot": "457742203",
+              "unixTimestamp": "1792176362",
+              "clockDataSha256": "42a1b031687145768d6e45ce7384d814bd19b711747ec14d6c77fd15a9223de9",
+              "receivedServerTimeMs": 1792176363314,
+              "commitment": "confirmed",
+              "requestedFloor": 457742200
+            },
+            {
+              "requestId": "pair-4",
+              "accountIndex": 3,
+              "contextSlot": "457742203",
+              "clockSlot": "457742203",
+              "unixTimestamp": "1792176362",
+              "clockDataSha256": "42a1b031687145768d6e45ce7384d814bd19b711747ec14d6c77fd15a9223de9",
+              "receivedServerTimeMs": 1792176363314,
+              "commitment": "confirmed",
+              "requestedFloor": 457742200
+            }
+          ],
+          "clockWireObservationMs": 0.5568999999995867
+        },
+        {
+          "startMs": 4505.312,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 170.20309999999972
+        },
+        {
+          "startMs": 4684.9651,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 104.55229999999938
+        },
+        {
+          "startMs": 4885.2416,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 95.90599999999995
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3474.7576,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 212.10519999999997
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3475.0622,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742199",
+          "returned": true,
+          "elapsedMs": 211.80340000000024
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3687.0356,
+          "minContextSlot": 457742199,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742200",
+          "clockSlot": "457742200",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742200",
+          "clockDataSha256": "4fa1c63230aa2e81584eac3faa4af6a5dd42dedec96e89d755588cecb5b2ebea",
+          "chainUnix": "1792176362",
+          "clockSkewMs": 753,
+          "receivedServerTimeMs": 1792176362753,
+          "returned": true,
+          "elapsedMs": 247.39149999999972
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4295.5794,
+          "minContextSlot": 457742200,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742203",
+          "clockSlot": "457742203",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742203",
+          "clockDataSha256": "42a1b031687145768d6e45ce7384d814bd19b711747ec14d6c77fd15a9223de9",
+          "chainUnix": "1792176362",
+          "clockSkewMs": 1314,
+          "receivedServerTimeMs": 1792176363314,
+          "returned": true,
+          "elapsedMs": 200.09240000000045
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4295.6388,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 200.03499999999985
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "284591",
+          "minimumOutputRaw": "283168",
+          "observedAt": "2026-10-16T18:46:03.114Z"
+        }
+      ],
+      "providerTimings": [
+        {
+          "phase": "initial-quote",
+          "startMs": 3942.8931,
+          "endMs": 4295.5187,
+          "outcome": "returned"
+        },
+        {
+          "phase": "wallet-bound-order",
+          "startMs": 4504.9929,
+          "endMs": 4682.5563,
+          "outcome": "returned"
+        }
+      ],
+      "quoteAsset": "USDC",
+      "inputUiAmount": "1",
+      "qualificationPacing": "unsigned-stock-qualification-nine-methods-per-second",
+      "rpcPacingScope": "setup-and-runtime",
+      "rpcPacingMs": 200,
+      "runtimeProviderRole": "configured-standard-validator",
+      "runtimeProviderHost": "bold-necessary-arm.solana-mainnet.quiknode.pro",
+      "referenceSelection": {
+        "minimumIdleSlots": 256,
+        "checked": 1,
+        "eligible": 1,
+        "unavailable": 0
+      },
+      "publicReferenceSha256": "32d65da54f9ed973341891eed180b4898349584abaf7b3e3affbdb666b048b59",
+      "referenceActivity": {
+        "before": {
+          "observedSlot": 457742187,
+          "latestActivitySlot": "457725611",
+          "latestSignatureSha256": "3a97b691e3cb78a40d9f2b834defd1e181f6b09bd4d3489b52e5b59565b3ef8e",
+          "idleSlots": 16576
+        },
+        "after": {
+          "observedSlot": 457742206,
+          "latestActivitySlot": "457725611",
+          "latestSignatureSha256": "3a97b691e3cb78a40d9f2b834defd1e181f6b09bd4d3489b52e5b59565b3ef8e",
+          "idleSlots": 16595
+        },
+        "outcome": "no-new-observed-activity"
+      },
+      "clockObservations": [
+        {
+          "contextSlot": 457742196,
+          "clockSlot": 457742196,
+          "slot": 457742196,
+          "relation": "equal",
+          "unixTimestamp": "1792176361"
+        },
+        {
+          "contextSlot": 457742200,
+          "clockSlot": 457742200,
+          "slot": 457742200,
+          "relation": "equal",
+          "unixTimestamp": "1792176362"
+        },
+        {
+          "contextSlot": 457742203,
+          "clockSlot": 457742203,
+          "slot": 457742203,
+          "relation": "equal",
+          "unixTimestamp": "1792176362"
+        }
+      ],
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "284494",
+        "minimumOutputRaw": "283071",
+        "observedAt": "2026-10-16T18:46:03.501Z"
+      },
+      "diagnostic": {
+        "check": "minimum-output",
+        "comparisons": [
+          {
+            "field": "minimumOutputRaw",
+            "before": "283168",
+            "after": "283071"
+          }
+        ]
+      },
+      "errorName": "Error",
+      "status": null,
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "diagnosis": {
+        "check": "minimum-output",
+        "valuesAvailable": true,
+        "classification": "economic-minimum-output"
+      },
+      "pipelineMs": 1213.06,
+      "quietReferenceObserved": true,
+      "quoteTiming": {
+        "measured": true,
+        "reached": 2,
+        "initialQuoteDurationMs": 352.62559999999985,
+        "initialQuoteToOrderDispatchMs": 209.47420000000056,
+        "initialQuoteToOrderCompletionMs": 387.03760000000057,
+        "orderDurationMs": 177.5634,
+        "orderToFreshQuoteDispatchMs": null,
+        "freshQuoteDurationMs": null,
+        "orderToFreshQuoteCompletionMs": null
+      },
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 6,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T18:46:04.737Z",
+      "readOnly": true,
+      "harnessRuntime": {
+        "nodeVersion": "24.19.0",
+        "requiredNodeMajor": 24
+      },
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "2711ca97ac56c31a5bf2c51c5b46c72c03c40f89a266cd405d246547aabe7d8f",
+        "lib/pair-order-review.ts": "3fdf683af7fddea02843deb171583db2b7206114207f33c08bd31de6d686883b",
+        "lib/pair-review-diagnostic.ts": "7cb687f59c47a37faadf731a0ba12db212eca94b89831b44608ddfe10f989b9e",
+        "lib/pair-wallet-evidence.ts": "b001bf1d4f0c2e940007200ce6ee85058d2ff1d0df42a985b7f5950ca680feef",
+        "lib/pair-mint-evidence.ts": "83cdbabd4243273cf74ce8c669ced2148d46a3796bdf5f489caa7277d6300d5c",
+        "lib/pair-stock-clock.ts": "aada775f60447080d87bc15a0dee0e0eecd9f4f09e3ed398ee8bbe5de976dbb6",
+        "lib/solana-rpc.ts": "1d262934e01150e737c2f8a8fdf470cfc3298a6bc370c5c7a2500b51d30916e3",
+        "lib/imported-pair-wallet-preflight.ts": "2748f7cfa6bafddb18f9bfe5cd907b96094af1f48565b8922366193dee5efa2b",
+        "lib/pair-order-first-review.ts": "f3a05013909fab0f412d6bc352349bc1c39f9d875aff1089642baa3c082a2601",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "2077f0679b0ce300fe45ffc3e2e560f6c36e88d448633e182eb5d95d210f2c08",
+        "lib/imported-pair-quote-service.ts": "66a28f776833ac2999471ae982a43c3b6dbdb03ef085d07aa1dd59f50a049a73",
+        "lib/pair-runtime-preview.ts": "e74213b667bfad8f64420554ccc4db0072d37cf01941c89a9cc78136bf913f8e",
+        "lib/pair-runtime-exposure.ts": "1cbf837feb2cfcaa353b75a8f52735bd52beb5da37f154e4d4f529db334e8676",
+        "lib/pair-account-provenance.ts": "c3bb9429df31ff7cff7d0e600f112cfe75ca680483ce93b496546eb53dcda34f",
+        "lib/pair-order-simulation.ts": "93bebc5a9ca3552ec051ad7d8cd57add88b1f912119835f1cc07345d2f7e413f",
+        "lib/pair-order-collector.ts": "c9f4bd85ca03f1d9d8b4084d6e99639c09348ce520da011b949a36dd99d092c9",
+        "lib/pair-read-rpc.ts": "5c429c9a6cdb95deb690d6dac260a9bb48c1bd5f484daf20b7155f385d766c39",
+        "lib/wallet-rpc-pacing.ts": "e0ad1ae3760bc7905b1c25be07541ecda529e6496d67aca7f9a21a34a59eb7b4",
+        "lib/pair-order-state.ts": "fc4fef53ff8b4558e4ae81f4033e83d8472f322fb00100b26971fbca11f16f82",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "8d1e17eee146a5f49931731615caad7f63ec31aa53a4f27e556047245937a126",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "5592661eaba07131486a340d513fc18e998acaf2e1cacab7f7c399b33d3b2c0d",
+        "lib/pair-order-quote-bounds.ts": "2fd6760ec3d80eedea19f670c9be315e0e3f6ab942af5b5491d2a8d770f600ba",
+        "scripts/qualify-stock-pair-runtime.mjs": "a281e9bff029208cd15dc89fdcace35875acbb05da5efe253c73f19a8c79905b",
+        "scripts/run-stock-repeatability.mjs": "0b6a1fc8c6257d2dd4296269d90f8a921f4c8bc96e6a6258927b69c90c7a535f",
+        "scripts/stock-reference-activity.mjs": "49805948e32e3f1d16314ffffd25546bd0d748acd19934aeb0ece8196c5a0785",
+        "scripts/stock-reference-fixture.mjs": "c800e6555125acff33938179a28804b17a8b3c305d39ebf9521a6692713e5c58",
+        "scripts/stock-provider-timing.mjs": "59097bee1cfb6831f81c7a4d5a2f9a20b5a7b0ad4823658d086aea77f6bb4895",
+        "scripts/stock-clock-wire.mjs": "fa750d05a30e8841766f68dca4c8f1627cd0685935ed89f7e271be6a77b5ca84",
+        "scripts/stock-qualification-runtime.mjs": "9c8c11edf932af2b10780040719bac51ced8caa6aa4297a0f8cd8de56c43b9ae"
+      },
+      "sourceUnchanged": true,
+      "referenceFixtureSha256": "fa612cb1599c8d9e85457ee6dac6451d631a21b3fb661e0ad3e33b403958d211",
+      "publicReferenceKind": "idle-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 860.1235,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 206.92549999999994
+        },
+        {
+          "startMs": 1071.6579,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 86.32090000000017
+        },
+        {
+          "startMs": 1273.9275,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 100.28070000000002
+        },
+        {
+          "startMs": 1472.566,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 93.21190000000001
+        },
+        {
+          "startMs": 1673.0879,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 96.98960000000011
+        },
+        {
+          "startMs": 1874.5123,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 98.53939999999989
+        },
+        {
+          "startMs": 1973.9243,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 628.2448999999999
+        },
+        {
+          "startMs": 2602.8469,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 623.1363999999999
+        },
+        {
+          "startMs": 3227.348,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 198.37879999999996,
+          "clockWire": [
+            {
+              "requestId": "1",
+              "accountIndex": 2,
+              "contextSlot": "457742222",
+              "clockSlot": "457742222",
+              "unixTimestamp": "1792176366",
+              "clockDataSha256": "e07df45297f4b6666b29f529de73dec42c2a44b0ccfbcdd39750269c4112134f",
+              "receivedServerTimeMs": 1792176367304,
+              "commitment": "confirmed",
+              "requestedFloor": 457742221
+            },
+            {
+              "requestId": "1",
+              "accountIndex": 3,
+              "contextSlot": "457742222",
+              "clockSlot": "457742222",
+              "unixTimestamp": "1792176366",
+              "clockDataSha256": "e07df45297f4b6666b29f529de73dec42c2a44b0ccfbcdd39750269c4112134f",
+              "receivedServerTimeMs": 1792176367304,
+              "commitment": "confirmed",
+              "requestedFloor": 457742221
+            }
+          ],
+          "clockWireObservationMs": 0.8575000000000728
+        },
+        {
+          "startMs": 3456.4402,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 201.43809999999985
+        },
+        {
+          "startMs": 3663.9545,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 218.56100000000015
+        },
+        {
+          "startMs": 3902.1956,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 216.1849000000002,
+          "clockWire": [
+            {
+              "requestId": "pair-3",
+              "accountIndex": 2,
+              "contextSlot": "457742226",
+              "clockSlot": "457742226",
+              "unixTimestamp": "1792176367",
+              "clockDataSha256": "ddaea390e58c63eb69ba7f395a4171132e09cbdd14213817cf764a49dab778ce",
+              "receivedServerTimeMs": 1792176367997,
+              "commitment": "confirmed",
+              "requestedFloor": 457742224
+            },
+            {
+              "requestId": "pair-3",
+              "accountIndex": 3,
+              "contextSlot": "457742226",
+              "clockSlot": "457742226",
+              "unixTimestamp": "1792176367",
+              "clockDataSha256": "ddaea390e58c63eb69ba7f395a4171132e09cbdd14213817cf764a49dab778ce",
+              "receivedServerTimeMs": 1792176367997,
+              "commitment": "confirmed",
+              "requestedFloor": 457742224
+            }
+          ],
+          "clockWireObservationMs": 0.32220000000052096
+        },
+        {
+          "startMs": 4125.7908,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 452.08520000000044
+        },
+        {
+          "startMs": 4578.46,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 211.13500000000022,
+          "clockWire": [
+            {
+              "requestId": "pair-4",
+              "accountIndex": 2,
+              "contextSlot": "457742229",
+              "clockSlot": "457742229",
+              "unixTimestamp": "1792176368",
+              "clockDataSha256": "8c50d4c6b0fcb95dd1706bb52fde87e43150da753062dbffd3af300f47d419db",
+              "receivedServerTimeMs": 1792176368668,
+              "commitment": "confirmed",
+              "requestedFloor": 457742226
+            },
+            {
+              "requestId": "pair-4",
+              "accountIndex": 3,
+              "contextSlot": "457742229",
+              "clockSlot": "457742229",
+              "unixTimestamp": "1792176368",
+              "clockDataSha256": "8c50d4c6b0fcb95dd1706bb52fde87e43150da753062dbffd3af300f47d419db",
+              "receivedServerTimeMs": 1792176368668,
+              "commitment": "confirmed",
+              "requestedFloor": 457742226
+            }
+          ],
+          "clockWireObservationMs": 0.3503999999993539
+        },
+        {
+          "startMs": 4797.6711,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 257.78200000000015
+        },
+        {
+          "startMs": 5063.6942,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 94.55180000000018
+        },
+        {
+          "startMs": 5268.2819,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 89.46010000000024
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3663.065,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 219.90329999999994
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3663.2802,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742224",
+          "returned": true,
+          "elapsedMs": 219.69000000000005
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3883.0883,
+          "minContextSlot": 457742224,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742226",
+          "clockSlot": "457742226",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742226",
+          "clockDataSha256": "ddaea390e58c63eb69ba7f395a4171132e09cbdd14213817cf764a49dab778ce",
+          "chainUnix": "1792176367",
+          "clockSkewMs": 997,
+          "receivedServerTimeMs": 1792176367997,
+          "returned": true,
+          "elapsedMs": 235.9069000000004
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4578.3049,
+          "minContextSlot": 457742226,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742229",
+          "clockSlot": "457742229",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742229",
+          "clockDataSha256": "8c50d4c6b0fcb95dd1706bb52fde87e43150da753062dbffd3af300f47d419db",
+          "chainUnix": "1792176368",
+          "clockSkewMs": 668,
+          "receivedServerTimeMs": 1792176368668,
+          "returned": true,
+          "elapsedMs": 211.85689999999977
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4578.3445,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 211.8186999999998
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29343",
+          "minimumOutputRaw": "29196",
+          "observedAt": "2026-10-16T18:46:08.456Z"
+        }
+      ],
+      "providerTimings": [
+        {
+          "phase": "initial-quote",
+          "startMs": 4125.0245,
+          "endMs": 4578.2671,
+          "outcome": "returned"
+        },
+        {
+          "phase": "wallet-bound-order",
+          "startMs": 4797.4071,
+          "endMs": 5062.1785,
+          "outcome": "returned"
+        }
+      ],
+      "quoteAsset": "SOL",
+      "inputUiAmount": "0.001",
+      "qualificationPacing": "unsigned-stock-qualification-nine-methods-per-second",
+      "rpcPacingScope": "setup-and-runtime",
+      "rpcPacingMs": 200,
+      "runtimeProviderRole": "configured-standard-validator",
+      "runtimeProviderHost": "bold-necessary-arm.solana-mainnet.quiknode.pro",
+      "referenceSelection": {
+        "minimumIdleSlots": 256,
+        "checked": 1,
+        "eligible": 1,
+        "unavailable": 0
+      },
+      "publicReferenceSha256": "69ae13aa52622db3ac8e7e60a26d9bc39e98d293fb14eb9218f8734ec5c62eb2",
+      "referenceActivity": {
+        "before": {
+          "observedSlot": 457742213,
+          "latestActivitySlot": "457465679",
+          "latestSignatureSha256": "906d6aaf090c81ba8382a9c83f7948382279bd1610358f4bee698865b898ffc4",
+          "idleSlots": 276534
+        },
+        "after": {
+          "observedSlot": 457742231,
+          "latestActivitySlot": "457465679",
+          "latestSignatureSha256": "906d6aaf090c81ba8382a9c83f7948382279bd1610358f4bee698865b898ffc4",
+          "idleSlots": 276552
+        },
+        "outcome": "no-new-observed-activity"
+      },
+      "clockObservations": [
+        {
+          "contextSlot": 457742222,
+          "clockSlot": 457742222,
+          "slot": 457742222,
+          "relation": "equal",
+          "unixTimestamp": "1792176366"
+        },
+        {
+          "contextSlot": 457742226,
+          "clockSlot": 457742226,
+          "slot": 457742226,
+          "relation": "equal",
+          "unixTimestamp": "1792176367"
+        },
+        {
+          "contextSlot": 457742229,
+          "clockSlot": 457742229,
+          "slot": 457742229,
+          "relation": "equal",
+          "unixTimestamp": "1792176368"
+        }
+      ],
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "29342",
+        "minimumOutputRaw": "29195",
+        "observedAt": "2026-10-16T18:46:08.940Z"
+      },
+      "diagnostic": {
+        "check": "minimum-output",
+        "comparisons": [
+          {
+            "field": "minimumOutputRaw",
+            "before": "29196",
+            "after": "29195"
+          }
+        ]
+      },
+      "errorName": "Error",
+      "status": null,
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "diagnosis": {
+        "check": "minimum-output",
+        "valuesAvailable": true,
+        "classification": "economic-minimum-output"
+      },
+      "pipelineMs": 1402.6752999999994,
+      "quietReferenceObserved": true,
+      "quoteTiming": {
+        "measured": true,
+        "reached": 2,
+        "initialQuoteDurationMs": 453.2425999999996,
+        "initialQuoteToOrderDispatchMs": 219.14000000000033,
+        "initialQuoteToOrderCompletionMs": 483.91139999999996,
+        "orderDurationMs": 264.77139999999963,
+        "orderToFreshQuoteDispatchMs": null,
+        "freshQuoteDurationMs": null,
+        "orderToFreshQuoteCompletionMs": null
+      },
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 6,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T18:46:09.945Z",
+      "readOnly": true,
+      "harnessRuntime": {
+        "nodeVersion": "24.19.0",
+        "requiredNodeMajor": 24
+      },
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "2711ca97ac56c31a5bf2c51c5b46c72c03c40f89a266cd405d246547aabe7d8f",
+        "lib/pair-order-review.ts": "3fdf683af7fddea02843deb171583db2b7206114207f33c08bd31de6d686883b",
+        "lib/pair-review-diagnostic.ts": "7cb687f59c47a37faadf731a0ba12db212eca94b89831b44608ddfe10f989b9e",
+        "lib/pair-wallet-evidence.ts": "b001bf1d4f0c2e940007200ce6ee85058d2ff1d0df42a985b7f5950ca680feef",
+        "lib/pair-mint-evidence.ts": "83cdbabd4243273cf74ce8c669ced2148d46a3796bdf5f489caa7277d6300d5c",
+        "lib/pair-stock-clock.ts": "aada775f60447080d87bc15a0dee0e0eecd9f4f09e3ed398ee8bbe5de976dbb6",
+        "lib/solana-rpc.ts": "1d262934e01150e737c2f8a8fdf470cfc3298a6bc370c5c7a2500b51d30916e3",
+        "lib/imported-pair-wallet-preflight.ts": "2748f7cfa6bafddb18f9bfe5cd907b96094af1f48565b8922366193dee5efa2b",
+        "lib/pair-order-first-review.ts": "f3a05013909fab0f412d6bc352349bc1c39f9d875aff1089642baa3c082a2601",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "2077f0679b0ce300fe45ffc3e2e560f6c36e88d448633e182eb5d95d210f2c08",
+        "lib/imported-pair-quote-service.ts": "66a28f776833ac2999471ae982a43c3b6dbdb03ef085d07aa1dd59f50a049a73",
+        "lib/pair-runtime-preview.ts": "e74213b667bfad8f64420554ccc4db0072d37cf01941c89a9cc78136bf913f8e",
+        "lib/pair-runtime-exposure.ts": "1cbf837feb2cfcaa353b75a8f52735bd52beb5da37f154e4d4f529db334e8676",
+        "lib/pair-account-provenance.ts": "c3bb9429df31ff7cff7d0e600f112cfe75ca680483ce93b496546eb53dcda34f",
+        "lib/pair-order-simulation.ts": "93bebc5a9ca3552ec051ad7d8cd57add88b1f912119835f1cc07345d2f7e413f",
+        "lib/pair-order-collector.ts": "c9f4bd85ca03f1d9d8b4084d6e99639c09348ce520da011b949a36dd99d092c9",
+        "lib/pair-read-rpc.ts": "5c429c9a6cdb95deb690d6dac260a9bb48c1bd5f484daf20b7155f385d766c39",
+        "lib/wallet-rpc-pacing.ts": "e0ad1ae3760bc7905b1c25be07541ecda529e6496d67aca7f9a21a34a59eb7b4",
+        "lib/pair-order-state.ts": "fc4fef53ff8b4558e4ae81f4033e83d8472f322fb00100b26971fbca11f16f82",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "8d1e17eee146a5f49931731615caad7f63ec31aa53a4f27e556047245937a126",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "5592661eaba07131486a340d513fc18e998acaf2e1cacab7f7c399b33d3b2c0d",
+        "lib/pair-order-quote-bounds.ts": "2fd6760ec3d80eedea19f670c9be315e0e3f6ab942af5b5491d2a8d770f600ba",
+        "scripts/qualify-stock-pair-runtime.mjs": "a281e9bff029208cd15dc89fdcace35875acbb05da5efe253c73f19a8c79905b",
+        "scripts/run-stock-repeatability.mjs": "0b6a1fc8c6257d2dd4296269d90f8a921f4c8bc96e6a6258927b69c90c7a535f",
+        "scripts/stock-reference-activity.mjs": "49805948e32e3f1d16314ffffd25546bd0d748acd19934aeb0ece8196c5a0785",
+        "scripts/stock-reference-fixture.mjs": "c800e6555125acff33938179a28804b17a8b3c305d39ebf9521a6692713e5c58",
+        "scripts/stock-provider-timing.mjs": "59097bee1cfb6831f81c7a4d5a2f9a20b5a7b0ad4823658d086aea77f6bb4895",
+        "scripts/stock-clock-wire.mjs": "fa750d05a30e8841766f68dca4c8f1627cd0685935ed89f7e271be6a77b5ca84",
+        "scripts/stock-qualification-runtime.mjs": "9c8c11edf932af2b10780040719bac51ced8caa6aa4297a0f8cd8de56c43b9ae"
+      },
+      "sourceUnchanged": true,
+      "referenceFixtureSha256": "fa612cb1599c8d9e85457ee6dac6451d631a21b3fb661e0ad3e33b403958d211",
+      "publicReferenceKind": "idle-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 654.3599,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 199.02499999999998
+        },
+        {
+          "startMs": 857.863,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 74.67079999999999
+        },
+        {
+          "startMs": 1064.4538,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 96.8311000000001
+        },
+        {
+          "startMs": 1267.4762,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 106.16509999999994
+        },
+        {
+          "startMs": 1464.6525,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 108.11590000000001
+        },
+        {
+          "startMs": 1665.7617,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 95.65989999999988
+        },
+        {
+          "startMs": 1762.211,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 657.5267000000001
+        },
+        {
+          "startMs": 2420.2877,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 632.9396000000002
+        },
+        {
+          "startMs": 3053.8121,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 223.66800000000012,
+          "clockWire": [
+            {
+              "requestId": "1",
+              "accountIndex": 2,
+              "contextSlot": "457742246",
+              "clockSlot": "457742246",
+              "unixTimestamp": "1792176371",
+              "clockDataSha256": "95c224c00c318d89011622d366936f119aa530f708035edd94317e9abdbc12b3",
+              "receivedServerTimeMs": 1792176372570,
+              "commitment": "confirmed",
+              "requestedFloor": 457742245
+            },
+            {
+              "requestId": "1",
+              "accountIndex": 3,
+              "contextSlot": "457742246",
+              "clockSlot": "457742246",
+              "unixTimestamp": "1792176371",
+              "clockDataSha256": "95c224c00c318d89011622d366936f119aa530f708035edd94317e9abdbc12b3",
+              "receivedServerTimeMs": 1792176372570,
+              "commitment": "confirmed",
+              "requestedFloor": 457742245
+            }
+          ],
+          "clockWireObservationMs": 0.8261999999999716
+        },
+        {
+          "startMs": 3302.6178,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 210.5005000000001
+        },
+        {
+          "startMs": 3518.8519,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 230.20559999999978
+        },
+        {
+          "startMs": 3750.2985,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 230.94410000000016,
+          "clockWire": [
+            {
+              "requestId": "pair-3",
+              "accountIndex": 2,
+              "contextSlot": "457742249",
+              "clockSlot": "457742249",
+              "unixTimestamp": "1792176372",
+              "clockDataSha256": "fd8d808e0a5e0c908f778c88152263bf678ba018270f9f8ad83f52dd854b7878",
+              "receivedServerTimeMs": 1792176373273,
+              "commitment": "confirmed",
+              "requestedFloor": 457742247
+            },
+            {
+              "requestId": "pair-3",
+              "accountIndex": 3,
+              "contextSlot": "457742249",
+              "clockSlot": "457742249",
+              "unixTimestamp": "1792176372",
+              "clockDataSha256": "fd8d808e0a5e0c908f778c88152263bf678ba018270f9f8ad83f52dd854b7878",
+              "receivedServerTimeMs": 1792176373273,
+              "commitment": "confirmed",
+              "requestedFloor": 457742247
+            }
+          ],
+          "clockWireObservationMs": 0.2948999999998705
+        },
+        {
+          "startMs": 3987.8722,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 361.3128000000006
+        },
+        {
+          "startMs": 4349.8054,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 231.14220000000023,
+          "clockWire": [
+            {
+              "requestId": "pair-4",
+              "accountIndex": 2,
+              "contextSlot": "457742252",
+              "clockSlot": "457742252",
+              "unixTimestamp": "1792176373",
+              "clockDataSha256": "8f1305a8fb4e95ebaa3c4a19aec1ec2a652fc42591ef56153dc7156dba45ca2f",
+              "receivedServerTimeMs": 1792176373873,
+              "commitment": "confirmed",
+              "requestedFloor": 457742249
+            },
+            {
+              "requestId": "pair-4",
+              "accountIndex": 3,
+              "contextSlot": "457742252",
+              "clockSlot": "457742252",
+              "unixTimestamp": "1792176373",
+              "clockDataSha256": "8f1305a8fb4e95ebaa3c4a19aec1ec2a652fc42591ef56153dc7156dba45ca2f",
+              "receivedServerTimeMs": 1792176373873,
+              "commitment": "confirmed",
+              "requestedFloor": 457742249
+            }
+          ],
+          "clockWireObservationMs": 0.36530000000038854
+        },
+        {
+          "startMs": 4588.7112,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 172.39580000000024
+        },
+        {
+          "startMs": 4767.4001,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 229.20800000000054
+        },
+        {
+          "startMs": 4997.0124,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 232.02739999999994,
+          "clockWire": [
+            {
+              "requestId": "pair-8",
+              "accountIndex": 2,
+              "contextSlot": "457742255",
+              "clockSlot": "457742255",
+              "unixTimestamp": "1792176373",
+              "clockDataSha256": "828b203c8b82ea49b715a20d015a17521b760d4e167aa68d3864a2b968d4b0ec",
+              "receivedServerTimeMs": 1792176374521,
+              "commitment": "confirmed",
+              "requestedFloor": 457742254
+            },
+            {
+              "requestId": "pair-8",
+              "accountIndex": 3,
+              "contextSlot": "457742255",
+              "clockSlot": "457742255",
+              "unixTimestamp": "1792176373",
+              "clockDataSha256": "828b203c8b82ea49b715a20d015a17521b760d4e167aa68d3864a2b968d4b0ec",
+              "receivedServerTimeMs": 1792176374521,
+              "commitment": "confirmed",
+              "requestedFloor": 457742254
+            }
+          ],
+          "clockWireObservationMs": 0.37040000000069995
+        },
+        {
+          "startMs": 5234.0458,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 172.61170000000038
+        },
+        {
+          "startMs": 5407.1007,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 222.09360000000015,
+          "clockWire": [
+            {
+              "requestId": "pair-9",
+              "accountIndex": 2,
+              "contextSlot": "457742256",
+              "clockSlot": "457742256",
+              "unixTimestamp": "1792176374",
+              "clockDataSha256": "7dc0c099864e9acfcb1bd24b2ced719a6cb19ee6d98f081551fe24ba426643a8",
+              "receivedServerTimeMs": 1792176374921,
+              "commitment": "confirmed",
+              "requestedFloor": 457742255
+            },
+            {
+              "requestId": "pair-9",
+              "accountIndex": 3,
+              "contextSlot": "457742256",
+              "clockSlot": "457742256",
+              "unixTimestamp": "1792176374",
+              "clockDataSha256": "7dc0c099864e9acfcb1bd24b2ced719a6cb19ee6d98f081551fe24ba426643a8",
+              "receivedServerTimeMs": 1792176374921,
+              "commitment": "confirmed",
+              "requestedFloor": 457742255
+            }
+          ],
+          "clockWireObservationMs": 0.2996000000002823
+        },
+        {
+          "startMs": 5637.0261,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 413,
+          "headerMs": 220.1235999999999,
+          "clockWireUnavailable": true,
+          "clockWireObservationMs": 0.2519000000002052
+        },
+        {
+          "startMs": 5859.0944,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 198.6189000000004
+        },
+        {
+          "startMs": 6066.7997,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 97.88640000000032
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3518.0364,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 231.73129999999992
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3518.2736,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742247",
+          "returned": true,
+          "elapsedMs": 231.4985999999999
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3750.0433,
+          "minContextSlot": 457742247,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742249",
+          "clockSlot": "457742249",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742249",
+          "clockDataSha256": "fd8d808e0a5e0c908f778c88152263bf678ba018270f9f8ad83f52dd854b7878",
+          "chainUnix": "1792176372",
+          "clockSkewMs": 1274,
+          "receivedServerTimeMs": 1792176373274,
+          "returned": true,
+          "elapsedMs": 231.75710000000026
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4349.6219,
+          "minContextSlot": 457742249,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742252",
+          "clockSlot": "457742252",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742252",
+          "clockDataSha256": "8f1305a8fb4e95ebaa3c4a19aec1ec2a652fc42591ef56153dc7156dba45ca2f",
+          "chainUnix": "1792176373",
+          "clockSkewMs": 873,
+          "receivedServerTimeMs": 1792176373873,
+          "returned": true,
+          "elapsedMs": 231.98239999999987
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4349.6814,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 231.92439999999988
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4767.3025,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 229.5693000000001
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4767.3272,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742254",
+          "returned": true,
+          "elapsedMs": 229.54570000000058
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4996.9302,
+          "minContextSlot": 457742254,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742255",
+          "clockSlot": "457742255",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742255",
+          "clockDataSha256": "828b203c8b82ea49b715a20d015a17521b760d4e167aa68d3864a2b968d4b0ec",
+          "chainUnix": "1792176373",
+          "clockSkewMs": 1521,
+          "receivedServerTimeMs": 1792176374521,
+          "returned": true,
+          "elapsedMs": 232.65689999999995
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5406.96,
+          "minContextSlot": 457742255,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742256",
+          "clockSlot": "457742256",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742256",
+          "clockDataSha256": "7dc0c099864e9acfcb1bd24b2ced719a6cb19ee6d98f081551fe24ba426643a8",
+          "chainUnix": "1792176374",
+          "clockSkewMs": 922,
+          "receivedServerTimeMs": 1792176374922,
+          "returned": true,
+          "elapsedMs": 222.69800000000032
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5407.0127,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 222.64629999999943
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5636.9295,
+          "minContextSlot": 457742256,
+          "accountCount": 8,
+          "slice": null,
+          "returned": false,
+          "status": 413,
+          "elapsedMs": 221.42749999999978
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "284478",
+          "minimumOutputRaw": "283055",
+          "observedAt": "2026-10-16T18:46:13.641Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "284478",
+          "minimumOutputRaw": "283055",
+          "observedAt": "2026-10-16T18:46:14.699Z"
+        }
+      ],
+      "providerTimings": [
+        {
+          "phase": "initial-quote",
+          "startMs": 3987.1314,
+          "endMs": 4349.5816,
+          "outcome": "returned"
+        },
+        {
+          "phase": "wallet-bound-order",
+          "startMs": 4588.4774,
+          "endMs": 4765.9713,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fresh-quote",
+          "startMs": 5233.8918,
+          "endMs": 5406.9118,
+          "outcome": "returned"
+        }
+      ],
+      "quoteAsset": "USDC",
+      "inputUiAmount": "1",
+      "qualificationPacing": "unsigned-stock-qualification-nine-methods-per-second",
+      "rpcPacingScope": "setup-and-runtime",
+      "rpcPacingMs": 200,
+      "runtimeProviderRole": "configured-standard-validator",
+      "runtimeProviderHost": "bold-necessary-arm.solana-mainnet.quiknode.pro",
+      "referenceSelection": {
+        "minimumIdleSlots": 256,
+        "checked": 1,
+        "eligible": 1,
+        "unavailable": 0
+      },
+      "publicReferenceSha256": "32d65da54f9ed973341891eed180b4898349584abaf7b3e3affbdb666b048b59",
+      "referenceActivity": {
+        "before": {
+          "observedSlot": 457742238,
+          "latestActivitySlot": "457725611",
+          "latestSignatureSha256": "3a97b691e3cb78a40d9f2b834defd1e181f6b09bd4d3489b52e5b59565b3ef8e",
+          "idleSlots": 16627
+        },
+        "after": {
+          "observedSlot": 457742259,
+          "latestActivitySlot": "457725611",
+          "latestSignatureSha256": "3a97b691e3cb78a40d9f2b834defd1e181f6b09bd4d3489b52e5b59565b3ef8e",
+          "idleSlots": 16648
+        },
+        "outcome": "no-new-observed-activity"
+      },
+      "clockObservations": [
+        {
+          "contextSlot": 457742246,
+          "clockSlot": 457742246,
+          "slot": 457742246,
+          "relation": "equal",
+          "unixTimestamp": "1792176371"
+        },
+        {
+          "contextSlot": 457742249,
+          "clockSlot": 457742249,
+          "slot": 457742249,
+          "relation": "equal",
+          "unixTimestamp": "1792176372"
+        },
+        {
+          "contextSlot": 457742252,
+          "clockSlot": 457742252,
+          "slot": 457742252,
+          "relation": "equal",
+          "unixTimestamp": "1792176373"
+        },
+        {
+          "contextSlot": 457742255,
+          "clockSlot": 457742255,
+          "slot": 457742255,
+          "relation": "equal",
+          "unixTimestamp": "1792176373"
+        },
+        {
+          "contextSlot": 457742256,
+          "clockSlot": 457742256,
+          "slot": 457742256,
+          "relation": "equal",
+          "unixTimestamp": "1792176374"
+        }
+      ],
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "284478",
+        "minimumOutputRaw": "283055",
+        "observedAt": "2026-10-16T18:46:14.058Z"
+      },
+      "errorName": "Error",
+      "status": 502,
+      "reason": "Pair wallet provider reads are unavailable.",
+      "diagnosis": {
+        "check": "unclassified-refusal",
+        "valuesAvailable": false,
+        "classification": "evidence-unavailable"
+      },
+      "pipelineMs": 2343.3745000000004,
+      "quietReferenceObserved": true,
+      "quoteTiming": {
+        "measured": true,
+        "reached": 3,
+        "initialQuoteDurationMs": 362.4502000000002,
+        "initialQuoteToOrderDispatchMs": 238.89579999999933,
+        "initialQuoteToOrderCompletionMs": 416.3896999999997,
+        "orderDurationMs": 177.4939000000004,
+        "orderToFreshQuoteDispatchMs": 467.9205000000002,
+        "freshQuoteDurationMs": 173.01999999999953,
+        "orderToFreshQuoteCompletionMs": 640.9404999999997
+      },
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 6,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T18:46:16.187Z",
+      "readOnly": true,
+      "harnessRuntime": {
+        "nodeVersion": "24.19.0",
+        "requiredNodeMajor": 24
+      },
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "2711ca97ac56c31a5bf2c51c5b46c72c03c40f89a266cd405d246547aabe7d8f",
+        "lib/pair-order-review.ts": "3fdf683af7fddea02843deb171583db2b7206114207f33c08bd31de6d686883b",
+        "lib/pair-review-diagnostic.ts": "7cb687f59c47a37faadf731a0ba12db212eca94b89831b44608ddfe10f989b9e",
+        "lib/pair-wallet-evidence.ts": "b001bf1d4f0c2e940007200ce6ee85058d2ff1d0df42a985b7f5950ca680feef",
+        "lib/pair-mint-evidence.ts": "83cdbabd4243273cf74ce8c669ced2148d46a3796bdf5f489caa7277d6300d5c",
+        "lib/pair-stock-clock.ts": "aada775f60447080d87bc15a0dee0e0eecd9f4f09e3ed398ee8bbe5de976dbb6",
+        "lib/solana-rpc.ts": "1d262934e01150e737c2f8a8fdf470cfc3298a6bc370c5c7a2500b51d30916e3",
+        "lib/imported-pair-wallet-preflight.ts": "2748f7cfa6bafddb18f9bfe5cd907b96094af1f48565b8922366193dee5efa2b",
+        "lib/pair-order-first-review.ts": "f3a05013909fab0f412d6bc352349bc1c39f9d875aff1089642baa3c082a2601",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "2077f0679b0ce300fe45ffc3e2e560f6c36e88d448633e182eb5d95d210f2c08",
+        "lib/imported-pair-quote-service.ts": "66a28f776833ac2999471ae982a43c3b6dbdb03ef085d07aa1dd59f50a049a73",
+        "lib/pair-runtime-preview.ts": "e74213b667bfad8f64420554ccc4db0072d37cf01941c89a9cc78136bf913f8e",
+        "lib/pair-runtime-exposure.ts": "1cbf837feb2cfcaa353b75a8f52735bd52beb5da37f154e4d4f529db334e8676",
+        "lib/pair-account-provenance.ts": "c3bb9429df31ff7cff7d0e600f112cfe75ca680483ce93b496546eb53dcda34f",
+        "lib/pair-order-simulation.ts": "93bebc5a9ca3552ec051ad7d8cd57add88b1f912119835f1cc07345d2f7e413f",
+        "lib/pair-order-collector.ts": "c9f4bd85ca03f1d9d8b4084d6e99639c09348ce520da011b949a36dd99d092c9",
+        "lib/pair-read-rpc.ts": "5c429c9a6cdb95deb690d6dac260a9bb48c1bd5f484daf20b7155f385d766c39",
+        "lib/wallet-rpc-pacing.ts": "e0ad1ae3760bc7905b1c25be07541ecda529e6496d67aca7f9a21a34a59eb7b4",
+        "lib/pair-order-state.ts": "fc4fef53ff8b4558e4ae81f4033e83d8472f322fb00100b26971fbca11f16f82",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "8d1e17eee146a5f49931731615caad7f63ec31aa53a4f27e556047245937a126",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "5592661eaba07131486a340d513fc18e998acaf2e1cacab7f7c399b33d3b2c0d",
+        "lib/pair-order-quote-bounds.ts": "2fd6760ec3d80eedea19f670c9be315e0e3f6ab942af5b5491d2a8d770f600ba",
+        "scripts/qualify-stock-pair-runtime.mjs": "a281e9bff029208cd15dc89fdcace35875acbb05da5efe253c73f19a8c79905b",
+        "scripts/run-stock-repeatability.mjs": "0b6a1fc8c6257d2dd4296269d90f8a921f4c8bc96e6a6258927b69c90c7a535f",
+        "scripts/stock-reference-activity.mjs": "49805948e32e3f1d16314ffffd25546bd0d748acd19934aeb0ece8196c5a0785",
+        "scripts/stock-reference-fixture.mjs": "c800e6555125acff33938179a28804b17a8b3c305d39ebf9521a6692713e5c58",
+        "scripts/stock-provider-timing.mjs": "59097bee1cfb6831f81c7a4d5a2f9a20b5a7b0ad4823658d086aea77f6bb4895",
+        "scripts/stock-clock-wire.mjs": "fa750d05a30e8841766f68dca4c8f1627cd0685935ed89f7e271be6a77b5ca84",
+        "scripts/stock-qualification-runtime.mjs": "9c8c11edf932af2b10780040719bac51ced8caa6aa4297a0f8cd8de56c43b9ae"
+      },
+      "sourceUnchanged": true,
+      "referenceFixtureSha256": "fa612cb1599c8d9e85457ee6dac6451d631a21b3fb661e0ad3e33b403958d211",
+      "publicReferenceKind": "idle-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 677.5006,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 231.36040000000003
+        },
+        {
+          "startMs": 912.9418,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 85.49710000000005
+        },
+        {
+          "startMs": 1116.3335,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 118.34439999999995
+        },
+        {
+          "startMs": 1319.5967,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 98.87300000000005
+        },
+        {
+          "startMs": 1518.7918,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 167.59539999999993
+        },
+        {
+          "startMs": 1720.1296,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 102.25310000000013
+        },
+        {
+          "startMs": 1823.1482,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 687.0756000000001
+        },
+        {
+          "startMs": 2510.778,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 651.3771000000002
+        },
+        {
+          "startMs": 3162.741,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 215.52309999999989,
+          "clockWire": [
+            {
+              "requestId": "1",
+              "accountIndex": 2,
+              "contextSlot": "457742275",
+              "clockSlot": "457742275",
+              "unixTimestamp": "1792176378",
+              "clockDataSha256": "ac9317ce741f1fc12328f66315c0a6a2000d72e92d85ebd57d82d5271c5c503d",
+              "receivedServerTimeMs": 1792176378890,
+              "commitment": "confirmed",
+              "requestedFloor": 457742274
+            },
+            {
+              "requestId": "1",
+              "accountIndex": 3,
+              "contextSlot": "457742275",
+              "clockSlot": "457742275",
+              "unixTimestamp": "1792176378",
+              "clockDataSha256": "ac9317ce741f1fc12328f66315c0a6a2000d72e92d85ebd57d82d5271c5c503d",
+              "receivedServerTimeMs": 1792176378890,
+              "commitment": "confirmed",
+              "requestedFloor": 457742274
+            }
+          ],
+          "clockWireObservationMs": 1.0889999999999418
+        },
+        {
+          "startMs": 3406.0664,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 216.88409999999976
+        },
+        {
+          "startMs": 3629.0646,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 229.27559999999994
+        },
+        {
+          "startMs": 3859.0643,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 218.99339999999984,
+          "clockWire": [
+            {
+              "requestId": "pair-3",
+              "accountIndex": 2,
+              "contextSlot": "457742279",
+              "clockSlot": "457742279",
+              "unixTimestamp": "1792176379",
+              "clockDataSha256": "e6976f753f8ff7562b2c2537ea224f4c12462156f6d078f69a0ea0ae75eef231",
+              "receivedServerTimeMs": 1792176379589,
+              "commitment": "confirmed",
+              "requestedFloor": 457742277
+            },
+            {
+              "requestId": "pair-3",
+              "accountIndex": 3,
+              "contextSlot": "457742279",
+              "clockSlot": "457742279",
+              "unixTimestamp": "1792176379",
+              "clockDataSha256": "e6976f753f8ff7562b2c2537ea224f4c12462156f6d078f69a0ea0ae75eef231",
+              "receivedServerTimeMs": 1792176379589,
+              "commitment": "confirmed",
+              "requestedFloor": 457742277
+            }
+          ],
+          "clockWireObservationMs": 0.3907000000003791
+        },
+        {
+          "startMs": 4084.9004,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 441.38189999999986
+        },
+        {
+          "startMs": 4526.8755,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 215.40089999999964,
+          "clockWire": [
+            {
+              "requestId": "pair-4",
+              "accountIndex": 2,
+              "contextSlot": "457742282",
+              "clockSlot": "457742282",
+              "unixTimestamp": "1792176379",
+              "clockDataSha256": "299998abbe42873f6817829bbb84701e64bbf9a62d03e63db0fe609abeaf58c4",
+              "receivedServerTimeMs": 1792176380253,
+              "commitment": "confirmed",
+              "requestedFloor": 457742279
+            },
+            {
+              "requestId": "pair-4",
+              "accountIndex": 3,
+              "contextSlot": "457742282",
+              "clockSlot": "457742282",
+              "unixTimestamp": "1792176379",
+              "clockDataSha256": "299998abbe42873f6817829bbb84701e64bbf9a62d03e63db0fe609abeaf58c4",
+              "receivedServerTimeMs": 1792176380253,
+              "commitment": "confirmed",
+              "requestedFloor": 457742279
+            }
+          ],
+          "clockWireObservationMs": 0.3488999999999578
+        },
+        {
+          "startMs": 4749.8952,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 352.46659999999974
+        },
+        {
+          "startMs": 5110.3374,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 231.34299999999985
+        },
+        {
+          "startMs": 5342.0708,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 220.14059999999972,
+          "clockWire": [
+            {
+              "requestId": "pair-8",
+              "accountIndex": 2,
+              "contextSlot": "457742286",
+              "clockSlot": "457742286",
+              "unixTimestamp": "1792176380",
+              "clockDataSha256": "928750d1514f3dbebc26f8a8624603b8d003816aece0fe7e87352dcd5f73acd4",
+              "receivedServerTimeMs": 1792176381073,
+              "commitment": "confirmed",
+              "requestedFloor": 457742284
+            },
+            {
+              "requestId": "pair-8",
+              "accountIndex": 3,
+              "contextSlot": "457742286",
+              "clockSlot": "457742286",
+              "unixTimestamp": "1792176380",
+              "clockDataSha256": "928750d1514f3dbebc26f8a8624603b8d003816aece0fe7e87352dcd5f73acd4",
+              "receivedServerTimeMs": 1792176381073,
+              "commitment": "confirmed",
+              "requestedFloor": 457742284
+            }
+          ],
+          "clockWireObservationMs": 0.2775000000001455
+        },
+        {
+          "startMs": 5567.6611,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 202.48610000000008
+        },
+        {
+          "startMs": 5770.5785,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 219.95240000000013,
+          "clockWire": [
+            {
+              "requestId": "pair-9",
+              "accountIndex": 2,
+              "contextSlot": "457742287",
+              "clockSlot": "457742287",
+              "unixTimestamp": "1792176380",
+              "clockDataSha256": "07e0875742a3764e0538df9962ad52a8f621ae24c06b49f827d46173f0e7f2da",
+              "receivedServerTimeMs": 1792176381502,
+              "commitment": "confirmed",
+              "requestedFloor": 457742286
+            },
+            {
+              "requestId": "pair-9",
+              "accountIndex": 3,
+              "contextSlot": "457742287",
+              "clockSlot": "457742287",
+              "unixTimestamp": "1792176380",
+              "clockDataSha256": "07e0875742a3764e0538df9962ad52a8f621ae24c06b49f827d46173f0e7f2da",
+              "receivedServerTimeMs": 1792176381502,
+              "commitment": "confirmed",
+              "requestedFloor": 457742286
+            }
+          ],
+          "clockWireObservationMs": 0.44129999999950087
+        },
+        {
+          "startMs": 6001.4358,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 413,
+          "headerMs": 224.2601999999997,
+          "clockWireUnavailable": true,
+          "clockWireObservationMs": 0.2661000000007334
+        },
+        {
+          "startMs": 6227.6383,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 215.2406000000001
+        },
+        {
+          "startMs": 6443.4165,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 106.42659999999978
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3628.1708,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 230.61720000000014
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3628.4224,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742277",
+          "returned": true,
+          "elapsedMs": 230.3678
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3858.9122,
+          "minContextSlot": 457742277,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742279",
+          "clockSlot": "457742279",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742279",
+          "clockDataSha256": "e6976f753f8ff7562b2c2537ea224f4c12462156f6d078f69a0ea0ae75eef231",
+          "chainUnix": "1792176379",
+          "clockSkewMs": 590,
+          "receivedServerTimeMs": 1792176379590,
+          "returned": true,
+          "elapsedMs": 219.8828999999996
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4526.696,
+          "minContextSlot": 457742279,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742282",
+          "clockSlot": "457742282",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742282",
+          "clockDataSha256": "299998abbe42873f6817829bbb84701e64bbf9a62d03e63db0fe609abeaf58c4",
+          "chainUnix": "1792176379",
+          "clockSkewMs": 1254,
+          "receivedServerTimeMs": 1792176380254,
+          "returned": true,
+          "elapsedMs": 216.14580000000024
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4526.755,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 216.08809999999994
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5110.2252,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 231.70080000000053
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5110.255,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742284",
+          "returned": true,
+          "elapsedMs": 231.67249999999967
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5341.9853,
+          "minContextSlot": 457742284,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742286",
+          "clockSlot": "457742286",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742286",
+          "clockDataSha256": "928750d1514f3dbebc26f8a8624603b8d003816aece0fe7e87352dcd5f73acd4",
+          "chainUnix": "1792176380",
+          "clockSkewMs": 1073,
+          "receivedServerTimeMs": 1792176381073,
+          "returned": true,
+          "elapsedMs": 220.6835999999994
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5770.4326,
+          "minContextSlot": 457742286,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742287",
+          "clockSlot": "457742287",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742287",
+          "clockDataSha256": "07e0875742a3764e0538df9962ad52a8f621ae24c06b49f827d46173f0e7f2da",
+          "chainUnix": "1792176380",
+          "clockSkewMs": 1502,
+          "receivedServerTimeMs": 1792176381502,
+          "returned": true,
+          "elapsedMs": 220.72279999999955
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5770.4865,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 220.67050000000017
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6001.3465,
+          "minContextSlot": 457742287,
+          "accountCount": 7,
+          "slice": null,
+          "returned": false,
+          "status": 413,
+          "elapsedMs": 225.58300000000054
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29345",
+          "minimumOutputRaw": "29198",
+          "observedAt": "2026-10-16T18:46:20.037Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29346",
+          "minimumOutputRaw": "29199",
+          "observedAt": "2026-10-16T18:46:21.281Z"
+        }
+      ],
+      "providerTimings": [
+        {
+          "phase": "initial-quote",
+          "startMs": 4084.2257,
+          "endMs": 4526.657,
+          "outcome": "returned"
+        },
+        {
+          "phase": "wallet-bound-order",
+          "startMs": 4749.6466,
+          "endMs": 5108.7887,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fresh-quote",
+          "startMs": 5567.5017,
+          "endMs": 5770.3863,
+          "outcome": "returned"
+        }
+      ],
+      "quoteAsset": "SOL",
+      "inputUiAmount": "0.001",
+      "qualificationPacing": "unsigned-stock-qualification-nine-methods-per-second",
+      "rpcPacingScope": "setup-and-runtime",
+      "rpcPacingMs": 200,
+      "runtimeProviderRole": "configured-standard-validator",
+      "runtimeProviderHost": "bold-necessary-arm.solana-mainnet.quiknode.pro",
+      "referenceSelection": {
+        "minimumIdleSlots": 256,
+        "checked": 1,
+        "eligible": 1,
+        "unavailable": 0
+      },
+      "publicReferenceSha256": "69ae13aa52622db3ac8e7e60a26d9bc39e98d293fb14eb9218f8734ec5c62eb2",
+      "referenceActivity": {
+        "before": {
+          "observedSlot": 457742267,
+          "latestActivitySlot": "457465679",
+          "latestSignatureSha256": "906d6aaf090c81ba8382a9c83f7948382279bd1610358f4bee698865b898ffc4",
+          "idleSlots": 276588
+        },
+        "after": {
+          "observedSlot": 457742290,
+          "latestActivitySlot": "457465679",
+          "latestSignatureSha256": "906d6aaf090c81ba8382a9c83f7948382279bd1610358f4bee698865b898ffc4",
+          "idleSlots": 276611
+        },
+        "outcome": "no-new-observed-activity"
+      },
+      "clockObservations": [
+        {
+          "contextSlot": 457742275,
+          "clockSlot": 457742275,
+          "slot": 457742275,
+          "relation": "equal",
+          "unixTimestamp": "1792176378"
+        },
+        {
+          "contextSlot": 457742279,
+          "clockSlot": 457742279,
+          "slot": 457742279,
+          "relation": "equal",
+          "unixTimestamp": "1792176379"
+        },
+        {
+          "contextSlot": 457742282,
+          "clockSlot": 457742282,
+          "slot": 457742282,
+          "relation": "equal",
+          "unixTimestamp": "1792176379"
+        },
+        {
+          "contextSlot": 457742286,
+          "clockSlot": 457742286,
+          "slot": 457742286,
+          "relation": "equal",
+          "unixTimestamp": "1792176380"
+        },
+        {
+          "contextSlot": 457742287,
+          "clockSlot": 457742287,
+          "slot": 457742287,
+          "relation": "equal",
+          "unixTimestamp": "1792176380"
+        }
+      ],
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "29346",
+        "minimumOutputRaw": "29199",
+        "observedAt": "2026-10-16T18:46:20.620Z"
+      },
+      "errorName": "Error",
+      "status": 502,
+      "reason": "Pair wallet provider reads are unavailable.",
+      "diagnosis": {
+        "check": "unclassified-refusal",
+        "valuesAvailable": false,
+        "classification": "evidence-unavailable"
+      },
+      "pipelineMs": 2602.0824,
+      "quietReferenceObserved": true,
+      "quoteTiming": {
+        "measured": true,
+        "reached": 3,
+        "initialQuoteDurationMs": 442.4313000000002,
+        "initialQuoteToOrderDispatchMs": 222.98959999999988,
+        "initialQuoteToOrderCompletionMs": 582.1316999999999,
+        "orderDurationMs": 359.1421,
+        "orderToFreshQuoteDispatchMs": 458.71299999999974,
+        "freshQuoteDurationMs": 202.88460000000032,
+        "orderToFreshQuoteCompletionMs": 661.5976
+      },
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 6,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T18:46:22.802Z",
+      "readOnly": true,
+      "harnessRuntime": {
+        "nodeVersion": "24.19.0",
+        "requiredNodeMajor": 24
+      },
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "2711ca97ac56c31a5bf2c51c5b46c72c03c40f89a266cd405d246547aabe7d8f",
+        "lib/pair-order-review.ts": "3fdf683af7fddea02843deb171583db2b7206114207f33c08bd31de6d686883b",
+        "lib/pair-review-diagnostic.ts": "7cb687f59c47a37faadf731a0ba12db212eca94b89831b44608ddfe10f989b9e",
+        "lib/pair-wallet-evidence.ts": "b001bf1d4f0c2e940007200ce6ee85058d2ff1d0df42a985b7f5950ca680feef",
+        "lib/pair-mint-evidence.ts": "83cdbabd4243273cf74ce8c669ced2148d46a3796bdf5f489caa7277d6300d5c",
+        "lib/pair-stock-clock.ts": "aada775f60447080d87bc15a0dee0e0eecd9f4f09e3ed398ee8bbe5de976dbb6",
+        "lib/solana-rpc.ts": "1d262934e01150e737c2f8a8fdf470cfc3298a6bc370c5c7a2500b51d30916e3",
+        "lib/imported-pair-wallet-preflight.ts": "2748f7cfa6bafddb18f9bfe5cd907b96094af1f48565b8922366193dee5efa2b",
+        "lib/pair-order-first-review.ts": "f3a05013909fab0f412d6bc352349bc1c39f9d875aff1089642baa3c082a2601",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "2077f0679b0ce300fe45ffc3e2e560f6c36e88d448633e182eb5d95d210f2c08",
+        "lib/imported-pair-quote-service.ts": "66a28f776833ac2999471ae982a43c3b6dbdb03ef085d07aa1dd59f50a049a73",
+        "lib/pair-runtime-preview.ts": "e74213b667bfad8f64420554ccc4db0072d37cf01941c89a9cc78136bf913f8e",
+        "lib/pair-runtime-exposure.ts": "1cbf837feb2cfcaa353b75a8f52735bd52beb5da37f154e4d4f529db334e8676",
+        "lib/pair-account-provenance.ts": "c3bb9429df31ff7cff7d0e600f112cfe75ca680483ce93b496546eb53dcda34f",
+        "lib/pair-order-simulation.ts": "93bebc5a9ca3552ec051ad7d8cd57add88b1f912119835f1cc07345d2f7e413f",
+        "lib/pair-order-collector.ts": "c9f4bd85ca03f1d9d8b4084d6e99639c09348ce520da011b949a36dd99d092c9",
+        "lib/pair-read-rpc.ts": "5c429c9a6cdb95deb690d6dac260a9bb48c1bd5f484daf20b7155f385d766c39",
+        "lib/wallet-rpc-pacing.ts": "e0ad1ae3760bc7905b1c25be07541ecda529e6496d67aca7f9a21a34a59eb7b4",
+        "lib/pair-order-state.ts": "fc4fef53ff8b4558e4ae81f4033e83d8472f322fb00100b26971fbca11f16f82",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "8d1e17eee146a5f49931731615caad7f63ec31aa53a4f27e556047245937a126",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "5592661eaba07131486a340d513fc18e998acaf2e1cacab7f7c399b33d3b2c0d",
+        "lib/pair-order-quote-bounds.ts": "2fd6760ec3d80eedea19f670c9be315e0e3f6ab942af5b5491d2a8d770f600ba",
+        "scripts/qualify-stock-pair-runtime.mjs": "a281e9bff029208cd15dc89fdcace35875acbb05da5efe253c73f19a8c79905b",
+        "scripts/run-stock-repeatability.mjs": "0b6a1fc8c6257d2dd4296269d90f8a921f4c8bc96e6a6258927b69c90c7a535f",
+        "scripts/stock-reference-activity.mjs": "49805948e32e3f1d16314ffffd25546bd0d748acd19934aeb0ece8196c5a0785",
+        "scripts/stock-reference-fixture.mjs": "c800e6555125acff33938179a28804b17a8b3c305d39ebf9521a6692713e5c58",
+        "scripts/stock-provider-timing.mjs": "59097bee1cfb6831f81c7a4d5a2f9a20b5a7b0ad4823658d086aea77f6bb4895",
+        "scripts/stock-clock-wire.mjs": "fa750d05a30e8841766f68dca4c8f1627cd0685935ed89f7e271be6a77b5ca84",
+        "scripts/stock-qualification-runtime.mjs": "9c8c11edf932af2b10780040719bac51ced8caa6aa4297a0f8cd8de56c43b9ae"
+      },
+      "sourceUnchanged": true,
+      "referenceFixtureSha256": "fa612cb1599c8d9e85457ee6dac6451d631a21b3fb661e0ad3e33b403958d211",
+      "publicReferenceKind": "idle-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 689.9465,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 232.63339999999994
+        },
+        {
+          "startMs": 926.2559,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 88.65070000000003
+        },
+        {
+          "startMs": 1130.3226,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 113.3279
+        },
+        {
+          "startMs": 1328.6107,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 106.92920000000004
+        },
+        {
+          "startMs": 1528.4578,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 171.55110000000013
+        },
+        {
+          "startMs": 1740.0322,
+          "pipeline": false,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 99.65119999999979
+        },
+        {
+          "startMs": 1840.8794,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 698.0276999999999
+        },
+        {
+          "startMs": 2539.5424,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 627.3100000000004
+        },
+        {
+          "startMs": 3167.6067,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 228.61760000000004,
+          "clockWire": [
+            {
+              "requestId": "1",
+              "accountIndex": 2,
+              "contextSlot": "457742305",
+              "clockSlot": "457742305",
+              "unixTimestamp": "1792176384",
+              "clockDataSha256": "05cfb6da524a754bb568aabe94f00413d2cc66fa389dd46e72bb68b1f65248b7",
+              "receivedServerTimeMs": 1792176385510,
+              "commitment": "confirmed",
+              "requestedFloor": 457742303
+            },
+            {
+              "requestId": "1",
+              "accountIndex": 3,
+              "contextSlot": "457742305",
+              "clockSlot": "457742305",
+              "unixTimestamp": "1792176384",
+              "clockDataSha256": "05cfb6da524a754bb568aabe94f00413d2cc66fa389dd46e72bb68b1f65248b7",
+              "receivedServerTimeMs": 1792176385510,
+              "commitment": "confirmed",
+              "requestedFloor": 457742303
+            }
+          ],
+          "clockWireObservationMs": 1.0453999999999724
+        },
+        {
+          "startMs": 3431.4082,
+          "pipeline": false,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 207.44849999999997
+        },
+        {
+          "startMs": 3645.7609,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 201.02229999999963
+        },
+        {
+          "startMs": 3881.3244,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 233.94590000000017,
+          "clockWire": [
+            {
+              "requestId": "pair-3",
+              "accountIndex": 2,
+              "contextSlot": "457742308",
+              "clockSlot": "457742308",
+              "unixTimestamp": "1792176385",
+              "clockDataSha256": "6e5905bed6908b1b1e7c7a70911825894da07aa9e30000c0fd6b697af0b0d3c6",
+              "receivedServerTimeMs": 1792176386229,
+              "commitment": "confirmed",
+              "requestedFloor": 457742307
+            },
+            {
+              "requestId": "pair-3",
+              "accountIndex": 3,
+              "contextSlot": "457742308",
+              "clockSlot": "457742308",
+              "unixTimestamp": "1792176385",
+              "clockDataSha256": "6e5905bed6908b1b1e7c7a70911825894da07aa9e30000c0fd6b697af0b0d3c6",
+              "receivedServerTimeMs": 1792176386229,
+              "commitment": "confirmed",
+              "requestedFloor": 457742307
+            }
+          ],
+          "clockWireObservationMs": 0.4452000000001135
+        },
+        {
+          "startMs": 4123.5307,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 416.1412999999993
+        },
+        {
+          "startMs": 4540.4507,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 234.5578999999998,
+          "clockWire": [
+            {
+              "requestId": "pair-4",
+              "accountIndex": 2,
+              "contextSlot": "457742311",
+              "clockSlot": "457742311",
+              "unixTimestamp": "1792176386",
+              "clockDataSha256": "17260174ce306a2f93e5adc75c064a2064ce849bd7be07f30f0a44afb14a4850",
+              "receivedServerTimeMs": 1792176386889,
+              "commitment": "confirmed",
+              "requestedFloor": 457742308
+            },
+            {
+              "requestId": "pair-4",
+              "accountIndex": 3,
+              "contextSlot": "457742311",
+              "clockSlot": "457742311",
+              "unixTimestamp": "1792176386",
+              "clockDataSha256": "17260174ce306a2f93e5adc75c064a2064ce849bd7be07f30f0a44afb14a4850",
+              "receivedServerTimeMs": 1792176386889,
+              "commitment": "confirmed",
+              "requestedFloor": 457742308
+            }
+          ],
+          "clockWireObservationMs": 0.49949999999989814
+        },
+        {
+          "startMs": 4784.1336,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 170.94750000000022
+        },
+        {
+          "startMs": 4961.8419,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getGenesisHash",
+            "getSlot"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 232.85249999999996
+        },
+        {
+          "startMs": 5195.3522,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 219.53899999999976,
+          "clockWire": [
+            {
+              "requestId": "pair-8",
+              "accountIndex": 2,
+              "contextSlot": "457742314",
+              "clockSlot": "457742314",
+              "unixTimestamp": "1792176386",
+              "clockDataSha256": "025ebb350edc5d299a1a68a13e50e9869840477ea8eea34631e855e6c9b7a577",
+              "receivedServerTimeMs": 1792176387529,
+              "commitment": "confirmed",
+              "requestedFloor": 457742313
+            },
+            {
+              "requestId": "pair-8",
+              "accountIndex": 3,
+              "contextSlot": "457742314",
+              "clockSlot": "457742314",
+              "unixTimestamp": "1792176386",
+              "clockDataSha256": "025ebb350edc5d299a1a68a13e50e9869840477ea8eea34631e855e6c9b7a577",
+              "receivedServerTimeMs": 1792176387529,
+              "commitment": "confirmed",
+              "requestedFloor": 457742313
+            }
+          ],
+          "clockWireObservationMs": 0.3668999999999869
+        },
+        {
+          "startMs": 5420.9163,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 189.70480000000043
+        },
+        {
+          "startMs": 5611.162,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "rpcUnits": 2,
+          "status": 200,
+          "headerMs": 227.45719999999983,
+          "clockWire": [
+            {
+              "requestId": "pair-9",
+              "accountIndex": 2,
+              "contextSlot": "457742316",
+              "clockSlot": "457742316",
+              "unixTimestamp": "1792176387",
+              "clockDataSha256": "4ba10f0dd057a5bf6940c39f714e0fd4c88ff435c32d9def8924542d4b34e958",
+              "receivedServerTimeMs": 1792176387952,
+              "commitment": "confirmed",
+              "requestedFloor": 457742314
+            },
+            {
+              "requestId": "pair-9",
+              "accountIndex": 3,
+              "contextSlot": "457742316",
+              "clockSlot": "457742316",
+              "unixTimestamp": "1792176387",
+              "clockDataSha256": "4ba10f0dd057a5bf6940c39f714e0fd4c88ff435c32d9def8924542d4b34e958",
+              "receivedServerTimeMs": 1792176387952,
+              "commitment": "confirmed",
+              "requestedFloor": 457742314
+            }
+          ],
+          "clockWireObservationMs": 0.33479999999963184
+        },
+        {
+          "startMs": 5849.6075,
+          "pipeline": true,
+          "providerRole": "stock-runtime",
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "rpcUnits": 1,
+          "status": 413,
+          "headerMs": 228.92599999999948,
+          "clockWireUnavailable": true,
+          "clockWireObservationMs": 0.2644000000000233
+        },
+        {
+          "startMs": 6080.7573,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 210.77779999999984
+        },
+        {
+          "startMs": 6292.4514,
+          "pipeline": true,
+          "providerRole": "indexer-fallback",
+          "methods": [
+            "getSlot"
+          ],
+          "rpcUnits": 1,
+          "status": 200,
+          "headerMs": 90.28049999999985
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3644.8597,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 202.45409999999993
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3645.1223,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742307",
+          "returned": true,
+          "elapsedMs": 202.1938
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3847.4674,
+          "minContextSlot": 457742307,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742308",
+          "clockSlot": "457742308",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742308",
+          "clockDataSha256": "6e5905bed6908b1b1e7c7a70911825894da07aa9e30000c0fd6b697af0b0d3c6",
+          "chainUnix": "1792176385",
+          "clockSkewMs": 1230,
+          "receivedServerTimeMs": 1792176386230,
+          "returned": true,
+          "elapsedMs": 268.61670000000004
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4540.254,
+          "minContextSlot": 457742308,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742311",
+          "clockSlot": "457742311",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742311",
+          "clockDataSha256": "17260174ce306a2f93e5adc75c064a2064ce849bd7be07f30f0a44afb14a4850",
+          "chainUnix": "1792176386",
+          "clockSkewMs": 889,
+          "receivedServerTimeMs": 1792176386889,
+          "returned": true,
+          "elapsedMs": 235.51090000000022
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4540.3027,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 235.46379999999954
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4961.698,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 233.46579999999994
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4961.7358,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457742313",
+          "returned": true,
+          "elapsedMs": 233.4297999999999
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5195.243,
+          "minContextSlot": 457742313,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742314",
+          "clockSlot": "457742314",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742314",
+          "clockDataSha256": "025ebb350edc5d299a1a68a13e50e9869840477ea8eea34631e855e6c9b7a577",
+          "chainUnix": "1792176386",
+          "clockSkewMs": 1529,
+          "receivedServerTimeMs": 1792176387529,
+          "returned": true,
+          "elapsedMs": 220.23929999999928
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5610.9678,
+          "minContextSlot": 457742314,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457742316",
+          "clockSlot": "457742316",
+          "clockRelation": "equal",
+          "effectiveClockSlot": "457742316",
+          "clockDataSha256": "4ba10f0dd057a5bf6940c39f714e0fd4c88ff435c32d9def8924542d4b34e958",
+          "chainUnix": "1792176387",
+          "clockSkewMs": 953,
+          "receivedServerTimeMs": 1792176387953,
+          "returned": true,
+          "elapsedMs": 228.15729999999985
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5611.0432,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 228.08299999999963
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5849.5324,
+          "minContextSlot": 457742316,
+          "accountCount": 8,
+          "slice": null,
+          "returned": false,
+          "status": 413,
+          "elapsedMs": 230.3166000000001
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "284478",
+          "minimumOutputRaw": "283055",
+          "observedAt": "2026-10-16T18:46:26.654Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "284478",
+          "minimumOutputRaw": "283055",
+          "observedAt": "2026-10-16T18:46:27.724Z"
+        }
+      ],
+      "providerTimings": [
+        {
+          "phase": "initial-quote",
+          "startMs": 4122.6071,
+          "endMs": 4540.2023,
+          "outcome": "returned"
+        },
+        {
+          "phase": "wallet-bound-order",
+          "startMs": 4783.8597,
+          "endMs": 4960.2557,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fresh-quote",
+          "startMs": 5420.7167,
+          "endMs": 5610.93,
+          "outcome": "returned"
+        }
+      ],
+      "quoteAsset": "USDC",
+      "inputUiAmount": "1",
+      "qualificationPacing": "unsigned-stock-qualification-nine-methods-per-second",
+      "rpcPacingScope": "setup-and-runtime",
+      "rpcPacingMs": 200,
+      "runtimeProviderRole": "configured-standard-validator",
+      "runtimeProviderHost": "bold-necessary-arm.solana-mainnet.quiknode.pro",
+      "referenceSelection": {
+        "minimumIdleSlots": 256,
+        "checked": 1,
+        "eligible": 1,
+        "unavailable": 0
+      },
+      "publicReferenceSha256": "32d65da54f9ed973341891eed180b4898349584abaf7b3e3affbdb666b048b59",
+      "referenceActivity": {
+        "before": {
+          "observedSlot": 457742297,
+          "latestActivitySlot": "457725611",
+          "latestSignatureSha256": "3a97b691e3cb78a40d9f2b834defd1e181f6b09bd4d3489b52e5b59565b3ef8e",
+          "idleSlots": 16686
+        },
+        "after": {
+          "observedSlot": 457742319,
+          "latestActivitySlot": "457725611",
+          "latestSignatureSha256": "3a97b691e3cb78a40d9f2b834defd1e181f6b09bd4d3489b52e5b59565b3ef8e",
+          "idleSlots": 16708
+        },
+        "outcome": "no-new-observed-activity"
+      },
+      "clockObservations": [
+        {
+          "contextSlot": 457742305,
+          "clockSlot": 457742305,
+          "slot": 457742305,
+          "relation": "equal",
+          "unixTimestamp": "1792176384"
+        },
+        {
+          "contextSlot": 457742308,
+          "clockSlot": 457742308,
+          "slot": 457742308,
+          "relation": "equal",
+          "unixTimestamp": "1792176385"
+        },
+        {
+          "contextSlot": 457742311,
+          "clockSlot": 457742311,
+          "slot": 457742311,
+          "relation": "equal",
+          "unixTimestamp": "1792176386"
+        },
+        {
+          "contextSlot": 457742314,
+          "clockSlot": 457742314,
+          "slot": 457742314,
+          "relation": "equal",
+          "unixTimestamp": "1792176386"
+        },
+        {
+          "contextSlot": 457742316,
+          "clockSlot": 457742316,
+          "slot": 457742316,
+          "relation": "equal",
+          "unixTimestamp": "1792176387"
+        }
+      ],
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "284478",
+        "minimumOutputRaw": "283055",
+        "observedAt": "2026-10-16T18:46:27.074Z"
+      },
+      "errorName": "Error",
+      "status": 502,
+      "reason": "Pair wallet provider reads are unavailable.",
+      "diagnosis": {
+        "check": "unclassified-refusal",
+        "valuesAvailable": false,
+        "classification": "evidence-unavailable"
+      },
+      "pipelineMs": 2438.5007000000005,
+      "quietReferenceObserved": true,
+      "quoteTiming": {
+        "measured": true,
+        "reached": 3,
+        "initialQuoteDurationMs": 417.59519999999975,
+        "initialQuoteToOrderDispatchMs": 243.65740000000005,
+        "initialQuoteToOrderCompletionMs": 420.0533999999998,
+        "orderDurationMs": 176.39599999999973,
+        "orderToFreshQuoteDispatchMs": 460.46100000000024,
+        "freshQuoteDurationMs": 190.21330000000034,
+        "orderToFreshQuoteCompletionMs": 650.6743000000006
+      },
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 6,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    }
+  ],
+  "signingAllowed": false,
+  "executionAllowed": false
+}

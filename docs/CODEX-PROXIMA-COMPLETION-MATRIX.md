@@ -1,5 +1,9 @@
 # Proxima reconstruction completion matrix
 
+## 16 October first QuickNode qualification sample
+
+The fixed3SOL/3USDC configured-validator sample completed on ebdcba6:0/3 each, all references unchanged, zero429. Four wallet observations hit HTTP413 at7/8 accounts; a separate bounded probe confirms this Free trial accepts5 accounts and rejects6 with error-32615. Two other attempts correctly refused worsened initial minima. All26 accepted Clocks were equal and correlate to raw duplicate hashes; no simulation/code-scan/32-slot pass was reached. Source/receipt hashes and offline summaries verify; all safeguards and signing-off state remain. See CODEX-PAIR-QUICKNODE-FIXED-SAMPLE-20261016.md/.json. A context-preserving provider-count compatibility design remains open; no free-to-paid upgrade or further deploy occurred.
+
 ## 16 October QuickNode configuration
 
 The user chose the QuickNode Free trial and explicitly authorized a Solana Mainnet endpoint and Production-only sensitive SOLANA_STOCK_RUNTIME_RPC_URL. The existing production snapshot was redeployed as dpl_FbmX1qdqSxwHxV3h6QhCeGciChyY, READY; no local source was uploaded. Basic read-only genesis/floor/duplicate-Clock checks and anonymous production HTTP checks pass. No paid plan, local provider change or signing. The fixed SOL/USDC qualification, use of the selector by historical production source and release of newer local code remain unverified. See CODEX-QUICKNODE-PRODUCTION-SETUP-20261016.md. Counter's actionable missing-wallet diagnostic is local cb38d2d, separately from this configuration redeploy.

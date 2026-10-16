@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October fixed QuickNode qualification diagnosis
+
+Read docs/CODEX-PAIR-QUICKNODE-FIXED-SAMPLE-20261016.md/.json. ebdcba6 first fixes raw Clock capture for both admitted endpoints without new calls/rule changes (21 offline tests, syntax/lint/format pass). One fixed Node24 campaign: SOL0/3, USDC0/3, all reference audits unchanged, no429/retry/replacement. Four HTTP413 wallet reads at7/8 accounts; separate two-call probe proves trial max5 (5success,6refusal-32615). Two strict initial-minimum refusals retained. All26 Clocks equal and raw duplicate hashes correlate; maxskew1570ms. No simulation/code scan/32slot pass. All six source vectors/hashes and summary verify. Need reviewed context-preserving count-limited reads, never concatenate different slots as one snapshot. No app/UI/provider/credential/SQL/cron/push/deploy/wallet action, signing off. Private transfer files removed. Preserve main dirty files.
+
 ## 16 October approved QuickNode production setup
 
 Read docs/CODEX-QUICKNODE-PRODUCTION-SETUP-20261016.md. User explicitly chose free Solana Mainnet QuickNode and Production-only sensitive SOLANA_STOCK_RUNTIME_RPC_URL. One-month trial, no card/paid add-ons. Existing production snapshot redeployed as dpl_FbmX1qdqSxwHxV3h6QhCeGciChyY READY, no local source upload. Mainnet genesis/floor/duplicate Clock probe passes; public home/sign-in200 and group401. Temporary credential transfer file removed; no secret in notes. Exact historical source commit/stock-selector routing unverified; fixed SOL/USDC qualification still pending. No local provider/other env/cron/SQL/signing change. Independent Counter diagnostic cb38d2d remains local and not deployed. Preserve dirty files.
