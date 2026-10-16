@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October pacing isolation and second repeatability sample
+
+Implementation 3b094f6 removes the Helius profile from the service fallback and separates explicit qualification scheduling from ordinary configured RPC queues. New fake-clock isolation and default non-Helius construction regressions pass; seven Vitest files/140 tests, TypeScript, scoped typed lint/format plus five Node checker tests pass. Read docs/CODEX-PAIR-PACING-ISOLATION-20261016.md and CODEX-PAIR-PACING-REPEATABILITY-20261016.json. New fixed sample: SOL 0/3, USDC 0/3, all before simulation (candidate scope, clock, custody or minimum-output refusal), 188 HTTP 200, zero 429s, max nine methods/sec. No fresh latency pass or signing readiness. Runtime safeguards, group serial defaults, UI and provider settings unchanged. Signing off; no push/deploy/remote SQL or real wallet action. Preserve main dirty files.
+
 ## 16 October stock repeatability follow-up
 
 Read docs/CODEX-STOCK-REPEATABILITY-20261016.md and its JSON. On unchanged a0d03cf runtime, three fixed alternating rounds produced SOL 0/3 and USDC 0/3: one 46-slot refusal after simulation and both code phases, one preserved-minimum refusal, one stale-clock refusal, two instruction/account/spending refusals, one balance-provider response refusal before the pipeline. Zero 429s, maximum nine methods/sec, zero signatures/broadcasts. Earlier isolated 30-slot passes are not repeatability. New offline six-receipt checker retains all failures and rejects incomplete/unsafe evidence; five Node tests plus seven runtime files/141 Vitest tests pass, scoped lint/format pass. Runtime/UI/provider/signing gates unchanged; no push/deploy/remote SQL. Next diagnose mismatches and clock/latency without weakening the 32-slot bound or final recheck. Main's two dirty files and Claude-owned files preserved.

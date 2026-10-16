@@ -1,0 +1,3656 @@
+{
+  "format": "stock-pair-repeatability-v1",
+  "sample": "three fixed alternating rounds; no replacement attempts",
+  "sourceFiles": {
+    "lib/pair-order-first-service.ts": "7a5df15a5208b995cd264ad51c2a38c42c1d01cd26f6e953b673da790a0e238f",
+    "lib/pair-order-first-review.ts": "14479f26f089e60a1f119648770430e22bc2ba95e34b61e4ac90bec46b6fad94",
+    "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+    "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+    "lib/imported-pair-order-candidate.ts": "0b4bbc92d9a9483e88e6640382095b57a3c4d2adb4d26f7c9dba2001b31e7044",
+    "lib/imported-pair-wallet-preflight.ts": "625a338877835aa9f41187c07b56162b881ff9a9ff2a1248d9fcc8f036b8f1b8",
+    "lib/imported-pair-quote-service.ts": "afab259f115ccf5e6ae63d60b25fe9ca35bf3331c049d4cf48440629ba92fe35",
+    "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+    "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+    "lib/pair-read-rpc.ts": "49a941e048b77dca269bb3700b641ba625cbdc1617af6648c13fc41075ba6cf0",
+    "lib/wallet-rpc-pacing.ts": "7eb9ae312aeae7f1a03b4611f9658d77011572100b549436ef674de6031c6f87",
+    "lib/pair-order-state.ts": "d9d16722a1fd96f007cc22557dfe7f43c7df1c815f36d6c06515fbb9ce2188fa",
+    "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+    "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+    "lib/pump-group-code-identity.ts": "80bf0ceb2e845059dc647a354f4eab039787ac6b10e9c89aa3725f57809fdc0e",
+    "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+    "lib/warmup-swap-quote.ts": "8625be45506591b5e0da051be68372c182be80badf329be1f45d49084b96a076",
+    "lib/pair-order-quote-bounds.ts": "0004039763a0a773a55e0a801d8cf559e078bf6b91f0994433d7e2c14f4340ce",
+    "scripts/qualify-stock-pair-runtime.mjs": "8bae32900c8ef680019caa082b98bb6c67d017df8af1a0ab3324e749732207fc"
+  },
+  "maximumSlots": 32,
+  "repeatableInThisSample": false,
+  "assets": [
+    {
+      "asset": "SOL",
+      "attempted": 3,
+      "passed": 0
+    },
+    {
+      "asset": "USDC",
+      "attempted": 3,
+      "passed": 0
+    }
+  ],
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "deployed": false,
+  "attempts": [
+    {
+      "round": 1,
+      "asset": "SOL",
+      "checkedAt": "2026-10-16T14:40:55.539Z",
+      "passed": false,
+      "stage": "order-first-runtime",
+      "reason": "Pair candidate instructions, accounts or raw spending limits differ.",
+      "elapsedSlots": null,
+      "pipelineMs": 4255.136100000001,
+      "simulationCount": 0,
+      "firstCodeReads": 7,
+      "finalCodeReads": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 9,
+      "phases": [
+        {
+          "phase": "before-simulation",
+          "logicalReads": 29,
+          "codeReads": 7,
+          "observedMinimumSlot": 457674367,
+          "observedMaximumSlot": 457674386
+        },
+        {
+          "phase": "after-simulation",
+          "logicalReads": 0,
+          "codeReads": 0,
+          "observedMinimumSlot": null,
+          "observedMaximumSlot": null
+        }
+      ]
+    },
+    {
+      "round": 1,
+      "asset": "USDC",
+      "checkedAt": "2026-10-16T14:41:03.628Z",
+      "passed": false,
+      "stage": "order-first-runtime",
+      "reason": "Pair chain clock is inconsistent or stale.",
+      "elapsedSlots": null,
+      "pipelineMs": 2037.9402999999998,
+      "simulationCount": 0,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 8,
+      "phases": [
+        {
+          "phase": "before-simulation",
+          "logicalReads": 13,
+          "codeReads": 0,
+          "observedMinimumSlot": 457674404,
+          "observedMaximumSlot": 457674412
+        },
+        {
+          "phase": "after-simulation",
+          "logicalReads": 0,
+          "codeReads": 0,
+          "observedMinimumSlot": null,
+          "observedMaximumSlot": null
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "asset": "SOL",
+      "checkedAt": "2026-10-16T14:41:09.332Z",
+      "passed": false,
+      "stage": "order-first-runtime",
+      "reason": "Selected wallet balances, custody or rent changed. Request a new preflight.",
+      "elapsedSlots": null,
+      "pipelineMs": 2053.137,
+      "simulationCount": 0,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 7,
+      "phases": [
+        {
+          "phase": "before-simulation",
+          "logicalReads": 13,
+          "codeReads": 0,
+          "observedMinimumSlot": 457674431,
+          "observedMaximumSlot": 457674440
+        },
+        {
+          "phase": "after-simulation",
+          "logicalReads": 0,
+          "codeReads": 0,
+          "observedMinimumSlot": null,
+          "observedMaximumSlot": null
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "asset": "USDC",
+      "checkedAt": "2026-10-16T14:41:15.153Z",
+      "passed": false,
+      "stage": "order-first-runtime",
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "elapsedSlots": null,
+      "pipelineMs": 2148.2963,
+      "simulationCount": 0,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 7,
+      "phases": [
+        {
+          "phase": "before-simulation",
+          "logicalReads": 13,
+          "codeReads": 0,
+          "observedMinimumSlot": 457674460,
+          "observedMaximumSlot": 457674469
+        },
+        {
+          "phase": "after-simulation",
+          "logicalReads": 0,
+          "codeReads": 0,
+          "observedMinimumSlot": null,
+          "observedMaximumSlot": null
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "asset": "SOL",
+      "checkedAt": "2026-10-16T14:41:20.992Z",
+      "passed": false,
+      "stage": "order-first-runtime",
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "elapsedSlots": null,
+      "pipelineMs": 2210.1885,
+      "simulationCount": 0,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 7,
+      "phases": [
+        {
+          "phase": "before-simulation",
+          "logicalReads": 13,
+          "codeReads": 0,
+          "observedMinimumSlot": 457674486,
+          "observedMaximumSlot": 457674495
+        },
+        {
+          "phase": "after-simulation",
+          "logicalReads": 0,
+          "codeReads": 0,
+          "observedMinimumSlot": null,
+          "observedMaximumSlot": null
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "asset": "USDC",
+      "checkedAt": "2026-10-16T14:41:26.848Z",
+      "passed": false,
+      "stage": "order-first-runtime",
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "elapsedSlots": null,
+      "pipelineMs": 2303.9072,
+      "simulationCount": 0,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 7,
+      "phases": [
+        {
+          "phase": "before-simulation",
+          "logicalReads": 13,
+          "codeReads": 0,
+          "observedMinimumSlot": 457674515,
+          "observedMaximumSlot": 457674523
+        },
+        {
+          "phase": "after-simulation",
+          "logicalReads": 0,
+          "codeReads": 0,
+          "observedMinimumSlot": null,
+          "observedMaximumSlot": null
+        }
+      ]
+    }
+  ],
+  "receiptSha256": [
+    "0228761288be6e9fbf74179ed5c56127d3ce00749b94de97c5cb0bbea104211b",
+    "8f89cb2cd6256c8c0ab27b41d5c6a11f6588a11975454703f58c29bad187f73e",
+    "608f338d3e0703f038c02b120d039d28436133e27926950a68ce1c0dc3b3faa1",
+    "2006c04e6a9258a2c4b2b81539b72c099a70c5398de9ac0c907f80636167818a",
+    "38e9677b3c8fcbbb75757aa7d94fa1c6d0de036d856a5f4f13e70018934d3a53",
+    "0991587950fbe4f2c3718b885a2cba3689125157effcaa9b616fb0fd0cb8dada"
+  ],
+  "receipts": [
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T14:40:55.539Z",
+      "readOnly": true,
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "7a5df15a5208b995cd264ad51c2a38c42c1d01cd26f6e953b673da790a0e238f",
+        "lib/pair-order-first-review.ts": "14479f26f089e60a1f119648770430e22bc2ba95e34b61e4ac90bec46b6fad94",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "0b4bbc92d9a9483e88e6640382095b57a3c4d2adb4d26f7c9dba2001b31e7044",
+        "lib/imported-pair-wallet-preflight.ts": "625a338877835aa9f41187c07b56162b881ff9a9ff2a1248d9fcc8f036b8f1b8",
+        "lib/imported-pair-quote-service.ts": "afab259f115ccf5e6ae63d60b25fe9ca35bf3331c049d4cf48440629ba92fe35",
+        "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+        "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+        "lib/pair-read-rpc.ts": "49a941e048b77dca269bb3700b641ba625cbdc1617af6648c13fc41075ba6cf0",
+        "lib/wallet-rpc-pacing.ts": "7eb9ae312aeae7f1a03b4611f9658d77011572100b549436ef674de6031c6f87",
+        "lib/pair-order-state.ts": "d9d16722a1fd96f007cc22557dfe7f43c7df1c815f36d6c06515fbb9ce2188fa",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "80bf0ceb2e845059dc647a354f4eab039787ac6b10e9c89aa3725f57809fdc0e",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "8625be45506591b5e0da051be68372c182be80badf329be1f45d49084b96a076",
+        "lib/pair-order-quote-bounds.ts": "0004039763a0a773a55e0a801d8cf559e078bf6b91f0994433d7e2c14f4340ce",
+        "scripts/qualify-stock-pair-runtime.mjs": "8bae32900c8ef680019caa082b98bb6c67d017df8af1a0ab3324e749732207fc"
+      },
+      "sourceUnchanged": true,
+      "publicReferenceKind": "fresh-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 737.4191,
+          "pipeline": false,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 231.5965
+        },
+        {
+          "startMs": 972.7112,
+          "pipeline": false,
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "status": 200,
+          "headerMs": 107.75810000000001
+        },
+        {
+          "startMs": 1182.0804,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 129.07079999999996
+        },
+        {
+          "startMs": 1379.8143,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 123.03770000000009
+        },
+        {
+          "startMs": 1581.7702,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 125.33960000000002
+        },
+        {
+          "startMs": 1779.9788,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 119.10680000000002
+        },
+        {
+          "startMs": 1981.4279,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 110.65150000000017
+        },
+        {
+          "startMs": 2179.9003,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 96.05520000000024
+        },
+        {
+          "startMs": 2377.8859,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 114.7464
+        },
+        {
+          "startMs": 2578.7516,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 101.66240000000016
+        },
+        {
+          "startMs": 2777.9332,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 114.08939999999984
+        },
+        {
+          "startMs": 2978.0332,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 117.20980000000009
+        },
+        {
+          "startMs": 3177.6304,
+          "pipeline": false,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 97.49089999999978
+        },
+        {
+          "startMs": 3374.971,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 104.60579999999982
+        },
+        {
+          "startMs": 3577.0733,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 106.56489999999985
+        },
+        {
+          "startMs": 3690.4584,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 96.98329999999987
+        },
+        {
+          "startMs": 3811.5426,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 95.60369999999966
+        },
+        {
+          "startMs": 3931.1867,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 104.3143
+        },
+        {
+          "startMs": 4044.3467,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 315.3245999999999
+        },
+        {
+          "startMs": 4360.3163,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 112.5009999999993
+        },
+        {
+          "startMs": 4484.315,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 211.34910000000036
+        },
+        {
+          "startMs": 4706.0105,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 97.37129999999979
+        },
+        {
+          "startMs": 4826.5945,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 101.28250000000025
+        },
+        {
+          "startMs": 4950.9159,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 112.67119999999977
+        },
+        {
+          "startMs": 5069.5725,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 194.63609999999971
+        },
+        {
+          "startMs": 5264.5615,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 90.60800000000017
+        },
+        {
+          "startMs": 5490.5842,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 105.34789999999975
+        },
+        {
+          "startMs": 5604.6948,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 94.48359999999957
+        },
+        {
+          "startMs": 5718.4851,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 104.9971000000005
+        },
+        {
+          "startMs": 5836.1972,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 185.3099000000002
+        },
+        {
+          "startMs": 6032.5442,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 95.70579999999973
+        },
+        {
+          "startMs": 6149.4395,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash",
+            "getBlockHeight"
+          ],
+          "status": 200,
+          "headerMs": 102.41599999999926
+        },
+        {
+          "startMs": 6379.4024,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash",
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 104.2482
+        },
+        {
+          "startMs": 6612.137,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 106.94500000000062
+        },
+        {
+          "startMs": 6732.8739,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 111.17060000000038
+        },
+        {
+          "startMs": 6846.2851,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 98.03369999999995
+        },
+        {
+          "startMs": 6964.7522,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 115.89270000000033
+        },
+        {
+          "startMs": 7079.016,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 465.97389999999996
+        },
+        {
+          "startMs": 7200.0716,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 402.11029999999937
+        },
+        {
+          "startMs": 7325.7974,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 201.45719999999983
+        },
+        {
+          "startMs": 7448.8087,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 443.77560000000085
+        },
+        {
+          "startMs": 7718.7248,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 113.1235999999999
+        },
+        {
+          "startMs": 7839.0947,
+          "pipeline": true,
+          "methods": [
+            "getFeeForMessage"
+          ],
+          "status": 200,
+          "headerMs": 92.10530000000017
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3689.6558,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 98.48579999999993
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3788.1665,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674367",
+          "returned": true,
+          "elapsedMs": 119.54740000000038
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3907.8581,
+          "minContextSlot": 457674367,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674367",
+          "clockSlot": "457674367",
+          "chainUnix": "1792161658",
+          "clockSkewMs": 840,
+          "returned": true,
+          "elapsedMs": 128.46190000000024
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4360.051,
+          "minContextSlot": 457674367,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674369",
+          "clockSlot": "457674369",
+          "chainUnix": "1792161658",
+          "clockSkewMs": 1277,
+          "returned": true,
+          "elapsedMs": 113.59049999999934
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4360.0899,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 113.55310000000009
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4705.9105,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 98.02639999999974
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4803.9539,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674372",
+          "returned": true,
+          "elapsedMs": 124.5039999999999
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4928.4963,
+          "minContextSlot": 457674372,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674373",
+          "clockSlot": "457674373",
+          "chainUnix": "1792161659",
+          "clockSkewMs": 867,
+          "returned": true,
+          "elapsedMs": 135.58910000000014
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5264.3958,
+          "minContextSlot": 457674373,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674374",
+          "clockSlot": "457674374",
+          "chainUnix": "1792161659",
+          "clockSkewMs": 1159,
+          "returned": true,
+          "elapsedMs": 91.47329999999965
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5264.4541,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 91.41660000000047
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5363.1004,
+          "minContextSlot": 457674374,
+          "accountCount": 6,
+          "slice": null,
+          "slot": "457674375",
+          "clockSlot": "457674375",
+          "chainUnix": "1792161659",
+          "clockSkewMs": 1400,
+          "returned": true,
+          "elapsedMs": 233.28909999999996
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5604.6354,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 95.0677999999998
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5605.3295,
+          "minContextSlot": 457674375,
+          "accountCount": 6,
+          "slice": null,
+          "slot": "457674377",
+          "clockSlot": "457674377",
+          "chainUnix": "1792161660",
+          "clockSkewMs": 627,
+          "returned": true,
+          "elapsedMs": 218.6274000000003
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5836.1218,
+          "minContextSlot": 457674377,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457674377",
+          "returned": true,
+          "elapsedMs": 186.70970000000034
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6029.9854,
+          "minContextSlot": 457674377,
+          "accountCount": 45,
+          "slice": {
+            "offset": 0,
+            "length": 166
+          },
+          "slot": "457674378",
+          "returned": true,
+          "elapsedMs": 101.40460000000076
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6033.7117,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 218.7403000000004
+        },
+        {
+          "method": "getBlockHeight",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6033.7551,
+          "minContextSlot": 457674377,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 218.69779999999992
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6136.9721,
+          "minContextSlot": 457674378,
+          "accountCount": 6,
+          "slice": null,
+          "slot": "457674381",
+          "returned": true,
+          "elapsedMs": 582.5308999999997
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "code",
+          "phase": "before-simulation",
+          "startMs": 6137.0938,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 347.08610000000044
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "code",
+          "phase": "before-simulation",
+          "startMs": 6137.139,
+          "minContextSlot": 457674378,
+          "accountCount": 7,
+          "slice": {
+            "offset": 0,
+            "length": 45
+          },
+          "slot": "457674380",
+          "returned": true,
+          "elapsedMs": 347.0451000000003
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6252.5115,
+          "minContextSlot": 457674378,
+          "accountCount": 4,
+          "slice": null,
+          "slot": "457674382",
+          "returned": true,
+          "elapsedMs": 592.4478000000008
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "code",
+          "phase": "before-simulation",
+          "startMs": 6484.6723,
+          "minContextSlot": 457674380,
+          "accountCount": 6,
+          "slice": {
+            "offset": 0,
+            "length": 45
+          },
+          "slot": "457674382",
+          "returned": true,
+          "elapsedMs": 463.3863999999994
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 6852.4223,
+          "minContextSlot": 457674382,
+          "accountCount": 22,
+          "slice": {
+            "offset": 0,
+            "length": 166
+          },
+          "slot": "457674383",
+          "returned": true,
+          "elapsedMs": 229.02269999999953
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "code",
+          "phase": "before-simulation",
+          "startMs": 6949.5549,
+          "minContextSlot": 457674382,
+          "accountCount": 6,
+          "slice": {
+            "offset": 45,
+            "length": 184320
+          },
+          "slot": "457674383",
+          "returned": true,
+          "elapsedMs": 767.9322000000002
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "code",
+          "phase": "before-simulation",
+          "startMs": 6949.6187,
+          "minContextSlot": 457674382,
+          "accountCount": 5,
+          "slice": {
+            "offset": 184365,
+            "length": 233472
+          },
+          "slot": "457674383",
+          "returned": true,
+          "elapsedMs": 780.9461000000001
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "code",
+          "phase": "before-simulation",
+          "startMs": 6949.6358,
+          "minContextSlot": 457674382,
+          "accountCount": 4,
+          "slice": {
+            "offset": 417837,
+            "length": 262144
+          },
+          "slot": "457674384",
+          "returned": true,
+          "elapsedMs": 953.9341000000004
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "code",
+          "phase": "before-simulation",
+          "startMs": 6949.6636,
+          "minContextSlot": 457674382,
+          "accountCount": 4,
+          "slice": {
+            "offset": 679981,
+            "length": 262144
+          }
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 7082.6936,
+          "minContextSlot": 457674383,
+          "accountCount": 11,
+          "slice": null,
+          "slot": "457674386",
+          "clockSlot": "457674386",
+          "chainUnix": "1792161661",
+          "clockSkewMs": 1636,
+          "returned": true,
+          "elapsedMs": 749.8235000000004
+        },
+        {
+          "method": "getFeeForMessage",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 7839.0096,
+          "minContextSlot": 457674386,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674386",
+          "returned": true,
+          "elapsedMs": 92.66219999999976
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29123",
+          "minimumOutputRaw": "28977",
+          "observedAt": "2026-10-16T14:40:59.163Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29120",
+          "minimumOutputRaw": "28974",
+          "observedAt": "2026-10-16T14:41:00.068Z"
+        }
+      ],
+      "quoteAsset": "SOL",
+      "inputUiAmount": "0.001",
+      "qualificationPacing": "unsigned-helius-qualification-nine-methods-per-second",
+      "rpcPacingMs": 200,
+      "publicReferenceSha256": "6b8c8830615d5c063e6b97ed46697ccbf293fdb2438f990f7190c6ff752f8996",
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "29120",
+        "minimumOutputRaw": "28974",
+        "observedAt": "2026-10-16T14:40:59.508Z"
+      },
+      "errorName": "Error",
+      "status": 409,
+      "reason": "Pair candidate instructions, accounts or raw spending limits differ.",
+      "pipelineMs": 4255.136100000001,
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 9,
+      "firstCodeReads": 7,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T14:41:03.628Z",
+      "readOnly": true,
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "7a5df15a5208b995cd264ad51c2a38c42c1d01cd26f6e953b673da790a0e238f",
+        "lib/pair-order-first-review.ts": "14479f26f089e60a1f119648770430e22bc2ba95e34b61e4ac90bec46b6fad94",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "0b4bbc92d9a9483e88e6640382095b57a3c4d2adb4d26f7c9dba2001b31e7044",
+        "lib/imported-pair-wallet-preflight.ts": "625a338877835aa9f41187c07b56162b881ff9a9ff2a1248d9fcc8f036b8f1b8",
+        "lib/imported-pair-quote-service.ts": "afab259f115ccf5e6ae63d60b25fe9ca35bf3331c049d4cf48440629ba92fe35",
+        "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+        "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+        "lib/pair-read-rpc.ts": "49a941e048b77dca269bb3700b641ba625cbdc1617af6648c13fc41075ba6cf0",
+        "lib/wallet-rpc-pacing.ts": "7eb9ae312aeae7f1a03b4611f9658d77011572100b549436ef674de6031c6f87",
+        "lib/pair-order-state.ts": "d9d16722a1fd96f007cc22557dfe7f43c7df1c815f36d6c06515fbb9ce2188fa",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "80bf0ceb2e845059dc647a354f4eab039787ac6b10e9c89aa3725f57809fdc0e",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "8625be45506591b5e0da051be68372c182be80badf329be1f45d49084b96a076",
+        "lib/pair-order-quote-bounds.ts": "0004039763a0a773a55e0a801d8cf559e078bf6b91f0994433d7e2c14f4340ce",
+        "scripts/qualify-stock-pair-runtime.mjs": "8bae32900c8ef680019caa082b98bb6c67d017df8af1a0ab3324e749732207fc"
+      },
+      "sourceUnchanged": true,
+      "publicReferenceKind": "fresh-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 723.8147,
+          "pipeline": false,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 222.69650000000001
+        },
+        {
+          "startMs": 949.8886,
+          "pipeline": false,
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "status": 200,
+          "headerMs": 105.90190000000007
+        },
+        {
+          "startMs": 1157.0222,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 141.78109999999992
+        },
+        {
+          "startMs": 1356.9232,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 85.6132
+        },
+        {
+          "startMs": 1557.5446,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 105.5431000000001
+        },
+        {
+          "startMs": 1757.7569,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 121.38529999999992
+        },
+        {
+          "startMs": 1958.8662,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 115.51009999999997
+        },
+        {
+          "startMs": 2159.2473,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 103.21180000000004
+        },
+        {
+          "startMs": 2356.1891,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 102.01389999999992
+        },
+        {
+          "startMs": 2552.2975,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 114.87480000000005
+        },
+        {
+          "startMs": 2751.112,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 87.01749999999993
+        },
+        {
+          "startMs": 2952.9368,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 108.75660000000016
+        },
+        {
+          "startMs": 3153.9878,
+          "pipeline": false,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 107.51070000000027
+        },
+        {
+          "startMs": 3354.0392,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 99.80659999999989
+        },
+        {
+          "startMs": 3556.9757,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 105.35640000000012
+        },
+        {
+          "startMs": 3669.5365,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 94.5926999999997
+        },
+        {
+          "startMs": 3788.7355,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 88.97960000000012
+        },
+        {
+          "startMs": 3911.5287,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 102.22910000000002
+        },
+        {
+          "startMs": 4021.7383,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 324.76950000000033
+        },
+        {
+          "startMs": 4347.0891,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 95.5604000000003
+        },
+        {
+          "startMs": 4451.5359,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 162.32490000000053
+        },
+        {
+          "startMs": 4620.5636,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 101.36139999999978
+        },
+        {
+          "startMs": 4741.3158,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 100.29249999999956
+        },
+        {
+          "startMs": 4864.966,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 92.85599999999977
+        },
+        {
+          "startMs": 4964.5479,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 165.25790000000052
+        },
+        {
+          "startMs": 5130.1825,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 99.34029999999984
+        },
+        {
+          "startMs": 5356.4585,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 105.38510000000042
+        },
+        {
+          "startMs": 5470.0443,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 87.62490000000071
+        },
+        {
+          "startMs": 5585.4407,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 116.4988999999996
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3668.794,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 96.07390000000032
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3764.9,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674404",
+          "returned": true,
+          "elapsedMs": 113.34580000000005
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3878.4047,
+          "minContextSlot": 457674404,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674405",
+          "clockSlot": "457674405",
+          "chainUnix": "1792161666",
+          "clockSkewMs": 919,
+          "returned": true,
+          "elapsedMs": 135.86409999999978
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4346.8457,
+          "minContextSlot": 457674405,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674406",
+          "clockSlot": "457674406",
+          "chainUnix": "1792161666",
+          "clockSkewMs": 1348,
+          "returned": true,
+          "elapsedMs": 96.46500000000015
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4346.8805,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 96.43159999999989
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4620.4621,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 102.01069999999982
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4722.5002,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674408",
+          "returned": true,
+          "elapsedMs": 119.62509999999929
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4842.1581,
+          "minContextSlot": 457674408,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674409",
+          "clockSlot": "457674409",
+          "chainUnix": "1792161667",
+          "clockSkewMs": 863,
+          "returned": true,
+          "elapsedMs": 116.29510000000028
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5130.006,
+          "minContextSlot": 457674409,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674410",
+          "clockSlot": "457674410",
+          "chainUnix": "1792161667",
+          "clockSkewMs": 1135,
+          "returned": true,
+          "elapsedMs": 100.05879999999979
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5130.0624,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 100.0034999999998
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5238.3638,
+          "minContextSlot": 457674410,
+          "accountCount": 7,
+          "slice": null,
+          "slot": "457674411",
+          "clockSlot": "457674411",
+          "chainUnix": "1792161667",
+          "clockSkewMs": 1367,
+          "returned": true,
+          "elapsedMs": 223.96619999999984
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5469.9638,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 88.30779999999959
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5470.8332,
+          "minContextSlot": 457674411,
+          "accountCount": 7,
+          "slice": null,
+          "slot": "457674412",
+          "clockSlot": "457674413",
+          "chainUnix": "1792161668",
+          "clockSkewMs": 607,
+          "returned": true,
+          "elapsedMs": 231.70020000000022
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "274168",
+          "minimumOutputRaw": "272797",
+          "observedAt": "2026-10-16T14:41:07.252Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "274142",
+          "minimumOutputRaw": "272771",
+          "observedAt": "2026-10-16T14:41:08.035Z"
+        }
+      ],
+      "quoteAsset": "USDC",
+      "inputUiAmount": "1",
+      "qualificationPacing": "unsigned-helius-qualification-nine-methods-per-second",
+      "rpcPacingMs": 200,
+      "publicReferenceSha256": "6b8c8830615d5c063e6b97ed46697ccbf293fdb2438f990f7190c6ff752f8996",
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "274220",
+        "minimumOutputRaw": "272848",
+        "observedAt": "2026-10-16T14:41:07.524Z"
+      },
+      "errorName": "Error",
+      "status": 409,
+      "reason": "Pair chain clock is inconsistent or stale.",
+      "pipelineMs": 2037.9402999999998,
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 8,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T14:41:09.332Z",
+      "readOnly": true,
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "7a5df15a5208b995cd264ad51c2a38c42c1d01cd26f6e953b673da790a0e238f",
+        "lib/pair-order-first-review.ts": "14479f26f089e60a1f119648770430e22bc2ba95e34b61e4ac90bec46b6fad94",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "0b4bbc92d9a9483e88e6640382095b57a3c4d2adb4d26f7c9dba2001b31e7044",
+        "lib/imported-pair-wallet-preflight.ts": "625a338877835aa9f41187c07b56162b881ff9a9ff2a1248d9fcc8f036b8f1b8",
+        "lib/imported-pair-quote-service.ts": "afab259f115ccf5e6ae63d60b25fe9ca35bf3331c049d4cf48440629ba92fe35",
+        "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+        "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+        "lib/pair-read-rpc.ts": "49a941e048b77dca269bb3700b641ba625cbdc1617af6648c13fc41075ba6cf0",
+        "lib/wallet-rpc-pacing.ts": "7eb9ae312aeae7f1a03b4611f9658d77011572100b549436ef674de6031c6f87",
+        "lib/pair-order-state.ts": "d9d16722a1fd96f007cc22557dfe7f43c7df1c815f36d6c06515fbb9ce2188fa",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "80bf0ceb2e845059dc647a354f4eab039787ac6b10e9c89aa3725f57809fdc0e",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "8625be45506591b5e0da051be68372c182be80badf329be1f45d49084b96a076",
+        "lib/pair-order-quote-bounds.ts": "0004039763a0a773a55e0a801d8cf559e078bf6b91f0994433d7e2c14f4340ce",
+        "scripts/qualify-stock-pair-runtime.mjs": "8bae32900c8ef680019caa082b98bb6c67d017df8af1a0ab3324e749732207fc"
+      },
+      "sourceUnchanged": true,
+      "publicReferenceKind": "fresh-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 680.7394,
+          "pipeline": false,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 226.3329
+        },
+        {
+          "startMs": 911.054,
+          "pipeline": false,
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "status": 200,
+          "headerMs": 97.30849999999998
+        },
+        {
+          "startMs": 1112.8588,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 109.8469
+        },
+        {
+          "startMs": 1311.6939,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 110.70190000000002
+        },
+        {
+          "startMs": 1524.5566,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 122.03370000000018
+        },
+        {
+          "startMs": 1710.9272,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 110.81679999999983
+        },
+        {
+          "startMs": 1913.3115,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 113.49829999999997
+        },
+        {
+          "startMs": 2112.7972,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 117.77149999999983
+        },
+        {
+          "startMs": 2310.5453,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 119.99339999999984
+        },
+        {
+          "startMs": 2525.2824,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 113.42729999999983
+        },
+        {
+          "startMs": 2725.4443,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 100.79269999999997
+        },
+        {
+          "startMs": 2923.7218,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 153.91440000000011
+        },
+        {
+          "startMs": 3123.9836,
+          "pipeline": false,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 101.82139999999981
+        },
+        {
+          "startMs": 3311.6004,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 95.40129999999999
+        },
+        {
+          "startMs": 3511.5165,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 102.8110999999999
+        },
+        {
+          "startMs": 3621.2134,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 96.93769999999995
+        },
+        {
+          "startMs": 3739.9822,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 94.05110000000013
+        },
+        {
+          "startMs": 3863.384,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 98.6909999999998
+        },
+        {
+          "startMs": 3969.917,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 285.12840000000006
+        },
+        {
+          "startMs": 4255.7763,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 95.26439999999911
+        },
+        {
+          "startMs": 4361.5407,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 208.33090000000084
+        },
+        {
+          "startMs": 4579.3424,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 94.53039999999964
+        },
+        {
+          "startMs": 4700.4795,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 94.46039999999994
+        },
+        {
+          "startMs": 4825.7612,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 97.06580000000031
+        },
+        {
+          "startMs": 4927.8549,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 170.89449999999943
+        },
+        {
+          "startMs": 5099.1311,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 90.98860000000059
+        },
+        {
+          "startMs": 5334.6645,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 100.42709999999988
+        },
+        {
+          "startMs": 5458.659,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 87.65200000000004
+        },
+        {
+          "startMs": 5580.1907,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 81.8728000000001
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3620.4717,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 98.44970000000012
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3718.9534,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674431",
+          "returned": true,
+          "elapsedMs": 115.5649000000003
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3834.642,
+          "minContextSlot": 457674431,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674432",
+          "clockSlot": "457674432",
+          "chainUnix": "1792161671",
+          "clockSkewMs": 1615,
+          "returned": true,
+          "elapsedMs": 128.2095000000004
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4255.4699,
+          "minContextSlot": 457674432,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674434",
+          "clockSlot": "457674434",
+          "chainUnix": "1792161672",
+          "clockSkewMs": 1004,
+          "returned": true,
+          "elapsedMs": 96.28349999999955
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4255.5124,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 96.24290000000019
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4579.2448,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 95.07889999999952
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4674.3411,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674436",
+          "returned": true,
+          "elapsedMs": 121.21399999999994
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4795.5953,
+          "minContextSlot": 457674436,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674437",
+          "clockSlot": "457674437",
+          "chainUnix": "1792161673",
+          "clockSkewMs": 576,
+          "returned": true,
+          "elapsedMs": 127.80580000000009
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5098.9592,
+          "minContextSlot": 457674437,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674438",
+          "clockSlot": "457674438",
+          "chainUnix": "1792161673",
+          "clockSkewMs": 843,
+          "returned": true,
+          "elapsedMs": 91.68019999999979
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5099.0152,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 91.6252000000004
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5198.1129,
+          "minContextSlot": 457674438,
+          "accountCount": 6,
+          "slice": null,
+          "slot": "457674439",
+          "clockSlot": "457674439",
+          "chainUnix": "1792161673",
+          "clockSkewMs": 1088,
+          "returned": true,
+          "elapsedMs": 237.44959999999992
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5444.0811,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 102.70809999999983
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5444.391,
+          "minContextSlot": 457674439,
+          "accountCount": 6,
+          "slice": null,
+          "slot": "457674440",
+          "clockSlot": "457674440",
+          "chainUnix": "1792161673",
+          "clockSkewMs": 1315,
+          "returned": true,
+          "elapsedMs": 218.35020000000077
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29089",
+          "minimumOutputRaw": "28943",
+          "observedAt": "2026-10-16T14:41:12.908Z"
+        },
+        {
+          "router": "okx",
+          "expectedOutputRaw": "29090",
+          "minimumOutputRaw": "28945",
+          "observedAt": "2026-10-16T14:41:13.751Z"
+        }
+      ],
+      "quoteAsset": "SOL",
+      "inputUiAmount": "0.001",
+      "qualificationPacing": "unsigned-helius-qualification-nine-methods-per-second",
+      "rpcPacingMs": 200,
+      "publicReferenceSha256": "bb03557317d61ca9cee0a24997f998db2aa9315fe35bccbe34c466142c46941b",
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "29087",
+        "minimumOutputRaw": "28941",
+        "observedAt": "2026-10-16T14:41:13.230Z"
+      },
+      "errorName": "Error",
+      "status": 409,
+      "reason": "Selected wallet balances, custody or rent changed. Request a new preflight.",
+      "pipelineMs": 2053.137,
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 7,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T14:41:15.153Z",
+      "readOnly": true,
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "7a5df15a5208b995cd264ad51c2a38c42c1d01cd26f6e953b673da790a0e238f",
+        "lib/pair-order-first-review.ts": "14479f26f089e60a1f119648770430e22bc2ba95e34b61e4ac90bec46b6fad94",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "0b4bbc92d9a9483e88e6640382095b57a3c4d2adb4d26f7c9dba2001b31e7044",
+        "lib/imported-pair-wallet-preflight.ts": "625a338877835aa9f41187c07b56162b881ff9a9ff2a1248d9fcc8f036b8f1b8",
+        "lib/imported-pair-quote-service.ts": "afab259f115ccf5e6ae63d60b25fe9ca35bf3331c049d4cf48440629ba92fe35",
+        "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+        "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+        "lib/pair-read-rpc.ts": "49a941e048b77dca269bb3700b641ba625cbdc1617af6648c13fc41075ba6cf0",
+        "lib/wallet-rpc-pacing.ts": "7eb9ae312aeae7f1a03b4611f9658d77011572100b549436ef674de6031c6f87",
+        "lib/pair-order-state.ts": "d9d16722a1fd96f007cc22557dfe7f43c7df1c815f36d6c06515fbb9ce2188fa",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "80bf0ceb2e845059dc647a354f4eab039787ac6b10e9c89aa3725f57809fdc0e",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "8625be45506591b5e0da051be68372c182be80badf329be1f45d49084b96a076",
+        "lib/pair-order-quote-bounds.ts": "0004039763a0a773a55e0a801d8cf559e078bf6b91f0994433d7e2c14f4340ce",
+        "scripts/qualify-stock-pair-runtime.mjs": "8bae32900c8ef680019caa082b98bb6c67d017df8af1a0ab3324e749732207fc"
+      },
+      "sourceUnchanged": true,
+      "publicReferenceKind": "fresh-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 781.1218,
+          "pipeline": false,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 201.1322
+        },
+        {
+          "startMs": 985.83,
+          "pipeline": false,
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "status": 200,
+          "headerMs": 99.94690000000003
+        },
+        {
+          "startMs": 1196.5063,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 90.1056000000001
+        },
+        {
+          "startMs": 1402.0041,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 123.24879999999985
+        },
+        {
+          "startMs": 1603.2605,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 103.17409999999995
+        },
+        {
+          "startMs": 1806.4148,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 128.30819999999994
+        },
+        {
+          "startMs": 2006.2085,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 112.40490000000023
+        },
+        {
+          "startMs": 2208.0669,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 113.10690000000022
+        },
+        {
+          "startMs": 2410.8124,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 131.11170000000038
+        },
+        {
+          "startMs": 2609.5993,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 115.78560000000016
+        },
+        {
+          "startMs": 2806.7819,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 130.07420000000002
+        },
+        {
+          "startMs": 3003.6618,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 133.18229999999994
+        },
+        {
+          "startMs": 3204.4947,
+          "pipeline": false,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 116.05319999999983
+        },
+        {
+          "startMs": 3404.5731,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 113.52449999999999
+        },
+        {
+          "startMs": 3605.0324,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 123.4353000000001
+        },
+        {
+          "startMs": 3735.4764,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 85.33460000000014
+        },
+        {
+          "startMs": 3856.4433,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 100.68049999999994
+        },
+        {
+          "startMs": 3982.1588,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 108.95079999999962
+        },
+        {
+          "startMs": 4101.4423,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 259.4953000000005
+        },
+        {
+          "startMs": 4361.5895,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 95.04780000000028
+        },
+        {
+          "startMs": 4468.8435,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 192.55199999999968
+        },
+        {
+          "startMs": 4668.7579,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 84.80160000000069
+        },
+        {
+          "startMs": 4789.4947,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 107.63779999999952
+        },
+        {
+          "startMs": 4911.9249,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 97.54190000000017
+        },
+        {
+          "startMs": 5015.047,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 189.97140000000036
+        },
+        {
+          "startMs": 5205.4011,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 112.60249999999996
+        },
+        {
+          "startMs": 5439.1704,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 111.04370000000017
+        },
+        {
+          "startMs": 5561.8209,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 144.38300000000072
+        },
+        {
+          "startMs": 5689.3793,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 180.10620000000017
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3734.5993,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 86.79919999999993
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3821.4225,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674460",
+          "returned": true,
+          "elapsedMs": 136.2747999999997
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3957.8177,
+          "minContextSlot": 457674460,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674461",
+          "clockSlot": "457674461",
+          "chainUnix": "1792161677",
+          "clockSkewMs": 1465,
+          "returned": true,
+          "elapsedMs": 134.1916000000001
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4361.3441,
+          "minContextSlot": 457674461,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674463",
+          "clockSlot": "457674463",
+          "chainUnix": "1792161678",
+          "clockSkewMs": 833,
+          "returned": true,
+          "elapsedMs": 99.35379999999986
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4361.3811,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 99.31780000000072
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4668.6472,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 85.44200000000001
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4754.1085,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674464",
+          "returned": true,
+          "elapsedMs": 143.76909999999953
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4897.9227,
+          "minContextSlot": 457674464,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674464",
+          "clockSlot": "457674464",
+          "chainUnix": "1792161678",
+          "clockSkewMs": 1383,
+          "returned": true,
+          "elapsedMs": 112.08770000000004
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5205.2163,
+          "minContextSlot": 457674464,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674466",
+          "clockSlot": "457674466",
+          "chainUnix": "1792161678",
+          "clockSkewMs": 1691,
+          "returned": true,
+          "elapsedMs": 113.32799999999952
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5205.2862,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 113.25910000000022
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5326.2401,
+          "minContextSlot": 457674466,
+          "accountCount": 7,
+          "slice": null,
+          "slot": "457674467",
+          "clockSlot": "457674467",
+          "chainUnix": "1792161679",
+          "clockSkewMs": 926,
+          "returned": true,
+          "elapsedMs": 227.5084999999999
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5561.7487,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 145.04119999999966
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5562.5092,
+          "minContextSlot": 457674467,
+          "accountCount": 7,
+          "slice": null,
+          "slot": "457674469",
+          "clockSlot": "457674469",
+          "chainUnix": "1792161679",
+          "clockSkewMs": 1243,
+          "returned": true,
+          "elapsedMs": 307.7507999999998
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "274216",
+          "minimumOutputRaw": "272844",
+          "observedAt": "2026-10-16T14:41:18.734Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "274228",
+          "minimumOutputRaw": "272856",
+          "observedAt": "2026-10-16T14:41:19.578Z"
+        }
+      ],
+      "quoteAsset": "USDC",
+      "inputUiAmount": "1",
+      "qualificationPacing": "unsigned-helius-qualification-nine-methods-per-second",
+      "rpcPacingMs": 200,
+      "publicReferenceSha256": "6b8c8830615d5c063e6b97ed46697ccbf293fdb2438f990f7190c6ff752f8996",
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "274216",
+        "minimumOutputRaw": "272844",
+        "observedAt": "2026-10-16T14:41:19.040Z"
+      },
+      "errorName": "Error",
+      "status": 409,
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "pipelineMs": 2148.2963,
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 7,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T14:41:20.992Z",
+      "readOnly": true,
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "7a5df15a5208b995cd264ad51c2a38c42c1d01cd26f6e953b673da790a0e238f",
+        "lib/pair-order-first-review.ts": "14479f26f089e60a1f119648770430e22bc2ba95e34b61e4ac90bec46b6fad94",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "0b4bbc92d9a9483e88e6640382095b57a3c4d2adb4d26f7c9dba2001b31e7044",
+        "lib/imported-pair-wallet-preflight.ts": "625a338877835aa9f41187c07b56162b881ff9a9ff2a1248d9fcc8f036b8f1b8",
+        "lib/imported-pair-quote-service.ts": "afab259f115ccf5e6ae63d60b25fe9ca35bf3331c049d4cf48440629ba92fe35",
+        "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+        "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+        "lib/pair-read-rpc.ts": "49a941e048b77dca269bb3700b641ba625cbdc1617af6648c13fc41075ba6cf0",
+        "lib/wallet-rpc-pacing.ts": "7eb9ae312aeae7f1a03b4611f9658d77011572100b549436ef674de6031c6f87",
+        "lib/pair-order-state.ts": "d9d16722a1fd96f007cc22557dfe7f43c7df1c815f36d6c06515fbb9ce2188fa",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "80bf0ceb2e845059dc647a354f4eab039787ac6b10e9c89aa3725f57809fdc0e",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "8625be45506591b5e0da051be68372c182be80badf329be1f45d49084b96a076",
+        "lib/pair-order-quote-bounds.ts": "0004039763a0a773a55e0a801d8cf559e078bf6b91f0994433d7e2c14f4340ce",
+        "scripts/qualify-stock-pair-runtime.mjs": "8bae32900c8ef680019caa082b98bb6c67d017df8af1a0ab3324e749732207fc"
+      },
+      "sourceUnchanged": true,
+      "publicReferenceKind": "fresh-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 689.8941,
+          "pipeline": false,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 187.04820000000007
+        },
+        {
+          "startMs": 904.2532,
+          "pipeline": false,
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "status": 200,
+          "headerMs": 112.05150000000003
+        },
+        {
+          "startMs": 1103.2194,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 96.93780000000015
+        },
+        {
+          "startMs": 1291.5794,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 104.49129999999991
+        },
+        {
+          "startMs": 1505.6891,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 105.93069999999989
+        },
+        {
+          "startMs": 1693.7386,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 102.47640000000001
+        },
+        {
+          "startMs": 1897.9498,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 97.79719999999998
+        },
+        {
+          "startMs": 2099.4063,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 89.35489999999982
+        },
+        {
+          "startMs": 2300.3105,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 103.09540000000015
+        },
+        {
+          "startMs": 2498.6672,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 101.20160000000033
+        },
+        {
+          "startMs": 2699.1708,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 99.94489999999996
+        },
+        {
+          "startMs": 2896.1951,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 79.12950000000001
+        },
+        {
+          "startMs": 3097.1001,
+          "pipeline": false,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 102.1882999999998
+        },
+        {
+          "startMs": 3296.7657,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 102.45040000000017
+        },
+        {
+          "startMs": 3498.0961,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 101.10099999999966
+        },
+        {
+          "startMs": 3605.7718,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 97.96709999999985
+        },
+        {
+          "startMs": 3727.3404,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 95.50579999999991
+        },
+        {
+          "startMs": 3848.4181,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 103.44990000000007
+        },
+        {
+          "startMs": 3959.6896,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 411.7773000000002
+        },
+        {
+          "startMs": 4372.2784,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 95.73919999999998
+        },
+        {
+          "startMs": 4478.1754,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 162.3699999999999
+        },
+        {
+          "startMs": 4649.8167,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 90.21829999999954
+        },
+        {
+          "startMs": 4775.4561,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 91.95889999999963
+        },
+        {
+          "startMs": 4897.6616,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 102.51319999999942
+        },
+        {
+          "startMs": 5006.4149,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 172.7373000000007
+        },
+        {
+          "startMs": 5179.5219,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 87.3765000000003
+        },
+        {
+          "startMs": 5418.5902,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 104.7431000000006
+        },
+        {
+          "startMs": 5535.2268,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 88.54999999999927
+        },
+        {
+          "startMs": 5653.8699,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 149.04190000000017
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3604.9141,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 99.6264000000001
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3704.5952,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674486",
+          "returned": true,
+          "elapsedMs": 118.74739999999974
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3823.4697,
+          "minContextSlot": 457674486,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674487",
+          "clockSlot": "457674487",
+          "chainUnix": "1792161683",
+          "clockSkewMs": 1256,
+          "returned": true,
+          "elapsedMs": 129.00700000000006
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4371.9551,
+          "minContextSlot": 457674487,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674489",
+          "clockSlot": "457674489",
+          "chainUnix": "1792161684",
+          "clockSkewMs": 772,
+          "returned": true,
+          "elapsedMs": 96.84349999999995
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4372.0017,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 96.79830000000038
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4649.6992,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 90.88789999999972
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4740.6058,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674491",
+          "returned": true,
+          "elapsedMs": 127.36740000000009
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4868.0062,
+          "minContextSlot": 457674491,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674491",
+          "clockSlot": "457674491",
+          "chainUnix": "1792161684",
+          "clockSkewMs": 1304,
+          "returned": true,
+          "elapsedMs": 132.88680000000022
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5179.3434,
+          "minContextSlot": 457674491,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674492",
+          "clockSlot": "457674492",
+          "chainUnix": "1792161684",
+          "clockSkewMs": 1574,
+          "returned": true,
+          "elapsedMs": 91.72620000000006
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5179.3998,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 91.67140000000018
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5280.1373,
+          "minContextSlot": 457674492,
+          "accountCount": 6,
+          "slice": null,
+          "slot": "457674494",
+          "clockSlot": "457674494",
+          "chainUnix": "1792161685",
+          "clockSkewMs": 827,
+          "returned": true,
+          "elapsedMs": 243.7590999999993
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5535.149,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 89.16820000000007
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5535.9012,
+          "minContextSlot": 457674494,
+          "accountCount": 6,
+          "slice": null,
+          "slot": "457674495",
+          "clockSlot": "457674495",
+          "chainUnix": "1792161685",
+          "clockSkewMs": 1106,
+          "returned": true,
+          "elapsedMs": 267.5014999999994
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29113",
+          "minimumOutputRaw": "28967",
+          "observedAt": "2026-10-16T14:41:24.675Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "29113",
+          "minimumOutputRaw": "28967",
+          "observedAt": "2026-10-16T14:41:25.482Z"
+        }
+      ],
+      "quoteAsset": "SOL",
+      "inputUiAmount": "0.001",
+      "qualificationPacing": "unsigned-helius-qualification-nine-methods-per-second",
+      "rpcPacingMs": 200,
+      "publicReferenceSha256": "7399481035b874d9196c7d8e71b8f2b280f3f2f4cda2abbe97a134fb3a2b3e6b",
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "29109",
+        "minimumOutputRaw": "28963",
+        "observedAt": "2026-10-16T14:41:24.951Z"
+      },
+      "errorName": "Error",
+      "status": 409,
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "pipelineMs": 2210.1885,
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 7,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    },
+    {
+      "format": "stock-pair-live-qualification-v1",
+      "checkedAt": "2026-10-16T14:41:26.848Z",
+      "readOnly": true,
+      "sourceFiles": {
+        "lib/pair-order-first-service.ts": "7a5df15a5208b995cd264ad51c2a38c42c1d01cd26f6e953b673da790a0e238f",
+        "lib/pair-order-first-review.ts": "14479f26f089e60a1f119648770430e22bc2ba95e34b61e4ac90bec46b6fad94",
+        "lib/pair-order-market-bound.ts": "a9a22a92278f443be6a9e4064a4069602a126574fc1834c9ecebf230ffd5f528",
+        "lib/token-market.ts": "dd044544b1399ae50756ab40b3058a0918e25083015fcef8979004f4b522f3b9",
+        "lib/imported-pair-order-candidate.ts": "0b4bbc92d9a9483e88e6640382095b57a3c4d2adb4d26f7c9dba2001b31e7044",
+        "lib/imported-pair-wallet-preflight.ts": "625a338877835aa9f41187c07b56162b881ff9a9ff2a1248d9fcc8f036b8f1b8",
+        "lib/imported-pair-quote-service.ts": "afab259f115ccf5e6ae63d60b25fe9ca35bf3331c049d4cf48440629ba92fe35",
+        "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+        "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+        "lib/pair-read-rpc.ts": "49a941e048b77dca269bb3700b641ba625cbdc1617af6648c13fc41075ba6cf0",
+        "lib/wallet-rpc-pacing.ts": "7eb9ae312aeae7f1a03b4611f9658d77011572100b549436ef674de6031c6f87",
+        "lib/pair-order-state.ts": "d9d16722a1fd96f007cc22557dfe7f43c7df1c815f36d6c06515fbb9ce2188fa",
+        "lib/pair-rent-evidence.ts": "8741f65afdc1f019247512c8dda9ee92f2f83ed9c7cf61414f109b2545e9a589",
+        "lib/pair-runtime-trace.ts": "85a02a4adb69e9b910ccbe567e889397c28be3cf1705bbcd88d1586db28f1d13",
+        "lib/pump-group-code-identity.ts": "80bf0ceb2e845059dc647a354f4eab039787ac6b10e9c89aa3725f57809fdc0e",
+        "lib/pair-stock-signing-policy.ts": "ed683c00af77abefad405f280a5c87a6133fc76f2491050e4d65093a9e5ceb1d",
+        "lib/warmup-swap-quote.ts": "8625be45506591b5e0da051be68372c182be80badf329be1f45d49084b96a076",
+        "lib/pair-order-quote-bounds.ts": "0004039763a0a773a55e0a801d8cf559e078bf6b91f0994433d7e2c14f4340ce",
+        "scripts/qualify-stock-pair-runtime.mjs": "8bae32900c8ef680019caa082b98bb6c67d017df8af1a0ab3324e749732207fc"
+      },
+      "sourceUnchanged": true,
+      "publicReferenceKind": "fresh-public-transaction-reference",
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "stage": "order-first-runtime",
+      "passed": false,
+      "requests": [
+        {
+          "startMs": 690.3185,
+          "pipeline": false,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 326.84810000000004
+        },
+        {
+          "startMs": 1020.6199,
+          "pipeline": false,
+          "methods": [
+            "getSignaturesForAddress"
+          ],
+          "status": 200,
+          "headerMs": 126.18690000000004
+        },
+        {
+          "startMs": 1280.5801,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 196.56950000000006
+        },
+        {
+          "startMs": 1481.6951,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 246.4457
+        },
+        {
+          "startMs": 1682.0148,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 131.76250000000005
+        },
+        {
+          "startMs": 1893.7888,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 127.56259999999997
+        },
+        {
+          "startMs": 2092.3747,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 141.24760000000015
+        },
+        {
+          "startMs": 2294.9729,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 147.2772
+        },
+        {
+          "startMs": 2495.5236,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 122.57970000000023
+        },
+        {
+          "startMs": 2683.2048,
+          "pipeline": false,
+          "methods": [
+            "getTransaction"
+          ],
+          "status": 200,
+          "headerMs": 127.01240000000007
+        },
+        {
+          "startMs": 2883.615,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 134.7867000000001
+        },
+        {
+          "startMs": 3083.2,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 132.3777
+        },
+        {
+          "startMs": 3288.4657,
+          "pipeline": false,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 187.51249999999982
+        },
+        {
+          "startMs": 3487.2634,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 149.07230000000027
+        },
+        {
+          "startMs": 3686.5539,
+          "pipeline": false,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 137.4312
+        },
+        {
+          "startMs": 3830.2172,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 121.59949999999981
+        },
+        {
+          "startMs": 3952.8398,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 117.77919999999995
+        },
+        {
+          "startMs": 4071.4892,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 114.28420000000006
+        },
+        {
+          "startMs": 4193.6496,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 354.6352000000006
+        },
+        {
+          "startMs": 4548.8515,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 116.49539999999979
+        },
+        {
+          "startMs": 4672.9373,
+          "pipeline": true,
+          "methods": [
+            "unsigned-order"
+          ],
+          "status": 200,
+          "headerMs": 312.78860000000077
+        },
+        {
+          "startMs": 4992.0314,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 105.36589999999978
+        },
+        {
+          "startMs": 5110.3774,
+          "pipeline": true,
+          "methods": [
+            "getSlot"
+          ],
+          "status": 200,
+          "headerMs": 120.85529999999926
+        },
+        {
+          "startMs": 5231.7939,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 122.96110000000044
+        },
+        {
+          "startMs": 5361.1066,
+          "pipeline": true,
+          "methods": [
+            "quote"
+          ],
+          "status": 200,
+          "headerMs": 158.86599999999999
+        },
+        {
+          "startMs": 5520.3311,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts",
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 121.8121999999994
+        },
+        {
+          "startMs": 5750.8131,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 125.65309999999954
+        },
+        {
+          "startMs": 5890.7711,
+          "pipeline": true,
+          "methods": [
+            "getGenesisHash"
+          ],
+          "status": 200,
+          "headerMs": 113.5630000000001
+        },
+        {
+          "startMs": 6004.5839,
+          "pipeline": true,
+          "methods": [
+            "getMultipleAccounts"
+          ],
+          "status": 200,
+          "headerMs": 117.17960000000039
+        }
+      ],
+      "logicalReads": [
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3829.4201,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 123.2497000000003
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 3952.7051,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674515",
+          "returned": true,
+          "elapsedMs": 118.45910000000003
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4071.3375,
+          "minContextSlot": 457674515,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674516",
+          "clockSlot": "457674516",
+          "chainUnix": "1792161689",
+          "clockSkewMs": 1345,
+          "returned": true,
+          "elapsedMs": 115.00019999999995
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4548.6156,
+          "minContextSlot": 457674516,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674518",
+          "clockSlot": "457674518",
+          "chainUnix": "1792161690",
+          "clockSkewMs": 825,
+          "returned": true,
+          "elapsedMs": 117.5002999999997
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4548.6491,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 117.46800000000076
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 4991.9404,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 105.96969999999965
+        },
+        {
+          "method": "getSlot",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5097.927,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": "457674520",
+          "returned": true,
+          "elapsedMs": 133.76890000000003
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5231.7204,
+          "minContextSlot": 457674520,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674521",
+          "clockSlot": "457674521",
+          "chainUnix": "1792161690",
+          "clockSkewMs": 1514,
+          "returned": true,
+          "elapsedMs": 123.68049999999948
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5520.1666,
+          "minContextSlot": 457674521,
+          "accountCount": 3,
+          "slice": null,
+          "slot": "457674522",
+          "clockSlot": "457674522",
+          "chainUnix": "1792161691",
+          "clockSkewMs": 802,
+          "returned": true,
+          "elapsedMs": 122.64640000000054
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5520.2214,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 122.59269999999924
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5650.6355,
+          "minContextSlot": 457674522,
+          "accountCount": 7,
+          "slice": null,
+          "slot": "457674523",
+          "clockSlot": "457674523",
+          "chainUnix": "1792161691",
+          "clockSkewMs": 1040,
+          "returned": true,
+          "elapsedMs": 230.5565999999999
+        },
+        {
+          "method": "getGenesisHash",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5890.6887,
+          "minContextSlot": null,
+          "accountCount": null,
+          "slice": null,
+          "slot": null,
+          "returned": true,
+          "elapsedMs": 114.57150000000001
+        },
+        {
+          "method": "getMultipleAccounts",
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "startMs": 5891.6317,
+          "minContextSlot": 457674523,
+          "accountCount": 7,
+          "slice": null,
+          "slot": "457674523",
+          "clockSlot": "457674523",
+          "chainUnix": "1792161691",
+          "clockSkewMs": 1281,
+          "returned": true,
+          "elapsedMs": 230.54610000000048
+        }
+      ],
+      "quotes": [
+        {
+          "router": "metis",
+          "expectedOutputRaw": "274243",
+          "minimumOutputRaw": "272871",
+          "observedAt": "2026-10-16T14:41:30.707Z"
+        },
+        {
+          "router": "metis",
+          "expectedOutputRaw": "274257",
+          "minimumOutputRaw": "272885",
+          "observedAt": "2026-10-16T14:41:31.679Z"
+        }
+      ],
+      "quoteAsset": "USDC",
+      "inputUiAmount": "1",
+      "qualificationPacing": "unsigned-helius-qualification-nine-methods-per-second",
+      "rpcPacingMs": 200,
+      "publicReferenceSha256": "90bb54fd9cd954eaa2f6662df1bca692e19bf723701382813fd80c085044f546",
+      "unsignedOrder": {
+        "router": "metis",
+        "expectedOutputRaw": "274243",
+        "minimumOutputRaw": "272871",
+        "observedAt": "2026-10-16T14:41:31.149Z"
+      },
+      "errorName": "Error",
+      "status": 409,
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "pipelineMs": 2303.9072,
+      "elapsedSlots": null,
+      "simulationCount": 0,
+      "http429": 0,
+      "maximumRollingRpcMethods": 7,
+      "firstCodeReads": 0,
+      "finalCodeReads": 0
+    }
+  ]
+}
