@@ -1,0 +1,18 @@
+--- a/components/imported-token-market.tsx
++++ b/components/imported-token-market.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ import { useCallback, useEffect, useRef, useState } from 'react';
+ import { Button } from './ui/button';
++import { usePublishPairMarketSelection } from './pair-market-selection';
+ import { ImportedPoolCandles } from './imported-pool-candles';
+ import { ImportedPoolTrades } from './imported-pool-trades';
+ import { MarketConditionReview } from './market-condition-review';
+@@ -235,6 +236,7 @@
+   }, [refresh, project.archived, chain]);
+   const latest = observations[0],
+     pair = latest?.pairs.find((p) => p.address === selected);
++  usePublishPairMarketSelection(project.id, project.revision, pair?.address ?? null);
+   return (
+     <section
+       className="wallet-warmup-panel imported-market-pane"

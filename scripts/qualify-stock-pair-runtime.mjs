@@ -31,6 +31,8 @@ const hash = (value) => createHash('sha256').update(value).digest('hex');
 const files = [
   'lib/pair-order-first-service.ts',
   'lib/pair-order-first-review.ts',
+  'lib/pair-order-market-bound.ts',
+  'lib/token-market.ts',
   'lib/imported-pair-order-candidate.ts',
   'lib/imported-pair-wallet-preflight.ts',
   'lib/imported-pair-quote-service.ts',

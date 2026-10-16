@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { usePairMarketSelection } from './pair-market-selection';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import { chainQuoteAssets } from '@/lib/quote-catalog';
@@ -19,6 +20,7 @@ export function ImportedPairTradeWalletReview({
   side: 'Buy' | 'Sell';
   locked: boolean;
 }) {
+  const marketPair = usePairMarketSelection(project.id, project.revision);
   const [quoteMint, setQuoteMint] = useState(''),
     [amount, setAmount] = useState(''),
     [allowance, setAllowance] = useState(''),
@@ -44,6 +46,7 @@ export function ImportedPairTradeWalletReview({
         quoteMint,
         feeAndRentLimitRaw: allowance,
         absoluteMinimumRaw: absolute || null,
+        marketPair,
         prepareUnsigned: true,
       }
     : null;
@@ -53,6 +56,11 @@ export function ImportedPairTradeWalletReview({
       <p>
         Review {side.toLowerCase()} against an exact catalog asset. Amounts here
         are separate from the SOL trade form. Signing is disabled.
+      </p>
+      <p>
+        Independent comparison market pair:{' '}
+        {marketPair ??
+          'No market pair is available for this review. The independent comparison is unavailable.'}
       </p>
       <label>
         Pair asset
