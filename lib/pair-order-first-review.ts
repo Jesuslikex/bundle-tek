@@ -50,8 +50,10 @@ export async function buildPairOrderFirstReview(
   market: PairOrderMarketBound = {
     available: false,
     reason: 'No fresh saved market observation is available.',
+    reasonCode: 'market-unavailable',
     acknowledgementRequired: false,
   },
+  marketPair: string | null = null,
 ) {
   const { preflight, order, review } = candidate,
     reference = preflight.quote;
@@ -103,6 +105,7 @@ export async function buildPairOrderFirstReview(
     throw Error('Request a new order review.');
   const terms = {
     format: 'pair-order-first-review-v1' as const,
+    marketPair,
     projectId: reference.pair.projectId,
     projectRevision: reference.pair.projectRevision,
     wallet: preflight.wallet,

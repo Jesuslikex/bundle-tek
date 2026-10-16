@@ -65,7 +65,7 @@ it('renders exact amounts, decoded route, impact, fees, expiry and missing marke
   expect(container.textContent).toContain('Raydium');
   expect(container.textContent).toContain('0.12%');
   expect(container.textContent).toContain('2039280');
-  expect(container.textContent).toContain('No fresh saved USD observation');
+  expect(container.textContent).toContain('No fresh server USD observation');
   expect(container.textContent).toContain('Initial Jupiter preview');
   expect(checks()).toHaveLength(2);
   expect(checks()[0].checked).toBe(false);
@@ -108,20 +108,30 @@ it('expires and clears displayed consent using a controlled clock, with no autom
   expect(button('Request signing authorization').disabled).toBe(true);
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
-it('invalidates the review and consent synchronously when selection changes', async () => {
-  const { fetcher } = await mount();
-  await click(checks()[0]);
-  await act(async () =>
-    root.render(
-      <ImportedPairOrderReview
-        request={{ ...pairReviewUiRequest, walletRevision: 2 }}
-      />,
-    ),
-  );
-  expect(checks()).toHaveLength(0);
-  expect(button('Request signing authorization')).toBeUndefined();
-  expect(fetcher).toHaveBeenCalledTimes(1);
-});
+it.each(['wallet', 'market'] as const)(
+  'invalidates review and consent synchronously when %s changes',
+  async (mode) => {
+    const { fetcher } = await mount();
+    await click(checks()[0]);
+    await act(async () =>
+      root.render(
+        <ImportedPairOrderReview
+          request={
+            mode === 'wallet'
+              ? { ...pairReviewUiRequest, walletRevision: 2 }
+              : {
+                  ...pairReviewUiRequest,
+                  marketPair: pairReviewUiRequest.quoteMint,
+                }
+          }
+        />,
+      ),
+    );
+    expect(checks()).toHaveLength(0);
+    expect(button('Request signing authorization')).toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  },
+);
 it('aborts an old request and refuses its result after a selection change', async () => {
   const saved = await pairReviewUiFixture(now);
   let release: (value: Response) => void = () => {};

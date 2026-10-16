@@ -20,6 +20,7 @@ export async function pairReviewUiFixture(
 ) {
   const terms = {
     format: 'pair-order-first-review-v1',
+    marketPair: null,
     projectId: pairReviewUiRequest.id,
     projectRevision: 1,
     wallet: pairReviewUiRequest.wallet,
@@ -55,7 +56,7 @@ export async function pairReviewUiFixture(
     marketComparison: marketWarning
       ? {
           available: true,
-          source: 'saved-dexscreener-usd-observations',
+          source: 'saved-token-and-server-quote-dexscreener-usd',
           baseObservedAt: new Date(now).toISOString(),
           quoteObservedAt: new Date(now).toISOString(),
           baseMarketPair: 'base-pool',
@@ -70,7 +71,8 @@ export async function pairReviewUiFixture(
         }
       : {
           available: false,
-          reason: 'No fresh saved USD observation for the exact pair asset.',
+          reason: 'No fresh server USD observation for the exact pair asset.',
+          reasonCode: 'quote-price-unavailable',
           acknowledgementRequired: false,
         },
     acknowledgementRequired: warning || marketWarning,

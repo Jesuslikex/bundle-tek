@@ -1,5 +1,8 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import type { TokenMarket } from './token-market';
+import { pairQuoteMint } from '../test/imported-pair-quote-fixture';
+import { pairWalletTokenAccount } from '../test/pair-wallet-fixture';
 import { pairOrderFixture } from '../test/pair-order-fixture';
 import { authorizePairOrderAfterRecheck } from './pair-order-authorization';
 import {
@@ -302,4 +305,160 @@ it.each([
   expect(() =>
     pairOrderFirstRequest({ ...v.orderRequest, ...extra }),
   ).toThrow();
+});
+
+it('reads the exact quote mint on the server alongside preparation, pins its evidence, and uses the selected base pool', async () => {
+  const { v, request } = await setup();
+  // Synthetic unscaled quote asset for this branch. The normal fixture retains real TSLAX scaling.
+  v.mints[1] = { ...v.mints[1], ...pairQuoteMint(8, v.mints[1].owner) };
+  v.accounts[1] = pairWalletTokenAccount(
+    request.quoteMint,
+    v.wallet,
+    v.mints[1].owner,
+    '500000000',
+    [{ __kind: 'ImmutableOwner' }],
+  );
+  const stamp = new Date(v.clock.now).toISOString();
+  const pool = (address: string, priceUsd: string) => ({
+    address,
+    priceUsd,
+    dex: 'test',
+    url: 'https://dexscreener.com/solana/' + address,
+    quoteSymbol: 'USD',
+    liquidityUsd: 100,
+    volume24hUsd: null,
+    change24h: null,
+    marketCapUsd: null,
+  });
+  const counter: TokenMarket = {
+    chain: 'Solana',
+    address: request.quoteMint,
+    observedAt: stamp,
+    source: 'api.dexscreener.com',
+    pairs: [pool(request.quoteMint, '150')],
+    returnedPairCount: 1,
+    quoteOnlyPairCount: 0,
+    executionAllowed: false,
+  };
+  const base = {
+    ...counter,
+    address: v.baseMint,
+    projectRevision: 1,
+    pairs: [pool(v.wallet, '999999'), pool(v.baseMint, '1')],
+  };
+  v.sqlite
+    .prepare('INSERT INTO imported_market_observations VALUES(?,?,?,?)')
+    .run('alice', request.id, JSON.stringify([base]), stamp);
+  expect(
+    v.sqlite
+      .prepare(
+        'SELECT count(*) AS n FROM imported_token_projects WHERE address=?',
+      )
+      .get(request.quoteMint),
+  ).toMatchObject({ n: 0 });
+  let release: (value: TokenMarket) => void = () => {};
+  const waiting = new Promise<TokenMarket>((resolve) => {
+    release = resolve;
+  });
+  const observe = vi.fn(async () => waiting);
+  let prepared: () => void = () => {};
+  const started = new Promise<void>((resolve) => {
+    prepared = resolve;
+  });
+  const original = v.prepare.getMockImplementation()!;
+  v.prepare.mockImplementation(async (...args) => {
+    prepared();
+    return original(...args);
+  });
+  const pending = prepareOwnedPairOrderFirstReview(
+    v.db,
+    'alice',
+    { ...request, marketPair: v.baseMint },
+    new AbortController().signal,
+    { ...v.orderDependencies, observeQuoteMarket: observe },
+  );
+  await started;
+  release(counter);
+  const result = await pending;
+  expect(observe).toHaveBeenCalledWith(
+    { chain: 'Solana', address: request.quoteMint },
+    expect.any(AbortSignal),
+  );
+
+  expect(result.review).toMatchObject({
+    marketPair: v.baseMint,
+    marketComparison: {
+      available: true,
+      baseMarketPair: v.baseMint,
+      basePriceUsd: '1',
+      quotePriceUsd: '150',
+      quoteObservation: counter,
+    },
+  });
+  await expect(
+    approveOwnedPairOrderFirstReview(
+      v.db,
+      'alice',
+      result.id,
+      {
+        reviewSha256: result.review.sha256,
+        packetSha256: result.review.packetSha256,
+        approvedMinimumOutputRaw: result.review.minimumOutputRaw,
+        approveExactOrder: true,
+        acknowledgeIndependentDifference: true,
+        acknowledgeUnavailableIndependentPrice: false,
+      },
+      v.clock.now,
+    ),
+  ).rejects.toThrow('Stock signing is disabled');
+  expect(observe).toHaveBeenCalledOnce();
+});
+it.each(['not-a-pool', 1, {}, ' ' + '11111111111111111111111111111111'])(
+  'rejects malformed or noncanonical market selection %s',
+  (marketPair) => {
+    expect(() =>
+      pairOrderFirstRequest({
+        id: '11111111-1111-4111-8111-111111111111',
+        revision: 1,
+        wallet: '11111111111111111111111111111111',
+        walletRevision: 1,
+        amount: '1',
+        quoteMint: 'So11111111111111111111111111111111111111112',
+        side: 'Buy',
+        feeAndRentLimitRaw: '10000',
+        prepareUnsigned: true,
+        absoluteMinimumRaw: null,
+        marketPair,
+      }),
+    ).toThrow();
+  },
+);
+
+it('keeps real scaled TSLAX quote units unavailable and does not request a USD conversion', async () => {
+  const { v, request } = await setup();
+  const observe = vi.fn();
+  const stamp = new Date(v.clock.now).toISOString();
+  const base = {
+    chain: 'Solana',
+    address: v.baseMint,
+    observedAt: stamp,
+    source: 'api.dexscreener.com',
+    projectRevision: 1,
+    pairs: [{ address: v.baseMint, priceUsd: '1' }],
+  };
+  v.sqlite
+    .prepare('INSERT INTO imported_market_observations VALUES(?,?,?,?)')
+    .run('alice', request.id, JSON.stringify([base]), stamp);
+  const result = await prepareOwnedPairOrderFirstReview(
+    v.db,
+    'alice',
+    { ...request, marketPair: v.baseMint },
+    new AbortController().signal,
+    { ...v.orderDependencies, observeQuoteMarket: observe },
+  );
+  expect(result.review.marketComparison).toMatchObject({
+    available: false,
+    reason: expect.stringContaining('scaled-token'),
+  });
+  expect(observe).not.toHaveBeenCalled();
 });

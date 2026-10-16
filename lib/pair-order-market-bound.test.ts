@@ -1,7 +1,8 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import {
   pairOrderMarketBound,
   readPairOrderMarketBound,
+  readPairQuoteUsdObservation,
 } from './pair-order-market-bound';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import type { ImportedPairQuote } from './imported-trade-pair';
@@ -52,7 +53,9 @@ it.each([
   'warns only on worse %s expected price: %s/%s',
   (side, input, output, required) => {
     const { q, order, base, counter } = setup(side, input, output);
-    expect(pairOrderMarketBound(q, order, base, counter, now)).toMatchObject({
+    expect(
+      pairOrderMarketBound(q, order, base, counter, now, 'base-pool'),
+    ).toMatchObject({
       available: true,
       acknowledgementRequired: required,
     });
@@ -61,7 +64,9 @@ it.each([
 it('converts quote asset USD price instead of assuming a stablecoin peg', () => {
   const { q, order, base, counter } = setup();
   counter.pairs[0].priceUsd = '2';
-  expect(pairOrderMarketBound(q, order, base, counter, now)).toMatchObject({
+  expect(
+    pairOrderMarketBound(q, order, base, counter, now, 'base-pool'),
+  ).toMatchObject({
     available: true,
     orderImpliedBasePriceUsd: '20.000000000000000000',
     acknowledgementRequired: true,
@@ -99,6 +104,7 @@ it.each([
     mode === 'missing-base' ? null : base,
     mode === 'missing-quote' ? null : counter,
     now,
+    'base-pool',
   );
   expect(result).toMatchObject({
     available: false,
@@ -114,7 +120,9 @@ it('handles exact micro prices and amounts without floating point or exponent no
   );
   base.pairs[0].priceUsd = '0.000000000000000001';
   counter.pairs[0].priceUsd = '0.000000000000000001';
-  expect(pairOrderMarketBound(q, order, base, counter, now)).toMatchObject({
+  expect(
+    pairOrderMarketBound(q, order, base, counter, now, 'base-pool'),
+  ).toMatchObject({
     available: true,
     acknowledgementRequired: true,
     differenceBps: '-200',
@@ -123,12 +131,14 @@ it('handles exact micro prices and amounts without floating point or exponent no
 it('allows exactly five minutes and retains the earlier USD-source expiry', () => {
   const { q, order, base, counter } = setup();
   counter.observedAt = new Date(now - 300000).toISOString();
-  expect(pairOrderMarketBound(q, order, base, counter, now)).toMatchObject({
+  expect(
+    pairOrderMarketBound(q, order, base, counter, now, 'base-pool'),
+  ).toMatchObject({
     available: true,
     expiresAt: stamp,
   });
 });
-it('reads the stats collection for the current owner/revisions and never substitutes another owner or archived quote', async () => {
+it('uses the owned base observation and a server quote observation without requiring an imported quote project', async () => {
   const { q, order, base, counter } = setup();
   q.pair.projectId = 'base-project';
   const sqlite = new DatabaseSync(':memory:');
@@ -167,7 +177,11 @@ it('reads the stats collection for the current owner/revisions and never substit
       },
     } as unknown as D1Database;
     expect(
-      await readPairOrderMarketBound(db, 'alice', q, order, now),
+      await readPairOrderMarketBound(db, 'alice', q, order, now, {
+        selectedMarketPair: 'base-pool',
+        observeQuote: async () => counter,
+        clock: () => now,
+      }),
     ).toMatchObject({
       available: true,
       quotePriceUsd: '1',
@@ -178,18 +192,71 @@ it('reads the stats collection for the current owner/revisions and never substit
       "UPDATE imported_token_projects SET archived=1 WHERE id='quote-project'",
     );
     expect(
-      await readPairOrderMarketBound(db, 'alice', q, order, now),
-    ).toMatchObject({
-      available: false,
-      reason: expect.stringContaining('exact pair asset'),
-    });
+      await readPairOrderMarketBound(db, 'alice', q, order, now, {
+        selectedMarketPair: 'base-pool',
+        observeQuote: async () => counter,
+        clock: () => now,
+      }),
+    ).toMatchObject({ available: true, quotePriceUsd: '1' });
     sqlite.exec(
       "UPDATE imported_token_projects SET revision=2 WHERE id='base-project'",
     );
     expect(
-      await readPairOrderMarketBound(db, 'alice', q, order, now),
+      await readPairOrderMarketBound(db, 'alice', q, order, now, {
+        selectedMarketPair: 'base-pool',
+        observeQuote: async () => counter,
+        clock: () => now,
+      }),
     ).toMatchObject({ available: false });
   } finally {
     sqlite.close();
   }
+});
+
+it('compares exactly the selected saved pool instead of the first pool', () => {
+  const { q, order, base, counter } = setup();
+  base.pairs.unshift({
+    ...base.pairs[0],
+    address: 'different-pool',
+    priceUsd: '10000',
+  });
+  expect(
+    pairOrderMarketBound(q, order, base, counter, now, 'base-pool'),
+  ).toMatchObject({
+    available: true,
+    basePriceUsd: '10',
+    baseMarketPair: 'base-pool',
+    acknowledgementRequired: false,
+  });
+  expect(
+    pairOrderMarketBound(q, order, base, counter, now, 'unknown-pool'),
+  ).toMatchObject({ available: false });
+  expect(
+    pairOrderMarketBound(q, order, base, counter, now, null),
+  ).toMatchObject({ available: false });
+});
+it('keeps scaled quote units unavailable too, even with a perfect USD observation', () => {
+  const { q, order, base, counter } = setup();
+  q.pair.quote.amountPolicy = {
+    kind: 'scaled-ui-v1',
+    multiplierHex: '3ff0000000000000',
+    nextMultiplierHex: '3ff0000000000000',
+    effectiveTimestamp: '1',
+  };
+  expect(
+    pairOrderMarketBound(q, order, base, counter, now, 'base-pool'),
+  ).toMatchObject({
+    available: false,
+    reason: expect.stringContaining('scaled-token'),
+  });
+});
+
+it('returns unavailable after a bounded quote read failure instead of assuming a peg', async () => {
+  const observe = vi.fn(async () => {
+    throw Error('offline');
+  });
+  await expect(
+    readPairQuoteUsdObservation('quote', new AbortController().signal, observe),
+  ).resolves.toBeNull();
+  expect(observe).toHaveBeenCalledOnce();
 });

@@ -111,6 +111,7 @@ function PairOrderReviewSession({
         data.review.wallet !== request.wallet ||
         data.review.side !== request.side ||
         data.review.absoluteMinimumRaw !== request.absoluteMinimumRaw ||
+        data.review.marketPair !== (request.marketPair ?? null) ||
         (request.side === 'Buy'
           ? data.review.inputMint
           : data.review.outputMint) !== request.quoteMint
@@ -258,7 +259,7 @@ function PairOrderReviewSession({
                 <>
                   Order-implied token price: $
                   {review.marketComparison.orderImpliedBasePriceUsd}. Saved
-                  token price: ${review.marketComparison.basePriceUsd}. Saved
+                  token price: ${review.marketComparison.basePriceUsd}. Server
                   pair-asset price: ${review.marketComparison.quotePriceUsd}.
                   Difference:{' '}
                   {(

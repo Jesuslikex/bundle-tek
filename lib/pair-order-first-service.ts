@@ -1,4 +1,6 @@
 import { env } from './server-env';
+import { walletAddress } from './wallet-workspace';
+import type { observeTokenMarket } from './token-market';
 import {
   quoteOwnedImportedPair,
   configuredPairQuoteDependencies,
@@ -26,16 +28,25 @@ import { createPairReadRpc } from './pair-read-rpc';
 import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
 import {
   readPairOrderMarketBound,
+  readPairQuoteUsdObservation,
   type PairOrderMarketBound,
 } from './pair-order-market-bound';
 
 export type PairOrderFirstRequest = ImportedPairOrderRequest & {
   absoluteMinimumRaw: string | null;
+  marketPair?: string | null;
+};
+type PairOrderFirstDependencies = ImportedPairOrderDependencies & {
+  observeQuoteMarket?: typeof observeTokenMarket;
 };
 export function pairOrderFirstRequest(value: unknown): PairOrderFirstRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new ImportedPairQuoteError('Order review request required.', 400);
-  const { absoluteMinimumRaw, ...rest } = value as Record<string, unknown>;
+  const {
+    absoluteMinimumRaw,
+    marketPair = null,
+    ...rest
+  } = value as Record<string, unknown>;
   if (
     absoluteMinimumRaw !== null &&
     (typeof absoluteMinimumRaw !== 'string' ||
@@ -46,14 +57,28 @@ export function pairOrderFirstRequest(value: unknown): PairOrderFirstRequest {
       'Choose a positive raw absolute minimum or null.',
       400,
     );
-  return { ...importedPairOrderRequest(rest), absoluteMinimumRaw };
+  if (marketPair !== null) {
+    try {
+      if (walletAddress(marketPair, 'Solana') !== marketPair) throw Error();
+    } catch {
+      throw new ImportedPairQuoteError(
+        'Choose the exact saved market pair.',
+        400,
+      );
+    }
+  }
+  return {
+    ...importedPairOrderRequest(rest),
+    absoluteMinimumRaw,
+    marketPair: marketPair as string | null,
+  };
 }
 export async function prepareOwnedPairOrderFirstReview(
   db: D1Database,
   owner: string,
   value: PairOrderFirstRequest,
   signal: AbortSignal,
-  dependencies?: ImportedPairOrderDependencies,
+  dependencies?: PairOrderFirstDependencies,
 ) {
   return preparePairOrderFirst(db, owner, value, signal, dependencies);
 }
@@ -64,7 +89,7 @@ export async function qualifyOwnedPairOrderFirstRuntime(
   owner: string,
   value: PairOrderFirstRequest,
   signal: AbortSignal,
-  dependencies?: ImportedPairOrderDependencies & {
+  dependencies?: PairOrderFirstDependencies & {
     programRpc?: ImportedPairOrderDependencies['rpc'];
   },
 ) {
@@ -116,12 +141,16 @@ async function preparePairOrderFirst(
   owner: string,
   value: PairOrderFirstRequest,
   signal: AbortSignal,
-  dependencies?: ImportedPairOrderDependencies,
+  dependencies?: PairOrderFirstDependencies,
   programRpc?: ImportedPairOrderDependencies['rpc'],
 ) {
-  const { absoluteMinimumRaw, ...request } = pairOrderFirstRequest(value);
+  const {
+    absoluteMinimumRaw,
+    marketPair = null,
+    ...request
+  } = pairOrderFirstRequest(value);
   signal = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
-  const provider = {
+  const provider: PairOrderFirstDependencies = {
     ...(dependencies ?? {
       ...configuredPairQuoteDependencies(signal),
       prepare: (
@@ -156,6 +185,18 @@ async function preparePairOrderFirst(
     provider,
   );
   signal.throwIfAborted();
+  // Run the independent quote observation alongside packet preparation/code IO,
+  // not after the final on-chain recheck. Scaled units are deliberately unsupported.
+  const quoteObservationPending =
+    marketPair &&
+    initial.pair.base.amountPolicy.kind === 'unscaled' &&
+    initial.pair.quote.amountPolicy.kind === 'unscaled'
+      ? readPairQuoteUsdObservation(
+          initial.pair.quote.address,
+          signal,
+          provider.observeQuoteMarket,
+        )
+      : Promise.resolve(null);
   const order = await provider.prepare(
     {
       baseMint: initial.pair.base.address,
@@ -207,12 +248,18 @@ async function preparePairOrderFirst(
       return collected.review;
     },
   );
+  const quoteObservation = await quoteObservationPending;
   const market = await readPairOrderMarketBound(
     db,
     owner,
     candidate.preflight.quote,
     candidate.order,
     now(),
+    {
+      selectedMarketPair: marketPair,
+      quoteObservation,
+      signal,
+    },
   );
   const review = await buildPairOrderFirstReview(
     candidate,
@@ -220,12 +267,13 @@ async function preparePairOrderFirst(
     absoluteMinimumRaw,
     now(),
     market,
+    marketPair,
   );
   const id = crypto.randomUUID();
   if (JSON.stringify(originalOwned) !== JSON.stringify(await ownedSnapshot()))
     throw new ImportedPairQuoteError('Owned review context changed.');
   const record = {
-    request: { ...request, absoluteMinimumRaw },
+    request: { ...request, absoluteMinimumRaw, marketPair },
     initial,
     candidate,
     review,
@@ -292,6 +340,7 @@ export async function readOwnedPairOrderFirstReview(
     record.request.absoluteMinimumRaw,
     Date.parse(record.review.createdAt),
     record.market,
+    record.request.marketPair ?? null,
   );
   if (JSON.stringify(rebuilt) !== JSON.stringify(record.review))
     throw new ImportedPairQuoteError('Saved order review changed.');
@@ -315,6 +364,13 @@ export async function approveOwnedPairOrderFirstReview(
     record.candidate.preflight.quote,
     record.candidate.order,
     now,
+    {
+      selectedMarketPair: record.request.marketPair ?? null,
+      quoteObservation: record.market.available
+        ? record.market.quoteObservation
+        : null,
+      signal,
+    },
   );
   if (JSON.stringify(market) !== JSON.stringify(record.market))
     throw new ImportedPairQuoteError(
