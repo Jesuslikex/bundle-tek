@@ -55,6 +55,65 @@ export async function prepareOwnedPairOrderFirstReview(
   signal: AbortSignal,
   dependencies?: ImportedPairOrderDependencies,
 ) {
+  return preparePairOrderFirst(db, owner, value, signal, dependencies);
+}
+
+/** Internal unsigned qualification only; no request flag, approval or signing authority. */
+export async function qualifyOwnedPairOrderFirstRuntime(
+  db: D1Database,
+  owner: string,
+  value: PairOrderFirstRequest,
+  signal: AbortSignal,
+  dependencies?: ImportedPairOrderDependencies & {
+    programRpc?: ImportedPairOrderDependencies['rpc'];
+  },
+) {
+  const child = new AbortController();
+  signal = AbortSignal.any([signal, child.signal, AbortSignal.timeout(45000)]);
+  const reads = dependencies
+    ? undefined
+    : createPairReadRpc(getSolanaIndexerRpcEndpoint(), signal);
+  try {
+    const provider = dependencies ?? {
+      ...configuredPairQuoteDependencies(signal),
+      rpc: reads!.rpc,
+      prepare: (
+        input: Parameters<typeof prepareSolanaPair>[0],
+        s: AbortSignal,
+      ) => prepareSolanaPair(input, env.JUPITER_API_KEY, s),
+    };
+    const result = await preparePairOrderFirst(
+      db,
+      owner,
+      value,
+      signal,
+      provider,
+      dependencies?.programRpc ?? reads?.programRpc ?? provider.rpc,
+    );
+    if (!result.runtime)
+      throw new ImportedPairQuoteError(
+        'Unsigned runtime qualification evidence is missing.',
+      );
+    return {
+      ...result,
+      runtime: result.runtime,
+      signingAllowed: false as const,
+      executionAllowed: false as const,
+    };
+  } finally {
+    child.abort();
+    reads?.close();
+  }
+}
+
+async function preparePairOrderFirst(
+  db: D1Database,
+  owner: string,
+  value: PairOrderFirstRequest,
+  signal: AbortSignal,
+  dependencies?: ImportedPairOrderDependencies,
+  programRpc?: ImportedPairOrderDependencies['rpc'],
+) {
   const { absoluteMinimumRaw, ...request } = pairOrderFirstRequest(value);
   signal = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
   const provider = {
@@ -76,7 +135,7 @@ export async function prepareOwnedPairOrderFirstReview(
       .first();
   const originalOwned = await ownedSnapshot();
   const now = provider.now ?? Date.now;
-  // Server-created independent baseline, never an arbitrary client-supplied number.
+  // Server-created Jupiter baseline, never an arbitrary client-supplied number.
   const {
     prepareUnsigned: _consent,
     wallet: _wallet,
@@ -105,6 +164,9 @@ export async function prepareOwnedPairOrderFirstReview(
   signal.throwIfAborted();
   // Existing owned lifecycle now fetches its fresh quote AFTER packet preparation.
   // Its unchanged lower-bound check and independent decoder/simulation still run.
+  let runtime:
+    | Awaited<ReturnType<typeof collectPairRuntimePreview>>['runtime']
+    | undefined;
   const candidate = await inspectOwnedImportedPairOrder(
     db,
     owner,
@@ -126,8 +188,19 @@ export async function prepareOwnedPairOrderFirstReview(
         return order;
       },
     },
-    (preflight, packet, rpc, clock) =>
-      collectPairOrderReview(preflight, packet, rpc, clock),
+    async (preflight, packet, rpc, clock) => {
+      if (!programRpc)
+        return collectPairOrderReview(preflight, packet, rpc, clock);
+      const collected = await collectPairRuntimePreview(
+        { preflight, order: packet },
+        rpc,
+        programRpc,
+        signal,
+        clock,
+      );
+      runtime = collected.runtime;
+      return collected.review;
+    },
   );
   const market = await readPairOrderMarketBound(
     db,
@@ -181,7 +254,7 @@ export async function prepareOwnedPairOrderFirstReview(
   signal.throwIfAborted();
   if (saved.meta.changes !== 1)
     throw new ImportedPairQuoteError('Order review could not be saved.');
-  return { id, review };
+  return { id, review, ...(runtime ? { runtime } : {}) };
 }
 
 export async function readOwnedPairOrderFirstReview(

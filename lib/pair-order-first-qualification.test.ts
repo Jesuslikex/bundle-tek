@@ -1,0 +1,110 @@
+import { afterEach, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { pairRuntimeFixture } from '../test/pair-runtime-fixture';
+import {
+  qualifyOwnedPairOrderFirstRuntime,
+  pairOrderFirstRequest,
+} from './pair-order-first-service';
+let fixture: Awaited<ReturnType<typeof pairRuntimeFixture>> | undefined;
+afterEach(() => {
+  fixture?.close();
+  fixture = undefined;
+});
+async function setup() {
+  const f = (fixture = await pairRuntimeFixture());
+  f.sqlite.exec(
+    'CREATE TABLE imported_market_observations(owner_id TEXT,project_id TEXT,document TEXT,observed_at TEXT)',
+  );
+  f.sqlite.exec(
+    readFileSync(
+      new URL('../drizzle/0089_pair_order_first_reviews.sql', import.meta.url),
+      'utf8',
+    ).replaceAll('--> statement-breakpoint', ''),
+  );
+  const request = { ...f.orderRequest, absoluteMinimumRaw: null };
+  const run = (signal = new AbortController().signal) =>
+    qualifyOwnedPairOrderFirstRuntime(
+      f.db,
+      'alice',
+      request,
+      signal,
+      f.runtimeDependencies,
+    );
+  return { f, request, run };
+}
+it('qualifies the exact order-first lifecycle with one simulation, fresh full code scans and no signing authority', async () => {
+  const { f, run } = await setup();
+  f.runtimeState.onCodeRead = () => {};
+  const sequence: string[] = [],
+    quote = f.quote.getMockImplementation()!,
+    prepare = f.prepare.getMockImplementation()!;
+  f.quote.mockImplementation(async (...args) => {
+    sequence.push('quote');
+    return quote(...args);
+  });
+  f.prepare.mockImplementation(async (...args) => {
+    sequence.push('order');
+    return prepare(...args);
+  });
+  const result = await run();
+  expect(sequence).toEqual(['quote', 'order', 'quote']);
+  expect(
+    f.rpc.mock.calls.filter(([m]) => m === 'simulateTransaction'),
+  ).toHaveLength(1);
+  expect(f.runtimeState.codeReads).toBe(f.programs.size * 6);
+  expect(
+    result.runtime.maximumSlot - result.runtime.minimumSlot,
+  ).toBeLessThanOrEqual(32);
+  expect(result).toMatchObject({
+    signingAllowed: false,
+    executionAllowed: false,
+    runtime: {
+      codeIdentityObserved: true,
+      trustedProgramPolicyEstablished: false,
+      signingAllowed: false,
+    },
+  });
+  expect(result.review.minimumOutputRaw).toBe('995000');
+});
+it.each(['changed-code', '33-slots', 'abort'] as const)(
+  'refuses %s without publishing a qualification',
+  async (mode) => {
+    const { f, run } = await setup();
+    const controller = new AbortController();
+    f.runtimeState.onCodeRead = (key, count) => {
+      if (count <= f.programs.size * 3) return;
+      if (mode === 'changed-code')
+        f.programs.get(key)!.data[0] = Buffer.from(
+          new Uint8Array(256).fill(1),
+        ).toString('base64');
+      if (mode === 'abort') controller.abort();
+    };
+    if (mode === '33-slots') {
+      const original = f.runtimeDependencies.programRpc!;
+      f.runtimeDependencies.programRpc = async (method, params) => {
+        const result = await original(method, params);
+        if (
+          method === 'getMultipleAccounts' &&
+          result &&
+          typeof result === 'object'
+        )
+          (result as { context: { slot: string } }).context.slot = String(
+            (params[1] as { minContextSlot: number }).minContextSlot + 33,
+          );
+        return result;
+      };
+    }
+    await expect(run(controller.signal)).rejects.toThrow();
+    expect(
+      f.sqlite
+        .prepare('SELECT count(*) AS n FROM pair_order_first_reviews')
+        .get()!.n,
+    ).toBe(0);
+  },
+);
+it('has no client-selectable qualification or signing flag', async () => {
+  const { request } = await setup();
+  expect(() =>
+    pairOrderFirstRequest({ ...request, qualifyRuntime: true }),
+  ).toThrow();
+});
