@@ -1,6 +1,7 @@
 import type { PairOrderFirstRequest } from '../lib/pair-order-first-service';
 import type { PairOrderFirstReview } from '../lib/pair-order-first-review';
 import { pairRuntimeDigest } from '../lib/pair-runtime-trace';
+import { PAIR_FRESH_REFERENCE_MINIMUM_TOLERANCE_BPS } from '../lib/pair-order-quote-bounds';
 export const pairReviewUiRequest: PairOrderFirstRequest = {
   id: '11111111-1111-4111-8111-111111111111',
   revision: 1,
@@ -43,7 +44,8 @@ export async function pairReviewUiFixture(
       minimumOutputAmount: '0.995',
     },
     freshReferenceOutputRaw: '1000000',
-    freshReferenceMinimumRaw: '995000',
+    freshReferenceMinimumRaw: '995995',
+    freshReferenceToleranceBps: PAIR_FRESH_REFERENCE_MINIMUM_TOLERANCE_BPS,
     freshReferenceObservedAt: new Date(now).toISOString(),
     previewComparison: {
       source: 'initial-jupiter-preview',

@@ -67,6 +67,9 @@ it('renders exact amounts, decoded route, impact, fees, expiry and missing marke
   expect(container.textContent).toContain('2039280');
   expect(container.textContent).toContain('No fresh server USD observation');
   expect(container.textContent).toContain('Initial Jupiter preview');
+  expect(container.textContent).toContain(
+    '995995 atomic units. Order minimum: 995000 atomic units. Fresh-reference tolerance: 0.1%',
+  );
   expect(checks()).toHaveLength(2);
   expect(checks()[0].checked).toBe(false);
   expect(button('Request signing authorization').disabled).toBe(true);

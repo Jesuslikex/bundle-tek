@@ -239,9 +239,12 @@ function PairOrderReviewSession({
               ({review.minimumOutputRaw} atomic units)
             </dd>
             <dt>Slippage bound</dt>
+            <dd>0.5%</dd>
+            <dt>Fresh reference minimum</dt>
             <dd>
-              0.5%. Fresh reference minimum: {review.freshReferenceMinimumRaw}{' '}
-              atomic units.
+              {review.freshReferenceMinimumRaw} atomic units. Order minimum:{' '}
+              {review.minimumOutputRaw} atomic units. Fresh-reference tolerance:{' '}
+              {(review.freshReferenceToleranceBps ?? 0) / 100}%.
             </dd>
             <dt>Initial Jupiter preview</dt>
             <dd>
