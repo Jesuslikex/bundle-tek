@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October Counter preview UI
+
+Read docs/CODEX-COUNTER-PREVIEW-UI-UPDATE-20261016.md. Codex-owned Counter pricing now mounts an explicit verified-wallet/fee-limit read-only settlement preview. Exact response/authority/freshness validation, context invalidation, cancellation and local expiry; no auto fetch/retry or sign/send controls. Final16 files/182 tests, TypeScript/typed lint/format pass. Existing Chrome desktop/375px synthetic harness renders costs without horizontal phone overflow; no live provider, authenticated production, build or full-suite proof. Only Codex files, no globalCSS rewrite or Claude shell/token files. No stock gate/provider/credential/cron/SQL/push/deploy/wallet action. Preserve main dirty files.
+
 ## 16 October owned Counter Buy preview
 
 Read docs/CODEX-COUNTER-OWNED-PREVIEW-20261016.md. New owned read-only server/API composition joins existing Counter preparation/simulation/gross settlement after exact plan/project/wallet-proof/exclusion admission, with owned snapshot rechecks after each stage. No packet/approval/reservation/signing authority in response; fresh source/code admission and durable execution review remain open. Existing15-second gate only DB write; no new migration. 12files/152 targeted tests, TypeScript/four-file typed lint/format pass. Boundary/API tests use declared provider doubles; no live/browser/build/full-app proof. No UI/Claude file, stock gate, provider/credential/cron/SQL/deploy/push/wallet action. Preserve main dirty files.

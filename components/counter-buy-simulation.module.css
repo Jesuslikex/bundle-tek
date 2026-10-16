@@ -1,0 +1,39 @@
+.panel {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border, #30323d);
+}
+.fields,
+.summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-block: 1rem;
+}
+.fields label {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+.fields select {
+  width: 100%;
+  min-width: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.summary dt {
+  color: var(--muted-foreground, #a2a6b4);
+  font-size: 0.8rem;
+}
+.summary dd {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .fields,
+  .summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

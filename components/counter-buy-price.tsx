@@ -7,6 +7,7 @@ import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { readPanelJson } from './read-panel-json';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { CounterBuySimulation } from './counter-buy-simulation';
 const SOL = 'So11111111111111111111111111111111111111112';
 const MAX = (1n << 64n) - 1n;
 function raw(value: unknown) {
@@ -264,12 +265,18 @@ function PriceControls({
                 amounts exclude network fees and account rent.
               </p>
               <p>
-                Preview only. Transaction preparation and signing are not
-                connected.
+                Preview only. Use the separate settlement preview below to
+                simulate wallet costs. Signing remains unavailable.
               </p>
             </>
           ))}
       </div>
+      <CounterBuySimulation
+        plan={plan}
+        decisionIdentity={identity}
+        maximumSolAmount={budget}
+        locked={locked || busy}
+      />
     </section>
   );
 }

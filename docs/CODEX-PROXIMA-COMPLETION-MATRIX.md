@@ -1,5 +1,9 @@
 # Proxima reconstruction completion matrix
 
+## 16 October Counter preview controls
+
+The owned read-only Counter preview API is now connected to explicit verified-wallet selection and separate swap/fee-rent limits in Codex-owned Counter controls. It validates exact response context and false authority flags, clears changed/cancelled/expired evidence and shows costs with execution limitations. Final scoped verification: 16 files/182 tests, TypeScript, typed lint and format; desktop/375px Chrome rendering uses labelled synthetic responses, not live provider proof. See CODEX-COUNTER-PREVIEW-UI-UPDATE-20261016.md. Fresh source/code admission and durable approval/execution/recovery remain open; Counter execution and stock signing are not enabled. No provider change or deploy.
+
 ## 16 October owned Counter preview checkpoint
 
 The authenticated counter-previews API now joins the existing unsigned preparation, original-packet simulation and gross native settlement under current owned plan/project/wallet-proof/exclusion guards, with exact context rechecks after each provider stage. It returns a read-only summary without packet bytes or approval authority. Twelve targeted files/152 tests and TypeScript/lint/format pass; provider stages are declared fixtures, and UI/live/full-suite proof is absent. Fresh trigger/code admission, immutable prepared storage, reservations, approval/signing/submission/recovery and broader Counter paths remain incomplete. See CODEX-COUNTER-OWNED-PREVIEW-20261016.md. Stock repeatability is still incomplete after the latest rate-limit stop; no provider was configured and signing/deploy remain off.
