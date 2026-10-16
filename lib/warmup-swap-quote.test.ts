@@ -3,6 +3,7 @@ import {
   quoteWarmupBuy,
   quoteSolanaBuy,
   quoteSolanaSell,
+  quoteSolanaPair,
   WRAPPED_SOL,
 } from './warmup-swap-quote';
 const mint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
@@ -33,6 +34,57 @@ const result = {
   transaction: 'untrustedTransaction',
   requestId: 'untrustedRequest',
 };
+it.each(['metis', 'jupiterz', 'dflow', 'okx'] as const)(
+  'aligns unsigned pair reference quotes with wallet-bound routing and rejects ignored exclusions: %s',
+  async (router) => {
+    const fetcher = vi.fn(async (_url: unknown) =>
+      Response.json({ ...result, router }),
+    );
+    const pending = quoteSolanaPair(
+      {
+        baseMint: mint,
+        quoteMint: WRAPPED_SOL,
+        side: 'Buy',
+        amountRaw: '1000000',
+      },
+      'qa-key',
+      new AbortController().signal,
+      fetcher,
+    );
+    if (router === 'metis')
+      await expect(pending).resolves.toMatchObject({
+        router: 'metis',
+        slippageBps: 50,
+      });
+    else
+      await expect(pending).rejects.toMatchObject({
+        code: 'UNSUPPORTED_ROUTER',
+      });
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    expect(url.searchParams.get('excludeRouters')).toBe('jupiterz,dflow,okx');
+    expect(url.searchParams.get('slippageBps')).toBe('50');
+    expect(url.searchParams.has('taker')).toBe(false);
+    expect(fetcher).toHaveBeenCalledOnce();
+  },
+);
+it('preserves broader quote-only routing for the existing non-pair swap flow', async () => {
+  const fetcher = vi.fn(async (_url: unknown) =>
+    Response.json({ ...result, router: 'okx' }),
+  );
+  await expect(
+    quoteSolanaBuy(
+      { outputMint: mint, amount: '0.001' },
+      'qa-key',
+      new AbortController().signal,
+      fetcher,
+    ),
+  ).resolves.toMatchObject({ router: 'okx' });
+  expect(
+    new URL(String(fetcher.mock.calls[0]?.[0])).searchParams.has(
+      'excludeRouters',
+    ),
+  ).toBe(false);
+});
 it.each([
   ['QUOTE_EXPIRED', { expireAt: '2000-01-01T00:00:00Z' }],
   ['UNSUPPORTED_ROUTER', { router: 'unknown' }],

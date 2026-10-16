@@ -108,6 +108,7 @@ async function quoteSolanaSwap(
     side: 'Buy' | 'Sell';
     taker?: string;
     quoteMint?: string;
+    metisOnly?: true;
   },
   apiKey: string | undefined,
   signal: AbortSignal,
@@ -146,11 +147,13 @@ async function quoteSolanaSwap(
     amount: amount.toString(),
     swapMode: 'ExactIn',
     slippageBps: '50',
+    ...(input.taker || input.metisOnly
+      ? { excludeRouters: 'jupiterz,dflow,okx' }
+      : {}),
     ...(input.taker
       ? {
           taker: input.taker,
           maxSupportedTransactionVersion: '0',
-          excludeRouters: 'jupiterz,dflow,okx',
         }
       : {}),
   }).toString();
@@ -258,9 +261,9 @@ async function quoteSolanaSwap(
       'Quote router is unsupported. Request a fresh quote from a supported route.',
       'UNSUPPORTED_ROUTER',
     );
-  if (input.taker && data.router !== 'metis')
+  if ((input.taker || input.metisOnly) && data.router !== 'metis')
     throw new WarmupQuoteError(
-      'Wallet-bound signing preparations require the supported Metis router.',
+      'Pair quotes and wallet-bound preparations require the supported Metis router.',
       'UNSUPPORTED_ROUTER',
     );
   let expiry = Date.now() + 30000;
@@ -353,6 +356,7 @@ export async function quoteSolanaPair(
       quoteMint,
       amountRaw: input.amountRaw,
       side: input.side,
+      metisOnly: true,
     },
     apiKey,
     signal,
