@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October partitioned wallet consumer for review
+
+c0b4bbe refuses ambiguous original Clock scopes and adds controlled pending cancellation coverage. Read docs/CODEX-PAIR-PARTITIONED-WALLET-20261016.md for the separate offline wallet consumer: exact positional coverage, real response Clock binding, dynamic server clock and unchanged shared wallet parser. Complete synthetic SOL/USDC scaled-stock evidence matches the ordinary reader; +33 slots and stale pending reads refuse. Final12 files/299 tests, TypeScript/scoped typed lint/format pass; parser tail/seven helpers match5b9c6b7 under printer comparison. Existing production entry point still single-read; new partitioned entry point has only tests. Review before runtime/script integration; sliced inventory/code cap and fixed live campaign remain open. No UI/provider/credential/remote SQL/cron/deploy/wallet action, signing off. Preserve main dirty files.
+
 ## 16 October five-account stock evidence prototype
 
 Read docs/CODEX-PAIR-ACCOUNT-CAP-20261016.md and docs/CODEX-PAIR-ACCOUNT-PARTITIONS-20261016.md. f3e6f0f adds an opt-in actual transport account cap, default100 unchanged. Separate unconnected partition collector keeps original positions and actual five-account responses with two Clocks each; requires identical raw context and full Clock across partitions, no mixed-slot merge/retry. Seven files/137 tests, plain TypeScript, scoped typed lint and formatting pass. Review before wiring wallet/runtime consumers; sliced inventory/code compatibility and a new fixed live campaign remain open. No production call site opts in, no UI/provider/credential/SQL/cron/deploy/wallet action. Signing stays off; preserve main dirty files.

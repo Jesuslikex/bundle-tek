@@ -1,3 +1,4 @@
+import { collectPairAccountPartitions } from './pair-account-partitions';
 import { pairEvidenceClock } from './pair-stock-clock';
 import bs58 from 'bs58';
 import {
@@ -277,6 +278,90 @@ export async function readPairWalletEvidence(
   rpc: Rpc,
   now = Date.now(),
 ): Promise<PairWalletEvidence> {
+  return collectPairWalletEvidence(
+    mints,
+    wallet,
+    now,
+    async (requested, floor) => {
+      const response = (await rpc('getMultipleAccounts', [
+        requested,
+        { encoding: 'base64', commitment: 'confirmed', minContextSlot: floor },
+      ])) as { context?: { slot?: unknown }; value?: unknown[] };
+      return { response, values: response?.value };
+    },
+  );
+}
+/** Offline review composition only. No production service opts into partitioned wallet evidence. */
+export async function readPartitionedPairWalletEvidence(
+  mints: PairMintEvidence,
+  wallet: string,
+  rpc: Rpc,
+  signal: AbortSignal,
+  now: () => number = Date.now,
+) {
+  let partitions:
+    | Awaited<ReturnType<typeof collectPairAccountPartitions>>
+    | undefined;
+  const evidence = await collectPairWalletEvidence(
+    mints,
+    wallet,
+    now(),
+    async (requested, floor) => {
+      partitions = await collectPairAccountPartitions(
+        requested,
+        { encoding: 'base64', commitment: 'confirmed', minContextSlot: floor },
+        rpc,
+        signal,
+        now,
+      );
+      const values: unknown[] = Array(requested.length);
+      const seen = new Set<number>();
+      for (const partition of partitions.partitions) {
+        for (const [local, original] of partition.originalPositions.entries()) {
+          if (
+            seen.has(original) ||
+            requested[original] !== partition.accountKeys[local]
+          )
+            throw Error('Partitioned wallet account mapping differs.');
+          seen.add(original);
+          values[original] = partition.response.value[local];
+        }
+      }
+      const response = partitions.partitions[0].response;
+      const clockIndex = requested.indexOf(PAIR_CLOCK);
+      if (
+        clockIndex < 0 ||
+        seen.has(clockIndex) ||
+        seen.size !== requested.length - 1
+      )
+        throw Error('Partitioned wallet account coverage differs.');
+      values[clockIndex] = response.value.at(-1);
+      return { response, values };
+    },
+  );
+  signal.throwIfAborted();
+  if (!partitions) throw Error('Partitioned wallet evidence is missing.');
+  for (const partition of partitions.partitions)
+    pairEvidenceClock(
+      partition.response,
+      partition.response.value.at(-1),
+      Number(partition.response.context.slot),
+      now(),
+    );
+  return { evidence, partitions };
+}
+async function collectPairWalletEvidence(
+  mints: PairMintEvidence,
+  wallet: string,
+  now: number,
+  readAccounts: (
+    requested: string[],
+    floor: number,
+  ) => Promise<{
+    response: { context?: { slot?: unknown }; value?: unknown[] };
+    values: unknown;
+  }>,
+): Promise<PairWalletEvidence> {
   address(wallet);
   if (
     !Number.isSafeInteger(mints.slot) ||
@@ -306,10 +391,10 @@ export async function readPairWalletEvidence(
   ];
   if (new Set(requested).size !== requested.length)
     throw new Error('Pair wallet account scope overlaps.');
-  const result = (await rpc('getMultipleAccounts', [
+  const { response: result, values } = await readAccounts(
     requested,
-    { encoding: 'base64', commitment: 'confirmed', minContextSlot: mints.slot },
-  ])) as { context?: { slot?: unknown }; value?: unknown[] };
+    mints.slot,
+  );
   const s = result?.context?.slot;
   if (
     typeof s !== 'string' ||
@@ -317,15 +402,13 @@ export async function readPairWalletEvidence(
     !Number.isSafeInteger(Number(s)) ||
     Number(s) < mints.slot ||
     Number(s) > mints.slot + 32 ||
-    !Array.isArray(result.value) ||
-    result.value.length !== requested.length
+    !Array.isArray(values) ||
+    values.length !== requested.length
   )
     throw new Error('Pair wallet account context differs.');
-  const clock = pairEvidenceClock(result, result.value.at(-1), Number(s), now);
+  const clock = pairEvidenceClock(result, result.value?.at(-1), Number(s), now);
   const unix = clock.unixTimestamp;
-  const rent = inspectPairRentAccount(
-    result.value[requested.indexOf(PAIR_RENT)],
-  );
+  const rent = inspectPairRentAccount(values[requested.indexOf(PAIR_RENT)]);
   const observedMints: PairMintEvidence = {
     slot: clock.slot,
     clock,
@@ -333,7 +416,7 @@ export async function readPairWalletEvidence(
     mints: await Promise.all(
       mints.mints.map((m) =>
         inspectPairMintAccount(
-          result.value![requested.indexOf(m.address)],
+          values![requested.indexOf(m.address)],
           m.address,
         ),
       ),
@@ -352,9 +435,9 @@ export async function readPairWalletEvidence(
     throw new PairMintPolicyError(
       'Pair wallet policy clock changed. Request a new quote.',
     );
-  const walletExists = result.value[0] !== null;
+  const walletExists = values[0] !== null;
   const system = walletExists
-    ? bytes(result.value[0], SYSTEM, 0)
+    ? bytes(values[0], SYSTEM, 0)
     : { data: new Uint8Array(), lamports: '0' };
   if (system.data.length !== 0)
     throw new PairMintPolicyError(
@@ -389,7 +472,7 @@ export async function readPairWalletEvidence(
               mintPolicySha256: m.policySha256,
             })
           : inspectPairTokenAccount(
-              result.value![requested.indexOf(atas[i]!)],
+              values![requested.indexOf(atas[i]!)],
               m,
               wallet,
               atas[i]!,
