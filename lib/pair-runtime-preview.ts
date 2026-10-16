@@ -23,6 +23,7 @@ import { reviewUnsignedSwapEnvelope } from './unsigned-swap-order';
 import { assessJupiterRoute } from './jupiter-route-assessment';
 import { discoverPairAuxiliaryAccounts } from './pair-order-auxiliary';
 import { PAIR_RENT, inspectPairRentAccount } from './pair-rent-evidence';
+import { assertPairOrderQuoteBounds } from './pair-order-quote-bounds';
 import type { prepareOwnedImportedPairOrder } from './imported-pair-order-candidate';
 type Candidate = Pick<
   Awaited<ReturnType<typeof prepareOwnedImportedPairOrder>>,
@@ -95,6 +96,11 @@ export async function collectPairRuntimePreview(
     return result;
   };
   fresh();
+  assertPairOrderQuoteBounds(
+    candidate.preflight.quote,
+    candidate.order,
+    candidate.preflight.wallet,
+  );
   const envelope = await reviewUnsignedSwapEnvelope(
     candidate.order.preparation.transaction,
     candidate.preflight.wallet,

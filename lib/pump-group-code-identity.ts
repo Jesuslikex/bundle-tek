@@ -165,34 +165,50 @@ export async function collectPumpProgramIdentities(
     if (!selected.length) continue;
     for (let offset = 0; selected.some((item) => !item.done);) {
       const active = selected.filter((item) => !item.done);
-      const chunkSize = Math.min(
-        720 * 1024,
-        Math.floor(1048576 / active.length / 4096) * 4096,
-      );
       // Known declared sizes let independent slices run in a bounded batch.
       // Unknown-size accounts keep the serial short-chunk termination profile.
-      const batches = active.every((item) => item.space !== null)
-        ? Math.min(
-            maxConcurrentCodeReads,
-            Math.ceil(
-              Math.max(...active.map((item) => item.space! - start - offset)) /
-                chunkSize,
-            ),
-          )
-        : 1;
-      const plan = Array.from({ length: batches }, (_, i) => ({
-        offset: offset + i * chunkSize,
-        items: active.filter(
-          (item) =>
-            item.space === null || offset + i * chunkSize < item.space - start,
-        ),
-      }));
+      const parallelDeclared =
+        maxConcurrentCodeReads === 4 &&
+        active.every((item) => item.space !== null);
+      const plan: {
+        offset: number;
+        chunkSize: number;
+        items: typeof active;
+      }[] = [];
+      let nextOffset = offset;
+      for (let i = 0; i < (parallelDeclared ? 4 : 1); i++) {
+        const items = active.filter(
+          (item) => item.space === null || nextOffset < item.space - start,
+        );
+        if (!items.length) break;
+        let chunkSize = Math.min(
+          720 * 1024,
+          Math.floor(1048576 / items.length / 4096) * 4096,
+        );
+        // Pack short declared accounts with long ones, then enlarge later slices
+        // as short accounts finish. Keep existing aggregate/per-account bounds.
+        if (parallelDeclared)
+          for (let size = 720 * 1024; size > chunkSize; size -= 4096) {
+            if (
+              items.reduce(
+                (sum, item) =>
+                  sum + Math.min(size, item.space! - start - nextOffset),
+                0,
+              ) <= 1048576
+            ) {
+              chunkSize = size;
+              break;
+            }
+          }
+        plan.push({ offset: nextOffset, chunkSize, items });
+        nextOffset += chunkSize;
+      }
       const responses = await Promise.all(
         plan.map((batch) =>
           accounts(
             batch.items.map((item) => item.dataKey),
             start + batch.offset,
-            chunkSize,
+            batch.chunkSize,
           ),
         ),
       );
@@ -211,10 +227,10 @@ export async function collectPumpProgramIdentities(
             throw new Error('Program identity changed during code read.');
           const chunk = pumpAccountBytes(part);
           if (
-            chunk.length > chunkSize ||
+            chunk.length > batch.chunkSize ||
             (item.space !== null &&
               chunk.length !==
-                Math.min(chunkSize, item.space - start - batch.offset))
+                Math.min(batch.chunkSize, item.space - start - batch.offset))
           )
             throw new Error('Truncated program code.');
           item.size += chunk.length;
@@ -223,11 +239,11 @@ export async function collectPumpProgramIdentities(
             throw new Error('Program code size exceeds bounds.');
           code.get(item.key)!.push(chunk);
           item.done =
-            chunk.length < chunkSize ||
+            chunk.length < batch.chunkSize ||
             (item.space !== null && item.size === item.space - start);
         }
       }
-      offset += chunkSize * batches;
+      offset = nextOffset;
     }
   }
   const identities: PumpProgramIdentity[] = [];

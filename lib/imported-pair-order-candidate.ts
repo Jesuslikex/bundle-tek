@@ -13,6 +13,10 @@ import {
 import { prepareSolanaPair } from './warmup-swap-quote';
 import { collectPairOrderReview } from './pair-order-collector';
 import { parseImportedPairQuote } from './imported-trade-pair';
+import {
+  assertPairOrderQuoteBounds,
+  PairOrderQuoteBoundsError,
+} from './pair-order-quote-bounds';
 export type ImportedPairOrderRequest = ImportedPairWalletRequest & {
   prepareUnsigned: true;
 };
@@ -147,6 +151,13 @@ export async function inspectOwnedImportedPairOrder<Review>(
       );
     }
     signal.throwIfAborted();
+    try {
+      assertPairOrderQuoteBounds(preflight.quote, order, preflight.wallet);
+    } catch (error) {
+      if (error instanceof PairOrderQuoteBoundsError)
+        throw new ImportedPairQuoteError(error.message);
+      throw error;
+    }
     const review = await inspect(
       preflight,
       order,

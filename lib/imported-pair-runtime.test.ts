@@ -27,6 +27,35 @@ const run = (
     signal,
     v.runtimeDependencies,
   );
+it('rejects a one-raw-unit worse order before any executable scan or simulation', async () => {
+  const v = (f = await pairRuntimeFixture()),
+    prepare = v.prepare.getMockImplementation()!;
+  let codeReads = 0;
+  const codeRpc = v.runtimeDependencies.programRpc!;
+  v.runtimeDependencies.programRpc = async (...args) => {
+    codeReads++;
+    return codeRpc(...args);
+  };
+  v.prepare.mockImplementation(async (...args) => {
+    const order = await prepare(...args);
+    return {
+      ...order,
+      minimumOutAmount: (BigInt(order.minimumOutAmount) - 1n).toString(),
+    };
+  });
+  await expect(run(v)).rejects.toMatchObject({
+    status: 409,
+    message: expect.stringContaining('original minimum output'),
+  });
+  expect(codeReads).toBe(0);
+  expect(
+    v.rpc.mock.calls.some(([method]) =>
+      ['getBlockHeight', 'getFeeForMessage', 'simulateTransaction'].includes(
+        method,
+      ),
+    ),
+  ).toBe(false);
+});
 it.each([false, true])(
   'binds every block-height read to its current slot floor, lagging=%s',
   async (lagging) => {

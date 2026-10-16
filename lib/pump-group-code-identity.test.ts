@@ -78,6 +78,98 @@ function fixture(kind = 'ok', space = true, size = 300000) {
   };
   return { rpc, calls, code };
 }
+it.each([4096, 100 * 1024])(
+  'packs unequal declared code sizes with fewer calls and the same complete hashes, short size=%i',
+  async (shortSize) => {
+    const sizes = [
+      3 * 1024 * 1024,
+      ...Array.from({ length: 7 }, () => shortSize),
+    ];
+    const programs = sizes.map((_s, i) =>
+      bs58.encode(new Uint8Array(32).fill(10 + i * 2)),
+    );
+    const code = sizes.map((size, i) => {
+      const bytes = new Uint8Array(size).fill(i + 20);
+      bytes.set([127, 69, 76, 70]);
+      return bytes;
+    });
+    const raw = new Map<string, { bytes: Uint8Array; executable: boolean }>();
+    for (const [i, key] of programs.entries()) {
+      const dataKey = bs58.encode(new Uint8Array(32).fill(11 + i * 2)),
+        link = new Uint8Array(36),
+        data = new Uint8Array(45 + sizes[i]);
+      new DataView(link.buffer).setUint32(0, 2, true);
+      link.set(bs58.decode(dataKey), 4);
+      const view = new DataView(data.buffer);
+      view.setUint32(0, 3, true);
+      view.setBigUint64(4, 90n, true);
+      data[12] = 1;
+      data.fill(4, 13, 45);
+      data.set(code[i], 45);
+      raw.set(key, { bytes: link, executable: true });
+      raw.set(dataKey, { bytes: data, executable: false });
+    }
+    const run = async (parallel: 1 | 4) => {
+      let reads = 0;
+      const rpc: PumpLaunchRpc = async (method, params) => {
+        if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
+        if (method !== 'getMultipleAccounts') throw Error('Unexpected method');
+        const keys = params[0] as string[],
+          config = params[1] as {
+            dataSlice: { offset: number; length: number };
+          };
+        const slice = config.dataSlice;
+        const value = keys.map((key) => {
+          const a = raw.get(key)!;
+          return {
+            owner: PUMP_UPGRADEABLE_LOADER,
+            executable: a.executable,
+            lamports: '1000000',
+            space: String(a.bytes.length),
+            data: [
+              Buffer.from(
+                a.bytes.slice(slice.offset, slice.offset + slice.length),
+              ).toString('base64'),
+              'base64',
+            ],
+          };
+        });
+        if (slice.offset >= 45 && slice.length > 45) {
+          reads++;
+          const lengths = value.map(
+            (a) => Buffer.from(a.data[0], 'base64').length,
+          );
+          expect(Math.max(...lengths)).toBeLessThanOrEqual(720 * 1024);
+          expect(lengths.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(
+            1048576,
+          );
+        }
+        return { context: { slot: '100' }, value };
+      };
+      const report = await collectPumpProgramIdentities(
+        programs,
+        100,
+        new AbortController().signal,
+        rpc,
+        parallel,
+      );
+      for (const [i, p] of report.programs.entries()) {
+        expect(p.codeBytes).toBe(sizes[i]);
+        expect(p.codeSha256).toBe(
+          Buffer.from(await crypto.subtle.digest('SHA-256', code[i])).toString(
+            'hex',
+          ),
+        );
+      }
+      return { report, reads };
+    };
+    const serial = await run(1),
+      parallel = await run(4);
+    expect(parallel.report.programs).toEqual(serial.report.programs);
+    expect(parallel.reads).toBe(5);
+    expect(serial.reads).toBe(6);
+  },
+);
 it('stops after one bounded four-slice batch when the provider rate limits code reads', async () => {
   const f = fixture('ok', true, 3 * 1024 * 1024),
     failure = new WalletRpcError(429);
