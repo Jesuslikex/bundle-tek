@@ -1,5 +1,8 @@
 import bs58 from 'bs58';
-import { pairReviewDiagnostic } from './pair-review-diagnostic';
+import {
+  pairReviewDiagnostic,
+  pairDiagnosticComparisons,
+} from './pair-review-diagnostic';
 import { address } from '@solana/kit';
 import { findAssociatedTokenPda } from '@solana-program/token';
 import {
@@ -536,6 +539,36 @@ export function assertStablePairWalletEvidence(
             ),
           ),
         ],
+        comparisons: pairDiagnosticComparisons(
+          {
+            slot: before.slot,
+            wallet: before.wallet,
+            scope: before.scope,
+            unixTimestamp: before.unixTimestamp,
+            nativeBalanceRaw: before.nativeBalanceRaw,
+            walletExists: before.walletExists,
+            systemRentMinimumRaw: before.systemRentMinimumRaw,
+            ...Object.fromEntries(
+              before.accounts.flatMap((a, i) =>
+                Object.entries(a).map(([k, v]) => [`accounts[${i}].${k}`, v]),
+              ),
+            ),
+          },
+          {
+            slot: after.slot,
+            wallet: after.wallet,
+            scope: after.scope,
+            unixTimestamp: after.unixTimestamp,
+            nativeBalanceRaw: after.nativeBalanceRaw,
+            walletExists: after.walletExists,
+            systemRentMinimumRaw: after.systemRentMinimumRaw,
+            ...Object.fromEntries(
+              after.accounts.flatMap((a, i) =>
+                Object.entries(a).map(([k, v]) => [`accounts[${i}].${k}`, v]),
+              ),
+            ),
+          },
+        ),
       },
     );
 }

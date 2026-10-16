@@ -1,6 +1,10 @@
 import type { ImportedPairQuote } from './imported-trade-pair';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 import { pairWalletUint } from './pair-wallet-evidence';
+import {
+  pairReviewDiagnostic,
+  pairDiagnosticComparisons,
+} from './pair-review-diagnostic';
 export class PairOrderQuoteBoundsError extends Error {}
 /** Cheap request/response checks precede expensive RPC work and repeat in instruction review. */
 export function assertPairOrderQuoteBounds(
@@ -27,7 +31,16 @@ export function assertPairOrderQuoteBounds(
   const minimum = pairWalletUint(order.minimumOutAmount),
     original = pairWalletUint(quote.quote.minimumOutAmount);
   if (minimum < original)
-    throw new PairOrderQuoteBoundsError(
-      'The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.',
+    throw pairReviewDiagnostic(
+      new PairOrderQuoteBoundsError(
+        'The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.',
+      ),
+      'minimum-output',
+      {
+        comparisons: pairDiagnosticComparisons(
+          { minimumOutputRaw: original.toString() },
+          { minimumOutputRaw: minimum.toString() },
+        ),
+      },
     );
 }

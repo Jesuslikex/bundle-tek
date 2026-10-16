@@ -1,5 +1,9 @@
 import bs58 from 'bs58';
-import { pairReviewDiagnostic } from './pair-review-diagnostic';
+import {
+  pairReviewDiagnostic,
+  pairDiagnosticComparisons,
+  type PairDiagnosticDetails,
+} from './pair-review-diagnostic';
 import { address, getProgramDerivedAddress } from '@solana/kit';
 import { assessJupiterRoute } from './jupiter-route-assessment';
 import {
@@ -62,16 +66,24 @@ export async function reviewPairOrderInstructions(
   networkFeeRaw: string,
   auxiliary: PairAuxiliaryAccount[] = [],
 ) {
-  const fail = (
-    check: string,
-    details: Record<string, boolean> = {},
-  ): never => {
+  let activeInstruction: (typeof review.instructions)[number] | undefined;
+  const fail = (check: string, details: PairDiagnosticDetails = {}): never => {
     throw pairReviewDiagnostic(
       Error(
         'Pair candidate instructions, accounts or raw spending limits differ.',
       ),
       check,
-      details,
+      {
+        ...details,
+        ...(activeInstruction
+          ? {
+              instructionProgram: activeInstruction.program.address,
+              instructionIndex: activeInstruction.index,
+              instructionDataHex: activeInstruction.dataHex,
+              instructionAccounts: JSON.stringify(activeInstruction.accounts),
+            }
+          : {}),
+      },
     );
   };
   const original = preflight.quote,
@@ -163,7 +175,22 @@ export async function reviewPairOrderInstructions(
             observed.status !== selected!.status ||
             observed.amountRaw !== selected!.amountRaw)
         )
-          fail('selected-token-state');
+          fail('selected-token-state', {
+            comparisons: pairDiagnosticComparisons(
+              {
+                sourceSha256: selected!.sourceSha256,
+                lamportsRaw: selected!.lamportsRaw,
+                status: selected!.status,
+                amountRaw: selected!.amountRaw,
+              },
+              {
+                sourceSha256: observed.sourceSha256,
+                lamportsRaw: observed.lamportsRaw,
+                status: observed.status,
+                amountRaw: observed.amountRaw,
+              },
+            ),
+          });
         if (
           extra &&
           existing &&
@@ -193,7 +220,20 @@ export async function reviewPairOrderInstructions(
           a.lamports - beforeAmount !== v.getBigUint64(113, true) ||
           a.lamports - beforeAmount < rent
         )
-          fail('native-existing-rent');
+          fail('native-existing-rent', {
+            comparisons: pairDiagnosticComparisons(
+              {
+                reserveRaw: v.getBigUint64(113, true).toString(),
+                rentFloorRaw: rent.toString(),
+              },
+              {
+                reserveRaw: (a.lamports - beforeAmount).toString(),
+                rentFloorRaw: (a.lamports - beforeAmount).toString(),
+              },
+            ),
+            nativeBalanceRaw: a.lamports.toString(),
+            nativeTokenAmountRaw: beforeAmount.toString(),
+          });
       }
       return {
         asset,
@@ -229,6 +269,20 @@ export async function reviewPairOrderInstructions(
       systemOwnerChanged: w.owner !== SYSTEM,
       systemExecutable: w.executable,
       systemDataChanged: w.bytes.length !== 0,
+      comparisons: pairDiagnosticComparisons(
+        {
+          nativeBalanceRaw: preflight.evidence.nativeBalanceRaw,
+          owner: SYSTEM,
+          executable: false,
+          dataBytes: 0,
+        },
+        {
+          nativeBalanceRaw: w.lamports.toString(),
+          owner: w.owner,
+          executable: w.executable,
+          dataBytes: w.bytes.length,
+        },
+      ),
     });
   // Every wallet-controlled token account must belong to the selected pair or
   // the explicitly protected intermediate set. Delegated/close-only custody
@@ -273,6 +327,7 @@ export async function reviewPairOrderInstructions(
     setupRent = 0n,
     wrappedInput = 0n;
   for (const instruction of review.instructions) {
+    activeInstruction = instruction;
     const p = instruction.program.address,
       a = instruction.accounts;
     if (instruction.program.signer || instruction.program.writable)
@@ -443,6 +498,7 @@ export async function reviewPairOrderInstructions(
       selected.closed = instruction.index;
     } else fail('unsupported-setup');
   }
+  activeInstruction = undefined;
   for (const s of state) {
     if (!s.existing && (s.created === -1 || s.initialized === -1))
       fail('missing-account-creation');

@@ -240,6 +240,7 @@ try {
           row.clockSlot = bytes.readBigUInt64LE(0).toString();
           row.chainUnix = bytes.readBigInt64LE(32).toString();
           row.clockSkewMs = Date.now() - Number(row.chainUnix) * 1000;
+          row.receivedServerTimeMs = Date.now();
         }
       }
       row.returned = true;
@@ -581,8 +582,40 @@ try {
       'wallSkewMs',
       'slotDelta',
       'unixDelta',
+      'evaluatedServerTimeMs',
+      'instructionIndex',
     ])
       if (Number.isSafeInteger(d[key])) receipt.diagnostic[key] = d[key];
+    for (const key of [
+      'nativeBalanceRaw',
+      'nativeTokenAmountRaw',
+      'instructionProgram',
+      'instructionDataHex',
+      'instructionAccounts',
+    ])
+      if (
+        typeof d[key] === 'string' &&
+        d[key].length <= 32768 &&
+        !/https?:|secret|api.key|bearer /i.test(d[key])
+      )
+        receipt.diagnostic[key] = d[key];
+    if (
+      Array.isArray(d.comparisons) &&
+      d.comparisons.length <= 128 &&
+      d.comparisons.every(
+        (c) =>
+          c &&
+          typeof c.field === 'string' &&
+          /^[a-zA-Z][a-zA-Z0-9.[\]]{0,95}$/.test(c.field) &&
+          ['before', 'after'].every(
+            (k) =>
+              typeof c[k] === 'string' &&
+              c[k].length <= 8192 &&
+              !/https?:|secret|api.key|bearer /i.test(c[k]),
+          ),
+      )
+    )
+      receipt.diagnostic.comparisons = d.comparisons;
     for (const key of [
       'nativeBalanceChanged',
       'systemOwnerChanged',
@@ -608,6 +641,30 @@ try {
     !/https?:|api.key|secret|token=|[A-Za-z0-9_-]{70,}/i.test(message)
       ? message
       : 'Unsigned qualification failed; provider details withheld.';
+  const d = receipt.diagnostic;
+  receipt.diagnosis = {
+    check: d?.check ?? 'unclassified-refusal',
+    valuesAvailable: Boolean(d?.comparisons?.length),
+    classification: !d
+      ? 'evidence-unavailable'
+      : d.check === 'chain-clock'
+        ? d.contextSlot !== d.clockSlot
+          ? 'clock-bank-mismatch'
+          : 'clock-age-or-invalid-time'
+        : ['wallet-stability', 'system-wallet-state'].includes(d.check)
+          ? d.comparisons?.some(
+              (c) => c.field === 'nativeBalanceRaw' && c.before !== c.after,
+            )
+            ? 'custody-native-balance-changed'
+            : 'custody-other-state-or-window'
+          : d.check === 'selected-token-state'
+            ? 'custody-token-state-changed'
+            : d.check === 'native-existing-rent'
+              ? 'account-wsol-reserve-or-rent'
+              : d.check === 'minimum-output'
+                ? 'economic-minimum-output'
+                : 'instruction-or-account-review',
+  };
 } finally {
   receipt.pipelineMs =
     pipelineStart === undefined ? null : clock() - pipelineStart;
@@ -625,6 +682,13 @@ try {
     (r) => r.method === 'simulateTransaction',
   ).length;
   receipt.http429 = receipt.requests.filter((r) => r.status === 429).length;
+  if (receipt.http429 > 0)
+    receipt.diagnosis = {
+      check: 'provider-rate-limit',
+      classification: 'provider-rate-limit',
+      valuesAvailable: true,
+      comparisons: [{ field: 'httpStatus', before: '200', after: '429' }],
+    };
   const allRpc = receipt.requests.filter((r) => r.rpcUnits !== undefined);
   receipt.maximumRollingRpcMethods = allRpc.length
     ? Math.max(

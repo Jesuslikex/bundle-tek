@@ -212,8 +212,11 @@ export async function inspectOwnedImportedPairOrder<Review>(
       }),
     ]);
   } catch (error) {
-    if (error instanceof PairOrderQuoteBoundsError)
-      throw new ImportedPairQuoteError(error.message);
+    if (error instanceof PairOrderQuoteBoundsError) {
+      const failure = new ImportedPairQuoteError(error.message);
+      Object.defineProperty(failure, 'cause', { value: error });
+      throw failure;
+    }
     if (error instanceof ImportedPairQuoteError) throw error;
     const failure = new ImportedPairQuoteError(
       'Unsigned pair candidate did not pass independent account, instruction, simulation, fee or lifetime review. No approval or signature was created.',

@@ -351,6 +351,27 @@ it('rechecks exact selected account balances after instruction review', async ()
   };
   await expect(run(f)).rejects.toMatchObject({ status: 409 });
 });
+it('records exact raw token balances when instruction review detects custody churn', async () => {
+  const v = (f = await pairOrderFixture());
+  v.state.onWalletRead = (n) => {
+    if (n !== 3) return;
+    const a = v.accounts[0]!;
+    const bytes = Buffer.from(a.data[0], 'base64');
+    bytes.writeBigUInt64LE(19999999n, 64);
+    a.data[0] = bytes.toString('base64');
+  };
+  await expect(run(v)).rejects.toMatchObject({
+    status: 409,
+    cause: {
+      pairDiagnostic: {
+        check: 'selected-token-state',
+        comparisons: expect.arrayContaining([
+          { field: 'amountRaw', before: '20000000', after: '19999999' },
+        ]),
+      },
+    },
+  });
+});
 it.each(['stable', 'changed'] as const)(
   'independently resolves and rechecks %s ALT contents',
   async (mode) => {

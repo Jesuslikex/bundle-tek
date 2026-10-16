@@ -3,7 +3,10 @@ import {
   getExtensionEncoder,
   type Extension,
 } from '@solana-program/token-2022';
-import { pairReviewDiagnostic } from './pair-review-diagnostic';
+import {
+  pairReviewDiagnostic,
+  pairDiagnosticComparisons,
+} from './pair-review-diagnostic';
 import {
   SWAP_TOKEN,
   SWAP_TOKEN_2022,
@@ -82,6 +85,19 @@ export function pairClockUnixTimestamp(
         contextSlot: slot,
         clockSlot: Number(view.getBigUint64(0, true)),
         wallSkewMs: now - Number(unix) * 1000,
+        comparisons: pairDiagnosticComparisons(
+          {
+            slot,
+            unixTimestamp: String(Math.floor(now / 1000)),
+            wallSkewLimitMs: '30000',
+          },
+          {
+            slot: view.getBigUint64(0, true).toString(),
+            unixTimestamp: unix.toString(),
+            wallSkewLimitMs: '30000',
+          },
+        ),
+        evaluatedServerTimeMs: now,
       },
     );
   return unix.toString();

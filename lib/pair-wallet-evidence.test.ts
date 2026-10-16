@@ -246,6 +246,13 @@ it('compares exact rechecked balances and does not pool other accounts or native
         check: 'wallet-stability',
         nativeBalanceChanged: false,
         changedAccountFields: ['amountRaw', 'spendableRaw'],
+        comparisons: expect.arrayContaining([
+          {
+            field: 'accounts[1].amountRaw',
+            before: before.accounts[1].amountRaw,
+            after: '0',
+          },
+        ]),
       },
     });
     expect(JSON.stringify(error)).not.toContain('changedAccountFields');
