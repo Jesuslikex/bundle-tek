@@ -2,6 +2,12 @@
 
 This folder is the Bundle application repository. Start with `PRODUCT-PARITY.md` and `PROXIMA-REVIEW.md` for the current product context, and read `HOLDER-RPC-SETUP.md` when working on holder reads.
 
+## 16 October live stock runtime handoff
+
+The unsigned SOL 0.001 -> TSLAX order-first runtime completed once in **30 slots** (457653824..457653854), with one original-packet simulation, both full fresh code observations and the final custody/lookup/lifetime tail. **Broad stock-pair qualification is still incomplete**: the evidence records all 23 attempts, including >32-slot routes, direct-USDC quote mismatches and changing public-reference custody. Signing/execution remain hard-off, including the DB rule and five-second authorization guard. No push, deploy, remote SQL, real wallet unlock/sign/send or provider/credential/cron change. The successful implementation hashes match `3489415` in the Codex worktree; later harness-only metadata additions changed no production guard. Normal application/authorization pacing stays configured; the internal unsigned qualifier explicitly opts into nine-method Helius pacing. Group code still defaults to one read at a time. No UI file changed.
+
+Review `docs/CODEX-STOCK-LIVE-QUALIFICATION-20261016.md` and its JSON package. Implementation is split into `2f569d3`, `7df8508`, `bd131bb`, `284d98c`, `f6cecf1`, `5fb0f4b`, `7460cb7`, `3489415`. Final selection: 54 files / 794 tests together, zero failures (713.97s, two workers), production webpack build, subsequent plain TypeScript, 15-file typed lint and evidence invariant checks all pass. This is one complete live route observation, not signing readiness, funded proof or repeatable qualification of all routes. Main's two dirty files are preserved. Next work should diagnose the intermittent direct-USDC parameter mismatch and improve repeatable qualification, without loosening any bound or enabling signing.
+
 ## Preserve the working tree
 
 Before changing files, inspect `git status --short`. This checkout contains a large amount of intentional uncommitted and untracked work. Preserve it. Do not reset, clean, stash, or restore broad file sets, and keep edits focused on the requested task.
