@@ -2,6 +2,8 @@
 
 The user requested a visible Claude Code UI worker, like their BestTek setup. This notice authorizes a bounded pass in the dedicated `C:\Users\Julian\Desktop\Bundle-Claude-UI` worktree on `claude/bundle-ui-20261016`. Start from main1ca5ab5 plus this handoff. The main checkout's two unrelated dirty files are excluded.
 
+The user explicitly requires Opus5.5. Pin `--model claude-opus-5-5`; do not use Haiku or silently fall back. Session8b2f1c6d-350a-4f9f-9f09-895f216a207b. The initial inherited Haiku worker was stopped before any UI edits. Desktop `Bundle Claude UI.cmd` resumes this session with the explicit Opus model.
+
 ## Task
 
 Improve the existing token workspace's Proxima-style desktop proportions and responsive clarity. Inspect the current source before deciding what is missing. Preserve the existing stats strip. Aim for a dominant chart, compact surrounding controls, a stable trading column and wallet navigation/table beginning within a900px-high desktop viewport where practical. Preserve the phone stack at375px without horizontal page overflow. Make a bounded pass rather than a broad redesign.
