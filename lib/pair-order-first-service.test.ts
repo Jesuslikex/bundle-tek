@@ -101,6 +101,7 @@ it('enforces exact owned consent and one authorization per review in the local d
   for (const file of [
     '0013_fresh_sandman',
     '0090_pair_order_first_authorizations',
+    '0091_pair_order_independent_price_consent',
   ])
     v.sqlite.exec(
       readFileSync(
@@ -126,6 +127,7 @@ it('enforces exact owned consent and one authorization per review in the local d
     approvedMinimumOutputRaw: r.minimumOutputRaw,
     approveExactOrder: true as const,
     acknowledgeIndependentDifference: false,
+    acknowledgeUnavailableIndependentPrice: true,
   };
   const auth = await authorizePairOrderAfterRecheck(
     r,
@@ -171,6 +173,14 @@ it('enforces exact owned consent and one authorization per review in the local d
   expect(() =>
     insert({ ...auth, expiresAt: new Date(v.clock.now + 5001).toISOString() }),
   ).toThrow();
+  for (const ack of [false, undefined, null, 1, 'true']) {
+    const changed = {
+      ...auth,
+      id: crypto.randomUUID(),
+      consent: { ...auth.consent, acknowledgeUnavailableIndependentPrice: ack },
+    };
+    expect(() => insert(changed as typeof auth)).toThrow(/acknowledgement/);
+  }
   insert(auth);
   expect(() => insert({ ...auth, id: crypto.randomUUID() })).toThrow(/UNIQUE/);
   expect(() =>
@@ -216,6 +226,7 @@ it('captures a server baseline, prepares once, then quotes again before review a
     approvedMinimumOutputRaw: '995000',
     approveExactOrder: true as const,
     acknowledgeIndependentDifference: false,
+    acknowledgeUnavailableIndependentPrice: true,
   };
   await expect(
     approveOwnedPairOrderFirstReview(

@@ -61,6 +61,7 @@ it('binds decoded minimum, venues, impact, all fees and packet to separate conse
     approvedMinimumOutputRaw: review.minimumOutputRaw,
     approveExactOrder: true as const,
     acknowledgeIndependentDifference: false,
+    acknowledgeUnavailableIndependentPrice: true,
   };
   await expect(
     requirePairOrderFirstConsent(review, consent, v.clock.now),
@@ -104,6 +105,7 @@ it('requires an additional acknowledgement when initial preview differs by more 
     approvedMinimumOutputRaw: review.minimumOutputRaw,
     approveExactOrder: true as const,
     acknowledgeIndependentDifference: false,
+    acknowledgeUnavailableIndependentPrice: true,
   };
   await expect(
     requirePairOrderFirstConsent(review, consent, v.clock.now),
@@ -198,3 +200,30 @@ it('rejects impact beyond 100 even when floating point would round it down', asy
     ),
   ).rejects.toThrow();
 });
+
+it.each([false, undefined, null, 1, 'true'])(
+  'requires a separate boolean acknowledgement when the market comparison is unavailable: %s',
+  async (ack) => {
+    const { v, candidate, initial } = await setup();
+    const review = await buildPairOrderFirstReview(
+      candidate,
+      initial,
+      null,
+      v.clock.now,
+    );
+    await expect(
+      requirePairOrderFirstConsent(
+        review,
+        {
+          reviewSha256: review.sha256,
+          packetSha256: review.packetSha256,
+          approvedMinimumOutputRaw: review.minimumOutputRaw,
+          approveExactOrder: true,
+          acknowledgeIndependentDifference: true,
+          acknowledgeUnavailableIndependentPrice: ack,
+        } as Parameters<typeof requirePairOrderFirstConsent>[1],
+        v.clock.now,
+      ),
+    ).rejects.toThrow();
+  },
+);

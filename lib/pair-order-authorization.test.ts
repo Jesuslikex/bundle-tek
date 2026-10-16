@@ -32,6 +32,7 @@ async function setup() {
     approvedMinimumOutputRaw: r.minimumOutputRaw,
     approveExactOrder: true as const,
     acknowledgeIndependentDifference: false,
+    acknowledgeUnavailableIndependentPrice: true,
   };
   const evidence = {
     packetSha256: r.packetSha256,

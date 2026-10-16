@@ -67,7 +67,7 @@ it('renders exact amounts, decoded route, impact, fees, expiry and missing marke
   expect(container.textContent).toContain('2039280');
   expect(container.textContent).toContain('No fresh saved USD observation');
   expect(container.textContent).toContain('Initial Jupiter preview');
-  expect(checks()).toHaveLength(1);
+  expect(checks()).toHaveLength(2);
   expect(checks()[0].checked).toBe(false);
   expect(button('Request signing authorization').disabled).toBe(true);
 });
@@ -76,11 +76,11 @@ it.each([
   [false, true],
 ])('requires both separate consents for warning %s/%s', async (a, b) => {
   const { saved, fetcher } = await mount(a, b);
-  expect(checks()).toHaveLength(2);
+  expect(checks()).toHaveLength(a && !b ? 3 : 2);
   expect(checks().every((x) => !x.checked)).toBe(true);
   await click(checks()[0]);
   expect(button('Request signing authorization').disabled).toBe(true);
-  await click(checks()[1]);
+  for (const box of checks().slice(1)) await click(box);
   expect(button('Request signing authorization').disabled).toBe(false);
   await click(button('Request signing authorization'));
   expect(fetcher).toHaveBeenCalledTimes(2);
@@ -177,4 +177,21 @@ it('blocks authorization when price impact is unavailable', async () => {
   await click(checks()[0]);
   expect(button('Request signing authorization').disabled).toBe(true);
   expect(container.textContent).toContain('Price impact is unavailable');
+});
+
+it('requires the unavailable-price checkbox separately, sends its exact consent and resets after the attempt', async () => {
+  const { fetcher } = await mount();
+  expect(container.textContent).toContain(
+    'No independent price check is available for this order.',
+  );
+  expect(checks()[1].checked).toBe(false);
+  await click(checks()[0]);
+  expect(button('Request signing authorization').disabled).toBe(true);
+  await click(checks()[1]);
+  expect(button('Request signing authorization').disabled).toBe(false);
+  await click(button('Request signing authorization'));
+  const payload = JSON.parse(fetcher.mock.calls[1][1].body);
+  expect(payload.consent.acknowledgeUnavailableIndependentPrice).toBe(true);
+  expect(payload.consent.acknowledgeIndependentDifference).toBe(false);
+  expect(checks().every((box) => !box.checked)).toBe(true);
 });

@@ -36,6 +36,7 @@ function PairOrderReviewSession({
   const [saved, setSaved] = useState<Saved | null>(null),
     [approved, setApproved] = useState(false),
     [acknowledged, setAcknowledged] = useState(false),
+    [unavailableAcknowledged, setUnavailableAcknowledged] = useState(false),
     [busy, setBusy] = useState(false),
     [attempted, setAttempted] = useState(false),
     [error, setError] = useState(''),
@@ -86,6 +87,7 @@ function PairOrderReviewSession({
     setSaved(null);
     setApproved(false);
     setAcknowledged(false);
+    setUnavailableAcknowledged(false);
     setAttempted(false);
     try {
       const data = (await post({
@@ -136,6 +138,7 @@ function PairOrderReviewSession({
       attempted ||
       !approved ||
       (saved.review.acknowledgementRequired && !acknowledged) ||
+      (!saved.review.marketComparison.available && !unavailableAcknowledged) ||
       saved.review.priceImpactPct === null
     )
       return;
@@ -150,6 +153,7 @@ function PairOrderReviewSession({
       approvedMinimumOutputRaw: saved.review.minimumOutputRaw,
       approveExactOrder: true,
       acknowledgeIndependentDifference: acknowledged,
+      acknowledgeUnavailableIndependentPrice: unavailableAcknowledged,
     };
     setAttempted(true);
     setBusy(true);
@@ -175,6 +179,7 @@ function PairOrderReviewSession({
         setBusy(false);
         setApproved(false);
         setAcknowledged(false);
+        setUnavailableAcknowledged(false);
       }
     }
   }
@@ -192,7 +197,11 @@ function PairOrderReviewSession({
               ? 'Review the order and check its approval.'
               : review?.acknowledgementRequired && !acknowledged
                 ? 'Acknowledge the worse comparison above 2%.'
-                : '';
+                : review &&
+                    !review.marketComparison.available &&
+                    !unavailableAcknowledged
+                  ? 'Acknowledge that no independent price check is available.'
+                  : '';
   return (
     <section className={styles.panel} aria-label="Pair order review">
       <h3>Review this {review?.side.toLowerCase() ?? 'buy or sell'} order</h3>
@@ -314,6 +323,17 @@ function PairOrderReviewSession({
             I approve this exact order and its minimum output of{' '}
             {review.display.minimumOutputAmount} {review.display.outputSymbol}.
           </label>
+          {!review.marketComparison.available && (
+            <label className={styles.consent}>
+              <input
+                type="checkbox"
+                checked={unavailableAcknowledged && !expired}
+                disabled={busy || expired || attempted}
+                onChange={(e) => setUnavailableAcknowledged(e.target.checked)}
+              />
+              No independent price check is available for this order.
+            </label>
+          )}
           {review.acknowledgementRequired && (
             <label className={styles.consent}>
               <input

@@ -18,6 +18,7 @@ export type PairOrderFirstConsent = {
   approvedMinimumOutputRaw: string;
   approveExactOrder: true;
   acknowledgeIndependentDifference: boolean;
+  acknowledgeUnavailableIndependentPrice: boolean;
 };
 
 /** Only deterioration above 2% requires acknowledgement. Improvements remain visible. */
@@ -194,9 +195,12 @@ export async function requirePairOrderFirstConsent(
     now >= Date.parse(review.expiresAt) ||
     !consent ||
     Object.keys(consent).sort().join(',') !==
-      'acknowledgeIndependentDifference,approveExactOrder,approvedMinimumOutputRaw,packetSha256,reviewSha256' ||
+      'acknowledgeIndependentDifference,acknowledgeUnavailableIndependentPrice,approveExactOrder,approvedMinimumOutputRaw,packetSha256,reviewSha256' ||
     consent.approveExactOrder !== true ||
     typeof consent.acknowledgeIndependentDifference !== 'boolean' ||
+    typeof consent.acknowledgeUnavailableIndependentPrice !== 'boolean' ||
+    (review.marketComparison.available !== true &&
+      consent.acknowledgeUnavailableIndependentPrice !== true) ||
     consent.reviewSha256 !== sha256 ||
     consent.packetSha256 !== review.packetSha256 ||
     consent.approvedMinimumOutputRaw !== review.minimumOutputRaw ||
