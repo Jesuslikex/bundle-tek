@@ -29,6 +29,7 @@ export async function paceWalletRpc(
   endpoint: string,
   signal: AbortSignal,
   qualificationMethods?: number,
+  qualificationScope?: 'stock-runtime-evidence',
 ) {
   signal.throwIfAborted();
   const configured = (env as unknown as Record<string, unknown>)
@@ -49,7 +50,8 @@ export async function paceWalletRpc(
   const interval = Number(configured ?? 0);
   if (qualificationMethods !== undefined) {
     if (
-      new URL(endpoint).hostname !== 'mainnet.helius-rpc.com' ||
+      (new URL(endpoint).hostname !== 'mainnet.helius-rpc.com' &&
+        qualificationScope !== 'stock-runtime-evidence') ||
       !Number.isInteger(qualificationMethods) ||
       qualificationMethods < 1 ||
       qualificationMethods > 2

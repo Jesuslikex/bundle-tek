@@ -199,7 +199,7 @@ it('qualifies stock-only +1 Clock observations with later-slot evidence and both
 
 it('uses configured pacing by default even on a non-Helius provider', async () => {
   const { f, request } = await setup();
-  vi.spyOn(solanaRpc, 'getSolanaIndexerRpcEndpoint').mockReturnValue(
+  vi.spyOn(solanaRpc, 'getSolanaStockRuntimeRpcEndpoint').mockReturnValue(
     'https://rpc.example.test/',
   );
   // Stop at reader construction; no real provider request or environment key is needed.

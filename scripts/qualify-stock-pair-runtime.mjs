@@ -65,6 +65,7 @@ const files = [
   'lib/pair-wallet-evidence.ts',
   'lib/pair-mint-evidence.ts',
   'lib/pair-stock-clock.ts',
+  'lib/solana-rpc.ts',
   'lib/imported-pair-wallet-preflight.ts',
   'lib/pair-order-first-review.ts',
   'lib/pair-order-market-bound.ts',
@@ -104,7 +105,7 @@ mkdirSync(folder, { recursive: true });
 const bundle = join(folder, 'reader.mjs');
 await build({
   stdin: {
-    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
+    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint,getSolanaStockRuntimeRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
     resolveDir: process.cwd(),
     sourcefile: 'unsigned-stock-qualification.ts',
   },
@@ -147,7 +148,7 @@ const receipt = {
   providerTimings: [],
   quoteAsset: args.has('--quote-usdc') ? 'USDC' : 'SOL',
   inputUiAmount: args.has('--one-unit') ? '1' : '0.001',
-  qualificationPacing: 'unsigned-helius-qualification-nine-methods-per-second',
+  qualificationPacing: 'unsigned-stock-qualification-nine-methods-per-second',
   rpcPacingScope: 'setup-and-runtime',
   rpcPacingMs: /^\d{1,4}$/.test(process.env.SOLANA_RPC_MIN_INTERVAL_MS ?? '')
     ? Number(process.env.SOLANA_RPC_MIN_INTERVAL_MS)
@@ -164,6 +165,12 @@ try {
   if (lib.pairStockSigningPolicy().qualified !== false)
     throw Error('Signing gate must remain disabled.');
   const endpoint = lib.getSolanaIndexerRpcEndpoint();
+  const runtimeEndpoint = lib.getSolanaStockRuntimeRpcEndpoint();
+  let useRuntimeEndpoint = false;
+  receipt.runtimeProviderRole = process.env.SOLANA_STOCK_RUNTIME_RPC_URL
+    ? 'configured-standard-validator'
+    : 'existing-indexer-fallback';
+  receipt.runtimeProviderHost = new URL(runtimeEndpoint).hostname;
   if (new URL(endpoint).protocol !== 'https:' || !process.env.JUPITER_API_KEY)
     throw Error('Configured provider settings unavailable.');
   const methods = new Set([
@@ -182,7 +189,13 @@ try {
     signal.throwIfAborted();
     const u = new URL(url),
       row = { startMs: clock(), pipeline: pipelineStart !== undefined };
-    if (u.href === new URL(endpoint).href) {
+    if (
+      [new URL(endpoint).href, new URL(runtimeEndpoint).href].includes(u.href)
+    ) {
+      row.providerRole =
+        u.href === new URL(runtimeEndpoint).href && runtimeEndpoint !== endpoint
+          ? 'stock-runtime'
+          : 'indexer-fallback';
       const body = JSON.parse(init?.body ?? '{}'),
         batch = Array.isArray(body) ? body : [body];
       if (
@@ -207,7 +220,13 @@ try {
       // Runtime dispatch already admits the exact batch size to this profile.
       // Setup balanceRpc calls do not, so admit them here after ordinary pacing.
       // Both phases share one budget without enrolling other wallet callers.
-      if (admit) await lib.paceWalletRpc(endpoint, signal, batch.length);
+      if (admit)
+        await lib.paceWalletRpc(
+          u.href,
+          signal,
+          batch.length,
+          'stock-runtime-evidence',
+        );
       row.rpcUnits = batch.length;
     } else {
       if (
@@ -266,7 +285,7 @@ try {
       const result = await (reader
         ? (code ? reader.programRpc : reader.rpc)(method, params)
         : lib.balanceRpc(
-            endpoint,
+            useRuntimeEndpoint ? runtimeEndpoint : endpoint,
             method,
             params,
             signal,
@@ -472,7 +491,7 @@ try {
       const floor = Math.max(
         beforeActivity.observedSlot,
         ...receipt.logicalReads
-          .map((r) => Number(r.slot))
+          .flatMap((r) => [Number(r.slot), Number(r.effectiveClockSlot)])
           .filter(Number.isSafeInteger),
       );
       const audit = (method, params) =>
@@ -538,6 +557,9 @@ try {
       }
     };
   }
+  useRuntimeEndpoint = true;
+  if ((await rpc('getGenesisHash', [])) !== lib.SOLANA_MAINNET_GENESIS)
+    throw Error('Runtime evidence provider network differs.');
   const stockReads = lib.createStockPairEvidenceRpc(rpc, programRpc);
   receipt.clockObservations = stockReads.observations;
   receipt.stage = 'mint-identity';
@@ -638,10 +660,10 @@ try {
   receipt.stage = 'order-first-runtime';
   pipelineStart = clock();
   reader = lib.createPairReadRpc(
-    endpoint,
+    runtimeEndpoint,
     signal,
     fetcher,
-    'unsigned-helius-qualification',
+    'unsigned-stock-qualification',
   );
   const result = await lib.qualifyOwnedPairOrderFirstRuntime(
     db,

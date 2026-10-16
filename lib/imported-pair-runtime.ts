@@ -1,7 +1,7 @@
 import { env } from './server-env';
 import { createStockPairEvidenceRpc } from './pair-stock-clock';
 import { createPairReadRpc } from './pair-read-rpc';
-import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
+import { getSolanaStockRuntimeRpcEndpoint } from './solana-rpc';
 import {
   ImportedPairQuoteError,
   importedPairProviderError,
@@ -65,7 +65,7 @@ export async function previewOwnedImportedPairRuntime(
       );
     const quote = dependencies ?? configuredPairQuoteDependencies(signal);
     if (!dependencies)
-      reads = createPairReadRpc(getSolanaIndexerRpcEndpoint(), signal);
+      reads = createPairReadRpc(getSolanaStockRuntimeRpcEndpoint(), signal);
     const provider: ImportedPairRuntimeDependencies = {
       ...(dependencies ?? {
         ...quote,

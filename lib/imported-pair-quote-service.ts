@@ -124,6 +124,7 @@ export type ImportedPairQuoteDependencies = {
 };
 export function configuredPairQuoteDependencies(
   signal: AbortSignal,
+  endpoint = getSolanaIndexerRpcEndpoint(),
 ): ImportedPairQuoteDependencies {
   const key = (env as unknown as Record<string, unknown>).JUPITER_API_KEY;
   if (
@@ -136,7 +137,6 @@ export function configuredPairQuoteDependencies(
       'Swap quote service is not configured.',
       503,
     );
-  const endpoint = getSolanaIndexerRpcEndpoint();
   return {
     rpc: (method, params) =>
       balanceRpc(endpoint, method, params, signal, fetch),

@@ -27,7 +27,7 @@ import { authorizePairOrderAfterRecheck } from './pair-order-authorization';
 import { collectPairRuntimePreview } from './pair-runtime-preview';
 import { assertPairOrderQuoteBounds } from './pair-order-quote-bounds';
 import { createPairReadRpc } from './pair-read-rpc';
-import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
+import { getSolanaStockRuntimeRpcEndpoint } from './solana-rpc';
 import {
   readPairOrderMarketBound,
   readPairQuoteUsdObservation,
@@ -99,10 +99,13 @@ export async function qualifyOwnedPairOrderFirstRuntime(
   signal = AbortSignal.any([signal, child.signal, AbortSignal.timeout(45000)]);
   const reads = dependencies
     ? undefined
-    : createPairReadRpc(getSolanaIndexerRpcEndpoint(), signal);
+    : createPairReadRpc(getSolanaStockRuntimeRpcEndpoint(), signal);
   try {
     const provider = dependencies ?? {
-      ...configuredPairQuoteDependencies(signal),
+      ...configuredPairQuoteDependencies(
+        signal,
+        getSolanaStockRuntimeRpcEndpoint(),
+      ),
       rpc: reads!.rpc,
       prepare: (
         input: Parameters<typeof prepareSolanaPair>[0],
@@ -149,7 +152,10 @@ async function preparePairOrderFirst(
   signal = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
   const provider: PairOrderFirstDependencies = {
     ...(dependencies ?? {
-      ...configuredPairQuoteDependencies(signal),
+      ...configuredPairQuoteDependencies(
+        signal,
+        getSolanaStockRuntimeRpcEndpoint(),
+      ),
       prepare: (
         input: Parameters<typeof prepareSolanaPair>[0],
         s: AbortSignal,
@@ -405,7 +411,7 @@ export async function approveOwnedPairOrderFirstReview(
     controller.signal,
     AbortSignal.timeout(5000),
   ]);
-  const reads = createPairReadRpc(getSolanaIndexerRpcEndpoint(), signal);
+  const reads = createPairReadRpc(getSolanaStockRuntimeRpcEndpoint(), signal);
   const owned = () =>
     db
       .prepare(

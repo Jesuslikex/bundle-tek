@@ -59,6 +59,23 @@ export function getSolanaIndexerRpcEndpoint() {
   );
 }
 
+/** Server-only stock runtime evidence. Missing configuration preserves the existing indexer selection. */
+export function getSolanaStockRuntimeRpcEndpoint() {
+  const configured = env.SOLANA_STOCK_RUNTIME_RPC_URL;
+  if (!configured) return getSolanaIndexerRpcEndpoint();
+  let url: URL;
+  try {
+    url = new URL(configured);
+  } catch {
+    throw new Error('Invalid stock runtime RPC configuration.');
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash)
+    throw new Error(
+      'Stock runtime RPC must use HTTPS without user-info or a fragment.',
+    );
+  return configured;
+}
+
 export function getSolanaHolderRpcEndpoint() {
   const configured = env.SOLANA_HOLDER_RPC_URL;
   if (!configured) return getSolanaIndexerRpcEndpoint();

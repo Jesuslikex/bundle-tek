@@ -1,12 +1,43 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getSolanaIndexerRpcEndpoint,
+  getSolanaStockRuntimeRpcEndpoint,
   getSolanaRpcEndpoint,
   MAX_SOLANA_SLOT_DRIFT,
   requireConsistentSolanaSlots,
   rpcCall,
 } from '@/lib/solana-rpc';
 import { env } from 'cloudflare:workers';
+
+it('selects the stock-only runtime provider and preserves indexer/native fallback isolation', () => {
+  const previous = env.SOLANA_STOCK_RUNTIME_RPC_URL;
+  try {
+    delete env.SOLANA_STOCK_RUNTIME_RPC_URL;
+    const indexer = getSolanaIndexerRpcEndpoint(),
+      native = getSolanaRpcEndpoint('mainnet');
+    expect(getSolanaStockRuntimeRpcEndpoint()).toBe(indexer);
+    env.SOLANA_STOCK_RUNTIME_RPC_URL =
+      'https://validator.example.test/?api-key=fixture';
+    expect(getSolanaStockRuntimeRpcEndpoint()).toBe(
+      env.SOLANA_STOCK_RUNTIME_RPC_URL,
+    );
+    expect(getSolanaIndexerRpcEndpoint()).toBe(indexer);
+    expect(getSolanaRpcEndpoint('mainnet')).toBe(native);
+    for (const invalid of [
+      'http://validator.example.test',
+      'https://user:password@validator.example.test',
+      'https://validator.example.test/#fragment',
+      'invalid',
+    ]) {
+      env.SOLANA_STOCK_RUNTIME_RPC_URL = invalid;
+      expect(() => getSolanaStockRuntimeRpcEndpoint()).toThrow('RPC');
+      expect(getSolanaIndexerRpcEndpoint()).toBe(indexer);
+    }
+  } finally {
+    if (previous === undefined) delete env.SOLANA_STOCK_RUNTIME_RPC_URL;
+    else env.SOLANA_STOCK_RUNTIME_RPC_URL = previous;
+  }
+});
 
 it('prefers the dedicated holdings provider without changing native or devnet RPC selection', () => {
   const previousIndexer = env.SOLANA_INDEXER_RPC_URL;

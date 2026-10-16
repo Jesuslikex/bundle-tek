@@ -6,6 +6,28 @@ afterEach(() => {
   delete (env as Record<string, unknown>).SOLANA_RPC_MIN_INTERVAL_MS;
   vi.useRealTimers();
 });
+
+it('uses the unchanged nine-method scheduler on an explicitly scoped standard validator without pacing ordinary calls', async () => {
+  vi.useFakeTimers();
+  const endpoint = 'https://validator.example.test/stock-qualified';
+  const signal = new AbortController().signal;
+  await expect(paceWalletRpc(endpoint, signal, 1)).rejects.toThrow('profile');
+  const admitted: number[] = [];
+  const reads = Array.from({ length: 12 }, () =>
+    paceWalletRpc(endpoint, signal, 1, 'stock-runtime-evidence').then(() =>
+      admitted.push(Date.now()),
+    ),
+  );
+  await vi.advanceTimersByTimeAsync(2000);
+  await Promise.all(reads);
+  for (const time of admitted)
+    expect(
+      admitted.filter((t) => t <= time && t > time - 1000).length,
+    ).toBeLessThanOrEqual(9);
+  const start = Date.now();
+  await paceWalletRpc(endpoint, signal);
+  expect(Date.now()).toBe(start);
+});
 it('does not apply the Solana provider interval to EVM reads', async () => {
   vi.useFakeTimers();
   (env as Record<string, unknown>).SOLANA_RPC_MIN_INTERVAL_MS = '1100';
