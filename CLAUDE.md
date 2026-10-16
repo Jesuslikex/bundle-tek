@@ -1,5 +1,10 @@
 # Claude Code project notes
 
+## 16 October stock repeatability follow-up
+
+Read docs/CODEX-STOCK-REPEATABILITY-20261016.md and its JSON. On unchanged a0d03cf runtime, three fixed alternating rounds produced SOL 0/3 and USDC 0/3: one 46-slot refusal after simulation and both code phases, one preserved-minimum refusal, one stale-clock refusal, two instruction/account/spending refusals, one balance-provider response refusal before the pipeline. Zero 429s, maximum nine methods/sec, zero signatures/broadcasts. Earlier isolated 30-slot passes are not repeatability. New offline six-receipt checker retains all failures and rejects incomplete/unsafe evidence; five Node tests plus seven runtime files/141 Vitest tests pass, scoped lint/format pass. Runtime/UI/provider/signing gates unchanged; no push/deploy/remote SQL. Next diagnose mismatches and clock/latency without weakening the 32-slot bound or final recheck. Main's two dirty files and Claude-owned files preserved.
+
+
 This folder is the Bundle application repository. Start with `PRODUCT-PARITY.md` and `PROXIMA-REVIEW.md` for the current product context, and read `HOLDER-RPC-SETUP.md` when working on holder reads.
 
 ## 16 October independent-price consent and server USD follow-up
