@@ -1,6 +1,7 @@
 import { parseBalanceJson, WalletRpcError } from './wallet-balances';
 import { paceWalletRpc } from './wallet-rpc-pacing';
 type Pending = {
+  children?: Pending[];
   id: string;
   method: string;
   params: unknown[];
@@ -178,14 +179,97 @@ export function createPairReadRpc(
     if (scheduled || terminal) return;
     scheduled = true;
     queueMicrotask(() => {
-      scheduled = false;
-      flush();
+      // Include reads issued through the collector's already-resolved Promise
+      // barriers, instead of reserving every paced HTTP slot one tick earlier.
+      queueMicrotask(() => {
+        scheduled = false;
+        flush();
+      });
     });
   }
   function flush() {
     if (terminal) return;
+    const metadata = (item: Pending) =>
+      item.maxBytes === CODE &&
+      (item.method === 'getGenesisHash' ||
+        (item.method === 'getMultipleAccounts' &&
+          (item.params[1] as { dataSlice?: { length: number } }).dataSlice
+            ?.length === 45))
+        ? 1
+        : 0;
+    // Small fresh deployment reads unblock both code passes. Large code bodies
+    // get no priority; ordinary reads still share the same four-slot budget.
+    queue.sort((a, b) => metadata(b) - metadata(a));
     while (queue.length && active.size < 4) {
-      const batch = [queue.shift()!],
+      let first = queue.shift()!;
+      const candidate = queue[0];
+      if (
+        candidate &&
+        first.method === 'getMultipleAccounts' &&
+        candidate.method === first.method &&
+        first.maxBytes === candidate.maxBytes
+      ) {
+        const a = first.params[1] as Record<string, unknown>,
+          b = candidate.params[1] as Record<string, unknown>;
+        const { minContextSlot: fa, ...ca } = a,
+          { minContextSlot: fb, ...cb } = b;
+        const keys = [
+          ...new Set([
+            ...(first.params[0] as string[]),
+            ...(candidate.params[0] as string[]),
+          ]),
+        ];
+        const slice = ca.dataSlice as
+          | { offset: number; length: number }
+          | undefined;
+        const raw =
+          first.maxBytes !== CODE
+            ? 0
+            : slice
+              ? keys.reduce(
+                  (sum, key) =>
+                    sum +
+                    Math.min(
+                      slice.length,
+                      Math.max(
+                        0,
+                        (lengths.get(key) ?? slice.offset + slice.length) -
+                          slice.offset,
+                      ),
+                    ),
+                  0,
+                )
+              : CODE;
+        if (
+          keys.length <= 100 &&
+          raw <= 1024 * 1024 &&
+          JSON.stringify(ca) === JSON.stringify(cb)
+        ) {
+          queue.shift();
+          const children = [first, candidate],
+            floor = Math.max(Number(fa ?? 0), Number(fb ?? 0));
+          first = {
+            id: first.id,
+            method: first.method,
+            params: [
+              keys,
+              {
+                ...ca,
+                ...(fa !== undefined || fb !== undefined
+                  ? { minContextSlot: floor }
+                  : {}),
+              },
+            ],
+            maxBytes: first.maxBytes,
+            children,
+            resolve: () => {},
+            reject: (error) => {
+              for (const child of children) child.reject(error);
+            },
+          };
+        }
+      }
+      const batch = [first],
         next = queue[0];
       // Enforce the smallest constituent bound on the *whole* response. Thus
       // no individual response can exceed its former single-read byte limit.
@@ -332,7 +416,43 @@ export function createPairReadRpc(
       }
     }
     if (terminal) throw terminal;
-    for (const item of batch) item.resolve(results.get(item.id));
+    const publications: { item: Pending; result: unknown }[] = [];
+    for (const item of batch) {
+      const result = results.get(item.id);
+      if (!item.children) {
+        publications.push({ item, result });
+        continue;
+      }
+      const r = result as { context?: { slot?: unknown }; value?: unknown[] },
+        keys = item.params[0] as string[];
+      if (!Array.isArray(r?.value) || r.value.length !== keys.length)
+        throw Error('Combined pair account mapping differs.');
+      for (const child of item.children) {
+        const floor = (child.params[1] as { minContextSlot?: number })
+          .minContextSlot;
+        const slot = r.context?.slot;
+        if (
+          floor !== undefined &&
+          (typeof slot !== 'string' ||
+            !/^\d{1,16}$/.test(slot) ||
+            !Number.isSafeInteger(Number(slot)) ||
+            Number(slot) < floor ||
+            Number(slot) > floor + 32)
+        )
+          throw Error('Combined pair account context differs.');
+        const positions = (child.params[0] as string[]).map((key) =>
+          keys.indexOf(key),
+        );
+        if (positions.some((i) => i < 0))
+          throw Error('Combined pair account scope differs.');
+        publications.push({
+          item: child,
+          result: { ...r, value: positions.map((i) => r.value![i]) },
+        });
+      }
+    }
+    signal.throwIfAborted();
+    for (const { item, result } of publications) item.resolve(result);
   }
   function read(
     method: string,

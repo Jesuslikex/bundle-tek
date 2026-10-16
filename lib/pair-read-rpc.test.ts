@@ -82,6 +82,93 @@ it('batches two independent calls and preserves floors and exact response order'
     method: 'POST',
   });
 });
+it('coalesces barrier-issued metadata before reserving paced slots, without prioritizing large code bodies', async () => {
+  const f = fixture();
+  const normal = [
+    f.reader.rpc('getMultipleAccounts', [
+      ['11111111111111111111111111111111'],
+      { encoding: 'base64' },
+    ]),
+    f.reader.rpc('getBlockHeight', [{}]),
+    f.reader.rpc('getGenesisHash', []),
+  ];
+  const code = Promise.resolve().then(() =>
+    Promise.all([
+      f.reader.programRpc('getGenesisHash', []),
+      f.reader.programRpc('getMultipleAccounts', [
+        ['So11111111111111111111111111111111111111112'],
+        { encoding: 'base64', dataSlice: { offset: 0, length: 45 } },
+      ]),
+    ]),
+  );
+  await Promise.all([...normal, code]);
+  expect(f.bodies[0].map((m) => m.method)).toEqual([
+    'getGenesisHash',
+    'getMultipleAccounts',
+  ]);
+  expect(
+    (f.bodies[0][1].params[1] as { dataSlice: { length: number } }).dataSlice
+      .length,
+  ).toBe(45);
+  expect(f.bodies.every((batch) => batch.length <= 2)).toBe(true);
+});
+it.each(['ok', 'partial', 'old-child-floor'] as const)(
+  'combines same-profile account scopes with exact individual mapping and floors: %s',
+  async (mode) => {
+    const f = fixture();
+    f.fetcher.mockImplementation(async (_url, init) => {
+      const body = JSON.parse(requestBody(init)),
+        messages = (Array.isArray(body) ? body : [body]) as Message[];
+      f.bodies.push(messages);
+      const replies = messages.map((m) => ({
+        jsonrpc: '2.0',
+        id: m.id,
+        result:
+          m.method === 'getMultipleAccounts'
+            ? {
+                context: { slot: mode === 'old-child-floor' ? '133' : '110' },
+                value: (m.params[0] as string[])
+                  .map((key) => ({ key }))
+                  .slice(0, mode === 'partial' ? 1 : undefined),
+              }
+            : 'genesis',
+      }));
+      return Response.json(Array.isArray(body) ? replies : replies[0]);
+    });
+    const a = '11111111111111111111111111111111',
+      b = 'So11111111111111111111111111111111111111112';
+    const calls = [
+      f.reader.rpc('getMultipleAccounts', [
+        [a],
+        { encoding: 'base64', minContextSlot: 100 },
+      ]),
+      f.reader.rpc('getMultipleAccounts', [
+        [b, a],
+        { encoding: 'base64', minContextSlot: 110 },
+      ]),
+      f.reader.rpc('getGenesisHash', []),
+    ];
+    const results = await Promise.allSettled(calls);
+    expect(f.bodies).toHaveLength(1);
+    expect(f.bodies[0]).toHaveLength(2);
+    expect(f.bodies[0][0].params).toEqual([
+      [a, b],
+      { encoding: 'base64', minContextSlot: 110 },
+    ]);
+    if (mode !== 'ok')
+      expect(results.every((r) => r.status === 'rejected')).toBe(true);
+    else {
+      expect(results[0]).toMatchObject({
+        status: 'fulfilled',
+        value: { value: [{ key: a }] },
+      });
+      expect(results[1]).toMatchObject({
+        status: 'fulfilled',
+        value: { value: [{ key: b }, { key: a }] },
+      });
+    }
+  },
+);
 it.each([
   'missing',
   'duplicate',
@@ -417,12 +504,10 @@ it.each([360, 720])(
         id: m.id,
         result: {
           context: { slot: 100 },
-          value: [
-            {
-              data: [Buffer.alloc(kib * 1024).toString('base64'), 'base64'],
-              space: kib * 1024,
-            },
-          ],
+          value: (m.params[0] as string[]).map(() => ({
+            data: [Buffer.alloc(kib * 1024).toString('base64'), 'base64'],
+            space: kib * 1024,
+          })),
         },
       }));
       return Response.json(Array.isArray(body) ? replies : replies[0]);
@@ -433,7 +518,10 @@ it.each([360, 720])(
     ];
     const result = await Promise.all([
       f.reader.programRpc('getMultipleAccounts', params),
-      f.reader.programRpc('getMultipleAccounts', params),
+      f.reader.programRpc('getMultipleAccounts', [
+        ['So11111111111111111111111111111111111111112'],
+        params[1],
+      ]),
     ]);
     expect(f.fetcher).toHaveBeenCalledTimes(kib === 360 ? 1 : 2);
     expect((result[0] as { context: { slot: string } }).context.slot).toBe(
