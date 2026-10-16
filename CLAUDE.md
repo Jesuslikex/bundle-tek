@@ -1,5 +1,11 @@
 # Claude Code project notes
 
+## 16 October integrated QuickNode fixed sample
+
+Read docs/CODEX-PAIR-QUICKNODE-INTEGRATED-SAMPLE-20261016.md/.json. Source14eae2f, one pinned Node24 fixed six-attempt campaign: SOL0/3, USDC0/3, no429/retry/replacement. Two same-context partition refusals, two measured10-method pacing refusals, two35/33-slot refusals. All sources and quiet activity stable. No oversized wallet error; profile5 selected throughout. Summary validation refused attempt2 pacing and original runner did not save campaign; original receipts retained and explicitly recovered with summary null. Reporting-only follow-up preserves rejected campaigns and original runtime refusal; 18 focused harness tests and scoped lint/format pass. No qualification or repeatability claim. Signing off, no deploy/provider/credentials/SQL/cron/UI/wallet action. Main dirty-file hashes preserved.
+
+
+
 ## 16 October QuickNode stock runtime integration
 
 Read docs/CODEX-PAIR-QUICKNODE-RUNTIME-INTEGRATION-20261016.md. Explicit QuickNode stock scopes share their lifecycle and five-account profile through wallet, state, lookup, inventory and both code scans; ordinary endpoints and serial group defaults stay unchanged. Final19 distinct files/385 tests, 21 offline harness tests, TypeScript/scoped typed lint pass. Real transport synthetic HTTP test completes owned runtime and refuses changed final custody/code. Live fixed campaign still pending, no repeatability claim. Signing off; no deploy/provider/credential/SQL/cron/wallet/UI action. Preserve main dirty files.
