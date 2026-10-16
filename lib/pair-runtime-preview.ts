@@ -40,6 +40,26 @@ export async function collectPairRuntimePreview(
   signal: AbortSignal,
   now: () => number = Date.now,
 ) {
+  const controller = new AbortController();
+  try {
+    return await inspectPairRuntime(
+      candidate,
+      rpc,
+      programRpc,
+      AbortSignal.any([signal, controller.signal]),
+      now,
+    );
+  } finally {
+    controller.abort();
+  }
+}
+async function inspectPairRuntime(
+  candidate: Candidate,
+  rpc: Rpc,
+  programRpc: Rpc,
+  signal: AbortSignal,
+  now: () => number,
+) {
   const started = now(),
     slots = [
       candidate.preflight.quote.pair.mintPolicy.slot,
@@ -85,6 +105,22 @@ export async function collectPairRuntimePreview(
         : params;
     const result = await rpc(method, scoped);
     fresh();
+    const requestedFloor = (
+      scoped[1] as { minContextSlot?: number } | undefined
+    )?.minContextSlot;
+    if (
+      typeof requestedFloor === 'number' &&
+      [
+        'getMultipleAccounts',
+        'getFeeForMessage',
+        'isBlockhashValid',
+        'simulateTransaction',
+      ].includes(method)
+    )
+      context(
+        (result as { context?: { slot?: unknown } })?.context?.slot,
+        requestedFloor,
+      );
     return result;
   };
   const codeCall: Rpc = async (method, params) => {
@@ -202,36 +238,51 @@ export async function collectPairRuntimePreview(
     selected.some((key) => !writable.includes(key))
   )
     throw Error('Pair runtime selected privileges differ.');
-  const beforeInventory = await inventory();
-  // Reuse the bounded account inventory for intermediate discovery.
-  const auxiliary = discoverPairAuxiliaryAccounts(
-    candidate.preflight.wallet,
-    selected,
-    [
-      candidate.preflight.quote.pair.base.address,
-      candidate.preflight.quote.pair.quote.address,
-    ],
-    top,
-    keys.flatMap((key, i) =>
-      writable.includes(key) && !selected.includes(key)
-        ? [{ address: key, raw: beforeInventory.accounts[i] }]
-        : [],
-    ),
-  );
-  selected.push(...auxiliary.map((a) => a.address));
-  const protectedState = [...selected, PAIR_RENT];
-  const beforeAccounts = await read(protectedState, false);
-  inspectPairRentAccount(beforeAccounts.at(-1));
+  async function initialEvidence() {
+    const beforeInventory = await inventory();
+    // Reuse the bounded account inventory for intermediate discovery.
+    const auxiliary = discoverPairAuxiliaryAccounts(
+      candidate.preflight.wallet,
+      selected,
+      [
+        candidate.preflight.quote.pair.base.address,
+        candidate.preflight.quote.pair.quote.address,
+      ],
+      top,
+      keys.flatMap((key, i) =>
+        writable.includes(key) && !selected.includes(key)
+          ? [{ address: key, raw: beforeInventory.accounts[i] }]
+          : [],
+      ),
+    );
+    selected.push(...auxiliary.map((a) => a.address));
+    const protectedState = [...selected, PAIR_RENT];
+    const [beforeCode, beforeAccounts] = await Promise.all([
+      identities(beforeInventory),
+      read(protectedState, false).then((accounts) => {
+        inspectPairRentAccount(accounts.at(-1));
+        return accounts;
+      }),
+    ]);
+    return {
+      beforeInventory,
+      auxiliary,
+      protectedState,
+      beforeCode,
+      beforeAccounts,
+    };
+  }
   async function identities(evidence: Awaited<ReturnType<typeof inventory>>) {
     const programs = evidence.programs.filter((p) => p !== COMPUTE);
+    const requestedFloor = floor();
     const code = await collectPumpProgramIdentities(
       programs,
-      floor(),
+      requestedFloor,
       signal,
       (method, params) => codeCall(method, params),
       4,
     );
-    context(String(code.maximumSlot));
+    context(String(code.maximumSlot), requestedFloor);
     const result = code.programs.map((p) => ({
       ...p,
       identityKind: p.identityKind as string,
@@ -265,14 +316,26 @@ export async function collectPairRuntimePreview(
       a.address < b.address ? -1 : a.address > b.address ? 1 : 0,
     );
   }
-  const beforeCode = await identities(beforeInventory);
-  const review = await collectPairOrderReview(
-    candidate.preflight,
-    candidate.order,
-    call,
-    now,
-    true,
-  );
+  const initial = initialEvidence();
+  const [
+    { beforeInventory, auxiliary, protectedState, beforeCode, beforeAccounts },
+    review,
+  ] = await Promise.all([
+    initial,
+    collectPairOrderReview(
+      candidate.preflight,
+      candidate.order,
+      call,
+      now,
+      true,
+      {
+        beforeSimulation: async () => {
+          await initial;
+          fresh();
+        },
+      },
+    ),
+  ]);
   context(String(review.maximumSlot));
   if (
     JSON.stringify(

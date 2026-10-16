@@ -54,6 +54,7 @@ export async function collectPairOrderReview(
   rpc: Rpc,
   now: () => number = Date.now,
   captureRuntimeTrace = false,
+  barriers?: { beforeSimulation?: () => Promise<void> },
 ) {
   const observedAt = now(),
     slots = [
@@ -295,6 +296,8 @@ export async function collectPairOrderReview(
     networkFee,
     auxiliary,
   );
+  fresh();
+  await barriers?.beforeSimulation?.();
   fresh();
   const simulationResponse = await rpc('simulateTransaction', [
     order.preparation.transaction,
