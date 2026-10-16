@@ -1,0 +1,32 @@
+# Clock isolated to provider responses; writable refusal not yet reproduced
+
+Checkpoints: 25d6c3b adds exact private writable/Clock diagnostics without changing acceptance; 7fca270 commits the first fixed six-attempt sample, including the now-active USDC fixture; 5884661 adds the fixed twelve-call Clock-only probe; e6fd7ae adds the four-order writable-scope probe. These are diagnostic tools, not signing or qualification modes. First sample raw receipts are in CODEX-PAIR-CLOCK-CUSTODY-SAMPLE1-20261016.json; second sample, discovery, both isolated probes and computed correlations are in CODEX-PAIR-CLOCK-CUSTODY-EVIDENCE-20261016.json.
+
+## Clock evidence
+
+The isolated probe makes six fixed alternating confirmed/finalized rounds of direct getMultipleAccounts, requesting Clock twice per call, on the existing endpoint. It does not use Bundle's pair batching, quote, wallet-preflight or trading runtime. All twelve calls are retained. One confirmed response has context 457703503 and both Clock accounts at 457703504, with identical forty-byte hashes. The other eleven calls match; all duplicate accounts agree. This establishes that this observed discrepancy arrived in the provider response rather than being introduced by the pair batch decoder. It does not identify the exact server implementation fault or establish that finalized commitment would solve it reliably.
+
+The second trade sample independently captures three more wire-level discrepancies before the pair transport starts: context/Clock 457704110/457704111, 457704174/457704175 and 457704186/457704187. The private guard operands match the raw values; evaluated server-time skew is only 356, 837 and 465 ms. Thus these are exact bank-slot discrepancies, not failures of the unchanged 30000-ms time bound. Increasing time tolerance would not fix the equality check and is not proposed. All transport-decoded Clock hash/context pairs from both samples are present in the captured wire observations; no transformation mismatch or unavailable wire observation was found.
+
+An [Agave maintainer discussion](https://github.com/anza-xyz/agave/issues/4807) explains the lack of an atomic-account guarantee at response context. It corroborates this class of symptom, without proving the cause of this endpoint's responses. Keep refusing discrepant observations. Do not subtract one slot, relabel the context, treat matching Clock as proof of an immutable account set, retry until one matches, switch commitment to hide it, or widen the 32-slot/Clock rules. No production Clock code or endpoint setting changed.
+
+## Writable custody evidence and limits
+
+The original generic writable refusal lacked address/phase/owner operands. It remains historically unresolved. The new private guard records those values and true read/simulation context, together with exact predicate comparisons and prior owner/executable/lamports where that snapshot exists. It does not expose private diagnostics in public JSON. Tests demonstrate both before-inventory and simulated-post-state cases through the existing public 409; null, empty system and ordinary token account acceptance is unchanged. An AST source comparison against 7d384ac confirms the exact writable predicate and blocked-owner set are unchanged.
+
+The four fixed scope observations comprise two alternating SOL/USDC rounds using the newly discovered references. Each fetches an original unsigned order, verifies/decodes its envelope and lookups, and reads the compiled message's writable accounts through a 166-byte slice. It never simulates, runs an economic review, grants consent, signs or submits. All four observed quiet references; 20/7/24/7 writable accounts respectively, 58 account observations total, and no writable guard refusal. This rules out nothing about a previous packet or a later simulation/post-state. It is not four accepted trades or four qualification passes. Full payloads/transactions are not stored in the evidence.
+
+Transport review found no demonstrated mapping defect: compatible account scopes are deduplicated by key and child positions restored by key lookup, with existing per-child floor and strict batch-ID/order checks. Existing tests cover reversed child account order, missing values, excessive child span and reordered batch refusal. No mapping policy or route/program allowance changed. The next actual writable refusal will now retain its account and phase; do not infer that the earlier refusal was a false positive or permit a program by id alone.
+
+## Complete fixed trade samples
+
+| Sample | SOL pass/fail | USDC pass/fail | Every refusal |
+| --- | --- | --- | --- |
+| Original pinned references, 16:23 UTC | 0/3 | 0/3 | SOL: 43-slot span, minimum 28965 required vs 28957 packet, 38-slot span. USDC: reference no longer idle on all three attempts. |
+| Fresh discovery, 16:27 UTC | 0/3 | 0/3 | SOL: code read 34 slots above minimum, 35-slot span, Clock-bank discrepancy. USDC: two Clock-bank discrepancies and minimum 278184 required vs 278050 packet. |
+
+The old USDC reference resumed activity; all three unavailable-fixture attempts remain in the first denominator. A new discovery preceded a separate fixed sample; it did not replace failed attempts. All selected references stayed unchanged during their attempts, but that is sampled provider-visible inactivity, not a promise about future activity. All samples/probes/discovery retained zero 429, signatures and broadcasts. No complete 32-slot qualification pass. No repeated campaign until a lucky pass is substituted for failures.
+
+Final verification: 26 relevant Vitest files / 527 tests together, twenty-one Node tests, plain TypeScript, scoped typed/script lint and formatting, exact source/artifact hashes, Clock wire/decoded correlations and writable-predicate/owner-set comparison pass. No new production build, full suite, rendered browser, funded or signing proof. The only production changes are private diagnostic context/labels; all guard predicates, original minimum, fresh final code scan, serial group reads, 32-slot limit and stock signing gate remain unchanged. Claude UI and main's two unrelated dirty files are preserved. No push, deploy, hosted SQL, provider/credential/cron change or real wallet action.
+
+Remaining: upstream response consistency, full-window runtime latency, and exact evidence from a recurring writable refusal. Do not claim these have been fixed or that qualification is complete.
