@@ -624,6 +624,13 @@
       "when": 1792030633759,
       "tag": "0088_pump_group_broadcast",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "6",
+      "when": 1792114800000,
+      "tag": "0089_pair_order_first_reviews",
+      "breakpoints": true
     }
   ]
 }

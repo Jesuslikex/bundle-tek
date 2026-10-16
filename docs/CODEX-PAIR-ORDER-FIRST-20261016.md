@@ -15,3 +15,11 @@ Verification: four files / 51 tests, standalone TypeScript pass. Exact 2% bounda
 ## Next steps
 
 Add the server-owned order-first preparation/store and guarded short authorization, then an isolated review component. No token layout edits without the exact patch and Claude/user approval. Keep 32 slots, both full code scans, serial default group reads and all existing consent safeguards. Stock signing remains off; full live runtime qualification, trusted policy and reservations remain prerequisites.
+
+## Step 2: owned preparation and immutable storage
+
+Prepare a server baseline, then exactly one unsigned order, then the fresh reference through the existing owned preflight/decoder/simulation lifecycle. Tests prove quote/order/quote ordering and one-unit fresh-minimum refusal. A WeakMap-backed server-only capability permits exactly two same-owner/request quote reads within 25 seconds while charging the existing 15-second public gate once. Forged, changed, expired and reused continuations refuse; ordinary reads remain rate-limited. No token can be supplied through the request parser.
+
+Append-only local migration 0089 stores immutable review evidence and hashes with owned project/wallet guards; no prior migration changed. Reads rebuild the economics contract and verify the full document hash. Cross-owner access returns 404. The approval boundary currently checks exact consent/expiry and refuses under the server-owned disabled stock signing gate. Next checkpoint adds the short authorization contract. No remote migration executed.
+
+Verification so far: three files / 56 tests including existing quote service; TypeScript caught a fixture adapter's omitted `success` flag and the final check now uses the actual exact one-row insert count, matching existing adapters.

@@ -37,6 +37,22 @@ export class ImportedPairQuoteError extends Error {
     super(message);
   }
 }
+const pairQuoteScopes = new WeakMap<
+  object,
+  {
+    db?: D1Database;
+    owner?: string;
+    input?: string;
+    expires?: number;
+    used: number;
+  }
+>();
+/** Server-only capability for exactly two quotes in one order-first lifecycle. */
+export function createPairOrderQuoteScope(): object {
+  const scope = Object.freeze({});
+  pairQuoteScopes.set(scope, { used: 0 });
+  return scope;
+}
 /** Preserve the bounded API backoff signal without exposing provider details or retrying. */
 export function importedPairProviderError(error: unknown, message: string) {
   return new ImportedPairQuoteError(
@@ -93,6 +109,7 @@ type Row = {
 };
 type Quote = Awaited<ReturnType<typeof quoteSolanaPair>>;
 export type ImportedPairQuoteDependencies = {
+  quoteScope?: object;
   rpc: (method: string, params: unknown[]) => Promise<unknown>;
   quote: (
     input: Parameters<typeof quoteSolanaPair>[0],
@@ -202,18 +219,45 @@ export async function quoteOwnedImportedPair(
     const provider = dependencies ?? configuredPairQuoteDependencies(signal),
       now = provider.now ?? Date.now,
       start = now();
-    const gate = await db
-      .prepare(
-        'INSERT INTO imported_token_project_gates(owner_id,next_allowed_at) VALUES (?,?) ON CONFLICT(owner_id) DO UPDATE SET next_allowed_at=excluded.next_allowed_at WHERE imported_token_project_gates.next_allowed_at<=?',
-      )
-      .bind(owner, start + 15000, start)
-      .run();
+    const quoteReadScope = provider.quoteScope
+      ? pairQuoteScopes.get(provider.quoteScope)
+      : undefined;
+    if (
+      provider.quoteScope &&
+      (!quoteReadScope ||
+        quoteReadScope.used > 1 ||
+        (quoteReadScope.used === 1 &&
+          (quoteReadScope.db !== db ||
+            quoteReadScope.owner !== owner ||
+            quoteReadScope.input !== JSON.stringify(input) ||
+            start >= quoteReadScope.expires!)))
+    )
+      throw new ImportedPairQuoteError(
+        'Order quote continuation expired, changed or was already consumed.',
+      );
+    const continuation = quoteReadScope?.used === 1;
+    if (quoteReadScope) quoteReadScope.used++;
+    const gate = continuation
+      ? null
+      : await db
+          .prepare(
+            'INSERT INTO imported_token_project_gates(owner_id,next_allowed_at) VALUES (?,?) ON CONFLICT(owner_id) DO UPDATE SET next_allowed_at=excluded.next_allowed_at WHERE imported_token_project_gates.next_allowed_at<=?',
+          )
+          .bind(owner, start + 15000, start)
+          .run();
     signal.throwIfAborted();
-    if (!gate.meta.changes)
+    if (gate && !gate.meta.changes)
       throw new ImportedPairQuoteError(
         'Wait 15 seconds between imported-token quote reads.',
         429,
       );
+    if (quoteReadScope && !continuation)
+      Object.assign(quoteReadScope, {
+        db,
+        owner,
+        input: JSON.stringify(input),
+        expires: start + 25000,
+      });
     const checked = async (method: string, params: unknown[]) => {
       signal.throwIfAborted();
       let result: unknown;
