@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October production Node qualification guard
+
+adcfac5 requires Node24 before live qualifier/campaign I/O, records exact patch separately from runtime evidence and rejects mixed metadata in offline summaries. Actual Node26 CLI refusal checks and 24 harness tests pass on bundled24.19.0. Read docs/CODEX-PAIR-NODE24-QUALIFICATION-20261016.md and JSON. One fixed sample stopped at first429 after four attempts, no retries/replacements: SOL0/2 (two raw Clock+1); USDC0/2 (41-slot full runtime with both25-read scans, then provider429). Remaining two attempts unrun and summary null. No guards, production source/UI, signing gate, provider settings or hosted state changed. No deploy/push/wallet action. Preserve main dirty files.
+
 ## 16 October fixed post-tolerance stock sample
 
 Read docs/CODEX-PAIR-POST-TOLERANCE-SAMPLE-20261016.md and JSON. One fixed six-attempt sample at 889ac66: SOL 0/3 and USDC 0/3, all public references unchanged, zero 429. Refusals: code floor+33 slots, runtime span34, Jupiter order HTTP400, strict initial minimum279601 vs279573, raw Clock+1 twice (483/938 ms skew). No writable refusal recurred. All source hashes and recomputed summary match; fourteen offline harness tests pass. Diagnostic ran on local Node26.4.0 rather than production24.x, so no production-engine qualification is claimed. No guard, signing gate, UI or provider change, no deploy/push/hosted SQL or wallet action. Preserve main dirty files.
