@@ -1,5 +1,9 @@
 # Proxima reconstruction completion matrix
 
+## 16 October owned Counter preview checkpoint
+
+The authenticated counter-previews API now joins the existing unsigned preparation, original-packet simulation and gross native settlement under current owned plan/project/wallet-proof/exclusion guards, with exact context rechecks after each provider stage. It returns a read-only summary without packet bytes or approval authority. Twelve targeted files/152 tests and TypeScript/lint/format pass; provider stages are declared fixtures, and UI/live/full-suite proof is absent. Fresh trigger/code admission, immutable prepared storage, reservations, approval/signing/submission/recovery and broader Counter paths remain incomplete. See CODEX-COUNTER-OWNED-PREVIEW-20261016.md. Stock repeatability is still incomplete after the latest rate-limit stop; no provider was configured and signing/deploy remain off.
+
 Full goal: **make this product like Proxima**. Status: **not complete**. This matrix preserves the full goal rather than defining success around passing local tests or recently added features.
 
 ## Current launch-group checkpoint, 15 October 2026

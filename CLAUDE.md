@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October owned Counter Buy preview
+
+Read docs/CODEX-COUNTER-OWNED-PREVIEW-20261016.md. New owned read-only server/API composition joins existing Counter preparation/simulation/gross settlement after exact plan/project/wallet-proof/exclusion admission, with owned snapshot rechecks after each stage. No packet/approval/reservation/signing authority in response; fresh source/code admission and durable execution review remain open. Existing15-second gate only DB write; no new migration. 12files/152 targeted tests, TypeScript/four-file typed lint/format pass. Boundary/API tests use declared provider doubles; no live/browser/build/full-app proof. No UI/Claude file, stock gate, provider/credential/cron/SQL/deploy/push/wallet action. Preserve main dirty files.
+
 ## 16 October mixed-packing live sample
 
 Read docs/CODEX-PAIR-MIXED-PACKING-LIVE-20261016.md and JSON. One fixed sample at5dded0c on Node24: SOL pass29 runtime/32 audited slots, one simulation and both14-read collections; USDC429 after simulation/first13 reads, final scan incomplete. Stopped entire campaign after two attempts; four unrun, summary null, no retry/replacement. All17 accepted Clocks equal; each raw duplicate correlates. 102HTTP200/one429, both current source vectors verified. This is a single SOL pass with no slot margin, not repeatability or a provider/causal latency claim. Standard endpoint still unset; no fresh executable-writable refusal. No source edit or repeated unchanged suite; prior589/24 tests remain prior checkpoint evidence. Signing off; no provider/UI/cron/SQL/push/deploy/wallet action. Preserve main dirty files.
