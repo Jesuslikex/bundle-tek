@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October stock code identity account cap
+
+Read docs/CODEX-PAIR-CODE-ACCOUNT-CAP-20261016.md. Explicit4-read stock code collection can opt into five accounts per actual request, covering initial/final program and deployment headers plus all sliced bytes. Each chunk retains its actual floor/slot/read-budget unit; complete vectors and final header recheck unchanged. Serial/group refuses this setting and keeps default100; trace tests and printer comparison preserve the original read body. Real bounded-transport mocked-HTTP composition stays within5. Final17 files/332 tests across two disjoint runs, plain TypeScript and scoped typed lint pass. No runtime/script call site selects the new cap, no live qualification result. Runtime inventory/provenance and whole-path integration still pending review. No UI/provider/credential/SQL/cron/deploy/wallet action, signing off. Preserve main dirty files.
+
 ## 16 October partitioned wallet consumer for review
 
 c0b4bbe refuses ambiguous original Clock scopes and adds controlled pending cancellation coverage. Read docs/CODEX-PAIR-PARTITIONED-WALLET-20261016.md for the separate offline wallet consumer: exact positional coverage, real response Clock binding, dynamic server clock and unchanged shared wallet parser. Complete synthetic SOL/USDC scaled-stock evidence matches the ordinary reader; +33 slots and stale pending reads refuse. Final12 files/299 tests, TypeScript/scoped typed lint/format pass; parser tail/seven helpers match5b9c6b7 under printer comparison. Existing production entry point still single-read; new partitioned entry point has only tests. Review before runtime/script integration; sliced inventory/code cap and fixed live campaign remain open. No UI/provider/credential/remote SQL/cron/deploy/wallet action, signing off. Preserve main dirty files.

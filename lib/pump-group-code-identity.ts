@@ -35,6 +35,7 @@ export async function collectPumpProgramIdentities(
   signal: AbortSignal,
   rpc: PumpLaunchRpc,
   maxConcurrentCodeReads: 1 | 4 = 1,
+  maximumAccountsPerRead: 5 | 100 = 100,
 ) {
   if (
     !programs.length ||
@@ -42,7 +43,9 @@ export async function collectPumpProgramIdentities(
     new Set(programs).size !== programs.length ||
     !Number.isSafeInteger(minimumSlot) ||
     minimumSlot < 0 ||
-    ![1, 4].includes(maxConcurrentCodeReads)
+    ![1, 4].includes(maxConcurrentCodeReads) ||
+    ![5, 100].includes(maximumAccountsPerRead) ||
+    (maximumAccountsPerRead === 5 && maxConcurrentCodeReads !== 4)
   )
     throw new Error('Program identity scope differs.');
   programs.forEach(address);
@@ -75,6 +78,21 @@ export async function collectPumpProgramIdentities(
     });
   }
   async function accounts(keys: string[], offset: number, length: number) {
+    const accounts: ((PumpRpcAccount & { space?: string }) | null)[] = [];
+    // Only the explicit stock profile partitions account scopes. Each actual
+    // response contributes its own slot and read-budget unit. These code
+    // observations never claim to be an atomic bank snapshot.
+    for (let index = 0; index < keys.length; index += maximumAccountsPerRead)
+      accounts.push(
+        ...(await accountChunk(
+          keys.slice(index, index + maximumAccountsPerRead),
+          offset,
+          length,
+        )),
+      );
+    return accounts;
+  }
+  async function accountChunk(keys: string[], offset: number, length: number) {
     const requestedFloor = Math.max(...slots);
     const value = (await call('getMultipleAccounts', [
       keys,
