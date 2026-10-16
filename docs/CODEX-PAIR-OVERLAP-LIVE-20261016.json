@@ -1,0 +1,160 @@
+{
+  "format": "pair-overlap-readonly-probes-v1",
+  "sourceCommit": "3e7b1c6ed6dce791f4553235eec9ee06b2af8952",
+  "scope": "Final source, one expired public-reference setup and one fresh public-reference runtime attempt with exact transport factory injection. Only a removable candidate error observer was added. Neither probe reached code/simulation, so no overlap latency qualification is established.",
+  "attempts": [
+    {
+      "checkedAt": "2026-10-16T01:02:26.714Z",
+      "stage": "public-reference",
+      "status": null,
+      "passed": false,
+      "reason": "Suitable public validator reference unavailable.",
+      "pipelineMs": null,
+      "sourceFiles": {
+        "lib/pair-read-rpc.ts": "2239e01d4aca12dc1fb41cb91c12acbff36105e678c22c0771f8fde44557ca89",
+        "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+        "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+        "lib/imported-pair-runtime.ts": "9f78792369ce87886cfab1e7ac92c0bbf1ecee65a72c96e8c80b4262c8db7074",
+        "lib/imported-pair-order-candidate.ts": "7ff2c9f8486aff489f02439f304e37777ab17723d4bcbbe291aab2a51198659b"
+      },
+      "readOnly": true,
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "logicalReads": [],
+      "http": {
+        "requests": 3,
+        "statuses": [
+          200
+        ],
+        "rateLimitedRequests": 0
+      },
+      "codeObservationsReached": false,
+      "simulationReached": false,
+      "runtimeQualificationEstablished": false,
+      "sourceReceiptSha256": "0e45e3d3998f6b5442590c8c063ba2fb9b1ecb33e6f519f41f4dfde271b9c4a4"
+    },
+    {
+      "checkedAt": "2026-10-16T01:03:01.985Z",
+      "stage": "owned-runtime-pipeline",
+      "status": 409,
+      "passed": false,
+      "reason": "The unsigned order offers less than the original minimum output. Request a fresh quote; the original minimum was preserved.",
+      "pipelineMs": 2272.6779,
+      "sourceFiles": {
+        "lib/pair-read-rpc.ts": "2239e01d4aca12dc1fb41cb91c12acbff36105e678c22c0771f8fde44557ca89",
+        "lib/pair-runtime-preview.ts": "37b29876d663625e5ef5cde5331c1828166b842a533e320cf60568b2706ba9c7",
+        "lib/pair-order-collector.ts": "74a5fdb98b95c653cb9620f18d6b19dabca852058b93e0b51e49803dea7a1ebb",
+        "lib/imported-pair-runtime.ts": "9f78792369ce87886cfab1e7ac92c0bbf1ecee65a72c96e8c80b4262c8db7074",
+        "lib/imported-pair-order-candidate.ts": "7ff2c9f8486aff489f02439f304e37777ab17723d4bcbbe291aab2a51198659b"
+      },
+      "readOnly": true,
+      "userWallets": 0,
+      "privateKeys": 0,
+      "signatures": 0,
+      "broadcasts": 0,
+      "logicalReads": [
+        {
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "method": "getGenesisHash",
+          "startMs": 3.6995999999999185,
+          "minContextSlot": null,
+          "accountCount": null,
+          "observedSlot": null,
+          "status": "returned",
+          "endMs": 206.1882999999998
+        },
+        {
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "method": "getSlot",
+          "startMs": 206.21619999999984,
+          "minContextSlot": null,
+          "accountCount": null,
+          "observedSlot": "457447036",
+          "status": "returned",
+          "endMs": 398.0900999999999
+        },
+        {
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "method": "getMultipleAccounts",
+          "startMs": 398.2518,
+          "minContextSlot": 457447036,
+          "accountCount": 3,
+          "observedSlot": "457447037",
+          "status": "returned",
+          "endMs": 600.7937000000002
+        },
+        {
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "method": "getMultipleAccounts",
+          "startMs": 1081.4903,
+          "minContextSlot": 457447037,
+          "accountCount": 3,
+          "observedSlot": "457447039",
+          "status": "returned",
+          "endMs": 1176.7199999999998
+        },
+        {
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "method": "getGenesisHash",
+          "startMs": 1182.2889,
+          "minContextSlot": null,
+          "accountCount": null,
+          "observedSlot": null,
+          "status": "returned",
+          "endMs": 1384.3953000000001
+        },
+        {
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "method": "getMultipleAccounts",
+          "startMs": 1388.1858000000002,
+          "minContextSlot": 457447039,
+          "accountCount": 6,
+          "observedSlot": "457447041",
+          "status": "returned",
+          "endMs": 1591.7958999999996
+        },
+        {
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "method": "getMultipleAccounts",
+          "startMs": 1602.9415999999997,
+          "minContextSlot": 457447041,
+          "accountCount": 6,
+          "observedSlot": "457447041",
+          "status": "returned",
+          "endMs": 1793.0251000000003
+        },
+        {
+          "profile": "ordinary",
+          "phase": "before-simulation",
+          "method": "getGenesisHash",
+          "startMs": 1802.9770999999996,
+          "minContextSlot": null,
+          "accountCount": null,
+          "observedSlot": null,
+          "status": "returned",
+          "endMs": 1985.7414000000003
+        }
+      ],
+      "http": {
+        "requests": 20,
+        "statuses": [
+          200
+        ],
+        "rateLimitedRequests": 0
+      },
+      "codeObservationsReached": false,
+      "simulationReached": false,
+      "runtimeQualificationEstablished": false,
+      "sourceReceiptSha256": "6062d7d8bd3f8293d82cf30ab354276232cc027addd0c9d23b330aeae2a79cfc"
+    }
+  ]
+}

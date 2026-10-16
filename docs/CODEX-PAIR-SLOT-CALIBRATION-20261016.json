@@ -1,0 +1,85 @@
+{
+  "format": "pair-single-endpoint-slot-calibration-v1",
+  "checkedAt": "2026-10-16T00:57:30.566Z",
+  "readOnly": true,
+  "signatures": 0,
+  "broadcasts": 0,
+  "providerSettingsChanged": false,
+  "endpointCount": 1,
+  "requests": [
+    {
+      "methods": [
+        "getSlot"
+      ],
+      "floors": [
+        null
+      ],
+      "status": 200
+    },
+    {
+      "methods": [
+        "getSlot"
+      ],
+      "floors": [
+        457445491
+      ],
+      "status": 200
+    },
+    {
+      "methods": [
+        "getSlot",
+        "getBlockHeight"
+      ],
+      "floors": [
+        457445511,
+        457445511
+      ],
+      "status": 200
+    }
+  ],
+  "passed": true,
+  "measurement": {
+    "samples": [
+      {
+        "slot": 457445491,
+        "startedAt": "2026-10-16T00:57:30.570Z",
+        "finishedAt": "2026-10-16T00:57:30.855Z",
+        "startMs": 1166.1183,
+        "endMs": 1451.6969,
+        "roundTripMs": 285.5785999999998
+      },
+      {
+        "slot": 457445511,
+        "startedAt": "2026-10-16T00:57:34.857Z",
+        "finishedAt": "2026-10-16T00:57:35.025Z",
+        "startMs": 5453.8099,
+        "endMs": 5621.5424,
+        "roundTripMs": 167.73250000000007
+      }
+    ],
+    "slotDelta": 20,
+    "midpointWallMs": 4228.768550000001,
+    "midpointSecondsPerSlot": 0.21143842750000003,
+    "elapsedWallBoundsMs": {
+      "minimum": 4002.1130000000003,
+      "maximum": 4455.4241
+    },
+    "estimated32SlotBudgetMs": 6766.0296800000015,
+    "interpretation": "One two-sample observation from one configured endpoint, not a long-run slot-time estimate or proof excluding node lag."
+  },
+  "batch": {
+    "supported": true,
+    "methods": [
+      "getSlot",
+      "getBlockHeight"
+    ],
+    "responseOrderVerified": true,
+    "exactResponseIdsVerified": true,
+    "slotResponseFloorVerified": true,
+    "blockHeightFloorPassedToProvider": true,
+    "blockHeightHasNoContextSlot": true,
+    "returnedSlot": 457445511,
+    "returnedHeight": "435481353"
+  },
+  "transportSha256": "2239e01d4aca12dc1fb41cb91c12acbff36105e678c22c0771f8fde44557ca89"
+}

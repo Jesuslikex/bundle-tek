@@ -23,3 +23,27 @@ Per the user's explicit requirement, reordered responses now fail the entire env
 Each slot-bearing result (`getSlot`, account snapshots, fee, blockhash validity and simulation) is checked against **its own captured minContextSlot**, including the 32-slot relative ceiling, before any constituent resolves. Invalid input floors fail before HTTP. Downstream evidence/Clock checks and the global 32-slot span remain independent and unchanged. `getBlockHeight` carries minContextSlot to the provider, but returns a height without a context slot; a height is not compared with a slot. Genesis replies likewise have no context slot.
 
 The transport's **44 tests** include twelve independently stale/future/malformed-slot batch failures, distinct valid per-method floors, simulation-floor refusal and strict reordered-envelope rejection. The transport, ordering, owned runtime and runtime route pass together: **4 files / 95 tests** (4.86s). Standalone TypeScript and typed lint on the two changed files pass. Final ordering is the separate parent commit `a2806af`. Live provider batching/slot calibration follows as a separate evidence checkpoint; these tests alone do not establish provider support.
+
+## Live provider and wall-clock calibration
+
+Strict batch/floor enforcement is separately committed as `3e7b1c6`. `CODEX-PAIR-SLOT-CALIBRATION-20261016.json` records one read-only timing interval and a real two-method batch at 00:57 UTC. It used one fixed configured RPC URL, three HTTP requests, no endpoint rotation and no provider-setting change. All three returned HTTP 200; no HTTP 429 occurred. The real `getSlot` / `getBlockHeight` batch passed the new exact-ID, exact-order and per-slot-floor validation. This confirms that bounded pair of methods on the configured provider at that time, not every possible batch size or method combination.
+
+| Observation | Value |
+| --- | ---: |
+| First confirmed slot | 457445491 |
+| Second confirmed slot | 457445511 |
+| Slot advance | 20 |
+| Midpoint wall interval | 4,228.77 ms |
+| Estimated seconds per slot | 0.21144 |
+| Estimated 32-slot wall budget | 6,766.03 ms |
+| RTT-based elapsed interval bounds | 4,002.11 to 4,455.42 ms |
+
+The RTT bounds describe sampling uncertainty, not a statistical confidence interval. One sample is consistent with a roughly 6.8-second budget and cannot rule out node lag or establish a long-run slot rate. The request-scoped transport already pins client reads to one endpoint URL. This is not a guarantee about the provider's internal load balancing or Jupiter's own upstream bank; no alternate provider was introduced.
+
+## Final verification and live qualification limit
+
+All **36 selected files / 853 tests passed together**, two workers, **250.88 seconds**. This includes both ordering barriers, the unchanged late Rent/wallet mutation cases, strict batches/context floors, pair candidates/runtime/APIs, mint/Rent/auxiliary/economic checks and existing group code/runtime/authorization regressions. This is not the complete repository suite. Production build, subsequent standalone TypeScript and typed lint on all five changed TypeScript files pass. All 1,290 frozen source/config hashes stayed unchanged through the run, and the retained probe source hashes match current application source. Whitespace checks pass.
+
+Once build/tests were idle, the old public reference failed its suitability/stability setup check before quoting (three HTTP 200 requests). One bounded discovery using fresh public transaction references then passed setup and reached the owned runtime pipeline, but the unsigned order's minimum deteriorated. It correctly returned the existing fresh-quote refusal before inventory/code/simulation (20 HTTP 200 requests overall, eight logical pipeline RPC reads, no 429). `CODEX-PAIR-OVERLAP-LIVE-20261016.json` retains both sanitized receipts. No live overlap latency or full-path 32-slot qualification can be claimed from these attempts. There was no automatic retry, relaxed minimum, signature, broadcast or funded trade.
+
+Keep the global **32-slot** limit, mandatory two full code observations, final runtime custody/lifetime tail, default one-read-at-a-time group code collection, stock signing/execution **off**, and production untouched. Main's two intentional dirty files remain preserved. The next live qualification needs a genuinely fresh acceptable unsigned order; the offline ordering results do not authorize signing or a funded test. UI, credentials, provider settings, cron, migrations and remote SQL are unchanged.
