@@ -10,6 +10,10 @@ import {
   unchangedQuietReference,
 } from './stock-reference-activity.mjs';
 import { stockReferenceFixture } from './stock-reference-fixture.mjs';
+import {
+  measureStockProvider,
+  stockQuoteGaps,
+} from './stock-provider-timing.mjs';
 
 const args = new Set(process.argv.slice(2));
 const referenceArg = [...args].filter((a) => a.startsWith('--reference-file='));
@@ -76,6 +80,7 @@ const files = [
   'scripts/run-stock-repeatability.mjs',
   'scripts/stock-reference-activity.mjs',
   'scripts/stock-reference-fixture.mjs',
+  'scripts/stock-provider-timing.mjs',
 ];
 const sourceFiles = Object.fromEntries(
   files.map((p) => [p, hash(readFileSync(p))]),
@@ -127,6 +132,7 @@ const receipt = {
   requests: [],
   logicalReads: [],
   quotes: [],
+  providerTimings: [],
   quoteAsset: args.has('--quote-usdc') ? 'USDC' : 'SOL',
   inputUiAmount: args.has('--one-unit') ? '1' : '0.001',
   qualificationPacing: 'unsigned-helius-qualification-nine-methods-per-second',
@@ -622,11 +628,13 @@ try {
       rpc,
       programRpc,
       quote: async (input, s) => {
-        const quote = await lib.quoteSolanaPair(
-          input,
-          process.env.JUPITER_API_KEY,
-          s,
-          fetcher,
+        const quote = await measureStockProvider(
+          receipt.providerTimings,
+          receipt.providerTimings.length === 0
+            ? 'initial-quote'
+            : 'fresh-quote',
+          () =>
+            lib.quoteSolanaPair(input, process.env.JUPITER_API_KEY, s, fetcher),
         );
         receipt.quotes.push({
           router: quote.router,
@@ -637,11 +645,16 @@ try {
         return quote;
       },
       prepare: async (input, s) => {
-        const order = await lib.prepareSolanaPair(
-          input,
-          process.env.JUPITER_API_KEY,
-          s,
-          fetcher,
+        const order = await measureStockProvider(
+          receipt.providerTimings,
+          'wallet-bound-order',
+          () =>
+            lib.prepareSolanaPair(
+              input,
+              process.env.JUPITER_API_KEY,
+              s,
+              fetcher,
+            ),
         );
         receipt.unsignedOrder = {
           router: order.router,
@@ -796,6 +809,7 @@ try {
   receipt.sourceUnchanged = files.every(
     (p) => sourceFiles[p] === hash(readFileSync(p)),
   );
+  receipt.quoteTiming = stockQuoteGaps(receipt.providerTimings);
   if (!receipt.sourceUnchanged) receipt.passed = false;
   receipt.elapsedSlots = receipt.runtime
     ? receipt.runtime.maximumSlot - receipt.runtime.minimumSlot
