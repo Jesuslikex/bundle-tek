@@ -1,3 +1,4 @@
+import { readPairPartitionObservation } from './pair-partition-observation';
 import { pairEvidenceClock } from './pair-stock-clock';
 import { address } from '@solana/kit';
 import {
@@ -14,6 +15,69 @@ export async function readPairOrderState(
   intermediateMints: string[],
   minimumSlot: number,
   rpc: (method: string, params: unknown[]) => Promise<unknown>,
+  now: () => number = Date.now,
+) {
+  return collectPairOrderState(
+    protectedAccounts,
+    selectedMints,
+    intermediateMints,
+    minimumSlot,
+    async (requested, floor) => {
+      const response = (await rpc('getMultipleAccounts', [
+        requested,
+        { encoding: 'base64', commitment: 'confirmed', minContextSlot: floor },
+      ])) as { context?: { slot?: unknown }; value?: unknown[] };
+      return { values: response?.value, clockResponse: response };
+    },
+    now,
+  );
+}
+/** Offline composition only; production callers retain their original single-read entry point. */
+export async function readPartitionedPairOrderState(
+  protectedAccounts: string[],
+  selectedMints: [string, string],
+  intermediateMints: string[],
+  minimumSlot: number,
+  rpc: (method: string, params: unknown[]) => Promise<unknown>,
+  signal: AbortSignal,
+  now: () => number = Date.now,
+) {
+  let observation:
+    | Awaited<ReturnType<typeof readPairPartitionObservation>>
+    | undefined;
+  const state = await collectPairOrderState(
+    protectedAccounts,
+    selectedMints,
+    intermediateMints,
+    minimumSlot,
+    async (requested, floor) => {
+      observation = await readPairPartitionObservation(
+        requested,
+        floor,
+        rpc,
+        signal,
+        now,
+      );
+      return observation;
+    },
+    now,
+  );
+  signal.throwIfAborted();
+  if (!observation) throw Error('Partitioned order observation is missing.');
+  return { state, partitions: observation.partitions };
+}
+async function collectPairOrderState(
+  protectedAccounts: string[],
+  selectedMints: [string, string],
+  intermediateMints: string[],
+  minimumSlot: number,
+  readAccounts: (
+    requested: string[],
+    floor: number,
+  ) => Promise<{
+    values: unknown;
+    clockResponse: { context?: { slot?: unknown }; value?: unknown[] };
+  }>,
   now: () => number = Date.now,
 ) {
   const accounts = [...protectedAccounts],
@@ -39,14 +103,10 @@ export async function readPairOrderState(
   )
     throw Error('Pair order state scope differs.');
   requested.forEach(address);
-  const response = (await rpc('getMultipleAccounts', [
+  const { values, clockResponse: response } = await readAccounts(
     requested,
-    {
-      encoding: 'base64',
-      commitment: 'confirmed',
-      minContextSlot: minimumSlot,
-    },
-  ])) as { context?: { slot?: unknown }; value?: unknown[] };
+    minimumSlot,
+  );
   const s = response?.context?.slot;
   if (
     typeof s !== 'string' ||
@@ -54,22 +114,22 @@ export async function readPairOrderState(
     !Number.isSafeInteger(Number(s)) ||
     Number(s) < minimumSlot ||
     Number(s) > minimumSlot + 32 ||
-    !Array.isArray(response.value) ||
-    response.value.length !== requested.length ||
-    Array.from(response.value).some((value) => value === undefined)
+    !Array.isArray(values) ||
+    values.length !== requested.length ||
+    Array.from(values).some((value) => value === undefined)
   )
     throw Error('Pair order state bank or mapping differs.');
   const clock = pairEvidenceClock(
     response,
-    response.value.at(-1),
+    response.value?.at(-1),
     Number(s),
     now(),
   );
   const { slot, unixTimestamp } = clock;
-  const rent = inspectPairRentAccount(response.value.at(-2));
+  const rent = inspectPairRentAccount(values.at(-2));
   const metadata = await Promise.all(
     [...selected, ...auxiliary].map((mint, i) =>
-      inspectPairMintAccount(response.value![accounts.length + i], mint),
+      inspectPairMintAccount(values![accounts.length + i], mint),
     ),
   );
   const mints: PairMintEvidence = {
@@ -88,7 +148,7 @@ export async function readPairOrderState(
     accounts: accounts.map(
       (key, i): PairOrderAccountSnapshot => ({
         address: key,
-        raw: response.value![i],
+        raw: values![i],
       }),
     ),
     mints,

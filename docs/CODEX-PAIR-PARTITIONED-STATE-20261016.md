@@ -1,0 +1,11 @@
+# Explicit partitioned order-state evidence
+
+The original order-state request always contains at least seven accounts. `readPartitionedPairOrderState` now consumes retained same-context partitions using the original state parser. Its values are mapped to the original protected/selected/auxiliary/Rent/Clock positions, while Clock validation uses an actual partition response. There is no synthetic merged JSON-RPC response or maximum-slot relabeling. The result retains the parsed state and all partition receipts.
+
+New shared `readPairPartitionObservation` handles the positional mapping explicitly. It also supports full protected-state scopes without an original Clock, adding two real provider Clock values per chunk but returning only the originally requested values. It rechecks actual partition Clocks with the current server clock before publishing. The wallet consumer still has its earlier local mapper; deduplicating it and sharing the stock lifecycle remain follow-ups.
+
+The existing `readPairOrderState` entry point retains one original full request. Both entry points share scope checks, mint decoding, auxiliary metadata and Rent parsing. TypeScript printer comparison against234c168 confirms that the parser tail from the observed slot through the returned state is unchanged after substituting the account-array variable.
+
+Final Node24.19.0 run:12 files/298 tests passed together, including order state, order-first service, order candidate, runtime/ordering/inventory, partition/transport, wallet and Clock tests. TypeScript and three-file typed lint pass. The new tests compare the entire state with the ordinary reader, cover three actual partitions with duplicate Clocks, effective+1 and exact32-slot admission, mixed/stale/+33/partial/missing-mint/missing-Rent refusals, and full-state observations whose original keys omit Clock. No live/build/browser/full-suite result is claimed.
+
+No production or qualification-script caller selects this entry point. Whole-path integration remains unfinished. In particular, shared Clock lifecycle and sibling cancellation must be resolved before live integration; see the accompanying Claude review note. Signing remains off. No UI/provider/credential/SQL/cron/deployment/wallet action changed.

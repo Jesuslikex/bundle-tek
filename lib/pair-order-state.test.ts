@@ -1,6 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import bs58 from 'bs58';
-import { readPairOrderState } from './pair-order-state';
+import {
+  readPairOrderState,
+  readPartitionedPairOrderState,
+} from './pair-order-state';
+import { readPairPartitionObservation } from './pair-partition-observation';
 import { PAIR_CLOCK } from './pair-mint-evidence';
 import { PAIR_RENT } from './pair-rent-evidence';
 import { pairRentAccount } from '../test/pair-rent-fixture';
@@ -53,8 +57,105 @@ function fixture() {
   const rpc = vi.fn(async (_method: string, _params: unknown[]) => response);
   const run = () =>
     readPairOrderState(accounts, mints, auxiliary, 100, rpc, () => clock);
-  return { clock, accounts, mints, auxiliary, response, rpc, run };
+  return { clock, accounts, mints, auxiliary, values, response, rpc, run };
 }
+function partitionFixture(mode = 'ok') {
+  const f = fixture();
+  let calls = 0;
+  const rpc = vi.fn(async (_method: string, params: unknown[]) => {
+    const keys = params[0] as string[];
+    expect(keys.length).toBeLessThanOrEqual(5);
+    const index = calls++,
+      slot =
+        mode === 'mixed' && index === 1
+          ? 101
+          : mode === 'stale'
+            ? 99
+            : mode === 'boundary'
+              ? 131
+              : mode === 'span'
+                ? 132
+                : 100;
+    const delta = ['plus-one', 'boundary', 'span'].includes(mode) ? 1 : 0;
+    const value = keys.map((key) =>
+      key === PAIR_CLOCK
+        ? pairQuoteClock(slot + delta, String(f.clock / 1000))
+        : structuredClone(f.values.get(key)),
+    );
+    if (mode === 'partial' && index === 1) value.pop();
+    if (mode === 'missing-mint' && keys.includes(f.mints[0]))
+      value[keys.indexOf(f.mints[0])] = null;
+    if (mode === 'missing-rent' && keys.includes(PAIR_RENT))
+      value[keys.indexOf(PAIR_RENT)] = null;
+    return { context: { slot: String(slot) }, value };
+  });
+  return {
+    ...f,
+    partitionRpc: rpc,
+    partitionRead: () =>
+      readPartitionedPairOrderState(
+        f.accounts,
+        f.mints,
+        f.auxiliary,
+        100,
+        rpc,
+        new AbortController().signal,
+        () => f.clock,
+      ),
+  };
+}
+it('matches every ordinary order-state account, mint, auxiliary, Rent and Clock with explicit partitions', async () => {
+  const f = partitionFixture();
+  const original = await f.run(),
+    result = await f.partitionRead();
+  expect(result.state).toEqual(original);
+  expect(result.partitions.partitions).toHaveLength(3);
+  expect(result.partitions.providerResponses).toHaveLength(3);
+  expect(
+    f.partitionRpc.mock.calls.every(
+      (call) =>
+        (call[1][0] as string[]).filter((key) => key === PAIR_CLOCK).length ===
+        2,
+    ),
+  ).toBe(true);
+});
+it.each(['plus-one', 'boundary'])(
+  'retains the effective Clock and raw contexts for %s state evidence',
+  async (mode) => {
+    const f = partitionFixture(mode),
+      result = await f.partitionRead();
+    expect(result.state.slot).toBe(mode === 'boundary' ? 132 : 101);
+    expect(result.state.clock.relation).toBe('+1');
+    expect(
+      result.partitions.partitions.every(
+        (p) =>
+          p.response.context.slot === String(mode === 'boundary' ? 131 : 100),
+      ),
+    ).toBe(true);
+  },
+);
+it.each(['mixed', 'stale', 'span', 'partial', 'missing-mint', 'missing-rent'])(
+  'refuses %s order-state partitions',
+  async (mode) => {
+    const f = partitionFixture(mode);
+    await expect(f.partitionRead()).rejects.toThrow();
+  },
+);
+it('returns requested values and real Clock receipts for full-state keys that do not include Clock', async () => {
+  const f = partitionFixture(),
+    keys = [...f.accounts, PAIR_RENT];
+  const result = await readPairPartitionObservation(
+    keys,
+    100,
+    f.partitionRpc,
+    new AbortController().signal,
+    () => f.clock,
+  );
+  expect(result.values).toEqual(keys.map((key) => f.values.get(key)));
+  expect(result.values).toHaveLength(keys.length);
+  expect(result.clockResponse.value.at(-1)).toEqual(f.values.get(PAIR_CLOCK));
+  expect(result.partitions.requestKeys).toEqual([...keys, PAIR_CLOCK]);
+});
 it('reads all protected accounts, mint policies and Clock in one exact bounded confirmed response', async () => {
   const f = fixture(),
     r = await f.run();
