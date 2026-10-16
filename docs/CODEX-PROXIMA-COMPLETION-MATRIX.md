@@ -1,5 +1,9 @@
 # Proxima reconstruction completion matrix
 
+## 16 October QuickNode configuration
+
+The user chose the QuickNode Free trial and explicitly authorized a Solana Mainnet endpoint and Production-only sensitive SOLANA_STOCK_RUNTIME_RPC_URL. The existing production snapshot was redeployed as dpl_FbmX1qdqSxwHxV3h6QhCeGciChyY, READY; no local source was uploaded. Basic read-only genesis/floor/duplicate-Clock checks and anonymous production HTTP checks pass. No paid plan, local provider change or signing. The fixed SOL/USDC qualification, use of the selector by historical production source and release of newer local code remain unverified. See CODEX-QUICKNODE-PRODUCTION-SETUP-20261016.md. Counter's actionable missing-wallet diagnostic is local cb38d2d, separately from this configuration redeploy.
+
 ## 16 October contributing Counter source admission
 
 New decisions retain source context/movement; owned Buy previews now reobserve every buffered contributor before preparation and after settlement, preserving exact fingerprints, block times, rules and historical probability draws. Missing legacy evidence stays readable but cannot pass current-source admission; five-minute activation/freshness checks apply to all contributors and cap preview expiry. The UI validates/displays source count/time. Twenty related files/223 tests, TypeScript, typed lint and formatting pass; Chrome desktop/phone checks use synthetic responses. See CODEX-COUNTER-SOURCE-RECHECK-20261016.md. Finalized pool-membership proof, code admission and durable execution/recovery remain open. No stock gate, provider or deploy change.

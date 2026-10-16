@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October approved QuickNode production setup
+
+Read docs/CODEX-QUICKNODE-PRODUCTION-SETUP-20261016.md. User explicitly chose free Solana Mainnet QuickNode and Production-only sensitive SOLANA_STOCK_RUNTIME_RPC_URL. One-month trial, no card/paid add-ons. Existing production snapshot redeployed as dpl_FbmX1qdqSxwHxV3h6QhCeGciChyY READY, no local source upload. Mainnet genesis/floor/duplicate Clock probe passes; public home/sign-in200 and group401. Temporary credential transfer file removed; no secret in notes. Exact historical source commit/stock-selector routing unverified; fixed SOL/USDC qualification still pending. No local provider/other env/cron/SQL/signing change. Independent Counter diagnostic cb38d2d remains local and not deployed. Preserve dirty files.
+
 ## 16 October actionable Counter exclusion errors
 
 Read docs/CODEX-COUNTER-MISSING-WALLET-20261016.md. Own proven wallets must stay excluded. Existing SQL guard unchanged; failure diagnostics under the same ownership/revision/archive/wallet guards name the first missing address and request a new reviewed plan. Client roster errors also name it. Four files/35 tests, TypeScript/typed lint/format pass. No provider/evaluator/source/signing change, no Claude TSX edit. Local only, excluded from the separate existing-release QuickNode redeploy. UI commits ad2f5e4 and ef9d57d are ready for review. Preserve main dirty files.
