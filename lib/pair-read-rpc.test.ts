@@ -10,6 +10,92 @@ vi.mock('./wallet-rpc-pacing', () => ({
   ),
 }));
 const endpoint = 'https://rpc.example.test/';
+
+it.each([0, 101, 1.5, Number.NaN])('rejects invalid account cap %s', (cap) => {
+  expect(() =>
+    createPairReadRpc(
+      endpoint,
+      new AbortController().signal,
+      fetch,
+      'configured',
+      cap,
+    ),
+  ).toThrow('account limit');
+});
+
+it('keeps an explicit five-account cap on actual coalesced calls and preserves method pacing', async () => {
+  const f = fixture((replies, messages) =>
+    replies.map((reply, i) => ({
+      ...(reply as object),
+      result: {
+        context: { slot: '123' },
+        value: (messages[i].params[0] as string[]).map((key) => ({ key })),
+      },
+    })),
+  );
+  const reader = createPairReadRpc(
+    endpoint,
+    f.controller.signal,
+    f.fetcher as typeof fetch,
+    'unsigned-stock-qualification',
+    5,
+  );
+  pending.push(reader);
+  const keys = Array.from(
+    { length: 6 },
+    (_, i) => '1'.repeat(31) + String(i + 1),
+  );
+  const result = await Promise.all(
+    [keys.slice(0, 3), keys.slice(3)].map((scope) =>
+      reader.rpc('getMultipleAccounts', [
+        scope,
+        {
+          encoding: 'base64',
+          minContextSlot: 123,
+          dataSlice: { offset: 0, length: 45 },
+        },
+      ]),
+    ),
+  );
+  expect(f.bodies.flat()).toHaveLength(2);
+  expect(
+    f.bodies.flat().every((m) => (m.params[0] as string[]).length <= 5),
+  ).toBe(true);
+  expect(result).toEqual(
+    [keys.slice(0, 3), keys.slice(3)].map((scope) => ({
+      context: { slot: '123' },
+      value: scope.map((key) => ({ key })),
+    })),
+  );
+  expect(paceWalletRpc).toHaveBeenLastCalledWith(
+    endpoint,
+    expect.any(AbortSignal),
+    2,
+    'stock-runtime-evidence',
+  );
+});
+
+it.each(['rpc', 'programRpc'] as const)(
+  'refuses an oversized %s scope before provider IO',
+  async (method) => {
+    const f = fixture();
+    const reader = createPairReadRpc(
+      endpoint,
+      f.controller.signal,
+      f.fetcher as typeof fetch,
+      'configured',
+      5,
+    );
+    pending.push(reader);
+    await expect(
+      reader[method]('getMultipleAccounts', [
+        Array(6).fill('11111111111111111111111111111111'),
+        { encoding: 'base64' },
+      ]),
+    ).rejects.toThrow();
+    expect(f.fetcher).not.toHaveBeenCalled();
+  },
+);
 type Message = {
   jsonrpc: string;
   id: string;

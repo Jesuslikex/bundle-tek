@@ -87,7 +87,14 @@ export function createPairReadRpc(
     | 'configured'
     | 'unsigned-helius-qualification'
     | 'unsigned-stock-qualification' = 'configured',
+  maximumAccounts = 100,
 ) {
+  if (
+    !Number.isSafeInteger(maximumAccounts) ||
+    maximumAccounts < 1 ||
+    maximumAccounts > 100
+  )
+    throw Error('Pair RPC account limit differs.');
   try {
     const url = new URL(endpoint);
     if (
@@ -249,7 +256,7 @@ export function createPairReadRpc(
                 )
               : CODE;
         if (
-          keys.length <= 100 &&
+          keys.length <= maximumAccounts &&
           raw <= 1024 * 1024 &&
           JSON.stringify(ca) === JSON.stringify(cb)
         ) {
@@ -511,7 +518,7 @@ export function createPairReadRpc(
         if (
           !Array.isArray(keys) ||
           !keys.length ||
-          keys.length > 100 ||
+          keys.length > maximumAccounts ||
           keys.some(
             (k) =>
               typeof k !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(k),
