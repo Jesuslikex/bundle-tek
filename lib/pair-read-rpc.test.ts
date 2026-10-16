@@ -729,3 +729,29 @@ it('cancels code responses above the unchanged 2-MiB bound', async () => {
   expect(cancel).toHaveBeenCalled();
   expect(f.fetcher).toHaveBeenCalledOnce();
 });
+
+it('opts into method-counted qualification pacing only when explicitly selected by server code', async () => {
+  const f = fixture();
+  const reader = createPairReadRpc(
+    endpoint,
+    new AbortController().signal,
+    f.fetcher as typeof fetch,
+    'unsigned-helius-qualification',
+  );
+  pending.push(reader);
+  await Promise.all([
+    reader.rpc('getGenesisHash', []),
+    reader.rpc('getBlockHeight', []),
+  ]);
+  expect(paceWalletRpc).toHaveBeenLastCalledWith(
+    endpoint,
+    expect.any(AbortSignal),
+    2,
+  );
+  await f.reader.rpc('getGenesisHash', []);
+  expect(paceWalletRpc).toHaveBeenLastCalledWith(
+    endpoint,
+    expect.any(AbortSignal),
+    undefined,
+  );
+});

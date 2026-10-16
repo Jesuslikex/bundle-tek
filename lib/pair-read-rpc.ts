@@ -83,6 +83,7 @@ export function createPairReadRpc(
   endpoint: string,
   outerSignal: AbortSignal,
   fetcher: typeof fetch = fetch,
+  pacing: 'configured' | 'unsigned-helius-qualification' = 'configured',
 ) {
   try {
     const url = new URL(endpoint);
@@ -290,7 +291,11 @@ export function createPairReadRpc(
     }
   }
   async function dispatch(batch: Pending[]) {
-    await paceWalletRpc(endpoint, signal);
+    await paceWalletRpc(
+      endpoint,
+      signal,
+      pacing === 'unsigned-helius-qualification' ? batch.length : undefined,
+    );
     signal.throwIfAborted();
     const messages = batch.map((item) => ({
       jsonrpc: '2.0',

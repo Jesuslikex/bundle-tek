@@ -10,14 +10,23 @@ const args = new Set(process.argv.slice(2));
 if (
   !args.has('--live-readonly') ||
   [...args].some(
-    (a) => !['--live-readonly', '--known-public-reference'].includes(a),
+    (a) =>
+      ![
+        '--live-readonly',
+        '--known-public-reference',
+        '--quote-usdc',
+        '--one-unit',
+        '--reserve-reference',
+      ].includes(a),
   )
 )
   throw Error(
-    'Use --live-readonly and optionally --known-public-reference. No signing or send mode exists.',
+    'Use --live-readonly; optional --known-public-reference, --quote-usdc, --one-unit. No signing or send mode exists.',
   );
 const baseMint = 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB',
-  quoteMint = 'So11111111111111111111111111111111111111112';
+  quoteMint = args.has('--quote-usdc')
+    ? 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+    : 'So11111111111111111111111111111111111111112';
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const files = [
   'lib/pair-order-first-service.ts',
@@ -28,11 +37,15 @@ const files = [
   'lib/pair-runtime-preview.ts',
   'lib/pair-order-collector.ts',
   'lib/pair-read-rpc.ts',
+  'lib/wallet-rpc-pacing.ts',
   'lib/pair-order-state.ts',
   'lib/pair-rent-evidence.ts',
   'lib/pair-runtime-trace.ts',
   'lib/pump-group-code-identity.ts',
   'lib/pair-stock-signing-policy.ts',
+  'lib/warmup-swap-quote.ts',
+  'lib/pair-order-quote-bounds.ts',
+  'scripts/qualify-stock-pair-runtime.mjs',
 ];
 const sourceFiles = Object.fromEntries(
   files.map((p) => [p, hash(readFileSync(p))]),
@@ -45,7 +58,7 @@ mkdirSync(folder, { recursive: true });
 const bundle = join(folder, 'reader.mjs');
 await build({
   stdin: {
-    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint} from './lib/solana-rpc'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy';`,
+    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy';`,
     resolveDir: process.cwd(),
     sourcefile: 'unsigned-stock-qualification.ts',
   },
@@ -65,9 +78,11 @@ const receipt = {
   readOnly: true,
   sourceFiles,
   sourceUnchanged: false,
-  publicReferenceKind: args.has('--known-public-reference')
-    ? 'retained-public-transaction-reference'
-    : 'fresh-public-transaction-reference',
+  publicReferenceKind: args.has('--reserve-reference')
+    ? 'public-largest-system-accounts'
+    : args.has('--known-public-reference')
+      ? 'retained-public-transaction-reference'
+      : 'fresh-public-transaction-reference',
   userWallets: 0,
   privateKeys: 0,
   signatures: 0,
@@ -78,6 +93,13 @@ const receipt = {
   passed: false,
   requests: [],
   logicalReads: [],
+  quotes: [],
+  quoteAsset: args.has('--quote-usdc') ? 'USDC' : 'SOL',
+  inputUiAmount: args.has('--one-unit') ? '1' : '0.001',
+  qualificationPacing: 'unsigned-helius-qualification-nine-methods-per-second',
+  rpcPacingMs: /^\d{1,4}$/.test(process.env.SOLANA_RPC_MIN_INTERVAL_MS ?? '')
+    ? Number(process.env.SOLANA_RPC_MIN_INTERVAL_MS)
+    : null,
 };
 const sqlite = new DatabaseSync(':memory:');
 let reader,
@@ -85,6 +107,15 @@ let reader,
   pipelineStart,
   simulated = false;
 const clock = () => performance.now();
+const methodsForReceipt = new Set([
+  'getGenesisHash',
+  'getSlot',
+  'getBlockHeight',
+  'getMultipleAccounts',
+  'getFeeForMessage',
+  'isBlockhashValid',
+  'simulateTransaction',
+]);
 try {
   if (lib.pairStockSigningPolicy().qualified !== false)
     throw Error('Signing gate must remain disabled.');
@@ -100,6 +131,7 @@ try {
     'isBlockhashValid',
     'simulateTransaction',
     'getSignaturesForAddress',
+    'getLargestAccounts',
     'getTransaction',
   ]);
   const fetcher = async (url, init) => {
@@ -180,10 +212,20 @@ try {
           ));
       row.slot =
         method === 'getSlot' ? String(result) : (result?.context?.slot ?? null);
-      if(method==='getMultipleAccounts'&&params[0].includes('SysvarC1ock11111111111111111111111111111111')) {
-        const raw=result.value[params[0].indexOf('SysvarC1ock11111111111111111111111111111111')];
-        const bytes=Buffer.from(raw?.data?.[0]??'','base64');
-        if(bytes.length===40){row.clockSlot=bytes.readBigUInt64LE(0).toString();row.chainUnix=bytes.readBigInt64LE(32).toString();row.clockSkewMs=Date.now()-Number(row.chainUnix)*1000;}
+      if (
+        method === 'getMultipleAccounts' &&
+        params[0].includes('SysvarC1ock11111111111111111111111111111111')
+      ) {
+        const raw =
+          result.value[
+            params[0].indexOf('SysvarC1ock11111111111111111111111111111111')
+          ];
+        const bytes = Buffer.from(raw?.data?.[0] ?? '', 'base64');
+        if (bytes.length === 40) {
+          row.clockSlot = bytes.readBigUInt64LE(0).toString();
+          row.chainUnix = bytes.readBigInt64LE(32).toString();
+          row.clockSkewMs = Date.now() - Number(row.chainUnix) * 1000;
+        }
       }
       row.returned = true;
       if (method === 'simulateTransaction' && reader) simulated = true;
@@ -206,7 +248,12 @@ try {
   if ((await rpc('getGenesisHash', [])) !== lib.SOLANA_MAINNET_GENESIS)
     throw Error('Provider network differs.');
   let keys;
-  if (args.has('--known-public-reference'))
+  if (args.has('--reserve-reference')) {
+    const accounts = await rpc('getLargestAccounts', [
+      { commitment: 'confirmed', filter: 'circulating' },
+    ]);
+    keys = accounts.value.slice(0, 20).map((a) => a.address);
+  } else if (args.has('--known-public-reference'))
     keys = ['2k5hrzuykwyTbUe8L7UriYAQhr5hijNLgBvEB4B9pP5y'];
   else {
     const signatures = await rpc('getSignaturesForAddress', [
@@ -215,11 +262,11 @@ try {
     ]);
     const good = signatures.filter((s) => s.err === null);
     const chosen = [
-      ...new Set([
-        Math.floor(good.length / 2),
-        Math.floor((good.length * 3) / 4),
-        good.length - 1,
-      ]),
+      ...new Set(
+        Array.from({ length: 8 }, (_, i) =>
+          Math.min(good.length - 1, Math.floor((good.length * (i + 1)) / 9)),
+        ),
+      ),
     ]
       .map((i) => good[i])
       .filter(Boolean);
@@ -245,19 +292,33 @@ try {
     ];
   }
   if (!keys.length) throw Error('No public reference candidates.');
+  const atas = args.has('--quote-usdc')
+    ? await Promise.all(
+        keys.map((key) =>
+          lib.pairAssociatedAddress(
+            {
+              address: quoteMint,
+              program: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+            },
+            key,
+          ),
+        ),
+      )
+    : [];
+  const requested = [...keys, ...atas];
   const before = await rpc('getMultipleAccounts', [
-    keys,
+    requested,
     { encoding: 'base64', commitment: 'confirmed' },
   ]);
   const after = await rpc('getMultipleAccounts', [
-    keys,
+    requested,
     {
       encoding: 'base64',
       commitment: 'confirmed',
       minContextSlot: Number(before.context.slot),
     },
   ]);
-  const index = before.value.findLastIndex(
+  const index = before.value.slice(0, keys.length).findLastIndex(
     (a, i) =>
       a &&
       a.owner === '11111111111111111111111111111111' &&
@@ -265,6 +326,17 @@ try {
       a.data?.[0] === '' &&
       typeof a.lamports === 'string' &&
       BigInt(a.lamports) >= 12000000n &&
+      (!atas.length ||
+        (() => {
+          const t = before.value[keys.length + i],
+            data = Buffer.from(t?.data?.[0] ?? '', 'base64');
+          return (
+            data.length >= 165 &&
+            data.readBigUInt64LE(64) >=
+              (args.has('--one-unit') ? 1000000n : 1000n) &&
+            JSON.stringify(t) === JSON.stringify(after.value[keys.length + i])
+          );
+        })()) &&
       JSON.stringify(a) === JSON.stringify(after.value[i]),
   );
   if (index < 0)
@@ -370,7 +442,12 @@ try {
   };
   receipt.stage = 'order-first-runtime';
   pipelineStart = clock();
-  reader = lib.createPairReadRpc(endpoint, signal, fetcher);
+  reader = lib.createPairReadRpc(
+    endpoint,
+    signal,
+    fetcher,
+    'unsigned-helius-qualification',
+  );
   const result = await lib.qualifyOwnedPairOrderFirstRuntime(
     db,
     owner,
@@ -379,7 +456,7 @@ try {
       revision: 1,
       quoteMint,
       side: 'Buy',
-      amount: '0.001',
+      amount: receipt.inputUiAmount,
       wallet: publicKey,
       walletRevision: 1,
       feeAndRentLimitRaw: '10000000',
@@ -390,10 +467,36 @@ try {
     {
       rpc,
       programRpc,
-      quote: (input, s) =>
-        lib.quoteSolanaPair(input, process.env.JUPITER_API_KEY, s, fetcher),
-      prepare: (input, s) =>
-        lib.prepareSolanaPair(input, process.env.JUPITER_API_KEY, s, fetcher),
+      quote: async (input, s) => {
+        const quote = await lib.quoteSolanaPair(
+          input,
+          process.env.JUPITER_API_KEY,
+          s,
+          fetcher,
+        );
+        receipt.quotes.push({
+          router: quote.router,
+          expectedOutputRaw: quote.outAmount,
+          minimumOutputRaw: quote.minimumOutAmount,
+          observedAt: quote.observedAt,
+        });
+        return quote;
+      },
+      prepare: async (input, s) => {
+        const order = await lib.prepareSolanaPair(
+          input,
+          process.env.JUPITER_API_KEY,
+          s,
+          fetcher,
+        );
+        receipt.unsignedOrder = {
+          router: order.router,
+          expectedOutputRaw: order.outAmount,
+          minimumOutputRaw: order.minimumOutAmount,
+          observedAt: order.observedAt,
+        };
+        return order;
+      },
     },
   );
   if (
@@ -419,7 +522,7 @@ try {
 } catch (error) {
   receipt.errorName = error.name;
   receipt.status = typeof error.status === 'number' ? error.status : null;
-  const message = String(error.message ?? '');
+  const message = String(error.cause?.message ?? error.message ?? '');
   receipt.reason =
     message.length <= 300 &&
     !/https?:|api.key|secret|token=|[A-Za-z0-9_-]{70,}/i.test(message)
@@ -442,6 +545,29 @@ try {
     (r) => r.method === 'simulateTransaction',
   ).length;
   receipt.http429 = receipt.requests.filter((r) => r.status === 429).length;
+  const pipelineRpc = receipt.requests.filter(
+    (r) =>
+      pipelineStart !== undefined &&
+      r.startMs >= pipelineStart &&
+      r.methods.every((method) => methodsForReceipt.has(method)),
+  );
+  receipt.maximumRollingRpcMethods = pipelineRpc.length
+    ? Math.max(
+        ...pipelineRpc.map((r) =>
+          pipelineRpc
+            .filter(
+              (other) =>
+                other.startMs <= r.startMs && other.startMs > r.startMs - 1000,
+            )
+            .reduce((sum, other) => sum + other.methods.length, 0),
+        ),
+      )
+    : 0;
+  if (receipt.maximumRollingRpcMethods > 9) {
+    receipt.passed = false;
+    receipt.reason =
+      'Qualification pacing exceeded nine RPC methods in a rolling second.';
+  }
   receipt.firstCodeReads = receipt.logicalReads.filter(
     (r) => r.profile === 'code' && r.phase === 'before-simulation',
   ).length;
@@ -460,8 +586,11 @@ try {
       reason: receipt.reason ?? null,
       elapsedSlots: receipt.elapsedSlots,
       pipelineMs: receipt.pipelineMs,
+      quoteAsset: receipt.quoteAsset,
+      inputUiAmount: receipt.inputUiAmount,
       httpRequests: receipt.requests.length,
       http429: receipt.http429,
+      maximumRollingRpcMethods: receipt.maximumRollingRpcMethods,
       simulationCount: receipt.simulationCount,
       firstCodeReads: receipt.firstCodeReads,
       finalCodeReads: receipt.finalCodeReads,

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { env } from '../test/cloudflare-workers';
 import { balanceRpc } from './wallet-balances';
+import { paceWalletRpc } from './wallet-rpc-pacing';
 afterEach(() => {
   delete (env as Record<string, unknown>).SOLANA_RPC_MIN_INTERVAL_MS;
   vi.useRealTimers();
@@ -79,4 +80,68 @@ it('rejects invalid pacing before sending a provider request', async () => {
     ).rejects.toThrow('pacing');
   }
   expect(fetcher).not.toHaveBeenCalled();
+});
+
+it('counts actual single and double qualification admissions under nine methods in every rolling second', async () => {
+  vi.useFakeTimers();
+  (env as Record<string, unknown>).SOLANA_RPC_MIN_INTERVAL_MS = '200';
+  const endpoint = 'https://mainnet.helius-rpc.com/qualification-mixed';
+  const sent: { at: number; units: number }[] = [];
+  const pending = [1, 2, 1, 2, 2, 1, 2, 1, 2, 2, 1, 2].map(async (units) => {
+    await paceWalletRpc(endpoint, new AbortController().signal, units);
+    sent.push({ at: Date.now(), units });
+  });
+  await vi.runAllTimersAsync();
+  await Promise.all(pending);
+  expect(sent).toHaveLength(12);
+  for (const item of sent) {
+    expect(
+      sent
+        .filter((entry) => entry.at <= item.at && entry.at > item.at - 1000)
+        .reduce((sum, entry) => sum + entry.units, 0),
+    ).toBeLessThanOrEqual(9);
+  }
+  expect(sent[1].at - sent[0].at).toBe(112);
+  expect(sent[2].at - sent[1].at).toBe(224);
+});
+it('rechecks admission time after delayed timers and never sends a cancelled qualification read', async () => {
+  vi.useFakeTimers();
+  (env as Record<string, unknown>).SOLANA_RPC_MIN_INTERVAL_MS = '200';
+  const endpoint = 'https://mainnet.helius-rpc.com/qualification-delayed';
+  const signal = new AbortController().signal;
+  await paceWalletRpc(endpoint, signal, 2);
+  const cancelled = new AbortController();
+  const rejected = expect(
+    paceWalletRpc(endpoint, cancelled.signal, 2),
+  ).rejects.toThrow('cancelled');
+  cancelled.abort(new Error('cancelled'));
+  await vi.runAllTimersAsync();
+  await rejected;
+  const pending = paceWalletRpc(endpoint, signal, 1);
+  vi.setSystemTime(Date.now() + 5000);
+  await vi.runAllTimersAsync();
+  await pending;
+  const at = Date.now();
+  const next = paceWalletRpc(endpoint, signal, 1);
+  await vi.advanceTimersByTimeAsync(111);
+  let done = false;
+  void next.then(() => {
+    done = true;
+  });
+  await Promise.resolve();
+  expect(done).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await next;
+  expect(Date.now() - at).toBe(112);
+});
+it('rejects an unsupported qualification provider or invalid method count', async () => {
+  for (const [endpoint, units] of [
+    ['https://example.test', 1],
+    ['https://mainnet.helius-rpc.com/invalid', 0],
+    ['https://mainnet.helius-rpc.com/invalid', 3],
+  ] as const) {
+    await expect(
+      paceWalletRpc(endpoint, new AbortController().signal, units),
+    ).rejects.toThrow('qualification');
+  }
 });
