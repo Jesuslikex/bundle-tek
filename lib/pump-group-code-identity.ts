@@ -160,8 +160,18 @@ export async function collectPumpProgramIdentities(
       },
     ];
   });
-  for (const start of [0, 45]) {
-    const selected = profiles.filter((item) => item.start === start);
+  // The explicit stock profile can align full declared accounts at absolute
+  // offset zero. Legacy code and upgradeable data then share a bounded read;
+  // group/default and unknown-size paths keep their original slice schedule.
+  const mixedDeclared =
+    maxConcurrentCodeReads === 4 &&
+    profiles.every((item) => item.space !== null) &&
+    profiles.some((item) => item.start === 0) &&
+    profiles.some((item) => item.start === 45);
+  for (const start of mixedDeclared ? [0] : [0, 45]) {
+    const selected = mixedDeclared
+      ? profiles
+      : profiles.filter((item) => item.start === start);
     if (!selected.length) continue;
     for (let offset = 0; selected.some((item) => !item.done);) {
       const active = selected.filter((item) => !item.done);
@@ -239,14 +249,27 @@ export async function collectPumpProgramIdentities(
                 Math.min(batch.chunkSize, item.space - start - batch.offset))
           )
             throw new Error('Truncated program code.');
-          item.size += chunk.length;
-          totalBytes += chunk.length;
+          let codeChunk = chunk;
+          if (mixedDeclared && item.start === 45 && batch.offset === 0) {
+            const headerBytes = pumpAccountBytes(item.header);
+            if (
+              headerBytes.length !== 45 ||
+              chunk.length < 49 ||
+              headerBytes.some((byte, i) => chunk[i] !== byte)
+            )
+              throw new Error(
+                'Program deployment header changed during code read.',
+              );
+            codeChunk = chunk.slice(45);
+          }
+          item.size += codeChunk.length;
+          totalBytes += codeChunk.length;
           if (item.size > 10 * 1024 * 1024 || totalBytes > 32 * 1024 * 1024)
             throw new Error('Program code size exceeds bounds.');
-          code.get(item.key)!.push(chunk);
+          code.get(item.key)!.push(codeChunk);
           item.done =
             chunk.length < batch.chunkSize ||
-            (item.space !== null && item.size === item.space - start);
+            (item.space !== null && item.size === item.space - item.start);
         }
       }
       offset = nextOffset;

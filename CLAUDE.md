@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October mixed-loader stock code packing
+
+Read docs/CODEX-PAIR-MIXED-CODE-PACKING-20261016.md and EVIDENCE JSON. Explicit4-read mixed/fully-declared profiles now align legacy code and upgradeable data at absolute0; first45 upgrade bytes must match the deployment header before hashing all ELF bytes. Default1 group reads and unknown/single-loader schedules stay unchanged; full final scan and all caps remain. Offline synthetic bytes using the retained pass geometry reduce body reads9to8, total15to14 per scan, identical full identities/7,783,420 ELF bytes and identical baseline c40140f default request trace. 32files/589 tests,24 harness tests, TypeScript/lint/format pass. No live latency/pass claim, no provider call after429, no provider/UI/consent/custody/Clock/minimum/signing change, no push/deploy/SQL/wallet action. Preserve main dirty files.
+
 ## 16 October writable packet provenance
 
 Read docs/CODEX-PAIR-WRITABLE-PACKET-PROVENANCE-20261016.md. Lazy private refusal diagnostics now bind the verified original packet hash, compiled static/lookup privilege index, table entry/hash/slot, instruction references and RPC/simulation row. Provenance cannot replace a rejection; missing history stays unavailable. Existing predicate/blocked-owner AST exactly matches1bb5a0b. 31 files/581 related tests,24 harness tests, TypeScript/scoped lint/format pass; final helper assertion cleanup passed ten tests. No new live read/retry after429, no claim of a historical mapping bug or fixed custody refusal. Clock/minimum/32-slot/signing/provider/group/UI policy unchanged, no deploy/push/SQL/wallet action. Preserve main dirty files.

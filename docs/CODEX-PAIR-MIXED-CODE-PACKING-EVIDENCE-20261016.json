@@ -1,0 +1,190 @@
+{
+  "format": "stock-mixed-loader-offline-audit-v1",
+  "baselineCommit": "c40140f",
+  "sourceBeforeSha256": "80bf0ceb2e845059dc647a354f4eab039787ac6b10e9c89aa3725f57809fdc0e",
+  "sourceAfterSha256": "8d1e17eee146a5f49931731615caad7f63ec31aa53a4f27e556047245937a126",
+  "geometrySource": "CODEX-PAIR-APPROVED-CLOCK-SAMPLE-20261016.json, retained USDC pass",
+  "syntheticBytes": true,
+  "networkRequests": 0,
+  "scope": "original program lengths/loader mix with synthetic ELF bytes; no live latency or actual code identity claim",
+  "programs": [
+    {
+      "address": "11111111111111111111111111111111",
+      "loader": "NativeLoader1111111111111111111111111111111",
+      "codeBytes": 21,
+      "programData": null
+    },
+    {
+      "address": "9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "codeBytes": 691104,
+      "programData": "DrrJDyBzyuyYAzkkjd6Vu9ZzaDLsKRf4RPXyRE7Uk2A8"
+    },
+    {
+      "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "loader": "BPFLoader2111111111111111111111111111111111",
+      "codeBytes": 105032,
+      "programData": null
+    },
+    {
+      "address": "BiSoNHVpsVZW2F7rx2eQ59yQwKxzU5NvBcmKshCSUypi",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "codeBytes": 252552,
+      "programData": "42snJ7ip4zKKsip3EtaMoBo8wzoRsQJSzgUSFXAVJFfG"
+    },
+    {
+      "address": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "codeBytes": 1700160,
+      "programData": "HzD2cCXXT3UQNjMMY6kDv9w6gZ9qquSdfoGXrLL3LXx"
+    },
+    {
+      "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "codeBytes": 2892224,
+      "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT"
+    },
+    {
+      "address": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+      "loader": "BPFLoader2111111111111111111111111111111111",
+      "codeBytes": 74800,
+      "programData": null
+    },
+    {
+      "address": "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "codeBytes": 576932,
+      "programData": "BzSXM6KLDpHQQChzr7Fdgbzwp8r8zRYWFFrHK2uZmDYV"
+    },
+    {
+      "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "codeBytes": 108600,
+      "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2"
+    },
+    {
+      "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "codeBytes": 1382016,
+      "programData": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY"
+    }
+  ],
+  "defaultTraceIdentical": true,
+  "completeSyntheticIdentitiesIdentical": true,
+  "totalCodeBytes": 7783420,
+  "before": {
+    "codeBodyCalls": 9,
+    "totalLogicalReads": 15,
+    "maximumCodeRawBytes": 1046852
+  },
+  "after": {
+    "codeBodyCalls": 8,
+    "totalLogicalReads": 14,
+    "maximumCodeRawBytes": 1044480
+  },
+  "syntheticIdentityVector": [
+    {
+      "address": "11111111111111111111111111111111",
+      "loader": "NativeLoader1111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "a7112e6e2321e6173fdbbd473f833361e968c23b30b11183b2f3f2c717df0770",
+      "codeBytes": 21,
+      "identityKind": "native-system"
+    },
+    {
+      "address": "9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "DrrJDyBzyuyYAzkkjd6Vu9ZzaDLsKRf4RPXyRE7Uk2A8",
+      "deploymentSlot": "161177892",
+      "upgradeAuthority": "23zF9Azpe9CN4iPeTsQndD1mQpcb5Gz1qFREL5gPTZvG",
+      "codeSha256": "27d8b606c28574627e948459a204c9ea30b5683963001d5c3cc36598f9f165c2",
+      "codeBytes": 691104,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "loader": "BPFLoader2111111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "bc55c4e7cd55cf3efeaf21674ec89a27b4cc90ed0a974080de040782d0f837c3",
+      "codeBytes": 105032,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "BiSoNHVpsVZW2F7rx2eQ59yQwKxzU5NvBcmKshCSUypi",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "42snJ7ip4zKKsip3EtaMoBo8wzoRsQJSzgUSFXAVJFfG",
+      "deploymentSlot": "456982351",
+      "upgradeAuthority": "6dDjBZdpafRKe7WuVHYTF1HphW1BWiKqioMD5eBGYipS",
+      "codeSha256": "35bcf0910db82c700838086d5131940f56a080997f015d1d2928e342e9e411f7",
+      "codeBytes": 252552,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "HzD2cCXXT3UQNjMMY6kDv9w6gZ9qquSdfoGXrLL3LXx",
+      "deploymentSlot": "451479902",
+      "upgradeAuthority": "FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK",
+      "codeSha256": "23d7601fe8cfc77edadbfd96ed8b6e62dc396bd13549b21f262f8f07f87d4b1f",
+      "codeBytes": 1700160,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+      "deploymentSlot": "454465850",
+      "upgradeAuthority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+      "codeSha256": "0a034c71f1d7845b76f8d8ed72b98b47742009ad64379bcc880173ef848c441e",
+      "codeBytes": 2892224,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+      "loader": "BPFLoader2111111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "61a93e264369b97b8556582424e72c576d691e11cb0a39a3b4535ec901df7e32",
+      "codeBytes": 74800,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "BzSXM6KLDpHQQChzr7Fdgbzwp8r8zRYWFFrHK2uZmDYV",
+      "deploymentSlot": "446053401",
+      "upgradeAuthority": "7bJ9xu9UGVZPtYzH1fMwdaKdvfhqeSJtoFc2eGrXBPhK",
+      "codeSha256": "4a7be21a5ac74188ba0ce58732211b6ae1a75674c9e7d1aa0dca4400ca03154a",
+      "codeBytes": 576932,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+      "deploymentSlot": "419472000",
+      "upgradeAuthority": null,
+      "codeSha256": "d22a72139cf9bb8274092338c615e7eeb3ea785df64a7cb19cb9a5e5e0a50dd7",
+      "codeBytes": 108600,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+      "deploymentSlot": "427147035",
+      "upgradeAuthority": "AeLmXCbPaQHGWRLr2saFsEVfmMNuKnxRAbWCT9P5twgz",
+      "codeSha256": "d3799c80551c4f21a2a4f79e3ab48dd0447f3868952d282acbaa23d7bfd2814c",
+      "codeBytes": 1382016,
+      "identityKind": "elf-code"
+    }
+  ],
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "deployed": false
+}
