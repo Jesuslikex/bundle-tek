@@ -1,0 +1,9 @@
+# Actionable Counter wallet exclusion refusals
+
+Counter intentionally requires every owned, proven Solana wallet in the plan's immutable ignore list. The strategy must not react to the user's own proven wallets. A new proof can invalidate an older plan's exclusions; neither previews nor diagnostics silently amend that plan.
+
+The existing SQL exclusion guard remains in the owned preview query. When admission or an in-flight context recheck fails, a separate diagnostic query uses the same owner, active plan, project revision/archive, selected saved wallet revision/role/archive and ownership-proof predicates. It names the first missing proven address in deterministic address order, explains the self-trade exclusion and requests a new reviewed plan. Other refusal causes retain their generic context message. A request for another owner's plan cannot reveal the original owner's missing address. Diagnostics never continue provider work or turn a refused context into an admitted one.
+
+The client wallet-roster check also identifies the missing address instead of only saying that exclusions changed. No TSX, Claude-owned UI, evaluator/source rules, rate gate, authority flags or signing behavior changes.
+
+Node24 verification: four owned-preview/client/API/UI files, 35 tests passed. These include real disposable SQLite admission checks, missing proof addresses, owner isolation and a proof added during preparation that still blocks simulation. Plain TypeScript, four-file typed lint and formatting pass. No live provider, full suite, build or fresh browser claim for this diagnostic. This local change was not uploaded in the independent QuickNode configuration redeploy. Existing UI/source checkpoints for Claude review: ad2f5e4 and ef9d57d. Preserve main's two unrelated dirty files; signing stays off.

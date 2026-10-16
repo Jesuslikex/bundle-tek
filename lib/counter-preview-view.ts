@@ -52,7 +52,7 @@ export function counterPreviewWallets(
       throw Error('Wallet proof metadata is invalid.');
     if (!plan.rules.ignoredWallets.includes(address))
       throw Error(
-        'Verified wallet exclusions changed. Review a new Counter plan before previewing.',
+        `Verified wallet exclusions changed: ${address} is missing from this Counter plan's ignore list. Review a new plan including this wallet before previewing.`,
       );
     proofs.add(address);
   }

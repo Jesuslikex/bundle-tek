@@ -284,6 +284,37 @@ it('keeps legacy history readable but refuses its missing source before preparat
   expect(f.dependencies.observeSource).not.toHaveBeenCalled();
   expect(f.dependencies.prepare).not.toHaveBeenCalled();
 });
+it('names the missing owned proof without exposing another owner or running a provider', async () => {
+  const f = fixture();
+  f.sqlite
+    .prepare('INSERT INTO wallet_ownership_proofs VALUES(?,?,?)')
+    .run('alice', 'Solana', WRAPPED_SOL);
+  await expect(f.run()).rejects.toMatchObject({
+    status: 409,
+    message: expect.stringContaining(`Proven wallet ${WRAPPED_SOL} is missing`),
+  });
+  await expect(f.run('bob')).rejects.toMatchObject({
+    status: 409,
+    message:
+      'Owned Counter proposal, exclusions or wallet changed. Reload saved history.',
+  });
+  expect(f.dependencies.observeSource).not.toHaveBeenCalled();
+  expect(f.dependencies.prepare).not.toHaveBeenCalled();
+});
+it('names a new proof added during preparation and still refuses simulation', async () => {
+  const f = fixture();
+  f.dependencies.prepare.mockImplementationOnce(async () => {
+    f.sqlite
+      .prepare('INSERT INTO wallet_ownership_proofs VALUES(?,?,?)')
+      .run('alice', 'Solana', WRAPPED_SOL);
+    return f.prepared;
+  });
+  await expect(f.run()).rejects.toMatchObject({
+    status: 409,
+    message: expect.stringContaining(WRAPPED_SOL),
+  });
+  expect(f.dependencies.simulate).not.toHaveBeenCalled();
+});
 it('rechecks sources after settlement and rejects a changed final observation', async () => {
   const f = fixture(),
     observe = f.dependencies.observeSource.getMockImplementation()!;

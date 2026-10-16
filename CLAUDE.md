@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October actionable Counter exclusion errors
+
+Read docs/CODEX-COUNTER-MISSING-WALLET-20261016.md. Own proven wallets must stay excluded. Existing SQL guard unchanged; failure diagnostics under the same ownership/revision/archive/wallet guards name the first missing address and request a new reviewed plan. Client roster errors also name it. Four files/35 tests, TypeScript/typed lint/format pass. No provider/evaluator/source/signing change, no Claude TSX edit. Local only, excluded from the separate existing-release QuickNode redeploy. UI commits ad2f5e4 and ef9d57d are ready for review. Preserve main dirty files.
+
 ## 16 October Counter contributing source checks
 
 Read docs/CODEX-COUNTER-SOURCE-RECHECK-20261016.md. New decisions retain detached context/movement; owned Buy previews reobserve every buffered contributor before preparation and after settlement, then recheck ownership. Exact fingerprint/time/decision terms and retained probability draws, no reroll; five-minute activation/freshness applied to all contributors, preview expiry capped and late packet refused. Legacy missing source remains readable but cannot preview. UI validates/shows source count/time. Final20 files/223 tests, TypeScript/typed lint/format pass; desktop/375px Chrome uses synthetic responses, no live/build/full-suite claim. Program/pool finality admission and durable approval/execution/recovery remain open. No Claude files, stock gate/provider/credential/cron/SQL/push/deploy/wallet action. Preserve main dirty files.

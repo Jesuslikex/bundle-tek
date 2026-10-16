@@ -34,6 +34,9 @@ it('refuses new proof exclusions, duplicate wallets and unavailable proof metada
   expect(() => counterPreviewWallets(f.workspace, f.plan)).toThrow(
     'exclusions changed',
   );
+  expect(() => counterPreviewWallets(f.workspace, f.plan)).toThrow(
+    f.request.wallet,
+  );
 });
 it('accepts an exact current summary while rejecting authority, swapped context, excess amounts and expiry', () => {
   const f = counterPreviewUiFixture();

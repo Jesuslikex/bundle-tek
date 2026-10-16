@@ -106,25 +106,46 @@ export async function previewOwnedCounterBuy(
 ) {
   const input = counterPreviewRequest(value);
   signal = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
+  const access =
+      "FROM counter_trade_plans c JOIN imported_token_projects p ON p.owner_id=c.owner_id AND p.id=c.project_id JOIN workspace_wallets w ON w.owner_id=c.owner_id AND w.chain='Solana' AND w.address=? WHERE c.owner_id=? AND c.project_id=? AND c.id=? AND c.revision=? AND c.state='active' AND p.chain='Solana' AND p.revision=? AND p.archived=0 AND w.revision=? AND w.archived=0 AND w.role IN ('Recipient','Deployer','Funder') AND EXISTS(SELECT 1 FROM wallet_ownership_proofs o WHERE o.owner_id=c.owner_id AND o.chain='Solana' AND o.address=w.address)",
+    missing =
+      "SELECT o.address FROM wallet_ownership_proofs o WHERE o.owner_id=c.owner_id AND o.chain='Solana' AND NOT EXISTS(SELECT 1 FROM json_each(c.document,'$.rules.ignoredWallets') x WHERE x.value=o.address)",
+    parameters = [
+      input.wallet,
+      owner,
+      input.projectId,
+      input.planId,
+      input.planRevision,
+      input.projectRevision,
+      input.walletRevision,
+    ];
   const read = () =>
     db
       .prepare(
-        "SELECT p.document AS project_document,p.address AS mint,p.revision AS project_revision,c.document AS plan_document,c.revision AS plan_revision,c.state AS plan_state,w.revision AS wallet_revision,w.role AS wallet_role,w.updated_at AS wallet_updated_at FROM counter_trade_plans c JOIN imported_token_projects p ON p.owner_id=c.owner_id AND p.id=c.project_id JOIN workspace_wallets w ON w.owner_id=c.owner_id AND w.chain='Solana' AND w.address=? WHERE c.owner_id=? AND c.project_id=? AND c.id=? AND c.revision=? AND c.state='active' AND p.chain='Solana' AND p.revision=? AND p.archived=0 AND w.revision=? AND w.archived=0 AND w.role IN ('Recipient','Deployer','Funder') AND EXISTS(SELECT 1 FROM wallet_ownership_proofs o WHERE o.owner_id=c.owner_id AND o.chain='Solana' AND o.address=w.address) AND NOT EXISTS(SELECT 1 FROM wallet_ownership_proofs o WHERE o.owner_id=c.owner_id AND o.chain='Solana' AND NOT EXISTS(SELECT 1 FROM json_each(c.document,'$.rules.ignoredWallets') x WHERE x.value=o.address))",
+        `SELECT p.document AS project_document,p.address AS mint,p.revision AS project_revision,c.document AS plan_document,c.revision AS plan_revision,c.state AS plan_state,w.revision AS wallet_revision,w.role AS wallet_role,w.updated_at AS wallet_updated_at ${access} AND NOT EXISTS(${missing})`,
       )
-      .bind(
-        input.wallet,
-        owner,
-        input.projectId,
-        input.planId,
-        input.planRevision,
-        input.projectRevision,
-        input.walletRevision,
-      )
+      .bind(...parameters)
       .first<Context>();
+  const refuseContext = async (message: string): Promise<never> => {
+    signal.throwIfAborted();
+    // Explain an exclusion refusal only under the same owned project/wallet guards.
+    const row = await db
+      .prepare(
+        `SELECT (${missing} ORDER BY o.address LIMIT 1) AS missing_wallet ${access}`,
+      )
+      .bind(...parameters)
+      .first<{ missing_wallet: string | null }>();
+    signal.throwIfAborted();
+    if (row?.missing_wallet)
+      throw new CounterPreviewError(
+        `Proven wallet ${walletAddress(row.missing_wallet, 'Solana')} is missing from this Counter plan's ignore list. Counter must not react to your own wallets. Review a new plan including this wallet before previewing.`,
+      );
+    throw new CounterPreviewError(message);
+  };
   signal.throwIfAborted();
   const context = await read();
   if (!context)
-    throw new CounterPreviewError(
+    return refuseContext(
       'Owned Counter proposal, exclusions or wallet changed. Reload saved history.',
     );
   const plan = decodeCounterPlan(JSON.parse(context.plan_document)),
@@ -153,7 +174,7 @@ export async function previewOwnedCounterBuy(
   const unchanged = async () => {
     signal.throwIfAborted();
     if (JSON.stringify(await read()) !== JSON.stringify(context))
-      throw new CounterPreviewError(
+      await refuseContext(
         'Counter context changed during the preview. Request a fresh preview.',
       );
     signal.throwIfAborted();
