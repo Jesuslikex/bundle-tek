@@ -21,6 +21,7 @@ export async function collectPairAccountPartitions(
   if (
     keys.length < 1 ||
     keys.length > 100 ||
+    keys.filter((key) => key === PAIR_CLOCK).length !== 1 ||
     keys.some((key) => !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(key)) ||
     Object.keys(config).sort().join(',') !==
       'commitment,encoding,minContextSlot' ||

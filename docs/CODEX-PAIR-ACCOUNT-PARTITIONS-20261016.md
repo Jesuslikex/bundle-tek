@@ -21,3 +21,7 @@ New coverage includes actual five-account wire calls with duplicate Clocks, orig
 Consumers still expect single RPC envelopes. A subsequent reviewed change must consume partition evidence explicitly, preserve the later effective slot for every floor/span, propagate every actual observation into qualification receipts, and close the transport on cancellation/refusal. Any sliced inventory/code request above five must be addressed separately without removing identity reads, byte bounds or the final code recheck. This prototype cannot yet make the existing qualification campaign pass.
 
 Same-slot admission can fail when the node advances between chunks. That is an intentional refusal, not a reason to merge different slots or loop until a pass. Only after reviewed integration should a new fixed three-SOL/three-USDC campaign run, retaining every outcome. Initial minimum output, fresh-reference tolerance, writable custody checks,32-slot ceiling and signing gate are unchanged. No UI ownership files, provider settings, credentials, migrations, cron or deployed release changed.
+
+## Scope audit follow-up
+
+The collector now requires exactly one original Clock position, matching the actual wallet reader's unique scope. Previously, multiple original Clock positions could be collapsed while partitioning. Rejecting such requests before IO prevents losing requested observations. Added zero/two/three-original-Clock refusal tests and controlled cancellation while both reads are pending. Both partition test files pass,17 tests. Production remains unconnected.

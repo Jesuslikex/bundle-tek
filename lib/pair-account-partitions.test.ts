@@ -116,6 +116,37 @@ it('refuses pre-cancellation without provider IO', async () => {
   await expect(f.run(AbortSignal.abort())).rejects.toThrow();
   expect(f.source).not.toHaveBeenCalled();
 });
+it.each([0, 2, 3])(
+  'refuses %s original Clock positions instead of dropping or inventing observations',
+  async (count) => {
+    const f = fixture();
+    await expect(
+      collectPairAccountPartitions(
+        [...keys, ...Array<string>(count).fill(PAIR_CLOCK)],
+        config,
+        f.source,
+        new AbortController().signal,
+        () => now,
+      ),
+    ).rejects.toThrow('request differs');
+    expect(f.source).not.toHaveBeenCalled();
+  },
+);
+it('refuses cancellation while provider reads are pending without publishing evidence', async () => {
+  const f = fixture(),
+    controller = new AbortController();
+  const original = f.source.getMockImplementation()!;
+  const release: (() => void)[] = [];
+  f.source.mockImplementation(async (method, params) => {
+    await new Promise<void>((resolve) => release.push(resolve));
+    return original(method, params);
+  });
+  const pending = f.run(controller.signal);
+  controller.abort();
+  for (const resolve of release) resolve();
+  await expect(pending).rejects.toThrow();
+  expect(f.source).toHaveBeenCalledTimes(2);
+});
 it('preserves duplicate payload positions and copies the caller input', async () => {
   const f = fixture();
   const input = [keys[0], keys[0], keys[1], keys[2], PAIR_CLOCK];
