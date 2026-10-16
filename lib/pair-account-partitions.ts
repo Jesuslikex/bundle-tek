@@ -1,6 +1,10 @@
 import { createStockPairEvidenceRpc, PAIR_CLOCK } from './pair-stock-clock';
 
-type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
+type Rpc = (
+  method: string,
+  params: unknown[],
+  signal?: AbortSignal,
+) => Promise<unknown>;
 type AccountConfig = {
   encoding: 'base64';
   commitment: 'confirmed';
@@ -18,6 +22,30 @@ export async function collectPairAccountPartitions(
   now: () => number = Date.now,
 ) {
   signal.throwIfAborted();
+  const controller = new AbortController();
+  const lifecycle = AbortSignal.any([signal, controller.signal]);
+  function cancellable<T>(pending: Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const abort = () => {
+        lifecycle.removeEventListener('abort', abort);
+        reject(
+          new DOMException('Stock partition read cancelled.', 'AbortError'),
+        );
+      };
+      lifecycle.addEventListener('abort', abort, { once: true });
+      if (lifecycle.aborted) abort();
+      void pending.then(
+        (value) => {
+          lifecycle.removeEventListener('abort', abort);
+          resolve(value);
+        },
+        (error) => {
+          lifecycle.removeEventListener('abort', abort);
+          reject(error);
+        },
+      );
+    });
+  }
   if (
     keys.length < 1 ||
     keys.length > 100 ||
@@ -36,14 +64,14 @@ export async function collectPairAccountPartitions(
   const providerResponses: { params: unknown[]; response: unknown }[] = [];
   const scope = createStockPairEvidenceRpc(
     async (method, params) => {
-      signal.throwIfAborted();
+      lifecycle.throwIfAborted();
       const record = {
         params: structuredClone(params),
         response: undefined as unknown,
       };
       providerResponses.push(record);
-      const result = await source(method, params);
-      signal.throwIfAborted();
+      const result = await cancellable(source(method, params, lifecycle));
+      lifecycle.throwIfAborted();
       record.response = result;
       return result;
     },
@@ -59,24 +87,27 @@ export async function collectPairAccountPartitions(
   for (let i = 0; i < positions.length; i += 3)
     groups.push(positions.slice(i, i + 3));
   if (!groups.length) groups.push([]);
-  const partitions = await Promise.all(
-    groups.map(async (originalPositions) => {
-      const accountKeys = [
-        ...originalPositions.map((i) => requestKeys[i]),
-        PAIR_CLOCK,
-      ];
-      const response = (await scope.rpc('getMultipleAccounts', [
-        accountKeys,
-        { ...requestConfig },
-      ])) as {
-        context: { slot: string };
-        value: unknown[];
-      };
-      signal.throwIfAborted();
-      return { originalPositions, accountKeys, response };
-    }),
-  );
-  signal.throwIfAborted();
+  const tasks = groups.map(async (originalPositions) => {
+    const accountKeys = [
+      ...originalPositions.map((i) => requestKeys[i]),
+      PAIR_CLOCK,
+    ];
+    const response = (await scope.rpc('getMultipleAccounts', [
+      accountKeys,
+      { ...requestConfig },
+    ])) as {
+      context: { slot: string };
+      value: unknown[];
+    };
+    lifecycle.throwIfAborted();
+    return { originalPositions, accountKeys, response };
+  });
+  const partitions = await Promise.all(tasks).catch(async (error: unknown) => {
+    controller.abort();
+    await Promise.allSettled(tasks);
+    throw error;
+  });
+  lifecycle.throwIfAborted();
   const first = partitions[0];
   const canonical = (value: unknown) =>
     JSON.stringify(

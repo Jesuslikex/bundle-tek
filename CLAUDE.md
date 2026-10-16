@@ -1,5 +1,9 @@
 # Claude Code project notes
 
+## 16 October Claude prerequisite review and partition state/cancellation
+
+Claude CLI review c9e5d750-00c9-45cb-bb9f-cf03323e9f40 completed read-only, without running tests. Read docs/CODEX-CLAUDE-FIVE-ACCOUNT-REVIEW-20261016.md: prerequisites sound on reading, whole-path integration blocked by mixed caps, uncapped state/lookups, new per-call Clock scopes, pending siblings and effective-slot accounting. ac17ffa adds offline order-state and full-account observation consumers with original parser/default single-read behavior, documented/directly tested mapping. Follow-up cancellation links a local abort signal, settles siblings before refusal, prevents late retained publication and passes cancellation to cooperative providers; owner transport close still required. Final12 files/301 tests, TypeScript/scoped typed lint/format pass. Shared lifecycle, unified account profile, lookup/state integration and end-to-end cap-enforcing transport test remain before live runs. No live pass, UI/provider/credential/SQL/cron/deploy/wallet action. Signing off; preserve main dirty files.
+
 ## 16 October capped runtime inventory provenance
 
 Read docs/CODEX-PAIR-INVENTORY-ACCOUNT-CAP-20261016.md. Runtime collector has optional inventory5/default100; every actual sliced chunk keeps its own floor/slot and original account order. Custody diagnostics use that chunk size for real response slot/position/count while compiled packet index stays unchanged. Seven files/88 tests, TypeScript/scoped typed lint/format pass, including advancing second-chunk custody refusal and existing code/simulation ordering. No API/script caller selects the setting; full-state, lookup, candidate/wallet and transport integration remain separate. No live qualification result, UI/provider/credential/SQL/cron/deploy/wallet action. Signing off; preserve main dirty files.

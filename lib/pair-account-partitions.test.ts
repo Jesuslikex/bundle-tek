@@ -116,6 +116,93 @@ it('refuses pre-cancellation without provider IO', async () => {
   await expect(f.run(AbortSignal.abort())).rejects.toThrow();
   expect(f.source).not.toHaveBeenCalled();
 });
+it('passes a linked cancellation signal to a cooperative sibling provider', async () => {
+  let calls = 0,
+    siblingAborted = false;
+  const failure = Error('provider refusal');
+  const source = vi.fn(
+    async (
+      _method: string,
+      _params: unknown[],
+      signal?: AbortSignal,
+    ): Promise<unknown> => {
+      if (calls++ === 0) throw failure;
+      return new Promise((_resolve, reject) => {
+        signal!.addEventListener(
+          'abort',
+          () => {
+            siblingAborted = true;
+            reject(Error('sibling aborted'));
+          },
+          { once: true },
+        );
+      });
+    },
+  );
+  await expect(
+    collectPairAccountPartitions(
+      [...keys, PAIR_CLOCK],
+      config,
+      source,
+      new AbortController().signal,
+      () => now,
+    ),
+  ).rejects.toBe(failure);
+  expect(siblingAborted).toBe(true);
+  expect(source).toHaveBeenCalledTimes(2);
+});
+it(
+  'settles a refusal even when a sibling provider ignores cancellation, then ignores its late result',
+  { timeout: 1000 },
+  async () => {
+    const f = fixture(),
+      original = f.source.getMockImplementation()!,
+      failure = Error('declared provider refusal');
+    let release = () => {},
+      notifyComplete = () => {},
+      calls = 0;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const completed = new Promise<void>((resolve) => {
+      notifyComplete = resolve;
+    });
+    f.source.mockImplementation(async (method, params) => {
+      if (calls++ === 0) throw failure;
+      await blocked;
+      const result = await original(method, params);
+      notifyComplete();
+      return result;
+    });
+    const pending = f.run();
+    await expect(pending).rejects.toBe(failure);
+    release();
+    await completed;
+    expect(f.source).toHaveBeenCalledTimes(2);
+  },
+);
+it(
+  'settles outer cancellation without waiting for providers that ignore the signal',
+  { timeout: 1000 },
+  async () => {
+    const f = fixture(),
+      controller = new AbortController(),
+      original = f.source.getMockImplementation()!;
+    let release = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    f.source.mockImplementation(async (method, params) => {
+      await blocked;
+      return original(method, params);
+    });
+    const pending = f.run(controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toThrow();
+    release();
+    expect(f.source).toHaveBeenCalledTimes(2);
+  },
+);
 it.each([0, 2, 3])(
   'refuses %s original Clock positions instead of dropping or inventing observations',
   async (count) => {
