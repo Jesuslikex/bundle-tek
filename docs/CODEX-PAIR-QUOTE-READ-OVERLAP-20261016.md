@@ -1,0 +1,9 @@
+# Independent network/slot read overlap
+
+Timing instrumentation is 8c7d91a; fixed measured baseline is committed first as 1a3fc3c. That six-attempt sample remained SOL 0/3 and USDC 0/3: three protected-minimum refusals and three freshness refusals. Initial full quote completion to order dispatch was 74.2..95.2 ms. Order completion to fresh reference dispatch was 321.5..333.2 ms. Both provider latency and Bundle checks remain visible separately in the baseline JSON. Counts alone do not prove causality.
+
+This separate change overlaps only the initial getGenesisHash and getSlot in quoteOwnedImportedPair. They have no data dependency; their values are not used for mint/amount/quote work until both settle and pass the identical mainnet and canonical positive safe-integer checks. The request-scoped transport can combine the two independent methods in a batch. Each method still counts individually against pacing. All before/after mint reads, final genesis, saved ownership, scaled amount policy, fresh quote, wallet custody, minimum-output and 32-slot checks remain in their original order and retain their predicates. The quote's original timestamp/start, expiry and continuation scope are unchanged. No result or code is reused.
+
+Controlled deferred tests demonstrate that slot dispatch starts while genesis is pending, no mint/quote work starts until both settle, invalid genesis and invalid slot each refuse, and the final network read still occurs on success. Five relevant files / 191 tests pass, including service/minimum/order/transport checks. Signing remains off; no Claude UI, provider/credential/cron change, hosted SQL, push, deployment or real wallet action.
+
+Run one separate fixed post-change six-attempt sample on the same pinned references, preserving every refusal and reporting timing and counts regardless of improvement. Do not infer causal success from different live routes or market conditions, and do not replace either sample.

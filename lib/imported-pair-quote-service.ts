@@ -273,12 +273,17 @@ export async function quoteOwnedImportedPair(
       signal.throwIfAborted();
       return result;
     };
-    if ((await checked('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+    // Independent reads can share a transport batch. Neither result is used
+    // until both settle, and the final network/identity recheck still repeats.
+    const [genesis, rawSlot] = await Promise.all([
+      checked('getGenesisHash', []),
+      checked('getSlot', [{ commitment: 'confirmed' }]),
+    ]);
+    if (genesis !== SOLANA_MAINNET_GENESIS)
       throw new ImportedPairQuoteError(
         'Quote identity provider is on the wrong network.',
         502,
       );
-    const rawSlot = await checked('getSlot', [{ commitment: 'confirmed' }]);
     if (
       typeof rawSlot !== 'string' ||
       !/^[1-9]\d{0,15}$/.test(rawSlot) ||

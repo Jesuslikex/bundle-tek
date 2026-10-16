@@ -18,6 +18,58 @@ afterEach(() => {
   vi.useRealTimers();
 });
 const signal = () => new AbortController().signal;
+it.each(['valid', 'wrong-network', 'invalid-slot'] as const)(
+  'starts independent initial reads together and requires both valid results: %s',
+  async (mode) => {
+    const f = (fixture = importedPairQuoteFixture()),
+      original = f.rpc.getMockImplementation()!,
+      genesis = Promise.withResolvers<unknown>(),
+      slot = Promise.withResolvers<unknown>(),
+      slotEntered = Promise.withResolvers<void>();
+    let genesisCount = 0;
+    f.rpc.mockImplementation(async (method, params) => {
+      if (method === 'getGenesisHash' && genesisCount++ === 0)
+        return genesis.promise;
+      if (method === 'getSlot') {
+        slotEntered.resolve();
+        return slot.promise;
+      }
+      return original(method, params);
+    });
+    const pending = quoteOwnedImportedPair(
+      f.db,
+      'alice',
+      f.request,
+      signal(),
+      f.dependencies,
+    );
+    // This can only settle if slot dispatch is independent of pending genesis.
+    await slotEntered.promise;
+    expect(f.quote).not.toHaveBeenCalled();
+    expect(
+      f.rpc.mock.calls.some(([method]) => method === 'getMultipleAccounts'),
+    ).toBe(false);
+    genesis.resolve(
+      mode === 'wrong-network'
+        ? 'wrong-network'
+        : await original('getGenesisHash', []),
+    );
+    await Promise.resolve();
+    expect(f.quote).not.toHaveBeenCalled();
+    slot.resolve(mode === 'invalid-slot' ? '100.1' : '100');
+    if (mode === 'valid') {
+      expect((await pending).signingAllowed).toBe(false);
+      expect(f.quote).toHaveBeenCalledOnce();
+      expect(genesisCount).toBe(2);
+    } else {
+      await expect(pending).rejects.toMatchObject({ status: 502 });
+      expect(f.quote).not.toHaveBeenCalled();
+      expect(
+        f.rpc.mock.calls.some(([method]) => method === 'getMultipleAccounts'),
+      ).toBe(false);
+    }
+  },
+);
 it.each(['stable', 'crossed'] as const)(
   'bounds a scheduled stock multiplier transition when the quote is %s',
   async (mode) => {
