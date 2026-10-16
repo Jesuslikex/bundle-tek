@@ -3,6 +3,8 @@ import * as pairReads from './pair-read-rpc';
 import * as solanaRpc from './solana-rpc';
 import { readFileSync } from 'node:fs';
 import { pairRuntimeFixture } from '../test/pair-runtime-fixture';
+import { PAIR_CLOCK } from './pair-mint-evidence';
+import { pairQuoteClock } from '../test/imported-pair-quote-fixture';
 import {
   qualifyOwnedPairOrderFirstRuntime,
   pairOrderFirstRequest,
@@ -159,6 +161,40 @@ it('has no client-selectable qualification or signing flag', async () => {
   expect(() =>
     pairOrderFirstRequest({ ...request, qualifyRuntime: true }),
   ).toThrow();
+});
+
+it('qualifies stock-only +1 Clock observations with later-slot evidence and both full scans', async () => {
+  const { f, run } = await setup();
+  f.runtimeState.onCodeRead = () => {};
+  const original = f.rpc.getMockImplementation()!;
+  f.rpc.mockImplementation(async (method, params) => {
+    const result = await original(method, params);
+    if (
+      method === 'getMultipleAccounts' &&
+      (params[0] as string[]).includes(PAIR_CLOCK)
+    ) {
+      const r = result as { context: { slot: string }; value: unknown[] };
+      for (const [i, key] of (params[0] as string[]).entries())
+        if (key === PAIR_CLOCK)
+          r.value[i] = pairQuoteClock(
+            Number(r.context.slot) + 1,
+            String(Math.floor(f.clock.now / 1000)),
+          );
+    }
+    return result;
+  });
+  const result = await run();
+  expect(result.clockObservations.length).toBeGreaterThan(3);
+  for (const observation of result.clockObservations) {
+    expect(observation.relation).toBe('+1');
+    expect(observation.slot).toBe(observation.contextSlot + 1);
+    expect(observation.slot).toBeLessThanOrEqual(result.runtime.maximumSlot);
+  }
+  expect(
+    result.runtime.maximumSlot - result.runtime.minimumSlot,
+  ).toBeLessThanOrEqual(32);
+  expect(f.runtimeState.codeReads).toBe(f.programs.size * 6);
+  expect(result.signingAllowed).toBe(false);
 });
 
 it('uses configured pacing by default even on a non-Helius provider', async () => {

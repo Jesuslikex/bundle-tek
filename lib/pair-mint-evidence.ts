@@ -4,10 +4,6 @@ import {
   type Extension,
 } from '@solana-program/token-2022';
 import {
-  pairReviewDiagnostic,
-  pairDiagnosticComparisons,
-} from './pair-review-diagnostic';
-import {
   SWAP_TOKEN,
   SWAP_TOKEN_2022,
   SWAP_WRAPPED_SOL,
@@ -18,8 +14,16 @@ import {
   type PairAmountPolicy,
 } from './pair-ui-amount';
 
-export const PAIR_CLOCK = 'SysvarC1ock11111111111111111111111111111111';
-export const PAIR_SYSVAR_OWNER = 'Sysvar1111111111111111111111111111111111111';
+import {
+  PAIR_CLOCK,
+  PAIR_SYSVAR_OWNER,
+  pairEvidenceClock,
+} from './pair-stock-clock';
+export {
+  PAIR_CLOCK,
+  PAIR_SYSVAR_OWNER,
+  pairClockUnixTimestamp,
+} from './pair-stock-clock';
 export const PAIR_QUOTE_EXTENSIONS = [
   'ConfidentialTransferMint',
   'DefaultAccountState',
@@ -49,6 +53,7 @@ export type PairMintMetadata = {
   issuerControls: PairIssuerControl[];
 };
 export type PairMintEvidence = {
+  clock?: import('./pair-stock-clock').PairClockObservation;
   slot: number;
   unixTimestamp: string;
   mints: PairMintMetadata[];
@@ -60,47 +65,6 @@ export class PairMintPolicyError extends Error {
     super(message);
     this.name = 'PairMintPolicyError';
   }
-}
-export function pairClockUnixTimestamp(
-  raw: unknown,
-  slot: number,
-  now = Date.now(),
-) {
-  if (!Number.isSafeInteger(slot) || slot < 1)
-    throw new Error('Pair chain clock slot is invalid.');
-  const clock = accountBytes(raw, true).bytes;
-  const view = new DataView(clock.buffer);
-  const unix = view.getBigInt64(32, true);
-  if (
-    view.getBigUint64(0, true) !== BigInt(slot) ||
-    unix < 1n ||
-    unix > BigInt(Number.MAX_SAFE_INTEGER) ||
-    !Number.isFinite(now) ||
-    Math.abs(Number(unix) * 1000 - now) > 30000
-  )
-    throw pairReviewDiagnostic(
-      new Error('Pair chain clock is inconsistent or stale.'),
-      'chain-clock',
-      {
-        contextSlot: slot,
-        clockSlot: Number(view.getBigUint64(0, true)),
-        wallSkewMs: now - Number(unix) * 1000,
-        comparisons: pairDiagnosticComparisons(
-          {
-            slot,
-            unixTimestamp: String(Math.floor(now / 1000)),
-            wallSkewLimitMs: '30000',
-          },
-          {
-            slot: view.getBigUint64(0, true).toString(),
-            unixTimestamp: unix.toString(),
-            wallSkewLimitMs: '30000',
-          },
-        ),
-        evaluatedServerTimeMs: now,
-      },
-    );
-  return unix.toString();
 }
 function accountBytes(raw: unknown, clock = false) {
   const a = raw as { owner?: unknown; executable?: unknown; data?: unknown };
@@ -275,14 +239,16 @@ export async function readPairMintEvidence(
     result.value.length !== 3
   )
     throw new Error('Pair identity RPC context is unavailable.');
-  const unixTimestamp = pairClockUnixTimestamp(
+  const clock = pairEvidenceClock(
+    result,
     result.value[2],
     Number(rawSlot),
     now,
   );
   return {
-    slot: Number(rawSlot),
-    unixTimestamp,
+    slot: clock.slot,
+    unixTimestamp: clock.unixTimestamp,
+    clock,
     mints: await Promise.all([
       inspectPairMintAccount(result.value[0], pair.inputMint),
       inspectPairMintAccount(result.value[1], pair.outputMint),

@@ -64,6 +64,7 @@ const files = [
   'lib/pair-review-diagnostic.ts',
   'lib/pair-wallet-evidence.ts',
   'lib/pair-mint-evidence.ts',
+  'lib/pair-stock-clock.ts',
   'lib/imported-pair-wallet-preflight.ts',
   'lib/pair-order-first-review.ts',
   'lib/pair-order-market-bound.ts',
@@ -103,7 +104,7 @@ mkdirSync(folder, { recursive: true });
 const bundle = join(folder, 'reader.mjs');
 await build({
   stdin: {
-    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
+    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
     resolveDir: process.cwd(),
     sourcefile: 'unsigned-stock-qualification.ts',
   },
@@ -285,6 +286,14 @@ try {
         const bytes = Buffer.from(raw?.data?.[0] ?? '', 'base64');
         if (bytes.length === 40) {
           row.clockSlot = bytes.readBigUInt64LE(0).toString();
+          row.clockRelation =
+            BigInt(row.clockSlot) === BigInt(row.slot)
+              ? 'equal'
+              : BigInt(row.clockSlot) === BigInt(row.slot) + 1n
+                ? '+1'
+                : 'refused';
+          row.effectiveClockSlot =
+            row.clockRelation === 'refused' ? null : row.clockSlot;
           row.clockDataSha256 = hash(bytes);
           row.chainUnix = bytes.readBigInt64LE(32).toString();
           row.clockSkewMs = Date.now() - Number(row.chainUnix) * 1000;
@@ -529,12 +538,14 @@ try {
       }
     };
   }
+  const stockReads = lib.createStockPairEvidenceRpc(rpc, programRpc);
+  receipt.clockObservations = stockReads.observations;
   receipt.stage = 'mint-identity';
   const slot = Number(await rpc('getSlot', [{ commitment: 'confirmed' }]));
   const mints = await lib.readPairMintEvidence(
     { inputMint: baseMint, outputMint: quoteMint },
     slot,
-    rpc,
+    stockReads.rpc,
   );
   const mint = (
     await rpc('getMultipleAccounts', [
@@ -649,8 +660,8 @@ try {
     },
     signal,
     {
-      rpc,
-      programRpc,
+      rpc: stockReads.rpc,
+      programRpc: stockReads.programRpc,
       quote: async (input, s) => {
         const quote = await measureStockProvider(
           receipt.providerTimings,

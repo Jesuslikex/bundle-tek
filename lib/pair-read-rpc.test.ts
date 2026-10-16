@@ -755,3 +755,32 @@ it('opts into method-counted qualification pacing only when explicitly selected 
     undefined,
   );
 });
+
+it('keeps duplicate account positions on the wire instead of deduplicating evidence during coalescing', async () => {
+  const f = fixture((replies, messages) =>
+    replies.map((reply, i) => ({
+      ...(reply as object),
+      result: {
+        context: { slot: '123' },
+        value: (messages[i].params[0] as string[]).map((_key, n) => ({
+          position: n,
+        })),
+      },
+    })),
+  );
+  const key = 'SysvarC1ock11111111111111111111111111111111';
+  const [duplicate] = await Promise.all([
+    f.reader.rpc('getMultipleAccounts', [
+      [key, key],
+      { encoding: 'base64', minContextSlot: 123 },
+    ]),
+    f.reader.rpc('getMultipleAccounts', [
+      [key],
+      { encoding: 'base64', minContextSlot: 123 },
+    ]),
+  ]);
+  expect(f.bodies.flat().map((m) => m.params[0])).toContainEqual([key, key]);
+  expect(duplicate).toMatchObject({
+    value: [{ position: '0' }, { position: '1' }],
+  });
+});

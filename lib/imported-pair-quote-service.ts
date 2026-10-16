@@ -1,4 +1,5 @@
 import { env } from './server-env';
+import { StockPairEvidenceError } from './pair-stock-clock';
 import { chainQuoteAssets } from './quote-catalog';
 import { walletAddress } from './wallet-workspace';
 import { UUID } from './wallet-operation';
@@ -57,7 +58,11 @@ export function createPairOrderQuoteScope(): object {
 export function importedPairProviderError(error: unknown, message: string) {
   return new ImportedPairQuoteError(
     message,
-    error instanceof WalletRpcError && error.status === 429 ? 429 : 502,
+    error instanceof StockPairEvidenceError
+      ? 409
+      : error instanceof WalletRpcError && error.status === 429
+        ? 429
+        : 502,
   );
 }
 export type ImportedPairQuoteRequest = {

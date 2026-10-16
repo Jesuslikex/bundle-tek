@@ -1,4 +1,5 @@
 import { env } from './server-env';
+import { createStockPairEvidenceRpc } from './pair-stock-clock';
 import { walletAddress } from './wallet-workspace';
 import type { observeTokenMarket } from './token-market';
 import {
@@ -156,6 +157,13 @@ async function preparePairOrderFirst(
     }),
     quoteScope: createPairOrderQuoteScope(),
   };
+  const stockReads = createStockPairEvidenceRpc(
+    provider.rpc,
+    programRpc ?? provider.rpc,
+    provider.now,
+  );
+  provider.rpc = stockReads.rpc;
+  if (programRpc) programRpc = stockReads.programRpc;
   const ownedSnapshot = () =>
     db
       .prepare(
@@ -280,6 +288,7 @@ async function preparePairOrderFirst(
   if (JSON.stringify(originalOwned) !== JSON.stringify(await ownedSnapshot()))
     throw new ImportedPairQuoteError('Owned review context changed.');
   const record = {
+    clockObservations: stockReads.observations,
     request: { ...request, absoluteMinimumRaw, marketPair },
     initial,
     candidate,
@@ -314,7 +323,12 @@ async function preparePairOrderFirst(
   signal.throwIfAborted();
   if (saved.meta.changes !== 1)
     throw new ImportedPairQuoteError('Order review could not be saved.');
-  return { id, review, ...(runtime ? { runtime } : {}) };
+  return {
+    id,
+    review,
+    clockObservations: stockReads.observations,
+    ...(runtime ? { runtime } : {}),
+  };
 }
 
 export async function readOwnedPairOrderFirstReview(

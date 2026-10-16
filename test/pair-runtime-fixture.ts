@@ -110,8 +110,12 @@ export async function pairRuntimeFixture() {
     ) {
       const response = result as unknown as { value: unknown[] };
       const slot = config!.minContextSlot!;
-      response.value[(params[0] as string[]).indexOf(PAIR_CLOCK)] =
-        pairQuoteClock(slot, String(Math.floor(f.clock.now / 1000)));
+      for (const [i, key] of (params[0] as string[]).entries())
+        if (key === PAIR_CLOCK)
+          response.value[i] = pairQuoteClock(
+            slot,
+            String(Math.floor(f.clock.now / 1000)),
+          );
     }
     if (method === 'simulateTransaction' && config?.innerInstructions) {
       const input = f.orderRequest;

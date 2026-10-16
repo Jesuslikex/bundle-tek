@@ -1,8 +1,8 @@
+import { pairEvidenceClock } from './pair-stock-clock';
 import bs58 from 'bs58';
 import { address } from '@solana/kit';
 import {
   PAIR_CLOCK,
-  pairClockUnixTimestamp,
   inspectPairMintAccount,
   type PairMintMetadata,
   type PairMintEvidence,
@@ -122,9 +122,11 @@ export async function readPairAuxiliaryMints(
     raw.value.length !== mints.length + 1
   )
     throw Error('Auxiliary mint context differs.');
+  const clock = pairEvidenceClock(raw, raw.value.at(-1), Number(s), now());
   return {
-    slot: Number(s),
-    unixTimestamp: pairClockUnixTimestamp(raw.value.at(-1), Number(s), now()),
+    slot: clock.slot,
+    unixTimestamp: clock.unixTimestamp,
+    clock,
     mints: await Promise.all(
       mints.map((mint, i) => inspectPairMintAccount(raw.value![i], mint)),
     ),

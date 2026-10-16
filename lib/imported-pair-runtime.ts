@@ -1,4 +1,5 @@
 import { env } from './server-env';
+import { createStockPairEvidenceRpc } from './pair-stock-clock';
 import { createPairReadRpc } from './pair-read-rpc';
 import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
 import {
@@ -65,12 +66,21 @@ export async function previewOwnedImportedPairRuntime(
     const quote = dependencies ?? configuredPairQuoteDependencies(signal);
     if (!dependencies)
       reads = createPairReadRpc(getSolanaIndexerRpcEndpoint(), signal);
-    const provider: ImportedPairRuntimeDependencies = dependencies ?? {
-      ...quote,
-      rpc: reads!.rpc,
-      prepare: (input, s) => prepareSolanaPair(input, env.JUPITER_API_KEY, s),
-      programRpc: reads!.programRpc,
+    const provider: ImportedPairRuntimeDependencies = {
+      ...(dependencies ?? {
+        ...quote,
+        rpc: reads!.rpc,
+        prepare: (input, s) => prepareSolanaPair(input, env.JUPITER_API_KEY, s),
+        programRpc: reads!.programRpc,
+      }),
     };
+    const stockReads = createStockPairEvidenceRpc(
+      provider.rpc,
+      provider.programRpc ?? provider.rpc,
+      provider.now,
+    );
+    provider.rpc = stockReads.rpc;
+    provider.programRpc = stockReads.programRpc;
     const checked =
       (fn: typeof provider.rpc) =>
       async (method: string, params: unknown[]) => {
@@ -120,6 +130,7 @@ export async function previewOwnedImportedPairRuntime(
       format: 'imported-pair-runtime-preview-v1' as const,
       candidate: { ...candidate, review: preview.review },
       runtime: preview.runtime,
+      clockObservations: stockReads.observations,
       approvalCreated: false as const,
       reservationCreated: false as const,
       signingAllowed: false as const,

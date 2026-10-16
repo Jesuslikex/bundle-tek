@@ -1,3 +1,4 @@
+import { PAIR_CLOCK } from '../lib/pair-mint-evidence';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { vi } from 'vitest';
@@ -126,16 +127,17 @@ export function importedPairQuoteFixture(
         const options = params[1] as { minContextSlot: number };
         return {
           context: { slot: String(options.minContextSlot + 1) },
-          value: [
-            ...structuredClone(mints),
-            pairQuoteClock(
-              options.minContextSlot + 1,
-              clockState.unixTimestamp ??
-                Math.floor(
-                  (dependencies.now?.() ?? Date.now()) / 1000,
-                ).toString(),
-            ),
-          ],
+          value: (params[0] as string[]).map((key, i) =>
+            key === PAIR_CLOCK
+              ? pairQuoteClock(
+                  options.minContextSlot + 1,
+                  clockState.unixTimestamp ??
+                    Math.floor(
+                      (dependencies.now?.() ?? Date.now()) / 1000,
+                    ).toString(),
+                )
+              : structuredClone(mints[i]),
+          ),
         };
       }
       throw new Error('Unexpected quote-only RPC ' + method);

@@ -208,6 +208,10 @@ export function createPairReadRpc(
         candidate &&
         first.method === 'getMultipleAccounts' &&
         candidate.method === first.method &&
+        new Set(first.params[0] as string[]).size ===
+          (first.params[0] as string[]).length &&
+        new Set(candidate.params[0] as string[]).size ===
+          (candidate.params[0] as string[]).length &&
         first.maxBytes === candidate.maxBytes
       ) {
         const a = first.params[1] as Record<string, unknown>,

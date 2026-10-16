@@ -135,11 +135,11 @@ export async function pairWalletFixture(side: 'Buy' | 'Sell' = 'Buy') {
               ? pairQuoteClock(slot, String(Math.floor(clock.now / 1000)))
               : a === PAIR_RENT
                 ? structuredClone(state.rentAccount)
-                : keys.at(-1) === PAIR_CLOCK &&
-                    keys.length >= 6 &&
-                    i >= keys.length - 4 &&
-                    i < keys.length - 2
-                  ? structuredClone(f.mints[i - (keys.length - 4)])
+                : keys.includes(PAIR_CLOCK) &&
+                    keys.indexOf(PAIR_RENT) >= 2 &&
+                    i >= keys.indexOf(PAIR_RENT) - 2 &&
+                    i < keys.indexOf(PAIR_RENT)
+                  ? structuredClone(f.mints[i - (keys.indexOf(PAIR_RENT) - 2)])
                   : structuredClone(accounts[atas.indexOf(a)] ?? null),
         ),
       };

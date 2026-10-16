@@ -1,3 +1,4 @@
+import { pairEvidenceClock } from './pair-stock-clock';
 import bs58 from 'bs58';
 import {
   pairReviewDiagnostic,
@@ -14,7 +15,6 @@ import {
 import {
   PAIR_CLOCK,
   PairMintPolicyError,
-  pairClockUnixTimestamp,
   inspectPairMintAccount,
   assertSamePairMintEvidence,
   type PairMintEvidence,
@@ -60,6 +60,7 @@ export type PairWalletAccount = {
   mintPolicySha256: string;
 };
 export type PairWalletEvidence = {
+  clock?: import('./pair-stock-clock').PairClockObservation;
   format: 'pair-wallet-evidence-v1';
   scope: 'canonical-associated-accounts';
   wallet: string;
@@ -320,12 +321,14 @@ export async function readPairWalletEvidence(
     result.value.length !== requested.length
   )
     throw new Error('Pair wallet account context differs.');
-  const unix = pairClockUnixTimestamp(result.value.at(-1), Number(s), now);
+  const clock = pairEvidenceClock(result, result.value.at(-1), Number(s), now);
+  const unix = clock.unixTimestamp;
   const rent = inspectPairRentAccount(
     result.value[requested.indexOf(PAIR_RENT)],
   );
   const observedMints: PairMintEvidence = {
-    slot: Number(s),
+    slot: clock.slot,
+    clock,
     unixTimestamp: unix,
     mints: await Promise.all(
       mints.mints.map((m) =>
@@ -422,7 +425,8 @@ export async function readPairWalletEvidence(
     format: 'pair-wallet-evidence-v1',
     scope: 'canonical-associated-accounts',
     wallet,
-    slot: Number(s),
+    slot: clock.slot,
+    clock,
     unixTimestamp: unix,
     nativeBalanceRaw: system.lamports,
     walletExists,

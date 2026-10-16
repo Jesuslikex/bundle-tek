@@ -1,8 +1,8 @@
+import { pairEvidenceClock } from './pair-stock-clock';
 import { address } from '@solana/kit';
 import {
   PAIR_CLOCK,
   inspectPairMintAccount,
-  pairClockUnixTimestamp,
   type PairMintEvidence,
 } from './pair-mint-evidence';
 import type { PairOrderAccountSnapshot } from './pair-order-review';
@@ -59,8 +59,13 @@ export async function readPairOrderState(
     Array.from(response.value).some((value) => value === undefined)
   )
     throw Error('Pair order state bank or mapping differs.');
-  const slot = Number(s),
-    unixTimestamp = pairClockUnixTimestamp(response.value.at(-1), slot, now());
+  const clock = pairEvidenceClock(
+    response,
+    response.value.at(-1),
+    Number(s),
+    now(),
+  );
+  const { slot, unixTimestamp } = clock;
   const rent = inspectPairRentAccount(response.value.at(-2));
   const metadata = await Promise.all(
     [...selected, ...auxiliary].map((mint, i) =>
@@ -70,6 +75,7 @@ export async function readPairOrderState(
   const mints: PairMintEvidence = {
     slot,
     unixTimestamp,
+    clock,
     mints: metadata.slice(0, 2),
   };
   const auxiliaryMints: PairMintEvidence | null = auxiliary.length
@@ -78,6 +84,7 @@ export async function readPairOrderState(
   return {
     slot,
     unixTimestamp,
+    clock,
     accounts: accounts.map(
       (key, i): PairOrderAccountSnapshot => ({
         address: key,
