@@ -1,4 +1,4 @@
-import { afterEach, it, expect } from 'vitest';
+import { afterEach, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { quoteOwnedImportedPair } from './imported-pair-quote-service';
 import {
@@ -15,13 +15,18 @@ let fixture: ReturnType<typeof importedPairQuoteFixture> | undefined;
 afterEach(() => {
   fixture?.close();
   fixture = undefined;
+  vi.useRealTimers();
 });
 const signal = () => new AbortController().signal;
 it.each(['stable', 'crossed'] as const)(
   'bounds a scheduled stock multiplier transition when the quote is %s',
   async (mode) => {
-    const f = (fixture = importedPairQuoteFixture());
     const now = Math.floor(Date.now() / 1000) * 1000;
+    // The mock provider and service must share this same fixed clock. Real
+    // provider time can otherwise drift past the service's future-time bound.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+    const f = (fixture = importedPairQuoteFixture());
     f.dependencies.now = () => now;
     f.clockState.unixTimestamp = String(now / 1000);
     f.mints[1] = pairQuoteMint(8, SWAP_TOKEN_2022, [

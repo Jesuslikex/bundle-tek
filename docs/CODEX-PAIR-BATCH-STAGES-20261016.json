@@ -1,0 +1,1023 @@
+{
+  "format": "pair-runtime-batch-stage-handoff-v1",
+  "basedOnCommit": "d4b3ef8bb4df0e9d681ee86d8e2b32605aa90a6f",
+  "capturedAt": "2026-10-16T00:36:00.888Z",
+  "sourceFiles": {
+    "lib/pair-read-rpc.ts": "26090776b50fbad3d904e7ad9dcef14328f83f62238a7707d5f88ed84a01cf62",
+    "lib/imported-pair-runtime.ts": "9f78792369ce87886cfab1e7ac92c0bbf1ecee65a72c96e8c80b4262c8db7074"
+  },
+  "scope": "Unsigned public-reference runtime probe with the same request-scoped transport factory as the default service; dependencies injected for recording. Not a funded trade, default-environment end-to-end test or qualified signing path.",
+  "publicReference": "2k5hrzuykwyTbUe8L7UriYAQhr5hijNLgBvEB4B9pP5y",
+  "readOnly": true,
+  "userWallets": 0,
+  "privateKeys": 0,
+  "signatures": 0,
+  "broadcasts": 0,
+  "passed": false,
+  "status": 409,
+  "reason": "Solana RPC snapshot crossed too many slots (457439519-457439565)",
+  "measurement": {
+    "slotMeaning": "Slot costs are observed response high-water advances. No extra slot reads are made; time without slot-bearing responses is charged when a later bank is observed.",
+    "policyMinimumSlot": 457439519,
+    "policyMaximumSlot": 457439565,
+    "policySlotSpan": 46,
+    "initialObservedSlot": 457439518,
+    "allObservedSlotSpan": 47,
+    "pipelineMs": 10778.2526,
+    "rows": [
+      {
+        "name": "quote",
+        "status": "completed",
+        "startMs": 0.05700000000001637,
+        "entrySlot": null,
+        "firstResponseSlot": 457439518,
+        "lastResponseSlot": 457439521,
+        "endMs": 1214.1402000000003,
+        "exitSlot": 457439521,
+        "slotAdvance": 3,
+        "elapsedMs": 1214.0832000000003,
+        "rpcCalls": 5,
+        "policySlotAdvance": 2,
+        "rpcHttpRequests": 5
+      },
+      {
+        "name": "wallet-check",
+        "status": "completed",
+        "startMs": 1214.1473,
+        "entrySlot": 457439521,
+        "firstResponseSlot": 457439523,
+        "lastResponseSlot": 457439524,
+        "endMs": 1808.3415,
+        "exitSlot": 457439524,
+        "slotAdvance": 3,
+        "elapsedMs": 594.1941999999999,
+        "rpcCalls": 3,
+        "policySlotAdvance": 3,
+        "rpcHttpRequests": 3
+      },
+      {
+        "name": "unsigned-order",
+        "status": "completed",
+        "startMs": 1808.3457000000003,
+        "entrySlot": 457439524,
+        "firstResponseSlot": null,
+        "lastResponseSlot": null,
+        "endMs": 1982.4316,
+        "exitSlot": 457439524,
+        "slotAdvance": 0,
+        "elapsedMs": 174.08589999999958,
+        "rpcCalls": 0,
+        "policySlotAdvance": 0,
+        "rpcHttpRequests": 0
+      },
+      {
+        "name": "inventory-before",
+        "status": "completed",
+        "startMs": 1982.4357,
+        "entrySlot": 457439524,
+        "firstResponseSlot": 457439526,
+        "lastResponseSlot": 457439528,
+        "endMs": 2495.4142,
+        "exitSlot": 457439528,
+        "slotAdvance": 4,
+        "elapsedMs": 512.9785000000002,
+        "rpcCalls": 3,
+        "policySlotAdvance": 4,
+        "rpcHttpRequests": 3
+      },
+      {
+        "name": "code-before",
+        "status": "completed",
+        "startMs": 2495.4175000000005,
+        "entrySlot": 457439528,
+        "firstResponseSlot": 457439529,
+        "lastResponseSlot": 457439540,
+        "endMs": 5548.7566,
+        "exitSlot": 457439540,
+        "slotAdvance": 12,
+        "elapsedMs": 3053.3390999999992,
+        "rpcCalls": 14,
+        "policySlotAdvance": 12,
+        "rpcHttpRequests": 11
+      },
+      {
+        "name": "candidate-static",
+        "status": "completed",
+        "startMs": 5548.7621,
+        "entrySlot": 457439540,
+        "firstResponseSlot": 457439543,
+        "lastResponseSlot": 457439545,
+        "endMs": 6554.259599999999,
+        "exitSlot": 457439545,
+        "slotAdvance": 5,
+        "elapsedMs": 1005.4974999999995,
+        "rpcCalls": 6,
+        "policySlotAdvance": 5,
+        "rpcHttpRequests": 5
+      },
+      {
+        "name": "simulation",
+        "status": "completed",
+        "startMs": 6554.2636999999995,
+        "entrySlot": 457439545,
+        "firstResponseSlot": 457439546,
+        "lastResponseSlot": 457439546,
+        "endMs": 6856.847600000001,
+        "exitSlot": 457439546,
+        "slotAdvance": 1,
+        "elapsedMs": 302.58390000000145,
+        "rpcCalls": 1,
+        "policySlotAdvance": 1,
+        "rpcHttpRequests": 1
+      },
+      {
+        "name": "candidate-final-checks",
+        "status": "completed",
+        "startMs": 6856.856100000001,
+        "entrySlot": 457439546,
+        "firstResponseSlot": 457439548,
+        "lastResponseSlot": 457439549,
+        "endMs": 7567.3125,
+        "exitSlot": 457439549,
+        "slotAdvance": 3,
+        "elapsedMs": 710.4563999999991,
+        "rpcCalls": 5,
+        "policySlotAdvance": 3,
+        "rpcHttpRequests": 4
+      },
+      {
+        "name": "inventory-after",
+        "status": "completed",
+        "startMs": 7567.318300000001,
+        "entrySlot": 457439549,
+        "firstResponseSlot": 457439551,
+        "lastResponseSlot": 457439551,
+        "endMs": 7768.0735,
+        "exitSlot": 457439551,
+        "slotAdvance": 2,
+        "elapsedMs": 200.7551999999996,
+        "rpcCalls": 1,
+        "policySlotAdvance": 2,
+        "rpcHttpRequests": 1
+      },
+      {
+        "name": "code-after",
+        "status": "failed",
+        "startMs": 7768.079900000001,
+        "entrySlot": 457439551,
+        "firstResponseSlot": 457439552,
+        "lastResponseSlot": 457439565,
+        "endMs": 10778.2401,
+        "exitSlot": 457439565,
+        "slotAdvance": 14,
+        "elapsedMs": 3010.1602000000003,
+        "rpcCalls": 14,
+        "policySlotAdvance": 14,
+        "rpcHttpRequests": 11
+      },
+      {
+        "name": "runtime-final-checks",
+        "status": "not-reached",
+        "slotAdvance": null,
+        "elapsedMs": null,
+        "rpcCalls": 0,
+        "policySlotAdvance": null,
+        "rpcHttpRequests": 0
+      },
+      {
+        "name": "publication-final-checks",
+        "status": "not-reached",
+        "slotAdvance": null,
+        "elapsedMs": null,
+        "rpcCalls": 0,
+        "policySlotAdvance": null,
+        "rpcHttpRequests": 0
+      }
+    ],
+    "rpc": [
+      {
+        "stage": "quote",
+        "method": "getGenesisHash",
+        "startMs": 1.2741000000000895,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 187.57169999999996
+      },
+      {
+        "stage": "quote",
+        "method": "getSlot",
+        "startMs": 187.60440000000017,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 402.9836,
+        "observedSlot": 457439518
+      },
+      {
+        "stage": "quote",
+        "method": "getMultipleAccounts",
+        "startMs": 403.1041,
+        "minContextSlot": 457439518,
+        "accountCount": 3,
+        "clockIndex": 2,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 600.0074,
+        "clockSlot": "457439519",
+        "clockUnixSeconds": "1792110962",
+        "localUnixSeconds": 1792110962,
+        "observedSlot": 457439519
+      },
+      {
+        "stage": "quote",
+        "method": "getMultipleAccounts",
+        "startMs": 903.5336000000002,
+        "minContextSlot": 457439519,
+        "accountCount": 3,
+        "clockIndex": 2,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 996.1453999999999,
+        "clockSlot": "457439521",
+        "clockUnixSeconds": "1792110962",
+        "localUnixSeconds": 1792110963,
+        "observedSlot": 457439521
+      },
+      {
+        "stage": "quote",
+        "method": "getGenesisHash",
+        "startMs": 1002.1516000000001,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1211.5327000000002
+      },
+      {
+        "stage": "wallet-check",
+        "method": "getMultipleAccounts",
+        "startMs": 1215.6002000000003,
+        "minContextSlot": 457439521,
+        "accountCount": 6,
+        "clockIndex": 5,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1399.8189000000002,
+        "clockSlot": "457439523",
+        "clockUnixSeconds": "1792110962",
+        "localUnixSeconds": 1792110963,
+        "observedSlot": 457439523
+      },
+      {
+        "stage": "wallet-check",
+        "method": "getMultipleAccounts",
+        "startMs": 1409.1217000000001,
+        "minContextSlot": 457439523,
+        "accountCount": 6,
+        "clockIndex": 5,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1599.5822000000003,
+        "clockSlot": "457439524",
+        "clockUnixSeconds": "1792110963",
+        "localUnixSeconds": 1792110963,
+        "observedSlot": 457439524
+      },
+      {
+        "stage": "wallet-check",
+        "method": "getGenesisHash",
+        "startMs": 1605.9729000000002,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 1807.2284
+      },
+      {
+        "stage": "inventory-before",
+        "method": "getMultipleAccounts",
+        "startMs": 1986.5283,
+        "minContextSlot": 457439524,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 2074.8089,
+        "observedSlot": 457439526
+      },
+      {
+        "stage": "inventory-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2082.2297,
+        "minContextSlot": 457439526,
+        "accountCount": 29,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 166
+        },
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 2295.7409,
+        "observedSlot": 457439527
+      },
+      {
+        "stage": "inventory-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2299.1000000000004,
+        "minContextSlot": 457439527,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 2495.1191,
+        "observedSlot": 457439528
+      },
+      {
+        "stage": "code-before",
+        "method": "getGenesisHash",
+        "startMs": 2496.9283000000005,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 2743.5046
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2496.9628000000002,
+        "minContextSlot": 457439528,
+        "accountCount": 7,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 2743.5067,
+        "observedSlot": 457439529
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2744.2726000000002,
+        "minContextSlot": 457439529,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 2891.0492999999997,
+        "observedSlot": 457439530
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 2891.8369000000002,
+        "minContextSlot": 457439530,
+        "accountCount": 1,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 3235.8386,
+        "observedSlot": 457439531
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3249.2866000000004,
+        "minContextSlot": 457439531,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 45,
+          "length": 233472
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 3717.7514,
+        "observedSlot": 457439532
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3249.3822,
+        "minContextSlot": 457439531,
+        "accountCount": 4,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 233517,
+          "length": 262144
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4064.6187,
+        "observedSlot": 457439533
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3249.4040999999997,
+        "minContextSlot": 457439531,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 495661,
+          "length": 348160
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4101.0454,
+        "observedSlot": 457439533
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 3249.4184000000005,
+        "minContextSlot": 457439531,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 843821,
+          "length": 348160
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4060.7644,
+        "observedSlot": 457439534
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 4550.5771,
+        "minContextSlot": 457439534,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 1191981,
+          "length": 425984
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4802.9254,
+        "observedSlot": 457439536
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 4550.6382,
+        "minContextSlot": 457439534,
+        "accountCount": 2,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 1617965,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4971.6688,
+        "observedSlot": 457439537
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 4550.6538,
+        "minContextSlot": 457439534,
+        "accountCount": 1,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 2355245,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 4971.6762,
+        "observedSlot": 457439538
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 5240.3759,
+        "minContextSlot": 457439538,
+        "accountCount": 7,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 5334.4913,
+        "observedSlot": 457439540
+      },
+      {
+        "stage": "code-before",
+        "method": "getMultipleAccounts",
+        "startMs": 5240.4265000000005,
+        "minContextSlot": 457439538,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 5334.4958,
+        "observedSlot": 457439540
+      },
+      {
+        "stage": "code-before",
+        "method": "getGenesisHash",
+        "startMs": 5240.4419,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 5546.8072
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getGenesisHash",
+        "startMs": 5552.0163,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 5738.5046
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getBlockHeight",
+        "startMs": 5552.0976,
+        "minContextSlot": 457439524,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 5738.5068
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getMultipleAccounts",
+        "startMs": 5738.5751,
+        "minContextSlot": 457439540,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 5979.5963,
+        "observedSlot": 457439543
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getMultipleAccounts",
+        "startMs": 5989.7035000000005,
+        "minContextSlot": 457439543,
+        "accountCount": 11,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 166
+        },
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 6202.970499999999,
+        "observedSlot": 457439544
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getMultipleAccounts",
+        "startMs": 6203.8508999999995,
+        "minContextSlot": 457439544,
+        "accountCount": 9,
+        "clockIndex": 8,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 6346.991400000001,
+        "clockSlot": "457439545",
+        "clockUnixSeconds": "1792110967",
+        "localUnixSeconds": 1792110968,
+        "observedSlot": 457439545
+      },
+      {
+        "stage": "candidate-static",
+        "method": "getFeeForMessage",
+        "startMs": 6353.429700000001,
+        "minContextSlot": 457439545,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 6546.608700000001,
+        "observedSlot": 457439545
+      },
+      {
+        "stage": "simulation",
+        "method": "simulateTransaction",
+        "startMs": 6554.308300000001,
+        "minContextSlot": 457439545,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 6847.2351,
+        "observedSlot": 457439546
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "getMultipleAccounts",
+        "startMs": 6857.2471000000005,
+        "minContextSlot": 457439546,
+        "accountCount": 9,
+        "clockIndex": 8,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 6939.0216,
+        "clockSlot": "457439548",
+        "clockUnixSeconds": "1792110968",
+        "localUnixSeconds": 1792110969,
+        "observedSlot": 457439548
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "getMultipleAccounts",
+        "startMs": 6857.3148,
+        "minContextSlot": 457439546,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7144.409299999999,
+        "observedSlot": 457439548
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "isBlockhashValid",
+        "startMs": 6857.338400000001,
+        "minContextSlot": 457439546,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7358.731,
+        "observedSlot": 457439549
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "getBlockHeight",
+        "startMs": 6857.355799999999,
+        "minContextSlot": 457439546,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7358.737499999999
+      },
+      {
+        "stage": "candidate-final-checks",
+        "method": "getGenesisHash",
+        "startMs": 6857.365600000001,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7566.607900000001
+      },
+      {
+        "stage": "inventory-after",
+        "method": "getMultipleAccounts",
+        "startMs": 7567.355600000001,
+        "minContextSlot": 457439549,
+        "accountCount": 29,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 166
+        },
+        "maxResponseBytes": 524288,
+        "status": "returned",
+        "endMs": 7766.9346000000005,
+        "observedSlot": 457439551
+      },
+      {
+        "stage": "code-after",
+        "method": "getGenesisHash",
+        "startMs": 7768.4264,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 7978.419599999999
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 7768.4439,
+        "minContextSlot": 457439551,
+        "accountCount": 7,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 7978.4218,
+        "observedSlot": 457439552
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 7978.8045,
+        "minContextSlot": 457439552,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 8172.1068,
+        "observedSlot": 457439553
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 8172.489100000001,
+        "minContextSlot": 457439553,
+        "accountCount": 1,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 8398.6663,
+        "observedSlot": 457439554
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 8408.1061,
+        "minContextSlot": 457439554,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 45,
+          "length": 233472
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 8805.8286,
+        "observedSlot": 457439555
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 8408.2024,
+        "minContextSlot": 457439554,
+        "accountCount": 4,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 233517,
+          "length": 262144
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 9025.3958,
+        "observedSlot": 457439556
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 8408.2214,
+        "minContextSlot": 457439554,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 495661,
+          "length": 348160
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 9173.0878,
+        "observedSlot": 457439557
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 8408.2343,
+        "minContextSlot": 457439554,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 843821,
+          "length": 348160
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 9286.4288,
+        "observedSlot": 457439558
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 9762.1731,
+        "minContextSlot": 457439558,
+        "accountCount": 3,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 1191981,
+          "length": 425984
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 9965.1137,
+        "observedSlot": 457439562
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 9762.2372,
+        "minContextSlot": 457439558,
+        "accountCount": 2,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 1617965,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 10222.158300000001,
+        "observedSlot": 457439563
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 9762.2558,
+        "minContextSlot": 457439558,
+        "accountCount": 1,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 2355245,
+          "length": 737280
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 10222.165500000001,
+        "observedSlot": 457439563
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 10468.3236,
+        "minContextSlot": 457439563,
+        "accountCount": 7,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 10566.6208,
+        "observedSlot": 457439565
+      },
+      {
+        "stage": "code-after",
+        "method": "getMultipleAccounts",
+        "startMs": 10468.3667,
+        "minContextSlot": 457439563,
+        "accountCount": 5,
+        "clockIndex": -1,
+        "dataSlice": {
+          "offset": 0,
+          "length": 45
+        },
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 10566.6254,
+        "observedSlot": 457439565
+      },
+      {
+        "stage": "code-after",
+        "method": "getGenesisHash",
+        "startMs": 10468.3775,
+        "minContextSlot": null,
+        "accountCount": null,
+        "clockIndex": -1,
+        "dataSlice": null,
+        "maxResponseBytes": 2097152,
+        "status": "returned",
+        "endMs": 10775.3119
+      }
+    ]
+  },
+  "http": {
+    "totalRequests": 52,
+    "referenceSetupRpcRequests": 6,
+    "jupiterRequests": 2,
+    "pipelineRpcMethods": 52,
+    "pipelineRpcHttpRequests": 44,
+    "batchedEnvelopes": 8,
+    "statuses": [
+      200
+    ],
+    "rateLimitedRequests": 0
+  },
+  "observers": {
+    "imported-pair-wallet-preflight.ts": {
+      "sha256": "8be1983bb63c902cce22007eb542080beb7a3cadadb353ad39d784835e1a45ef",
+      "stages": [
+        "quote",
+        "wallet-check"
+      ],
+      "onlyObserverStatementsAdded": true
+    },
+    "imported-pair-order-candidate.ts": {
+      "sha256": "7ff2c9f8486aff489f02439f304e37777ab17723d4bcbbe291aab2a51198659b",
+      "stages": [
+        "unsigned-order",
+        "inventory-before"
+      ],
+      "onlyObserverStatementsAdded": true
+    },
+    "pair-runtime-preview.ts": {
+      "sha256": "723725691ec65f2e517ac3d09953dd157dbf55f9ba6e97d6a294b5c2bf04eb54",
+      "stages": [
+        "code-before",
+        "candidate-static",
+        "inventory-after",
+        "code-after",
+        "runtime-final-checks"
+      ],
+      "onlyObserverStatementsAdded": true
+    },
+    "pair-order-collector.ts": {
+      "sha256": "fc4d0d42b8a3d0517395419083c83a5a58aa57c1ab5b5531d0b751ac2c877c5c",
+      "stages": [
+        "simulation",
+        "candidate-final-checks"
+      ],
+      "onlyObserverStatementsAdded": true
+    },
+    "imported-pair-runtime.ts": {
+      "sha256": "9f78792369ce87886cfab1e7ac92c0bbf1ecee65a72c96e8c80b4262c8db7074",
+      "stages": [
+        "publication-final-checks"
+      ],
+      "onlyObserverStatementsAdded": true
+    }
+  },
+  "recorderSha256": "573107d6e69e45de147dc2176711ed0b35ee1699dd43c6db34d942d7b57f54f9",
+  "generatorSha256": "cf9665040354db6795356432c17469cf9e9852211e5993eb9576c81d57953d8f",
+  "sourceReceiptSha256": "a54201ecf5ee49436c73f8bf410d3cb7e9aa1537b993df3e2cb9b4c19265750f"
+}

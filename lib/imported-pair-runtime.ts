@@ -1,5 +1,5 @@
 import { env } from './server-env';
-import { balanceRpc } from './wallet-balances';
+import { createPairReadRpc } from './pair-read-rpc';
 import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
 import {
   ImportedPairQuoteError,
@@ -45,6 +45,7 @@ export async function previewOwnedImportedPairRuntime(
   const input = importedPairRuntimeRequest(value);
   signal = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
   let abort = () => {};
+  let reads: ReturnType<typeof createPairReadRpc> | undefined;
   const run = async () => {
     signal.throwIfAborted();
     const read = () =>
@@ -62,18 +63,13 @@ export async function previewOwnedImportedPairRuntime(
         404,
       );
     const quote = dependencies ?? configuredPairQuoteDependencies(signal);
+    if (!dependencies)
+      reads = createPairReadRpc(getSolanaIndexerRpcEndpoint(), signal);
     const provider: ImportedPairRuntimeDependencies = dependencies ?? {
       ...quote,
+      rpc: reads!.rpc,
       prepare: (input, s) => prepareSolanaPair(input, env.JUPITER_API_KEY, s),
-      programRpc: (method, params) =>
-        balanceRpc(
-          getSolanaIndexerRpcEndpoint(),
-          method,
-          params,
-          signal,
-          fetch,
-          2097152,
-        ),
+      programRpc: reads!.programRpc,
     };
     const checked =
       (fn: typeof provider.rpc) =>
@@ -156,6 +152,7 @@ export async function previewOwnedImportedPairRuntime(
       'Pair runtime identity, inner-call evidence, custody or lifetime did not pass review. No approval or signature was created.',
     );
   } finally {
+    reads?.close();
     signal.removeEventListener('abort', abort);
   }
 }
