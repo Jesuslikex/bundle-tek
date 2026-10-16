@@ -1,0 +1,7 @@
+# Reference setup scope after pinned diagnosis
+
+Diagnosis and first fixed sample are committed as 1896062. This separate fixture change records each sampled USDC amount and wrapped-SOL ATA presence, and selects a USDC reference only when that ATA is absent in both funding snapshots. It does not change the application token-close predicate or prove its historical failing operand. It avoids an existing wrapped-SOL setup path for the next bounded qualification sample. A subsequent run can still reject any new or unexpected setup.
+
+The candidate cap is reduced from 48 to 32 so all three account groups fit into a single getMultipleAccounts call (96 accounts maximum). Existing request/time/pacing limits and 4096-slot discovery idle screen remain unchanged. SOL continues to use the longest-idle eligible funded reference. USDC uses the longest-idle funded candidate meeting the additional no-existing-wrapped-SOL setup screen. This narrows fixture coverage and must not be described as qualification for every pre-existing account state.
+
+Read-only discovery work/stock-reference-discovery-2026-10-16T15-59-18-870Z completed in 68 requests and found both references; its retained artifact and next fixed six-attempt sample will be recorded separately. No production/Claude UI file, acceptance guard, provider setting or signing gate changed. No push, deploy, remote SQL, real wallet unlock/sign/send.

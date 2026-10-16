@@ -121,7 +121,7 @@ try {
       if (typeof token.owner === 'string') keys.add(token.owner);
     }
   }
-  const candidates = [...keys].slice(0, 48);
+  const candidates = [...keys].slice(0, 32);
   const atas = await Promise.all(
     candidates.map((key) =>
       lib.pairAssociatedAddress(
@@ -133,7 +133,18 @@ try {
       ),
     ),
   );
-  const requested = [...candidates, ...atas];
+  const wrappedSolAtas = await Promise.all(
+    candidates.map((key) =>
+      lib.pairAssociatedAddress(
+        {
+          address: 'So11111111111111111111111111111111111111112',
+          program: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+        },
+        key,
+      ),
+    ),
+  );
+  const requested = [...candidates, ...atas, ...wrappedSolAtas];
   const before = await rpc('getMultipleAccounts', [
     requested,
     { encoding: 'base64', commitment: 'confirmed' },
@@ -185,20 +196,31 @@ try {
       data.readBigUInt64LE(64) >= 1000000n &&
       JSON.stringify(token) ===
         JSON.stringify(after.value[candidates.length + i]);
+    const wrappedSolAbsent =
+      before.value[2 * candidates.length + i] === null &&
+      after.value[2 * candidates.length + i] === null;
     evidence.candidates.push({
       sha256: stockReferenceHash(candidates[i]),
       activity,
       usdcFunded,
+      usdcAmountRaw:
+        data.length >= 165 ? String(data.readBigUInt64LE(64)) : null,
+      wrappedSolAbsent,
     });
     if (activity.idleSlots >= 4096)
-      eligible.push({ key: candidates[i], activity, usdcFunded });
+      eligible.push({
+        key: candidates[i],
+        activity,
+        usdcFunded,
+        wrappedSolAbsent,
+      });
   }
   eligible.sort(
     (a, b) =>
       b.activity.idleSlots - a.activity.idleSlots || a.key.localeCompare(b.key),
   );
   const sol = eligible[0],
-    usd = eligible.find((r) => r.usdcFunded);
+    usd = eligible.find((r) => r.usdcFunded && r.wrappedSolAbsent);
   if (!sol || !usd)
     throw Error(
       'Bounded discovery found no long-idle funded references for both assets.',
