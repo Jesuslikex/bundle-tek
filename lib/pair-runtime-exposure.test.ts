@@ -79,3 +79,33 @@ it('marks unavailable prior state explicitly and preserves empty-system/token ac
     });
   }
 });
+
+it('keeps the same refusal if diagnostic packet provenance fails, and never computes it for accepted accounts', () => {
+  let calls = 0;
+  const context = {
+    address: SYSTEM,
+    phase: 'before-inventory' as const,
+    slot: 100,
+    packetScope: () => {
+      calls++;
+      throw Error('diagnostic unavailable');
+    },
+  };
+  expect(() =>
+    assertPairRuntimeWritableAccount(account(), context),
+  ).not.toThrow();
+  expect(calls).toBe(0);
+  let caught: unknown;
+  try {
+    assertPairRuntimeWritableAccount(account(SYSTEM, 1), context);
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toMatchObject({
+    message:
+      'Pair runtime exposes unsupported writable custody or executable state.',
+    pairDiagnostic: { packetScopeEvidence: 'unavailable' },
+  });
+  expect(calls).toBe(1);
+  expect(JSON.stringify(caught)).toBe('{}');
+});

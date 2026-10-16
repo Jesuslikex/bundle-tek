@@ -34,6 +34,7 @@ import { reviewPairOrderSimulation } from './pair-order-simulation';
 import { reviewPairRuntimeTrace } from './pair-runtime-trace';
 import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
 import type { PairQuoteBoundsMode } from './pair-order-quote-bounds';
+import { pairAccountProvenance } from './pair-account-provenance';
 import type { ImportedPairWalletPreflight } from './imported-pair-wallet-preflight';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
@@ -347,6 +348,16 @@ export async function collectPairOrderReview(
         phase: 'simulation-post-state',
         slot: simulationSlot,
         before: snapshots.find((a) => a.address === writable[i])?.raw,
+        packetScope: () =>
+          pairAccountProvenance(
+            message,
+            lookups,
+            keys.indexOf(writable[i]),
+            writable[i],
+            envelope.sha256,
+          ),
+        rpcAccountPosition: i,
+        rpcAccountCount: writable.length,
       }),
     );
   fresh();

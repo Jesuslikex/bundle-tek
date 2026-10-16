@@ -2,6 +2,7 @@ import { pumpAccountBytes, pumpRpcAccount } from './pump-launch-simulation';
 import {
   pairReviewDiagnostic,
   pairDiagnosticComparisons,
+  type PairDiagnosticDetails,
 } from './pair-review-diagnostic';
 const UNSUPPORTED_WRITABLE_OWNERS = new Set([
   'Stake11111111111111111111111111111111111111',
@@ -20,6 +21,9 @@ export function assertPairRuntimeWritableAccount(
     phase: 'before-inventory' | 'after-inventory' | 'simulation-post-state';
     slot: number;
     before?: unknown;
+    packetScope?: () => PairDiagnosticDetails;
+    rpcAccountPosition?: number;
+    rpcAccountCount?: number;
   },
 ) {
   const a = pumpRpcAccount(raw);
@@ -39,17 +43,30 @@ export function assertPairRuntimeWritableAccount(
     } catch {
       /* Unavailable historical evidence is never reconstructed. */
     }
+    let packetScope: PairDiagnosticDetails = {};
+    try {
+      packetScope = observation?.packetScope?.() ?? {};
+    } catch {
+      packetScope = { packetScopeEvidence: 'unavailable' };
+    }
     throw pairReviewDiagnostic(
       Error(
         'Pair runtime exposes unsupported writable custody or executable state.',
       ),
       'writable-runtime-state',
       {
+        ...packetScope,
         ...(observation
           ? {
               accountAddress: observation.address,
               observationPhase: observation.phase,
               contextSlot: observation.slot,
+              ...(observation.rpcAccountPosition === undefined
+                ? {}
+                : { rpcAccountPosition: observation.rpcAccountPosition }),
+              ...(observation.rpcAccountCount === undefined
+                ? {}
+                : { rpcAccountCount: observation.rpcAccountCount }),
             }
           : {}),
         accountOwner: a.owner,

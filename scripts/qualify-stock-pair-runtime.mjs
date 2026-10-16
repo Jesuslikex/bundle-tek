@@ -75,6 +75,7 @@ const files = [
   'lib/imported-pair-quote-service.ts',
   'lib/pair-runtime-preview.ts',
   'lib/pair-runtime-exposure.ts',
+  'lib/pair-account-provenance.ts',
   'lib/pair-order-simulation.ts',
   'lib/pair-order-collector.ts',
   'lib/pair-read-rpc.ts',
@@ -761,6 +762,14 @@ try {
       'evaluatedServerTimeMs',
       'instructionIndex',
       'accountDataBytes',
+      'compiledAccountIndex',
+      'staticAccountCount',
+      'loadedWritableCount',
+      'loadedReadonlyCount',
+      'lookupEntryIndex',
+      'lookupObservedSlot',
+      'rpcAccountPosition',
+      'rpcAccountCount',
     ])
       if (Number.isSafeInteger(d[key])) receipt.diagnostic[key] = d[key];
     for (const key of [
@@ -772,6 +781,12 @@ try {
       'accountAddress',
       'accountOwner',
       'observationPhase',
+      'packetScopeEvidence',
+      'packetSha256',
+      'compiledAccountSource',
+      'lookupTableAddress',
+      'lookupTableSha256',
+      'instructionReferences',
     ])
       if (
         typeof d[key] === 'string' &&
@@ -801,6 +816,8 @@ try {
       'systemOwnerChanged',
       'systemExecutable',
       'systemDataChanged',
+      'declaredWritable',
+      'declaredSigner',
     ])
       if (typeof d[key] === 'boolean') receipt.diagnostic[key] = d[key];
     if (

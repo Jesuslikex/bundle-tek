@@ -18,6 +18,7 @@ import { pairRuntimeDigest } from './pair-runtime-trace';
 import { collectPairOrderReview } from './pair-order-collector';
 import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
 import type { PairQuoteBoundsMode } from './pair-order-quote-bounds';
+import { pairAccountProvenance } from './pair-account-provenance';
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import { requireConsistentSolanaSlots } from './solana-rpc';
 import { reviewUnsignedSwapEnvelope } from './unsigned-swap-order';
@@ -240,6 +241,19 @@ async function inspectPairRuntime(
           phase,
           slot: observedSlots[Math.floor(i / 100)],
           before: previous?.[i],
+          packetScope: () =>
+            pairAccountProvenance(
+              message,
+              lookups,
+              i,
+              keys[i],
+              envelope.sha256,
+            ),
+          rpcAccountPosition: i % 100,
+          rpcAccountCount: Math.min(
+            100,
+            keys.length - Math.floor(i / 100) * 100,
+          ),
         });
     const programs = accounts
       .flatMap((a, i) => (a?.executable ? [keys[i]] : []))
