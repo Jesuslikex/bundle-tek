@@ -390,10 +390,12 @@ export type SolanaPairPreparation = Awaited<
 function validOrderPriceImpact(value: unknown): string {
   const text =
     typeof value === 'number' && Number.isFinite(value) ? String(value) : value;
+  if (typeof text !== 'string' || !/^-?\d{1,3}(?:\.\d{1,60})?$/.test(text))
+    throw new WarmupQuoteError('Invalid order price impact estimate.');
+  const [whole, fraction = ''] = text.replace(/^-/, '').split('.');
   if (
-    typeof text !== 'string' ||
-    !/^-?\d{1,3}(?:\.\d{1,18})?$/.test(text) ||
-    Math.abs(Number(text)) > 100
+    BigInt(whole) > 100n ||
+    (BigInt(whole) === 100n && /[1-9]/.test(fraction))
   )
     throw new WarmupQuoteError('Invalid order price impact estimate.');
   return text;

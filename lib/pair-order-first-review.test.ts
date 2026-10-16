@@ -165,3 +165,36 @@ it.each(['NaN', Infinity, '100.01', {}, '-101'])(
     ).rejects.toThrow();
   },
 );
+it.each([
+  '-0.0004986315722698763',
+  '0.123456789012345678901234567890',
+  '-100.0000',
+])(
+  'retains the bounded provider precision in price impact %s without amount conversion',
+  async (impact) => {
+    const v = (f = await pairOrderFixture());
+    v.orderState.responsePatch.priceImpactPct = impact;
+    const c = await prepareOwnedImportedPairOrder(
+      v.db,
+      'alice',
+      v.orderRequest,
+      new AbortController().signal,
+      v.orderDependencies,
+    );
+    expect(c.order.priceImpactPct).toBe(impact);
+  },
+);
+it('rejects impact beyond 100 even when floating point would round it down', async () => {
+  const v = (f = await pairOrderFixture());
+  v.orderState.responsePatch.priceImpactPct =
+    '100.0000000000000000000000000001';
+  await expect(
+    prepareOwnedImportedPairOrder(
+      v.db,
+      'alice',
+      v.orderRequest,
+      new AbortController().signal,
+      v.orderDependencies,
+    ),
+  ).rejects.toThrow();
+});
