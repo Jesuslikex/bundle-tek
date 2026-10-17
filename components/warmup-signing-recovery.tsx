@@ -5,6 +5,8 @@ import type { WarmupSigningReview } from '@/lib/warmup-signing';
 import type { SwapFailureReceipt } from '@/lib/swap-failure';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
+import { readPanelJson } from './read-panel-json';
+import { warmupApprovalStateLabel } from './warmup-transaction-progress';
 export function WarmupSigningRecovery({
   preparationId,
 }: {
@@ -44,7 +46,10 @@ export function WarmupSigningRecovery({
           ]),
         },
       );
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Approval recovery unavailable. Keep the original signature for recovery.',
+      )) as {
         error?: string;
         message?: string;
         state?: string;
@@ -58,6 +63,10 @@ export function WarmupSigningRecovery({
           failureReceipt?: SwapFailureReceipt | null;
         };
       };
+      if (!data || typeof data !== 'object')
+        throw new Error(
+          'Approval recovery unavailable. Keep the original signature for recovery.',
+        );
       if (!response.ok) throw new Error(data.error || 'Recovery unavailable.');
       const next = action
         ? intent
@@ -105,7 +114,8 @@ export function WarmupSigningRecovery({
       {intent && (
         <>
           <p>
-            Approval {intent.id}. State: {intent.state}.{' '}
+            Approval {intent.id}. State:{' '}
+            {warmupApprovalStateLabel(intent.state)}.{' '}
             {intent.signature && `Registered signature: ${intent.signature}`}
           </p>
           {intent.state === 'awaiting_signature' && (

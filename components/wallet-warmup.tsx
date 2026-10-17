@@ -12,6 +12,7 @@ import type { LaunchChain } from '@/lib/launch-plan';
 import { WalletWarmupPlans } from '@/components/wallet-warmup-plans';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { WarmupPlanSummary } from './warmup-plan-summary';
+import { readPanelJson } from './read-panel-json';
 
 type HistoryResult = {
   address: string;
@@ -80,11 +81,16 @@ export function WalletWarmup({
         signal: controller.signal,
         body: JSON.stringify({ chain, addresses }),
       });
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Wallet history unavailable. Try checking again.',
+      )) as {
         error?: string;
         chain?: string;
         results?: HistoryResult[];
       };
+      if (!data || typeof data !== 'object')
+        throw new Error('Wallet history unavailable. Try checking again.');
       if (!response.ok) throw new Error(data.error || 'History unavailable.');
       if (
         data.chain !== chain ||

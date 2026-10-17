@@ -12,6 +12,8 @@ import type { SavedWarmupPreparation } from '@/lib/warmup-preparation-history';
 import { warmupAtoms } from '@/lib/wallet-warmup';
 import { WalletWarmupSell } from '@/components/wallet-warmup-sell';
 import { SwapInstructionReview } from './swap-instruction-review';
+import { readPanelJson } from './read-panel-json';
+import { WarmupTransactionProgress } from './warmup-transaction-progress';
 export function WalletWarmupPreparation({
   plan,
   initialCycle = 1,
@@ -77,6 +79,7 @@ export function WalletWarmupPreparation({
           plan={plan}
           cycle={cycle}
           wallet={wallet}
+          onReviewSell={() => setSide('Sell')}
         />
       ) : (
         <WalletWarmupSell
@@ -93,10 +96,12 @@ function WarmupPreparationRequest({
   plan,
   cycle,
   wallet,
+  onReviewSell,
 }: {
   plan: SavedWarmup;
   cycle: number;
   wallet: string;
+  onReviewSell: () => void;
 }) {
   const [result, setResult] = useState<{
     order: SolanaSwapPreparation;
@@ -138,7 +143,10 @@ function WarmupPreparationRequest({
           wallet,
         }),
       });
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Warmup preparation unavailable. Try preparing again.',
+      )) as {
         id: string;
         revision: number;
         cycle: number;
@@ -149,6 +157,8 @@ function WarmupPreparationRequest({
         history?: SavedWarmupPreparation;
         error?: string;
       };
+      if (!data || typeof data !== 'object')
+        throw new Error('Warmup preparation unavailable. Try preparing again.');
       if (!response.ok)
         throw new Error(data.error || 'Warmup preparation unavailable.');
       const order = data.order,
@@ -211,6 +221,7 @@ function WarmupPreparationRequest({
   }
   return (
     <div>
+      {!result && <WarmupTransactionProgress stage="prepare" />}
       <p className="warmup-address">
         Cycle {cycle}: Spend {plan.document.amount} SOL to buy {mint}.
       </p>
@@ -245,13 +256,16 @@ function WarmupPreparationRequest({
           <p className="warmup-address">
             Transaction fingerprint: {result.order.preparation.sha256}
           </p>
-          <WarmupApprovedSigning
-            key={result.savedId}
-            planId={plan.id}
-            preparationId={result.savedId}
-            reviewNotBefore={result.reviewNotBefore}
-            order={result.order}
-          />
+          {result.simulation.succeeded && (
+            <WarmupApprovedSigning
+              key={result.savedId}
+              planId={plan.id}
+              preparationId={result.savedId}
+              reviewNotBefore={result.reviewNotBefore}
+              order={result.order}
+              onWarmupBuyFinalized={onReviewSell}
+            />
+          )}
           <SimulatedSwapTokenBalances simulation={result.simulation} />
           <SwapRouteAssessment
             assessment={result.simulation.routeAssessment}

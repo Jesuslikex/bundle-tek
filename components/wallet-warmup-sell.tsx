@@ -20,6 +20,8 @@ import type { SolanaSwapPreparation } from '@/lib/warmup-swap-quote';
 import type { ImportedSwapSimulation } from '@/lib/imported-swap-simulation';
 import type { SavedWarmupPreparation } from '@/lib/warmup-preparation-history';
 import { solanaTokenAtoms } from '@/lib/solana-token-amount';
+import { readPanelJson } from './read-panel-json';
+import { WarmupTransactionProgress } from './warmup-transaction-progress';
 export function WalletWarmupSell({
   plan,
   cycle,
@@ -144,7 +146,10 @@ function SellRequest({
           ...(prepare ? { amount } : { mode: 'inventory' }),
         }),
       });
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Warmup sell review unavailable. Try checking inventory again.',
+      )) as {
         id: string;
         revision: number;
         cycle: number;
@@ -157,6 +162,10 @@ function SellRequest({
         error?: string;
         buyLink?: WarmupBuyLink;
       };
+      if (!data || typeof data !== 'object')
+        throw new Error(
+          'Warmup sell review unavailable. Try checking inventory again.',
+        );
       if (!response.ok)
         throw new Error(data.error || 'Warmup sell review unavailable.');
       const value = data.inventory;
@@ -277,6 +286,7 @@ function SellRequest({
   }
   return (
     <div>
+      {!result && <WarmupTransactionProgress stage="prepare" />}
       <Button
         variant="outline"
         disabled={busy}
@@ -291,6 +301,13 @@ function SellRequest({
       >
         Prepare unsigned warmup sell
       </Button>
+      {!receipt && (
+        <p>
+          No buy lot selected. Use “Use matched buy amount” to cap this sell by
+          the acquired units and update that cycle’s lot accounting. Unlinked
+          inventory checks and sells do not complete a recorded buy lot.
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       {inventory && (
         <section aria-label="Warmup sell inventory">
@@ -364,13 +381,15 @@ function SellRequest({
           <p className="warmup-address">
             Transaction fingerprint: {result.order.preparation.sha256}
           </p>
-          <WarmupApprovedSigning
-            key={result.savedId}
-            planId={plan.id}
-            preparationId={result.savedId}
-            reviewNotBefore={result.reviewNotBefore}
-            order={result.order}
-          />
+          {result.simulation.succeeded && (
+            <WarmupApprovedSigning
+              key={result.savedId}
+              planId={plan.id}
+              preparationId={result.savedId}
+              reviewNotBefore={result.reviewNotBefore}
+              order={result.order}
+            />
+          )}
           <SimulatedSwapTokenBalances simulation={result.simulation} />
           <SwapRouteAssessment
             assessment={result.simulation.routeAssessment}

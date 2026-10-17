@@ -224,6 +224,19 @@ export function WalletWarmupPlans({
         {selected ? `Editing r${selected.revision}` : 'New saved draft'} ·{' '}
         {saved.length}/100 saved
       </small>
+      {!plan && (
+        <p>
+          Review the warmup plan above to enable saving. Editing or reopening
+          its settings requires a new review; saving alone does not schedule
+          transactions.
+        </p>
+      )}
+      {selected?.archived && (
+        <p>
+          This saved plan is archived. Restore it before saving changes or
+          preparing a new transaction.
+        </p>
+      )}
       {saved
         .filter((p) => p.document.chain === chain)
         .map((p) => {

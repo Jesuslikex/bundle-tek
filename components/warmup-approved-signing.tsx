@@ -24,6 +24,11 @@ import {
 } from '@/lib/imported-acquisition';
 import { ConditionalSigningReview } from './conditional-signing-review';
 import { validatedConditionalSigning } from '@/lib/conditional-signing';
+import { readPanelJson } from './read-panel-json';
+import {
+  WarmupTransactionProgress,
+  warmupApprovalStateLabel,
+} from './warmup-transaction-progress';
 import type { ConditionalPreparation } from '@/lib/conditional-preparation-server';
 import { ImportedAcquisitionReview } from './imported-acquisition-review';
 import {
@@ -41,6 +46,7 @@ export function WarmupApprovedSigning({
   order,
   reviewNotBefore,
   onReviewImportedBuy,
+  onWarmupBuyFinalized,
   expectedAcquisition,
   expectedConditional,
   expectedSession,
@@ -49,6 +55,7 @@ export function WarmupApprovedSigning({
   order: SolanaSwapPreparation;
   reviewNotBefore: number;
   onReviewImportedBuy?: (receipt: ImportedSwapReceipt) => void;
+  onWarmupBuyFinalized?: () => void;
   expectedAcquisition?: ImportedAcquisitionSelection;
   expectedConditional?: ConditionalPreparation;
   expectedSession?: TradeSessionCapture;
@@ -98,6 +105,7 @@ export function WarmupApprovedSigning({
       null,
     );
   const [, setWalletRevision] = useState(0);
+  const [submitAccepted, setSubmitAccepted] = useState(false);
   const epoch = useRef(0),
     pending = useRef<AbortController | null>(null),
     walletPrompt = useRef(false),
@@ -125,6 +133,7 @@ export function WarmupApprovedSigning({
               selectedWallet.current = null;
               setExternalWallet(null);
               setAccepted(false);
+              setSubmitAccepted(false);
               if (!walletPrompt.current) setBusy(false);
             }
           };
@@ -151,6 +160,7 @@ export function WarmupApprovedSigning({
       epoch.current++;
       pending.current?.abort();
       setAccepted(false);
+      setSubmitAccepted(false);
       setPassword('');
       if (!walletPrompt.current) setBusy(false);
       setWalletRevision((value) => value + 1);
@@ -173,6 +183,7 @@ export function WarmupApprovedSigning({
       pending.current?.abort();
       setPassword('');
       setAccepted(false);
+      setSubmitAccepted(false);
       if (!walletPrompt.current) setBusy(false);
     };
     const hidden = () => {
@@ -199,13 +210,20 @@ export function WarmupApprovedSigning({
       body: JSON.stringify(body),
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]),
     });
-    const data = (await response.json()) as {
+    const data = (await readPanelJson(
+      response,
+      'Approval unavailable. Keep any registered signature for recovery.',
+    )) as {
       error?: string;
       review?: WarmupSigningReview;
       signature?: string;
       state?: string;
       reviewWaitMs?: number;
     };
+    if (!data || typeof data !== 'object')
+      throw new Error(
+        'Approval unavailable. Keep any registered signature for recovery.',
+      );
     if (response.status === 429 && data.reviewWaitMs !== undefined)
       setReviewDeadline(warmupReviewDeadline(data.reviewWaitMs));
     if (!response.ok) throw new Error(data.error || 'Approval unavailable.');
@@ -218,6 +236,7 @@ export function WarmupApprovedSigning({
     setError('');
     setReview(null);
     setAccepted(false);
+    setSubmitAccepted(false);
     try {
       const data = await post({
         action: 'review',
@@ -369,9 +388,16 @@ export function WarmupApprovedSigning({
     externalWallets.includes(externalWallet);
   async function registerOrSubmit(submit: boolean) {
     if (!review || !signed) return;
+    if (
+      submit &&
+      !imported &&
+      (!submitAccepted || busy || expired || state !== 'signed')
+    )
+      return;
     const generation = epoch.current;
     setBusy(true);
     setError('');
+    if (submit) setSubmitAccepted(false);
     try {
       const data = await post({
         action: submit ? 'submit' : 'register',
@@ -418,12 +444,19 @@ export function WarmupApprovedSigning({
           ]),
         },
       );
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Receipt verification unavailable. Keep the original signature for recovery.',
+      )) as {
         error?: string;
         state?: string;
         signature?: string;
         receipt?: ImportedSwapReceipt & { planId?: string };
       };
+      if (!data || typeof data !== 'object')
+        throw new Error(
+          'Receipt verification unavailable. Keep the original signature for recovery.',
+        );
       if (
         imported &&
         response.ok &&
@@ -505,6 +538,30 @@ export function WarmupApprovedSigning({
       }
     >
       <h5>Approve this transaction</h5>
+      {!imported && (
+        <WarmupTransactionProgress
+          stage={
+            state === 'finalized'
+              ? 'complete'
+              : signed
+                ? state === 'awaiting_signature'
+                  ? 'sign'
+                  : state === 'signed'
+                    ? 'submit'
+                    : 'receipt'
+                : review
+                  ? 'sign'
+                  : 'review'
+          }
+        />
+      )}
+      {!imported && expired && state !== 'finalized' && (
+        <p>
+          {signed
+            ? 'This signed packet has expired. Do not replace it while its outcome is unknown. Verify the original signature or open saved approval recovery.'
+            : 'This preparation has expired. Prepare a fresh unsigned transaction before requesting approval.'}
+        </p>
+      )}
       {expectedConditional && expired && state !== 'finalized' && (
         <output className="block">
           Condition capture expired. Cancel an unsigned approval before
@@ -604,24 +661,32 @@ export function WarmupApprovedSigning({
         </div>
       )}
       {!review && (
-        <Button
-          className="h-auto min-h-9 max-w-full whitespace-normal"
-          variant="outline"
-          disabled={
-            busy ||
-            expired ||
-            reviewWaitSeconds > 0 ||
-            (!!(expectedConditional || expectedSession) &&
-              state === 'cancelled')
-          }
-          onClick={() => void prepare()}
-        >
-          {(expectedConditional || expectedSession) && state === 'cancelled'
-            ? 'Cancelled. Prepare a fresh transaction.'
-            : reviewWaitSeconds > 0
-              ? `Review available in ${reviewWaitSeconds}s`
-              : 'Check eligibility for user approval'}
-        </Button>
+        <>
+          <Button
+            className="h-auto min-h-9 max-w-full whitespace-normal"
+            variant="outline"
+            disabled={
+              busy ||
+              expired ||
+              reviewWaitSeconds > 0 ||
+              (!!(expectedConditional || expectedSession) &&
+                state === 'cancelled')
+            }
+            onClick={() => void prepare()}
+          >
+            {(expectedConditional || expectedSession) && state === 'cancelled'
+              ? 'Cancelled. Prepare a fresh transaction.'
+              : reviewWaitSeconds > 0
+                ? `Review available in ${reviewWaitSeconds}s`
+                : 'Check eligibility for user approval'}
+          </Button>
+          {!imported && !expired && reviewWaitSeconds > 0 && (
+            <p>
+              Wait for the review window, then explicitly check eligibility.
+              Nothing signs automatically.
+            </p>
+          )}
+        </>
       )}
       {review && (
         <>
@@ -724,6 +789,18 @@ export function WarmupApprovedSigning({
               >
                 Approve and sign this exact transaction
               </Button>
+              {!imported &&
+                !expired &&
+                (!accepted ||
+                  (signer === 'vault' ? !password : !externalReady)) && (
+                  <p>
+                    {!accepted
+                      ? 'Signing is disabled until you check the transaction approval above.'
+                      : signer === 'vault'
+                        ? 'Enter the browser-vault passphrase for this transaction.'
+                        : 'Connect the exact reviewed Solana wallet before signing.'}
+                  </p>
+                )}
               <Button
                 className="h-auto min-h-9 max-w-full whitespace-normal"
                 variant="outline"
@@ -738,7 +815,8 @@ export function WarmupApprovedSigning({
             <>
               <p className="warmup-address">
                 Signed transaction: {signed.signature}. Saved preparation:{' '}
-                {preparationId}. State: {state}.
+                {preparationId}. State:{' '}
+                {imported ? state : warmupApprovalStateLabel(state)}.
               </p>
               {state === 'awaiting_signature' && (
                 <Button
@@ -750,13 +828,41 @@ export function WarmupApprovedSigning({
                 </Button>
               )}
               {state === 'signed' && (
-                <Button
-                  className="h-auto min-h-9 max-w-full whitespace-normal"
-                  disabled={busy || expired}
-                  onClick={() => void registerOrSubmit(true)}
-                >
-                  Submit this signed transaction to mainnet
-                </Button>
+                <>
+                  {!imported && (
+                    <label
+                      className="warmup-checkbox-choice"
+                      htmlFor={field + '-submit'}
+                    >
+                      <input
+                        id={field + '-submit'}
+                        type="checkbox"
+                        checked={submitAccepted}
+                        disabled={busy || expired}
+                        onChange={(event) =>
+                          setSubmitAccepted(event.target.checked)
+                        }
+                      />
+                      <span>
+                        I approve sending this exact signed warmup transaction
+                        once to Solana mainnet. Signing alone did not send it.
+                      </span>
+                    </label>
+                  )}
+                  <Button
+                    className="h-auto min-h-9 max-w-full whitespace-normal"
+                    disabled={busy || expired || (!imported && !submitAccepted)}
+                    onClick={() => void registerOrSubmit(true)}
+                  >
+                    Submit this signed transaction to mainnet
+                  </Button>
+                  {!imported && !expired && !submitAccepted && (
+                    <p>
+                      Submission is disabled until you give the separate send
+                      approval.
+                    </p>
+                  )}
+                </>
               )}
               {['signed', 'submitted', 'recovery_required'].includes(state) && (
                 <Button
@@ -773,7 +879,9 @@ export function WarmupApprovedSigning({
                   {imported
                     ? 'Finalized swap receipt recorded. Refresh this wallet balance before preparing your next transaction.'
                     : order.side === 'Buy'
-                      ? 'Buy recorded. Choose this lot below to prepare a sell using its acquired units.'
+                      ? onWarmupBuyFinalized
+                        ? 'Buy recorded. Open the matched sell review with the button below.'
+                        : 'Buy recorded. Open this plan’s sell review and choose its matching finalized buy lot.'
                       : 'Sell recorded. Remaining buy units and receipt history updated.'}
                 </output>
               ) : state === 'failed' ? (
@@ -793,6 +901,18 @@ export function WarmupApprovedSigning({
               {state === 'finalized' && importedReceipt && (
                 <ImportedReceiptChart receipt={importedReceipt} autoOpen />
               )}
+              {state === 'finalized' &&
+                !imported &&
+                order.side === 'Buy' &&
+                onWarmupBuyFinalized && (
+                  <Button
+                    className="h-auto min-h-9 max-w-full whitespace-normal"
+                    variant="outline"
+                    onClick={onWarmupBuyFinalized}
+                  >
+                    Review sell of this warmup buy
+                  </Button>
+                )}
               {state === 'finalized' &&
                 importedReceipt?.document.side === 'Buy' &&
                 onReviewImportedBuy && (

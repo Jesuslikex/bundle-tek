@@ -7,13 +7,18 @@ import type { WarmupLotPerformance } from '@/lib/warmup-lot-performance';
 import { WarmupPerformance } from './warmup-performance';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { WARMUP_RECEIPT_SAVED } from '@/lib/warmup-receipt-events';
+import { readPanelJson } from './read-panel-json';
 type Progress = WarmupCycleProgress & { performance: WarmupLotPerformance };
 export function WarmupCycleProgress({
   plan,
   onReview,
+  onRecover,
+  refreshToken = 0,
 }: {
   plan: SavedWarmup;
   onReview?: (step: Progress['steps'][number]) => void;
+  onRecover?: (wallet: string) => void;
+  refreshToken?: number;
 }) {
   const field = useId(),
     pending = useRef<AbortController | null>(null);
@@ -42,7 +47,12 @@ export function WarmupCycleProgress({
           ]),
         },
       );
-      const data = (await response.json()) as Progress & { error?: string };
+      const data = (await readPanelJson(
+        response,
+        'Recorded cycle progress unavailable. Try refreshing.',
+      )) as Progress & { error?: string };
+      if (!data || typeof data !== 'object')
+        throw new Error('Recorded cycle progress unavailable. Try refreshing.');
       if (
         !response.ok ||
         data.planId !== plan.id ||
@@ -110,7 +120,7 @@ export function WarmupCycleProgress({
       pending.current?.abort();
       window.removeEventListener(WARMUP_RECEIPT_SAVED, saved);
     };
-  }, [open, read, plan.id]);
+  }, [open, read, plan.id, refreshToken]);
   return (
     <section
       className="warmup-cycle-progress"
@@ -181,7 +191,7 @@ export function WarmupCycleProgress({
                       <th>Recorded state</th>
                       <th>Buy lots</th>
                       <th>Remaining lot units</th>
-                      {onReview && <th>Review</th>}
+                      {(onReview || onRecover) && <th>Next action</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -222,19 +232,31 @@ export function WarmupCycleProgress({
                               </>
                             )}
                           </td>
-                          {onReview && (
+                          {(onReview || onRecover) && (
                             <td>
-                              {(step.state === 'Not bought' ||
-                                step.state === 'Tokens remaining') && (
+                              {step.recoveryCount > 0 && onRecover ? (
                                 <Button
                                   variant="outline"
-                                  onClick={() => onReview(step)}
-                                  aria-label={`Review ${step.state === 'Not bought' ? 'buy' : 'sell'} for cycle ${step.cycle}, wallet ${step.wallet}`}
+                                  onClick={() => onRecover(step.wallet)}
+                                  aria-label={`Open recovery for wallet ${step.wallet}`}
                                 >
-                                  {step.state === 'Not bought'
-                                    ? 'Review buy'
-                                    : 'Review sell'}
+                                  Open approval recovery
                                 </Button>
+                              ) : (
+                                onReview &&
+                                step.recoveryCount === 0 &&
+                                (step.state === 'Not bought' ||
+                                  step.state === 'Tokens remaining') && (
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => onReview(step)}
+                                    aria-label={`Review ${step.state === 'Not bought' ? 'buy' : 'sell'} for cycle ${step.cycle}, wallet ${step.wallet}`}
+                                  >
+                                    {step.state === 'Not bought'
+                                      ? 'Review buy'
+                                      : 'Review sell'}
+                                  </Button>
+                                )
                               )}
                             </td>
                           )}

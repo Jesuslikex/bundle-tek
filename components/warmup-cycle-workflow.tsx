@@ -4,6 +4,7 @@ import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import type { WarmupCycleProgress as Progress } from '@/lib/warmup-cycle-progress';
 import { WarmupCycleProgress } from './warmup-cycle-progress';
 import { WalletWarmupPreparation } from './wallet-warmup-preparation';
+import { WarmupApprovalHistory } from './warmup-approval-history';
 
 export function WarmupCycleWorkflow({
   plan,
@@ -19,6 +20,15 @@ export function WarmupCycleWorkflow({
     request: number;
   } | null>(null);
   const destination = useRef<HTMLDivElement>(null);
+  const recoveryDestination = useRef<HTMLDivElement>(null);
+  const [recovery, setRecovery] = useState<{
+    wallet: string;
+    request: number;
+  } | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
+  useEffect(() => {
+    if (recovery) recoveryDestination.current?.focus();
+  }, [recovery]);
   useEffect(() => {
     if (selection) destination.current?.focus();
   }, [selection]);
@@ -49,7 +59,41 @@ export function WarmupCycleWorkflow({
       <WarmupCycleProgress
         plan={plan}
         onReview={enabled ? review : undefined}
+        refreshToken={refreshToken}
+        onRecover={(wallet) => {
+          if (plan.document.addresses.includes(wallet))
+            setRecovery((previous) => ({
+              wallet,
+              request: (previous?.request ?? 0) + 1,
+            }));
+        }}
       />
+      {!enabled && (
+        <p>
+          {plan.archived
+            ? 'This plan is archived. Receipt and approval recovery remain available; restore the plan before preparing another transaction.'
+            : 'Select this saved plan’s wallets to prepare a transaction. Progress and approval recovery remain available.'}
+        </p>
+      )}
+      {recovery && (
+        <div
+          ref={recoveryDestination}
+          tabIndex={-1}
+          aria-label="Selected warmup wallet recovery"
+        >
+          <p>
+            Recover approvals for {recovery.wallet}. If the blocking approval
+            belongs to another saved plan, open that plan’s approval recovery.
+            Do not create a replacement transaction while an outcome is unknown.
+          </p>
+          <WarmupApprovalHistory
+            key={`${plan.id}:${recovery.request}`}
+            plan={plan}
+            autoOpen
+            onChanged={() => setRefreshToken((value) => value + 1)}
+          />
+        </div>
+      )}
       {enabled && (
         <div
           ref={destination}

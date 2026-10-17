@@ -10,6 +10,7 @@ import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import type { SavedWarmupBuyReceipt } from '@/lib/warmup-buy-receipt';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { warmupBuyLink } from '@/lib/warmup-buy-link';
+import { readPanelJson } from './read-panel-json';
 export function WarmupBuyReceipts({
   plan,
   cycle,
@@ -51,13 +52,20 @@ export function WarmupBuyReceipts({
             ]),
           },
         );
-        const data = (await response.json()) as {
+        const data = (await readPanelJson(
+          response,
+          'Buy receipt history unavailable. Try reloading receipts.',
+        )) as {
           planId: string;
           executionAllowed: boolean;
           receipts: SavedWarmupBuyReceipt[];
           nextCursor: string | null;
           error?: string;
         };
+        if (!data || typeof data !== 'object')
+          throw new Error(
+            'Buy receipt history unavailable. Try reloading receipts.',
+          );
         if (
           !response.ok ||
           data.planId !== plan.id ||
@@ -158,11 +166,18 @@ export function WarmupBuyReceipts({
           }),
         },
       );
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Buy receipt verification unavailable. Keep the original signature for recovery.',
+      )) as {
         executionAllowed: boolean;
         receipt: SavedWarmupBuyReceipt;
         error?: string;
       };
+      if (!data || typeof data !== 'object')
+        throw new Error(
+          'Buy receipt verification unavailable. Keep the original signature for recovery.',
+        );
       if (
         !response.ok ||
         data.executionAllowed !== false ||

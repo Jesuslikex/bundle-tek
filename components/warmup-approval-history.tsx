@@ -2,7 +2,7 @@
 import { SwapFailureEvidence } from './swap-failure-evidence';
 import { validatedWarmupFailure } from '@/lib/warmup-approval-history';
 import type { SwapFailureReceipt } from '@/lib/swap-failure';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import {
@@ -10,9 +10,19 @@ import {
   type WarmupApprovalHistoryRow,
 } from '@/lib/warmup-approval-history';
 import { notifyWarmupReceiptSaved } from '@/lib/warmup-receipt-events';
+import { readPanelJson } from './read-panel-json';
+import { warmupApprovalStateLabel } from './warmup-transaction-progress';
 
-export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
-  const [open, setOpen] = useState(false),
+export function WarmupApprovalHistory({
+  plan,
+  autoOpen = false,
+  onChanged,
+}: {
+  plan: SavedWarmup;
+  autoOpen?: boolean;
+  onChanged?: () => void;
+}) {
+  const [open, setOpen] = useState(autoOpen),
     [rows, setRows] = useState<WarmupApprovalHistoryRow[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
@@ -23,13 +33,14 @@ export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
     [unconfirmed, setUnconfirmed] = useState<Set<string>>(() => new Set());
   const pending = useRef<AbortController | null>(null),
     field = useId();
+  const initialLoad = useRef<string | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
   useEffect(() => {
     if (!open) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [open]);
-  function start() {
+  const start = useCallback(() => {
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
@@ -41,65 +52,82 @@ export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
       controller,
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]),
     };
-  }
-  async function read(older = false) {
-    const { controller, signal } = start();
-    try {
-      const response = await fetch(
-        `/api/wallet-workspace/warmup/signing?planId=${encodeURIComponent(plan.id)}${older && cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`,
-        { cache: 'no-store', signal },
-      );
-      const data = (await response.json()) as {
-        error?: string;
-        planId: string;
-        intents: WarmupApprovalHistoryRow[];
-        nextCursor: string | null;
-      };
-      if (
-        !response.ok ||
-        data.planId !== plan.id ||
-        !Array.isArray(data.intents) ||
-        data.intents.length > 50 ||
-        data.intents.some(
-          (row) =>
-            row.planId !== plan.id ||
-            row.document?.id !== row.id ||
-            row.document?.preparationId !== row.preparationId ||
-            row.document?.wallet !== row.wallet ||
-            row.document.network !== 'mainnet',
-        )
-      )
-        throw new Error(data.error || 'Approval history context differs.');
-      data.intents.forEach(validatedWarmupFailure);
-      if (controller.signal.aborted) return;
-      setRows((prior) =>
-        older
-          ? [
-              ...prior,
-              ...data.intents.filter(
-                (row) => !prior.some((item) => item.id === row.id),
-              ),
-            ]
-          : data.intents,
-      );
-      setCursor(data.nextCursor);
-      setUnconfirmed(
-        (prior) =>
-          new Set(
-            [...prior].filter(
-              (id) => !data.intents.some((row) => row.id === id),
-            ),
-          ),
-      );
-    } catch (err) {
-      if (!controller.signal.aborted)
-        setError(
-          err instanceof Error ? err.message : 'Approval history unavailable.',
+  }, []);
+  const read = useCallback(
+    async (older = false) => {
+      const { controller, signal } = start();
+      try {
+        const response = await fetch(
+          `/api/wallet-workspace/warmup/signing?planId=${encodeURIComponent(plan.id)}${older && cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`,
+          { cache: 'no-store', signal },
         );
-    } finally {
-      if (!controller.signal.aborted) setBusy(false);
+        const data = (await readPanelJson(
+          response,
+          'Approval history unavailable. Try refreshing.',
+        )) as {
+          error?: string;
+          planId: string;
+          intents: WarmupApprovalHistoryRow[];
+          nextCursor: string | null;
+        };
+        if (!data || typeof data !== 'object')
+          throw new Error('Approval history unavailable. Try refreshing.');
+        if (
+          !response.ok ||
+          data.planId !== plan.id ||
+          !Array.isArray(data.intents) ||
+          data.intents.length > 50 ||
+          data.intents.some(
+            (row) =>
+              row.planId !== plan.id ||
+              row.document?.id !== row.id ||
+              row.document?.preparationId !== row.preparationId ||
+              row.document?.wallet !== row.wallet ||
+              row.document.network !== 'mainnet',
+          )
+        )
+          throw new Error(data.error || 'Approval history context differs.');
+        data.intents.forEach(validatedWarmupFailure);
+        if (controller.signal.aborted) return;
+        setRows((prior) =>
+          older
+            ? [
+                ...prior,
+                ...data.intents.filter(
+                  (row) => !prior.some((item) => item.id === row.id),
+                ),
+              ]
+            : data.intents,
+        );
+        setCursor(data.nextCursor);
+        setUnconfirmed(
+          (prior) =>
+            new Set(
+              [...prior].filter(
+                (id) => !data.intents.some((row) => row.id === id),
+              ),
+            ),
+        );
+      } catch (err) {
+        if (!controller.signal.aborted)
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Approval history unavailable.',
+          );
+      } finally {
+        if (!controller.signal.aborted) setBusy(false);
+      }
+    },
+    [plan.id, cursor, start],
+  );
+  useEffect(() => {
+    if (autoOpen && initialLoad.current !== plan.id) {
+      initialLoad.current = plan.id;
+      setOpen(true);
+      void read();
     }
-  }
+  }, [autoOpen, plan.id, read]);
   async function act(
     row: WarmupApprovalHistoryRow,
     action: 'cancel' | 'submit' | 'recover' | 'receipt',
@@ -145,7 +173,10 @@ export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
           ),
         },
       );
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Approval recovery unavailable. Keep the original signature for recovery.',
+      )) as {
         error?: string;
         state?: WarmupApprovalHistoryRow['state'];
         signature?: string;
@@ -162,6 +193,10 @@ export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
           };
         };
       };
+      if (!data || typeof data !== 'object')
+        throw new Error(
+          'Approval recovery unavailable. Keep the original signature for recovery.',
+        );
       if (!response.ok)
         throw new Error(
           data.error || 'Recovery unavailable. Keep this signature reserved.',
@@ -211,9 +246,11 @@ export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
       setNotice(
         action === 'receipt'
           ? `Finalized ${row.side.toLowerCase()} receipt recorded. Remaining buy units and history updated.`
-          : data.message || `Approval state: ${state}.`,
+          : data.message ||
+              `Approval state: ${warmupApprovalStateLabel(state!)}.`,
       );
       if (action === 'receipt') notifyWarmupReceiptSaved(plan.id, row.side);
+      onChanged?.();
     } catch (err) {
       if (!controller.signal.aborted) {
         if (action === 'submit')
@@ -264,7 +301,8 @@ export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
             return (
               <article key={row.id} className="space-y-2 border-t py-3">
                 <h5>
-                  {row.side} · Cycle {row.cycle} · {row.state}
+                  {row.side} · Cycle {row.cycle} ·{' '}
+                  {warmupApprovalStateLabel(row.state)}
                 </h5>
                 <p>
                   Solana mainnet. Wallet {row.wallet}. Plan revision{' '}
@@ -361,6 +399,17 @@ export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
                     </Button>
                   </>
                 )}
+                {row.state === 'signed' && !canSubmit && (
+                  <p>
+                    {unconfirmed.has(row.id)
+                      ? 'Submission is uncertain. Check the original signature before another action.'
+                      : plan.archived
+                        ? 'This plan is archived. Submission is unavailable; recover the registered signature.'
+                        : row.planRevision !== plan.revision
+                          ? 'The plan revision changed. Submission is unavailable for this saved approval; recover its original signature.'
+                          : 'The signed packet expired or its registration is incomplete. Recover the original signature before preparing another transaction.'}
+                  </p>
+                )}
                 {row.signature &&
                   ['signed', 'submitted'].includes(row.state) && (
                     <>
@@ -425,7 +474,7 @@ export function WarmupApprovalHistory({ plan }: { plan: SavedWarmup }) {
               Load older approvals
             </Button>
           )}
-          {!busy && rows.length === 0 && (
+          {!busy && !error && rows.length === 0 && (
             <p>No saved approvals for this plan.</p>
           )}
           {notice && <output>{notice}</output>}
