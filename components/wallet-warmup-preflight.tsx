@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { WarmupPreflight } from '@/lib/wallet-warmup-preflight';
+import { readPanelJson } from './read-panel-json';
 export function WalletWarmupPreflight({
   id,
   revision,
@@ -28,12 +29,17 @@ export function WalletWarmupPreflight({
         signal: c.signal,
         body: JSON.stringify({ id, revision }),
       });
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Warmup preflight unavailable. Try checking again.',
+      )) as {
         id?: string;
         revision?: number;
         report?: WarmupPreflight;
         error?: string;
       };
+      if (!data || typeof data !== 'object')
+        throw new Error('Warmup preflight unavailable. Try checking again.');
       if (!response.ok) throw new Error(data.error || 'Preflight unavailable.');
       if (
         data.id !== id ||

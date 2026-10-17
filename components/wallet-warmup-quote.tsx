@@ -2,6 +2,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { WarmupSwapQuote } from '@/lib/warmup-swap-quote';
+import { readPanelJson } from './read-panel-json';
 export function WalletWarmupQuote({
   id,
   revision,
@@ -42,12 +43,17 @@ export function WalletWarmupQuote({
         signal: c.signal,
         body: JSON.stringify({ id, revision, cycle }),
       });
-      const data = (await response.json()) as {
+      const data = (await readPanelJson(
+        response,
+        'Warmup quote unavailable. Try quoting again.',
+      )) as {
         id?: string;
         revision?: number;
         quote?: WarmupSwapQuote;
         error?: string;
       };
+      if (!data || typeof data !== 'object')
+        throw new Error('Warmup quote unavailable. Try quoting again.');
       if (!response.ok) throw new Error(data.error || 'Quote unavailable.');
       if (
         data.id !== id ||
