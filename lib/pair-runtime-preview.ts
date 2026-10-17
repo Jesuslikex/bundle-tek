@@ -465,7 +465,7 @@ async function inspectPairRuntime(
     throw Error(
       'Pair runtime inner program is not covered by executable identities.',
     );
-  const { afterCode, height } = await finalEvidence;
+  const { afterCode, beforeCode, height } = await finalEvidence;
   if (
     height < BigInt(review.recheckBlockHeight) ||
     height + 10n > BigInt(review.lastValidBlockHeight)
@@ -495,7 +495,12 @@ async function inspectPairRuntime(
   };
   const sha256 = await pairRuntimeDigest(result);
   fresh();
-  return { review, runtime: { ...result, sha256 } };
+  // Both complete scans, outside the hashed runtime record, for trusted-program policy.
+  return {
+    review,
+    runtime: { ...result, sha256 },
+    codeScans: [beforeCode, afterCode] as const,
+  };
   async function collectFinalEvidence(
     state: Awaited<ReturnType<typeof initialEvidence>>,
   ) {
@@ -560,6 +565,6 @@ async function inspectPairRuntime(
     )
       throw Error('Pair runtime lifetime or network changed.');
     fresh();
-    return { afterCode, height };
+    return { afterCode, beforeCode, height };
   }
 }

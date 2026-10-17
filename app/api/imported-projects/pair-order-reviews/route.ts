@@ -7,6 +7,12 @@ import {
   approveOwnedPairOrderFirstReview,
 } from '@/lib/pair-order-first-service';
 import type { PairOrderFirstConsent } from '@/lib/pair-order-first-review';
+import { pairStockSigningPolicy } from '@/lib/pair-stock-signing-policy';
+import {
+  recoverPairOrderExecution,
+  registerPairOrderSignature,
+  submitPairOrderExecution,
+} from '@/lib/pair-order-execution';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -81,14 +87,16 @@ export async function POST(request: Request) {
       body.action === 'prepare' &&
       Object.keys(body).sort().join(',') === 'action,request'
     )
-      return json(
-        await prepareOwnedPairOrderFirstReview(
+      return json({
+        ...(await prepareOwnedPairOrderFirstReview(
           getD1(),
           user.userId,
           pairOrderFirstRequest(body.request),
           request.signal,
-        ),
-      );
+        )),
+        // Display hint only; every server action rechecks the server flag itself.
+        stockSigningEnabled: pairStockSigningPolicy().qualified,
+      });
     if (
       body.action === 'approve' &&
       Object.keys(body).sort().join(',') === 'action,consent,id' &&
@@ -104,8 +112,45 @@ export async function POST(request: Request) {
           request.signal,
         ),
       );
+    const id =
+      typeof body.authorizationId === 'string' ? body.authorizationId : '';
+    const keys = Object.keys(body).sort().join(',');
+    if (
+      body.action === 'register' &&
+      keys === 'action,authorizationId,signedPacket'
+    )
+      return json(
+        await registerPairOrderSignature(
+          getD1(),
+          user.userId,
+          id,
+          body.signedPacket,
+        ),
+      );
+    if (body.action === 'submit' && keys === 'action,authorizationId,consent')
+      return json(
+        await submitPairOrderExecution(
+          getD1(),
+          user.userId,
+          id,
+          body.consent,
+          request.signal,
+        ),
+      );
+    if (body.action === 'recover' && keys === 'action,authorizationId')
+      return json(
+        await recoverPairOrderExecution(
+          getD1(),
+          user.userId,
+          id,
+          request.signal,
+        ),
+      );
     return json(
-      { error: 'Choose explicit preparation or exact order approval.' },
+      {
+        error:
+          'Choose explicit preparation, exact order approval, signed registration, one-attempt submission or recovery.',
+      },
       400,
     );
   } catch (error) {
