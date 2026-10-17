@@ -82,6 +82,7 @@ export async function parsePumpGroupBroadcastState(
         'finalized',
         'failed',
         'expired-unobserved',
+        'partial-final',
         'partial',
         'pending',
         'unknown',

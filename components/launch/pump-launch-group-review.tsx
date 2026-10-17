@@ -637,7 +637,9 @@ function Panel({
           {view.receipt && (
             <output>
               {view.receipt.format === 'pump-launch-group-broadcast-terminal-v1'
-                ? 'Complete broadcast pending-execution proof saved. '
+                ? view.receipt.kind === 'partial'
+                  ? `Partial outcome settled: ${view.receipt.landedPacketCount} of ${view.receipt.packetCount} launch packets landed, ${view.receipt.succeededPacketCount} succeeded.${view.receipt.landedPacketCount === view.receipt.packetCount ? '' : ' The rest expired unlanded and can no longer execute.'} `
+                  : 'Complete broadcast pending-execution proof saved. '
                 : view.receipt.kind === 'expired-unobserved'
                   ? 'Expired group closed after finalized mint absence.'
                   : 'Every packet finalized as a failure.'}{' '}

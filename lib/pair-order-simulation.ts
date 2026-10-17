@@ -1,6 +1,10 @@
 import bs58 from 'bs58';
 import { address } from '@solana/kit';
 import {
+  pairDiagnosticComparisons,
+  pairReviewDiagnostic,
+} from './pair-review-diagnostic';
+import {
   inspectPairTokenAccount,
   pairWalletUint,
 } from './pair-wallet-evidence';
@@ -248,15 +252,40 @@ export async function reviewPairOrderSimulation(
       throw Error('Pair simulation token-account rent differs.');
     if (prior === null) nonnativeRent += cost;
     const delta = afterAmount - oldAmount;
+    const inputToken = selected.mint === inputMint;
+    const expectedDelta = auxiliary
+      ? 'at-least:0'
+      : inputToken
+        ? `equals:${(-BigInt(assessment.rawInput)).toString()}`
+        : `at-least:${assessment.minimumOutputRaw}`;
     if (
       auxiliary
         ? delta < 0n
-        : selected.mint === inputMint
+        : inputToken
           ? delta !== -BigInt(assessment.rawInput)
           : delta < BigInt(assessment.minimumOutputRaw)
     )
-      throw Error(
-        'Pair simulation raw token spending or output protection differs.',
+      throw pairReviewDiagnostic(
+        Error(
+          'Pair simulation raw token spending or output protection differs.',
+        ),
+        auxiliary
+          ? 'auxiliary-token-delta'
+          : inputToken
+            ? 'input-token-delta'
+            : 'output-minimum',
+        {
+          comparisons: pairDiagnosticComparisons(
+            {
+              tokenAmountRaw: oldAmount,
+              tokenDeltaRaw: expectedDelta,
+            },
+            {
+              tokenAmountRaw: afterAmount,
+              tokenDeltaRaw: delta,
+            },
+          ),
+        },
       );
     (auxiliary ? auxiliaryTokenDeltas : tokenDeltas).push({
       mint: selected.mint,
@@ -285,8 +314,45 @@ export async function reviewPairOrderSimulation(
           ? tradeNativeDelta < 0n
           : tradeNativeDelta !== 0n
   )
-    throw Error(
-      'Pair simulation SOL spending, fees, rent or refund conservation differs.',
+    throw pairReviewDiagnostic(
+      Error(
+        'Pair simulation SOL spending, fees, rent or refund conservation differs.',
+      ),
+      'native-conservation',
+      {
+        comparisons: [
+          {
+            field: 'walletLamportsRaw',
+            before: oldWallet.lamports.toString(),
+            after: newWallet.lamports.toString(),
+          },
+          {
+            field: 'nativeTradeDeltaRaw',
+            before:
+              inputMint === SWAP_WRAPPED_SOL
+                ? `equals:${(-BigInt(assessment.rawInput)).toString()}`
+                : outputMint === SWAP_WRAPPED_SOL
+                  ? `at-least:${assessment.minimumOutputRaw}`
+                  : closedAuxiliaryNative
+                    ? 'at-least:0'
+                    : 'equals:0',
+            after: tradeNativeDelta.toString(),
+          },
+          ...pairDiagnosticComparisons(
+            {},
+            {
+              walletAndWrappedSolDeltaRaw: nativeDelta,
+              networkFeeRaw: fee,
+              retainedNonNativeRentRaw: nonnativeRent,
+              retainedNativeRentRaw: retainedNativeRent,
+              refundedNonNativeRentRaw: refundedNonNativeRent,
+              auxiliaryWrappedSolGainRaw: auxiliaryNativeGain,
+              rawInputRaw: assessment.rawInput,
+              minimumOutputRaw: assessment.minimumOutputRaw,
+            },
+          ),
+        ],
+      },
     );
   // Other writable accounts may be AMM state, but cannot retain control over another wallet asset.
   for (const key of writable) {

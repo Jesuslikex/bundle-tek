@@ -278,7 +278,7 @@ it('refuses closure of any pre-existing intermediate holding', async () => {
 it.each(['delegate', 'frozen', 'noncanonical', 'under-rent'] as const)(
   'rejects invalid intermediate pre-state %s',
   async (mode) => {
-    const { v, key, prior } = await fixture();
+    const { v, key, prior, rent } = await fixture();
     if (mode === 'delegate') mutate(prior, (_b, d) => d.setUint32(72, 1, true));
     if (mode === 'frozen')
       mutate(prior, (b) => {
@@ -294,7 +294,34 @@ it.each(['delegate', 'frozen', 'noncanonical', 'under-rent'] as const)(
         return m;
       };
     }
-    await expect(run(v)).rejects.toMatchObject({ status: 409 });
+    const pending = run(v);
+    if (mode === 'under-rent')
+      await expect(pending).rejects.toMatchObject({
+        status: 409,
+        cause: {
+          pairDiagnostic: {
+            check: 'auxiliary-existing-state',
+            comparisons: expect.arrayContaining([
+              {
+                field: 'status',
+                before: 'Ready',
+                after: 'Ready',
+              },
+              {
+                field: 'lamportsRaw',
+                before: `>=${rent}`,
+                after: '1',
+              },
+              {
+                field: 'byteLength',
+                before: '165',
+                after: '165',
+              },
+            ]),
+          },
+        },
+      });
+    else await expect(pending).rejects.toMatchObject({ status: 409 });
   },
 );
 it.each(['balance', 'mint-policy'] as const)(
