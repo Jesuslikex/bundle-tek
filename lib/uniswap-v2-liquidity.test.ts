@@ -4,6 +4,7 @@ import {
   BURN_ADDRESS,
   UNISWAP_V2,
   burnLpCall,
+  createPoolCall,
   lpPosition,
   pairAbi,
   removeLiquidityCall,
@@ -77,4 +78,26 @@ it('builds removeLiquidityETH with slippage floors and burn to dead', () => {
   expect(withSlippage(1000n, 0)).toBe(1000n);
   expect(() => withSlippage(1n, 6000)).toThrow();
   expect(() => burnLpCall({ ...position, lpBalance: 0n })).toThrow();
+});
+
+it('seeds a new pool with exact minimums and rejects zero amounts', () => {
+  const data = createPoolCall({
+    token,
+    tokenAmount: 5n,
+    ethAmount: 7n,
+    to: token,
+    deadlineSeconds: 9,
+  });
+  const decoded = decodeFunctionData({ abi: routerAbi, data });
+  expect(decoded.functionName).toBe('addLiquidityETH');
+  expect(decoded.args).toEqual([token, 5n, 5n, 7n, token, 9n]);
+  expect(() =>
+    createPoolCall({
+      token,
+      tokenAmount: 0n,
+      ethAmount: 1n,
+      to: token,
+      deadlineSeconds: 1,
+    }),
+  ).toThrow();
 });

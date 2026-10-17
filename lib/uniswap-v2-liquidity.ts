@@ -35,6 +35,7 @@ export const pairAbi = parseAbi([
   'function transfer(address,uint256) returns (bool)',
 ]);
 export const routerAbi = parseAbi([
+  'function addLiquidityETH(address token,uint256 amountTokenDesired,uint256 amountTokenMin,uint256 amountETHMin,address to,uint256 deadline) payable returns (uint256,uint256,uint256)',
   'function removeLiquidityETH(address token,uint256 liquidity,uint256 amountTokenMin,uint256 amountETHMin,address to,uint256 deadline) returns (uint256,uint256)',
 ]);
 
@@ -114,6 +115,47 @@ export function removeLiquidityCall(input: {
       input.position.lpBalance,
       withSlippage(input.position.redeemableToken, input.slippageBasisPoints),
       withSlippage(input.position.redeemableEth, input.slippageBasisPoints),
+      getAddress(input.to),
+      BigInt(input.deadlineSeconds),
+    ],
+  });
+}
+
+export const erc20Abi = parseAbi([
+  'function approve(address,uint256) returns (bool)',
+  'function allowance(address,address) view returns (uint256)',
+  'function balanceOf(address) view returns (uint256)',
+]);
+
+export function approveTokenCall(chain: UniswapV2Chain, amount: bigint): Hex {
+  return encodeFunctionData({
+    abi: erc20Abi,
+    functionName: 'approve',
+    args: [UNISWAP_V2[chain].router, amount],
+  });
+}
+
+/**
+ * Seeds a new TOKEN/WETH pair. Only for a pair with no liquidity yet, so the
+ * amounts are taken exactly: the minimums equal the amounts sent.
+ */
+export function createPoolCall(input: {
+  token: Address;
+  tokenAmount: bigint;
+  ethAmount: bigint;
+  to: Address;
+  deadlineSeconds: number;
+}): Hex {
+  if (input.tokenAmount <= 0n || input.ethAmount <= 0n)
+    throw new Error('Enter token and ETH amounts above zero.');
+  return encodeFunctionData({
+    abi: routerAbi,
+    functionName: 'addLiquidityETH',
+    args: [
+      getAddress(input.token),
+      input.tokenAmount,
+      input.tokenAmount,
+      input.ethAmount,
       getAddress(input.to),
       BigInt(input.deadlineSeconds),
     ],
