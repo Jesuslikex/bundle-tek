@@ -346,3 +346,40 @@ test('applies a configured stock runtime method budget per endpoint', () => {
     assert.throws(() => summarizeStockRepeatability(rows));
   }
 });
+
+test('reports strict quote-drift refusals separately from runtime failures', () => {
+  const refuse = (row, classification) =>
+    Object.assign(row, {
+      passed: false,
+      runtime: undefined,
+      elapsedSlots: null,
+      stage: 'order-first-runtime',
+      reason: 'fresh quote required',
+      simulationCount: 0,
+      diagnosis: { check: 'minimum-output', classification },
+    });
+  const rows = samples();
+  refuse(rows[2], 'economic-minimum-output');
+  const market = summarizeStockRepeatability(rows);
+  assert.equal(market.repeatableInThisSample, false);
+  assert.equal(market.runtimeRepeatableExcludingMarketRefusals, true);
+  assert.equal(market.attempts[2].refusalKind, 'market-quote-drift');
+  assert.deepEqual(
+    market.assets.map((x) => [x.passed, x.marketRefusals]),
+    [
+      [2, 1],
+      [3, 0],
+    ],
+  );
+  refuse(rows[3], 'simulation-token-delta');
+  const runtime = summarizeStockRepeatability(rows);
+  assert.equal(runtime.attempts[3].refusalKind, 'runtime');
+  assert.equal(runtime.runtimeRepeatableExcludingMarketRefusals, false);
+  const allMarket = samples();
+  for (const i of [0, 2, 4]) refuse(allMarket[i], 'economic-minimum-output');
+  assert.equal(
+    summarizeStockRepeatability(allMarket)
+      .runtimeRepeatableExcludingMarketRefusals,
+    false,
+  );
+});

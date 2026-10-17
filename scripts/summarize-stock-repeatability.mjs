@@ -235,11 +235,19 @@ export function summarizeStockRepeatability(receipts) {
         observedMaximumSlot: slots.length ? Math.max(...slots) : null,
       };
     });
+    // A strict quote-bound refusal is the market moving, not a runtime failure.
+    const marketRefusal =
+      !r.passed && r.diagnosis?.classification === 'economic-minimum-output';
     return {
       round: Math.floor(i / 2) + 1,
       asset,
       checkedAt: r.checkedAt,
       passed: r.passed,
+      refusalKind: r.passed
+        ? null
+        : marketRefusal
+          ? 'market-quote-drift'
+          : 'runtime',
       stage: r.stage,
       reason: r.reason ?? null,
       elapsedSlots: span,
@@ -259,10 +267,18 @@ export function summarizeStockRepeatability(receipts) {
     ...(harnessRuntime === undefined ? {} : { harnessRuntime }),
     maximumSlots: 32,
     repeatableInThisSample: attempts.every((x) => x.passed),
+    runtimeRepeatableExcludingMarketRefusals:
+      attempts.every((x) => x.refusalKind !== 'runtime') &&
+      ['SOL', 'USDC'].every((asset) =>
+        attempts.some((x) => x.asset === asset && x.passed),
+      ),
     assets: ['SOL', 'USDC'].map((asset) => ({
       asset,
       attempted: 3,
       passed: attempts.filter((x) => x.asset === asset && x.passed).length,
+      marketRefusals: attempts.filter(
+        (x) => x.asset === asset && x.refusalKind === 'market-quote-drift',
+      ).length,
     })),
     signingAllowed: false,
     executionAllowed: false,
@@ -300,6 +316,8 @@ if (
     JSON.stringify({
       output,
       repeatableInThisSample: result.repeatableInThisSample,
+      runtimeRepeatableExcludingMarketRefusals:
+        result.runtimeRepeatableExcludingMarketRefusals,
       assets: result.assets,
     }),
   );
