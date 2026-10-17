@@ -111,7 +111,7 @@ const origin = 'https://bundle.test';
 function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(
-    'CREATE TABLE pump_launch_reviews(id TEXT PRIMARY KEY,owner_id TEXT,state TEXT);CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT);CREATE TABLE imported_token_project_gates(owner_id TEXT PRIMARY KEY,next_allowed_at INTEGER);',
+    'CREATE TABLE pump_launch_reviews(id TEXT PRIMARY KEY,owner_id TEXT,state TEXT);CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT);CREATE TABLE pump_organic_sequences(id TEXT PRIMARY KEY,owner_id TEXT,launch_review_id TEXT,state TEXT,created_at TEXT);CREATE TABLE imported_token_project_gates(owner_id TEXT PRIMARY KEY,next_allowed_at INTEGER);',
   );
   sqlite
     .prepare('INSERT INTO pump_launch_reviews VALUES(?,?,?)')
