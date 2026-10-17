@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { readWorkspaceResponse } from '@/lib/workspace-response';
 
 import { Folder, Plus, Download, X } from 'lucide-react';
 
@@ -56,7 +57,11 @@ async function readWorkspace(signal?: AbortSignal): Promise<Workspace> {
     signal,
   });
 
-  const data = (await response.json()) as Workspace & { error?: string };
+  const data = (await readWorkspaceResponse(
+    response,
+    'Wallet workspace unavailable. Try again later.',
+    'Sign in to open your wallet workspace.',
+  )) as Workspace & { error?: string };
 
   if (
     !response.ok ||

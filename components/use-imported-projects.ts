@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
+import { readWorkspaceResponse } from '@/lib/workspace-response';
 export function useImportedProjects() {
   const [projects, setProjects] = useState<ImportedTokenProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +31,11 @@ export function useImportedProjects() {
         cache: 'no-store',
         signal: controller.signal,
       });
-      const data = (await response.json()) as {
+      const data = (await readWorkspaceResponse(
+        response,
+        'Imported projects unavailable. Try again later.',
+        'Sign in to open imported token projects.',
+      )) as {
         projects?: ImportedTokenProject[];
         error?: string;
       };

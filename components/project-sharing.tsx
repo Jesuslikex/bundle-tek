@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import type { WorkspaceProject } from '@/lib/workspace-project';
+import { readWorkspaceResponse } from '@/lib/workspace-response';
 
 type Share = {
   id: string;
@@ -31,7 +32,11 @@ async function fetchShares(projectId: string) {
     `/api/projects/shares?projectId=${encodeURIComponent(projectId)}`,
     { cache: 'no-store' },
   );
-  const value = (await response.json()) as { shares?: Share[]; error?: string };
+  const value = (await readWorkspaceResponse(
+    response,
+    'Shares unavailable. Try again later.',
+    'Sign in to review project shares.',
+  )) as { shares?: Share[]; error?: string };
   if (!response.ok || !value.shares)
     throw new Error(value.error || 'Shares unavailable.');
   return value.shares;
@@ -39,7 +44,11 @@ async function fetchShares(projectId: string) {
 async function fetchSharedProjects() {
   const response = await fetch('/api/projects/shares', { cache: 'no-store' });
   if (response.status === 401) return null;
-  const value = (await response.json()) as {
+  const value = (await readWorkspaceResponse(
+    response,
+    'Shared projects unavailable. Try again later.',
+    'Sign in to open shared projects.',
+  )) as {
     projects?: SharedProject[];
     error?: string;
   };

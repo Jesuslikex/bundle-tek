@@ -1554,6 +1554,14 @@ export default function Home() {
             <WalletCards /> My wallets
           </button>
           <button
+            disabled={saveBusy}
+            onClick={() =>
+              guardDraft(() => window.location.assign('/marketplace'))
+            }
+          >
+            <WalletCards /> Wallet marketplace <b>PREVIEW</b>
+          </button>
+          <button
             onClick={() => changeView('tracker')}
             className={view === 'tracker' ? 'feature-active' : ''}
             aria-current={view === 'tracker' ? 'page' : undefined}
