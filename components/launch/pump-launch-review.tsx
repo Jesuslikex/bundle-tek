@@ -1,6 +1,7 @@
 'use client';
 import { useEffectEvent, useEffect, useId, useRef, useState } from 'react';
 import { PumpHolderLaunchReview } from './pump-holder-launch-review';
+import { PumpOrganicHolderBuys } from './pump-organic-holder-buys';
 import {
   PumpLaunchHistory,
   type SavedLaunchSelection,
@@ -1018,6 +1019,7 @@ function PumpLaunchReviewWorkspace(
         projectId={props.project.id}
         onOpenReview={setSelected}
       />
+      <PumpOrganicHolderBuys projectId={props.project.id} />
     </>
   );
 }

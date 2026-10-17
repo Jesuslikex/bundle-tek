@@ -69,7 +69,14 @@ export function summarizeStockRepeatability(receipts) {
       typeof r.passed !== 'boolean' ||
       !Number.isInteger(r.maximumRollingRpcMethods) ||
       r.maximumRollingRpcMethods < 0 ||
-      r.maximumRollingRpcMethods > 9 ||
+      !Number.isInteger(r.qualificationMethodBudget ?? 9) ||
+      (r.qualificationMethodBudget ?? 9) < 1 ||
+      (r.qualificationMethodBudget ?? 9) > 99 ||
+      r.maximumRollingRpcMethods >
+        Math.max(9, r.qualificationMethodBudget ?? 9) ||
+      (r.maximumRollingRpcMethodsByRole?.['indexer-fallback'] ?? 0) > 9 ||
+      (r.maximumRollingRpcMethodsByRole?.['stock-runtime'] ?? 0) >
+        (r.qualificationMethodBudget ?? 9) ||
       !Number.isInteger(r.simulationCount) ||
       r.simulationCount < 0 ||
       r.simulationCount > 1 ||
@@ -95,7 +102,7 @@ export function summarizeStockRepeatability(receipts) {
         'getLargestAccounts',
         'getTransaction',
       ]);
-      const rpc = [];
+      const rpcByProvider = new Map();
       for (const row of r.requests) {
         if (
           !Array.isArray(row.methods) ||
@@ -108,7 +115,14 @@ export function summarizeStockRepeatability(receipts) {
         if (row.methods.every((m) => methods.has(m))) {
           if (row.rpcUnits !== row.methods.length)
             throw Error('RPC method count omitted or changed.');
-          rpc.push(row);
+          const provider = row.providerRole ?? 'default';
+          if (
+            !['default', 'indexer-fallback', 'stock-runtime'].includes(provider)
+          )
+            throw Error('Unknown RPC provider role.');
+          const providerRows = rpcByProvider.get(provider) ?? [];
+          providerRows.push(row);
+          rpcByProvider.set(provider, providerRows);
         } else if (
           row.rpcUnits !== undefined ||
           row.methods.length !== 1 ||
@@ -116,18 +130,42 @@ export function summarizeStockRepeatability(receipts) {
         )
           throw Error('Unknown read scope.');
       }
-      const maximum = Math.max(
-        0,
-        ...rpc.map((row) =>
-          rpc
-            .filter(
-              (other) =>
-                other.startMs <= row.startMs &&
-                other.startMs > row.startMs - 1000,
-            )
-            .reduce((total, other) => total + other.rpcUnits, 0),
-        ),
+      const rolling = (rows) =>
+        Math.max(
+          0,
+          ...rows.map((row) =>
+            rows
+              .filter(
+                (other) =>
+                  other.startMs <= row.startMs &&
+                  other.startMs > row.startMs - 1000,
+              )
+              .reduce((total, other) => total + other.rpcUnits, 0),
+          ),
+        );
+      const maximumByProvider = Object.fromEntries(
+        [...rpcByProvider.entries()].map(([provider, rows]) => [
+          provider,
+          rolling(rows),
+        ]),
       );
+      const maximum = Math.max(0, ...Object.values(maximumByProvider));
+      if (
+        rpcByProvider.has('indexer-fallback') ||
+        rpcByProvider.has('stock-runtime')
+      ) {
+        const reported = r.maximumRollingRpcMethodsByRole;
+        if (
+          !reported ||
+          Object.keys(reported).some(
+            (role) => !['indexer-fallback', 'stock-runtime'].includes(role),
+          ) ||
+          ['indexer-fallback', 'stock-runtime'].some(
+            (role) => (reported[role] ?? 0) !== (maximumByProvider[role] ?? 0),
+          )
+        )
+          throw Error('Per-provider pacing does not match its receipt.');
+      }
       if (maximum !== r.maximumRollingRpcMethods)
         throw Error('Actual setup/runtime pacing does not match its receipt.');
     }
@@ -197,11 +235,19 @@ export function summarizeStockRepeatability(receipts) {
         observedMaximumSlot: slots.length ? Math.max(...slots) : null,
       };
     });
+    // A strict quote-bound refusal is the market moving, not a runtime failure.
+    const marketRefusal =
+      !r.passed && r.diagnosis?.classification === 'economic-minimum-output';
     return {
       round: Math.floor(i / 2) + 1,
       asset,
       checkedAt: r.checkedAt,
       passed: r.passed,
+      refusalKind: r.passed
+        ? null
+        : marketRefusal
+          ? 'market-quote-drift'
+          : 'runtime',
       stage: r.stage,
       reason: r.reason ?? null,
       elapsedSlots: span,
@@ -221,10 +267,18 @@ export function summarizeStockRepeatability(receipts) {
     ...(harnessRuntime === undefined ? {} : { harnessRuntime }),
     maximumSlots: 32,
     repeatableInThisSample: attempts.every((x) => x.passed),
+    runtimeRepeatableExcludingMarketRefusals:
+      attempts.every((x) => x.refusalKind !== 'runtime') &&
+      ['SOL', 'USDC'].every((asset) =>
+        attempts.some((x) => x.asset === asset && x.passed),
+      ),
     assets: ['SOL', 'USDC'].map((asset) => ({
       asset,
       attempted: 3,
       passed: attempts.filter((x) => x.asset === asset && x.passed).length,
+      marketRefusals: attempts.filter(
+        (x) => x.asset === asset && x.refusalKind === 'market-quote-drift',
+      ).length,
     })),
     signingAllowed: false,
     executionAllowed: false,
@@ -262,6 +316,8 @@ if (
     JSON.stringify({
       output,
       repeatableInThisSample: result.repeatableInThisSample,
+      runtimeRepeatableExcludingMarketRefusals:
+        result.runtimeRepeatableExcludingMarketRefusals,
       assets: result.assets,
     }),
   );

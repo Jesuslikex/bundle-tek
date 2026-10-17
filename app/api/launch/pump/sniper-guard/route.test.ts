@@ -117,7 +117,7 @@ function database() {
     .prepare('INSERT INTO pump_launch_reviews VALUES(?,?,?)')
     .run(REVIEW, 'alice', 'signed');
   for (const part of readFileSync(
-    'drizzle/0096_sniper_guards.sql',
+    'drizzle/0095_sniper_guards.sql',
     'utf8',
   ).split('--> statement-breakpoint'))
     sqlite.exec(part);

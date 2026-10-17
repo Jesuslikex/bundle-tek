@@ -64,7 +64,7 @@ function database() {
     .prepare('INSERT INTO wallet_ownership_proofs VALUES(?,?,?)')
     .run('owner', 'Solana', owned);
   for (const part of readFileSync(
-    'drizzle/0096_sniper_guards.sql',
+    'drizzle/0095_sniper_guards.sql',
     'utf8',
   ).split('--> statement-breakpoint'))
     sqlite.exec(part);
