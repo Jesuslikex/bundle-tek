@@ -1,0 +1,129 @@
+.page {
+  min-height: 100dvh;
+  max-height: 100dvh;
+  overflow-y: auto;
+}
+.footer {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 28px 48px;
+}
+.panel {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 48px 28px;
+  color: #e9edf5;
+}
+.panel h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: -0.035em;
+  margin: 12px 0;
+}
+.panel p {
+  color: #aeb9cc;
+  line-height: 1.6;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
+.badge {
+  display: inline-block;
+  padding: 7px 12px;
+  border: 1px solid #38455d;
+  border-radius: 20px;
+  font-size: 12px;
+}
+.filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 32px 0;
+}
+.filters label {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  font-size: 13px;
+}
+.filters input,
+.filters select,
+.filters button {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #34415b;
+  border-radius: 8px;
+  padding: 12px;
+  background: #131b29;
+  color: inherit;
+  font: inherit;
+}
+.filters button {
+  align-self: end;
+  cursor: pointer;
+  background: #405bc8;
+}
+.filters button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.filters :focus-visible {
+  outline: 2px solid #93b3ff;
+  outline-offset: 3px;
+}
+.totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.totals p,
+.notice {
+  border: 1px solid #2c384b;
+  border-radius: 12px;
+  padding: 18px;
+  background: #101722;
+}
+.totals strong {
+  display: block;
+  color: #edf2ff;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 24px 0;
+}
+.scroll table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.scroll th,
+.scroll td {
+  text-align: left;
+  padding: 14px 10px;
+  border-bottom: 1px solid #2b364a;
+}
+.scroll code {
+  display: block;
+  max-width: 170px;
+  overflow-wrap: anywhere;
+}
+.scroll caption {
+  text-align: left;
+  color: #aeb9cc;
+  padding: 12px 0;
+}
+.notice h2 {
+  font-size: 16px;
+}
+@media (max-width: 700px) {
+  .panel {
+    padding: 28px 16px;
+  }
+  .filters,
+  .totals {
+    grid-template-columns: 1fr;
+  }
+}
