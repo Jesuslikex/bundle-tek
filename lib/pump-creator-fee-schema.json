@@ -1,0 +1,156 @@
+{
+  "source": "https://github.com/pump-fun/pump-public-docs/tree/main/idl",
+  "retrieved": "2026-10-17",
+  "programs": {
+    "pump": {
+      "file": "pump.json",
+      "sourceSha256": "7616681ea557975f9f623ac211080f22a93060781eaf4765b0a488d980997207",
+      "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "instructions": [
+        {
+          "name": "collect_creator_fee",
+          "discriminator": [20, 22, 86, 123, 198, 28, 219, 132],
+          "accounts": [
+            {
+              "name": "creator",
+              "writable": true,
+              "signer": false
+            },
+            {
+              "name": "creator_vault",
+              "writable": true,
+              "signer": false
+            },
+            {
+              "name": "system_program",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "event_authority",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "program",
+              "writable": false,
+              "signer": false
+            }
+          ],
+          "args": []
+        },
+        {
+          "name": "collect_creator_fee_v2",
+          "discriminator": [207, 17, 138, 242, 4, 34, 19, 56],
+          "accounts": [
+            {
+              "name": "creator",
+              "writable": true,
+              "signer": false
+            },
+            {
+              "name": "creator_token_account",
+              "writable": true,
+              "signer": false
+            },
+            {
+              "name": "creator_vault",
+              "writable": true,
+              "signer": false
+            },
+            {
+              "name": "creator_vault_token_account",
+              "writable": true,
+              "signer": false
+            },
+            {
+              "name": "quote_mint",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "quote_token_program",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "associated_token_program",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "system_program",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "event_authority",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "program",
+              "writable": false,
+              "signer": false
+            }
+          ],
+          "args": []
+        }
+      ]
+    },
+    "pump_amm": {
+      "file": "pump_amm.json",
+      "sourceSha256": "b7d8c57a4d9c4dd0109a9ab893052352333252d4eedced10ac091d4d66cab89b",
+      "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "instructions": [
+        {
+          "name": "collect_coin_creator_fee",
+          "discriminator": [160, 57, 89, 42, 181, 139, 43, 66],
+          "accounts": [
+            {
+              "name": "quote_mint",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "quote_token_program",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "coin_creator",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "coin_creator_vault_authority",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "coin_creator_vault_ata",
+              "writable": true,
+              "signer": false
+            },
+            {
+              "name": "coin_creator_token_account",
+              "writable": true,
+              "signer": false
+            },
+            {
+              "name": "event_authority",
+              "writable": false,
+              "signer": false
+            },
+            {
+              "name": "program",
+              "writable": false,
+              "signer": false
+            }
+          ],
+          "args": []
+        }
+      ]
+    }
+  }
+}
