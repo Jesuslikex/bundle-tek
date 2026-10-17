@@ -1,7 +1,3 @@
-import {
-  pairDiagnosticComparisons,
-  pairReviewDiagnostic,
-} from './pair-review-diagnostic';
 import bs58 from 'bs58';
 import { address } from '@solana/kit';
 import {
@@ -259,34 +255,8 @@ export async function reviewPairOrderSimulation(
           ? delta !== -BigInt(assessment.rawInput)
           : delta < BigInt(assessment.minimumOutputRaw)
     )
-      throw pairReviewDiagnostic(
-        Error(
-          'Pair simulation raw token spending or output protection differs.',
-        ),
-        'simulation-token-delta',
-        {
-          accountAddress: selected.address,
-          comparisons: pairDiagnosticComparisons(
-            {
-              role: auxiliary
-                ? 'auxiliary'
-                : selected.mint === inputMint
-                  ? 'input'
-                  : 'output',
-              deltaRaw: auxiliary
-                ? '>=0'
-                : selected.mint === inputMint
-                  ? (-BigInt(assessment.rawInput)).toString()
-                  : '>=' + assessment.minimumOutputRaw,
-            },
-            {
-              mint: selected.mint,
-              beforeRaw: oldAmount,
-              afterRaw: afterAmount,
-              deltaRaw: delta,
-            },
-          ),
-        },
+      throw Error(
+        'Pair simulation raw token spending or output protection differs.',
       );
     (auxiliary ? auxiliaryTokenDeltas : tokenDeltas).push({
       mint: selected.mint,
@@ -315,33 +285,8 @@ export async function reviewPairOrderSimulation(
           ? tradeNativeDelta < 0n
           : tradeNativeDelta !== 0n
   )
-    throw pairReviewDiagnostic(
-      Error(
-        'Pair simulation SOL spending, fees, rent or refund conservation differs.',
-      ),
-      'simulation-native-conservation',
-      {
-        comparisons: pairDiagnosticComparisons(
-          {
-            tradeNativeDeltaRaw:
-              inputMint === SWAP_WRAPPED_SOL
-                ? (-BigInt(assessment.rawInput)).toString()
-                : outputMint === SWAP_WRAPPED_SOL
-                  ? '>=' + assessment.minimumOutputRaw
-                  : closedAuxiliaryNative
-                    ? '>=0'
-                    : '0',
-          },
-          {
-            tradeNativeDeltaRaw: tradeNativeDelta,
-            nativeDeltaRaw: nativeDelta,
-            networkFeeRaw: fee,
-            nonnativeRentRaw: nonnativeRent,
-            refundedNonNativeRentRaw: refundedNonNativeRent,
-            auxiliaryNativeGainRaw: auxiliaryNativeGain,
-          },
-        ),
-      },
+    throw Error(
+      'Pair simulation SOL spending, fees, rent or refund conservation differs.',
     );
   // Other writable accounts may be AMM state, but cannot retain control over another wallet asset.
   for (const key of writable) {
