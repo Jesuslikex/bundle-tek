@@ -10,7 +10,7 @@ import {
   referenceActivity,
   unchangedQuietReference,
 } from './stock-reference-activity.mjs';
-import { stockReferenceFixture } from './stock-reference-fixture.mjs';
+import { stockReferencePool } from './stock-reference-fixture.mjs';
 import {
   hasStockClockRequest,
   captureStockClockWire,
@@ -354,7 +354,7 @@ try {
     throw Error('Provider network differs.');
   let keys;
   if (referenceText !== null) {
-    keys = [stockReferenceFixture(referenceText, receipt.quoteAsset)];
+    keys = stockReferencePool(referenceText, receipt.quoteAsset);
   } else if (args.has('--reserve-reference')) {
     const accounts = await rpc('getLargestAccounts', [
       { commitment: 'confirmed', filter: 'circulating' },
