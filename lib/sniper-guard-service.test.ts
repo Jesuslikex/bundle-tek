@@ -57,7 +57,7 @@ function database() {
   const sqlite = new DatabaseSync(':memory:');
   databases.push(sqlite);
   sqlite.exec(
-    'CREATE TABLE pump_launch_reviews(id TEXT PRIMARY KEY);CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT);',
+    'CREATE TABLE pump_launch_reviews(id TEXT PRIMARY KEY);CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT);CREATE TABLE pump_organic_sequences(id TEXT PRIMARY KEY,owner_id TEXT,launch_review_id TEXT,state TEXT,created_at TEXT);',
   );
   sqlite.prepare('INSERT INTO pump_launch_reviews VALUES(?)').run(REVIEW);
   sqlite
@@ -450,5 +450,114 @@ describe('Sniper Guard observation', () => {
         readState,
       ),
     ).rejects.toThrow('changed elsewhere');
+  });
+  it("Complete Early stops this launch's active Organic/Stagger sequences on trigger", async () => {
+    const ctx = database();
+    ctx.sqlite.exec(
+      "INSERT INTO pump_organic_sequences VALUES('seq-1','owner','review-1','active','a'),('seq-2','owner','other-review','active','b'),('seq-3','owner','review-1','complete','c')",
+    );
+    await saveSniperGuardSettings(
+      ctx.db,
+      'owner',
+      REVIEW,
+      settings({ response: { kind: 'complete-early' } }),
+      null,
+      at(0),
+      readLaunch,
+    );
+    await armSniperGuard(ctx.db, 'owner', REVIEW, 1, at(0), readLaunch);
+    const stopped: string[] = [];
+    const stop = async (_db: D1Database, _owner: string, id: string) => {
+      stopped.push(id);
+      ctx.sqlite
+        .prepare("UPDATE pump_organic_sequences SET state='stopped' WHERE id=?")
+        .run(id);
+    };
+    const result = await observeSniperGuard(
+      ctx.db,
+      'owner',
+      REVIEW,
+      2,
+      chain([{ n: 1, signer: sniper, lamports: 1001 }]),
+      signal(),
+      () => at(100),
+      readState,
+      stop,
+    );
+    expect(result.state).toBe('triggered');
+    expect(stopped).toEqual(['seq-1']);
+    expect(result.observation?.stoppedSequences).toEqual(['seq-1']);
+  });
+  it('Nuke Dev only without Complete Early leaves sequences running', async () => {
+    const ctx = database();
+    ctx.sqlite.exec(
+      "INSERT INTO pump_organic_sequences VALUES('seq-1','owner','review-1','active','a')",
+    );
+    await saveSniperGuardSettings(
+      ctx.db,
+      'owner',
+      REVIEW,
+      settings({
+        response: { kind: 'nuke', scope: 'dev', completeEarly: false },
+      }),
+      null,
+      at(0),
+      readLaunch,
+    );
+    await armSniperGuard(ctx.db, 'owner', REVIEW, 1, at(0), readLaunch);
+    const stop = vi.fn(async () => {});
+    const result = await observeSniperGuard(
+      ctx.db,
+      'owner',
+      REVIEW,
+      2,
+      chain([{ n: 1, signer: sniper, lamports: 1001 }]),
+      signal(),
+      () => at(100),
+      readState,
+      stop,
+    );
+    expect(result.state).toBe('triggered');
+    expect(stop).not.toHaveBeenCalled();
+  });
+  it('Until complete keeps watching while a staged sequence is still active', async () => {
+    const ctx = database();
+    ctx.sqlite.exec(
+      "INSERT INTO pump_organic_sequences VALUES('seq-1','owner','review-1','active','a')",
+    );
+    await saveSniperGuardSettings(
+      ctx.db,
+      'owner',
+      REVIEW,
+      settings({ end: { kind: 'until-complete' } }),
+      null,
+      at(0),
+      readLaunch,
+    );
+    await armSniperGuard(ctx.db, 'owner', REVIEW, 1, at(0), readLaunch);
+    launchState = 'finalized';
+    const still = await observeSniperGuard(
+      ctx.db,
+      'owner',
+      REVIEW,
+      2,
+      chain([]),
+      signal(),
+      () => at(100),
+      readState,
+    );
+    expect(still.state).toBe('watching');
+    ctx.sqlite.exec("UPDATE pump_organic_sequences SET state='complete'");
+    const done = await observeSniperGuard(
+      ctx.db,
+      'owner',
+      REVIEW,
+      3,
+      chain([]),
+      signal(),
+      () => at(200),
+      readState,
+    );
+    expect(done.observation?.endReason).toBe('launch-complete');
   });
 });

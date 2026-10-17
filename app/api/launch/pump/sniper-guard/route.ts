@@ -16,6 +16,15 @@ import {
   saveSniperGuardSettings,
   stopSniperGuard,
 } from '@/lib/sniper-guard-service';
+import {
+  cancelSniperNuke,
+  sendSniperNukeSell,
+  observeSniperNuke,
+  prepareSniperNuke,
+  readSniperNuke,
+  registerSniperNuke,
+} from '@/lib/sniper-nuke-service';
+import type { SniperNukeConsent } from '@/lib/sniper-nuke';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -37,19 +46,29 @@ const failure = (error: unknown) =>
         },
         502,
       );
-const allowed = new Set<string>(SNIPER_GUARD_RPC_METHODS);
-function configuredRpc(): SniperGuardRpc {
+// Reads only, except nuke-send, which alone may send one user-signed sell.
+const allowed = new Set<string>([
+  ...SNIPER_GUARD_RPC_METHODS,
+  'getSignatureStatuses',
+  'getBlockHeight',
+]);
+function configuredRpc(canSend = false): SniperGuardRpc {
   const endpoint = getSolanaIndexerRpcEndpoint(),
     url = new URL(endpoint);
   if (url.protocol !== 'https:' || url.username || url.password || url.hash)
     throw new PumpPreflightError('Sniper Guard RPC is not configured.', 503);
   return (method, params, signal) => {
     signal.throwIfAborted();
-    if (!allowed.has(method))
+    if (!allowed.has(method) && !(canSend && method === 'sendTransaction'))
       throw new Error('Sniper Guard has no submission or mutation transport.');
     return balanceRpc(endpoint, method, params, signal, fetch, 2097152);
   };
 }
+const idOf = (value: unknown) => {
+  if (typeof value !== 'string' || !UUID.test(value))
+    throw new PumpPreflightError('Choose a saved Nuke batch.', 400);
+  return value;
+};
 const reviewIdOf = (value: unknown) => {
   if (typeof value !== 'string' || !UUID.test(value))
     throw new PumpPreflightError('Choose a saved launch review.', 400);
@@ -79,6 +98,7 @@ export async function GET(request: Request) {
     );
     return json({
       guard: await readSniperGuard(db, user.userId, reviewId),
+      nuke: await readSniperNuke(db, user.userId, reviewId),
       launch,
       launchState,
     });
@@ -92,6 +112,10 @@ type Body = {
   reviewId?: unknown;
   revision?: unknown;
   settings?: unknown;
+  batchId?: unknown;
+  sellId?: unknown;
+  consent?: unknown;
+  signed?: unknown;
 };
 export async function POST(request: Request) {
   try {
@@ -108,7 +132,7 @@ export async function POST(request: Request) {
     )
       return json({ error: 'JSON required.' }, 415);
     const text = await request.text();
-    if (text.length > 8000) return json({ error: 'Request too large.' }, 413);
+    if (text.length > 60000) return json({ error: 'Request too large.' }, 413);
     let body: Body;
     try {
       body = JSON.parse(text);
@@ -126,6 +150,11 @@ export async function POST(request: Request) {
       arm: 'action,reviewId,revision',
       observe: 'action,reviewId,revision',
       stop: 'action,reviewId,revision',
+      'nuke-prepare': 'action,reviewId',
+      'nuke-register': 'action,consent,reviewId,signed',
+      'nuke-observe': 'action,batchId,reviewId',
+      'nuke-cancel': 'action,batchId,reviewId',
+      'nuke-send': 'action,batchId,reviewId,sellId',
     };
     if (typeof action !== 'string' || expected[action] !== keys)
       return json({ error: 'Sniper Guard request differs.' }, 400);
@@ -136,7 +165,8 @@ export async function POST(request: Request) {
         )
         .bind(
           JSON.stringify(['sniper-guard-v1', user.userId, reviewId]),
-          now + (action === 'observe' ? 1500 : 1000),
+          now +
+            (action === 'observe' || action === 'nuke-observe' ? 1500 : 1000),
           now,
         )
         .run();
@@ -149,6 +179,53 @@ export async function POST(request: Request) {
       request.signal,
       AbortSignal.timeout(25000),
     ]);
+    if (action === 'nuke-prepare')
+      return json(
+        await prepareSniperNuke(
+          db,
+          user.userId,
+          reviewId,
+          configuredRpc(),
+          signal,
+        ),
+      );
+    if (action === 'nuke-register')
+      return json(
+        await registerSniperNuke(
+          db,
+          user.userId,
+          reviewId,
+          body.consent as SniperNukeConsent,
+          body.signed as { id: string; transaction: string }[],
+        ),
+      );
+    if (action === 'nuke-observe')
+      return json(
+        await observeSniperNuke(
+          db,
+          user.userId,
+          reviewId,
+          idOf(body.batchId),
+          configuredRpc(),
+          signal,
+        ),
+      );
+    if (action === 'nuke-send')
+      return json(
+        await sendSniperNukeSell(
+          db,
+          user.userId,
+          reviewId,
+          idOf(body.batchId),
+          idOf(body.sellId),
+          configuredRpc(true),
+          signal,
+        ),
+      );
+    if (action === 'nuke-cancel')
+      return json(
+        await cancelSniperNuke(db, user.userId, reviewId, idOf(body.batchId)),
+      );
     if (action === 'save')
       return json(
         await saveSniperGuardSettings(

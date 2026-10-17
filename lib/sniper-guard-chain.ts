@@ -244,7 +244,7 @@ export async function readLaunchTokenBalances(
           info?: {
             mint?: string;
             owner?: string;
-            tokenAmount?: { amount?: string };
+            tokenAmount?: { amount?: string; decimals?: number };
           };
         };
       };
@@ -254,10 +254,14 @@ export async function readLaunchTokenBalances(
     const info = account.data?.parsed?.info;
     if (info?.mint !== mint || info?.owner !== wallet)
       fail('Launch wallet token account differs.');
+    const decimals = info?.tokenAmount?.decimals;
     return {
       wallet,
       tokenAccount: String(accounts[index]),
       amountRaw: amount(info?.tokenAmount?.amount).toString(),
+      ...(Number.isInteger(decimals) && decimals! >= 0 && decimals! <= 18
+        ? { decimals: decimals! }
+        : {}),
     };
   });
 }

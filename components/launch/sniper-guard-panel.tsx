@@ -19,6 +19,8 @@ import {
 import type { SniperGuardView } from '@/lib/sniper-guard-service';
 import { usePumpTokenWorkspaceNavigation } from './pump-token-workspace-navigation';
 import styles from './pump-launch-group-ui.module.css';
+import { SniperNukeBatchPanel } from './sniper-nuke-batch';
+import type { SniperNukeBatch } from '@/lib/sniper-nuke';
 
 const endpoint = '/api/launch/pump/sniper-guard';
 export const SNIPER_GUARD_POLL_MS = 2000;
@@ -123,7 +125,8 @@ export function SniperGuardPanel({
     [draft, setDraft] = useState<Draft>(() => draftFrom(null, 9)),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [loaded, setLoaded] = useState(false);
+    [loaded, setLoaded] = useState(false),
+    [nuke, setNuke] = useState<SniperNukeBatch | null>(null);
   const openTokenWorkspace = usePumpTokenWorkspaceNavigation();
   const alive = useRef(true),
     notified = useRef(false);
@@ -170,6 +173,7 @@ export function SniperGuardPanel({
         )) as {
           guard: SniperGuardView | null;
           launch: SniperGuardLaunch;
+          nuke?: SniperNukeBatch | null;
           error?: string;
         };
         if (!alive.current) return;
@@ -177,6 +181,7 @@ export function SniperGuardPanel({
           throw new Error(value.error ?? 'Sniper Guard is unavailable.');
         setLaunch(value.launch);
         setGuard(value.guard);
+        setNuke(value.nuke ?? null);
         setDraft(
           draftFrom(value.guard?.settings ?? null, value.launch.quoteDecimals),
         );
@@ -472,9 +477,9 @@ export function SniperGuardPanel({
               {actions.sellWallets.length > 0 && (
                 <>
                   <p>
-                    Nuke: sell the full balance of these wallets now. Each sell
-                    still needs your review and signature in the token
-                    workspace.
+                    Nuke: sell the full balance of these wallets now. Prepare
+                    the batch below to review and sign every sell at once, or
+                    sell each one from the token workspace.
                   </p>
                   <ul className={styles.history}>
                     {actions.sellWallets.map((wallet) => {
@@ -494,6 +499,12 @@ export function SniperGuardPanel({
                       );
                     })}
                   </ul>
+                  <SniperNukeBatchPanel
+                    key={nuke?.batchId ?? 'none'}
+                    reviewId={reviewId}
+                    initial={nuke}
+                    disabled={locked}
+                  />
                   {openTokenWorkspace &&
                   group &&
                   pumpLaunchWorkspaceReady(group) ? (
