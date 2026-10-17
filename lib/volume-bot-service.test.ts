@@ -76,11 +76,14 @@ async function fixture() {
       sql: "INSERT INTO workspace_wallets VALUES('alice','Solana',?,0)",
       args: [address],
     });
-  for (const sql of readFileSync(
+  for (const file of [
+    'drizzle/0093_pump_organic_sequences.sql',
     'drizzle/0099_volume_bot_sessions.sql',
-    'utf8',
-  ).split('--> statement-breakpoint'))
-    if (sql.trim()) await client.execute(sql);
+  ])
+    for (const sql of readFileSync(file, 'utf8').split(
+      '--> statement-breakpoint',
+    ))
+      if (sql.trim()) await client.execute(sql);
   return { client, db: createTursoDatabase(client) };
 }
 
@@ -445,4 +448,43 @@ it('formats exact atomic units as decimals', () => {
   expect(rawToDecimal(100_000_000n, 9)).toBe('0.1');
   expect(rawToDecimal(5n, 0)).toBe('5');
   expect(rawToDecimal(1_230_000n, 6)).toBe('1.23');
+});
+
+it('keeps Volume Bot and organic holder-buy sequences off the same wallets', async () => {
+  const { db, client } = await fixture();
+  const { deps } = chain();
+  const organic = (id: string, address: string) =>
+    client.execute({
+      sql: "INSERT INTO pump_organic_sequences(id,owner_id,project_id,launch_review_id,mint,rent_allowance_raw,plan,plan_sha256,state) VALUES(?,'alice','p0','r',?,'0',?,'h','active')",
+      args: [id, MINT, JSON.stringify({ rows: [{ address }] })],
+    });
+  await organic('o1', wallets[0]);
+  await expect(
+    createVolumeSession(
+      db,
+      'alice',
+      {
+        projectId: 'p1',
+        projectRevision: 3,
+        terms: terms(),
+        seed: newVolumeSeed(),
+      },
+      signal(),
+      deps.rpc,
+    ),
+  ).rejects.toThrow(/busy/);
+  await client.execute("UPDATE pump_organic_sequences SET state='complete'");
+  await createVolumeSession(
+    db,
+    'alice',
+    {
+      projectId: 'p1',
+      projectRevision: 3,
+      terms: terms(),
+      seed: newVolumeSeed(),
+    },
+    signal(),
+    deps.rpc,
+  );
+  await expect(organic('o2', wallets[1])).rejects.toThrow(/Volume Bot/);
 });

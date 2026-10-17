@@ -94,3 +94,17 @@ CREATE TRIGGER volume_bot_launch_reservation BEFORE INSERT ON pump_launch_review
  AND (o.value=NEW.payer OR EXISTS(SELECT 1 FROM json_each(NEW.review,'$.input.holders') h WHERE json_extract(h.value,'$.address')=o.value AND json_extract(h.value,'$.kind')!='none')))
  THEN RAISE(ABORT,'Launch wallet reserved by a Volume Bot session') END;
 END;
+--> statement-breakpoint
+CREATE TRIGGER volume_bot_organic_reservation BEFORE INSERT ON volume_bot_sessions BEGIN
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(NEW.plan,'$.wallets') w,pump_organic_sequences s,json_each(s.plan,'$.rows') o
+ WHERE s.owner_id=NEW.owner_id AND json_extract(o.value,'$.address')=w.value
+ AND (s.state='active' OR EXISTS(SELECT 1 FROM pump_organic_buys b JOIN pump_organic_batches t ON t.id=b.batch_id WHERE t.sequence_id=s.id AND b.state IN ('signed','submitting','submitted'))))
+ THEN RAISE(ABORT,'Volume Bot wallet reserved by an organic holder-buy sequence') END;
+END;
+--> statement-breakpoint
+CREATE TRIGGER pump_organic_volume_reservation BEFORE INSERT ON pump_organic_sequences BEGIN
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(NEW.plan,'$.rows') w,volume_bot_sessions s,json_each(s.plan,'$.wallets') o
+ WHERE s.owner_id=NEW.owner_id AND o.value=json_extract(w.value,'$.address')
+ AND (s.state='active' OR EXISTS(SELECT 1 FROM volume_bot_trades t JOIN volume_bot_batches b ON b.id=t.batch_id WHERE b.session_id=s.id AND t.state IN ('signed','submitting','submitted'))))
+ THEN RAISE(ABORT,'Organic holder wallet reserved by a Volume Bot session') END;
+END;
