@@ -20,6 +20,7 @@ import { WalletFolderRow } from '@/components/wallet-folder-row';
 import { BrowserWalletVault } from '@/components/browser-wallet-vault';
 import { WalletWarmup } from '@/components/wallet-warmup';
 import { NativeWithdrawalPanel } from '@/components/native-withdrawal-panel';
+import { WalletCleanupPanel } from '@/components/wallet-cleanup-panel';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { resolveWarmupWorkspace } from '@/lib/warmup-workspace-handoff';
 
@@ -1232,6 +1233,9 @@ export function WalletWorkspace({
                   : undefined
               }
             />
+          )}
+          {chain === 'Solana' && !archived && (
+            <WalletCleanupPanel wallets={data.wallets} selected={picks} />
           )}
           {chain === 'Solana' && holdingsWallet && (
             <WalletHoldingsPanel
