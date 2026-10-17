@@ -182,6 +182,55 @@ it('shows a usable wallet-history error when the entry screen receives HTML', as
   );
   expect(container.textContent).not.toContain('Unexpected token');
 });
+it('explains an unfunded wallet without funding, signing or starting trades', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await fixture.fetcher(input, init);
+      if (input === '/api/wallet-workspace/warmup') {
+        const data = (await response.json()) as {
+          results: Array<{
+            observation: {
+              nativeBalance: string;
+              sampleCount: number;
+              successfulSampleCount: number;
+            };
+          }>;
+        };
+        data.results[0].observation.nativeBalance = '0';
+        data.results[0].observation.sampleCount = 0;
+        data.results[0].observation.successfulSampleCount = 0;
+        return Response.json(data);
+      }
+      return response;
+    }),
+  );
+  await act(async () =>
+    root.render(
+      <WalletWarmup
+        chain="Solana"
+        addresses={[fixture.wallet]}
+        walletRevisions={[{ address: fixture.wallet, revision: 1 }]}
+        onClose={() => {}}
+      />,
+    ),
+  );
+  expect(container.textContent).toContain(
+    'Saving does not fund the wallet or start trades',
+  );
+  await click('Check wallet history');
+  expect(container.textContent).toContain('No SOL balance was observed');
+  expect(container.textContent).toContain('0 sampled signatures, 0 successful');
+  expect(container.textContent).toContain('Check preflight after saving');
+  expect(button('Save warmup draft').disabled).toBe(true);
+  expect(
+    fixture.calls.filter((call) =>
+      ['submit', 'register'].includes(call.action ?? ''),
+    ),
+  ).toHaveLength(0);
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.unlock).not.toHaveBeenCalled();
+});
 it('walks buy through separate signing/send approvals, receipt, matched sell and completed progress', async () => {
   await mount();
   await click('Prepare unsigned warmup buy');

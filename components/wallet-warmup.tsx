@@ -132,6 +132,11 @@ export function WalletWarmup({
         {addresses.length} selected {chain} wallets. Review small buy/sell
         cycles and inspect existing activity.
       </p>
+      <p>
+        Start by checking wallet history, then choose your tokens and review a
+        plan. You can save a plan for an unfunded wallet. Saving does not fund
+        the wallet or start trades.
+      </p>
       <p className="text-muted-foreground">
         Each swap requires a fresh quote and your approval before execution.
         There is no background scheduler. Activity cannot guarantee launch
@@ -156,6 +161,15 @@ export function WalletWarmup({
                         ? `${r.observation.sampleCount} sampled signatures, ${r.observation.successfulSampleCount} successful`
                         : `${r.observation.outgoingTransactions} account nonce`}
                     </p>
+                    {r.observation.nativeBalance === '0' && (
+                      <p>
+                        No {r.observation.currency} balance was observed. You
+                        can inspect history and save a draft, but a swap needs
+                        enough balance for its amount, fees and any account
+                        rent. Check preflight after saving; no funding or trade
+                        happens automatically.
+                      </p>
+                    )}
                     <p>
                       Oldest sampled activity:{' '}
                       {r.observation.oldestObservedAt
