@@ -7,7 +7,6 @@ import {
   getAddress,
   http,
   isAddress,
-  maxUint256,
   parseEther,
   parseUnits,
   type Address,
@@ -128,6 +127,15 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
   }
   // The browser wallet shows each transaction for the user to confirm.
   async function send(to: Address, data: Hex, value = 0n) {
+    // The wallet may have switched network since review; never send elsewhere.
+    const chainId = await provider()!.request({ method: 'eth_chainId' });
+    if (
+      typeof chainId !== 'string' ||
+      Number.parseInt(chainId, 16) !== EVM_NETWORKS[CHAIN].id
+    )
+      throw new Error(
+        `Switch your wallet back to ${CHAIN} and review again. Nothing was sent.`,
+      );
     const hash = await provider()!.request({
       method: 'eth_sendTransaction',
       params: [
@@ -197,7 +205,7 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
       });
       if (allowance < position.lpBalance) {
         setNote('Approve the router in your wallet first…');
-        await send(position.pair, approveRouterCall(CHAIN, maxUint256));
+        await send(position.pair, approveRouterCall(CHAIN, position.lpBalance));
       }
       const hash = await send(
         router,
