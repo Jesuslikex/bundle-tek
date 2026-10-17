@@ -4,7 +4,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { referenceActivity } from './stock-reference-activity.mjs';
-import { stockReferenceHash } from './stock-reference-fixture.mjs';
+import {
+  STOCK_REFERENCE_POOL_MAX,
+  stockReferenceHash,
+} from './stock-reference-fixture.mjs';
 
 if (process.argv.length !== 3 || process.argv[2] !== '--live-readonly')
   throw Error('Use --live-readonly. No transaction or retry mode exists.');
@@ -48,7 +51,8 @@ const fetcher = async (url, init) => {
     requests.length >= 100
   )
     throw Error('Discovery read budget/method refused.');
-  await lib.paceWalletRpc(endpoint, signal, 1);
+  // Explicit scope so a non-Helius indexer is paced by the same budget.
+  await lib.paceWalletRpc(endpoint, signal, 1, 'stock-runtime-evidence');
   const row = { method: body.method, startMs: performance.now() };
   requests.push(row);
   const response = await fetch(url, { ...init, redirect: 'manual' });
@@ -219,19 +223,28 @@ try {
     (a, b) =>
       b.activity.idleSlots - a.activity.idleSlots || a.key.localeCompare(b.key),
   );
-  const sol = eligible[0],
-    usd = eligible.find((r) => r.usdcFunded && r.wrappedSolAbsent);
-  if (!sol || !usd)
+  // Pin every long-idle candidate (up to the pool limit), so one reference that
+  // later becomes active does not refuse the whole attempt.
+  const references = {
+    SOL: eligible.slice(0, STOCK_REFERENCE_POOL_MAX).map((r) => r.key),
+    USDC: eligible
+      .filter((r) => r.usdcFunded && r.wrappedSolAbsent)
+      .slice(0, STOCK_REFERENCE_POOL_MAX)
+      .map((r) => r.key),
+  };
+  if (!references.SOL.length || !references.USDC.length)
     throw Error(
       'Bounded discovery found no long-idle funded references for both assets.',
     );
-  const references = { SOL: sol.key, USDC: usd.key };
   const fixture = {
-    format: 'stock-public-reference-fixture-v1',
+    format: 'stock-public-reference-pool-v1',
     readOnly: true,
     references,
     referenceHashes: Object.fromEntries(
-      Object.entries(references).map(([k, v]) => [k, stockReferenceHash(v)]),
+      Object.entries(references).map(([k, v]) => [
+        k,
+        v.map((key) => stockReferenceHash(key)),
+      ]),
     ),
   };
   const path = join(folder, 'references.json');
