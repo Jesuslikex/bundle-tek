@@ -1,4 +1,10 @@
-import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 export const pumpLaunchReviews = sqliteTable(
   'pump_launch_reviews',
   {
@@ -239,4 +245,28 @@ export const pumpGroupBroadcastClosures = sqliteTable(
     state: text('state').notNull(),
     createdAt: text('created_at').notNull(),
   },
+);
+export const sniperGuards = sqliteTable(
+  'sniper_guards',
+  {
+    id: text('id').primaryKey().notNull(),
+    ownerId: text('owner_id').notNull(),
+    projectId: text('project_id').notNull(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => pumpLaunchReviews.id),
+    revision: integer('revision').notNull(),
+    state: text('state').notNull(),
+    settings: text('settings').notNull(),
+    launch: text('launch'),
+    observation: text('observation'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    armedAt: text('armed_at'),
+    finishedAt: text('finished_at'),
+  },
+  (t) => [
+    uniqueIndex('sniper_guards_owner_review').on(t.ownerId, t.reviewId),
+    index('sniper_guards_owner_project').on(t.ownerId, t.projectId),
+  ],
 );
