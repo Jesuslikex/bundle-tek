@@ -200,7 +200,25 @@ export async function reviewPairOrderInstructions(
           existing &&
           (observed.status !== 'Ready' || BigInt(observed.lamportsRaw) < rent)
         )
-          fail('auxiliary-existing-state');
+          fail('auxiliary-existing-state', {
+            comparisons: [
+              {
+                field: 'status',
+                before: 'Ready',
+                after: observed.status,
+              },
+              {
+                field: 'lamportsRaw',
+                before: `>=${rent.toString()}`,
+                after: observed.lamportsRaw,
+              },
+              {
+                field: 'byteLength',
+                before: observed.expectedByteLength.toString(),
+                after: observed.byteLength.toString(),
+              },
+            ],
+          });
         beforeAmount = BigInt(observed.amountRaw);
       } else if (existing) {
         const a = rawAccount(raw.get(target)),
