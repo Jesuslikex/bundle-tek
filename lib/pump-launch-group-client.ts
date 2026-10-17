@@ -119,8 +119,20 @@ export async function parsePumpGroupView(
     if (
       !signedEvidence ||
       !['finalized', 'failed', 'cancelled'].includes(brief.state) ||
-      terminal.kind !==
-        (brief.state === 'cancelled' ? 'expired-unobserved' : brief.state) ||
+      (terminal.kind === 'partial'
+        ? brief.state === 'cancelled' ||
+          terminal.packetCount !== review.packets.length ||
+          !Number.isSafeInteger(terminal.landedPacketCount) ||
+          !Number.isSafeInteger(terminal.succeededPacketCount) ||
+          Number(terminal.succeededPacketCount) < 0 ||
+          Number(terminal.succeededPacketCount) >
+            Number(terminal.landedPacketCount) ||
+          Number(terminal.landedPacketCount) > review.packets.length ||
+          (brief.state === 'finalized') !==
+            (terminal.succeededPacketCount === review.packets.length) ||
+          terminal.networkFeeUnresolved !== false
+        : terminal.kind !==
+          (brief.state === 'cancelled' ? 'expired-unobserved' : brief.state)) ||
       terminal.reviewId !== review.id ||
       terminal.contextSha256 !== review.contextSha256 ||
       terminal.manifestSha256 !== review.manifestSha256 ||
@@ -151,6 +163,7 @@ export async function parsePumpGroupView(
         ).toString() ||
       typeof terminal.networkFeeUnresolved !== 'boolean' ||
       (brief.state !== 'cancelled' &&
+        terminal.kind !== 'partial' &&
         (terminal.networkFeeUnresolved !== false ||
           terminal.tipNetworkFeeRaw === null))
     )

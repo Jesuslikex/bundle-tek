@@ -19,7 +19,10 @@ import { WalletFolderDeleteDialog } from '@/components/wallet-folder-delete-dial
 import { WalletFolderRow } from '@/components/wallet-folder-row';
 import { BrowserWalletVault } from '@/components/browser-wallet-vault';
 import { WalletWarmup } from '@/components/wallet-warmup';
+import { TokenToolsPanel } from './token-tools-panel';
 import { NativeWithdrawalPanel } from '@/components/native-withdrawal-panel';
+import { WalletCleanupPanel } from '@/components/wallet-cleanup-panel';
+import { CreatorFeeClaimPanel } from '@/components/creator-fee-claim-panel';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { resolveWarmupWorkspace } from '@/lib/warmup-workspace-handoff';
 
@@ -1232,6 +1235,13 @@ export function WalletWorkspace({
                   : undefined
               }
             />
+          )}
+          {chain === 'Solana' && <TokenToolsPanel wallets={data.wallets} />}
+          {chain === 'Solana' && !archived && (
+            <WalletCleanupPanel wallets={data.wallets} selected={picks} />
+          )}
+          {chain === 'Solana' && (
+            <CreatorFeeClaimPanel wallets={data.wallets} />
           )}
           {chain === 'Solana' && holdingsWallet && (
             <WalletHoldingsPanel

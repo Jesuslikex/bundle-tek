@@ -649,8 +649,50 @@
     {
       "idx": 92,
       "version": "6",
-      "when": 1792231200000,
+      "when": 1792209600000,
+      "tag": "0092_pump_group_partial_closure",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "6",
+      "when": 1792213200000,
+      "tag": "0093_pump_organic_sequences",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "6",
+      "when": 1792216800000,
+      "tag": "0094_wallet_cleanup",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "6",
+      "when": 1792217700000,
+      "tag": "0095_sniper_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "6",
+      "when": 1792218600000,
+      "tag": "0096_token_supply_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "6",
+      "when": 1792219500000,
       "tag": "0097_pair_order_executions",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "6",
+      "when": 1792227600000,
+      "tag": "0099_volume_bot_sessions",
       "breakpoints": true
     }
   ]

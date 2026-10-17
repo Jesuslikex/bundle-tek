@@ -124,9 +124,16 @@ export function FundingPlanner({
       .filter((line) => line.trim())
       .map((line) => {
         const parts = line.trim().split(/[\s,]+/);
-        if (parts.length !== 2)
-          throw new Error('Use one public address and amount per line.');
-        return { address: parts[0], amount: parts[1] };
+        if (parts.length === 2) return { address: parts[0], amount: parts[1] };
+        if (parts.length > 3 && parts[2] === 'via')
+          return {
+            address: parts[0],
+            amount: parts[1],
+            proxies: parts.slice(3),
+          };
+        throw new Error(
+          'Use one public address and amount per line, optionally followed by via and 1 to 3 proxy wallets.',
+        );
       });
     preview = validateFunding({ ...draft, recipients });
   } catch (e) {
@@ -140,7 +147,12 @@ export function FundingPlanner({
     setHistoryId(row.id);
     setDraft(row.document);
     setLines(
-      row.document.recipients.map((r) => `${r.address} ${r.amount}`).join('\n'),
+      row.document.recipients
+        .map(
+          (r) =>
+            `${r.address} ${r.amount}${r.proxies ? ' via ' + r.proxies.join(' ') : ''}`,
+        )
+        .join('\n'),
     );
     setSelected({ id: row.id, revision: row.revision });
     setNotice('');
@@ -458,7 +470,8 @@ export function FundingPlanner({
             }}
           />
           <small>
-            Up to 100 unique recipients. Example format: publicAddress 0.01
+            Up to 100 unique recipients. Example format: publicAddress 0.01.
+            Classic proxy route (SOL only): publicAddress 0.01 via proxy1 proxy2
           </small>
         </label>
       </fieldset>
