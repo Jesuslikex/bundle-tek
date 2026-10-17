@@ -675,6 +675,13 @@
       "breakpoints": true
     },
     {
+      "idx": 96,
+      "version": "6",
+      "when": 1792218600000,
+      "tag": "0096_token_supply_actions",
+      "breakpoints": true
+    },
+    {
       "idx": 99,
       "version": "6",
       "when": 1792227600000,
