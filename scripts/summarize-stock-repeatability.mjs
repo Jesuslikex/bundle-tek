@@ -102,7 +102,7 @@ export function summarizeStockRepeatability(receipts) {
         'getLargestAccounts',
         'getTransaction',
       ]);
-      const rpc = [];
+      const rpcByProvider = new Map();
       for (const row of r.requests) {
         if (
           !Array.isArray(row.methods) ||
@@ -115,7 +115,14 @@ export function summarizeStockRepeatability(receipts) {
         if (row.methods.every((m) => methods.has(m))) {
           if (row.rpcUnits !== row.methods.length)
             throw Error('RPC method count omitted or changed.');
-          rpc.push(row);
+          const provider = row.providerRole ?? 'default';
+          if (
+            !['default', 'indexer-fallback', 'stock-runtime'].includes(provider)
+          )
+            throw Error('Unknown RPC provider role.');
+          const providerRows = rpcByProvider.get(provider) ?? [];
+          providerRows.push(row);
+          rpcByProvider.set(provider, providerRows);
         } else if (
           row.rpcUnits !== undefined ||
           row.methods.length !== 1 ||
@@ -123,18 +130,42 @@ export function summarizeStockRepeatability(receipts) {
         )
           throw Error('Unknown read scope.');
       }
-      const maximum = Math.max(
-        0,
-        ...rpc.map((row) =>
-          rpc
-            .filter(
-              (other) =>
-                other.startMs <= row.startMs &&
-                other.startMs > row.startMs - 1000,
-            )
-            .reduce((total, other) => total + other.rpcUnits, 0),
-        ),
+      const rolling = (rows) =>
+        Math.max(
+          0,
+          ...rows.map((row) =>
+            rows
+              .filter(
+                (other) =>
+                  other.startMs <= row.startMs &&
+                  other.startMs > row.startMs - 1000,
+              )
+              .reduce((total, other) => total + other.rpcUnits, 0),
+          ),
+        );
+      const maximumByProvider = Object.fromEntries(
+        [...rpcByProvider.entries()].map(([provider, rows]) => [
+          provider,
+          rolling(rows),
+        ]),
       );
+      const maximum = Math.max(0, ...Object.values(maximumByProvider));
+      if (
+        rpcByProvider.has('indexer-fallback') ||
+        rpcByProvider.has('stock-runtime')
+      ) {
+        const reported = r.maximumRollingRpcMethodsByRole;
+        if (
+          !reported ||
+          Object.keys(reported).some(
+            (role) => !['indexer-fallback', 'stock-runtime'].includes(role),
+          ) ||
+          ['indexer-fallback', 'stock-runtime'].some(
+            (role) => (reported[role] ?? 0) !== (maximumByProvider[role] ?? 0),
+          )
+        )
+          throw Error('Per-provider pacing does not match its receipt.');
+      }
       if (maximum !== r.maximumRollingRpcMethods)
         throw Error('Actual setup/runtime pacing does not match its receipt.');
     }

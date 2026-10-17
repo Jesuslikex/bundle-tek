@@ -74,6 +74,51 @@ test('counts setup and runtime methods together and rejects omitted or under-rep
   delete missing[0].requests[0].rpcUnits;
   assert.throws(() => summarizeStockRepeatability(missing), /method count/);
 });
+
+test('measures the rolling method budget per RPC provider', () => {
+  const rows = samples();
+  for (const r of rows)
+    Object.assign(r, {
+      rpcPacingScope: 'setup-and-runtime',
+      maximumRollingRpcMethods: 5,
+      qualificationMethodBudget: 25,
+      maximumRollingRpcMethodsByRole: {
+        'indexer-fallback': 5,
+        'stock-runtime': 5,
+      },
+      requests: [
+        ...Array.from({ length: 5 }, () => ({
+          status: 200,
+          startMs: 0,
+          providerRole: 'indexer-fallback',
+          methods: ['getSlot'],
+          rpcUnits: 1,
+        })),
+        ...Array.from({ length: 5 }, () => ({
+          status: 200,
+          startMs: 0,
+          providerRole: 'stock-runtime',
+          methods: ['getSlot'],
+          rpcUnits: 1,
+        })),
+      ],
+    });
+  expectValid(rows);
+
+  const underReported = structuredClone(rows);
+  underReported[0].maximumRollingRpcMethodsByRole['stock-runtime'] = 4;
+  assert.throws(
+    () => summarizeStockRepeatability(underReported),
+    /Per-provider pacing/,
+  );
+
+  const combined = structuredClone(rows);
+  combined[0].maximumRollingRpcMethods = 10;
+  assert.throws(
+    () => summarizeStockRepeatability(combined),
+    /setup\/runtime pacing/,
+  );
+});
 function expectValid(rows) {
   assert.equal(summarizeStockRepeatability(rows).repeatableInThisSample, true);
 }
