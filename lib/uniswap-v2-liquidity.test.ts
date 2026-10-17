@@ -101,3 +101,11 @@ it('seeds a new pool with exact minimums and rejects zero amounts', () => {
     }),
   ).toThrow();
 });
+
+it('pins Robinhood to the Uniswap sdk-core V2 contracts and its WETH', () => {
+  expect(UNISWAP_V2.Robinhood).toEqual({
+    factory: getAddress('0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f'),
+    router: getAddress('0x89e5db8b5aa49aa85ac63f691524311aeb649eba'),
+    weth: getAddress('0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73'),
+  });
+});
