@@ -694,6 +694,13 @@
       "when": 1792227600000,
       "tag": "0098_volume_bot_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "6",
+      "when": 1792229400000,
+      "tag": "0099_sniper_nuke_sells",
+      "breakpoints": true
     }
   ]
 }

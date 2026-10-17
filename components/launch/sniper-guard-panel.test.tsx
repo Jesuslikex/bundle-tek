@@ -66,6 +66,7 @@ const observation = (triggered: boolean) => ({
   launchState: 'signed',
   evaluation: evaluation(triggered),
   endReason: null,
+  stoppedSequences: [] as string[],
   balances: triggered
     ? [{ wallet: key(2), tokenAccount: key(3), amountRaw: '1500000' }]
     : null,

@@ -30,6 +30,7 @@ export type SniperGuardBalance = {
   wallet: string;
   tokenAccount: string;
   amountRaw: string;
+  decimals?: number;
 };
 export type SniperGuardObservation = {
   cursor: string | null;
