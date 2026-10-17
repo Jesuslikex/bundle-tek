@@ -694,6 +694,13 @@
       "when": 1792227600000,
       "tag": "0098_volume_bot_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "6",
+      "when": 1792227600000,
+      "tag": "0100_project_shares",
+      "breakpoints": true
     }
   ]
 }
