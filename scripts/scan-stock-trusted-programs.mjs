@@ -2,14 +2,18 @@
 // account data only: no quote, order, signing or send. The output is a
 // proposed list for human review, never an automatic pin.
 import { createHash } from 'node:crypto';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import bs58 from 'bs58';
 
 const NATIVE = 'NativeLoader1111111111111111111111111111111',
   UPGRADEABLE = 'BPFLoaderUpgradeab1e11111111111111111111111',
   BPF2 = 'BPFLoader2111111111111111111111111111111111',
-  MAINNET = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dJZ3EM';
+  // The app's own constant, read from source so the two can never differ.
+  MAINNET = readFileSync('lib/wallet-balances.ts', 'utf8').match(
+    /SOLANA_MAINNET_GENESIS\s*=\s*'([1-9A-HJ-NP-Za-km-z]{43,44})'/,
+  )?.[1];
+if (!MAINNET) throw Error('SOLANA_MAINNET_GENESIS not found.');
 const BASE = [
   '11111111111111111111111111111111',
   'ComputeBudget111111111111111111111111111111',
