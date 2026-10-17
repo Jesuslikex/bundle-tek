@@ -202,7 +202,9 @@ try {
       [new URL(endpoint).href, new URL(runtimeEndpoint).href].includes(u.href)
     ) {
       row.providerRole =
-        u.href === new URL(runtimeEndpoint).href && runtimeEndpoint !== endpoint
+        u.href === new URL(runtimeEndpoint).href &&
+        (runtimeEndpoint !== endpoint ||
+          Boolean(process.env.SOLANA_STOCK_RUNTIME_RPC_URL))
           ? 'stock-runtime'
           : 'indexer-fallback';
       const body = JSON.parse(init?.body ?? '{}'),
