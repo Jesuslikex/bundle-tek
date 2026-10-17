@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { SavedFunding } from '@/lib/funding-plan';
-import { mainnetFundingAsset } from '@/lib/mainnet-funding';
+import { fundingLegs, mainnetFundingAsset } from '@/lib/mainnet-funding';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import { NativeWithdrawalPanel } from '../native-withdrawal-panel';
 import { Button } from '../ui/button';
@@ -15,6 +15,15 @@ export function MainnetFundingExecution({
 }) {
   const [wallets, setWallets] = useState<WorkspaceWallet[] | null>(null);
   const [item, setItem] = useState(1);
+  const [leg, setLeg] = useState(1);
+  const proxies = plan.document.items[item - 1]?.proxies;
+  let legs: ReturnType<typeof fundingLegs> = [];
+  try {
+    legs = fundingLegs(plan.document, item);
+  } catch {
+    /* Unsupported drafts withhold transfer controls. */
+  }
+  const sourceWallet = legs[(proxies ? leg : 1) - 1]?.wallet ?? '';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef<AbortController | null>(null);
@@ -53,14 +62,14 @@ export function MainnetFundingExecution({
       const source = value.wallets.filter(
         (w) =>
           w.chain === 'Solana' &&
-          w.address === plan.document.funderAddress &&
+          w.address === sourceWallet &&
           !w.archived &&
           Number.isSafeInteger(w.revision) &&
           w.revision > 0,
       );
       if (source.length !== 1)
         throw new Error(
-          'Save this exact active Solana funder in the wallet workspace first.',
+          'Save this exact active Solana source wallet in the wallet workspace first.',
         );
       if (!controller.signal.aborted) setWallets(source);
     } catch (error) {
@@ -93,7 +102,11 @@ export function MainnetFundingExecution({
       ) : (
         <>
           <Button variant="outline" disabled={busy} onClick={() => void load()}>
-            {busy ? 'Reading saved funder…' : 'Load saved mainnet funder'}
+            {busy
+              ? 'Reading saved source…'
+              : proxies
+                ? `Load leg ${leg} source wallet`
+                : 'Load saved mainnet funder'}
           </Button>
           <label>
             Saved recipient
@@ -101,28 +114,59 @@ export function MainnetFundingExecution({
               className="w-full min-w-0"
               value={item}
               disabled={busy}
-              onChange={(e) => setItem(Number(e.target.value))}
+              onChange={(e) => {
+                setItem(Number(e.target.value));
+                setLeg(1);
+                setWallets(null);
+              }}
             >
               {plan.document.items.map((entry, i) => (
                 <option key={entry.address} value={i + 1}>
                   {i + 1}. {entry.address} · {entry.amount} {asset.symbol} · due{' '}
                   {entry.scheduledAt}
+                  {entry.proxies ? ` · via ${entry.proxies.length} proxy` : ''}
                 </option>
               ))}
             </select>
           </label>
+          {proxies && (
+            <label>
+              Proxy leg
+              <select
+                className="w-full min-w-0"
+                value={leg}
+                disabled={busy}
+                onChange={(e) => {
+                  setLeg(Number(e.target.value));
+                  setWallets(null);
+                }}
+              >
+                {legs.map((l, i) => (
+                  <option key={l.wallet} value={i + 1}>
+                    Leg {i + 1}: {l.wallet} → {l.recipient}
+                  </option>
+                ))}
+              </select>
+              <small>
+                Send legs in order. A leg unlocks only after the previous one
+                finalizes. Earlier legs carry 0.0001 SOL per remaining hop so
+                each proxy can pay its own fee; any unused part stays in the
+                proxy.
+              </small>
+            </label>
+          )}
           {wallets && (
             <NativeWithdrawalPanel
-              key={`${plan.id}:${plan.revision}:${item}`}
+              key={`${plan.id}:${plan.revision}:${item}:${leg}`}
               wallets={wallets}
-              initialWallet={plan.document.funderAddress}
+              initialWallet={sourceWallet}
               initialOpen
               initialToken={
                 asset.kind === 'token'
                   ? { mint: asset.mint, decimals: asset.decimals }
                   : undefined
               }
-              funding={{ plan, item }}
+              funding={proxies ? { plan, item, leg } : { plan, item }}
             />
           )}
         </>

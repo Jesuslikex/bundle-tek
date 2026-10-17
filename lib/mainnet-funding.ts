@@ -16,7 +16,11 @@ export type FundingSelection = {
 };
 // Each earlier leg carries this much extra SOL so the next proxy can pay its own fee.
 export const PROXY_LEG_FEE_ALLOWANCE_LAMPORTS = 100_000n;
-export type FundingLeg = { wallet: string; recipient: string; amountRaw: string };
+export type FundingLeg = {
+  wallet: string;
+  recipient: string;
+  amountRaw: string;
+};
 export function fundingLegs(
   document: FundingDocument,
   item: number,
@@ -25,7 +29,11 @@ export function fundingLegs(
   if (!entry) throw new Error('Choose an exact saved funding recipient.');
   const asset = mainnetFundingAsset(document);
   const amount = solanaTokenAtoms(entry.amount, asset.decimals);
-  const route = [document.funderAddress, ...(entry.proxies ?? []), entry.address];
+  const route = [
+    document.funderAddress,
+    ...(entry.proxies ?? []),
+    entry.address,
+  ];
   return route.slice(0, -1).map((wallet, n) => ({
     wallet,
     recipient: route[n + 1],
@@ -144,7 +152,8 @@ export async function selectedFundingCapture(
   const legs = item ? fundingLegs(terms, selection.item) : [];
   // Direct recipients have no leg; proxied recipients must name one.
   const leg =
-    item && (item.proxies ? selection.leg !== undefined : selection.leg === undefined)
+    item &&
+    (item.proxies ? selection.leg !== undefined : selection.leg === undefined)
       ? legs[(selection.leg ?? 1) - 1]
       : undefined;
   if (

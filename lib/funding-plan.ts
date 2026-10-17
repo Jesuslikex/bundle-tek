@@ -156,7 +156,9 @@ export function validateFunding(value: unknown): FundingDocument {
         v.currency !== 'SOL' ||
         asset
       )
-        throw new Error('Proxy routes take 1 to 3 wallets and native SOL only.');
+        throw new Error(
+          'Proxy routes take 1 to 3 wallets and native SOL only.',
+        );
       proxies = r.proxies.map((p) => address(p, v.chain));
       const route = [funderAddress, ...proxies, publicAddress];
       if (!funderAddress || new Set(route).size !== route.length)

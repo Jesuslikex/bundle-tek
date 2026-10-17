@@ -60,6 +60,7 @@ export async function GET(request: Request) {
         planId: params.get('planId'),
         revision: Number(params.get('revision')),
         item: Number(params.get('item')),
+        ...(params.has('leg') ? { leg: Number(params.get('leg')) } : {}),
       });
   } catch {
     return json({ error: 'Choose a valid withdrawal wallet and cursor.' }, 400);
@@ -252,6 +253,30 @@ export async function POST(request: Request) {
           {
             error:
               'This saved funding recipient already has a retained transfer. Reload its history and recover the existing signature.',
+          },
+          409,
+        );
+      const legBefore =
+        fundingGuard?.capture.leg !== undefined && fundingGuard.capture.leg > 1
+          ? fundingHistoryScope({
+              ...fundingGuard.capture,
+              leg: fundingGuard.capture.leg - 1,
+            })
+          : undefined;
+      if (
+        legBefore &&
+        !(await db
+          .prepare(
+            "SELECT 1 FROM native_withdrawals WHERE owner_id=? AND state='finalized'" +
+              legBefore.sql,
+          )
+          .bind(user.userId, ...legBefore.bindings)
+          .first())
+      )
+        return json(
+          {
+            error:
+              'Finalize the previous proxy leg for this recipient before preparing the next one.',
           },
           409,
         );
