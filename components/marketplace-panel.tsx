@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   marketplaceResult,
+  marketplaceFilters,
+  marketplaceLamports,
   marketplaceSol,
   type MarketplaceResult,
 } from '@/lib/marketplace-catalog';
@@ -39,16 +41,30 @@ export function MarketplacePanel() {
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
-    const values = new FormData(event.currentTarget),
-      params = new URLSearchParams();
-    for (const [key, value] of values)
-      if (typeof value === 'string' && value) params.set(key, value);
+    const values = new FormData(event.currentTarget);
     setBusy(true);
     setError('');
     setResult(null);
     setSignIn(false);
     setExpired(false);
     try {
+      const params = new URLSearchParams();
+      const amounts: Record<string, string> = {
+        minimumBalanceSol: 'minimumBalanceLamports',
+        maximumBalanceSol: 'maximumBalanceLamports',
+        maximumPriceSol: 'maximumPriceLamports',
+      };
+      for (const [key, value] of values)
+        if (typeof value === 'string' && value)
+          params.set(
+            amounts[key] ?? key,
+            amounts[key] ? marketplaceLamports(value) : value,
+          );
+      const parsed = marketplaceFilters.safeParse(Object.fromEntries(params));
+      if (!parsed.success)
+        throw new Error(
+          'Check your filter ranges. Maximum values must be at or above their minimums.',
+        );
       const response = await fetch(`/api/marketplace/catalog?${params}`, {
         signal: controller.signal,
         cache: 'no-store',
@@ -75,6 +91,10 @@ export function MarketplacePanel() {
         );
       }
       const data = marketplaceResult.parse(body);
+      if (JSON.stringify(data.filters) !== JSON.stringify(parsed.data))
+        throw new Error(
+          'Inventory filters differ from your selection. Refresh to continue.',
+        );
       if (
         Date.parse(data.expiresAt) <= Date.now() ||
         Date.parse(data.observedAt) > Date.now()
@@ -104,7 +124,12 @@ export function MarketplacePanel() {
           Catalog preview · Checkout unavailable
         </span>
       </header>
-      <form onSubmit={load} onChange={invalidate} className={styles.filters}>
+      <form
+        onSubmit={load}
+        onChange={invalidate}
+        onReset={invalidate}
+        className={styles.filters}
+      >
         <label>
           Wallet count
           <select name="count" defaultValue="25">
@@ -135,40 +160,88 @@ export function MarketplacePanel() {
             required
           />
         </label>
-        <label>
-          History tier
-          <select name="tier" defaultValue="">
-            <option value="">All tiers</option>
-            <option value="funding-only">Funding only</option>
-            <option value="light-history">Light history</option>
-            <option value="established">Established</option>
-          </select>
-        </label>
-        <label>
-          Funding source
-          <input name="source" maxLength={80} placeholder="Any source" />
-        </label>
-        <label>
-          Minimum balance (lamports)
-          <input
-            name="minimumBalanceLamports"
-            inputMode="numeric"
-            pattern="[0-9]+"
-            defaultValue="0"
-            required
-          />
-        </label>
-        <label>
-          Maximum purchase price (lamports)
-          <input
-            name="maximumPriceLamports"
-            inputMode="numeric"
-            pattern="[0-9]+"
-            placeholder="No limit"
-          />
-        </label>
+        <details className={styles.advanced}>
+          <summary>Advanced filters</summary>
+          <p>
+            Optional ranges apply to this provider snapshot. Funding age is time
+            since reported funding, not wallet creation age.
+          </p>
+          <div className={styles.rangeGrid}>
+            <label>
+              History tier
+              <select name="tier" defaultValue="">
+                <option value="">All tiers</option>
+                <option value="funding-only">Funding only</option>
+                <option value="light-history">Light history</option>
+                <option value="established">Established</option>
+              </select>
+            </label>
+            <label>
+              Funding source
+              <input name="source" maxLength={80} placeholder="Any source" />
+            </label>
+            <label>
+              Minimum balance (SOL)
+              <input
+                name="minimumBalanceSol"
+                inputMode="decimal"
+                defaultValue="0"
+                required
+              />
+            </label>
+            <label>
+              Maximum balance (SOL)
+              <input
+                name="maximumBalanceSol"
+                inputMode="decimal"
+                placeholder="No limit"
+              />
+            </label>
+            <label>
+              Maximum purchase price (SOL)
+              <input
+                name="maximumPriceSol"
+                inputMode="decimal"
+                placeholder="No limit"
+              />
+            </label>
+            <label>
+              Maximum funding age (days)
+              <input
+                name="maximumAgeDays"
+                type="number"
+                min="1"
+                max="36500"
+                placeholder="No limit"
+              />
+            </label>
+            <label>
+              Minimum transactions
+              <input
+                name="minimumTransactions"
+                type="number"
+                min="0"
+                max={Number.MAX_SAFE_INTEGER}
+                defaultValue="0"
+              />
+            </label>
+            <label>
+              Maximum transactions
+              <input
+                name="maximumTransactions"
+                type="number"
+                min="0"
+                max={Number.MAX_SAFE_INTEGER}
+                placeholder="No limit"
+              />
+            </label>
+          </div>
+        </details>
         <button type="submit" disabled={busy}>
           {busy ? 'Loading inventory…' : 'Refresh inventory'}
+        </button>
+        <button type="reset" className={styles.reset}>
+          Reset filters
         </button>
       </form>
       {error && <p role="alert">{error}</p>}

@@ -74,3 +74,28 @@ it('keeps unavailable/error responses honest and masks unexpected errors', async
   mocks.read.mockRejectedValue(new Error('secret endpoint'));
   expect(await (await get()).text()).not.toContain('secret');
 });
+
+it('forwards exact bounded ranges and rejects inverted ranges before provider access', async () => {
+  mocks.read.mockResolvedValue({ purchaseEnabled: false, listings: [] });
+  const response = await get(
+    '?minimumBalanceLamports=9007199254740993&maximumBalanceLamports=9007199254740994&minimumAgeDays=2&maximumAgeDays=7&minimumTransactions=3&maximumTransactions=10',
+  );
+  expect(response.status).toBe(200);
+  expect(mocks.read.mock.calls[0][0]).toMatchObject({
+    minimumBalanceLamports: '9007199254740993',
+    maximumBalanceLamports: '9007199254740994',
+    minimumAgeDays: 2,
+    maximumAgeDays: 7,
+    minimumTransactions: 3,
+    maximumTransactions: 10,
+  });
+  mocks.read.mockClear();
+  for (const query of [
+    '?minimumBalanceLamports=2&maximumBalanceLamports=1',
+    '?minimumAgeDays=3&maximumAgeDays=2',
+    '?minimumTransactions=4&maximumTransactions=3',
+    '?minimumBalanceLamports=invalid&maximumBalanceLamports=1',
+  ])
+    expect((await get(query)).status).toBe(400);
+  expect(mocks.read).not.toHaveBeenCalled();
+});

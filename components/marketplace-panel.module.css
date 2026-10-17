@@ -46,6 +46,25 @@
   gap: 8px;
   font-size: 13px;
 }
+.advanced {
+  grid-column: 1 / -1;
+  border: 1px solid #2c384b;
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+.advanced summary {
+  cursor: pointer;
+  font-size: 14px;
+}
+.rangeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.filters .reset {
+  background: transparent;
+}
 .filters input,
 .filters select,
 .filters button {
@@ -123,6 +142,7 @@
     padding: 28px 16px;
   }
   .filters,
+  .rangeGrid,
   .totals {
     grid-template-columns: 1fr;
   }

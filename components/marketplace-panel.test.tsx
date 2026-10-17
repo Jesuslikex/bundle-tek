@@ -65,7 +65,63 @@ async function submit() {
 it('starts with explicit unavailable checkout and no invented catalog or purchase button', () => {
   expect(container.textContent).toContain('Checkout unavailable');
   expect(container.querySelector('table')).toBeNull();
-  expect(container.querySelectorAll('button')).toHaveLength(1);
+  expect(container.querySelector('details')?.open).toBe(false);
+  expect(container.textContent).toContain('Reset filters');
+});
+async function field(name: string, value: string) {
+  const input = container.querySelector<HTMLInputElement>(
+    `input[name="${name}"]`,
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+it('sends exact SOL ranges as lamports and blocks inverted ranges before fetching', async () => {
+  const fetcher = vi.fn(async (_url: string) =>
+    Response.json({}, { status: 503 }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await field('minimumBalanceSol', '0.000000001');
+  await field('maximumBalanceSol', '9007199.254740993');
+  await field('minimumTransactions', '2');
+  await field('maximumTransactions', '12');
+  await submit();
+  const url = new URL(fetcher.mock.calls[0][0], 'https://bundle.example');
+  expect(url.searchParams.get('minimumBalanceLamports')).toBe('1');
+  expect(url.searchParams.get('maximumBalanceLamports')).toBe(
+    '9007199254740993',
+  );
+  expect(url.searchParams.get('minimumTransactions')).toBe('2');
+  await field('maximumTransactions', '1');
+  await submit();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    'Maximum values',
+  );
+});
+it('rejects a response for different filters and reset clears rows without refetching', async () => {
+  const data = selectMarketplaceInventory(
+    marketplaceFixture(),
+    marketplaceFilters.parse({ count: 50 }),
+    Date.now(),
+  );
+  const fetcher = vi.fn(async () => Response.json(data));
+  vi.stubGlobal('fetch', fetcher);
+  await submit();
+  expect(container.querySelector('table')).toBeNull();
+  expect(container.textContent).toContain('Inventory filters differ');
+  data.filters.count = 25;
+  await submit();
+  expect(container.querySelector('table')).not.toBeNull();
+  await act(async () =>
+    container.querySelector<HTMLFormElement>('form')!.reset(),
+  );
+  expect(container.querySelector('table')).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });
 it('handles an HTML error without showing parser text and offers sign-in on 401', async () => {
   vi.stubGlobal(

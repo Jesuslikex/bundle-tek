@@ -56,13 +56,40 @@ export const marketplaceFilters = z
       )
       .default(25),
     minimumAgeDays: z.coerce.number().int().min(1).max(36500).default(1),
+    maximumAgeDays: z.coerce.number().int().min(1).max(36500).optional(),
     minimumGapMinutes: z.coerce.number().int().min(0).max(525600).default(30),
     minimumBalanceLamports: amount.default('0'),
+    maximumBalanceLamports: amount.optional(),
     maximumPriceLamports: amount.optional(),
+    minimumTransactions: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(Number.MAX_SAFE_INTEGER)
+      .default(0),
+    maximumTransactions: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional(),
     source: label.optional(),
     tier: z.enum(['funding-only', 'light-history', 'established']).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (f) =>
+      amount.safeParse(f.minimumBalanceLamports).success &&
+      (f.maximumBalanceLamports === undefined ||
+        amount.safeParse(f.maximumBalanceLamports).success) &&
+      (f.maximumAgeDays === undefined ||
+        f.maximumAgeDays >= f.minimumAgeDays) &&
+      (f.maximumBalanceLamports === undefined ||
+        BigInt(f.maximumBalanceLamports) >= BigInt(f.minimumBalanceLamports)) &&
+      (f.maximumTransactions === undefined ||
+        f.maximumTransactions >= f.minimumTransactions),
+    'Choose maximum values at or above their minimums.',
+  );
 export type MarketplaceFilters = z.infer<typeof marketplaceFilters>;
 export const marketplaceResult = z
   .object({
@@ -110,7 +137,15 @@ export function selectMarketplaceInventory(
     .filter(
       (item) =>
         observed - Date.parse(item.fundedAt) >= f.minimumAgeDays * 86400000 &&
+        (f.maximumAgeDays === undefined ||
+          observed - Date.parse(item.fundedAt) <=
+            f.maximumAgeDays * 86400000) &&
         BigInt(item.balanceLamports) >= BigInt(f.minimumBalanceLamports) &&
+        (f.maximumBalanceLamports === undefined ||
+          BigInt(item.balanceLamports) <= BigInt(f.maximumBalanceLamports)) &&
+        item.transactionCount >= f.minimumTransactions &&
+        (f.maximumTransactions === undefined ||
+          item.transactionCount <= f.maximumTransactions) &&
         (f.maximumPriceLamports === undefined ||
           BigInt(item.purchasePriceLamports) <=
             BigInt(f.maximumPriceLamports)) &&
@@ -168,4 +203,17 @@ export function marketplaceSol(raw: string) {
       .padStart(9, '0')
       .replace(/0+$/, '') || '0'
   }`;
+}
+
+/** Exact user-facing SOL conversion. Never round a spending/filter boundary. */
+export function marketplaceLamports(sol: string) {
+  if (!/^(0|[1-9]\d{0,10})(?:\.\d{1,9})?$/.test(sol))
+    throw new Error(
+      'Enter a non-negative SOL amount with up to 9 decimal places.',
+    );
+  const [whole, fraction = ''] = sol.split('.');
+  const raw = BigInt(whole) * 1000000000n + BigInt(fraction.padEnd(9, '0'));
+  if (raw > (1n << 64n) - 1n)
+    throw new Error('SOL amount exceeds the supported limit.');
+  return raw.toString();
 }
