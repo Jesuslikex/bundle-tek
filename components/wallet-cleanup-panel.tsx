@@ -6,6 +6,7 @@ import { unlockVault, VAULT_STORAGE_KEY } from '@/lib/browser-wallet-vault';
 import {
   CLEANUP_MAX_WALLETS,
   cleanupTotals,
+  isCleanupSell,
   signWalletCleanupBatch,
   validatedWalletCleanup,
   type CleanupSkipReason,
@@ -30,9 +31,11 @@ const short = (address: string) =>
 
 type Batch = {
   batchId: string;
+  stage: 'sell' | 'close';
   cleanups: WalletCleanup[];
-  errors: { wallet: string; error: string }[];
+  errors: { wallet: string; mint?: string; error: string }[];
   empty: string[];
+  remaining: number;
 };
 
 async function request(body: object, signal?: AbortSignal) {
@@ -65,6 +68,7 @@ export function WalletCleanupPanel({
   const [open, setOpen] = useState(false),
     [destination, setDestination] = useState(''),
     [keep, setKeep] = useState('0'),
+    [sellFirst, setSellFirst] = useState(true),
     [batch, setBatch] = useState<Batch | null>(null),
     [accepted, setAccepted] = useState(false),
     [password, setPassword] = useState(''),
@@ -108,7 +112,7 @@ export function WalletCleanupPanel({
         : b,
     );
 
-  async function prepare() {
+  async function prepare(stage: 'sell' | 'close') {
     reset();
     setBusy(true);
     try {
@@ -117,6 +121,7 @@ export function WalletCleanupPanel({
         : solanaTokenAtoms(keep.trim(), 9).toString();
       const value = (await request({
         action: 'prepare',
+        stage,
         destination,
         keepLamports,
         wallets: sources.map((w) => ({
@@ -133,6 +138,16 @@ export function WalletCleanupPanel({
         )
       )
         throw new Error('Cleanup review differs from the request.');
+      if (
+        stage === 'sell' &&
+        !value.cleanups.length &&
+        !value.errors.length &&
+        !value.remaining
+      ) {
+        // Nothing to sell: go straight to closing accounts and sweeping SOL.
+        setBusy(false);
+        return await prepare('close');
+      }
       if (mounted.current) setBatch(value);
     } catch (err) {
       if (mounted.current)
@@ -287,9 +302,10 @@ export function WalletCleanupPanel({
             Solana mainnet. For each selected wallet, one transaction closes
             every empty token account (and unwraps wrapped SOL), sends the
             reclaimed rent and all remaining SOL to the destination, minus the
-            network fee. Accounts that still hold tokens are skipped; sell them
-            first. Nothing is signed or sent until you approve the reviewed
-            batch.
+            network fee. With selling on, a first batch sells each leftover
+            token balance to SOL; once those finalize, the close and sweep batch
+            picks up the emptied accounts. Nothing is signed or sent until you
+            approve each reviewed batch.
           </p>
           <p className="tracker-note">
             {sources.length
@@ -323,6 +339,16 @@ export function WalletCleanupPanel({
             0 empties each wallet completely. Any kept amount must be at least
             0.00089088 SOL (the rent minimum).
           </p>
+          <label>
+            <input
+              type="checkbox"
+              checked={sellFirst}
+              disabled={busy || Boolean(batch)}
+              onChange={(e) => setSellFirst(e.target.checked)}
+            />{' '}
+            Sell leftover tokens to SOL first (Jupiter, 0.5% max slippage, up to
+            3 tokens per wallet)
+          </label>
           {!batch && (
             <Button
               disabled={
@@ -331,66 +357,123 @@ export function WalletCleanupPanel({
                 !sources.length ||
                 sources.length > CLEANUP_MAX_WALLETS
               }
-              onClick={() => void prepare()}
+              onClick={() => void prepare(sellFirst ? 'sell' : 'close')}
             >
               Scan and review cleanup
             </Button>
           )}
           {batch && (
             <div className="native-withdrawal-form">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Wallet</th>
-                    <th>Close</th>
-                    <th>Rent back</th>
-                    <th>SOL swept</th>
-                    <th>Skipped</th>
-                    <th>State</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id}>
-                      <td title={r.wallet}>{short(r.wallet)}</td>
-                      <td>{r.document.close.length}</td>
-                      <td>{sol(r.document.reclaimLamports)}</td>
-                      <td>{sol(r.document.sweepLamports)}</td>
-                      <td>
-                        {r.document.skipped.length
-                          ? r.document.skipped
-                              .map(
-                                (s) =>
-                                  `${short(s.mint)}: ${SKIP_LABEL[s.reason]}`,
-                              )
-                              .join('; ') +
-                            (r.document.skippedCount > r.document.skipped.length
-                              ? ` (+${r.document.skippedCount - r.document.skipped.length} more)`
-                              : '')
-                          : '—'}
-                      </td>
-                      <td>
-                        {r.state.replace('_', ' ')}
-                        {r.failure ? `: ${r.failure.error}` : ''}
-                      </td>
+              {batch.stage === 'sell' ? (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Wallet</th>
+                      <th>Sell</th>
+                      <th>Expected SOL</th>
+                      <th>Minimum SOL</th>
+                      <th>Price impact</th>
+                      <th>State</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <output>
-                Destination {short(destination)} receives {sol(totals.received)}{' '}
-                ({sol(totals.reclaim)} rent from {totals.closed} accounts and{' '}
-                {sol(totals.sweep)} SOL). Network fees {sol(totals.fee)}, paid
-                by each wallet.
-              </output>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) =>
+                      isCleanupSell(r.document) ? (
+                        <tr key={r.id}>
+                          <td title={r.wallet}>{short(r.wallet)}</td>
+                          <td title={r.document.mint}>
+                            {formatNativeBalance(
+                              r.document.amountRaw,
+                              r.document.decimals,
+                            )}{' '}
+                            of {short(r.document.mint)}
+                          </td>
+                          <td>{sol(r.document.expectedOutLamports)}</td>
+                          <td>{sol(r.document.minimumOutLamports)}</td>
+                          <td>
+                            {r.document.priceImpactPct === null
+                              ? 'unknown'
+                              : `${r.document.priceImpactPct}%`}
+                          </td>
+                          <td>
+                            {r.state.replace('_', ' ')}
+                            {r.failure ? `: ${r.failure.error}` : ''}
+                          </td>
+                        </tr>
+                      ) : null,
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Wallet</th>
+                      <th>Close</th>
+                      <th>Rent back</th>
+                      <th>SOL swept</th>
+                      <th>Skipped</th>
+                      <th>State</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) =>
+                      isCleanupSell(r.document) ? null : (
+                        <tr key={r.id}>
+                          <td title={r.wallet}>{short(r.wallet)}</td>
+                          <td>{r.document.close.length}</td>
+                          <td>{sol(r.document.reclaimLamports)}</td>
+                          <td>{sol(r.document.sweepLamports)}</td>
+                          <td>
+                            {r.document.skipped.length
+                              ? r.document.skipped
+                                  .map(
+                                    (s) =>
+                                      `${short(s.mint)}: ${SKIP_LABEL[s.reason]}`,
+                                  )
+                                  .join('; ') +
+                                (r.document.skippedCount >
+                                r.document.skipped.length
+                                  ? ` (+${r.document.skippedCount - r.document.skipped.length} more)`
+                                  : '')
+                              : '—'}
+                          </td>
+                          <td>
+                            {r.state.replace('_', ' ')}
+                            {r.failure ? `: ${r.failure.error}` : ''}
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              )}
+              {batch.stage === 'sell' ? (
+                <output>
+                  {totals.sells} sell{totals.sells === 1 ? '' : 's'} for at
+                  least {sol(totals.minimumSellOut)} in total, before fees (up
+                  to {sol(totals.fee)}). SOL stays in each wallet until the
+                  close and sweep step.
+                  {batch.remaining > 0 &&
+                    ` ${batch.remaining} more holding${batch.remaining === 1 ? '' : 's'} left for a later round.`}
+                </output>
+              ) : (
+                <output>
+                  Destination {short(destination)} receives{' '}
+                  {sol(totals.received)} ({sol(totals.reclaim)} rent from{' '}
+                  {totals.closed} accounts and {sol(totals.sweep)} SOL). Network
+                  fees {sol(totals.fee)}, paid by each wallet.
+                </output>
+              )}
               {batch.empty.length > 0 && (
                 <p className="tracker-note">
                   Nothing to clean: {batch.empty.map(short).join(', ')}.
                 </p>
               )}
               {batch.errors.map((e) => (
-                <p key={e.wallet} role="alert">
-                  {short(e.wallet)}: {e.error}
+                <p key={e.wallet + (e.mint ?? '')} role="alert">
+                  {short(e.wallet)}
+                  {e.mint ? ` (${short(e.mint)})` : ''}: {e.error}
                 </p>
               ))}
               {pending.length > 0 && (
@@ -443,6 +526,18 @@ export function WalletCleanupPanel({
                     Check outcomes
                   </Button>
                 )}
+                {batch.stage === 'sell' &&
+                  !pending.length &&
+                  rows.every((r) =>
+                    ['finalized', 'failed', 'cancelled'].includes(r.state),
+                  ) && (
+                    <Button
+                      disabled={busy}
+                      onClick={() => void prepare('close')}
+                    >
+                      Continue: close accounts and sweep SOL
+                    </Button>
+                  )}
                 {!pending.length && (
                   <Button variant="outline" disabled={busy} onClick={reset}>
                     New cleanup

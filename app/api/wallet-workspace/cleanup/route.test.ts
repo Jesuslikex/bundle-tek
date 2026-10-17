@@ -7,6 +7,8 @@ import {
   decode,
   signWalletCleanupBatch,
   type WalletCleanup,
+  type WalletCleanupReceipt,
+  type WalletCleanupReview,
 } from '@/lib/wallet-cleanup';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
@@ -26,7 +28,18 @@ vi.mock('@/lib/wallet-balances', async (original) => {
       actual.balanceRpc(args[0], args[1], args[2], args[3], mocks.fetcher),
   };
 });
+vi.mock('@/lib/warmup-swap-quote', async (original) => ({
+  ...(await original<typeof import('@/lib/warmup-swap-quote')>()),
+  prepareSolanaSwap: (...args: unknown[]) =>
+    (f.sell.deps.prepare as (...a: unknown[]) => unknown)(...args),
+}));
+vi.mock('@/lib/imported-swap-simulation', async (original) => ({
+  ...(await original<typeof import('@/lib/imported-swap-simulation')>()),
+  simulateImportedSwap: (...args: unknown[]) =>
+    (f.sell.deps.simulate as (...a: unknown[]) => unknown)(...args),
+}));
 import { GET, POST } from './route';
+import { env } from '@/lib/server-env';
 
 let mf: Miniflare, f: ReturnType<typeof cleanupFixture>;
 let receiptFor: ((transaction: string) => unknown) | null = null;
@@ -165,7 +178,7 @@ it('runs prepare, batch signing, registration, one submission and finalized reco
   expect(batch.errors).toEqual([]);
   expect(batch.cleanups).toHaveLength(1);
   const [row] = batch.cleanups;
-  expect(row.document.close).toHaveLength(3);
+  expect((row.document as WalletCleanupReview).close).toHaveLength(3);
 
   // A wallet in an active cleanup cannot be reserved by another flow.
   await expect(
@@ -221,11 +234,11 @@ it('runs prepare, batch signing, registration, one submission and finalized reco
 
   const pending = await post({ action: 'recover', id: row.id });
   expect(pending.status).toBe(409);
-  receiptFor = (tx) => f.receipt(row.document, tx);
+  receiptFor = (tx) => f.receipt(row.document as WalletCleanupReview, tx);
   const recovered = await post({ action: 'recover', id: row.id });
   const final = (await body(recovered)).cleanup as WalletCleanup;
   expect(final.state).toBe('finalized');
-  expect(final.receipt?.closedAccounts).toBe(3);
+  expect((final.receipt as WalletCleanupReceipt).closedAccounts).toBe(3);
 
   const history = await GET(
     new Request(
@@ -294,7 +307,7 @@ it('cancels unsigned batches, reports per-wallet refusals and blocks launch paye
   await expect(
     mocks.db
       .prepare(
-        "INSERT INTO wallet_cleanups (id,owner_id,batch_id,wallet_address,wallet_revision,destination,document,state,created_at,updated_at) VALUES(?,'alice',?,?,1,?,'{}','awaiting_signature','x','x')",
+        "INSERT INTO wallet_cleanups (id,owner_id,batch_id,wallet_address,wallet_revision,destination,document,state,created_at,updated_at) VALUES(?,'alice',?,?,1,?,'{\"format\":\"wallet-cleanup-v1\"}','awaiting_signature','x','x')",
       )
       .bind(crypto.randomUUID(), crypto.randomUUID(), f.wallet, f.destination)
       .run(),
@@ -317,4 +330,54 @@ it('stops before storage when the simulated settlement differs', async () => {
   const result = await body(await prepare());
   expect(result.cleanups).toEqual([]);
   expect(result.errors[0].error).toMatch(/settlement/);
+});
+
+it('sells leftover tokens as their own reviewed batch, then allows close and sweep', async () => {
+  env.JUPITER_API_KEY = 'test-key';
+  try {
+    const sold = await body(await prepare({ stage: 'sell' }));
+    expect(sold).toMatchObject({ errors: [] });
+    expect(sold.cleanups).toHaveLength(1);
+    const [row] = sold.cleanups;
+    expect(row.document.format).toBe('wallet-cleanup-sell-v1');
+    const blocked = await body(await prepare());
+    expect(blocked.errors[0].error).toMatch(/retained approval/);
+    await post({ action: 'begin_signing', batchId: sold.batchId });
+    const [signed] = await signWalletCleanupBatch(
+      await f.session(f.owner),
+      [row.document],
+      () => {},
+    );
+    await post({
+      action: 'register',
+      id: row.id,
+      transaction: signed.transaction,
+    });
+    const submitted = await body(
+      await post({
+        action: 'submit',
+        id: row.id,
+        transaction: signed.transaction,
+      }),
+    );
+    expect(submitted.cleanup.state).toBe('submitted');
+    expect(mocks.sent).toEqual([signed.transaction]);
+    receiptFor = (tx) => f.sell.receipt(tx);
+    const recovered = await body(await post({ action: 'recover', id: row.id }));
+    expect(recovered.cleanup.state).toBe('finalized');
+    expect(recovered.cleanup.receipt).toMatchObject({
+      kind: 'sell',
+      soldRaw: '5',
+    });
+    const closing = await body(await prepare());
+    expect(closing.errors).toEqual([]);
+    expect(closing.cleanups).toHaveLength(1);
+  } finally {
+    delete env.JUPITER_API_KEY;
+  }
+});
+
+it('refuses the sell stage when Jupiter is not configured', async () => {
+  const result = await prepare({ stage: 'sell' });
+  expect(result.status).toBe(503);
 });
