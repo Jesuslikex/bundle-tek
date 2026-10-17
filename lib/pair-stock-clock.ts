@@ -42,7 +42,16 @@ export function inheritStockPairRpcScope<T extends Rpc>(
   if (scope) stockScopes.set(target, scope);
   return target;
 }
-export function stockPairAccountLimit(endpoint: string): 5 | 100 {
+/** SOLANA_STOCK_RUNTIME_ACCOUNT_LIMIT overrides the host default, e.g. 100 after a QuickNode plan upgrade. */
+export function stockPairAccountLimit(
+  endpoint: string,
+  configured = typeof process === 'undefined'
+    ? undefined
+    : process.env.SOLANA_STOCK_RUNTIME_ACCOUNT_LIMIT,
+): 5 | 100 {
+  if (configured === '5' || configured === '100')
+    return configured === '5' ? 5 : 100;
+  if (configured) throw Error('Stock runtime account limit must be 5 or 100.');
   const url = new URL(endpoint);
   return url.protocol === 'https:' &&
     !url.username &&

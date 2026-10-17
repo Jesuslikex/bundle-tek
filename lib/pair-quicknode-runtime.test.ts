@@ -35,6 +35,26 @@ it.each([
   },
 );
 
+it.each([
+  [endpoint, '100', 100],
+  ['https://rpc.example.test/', '5', 5],
+  [endpoint, '', 5],
+] as const)(
+  'applies the configured stock account limit for %s (%s)',
+  (url, configured, cap) => {
+    expect(stockPairAccountLimit(url, configured)).toBe(cap);
+  },
+);
+
+it.each(['6', '0', '100 ', 'many'])(
+  'refuses unsupported stock account limit %s',
+  (configured) => {
+    expect(() => stockPairAccountLimit(endpoint, configured)).toThrow(
+      'Stock runtime account limit must be 5 or 100.',
+    );
+  },
+);
+
 async function run(mode = 'ok') {
   const f = (fixture = await pairRuntimeFixture());
   const wire: { method: string; params: unknown[] }[] = [];
