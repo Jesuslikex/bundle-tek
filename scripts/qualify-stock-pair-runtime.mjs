@@ -272,6 +272,29 @@ try {
         row.clockWireObservationMs = clock() - observationStart;
       }
     }
+    if (
+      u.pathname === '/swap/v2/order' &&
+      u.searchParams.has('taker') &&
+      response.ok
+    ) {
+      // Public route split only, to explain exact-input mismatches.
+      try {
+        const order = await response.clone().json();
+        row.routePlan = (order.routePlan ?? []).slice(0, 16).map((leg) => ({
+          label: String(leg.swapInfo?.label ?? '').slice(0, 64),
+          ammKey: String(leg.swapInfo?.ammKey ?? '').slice(0, 64),
+          inputMint: String(leg.swapInfo?.inputMint ?? '').slice(0, 64),
+          outputMint: String(leg.swapInfo?.outputMint ?? '').slice(0, 64),
+          inAmount: String(leg.swapInfo?.inAmount ?? ''),
+          outAmount: String(leg.swapInfo?.outAmount ?? ''),
+          percent: leg.percent ?? null,
+          bps: leg.bps ?? null,
+        }));
+        row.orderInAmount = String(order.inAmount ?? '');
+      } catch {
+        row.routePlanUnavailable = true;
+      }
+    }
     if (response.status === 429) {
       receipt.rateLimited = true;
       stop.abort(Error('Provider rate limit; no retry.'));
