@@ -16,6 +16,13 @@ export const UNISWAP_V2 = {
     router: getAddress('0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'),
     weth: getAddress('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'),
   },
+  // From Uniswap's sdk-core (V2_FACTORY_ADDRESSES, V2_ROUTER_ADDRESSES, WETH9
+  // for chain 4663); WETH also matches Robinhood's protocol-contracts page.
+  Robinhood: {
+    factory: getAddress('0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f'),
+    router: getAddress('0x89e5db8b5aa49aa85ac63f691524311aeb649eba'),
+    weth: getAddress('0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73'),
+  },
 } as const;
 export type UniswapV2Chain = keyof typeof UNISWAP_V2;
 export const BURN_ADDRESS = getAddress(
@@ -35,6 +42,9 @@ export const pairAbi = parseAbi([
   'function transfer(address,uint256) returns (bool)',
 ]);
 export const routerAbi = parseAbi([
+  'function addLiquidityETH(address token,uint256 amountTokenDesired,uint256 amountTokenMin,uint256 amountETHMin,address to,uint256 deadline) payable returns (uint256,uint256,uint256)',
+  'function factory() view returns (address)',
+  'function WETH() view returns (address)',
   'function removeLiquidityETH(address token,uint256 liquidity,uint256 amountTokenMin,uint256 amountETHMin,address to,uint256 deadline) returns (uint256,uint256)',
 ]);
 
@@ -114,6 +124,47 @@ export function removeLiquidityCall(input: {
       input.position.lpBalance,
       withSlippage(input.position.redeemableToken, input.slippageBasisPoints),
       withSlippage(input.position.redeemableEth, input.slippageBasisPoints),
+      getAddress(input.to),
+      BigInt(input.deadlineSeconds),
+    ],
+  });
+}
+
+export const erc20Abi = parseAbi([
+  'function approve(address,uint256) returns (bool)',
+  'function allowance(address,address) view returns (uint256)',
+  'function balanceOf(address) view returns (uint256)',
+]);
+
+export function approveTokenCall(chain: UniswapV2Chain, amount: bigint): Hex {
+  return encodeFunctionData({
+    abi: erc20Abi,
+    functionName: 'approve',
+    args: [UNISWAP_V2[chain].router, amount],
+  });
+}
+
+/**
+ * Seeds a new TOKEN/WETH pair. Only for a pair with no liquidity yet, so the
+ * amounts are taken exactly: the minimums equal the amounts sent.
+ */
+export function createPoolCall(input: {
+  token: Address;
+  tokenAmount: bigint;
+  ethAmount: bigint;
+  to: Address;
+  deadlineSeconds: number;
+}): Hex {
+  if (input.tokenAmount <= 0n || input.ethAmount <= 0n)
+    throw new Error('Enter token and ETH amounts above zero.');
+  return encodeFunctionData({
+    abi: routerAbi,
+    functionName: 'addLiquidityETH',
+    args: [
+      getAddress(input.token),
+      input.tokenAmount,
+      input.tokenAmount,
+      input.ethAmount,
       getAddress(input.to),
       BigInt(input.deadlineSeconds),
     ],

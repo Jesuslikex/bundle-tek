@@ -4,6 +4,7 @@ import {
   BURN_ADDRESS,
   UNISWAP_V2,
   burnLpCall,
+  createPoolCall,
   lpPosition,
   pairAbi,
   removeLiquidityCall,
@@ -77,4 +78,34 @@ it('builds removeLiquidityETH with slippage floors and burn to dead', () => {
   expect(withSlippage(1000n, 0)).toBe(1000n);
   expect(() => withSlippage(1n, 6000)).toThrow();
   expect(() => burnLpCall({ ...position, lpBalance: 0n })).toThrow();
+});
+
+it('seeds a new pool with exact minimums and rejects zero amounts', () => {
+  const data = createPoolCall({
+    token,
+    tokenAmount: 5n,
+    ethAmount: 7n,
+    to: token,
+    deadlineSeconds: 9,
+  });
+  const decoded = decodeFunctionData({ abi: routerAbi, data });
+  expect(decoded.functionName).toBe('addLiquidityETH');
+  expect(decoded.args).toEqual([token, 5n, 5n, 7n, token, 9n]);
+  expect(() =>
+    createPoolCall({
+      token,
+      tokenAmount: 0n,
+      ethAmount: 1n,
+      to: token,
+      deadlineSeconds: 1,
+    }),
+  ).toThrow();
+});
+
+it('pins Robinhood to the Uniswap sdk-core V2 contracts and its WETH', () => {
+  expect(UNISWAP_V2.Robinhood).toEqual({
+    factory: getAddress('0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f'),
+    router: getAddress('0x89e5db8b5aa49aa85ac63f691524311aeb649eba'),
+    weth: getAddress('0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73'),
+  });
 });

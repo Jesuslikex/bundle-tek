@@ -1,4 +1,5 @@
 'use client';
+import type { NarrativeDraft } from '@/lib/narratives';
 import {
   validateHoldersQuoteAmount,
   holdersBuyUnit,
@@ -1193,6 +1194,27 @@ export default function Home() {
       setPlanMessage('New draft. Choose a chain and launchpad.');
       changeView('chain');
     });
+  const startNarrativeProject = (draft: NarrativeDraft, keyword: string) =>
+    guardDraft(() => {
+      revision.current.edit();
+      setLaunchPlan({
+        ...DEFAULT_LAUNCH_PLAN,
+        tokenName: draft.tokenName,
+        ticker: draft.ticker,
+        description: draft.description,
+      });
+      setIdentity({ ...EMPTY_IDENTITY });
+      setVenueOptions({ ...DEFAULT_VENUE_OPTIONS });
+      setProjectId(null);
+      setProjectVersion(null);
+      setSavedAt(null);
+      setHasEdits(true);
+      setPersistenceState('ready');
+      setPlanMessage(
+        `Draft from the "${keyword}" narrative. Choose a chain and launchpad, then review the token details.`,
+      );
+      changeView('chain');
+    });
   const openProject = (project: WorkspaceProject, duplicate = false) =>
     guardDraft(() => {
       revision.current.edit();
@@ -1532,6 +1554,14 @@ export default function Home() {
             <WalletCards /> My wallets
           </button>
           <button
+            disabled={saveBusy}
+            onClick={() =>
+              guardDraft(() => window.location.assign('/marketplace'))
+            }
+          >
+            <WalletCards /> Wallet marketplace <b>PREVIEW</b>
+          </button>
+          <button
             onClick={() => changeView('tracker')}
             className={view === 'tracker' ? 'feature-active' : ''}
             aria-current={view === 'tracker' ? 'page' : undefined}
@@ -1635,6 +1665,7 @@ export default function Home() {
               busy={saveBusy}
               onOpen={openProject}
               onNew={startProject}
+              onNarrativeDraft={startNarrativeProject}
               onDuplicate={(p) => openProject(p, true)}
               onArchive={(p) => void archiveProject(p)}
               onReload={() => void reloadProjects()}

@@ -1,6 +1,8 @@
 'use client';
 
 import { ReferralPanel } from './referral-panel';
+import { NarrativeFinder } from './narrative-finder';
+import type { NarrativeDraft } from '@/lib/narratives';
 import { useState } from 'react';
 import {
   Archive,
@@ -38,6 +40,7 @@ export function ProjectDashboard({
   importsError = '',
   onOpenImport,
   onImport,
+  onNarrativeDraft,
   signedOut = false,
 }: {
   projects: WorkspaceProject[];
@@ -56,6 +59,8 @@ export function ProjectDashboard({
   onOpenImport?: (id: string) => void;
   /** Starts a new token import. */
   onImport?: () => void;
+  /** Starts a new launch draft pre-filled from a trending narrative. */
+  onNarrativeDraft?: (draft: NarrativeDraft, keyword: string) => void;
   /** Saved drafts and imports cannot be read; counts and empty states would mislead. */
   signedOut?: boolean;
 }) {
@@ -140,6 +145,9 @@ export function ProjectDashboard({
         </div>
       )}
       {!archived && <AccountPerformancePanel />}
+      {!archived && !signedOut && onNarrativeDraft && (
+        <NarrativeFinder onDraft={onNarrativeDraft} />
+      )}
       {!archived && !signedOut && <ReferralPanel />}
       {!archived && <AccountCostsPanel />}
       <div className="project-toolbar">
