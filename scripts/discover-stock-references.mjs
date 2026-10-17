@@ -51,7 +51,8 @@ const fetcher = async (url, init) => {
     requests.length >= 100
   )
     throw Error('Discovery read budget/method refused.');
-  await lib.paceWalletRpc(endpoint, signal, 1);
+  // Explicit scope so a non-Helius indexer is paced by the same budget.
+  await lib.paceWalletRpc(endpoint, signal, 1, 'stock-runtime-evidence');
   const row = { method: body.method, startMs: performance.now() };
   requests.push(row);
   const response = await fetch(url, { ...init, redirect: 'manual' });
