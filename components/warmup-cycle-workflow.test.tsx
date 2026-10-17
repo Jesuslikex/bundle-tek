@@ -389,3 +389,86 @@ it('leaves imported-swap presentation outside the new warmup-only step indicator
     container.querySelector('[aria-label="Warmup transaction steps"]'),
   ).toBeNull();
 });
+
+it('lets a stalled history read time out, then retries only on user request', async () => {
+  const original = fixture.fetcher;
+  let reads = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (input === '/api/wallet-workspace/warmup' && ++reads === 1) {
+        return new Promise<Response>((_resolve, reject) => {
+          init!.signal!.addEventListener(
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
+            { once: true },
+          );
+        });
+      }
+      return original(input, init);
+    }),
+  );
+  await act(async () =>
+    root.render(
+      <WalletWarmup
+        chain="Solana"
+        addresses={[fixture.wallet]}
+        walletRevisions={[{ address: fixture.wallet, revision: 1 }]}
+        onClose={() => {}}
+      />,
+    ),
+  );
+  await click('Check wallet history');
+  expect(
+    container.querySelector('output[aria-live=polite]')?.textContent,
+  ).toContain('does not start warmup');
+  await act(async () => vi.advanceTimersByTimeAsync(30_000));
+  expect(container.textContent).toContain('Wallet history took too long');
+  expect(button('Check wallet history').disabled).toBe(false);
+  expect(reads).toBe(1);
+  await click('Check wallet history');
+  expect(reads).toBe(2);
+  expect(container.textContent).toContain('Wallet age: unknown');
+  expect(container.textContent).not.toContain('took too long');
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.unlock).not.toHaveBeenCalled();
+});
+it('cancels a pending history read and refuses its late result', async () => {
+  let finish!: (response: Response) => void;
+  const original = fixture.fetcher;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      input === '/api/wallet-workspace/warmup'
+        ? new Promise<Response>((resolve) => {
+            finish = resolve;
+          })
+        : original(input, init),
+    ),
+  );
+  await act(async () =>
+    root.render(
+      <WalletWarmup
+        chain="Solana"
+        addresses={[fixture.wallet]}
+        walletRevisions={[{ address: fixture.wallet, revision: 1 }]}
+        onClose={() => {}}
+      />,
+    ),
+  );
+  await click('Check wallet history');
+  await click('Cancel history check');
+  expect(button('Check wallet history').disabled).toBe(false);
+  await act(async () =>
+    finish(
+      await original('/api/wallet-workspace/warmup', {
+        method: 'POST',
+        body: JSON.stringify({ chain: 'Solana', addresses: [fixture.wallet] }),
+      }),
+    ),
+  );
+  expect(container.textContent).not.toContain('Wallet age: unknown');
+  expect(container.textContent).toContain('History check cancelled');
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.unlock).not.toHaveBeenCalled();
+});

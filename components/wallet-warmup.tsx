@@ -74,6 +74,14 @@ export function WalletWarmup({
     setBusy(true);
     setError('');
     setHistory([]);
+    const timeout = setTimeout(() => {
+      if (controller.signal.aborted) return;
+      controller.abort();
+      setBusy(false);
+      setError(
+        'Wallet history took too long. Check your connection and try again.',
+      );
+    }, 30_000);
     try {
       const response = await fetch('/api/wallet-workspace/warmup', {
         method: 'POST',
@@ -106,6 +114,7 @@ export function WalletWarmup({
       if (!controller.signal.aborted)
         setError(e instanceof Error ? e.message : 'History unavailable.');
     } finally {
+      clearTimeout(timeout);
       if (!controller.signal.aborted) setBusy(false);
     }
   }
@@ -145,6 +154,26 @@ export function WalletWarmup({
       <Button variant="outline" disabled={busy} onClick={inspect}>
         {busy ? 'Checking activity…' : 'Check wallet history'}
       </Button>
+      {busy && (
+        <>
+          <output aria-live="polite">
+            Reading public wallet activity. This does not start warmup or
+            request a signature.
+          </output>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              abort.current?.abort();
+              setBusy(false);
+              setError(
+                'History check cancelled. You can check again when ready.',
+              );
+            }}
+          >
+            Cancel history check
+          </Button>
+        </>
+      )}
       {history.length > 0 && (
         <div className="warmup-history" aria-live="polite">
           {history.map((r) => (
