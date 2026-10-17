@@ -649,8 +649,22 @@
     {
       "idx": 92,
       "version": "6",
-      "when": 1792400000000,
-      "tag": "0095_wallet_cleanup",
+      "when": 1792209600000,
+      "tag": "0092_pump_group_partial_closure",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "6",
+      "when": 1792213200000,
+      "tag": "0093_pump_organic_sequences",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "6",
+      "when": 1792216800000,
+      "tag": "0094_wallet_cleanup",
       "breakpoints": true
     }
   ]

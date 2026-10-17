@@ -10,7 +10,7 @@ import {
   referenceActivity,
   unchangedQuietReference,
 } from './stock-reference-activity.mjs';
-import { stockReferenceFixture } from './stock-reference-fixture.mjs';
+import { stockReferencePool } from './stock-reference-fixture.mjs';
 import {
   hasStockClockRequest,
   captureStockClockWire,
@@ -108,7 +108,7 @@ mkdirSync(folder, { recursive: true });
 const bundle = join(folder, 'reader.mjs');
 await build({
   stdin: {
-    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint,getSolanaStockRuntimeRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc,stockPairAccountLimit} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
+    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint,getSolanaStockRuntimeRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc,stockPairAccountLimit} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc,stockQualificationMethodBudget} from './lib/wallet-rpc-pacing';`,
     resolveDir: process.cwd(),
     sourcefile: 'unsigned-stock-qualification.ts',
   },
@@ -151,7 +151,8 @@ const receipt = {
   providerTimings: [],
   quoteAsset: args.has('--quote-usdc') ? 'USDC' : 'SOL',
   inputUiAmount: args.has('--one-unit') ? '1' : '0.001',
-  qualificationPacing: 'unsigned-stock-qualification-nine-methods-per-second',
+  qualificationPacing:
+    'unsigned-stock-qualification-per-endpoint-method-budget',
   rpcPacingScope: 'setup-and-runtime',
   rpcPacingMs: /^\d{1,4}$/.test(process.env.SOLANA_RPC_MIN_INTERVAL_MS ?? '')
     ? Number(process.env.SOLANA_RPC_MIN_INTERVAL_MS)
@@ -161,6 +162,8 @@ const sqlite = new DatabaseSync(':memory:');
 let reader,
   auditReference,
   publicKey,
+  runtimeEndpoint = null,
+  qualificationMethodBudget = null,
   pipelineStart,
   simulated = false;
 const clock = () => performance.now();
@@ -168,8 +171,11 @@ try {
   if (lib.pairStockSigningPolicy().qualified !== false)
     throw Error('Signing gate must remain disabled.');
   const endpoint = lib.getSolanaIndexerRpcEndpoint();
-  const runtimeEndpoint = lib.getSolanaStockRuntimeRpcEndpoint();
+  runtimeEndpoint = lib.getSolanaStockRuntimeRpcEndpoint();
+  qualificationMethodBudget =
+    lib.stockQualificationMethodBudget(runtimeEndpoint);
   let useRuntimeEndpoint = false;
+  receipt.qualificationMethodBudget = qualificationMethodBudget;
   receipt.runtimeProviderRole = process.env.SOLANA_STOCK_RUNTIME_RPC_URL
     ? 'configured-standard-validator'
     : 'existing-indexer-fallback';
@@ -196,7 +202,9 @@ try {
       [new URL(endpoint).href, new URL(runtimeEndpoint).href].includes(u.href)
     ) {
       row.providerRole =
-        u.href === new URL(runtimeEndpoint).href && runtimeEndpoint !== endpoint
+        u.href === new URL(runtimeEndpoint).href &&
+        (runtimeEndpoint !== endpoint ||
+          Boolean(process.env.SOLANA_STOCK_RUNTIME_RPC_URL))
           ? 'stock-runtime'
           : 'indexer-fallback';
       const body = JSON.parse(init?.body ?? '{}'),
@@ -262,6 +270,29 @@ try {
           row.clockWireUnavailable = true;
         }
         row.clockWireObservationMs = clock() - observationStart;
+      }
+    }
+    if (
+      u.pathname === '/swap/v2/order' &&
+      u.searchParams.has('taker') &&
+      response.ok
+    ) {
+      // Public route split only, to explain exact-input mismatches.
+      try {
+        const order = await response.clone().json();
+        row.routePlan = (order.routePlan ?? []).slice(0, 16).map((leg) => ({
+          label: String(leg.swapInfo?.label ?? '').slice(0, 64),
+          ammKey: String(leg.swapInfo?.ammKey ?? '').slice(0, 64),
+          inputMint: String(leg.swapInfo?.inputMint ?? '').slice(0, 64),
+          outputMint: String(leg.swapInfo?.outputMint ?? '').slice(0, 64),
+          inAmount: String(leg.swapInfo?.inAmount ?? ''),
+          outAmount: String(leg.swapInfo?.outAmount ?? ''),
+          percent: leg.percent ?? null,
+          bps: leg.bps ?? null,
+        }));
+        row.orderInAmount = String(order.inAmount ?? '');
+      } catch {
+        row.routePlanUnavailable = true;
       }
     }
     if (response.status === 429) {
@@ -346,7 +377,7 @@ try {
     throw Error('Provider network differs.');
   let keys;
   if (referenceText !== null) {
-    keys = [stockReferenceFixture(referenceText, receipt.quoteAsset)];
+    keys = stockReferencePool(referenceText, receipt.quoteAsset);
   } else if (args.has('--reserve-reference')) {
     const accounts = await rpc('getLargestAccounts', [
       { commitment: 'confirmed', filter: 'circulating' },
@@ -913,24 +944,44 @@ try {
       valuesAvailable: true,
       comparisons: [{ field: 'httpStatus', before: '200', after: '429' }],
     };
+  // Each endpoint has its own pacing budget, so measure each endpoint alone.
+  const rolling = (rows) =>
+    rows.length
+      ? Math.max(
+          ...rows.map((r) =>
+            rows
+              .filter(
+                (other) =>
+                  other.startMs <= r.startMs &&
+                  other.startMs > r.startMs - 1000,
+              )
+              .reduce((sum, other) => sum + other.rpcUnits, 0),
+          ),
+        )
+      : 0;
   const allRpc = receipt.requests.filter((r) => r.rpcUnits !== undefined);
-  receipt.maximumRollingRpcMethods = allRpc.length
-    ? Math.max(
-        ...allRpc.map((r) =>
-          allRpc
-            .filter(
-              (other) =>
-                other.startMs <= r.startMs && other.startMs > r.startMs - 1000,
-            )
-            .reduce((sum, other) => sum + other.rpcUnits, 0),
-        ),
-      )
-    : 0;
-  if (receipt.maximumRollingRpcMethods > 9) {
+  receipt.qualificationMethodBudget = qualificationMethodBudget;
+  receipt.maximumRollingRpcMethodsByRole = {
+    'indexer-fallback': rolling(
+      allRpc.filter((r) => r.providerRole === 'indexer-fallback'),
+    ),
+    'stock-runtime': rolling(
+      allRpc.filter((r) => r.providerRole === 'stock-runtime'),
+    ),
+  };
+  receipt.maximumRollingRpcMethods = Math.max(
+    ...Object.values(receipt.maximumRollingRpcMethodsByRole),
+  );
+  if (
+    receipt.maximumRollingRpcMethodsByRole['indexer-fallback'] > 9 ||
+    (qualificationMethodBudget !== null &&
+      receipt.maximumRollingRpcMethodsByRole['stock-runtime'] >
+        qualificationMethodBudget)
+  ) {
     receipt.passed = false;
     receipt.runtimeRefusalBeforePacing = receipt.reason ?? null;
     receipt.reason =
-      'Qualification pacing exceeded nine RPC methods in a rolling second.';
+      'Qualification pacing exceeded the RPC method budget in a rolling second.';
   }
   receipt.firstCodeReads = receipt.logicalReads.filter(
     (r) => r.profile === 'code' && r.phase === 'before-simulation',

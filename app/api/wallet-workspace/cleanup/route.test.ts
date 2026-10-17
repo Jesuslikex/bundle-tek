@@ -70,7 +70,7 @@ beforeAll(async () => {
     '0045_warmup_signing_intents',
     '0047_shared_swap_reservations',
     '0049_native_withdrawals',
-    '0095_wallet_cleanup',
+    '0094_wallet_cleanup',
   ]) {
     const sql = await readFile(
       new URL(`../../../../drizzle/${name}.sql`, import.meta.url),

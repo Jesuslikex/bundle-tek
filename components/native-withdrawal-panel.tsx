@@ -1,7 +1,10 @@
 'use client';
 import { WithdrawalFailureEvidence } from './withdrawal-failure-evidence';
 import type { SavedFunding } from '@/lib/funding-plan';
-import { requireSelectedFundingReview } from '@/lib/mainnet-funding';
+import {
+  fundingLegs,
+  requireSelectedFundingReview,
+} from '@/lib/mainnet-funding';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -26,6 +29,12 @@ import {
   restoreNativeWithdrawalSignature,
   clearNativeWithdrawalSignature,
 } from '@/lib/native-withdrawal-signature-cache';
+// Exact SOL text for a lamport amount, as the prepare request expects.
+const lamportsText = (raw: string) => {
+  const padded = raw.padStart(10, '0');
+  const fraction = padded.slice(-9).replace(/0+$/, '');
+  return padded.slice(0, -9) + (fraction ? '.' + fraction : '');
+};
 export function NativeWithdrawalPanel({
   wallets,
   initialWallet = '',
@@ -37,9 +46,17 @@ export function NativeWithdrawalPanel({
   initialWallet?: string;
   initialToken?: { mint: string; decimals: number };
   initialOpen?: boolean;
-  funding?: { plan: SavedFunding; item: number };
+  funding?: { plan: SavedFunding; item: number; leg?: number };
 }) {
   const choices = wallets.filter((w) => w.chain === 'Solana');
+  let fundingLeg: ReturnType<typeof fundingLegs>[number] | undefined;
+  try {
+    fundingLeg = funding
+      ? fundingLegs(funding.plan.document, funding.item)[(funding.leg ?? 1) - 1]
+      : undefined;
+  } catch {
+    /* Unsupported drafts withhold the prefilled transfer. */
+  }
   const initialTokenMint = initialToken?.mint;
   const panel = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -57,11 +74,11 @@ export function NativeWithdrawalPanel({
     [wallet, setWallet] = useState(
       initialWallet || choices.find((w) => !w.archived)?.address || '',
     ),
-    [recipient, setRecipient] = useState(
-      funding?.plan.document.items[funding.item - 1]?.address || '',
-    ),
+    [recipient, setRecipient] = useState(fundingLeg?.recipient || ''),
     [amount, setAmount] = useState(
-      funding?.plan.document.items[funding.item - 1]?.amount || '',
+      funding?.leg && fundingLeg
+        ? lamportsText(fundingLeg.amountRaw)
+        : funding?.plan.document.items[funding.item - 1]?.amount || '',
     ),
     [rows, setRows] = useState<NativeWithdrawal[]>([]),
     [historyLoaded, setHistoryLoaded] = useState(false),
@@ -200,6 +217,7 @@ export function NativeWithdrawalPanel({
         validated.document,
         funding.plan,
         funding.item,
+        funding.leg,
       );
     return validated;
   }
@@ -226,7 +244,7 @@ export function NativeWithdrawalPanel({
     setError('');
     try {
       const response = await fetch(
-        `/api/wallet-workspace/withdrawals?wallet=${encodeURIComponent(wallet)}${funding ? '&' + new URLSearchParams({ planId: funding.plan.id, revision: String(funding.plan.revision), item: String(funding.item) }) : ''}${older && cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`,
+        `/api/wallet-workspace/withdrawals?wallet=${encodeURIComponent(wallet)}${funding ? '&' + new URLSearchParams({ planId: funding.plan.id, revision: String(funding.plan.revision), item: String(funding.item), ...(funding.leg ? { leg: String(funding.leg) } : {}) }) : ''}${older && cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`,
         {
           cache: 'no-store',
           signal: AbortSignal.any([
@@ -266,6 +284,7 @@ export function NativeWithdrawalPanel({
               row.document,
               funding.plan,
               funding.item,
+              funding.leg,
             ),
           ),
         );
@@ -274,6 +293,7 @@ export function NativeWithdrawalPanel({
             latest.document,
             funding.plan,
             funding.item,
+            funding.leg,
           );
       }
       const cached =
@@ -371,6 +391,7 @@ export function NativeWithdrawalPanel({
                       planId: funding.plan.id,
                       revision: funding.plan.revision,
                       item: funding.item,
+                      ...(funding.leg ? { leg: funding.leg } : {}),
                     },
                   }
                 : {}),
@@ -570,7 +591,8 @@ export function NativeWithdrawalPanel({
           {funding && (
             <p>
               Saved funding draft {funding.plan.document.name}, revision{' '}
-              {funding.plan.revision}, recipient {funding.item}. The source,
+              {funding.plan.revision}, recipient {funding.item}
+              {funding.leg ? `, proxy leg ${funding.leg}` : ''}. The source,
               recipient and amount are locked to this saved item. Each transfer
               requires its own signature and separate submission. Reload history
               to recover this recipient.

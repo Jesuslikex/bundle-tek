@@ -79,6 +79,9 @@ async function setup() {
     tipOnly: false,
     expiry: false,
     unknown: false,
+    tipMissing: false,
+    landed: null as number[] | null,
+    packetErrs: null as unknown[] | null,
   };
   let tipBytes = '',
     tipSignature = '';
@@ -88,6 +91,7 @@ async function setup() {
     reads.push({ method, params });
     if (method === 'getTransaction') {
       if (!control.chain) return null;
+      if (params[0] === tipSignature && control.tipMissing) return null;
       if (params[0] === tipSignature)
         return {
           slot: '250',
@@ -107,10 +111,15 @@ async function setup() {
         (p) => p.signature === params[0],
       );
       if (!packet) throw new Error('Unexpected receipt signature');
+      const index = group.signedEvidence!.packets.indexOf(packet);
+      if (control.landed && !control.landed.includes(index)) return null;
       return {
         slot: '250',
         transaction: [packet.transaction, 'base64'],
-        meta: { err: control.groupErr, fee: '5000' },
+        meta: {
+          err: control.packetErrs ? control.packetErrs[index] : control.groupErr,
+          fee: '5000',
+        },
       };
     }
     if (method === 'getEpochInfo')
@@ -740,4 +749,180 @@ it('rejects mismatched closure kind or fee totals in SQL and keeps reservations 
   expect(result.broadcast?.reservationsReleased).toBe(true);
   expect(result.group.state).toBe('cancelled');
   expect(f.sends).toHaveLength(0);
+}, 120000);
+
+// Controlled simulation boundary, as in the expiry case above: these cases test
+// recovery evidence and SQL closure, not the heavy sequential replay.
+async function settledSetup() {
+  const f = await setup();
+  vi.spyOn(
+    broadcastSimulation,
+    'simulateOwnedPumpGroupBroadcast',
+  ).mockResolvedValue({
+    format: 'pump-group-jito-simulation-v1',
+    bankSlot: 100,
+    tipFeeRaw: '5000',
+    launchSimulationSha256: 'b'.repeat(64),
+    replaySha256: 'c'.repeat(64),
+    expiresAt: f.group.review.expiresAt,
+    executionAllowed: false,
+  });
+  const { consent } = await f.ready();
+  await submitOwnedPumpGroupBroadcast(
+    f.db,
+    'alice',
+    f.group.review.id,
+    consent,
+    signal(),
+    f.rpc,
+    f.jito,
+  );
+  f.control.chain = true;
+  return f;
+}
+const recover = (
+  f: Awaited<ReturnType<typeof setup>>,
+  db: D1Database = f.db,
+) =>
+  recoverOwnedPumpGroupBroadcast(
+    db,
+    'alice',
+    f.group.review.id,
+    signal(),
+    f.rpc,
+    f.jito,
+  );
+it('holds a partial landing until expiry, then settles it and releases reservations', async () => {
+  const f = await settledSetup();
+  f.control.landed = [0];
+  f.control.tipMissing = true;
+  const held = await recover(f);
+  expect(held.broadcast?.recovery?.state).toBe('partial');
+  expect(held.broadcast?.reservationsReleased).toBe(false);
+  expect(held.group.state).toBe('signed');
+  f.control.expiry = true;
+  const result = await recover(f);
+  const count = f.group.review.packets.length;
+  expect(result.broadcast?.recovery?.state).toBe('partial-final');
+  expect(result.broadcast?.recovery?.expiry?.pastExpiryMargin).toBe(true);
+  expect(result.broadcast?.reservationsReleased).toBe(true);
+  expect(result.group.state).toBe(count === 1 ? 'finalized' : 'failed');
+  expect(result.group.receipt).toMatchObject({
+    kind: 'partial',
+    packetCount: count,
+    landedPacketCount: 1,
+    succeededPacketCount: 1,
+    groupNetworkFeeRaw: '5000',
+    tipNetworkFeeRaw: null,
+    knownNetworkFeeRaw: '5000',
+    networkFeeUnresolved: false,
+    reservationsReleased: true,
+    completeLaunch: false,
+  });
+  const view = await parsePumpGroupView(
+    result.group,
+    f.group.review.projectId,
+  );
+  expect(
+    (await parsePumpGroupBroadcastState(result.broadcast, view))?.recovery
+      ?.state,
+  ).toBe('partial-final');
+  expect(f.sends).toHaveLength(1);
+}, 120000);
+it('settles a tip that landed alone after the launch packets expired unobserved', async () => {
+  const f = await settledSetup();
+  f.control.tipOnly = true;
+  f.control.expiry = true;
+  const result = await recover(f);
+  expect(result.broadcast?.recovery?.state).toBe('partial-final');
+  expect(result.group.state).toBe('failed');
+  expect(result.group.receipt).toMatchObject({
+    kind: 'partial',
+    landedPacketCount: 0,
+    succeededPacketCount: 0,
+    tipDebitRaw: '1000',
+    tipNetworkFeeRaw: '5000',
+    knownNetworkFeeRaw: '5000',
+    networkFeeUnresolved: false,
+  });
+  expect(result.broadcast?.reservationsReleased).toBe(true);
+}, 120000);
+it('settles an all-finalized mixed outcome immediately without an expiry read for packets', async () => {
+  const f = await settledSetup();
+  const count = f.group.review.packets.length;
+  expect(count).toBeGreaterThan(1);
+  f.control.packetErrs = f.group.review.packets.map((_, i) =>
+    i === 0 ? null : { InstructionError: [0, 'Custom'] },
+  );
+  const result = await recover(f);
+  expect(result.broadcast?.recovery?.state).toBe('partial-final');
+  expect(result.group.state).toBe('failed');
+  expect(result.group.receipt).toMatchObject({
+    kind: 'partial',
+    landedPacketCount: count,
+    succeededPacketCount: 1,
+    knownNetworkFeeRaw: (5000n * BigInt(count) + 5000n).toString(),
+  });
+}, 120000);
+it('keeps a still-pending tip held even when every launch packet finalized', async () => {
+  const f = await settledSetup();
+  f.control.packetErrs = f.group.review.packets.map(() => null);
+  f.control.tipMissing = true;
+  const result = await recover(f);
+  expect(result.broadcast?.recovery?.state).toBe('partial');
+  expect(result.broadcast?.recovery?.expiry?.pastExpiryMargin).toBe(false);
+  expect(result.broadcast?.reservationsReleased).toBe(false);
+  expect(result.group.state).toBe('signed');
+}, 120000);
+it('rejects forged partial counts or states in SQL and keeps reservations until a valid retry', async () => {
+  const f = await settledSetup();
+  f.control.landed = [0];
+  f.control.tipMissing = true;
+  f.control.expiry = true;
+  for (const mutation of ['succeeded', 'landed', 'state']) {
+    const poisonedDb = new Proxy(f.db, {
+      get(target, property) {
+        if (property !== 'prepare') {
+          const value = Reflect.get(target, property);
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+        return (sql: string) => {
+          const statement = target.prepare(sql);
+          if (!sql.startsWith('INSERT INTO pump_group_broadcast_closures'))
+            return statement;
+          return new Proxy(statement, {
+            get(s, key) {
+              if (key !== 'bind') {
+                const value = Reflect.get(s, key);
+                return typeof value === 'function' ? value.bind(s) : value;
+              }
+              return (...values: unknown[]) => {
+                const receipt = JSON.parse(String(values[3])) as Record<
+                  string,
+                  unknown
+                >;
+                if (mutation === 'succeeded') receipt.succeededPacketCount = 0;
+                else if (mutation === 'landed') receipt.landedPacketCount = 2;
+                else {
+                  values[4] = values[4] === 'failed' ? 'finalized' : 'failed';
+                }
+                values[3] = JSON.stringify(receipt);
+                return s.bind(...values);
+              };
+            },
+          });
+        };
+      },
+    });
+    await expect(recover(f, poisonedDb)).rejects.toThrow('proof');
+    expect(
+      (
+        await f.client.execute(
+          'SELECT count(*) AS n FROM pump_group_broadcast_closures',
+        )
+      ).rows[0].n,
+    ).toBe(0);
+  }
+  const result = await recover(f);
+  expect(result.broadcast?.reservationsReleased).toBe(true);
 }, 120000);

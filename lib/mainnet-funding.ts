@@ -11,7 +11,38 @@ export type FundingSelection = {
   planId: string;
   revision: number;
   item: number;
+  // Classic proxy routes only: 1 is funder to first proxy, the last leg reaches the recipient.
+  leg?: number;
 };
+// Each earlier leg carries this much extra SOL so the next proxy can pay its own fee.
+export const PROXY_LEG_FEE_ALLOWANCE_LAMPORTS = 100_000n;
+export type FundingLeg = {
+  wallet: string;
+  recipient: string;
+  amountRaw: string;
+};
+export function fundingLegs(
+  document: FundingDocument,
+  item: number,
+): FundingLeg[] {
+  const entry = document.items[item - 1];
+  if (!entry) throw new Error('Choose an exact saved funding recipient.');
+  const asset = mainnetFundingAsset(document);
+  const amount = solanaTokenAtoms(entry.amount, asset.decimals);
+  const route = [
+    document.funderAddress,
+    ...(entry.proxies ?? []),
+    entry.address,
+  ];
+  return route.slice(0, -1).map((wallet, n) => ({
+    wallet,
+    recipient: route[n + 1],
+    amountRaw: (
+      amount +
+      BigInt(route.length - 2 - n) * PROXY_LEG_FEE_ALLOWANCE_LAMPORTS
+    ).toString(),
+  }));
+}
 export type FundingCapture = FundingSelection & {
   format: 'mainnet-funding-v1';
   termsSha256: string;
@@ -50,7 +81,11 @@ export function fundingSelection(value: unknown): FundingSelection {
   const v = value as FundingSelection;
   if (
     !v ||
-    Object.keys(v).sort().join(',') !== 'item,planId,revision' ||
+    !['item,planId,revision', 'item,leg,planId,revision'].includes(
+      Object.keys(v).sort().join(','),
+    ) ||
+    (v.leg !== undefined &&
+      (!Number.isInteger(v.leg) || v.leg < 1 || v.leg > 4)) ||
     typeof v.planId !== 'string' ||
     !/^[a-zA-Z0-9-]{1,64}$/.test(v.planId) ||
     !Number.isSafeInteger(v.revision) ||
@@ -61,22 +96,37 @@ export function fundingSelection(value: unknown): FundingSelection {
     v.item > 100
   )
     throw new Error('Choose an exact saved funding recipient.');
-  return { planId: v.planId, revision: v.revision, item: v.item };
+  return {
+    planId: v.planId,
+    revision: v.revision,
+    item: v.item,
+    ...(v.leg === undefined ? {} : { leg: v.leg }),
+  };
 }
 export function validatedFundingCapture(value: unknown): FundingCapture {
   const c = value as FundingCapture;
   if (
     !c ||
-    Object.keys(c).sort().join(',') !==
-      'format,item,planId,revision,scheduledAt,termsSha256' ||
+    ![
+      'format,item,planId,revision,scheduledAt,termsSha256',
+      'format,item,leg,planId,revision,scheduledAt,termsSha256',
+    ].includes(Object.keys(c).sort().join(',')) ||
     c.format !== 'mainnet-funding-v1' ||
     !/^[a-f0-9]{64}$/.test(c.termsSha256) ||
     typeof c.scheduledAt !== 'string' ||
     !Number.isFinite(Date.parse(c.scheduledAt))
   )
     throw new Error('Saved funding capture differs.');
-  fundingSelection({ planId: c.planId, revision: c.revision, item: c.item });
+  fundingSelection(captureSelection(c));
   return c;
+}
+export function captureSelection(c: FundingCapture): FundingSelection {
+  return {
+    planId: c.planId,
+    revision: c.revision,
+    item: c.item,
+    ...(c.leg === undefined ? {} : { leg: c.leg }),
+  };
 }
 async function fingerprint(value: unknown) {
   return Array.from(
@@ -99,6 +149,13 @@ export async function selectedFundingCapture(
   const terms = validateFunding(plan.document);
   const item = terms.items[selection.item - 1];
   const asset = mainnetFundingAsset(terms);
+  const legs = item ? fundingLegs(terms, selection.item) : [];
+  // Direct recipients have no leg; proxied recipients must name one.
+  const leg =
+    item &&
+    (item.proxies ? selection.leg !== undefined : selection.leg === undefined)
+      ? legs[(selection.leg ?? 1) - 1]
+      : undefined;
   if (
     plan.id !== selection.planId ||
     plan.revision !== selection.revision ||
@@ -106,15 +163,15 @@ export async function selectedFundingCapture(
     terms.source !== 'Wallet' ||
     !terms.funderAddress ||
     !item ||
+    !leg ||
     (asset.kind === 'native'
       ? Boolean(review.token)
       : !review.token ||
         review.token.mint !== asset.mint ||
         review.token.decimals !== asset.decimals) ||
-    review.wallet !== terms.funderAddress ||
-    review.recipient !== item.address ||
-    review.amountRaw !==
-      solanaTokenAtoms(item.amount, asset.decimals).toString() ||
+    review.wallet !== leg.wallet ||
+    review.recipient !== leg.recipient ||
+    review.amountRaw !== leg.amountRaw ||
     (now !== undefined && (plan.archived || Date.parse(item.scheduledAt) > now))
   )
     throw new Error(
@@ -131,14 +188,21 @@ export async function requireSelectedFundingReview(
   review: NativeWithdrawalReview,
   plan: SavedFunding,
   item: number,
+  leg?: number,
 ) {
   const c = validatedFundingCapture(review.funding);
   const expected = await selectedFundingCapture(
     plan,
-    { planId: plan.id, revision: plan.revision, item },
+    {
+      planId: plan.id,
+      revision: plan.revision,
+      item,
+      ...(leg === undefined ? {} : { leg }),
+    },
     review,
   );
   if (
+    Object.keys(c).length !== Object.keys(expected).length ||
     Object.keys(expected).some(
       (key) =>
         c[key as keyof FundingCapture] !==
