@@ -33,6 +33,7 @@ import { DcaTradeSession } from './dca-trade-session';
 import { CounterTradePanel } from './counter-trade-panel';
 import { VolumeBotPanel } from './volume-bot-panel';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
+import { readTemporaryHolders } from '@/lib/temporary-holders';
 type Activity = {
   sessionId: string;
   entry: number;
@@ -111,6 +112,11 @@ export function ImportedTradeSessions({
     setHistoryRevision((v) => v + 1);
   });
   const roster = wallets.filter((w) => w.chain === 'Solana' && !w.archived);
+  // Block-0 temporary holders marked on the launch, ready to sell back.
+  const [temporary] = useState(() =>
+    readTemporaryHolders(project.document.token.address),
+  );
+  const temporaryWallets = roster.filter((w) => temporary.includes(w.address));
   const invalidateSizedSell = useCallback((wallet: string, amount: string) => {
     setEntries((old) =>
       old.map((entry) =>
@@ -416,6 +422,28 @@ export function ImportedTradeSessions({
           <option value="Sell">Sell project tokens</option>
         </select>
       </label>
+      {temporaryWallets.length > 0 && (
+        <p>
+          {temporaryWallets.length} temporary holder wallet
+          {temporaryWallets.length === 1 ? '' : 's'} from your Block-0 launch.{' '}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || locked}
+            onClick={() => {
+              setSide('Sell');
+              setEntries(
+                temporaryWallets
+                  .slice(0, 25)
+                  .map((wallet) => ({ wallet, amount: '' })),
+              );
+              setError('');
+            }}
+          >
+            Prefill a Sell session with them
+          </Button>
+        </p>
+      )}
       <label>
         Add wallet
         <select

@@ -31,6 +31,7 @@ import {
   type PumpGroupSummary,
   type PumpGroupObservationView,
 } from '@/lib/pump-launch-group-client';
+import { ScheduledLaunchTimer } from './scheduled-launch-timer';
 import styles from './pump-launch-group-ui.module.css';
 import { PumpGroupBroadcast } from './pump-group-broadcast';
 import { SniperGuardPanel } from './sniper-guard-panel';
@@ -421,6 +422,32 @@ function Panel({
   }, []);
   const locked = disabled || busy || broadcastBusy;
   const review = view?.review;
+  const prepareReady =
+    !locked &&
+    canPrepare &&
+    (!view || ['cancelled', 'failed', 'finalized'].includes(view.state));
+  function prepareGroup() {
+    void run(async () => {
+      const capturedContext = contextKey;
+      const checked = await parsePumpGroupView(
+        await request('', { ...prepareRequest(), action: 'prepare' }),
+        projectId,
+        controller.current!.signal,
+      );
+      if (checked.state !== 'review' || checked.signedEvidence !== null)
+        throw new Error('Preparation state differs.');
+      current();
+      setPending(null);
+      setPendingProblem(false);
+      setRuntimePreview(null);
+      resetSigning();
+      setView(checked);
+      setPreparedContext(capturedContext);
+      setObservations([]);
+      setObservationCursor(null);
+      await history();
+    });
+  }
   return (
     <section
       className={styles.panel}
@@ -448,28 +475,7 @@ function Panel({
             (!!view &&
               !['cancelled', 'failed', 'finalized'].includes(view.state))
           }
-          onClick={() =>
-            void run(async () => {
-              const capturedContext = contextKey;
-              const checked = await parsePumpGroupView(
-                await request('', { ...prepareRequest(), action: 'prepare' }),
-                projectId,
-                controller.current!.signal,
-              );
-              if (checked.state !== 'review' || checked.signedEvidence !== null)
-                throw new Error('Preparation state differs.');
-              current();
-              setPending(null);
-              setPendingProblem(false);
-              setRuntimePreview(null);
-              resetSigning();
-              setView(checked);
-              setPreparedContext(capturedContext);
-              setObservations([]);
-              setObservationCursor(null);
-              await history();
-            })
-          }
+          onClick={prepareGroup}
         >
           Simulate complete launch group
         </Button>
@@ -482,6 +488,11 @@ function Panel({
           Reload saved groups
         </Button>
       </div>
+      <ScheduledLaunchTimer
+        projectId={projectId}
+        ready={prepareReady}
+        onDue={prepareGroup}
+      />
       {!canPrepare && (
         <p>
           To prepare a group, save the unscheduled plan, metadata release and

@@ -31,6 +31,7 @@ import {
   type PumpGroupChainEffects,
 } from '@/lib/pump-group-chain-effects';
 import { PumpGroupChainEffectsPanel } from './pump-group-chain-effects-panel';
+import { TemporaryHoldersPicker } from './temporary-holders-picker';
 import { usePumpTokenWorkspaceNavigation } from './pump-token-workspace-navigation';
 import {
   parsePumpLaunchTokenWorkspace,
@@ -639,6 +640,15 @@ export function PumpGroupBroadcast({
             </output>
           )}
         </>
+      )}
+      {openTokenWorkspace && pumpLaunchWorkspaceReady(group) && (
+        <TemporaryHoldersPicker
+          mint={group.review.input.create.mint}
+          holders={group.review.input.holders
+            .filter((h) => h.kind !== 'none')
+            .map((h) => h.address)}
+          disabled={!!locked}
+        />
       )}
       {openTokenWorkspace && pumpLaunchWorkspaceReady(group) && (
         <div className={styles.actions}>
