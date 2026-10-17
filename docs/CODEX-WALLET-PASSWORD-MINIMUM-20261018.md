@@ -1,0 +1,10 @@
+# Eight-character wallet password minimum
+
+The user explicitly requested a shorter wallet password after the create-wallet handoff. Lowered the minimum from 12 to 8 Unicode code points. An exported VAULT_MIN_PASSWORD_LENGTH now supplies both the crypto validation and the creation form hint; the validation error also uses Wallet password wording. The 1024-byte maximum, PBKDF2-SHA256 600,000 iterations, AES-256-GCM, salt/IV generation, non-extractable key, storage format and lock lifecycle are unchanged. Existing passwords and encrypted backups remain compatible.
+
+Validation covers real eight-character encrypted creation/unlock, seven-character refusal for creation/unlock, unchanged ciphertext confidentiality and derivation iterations, existing longer-password unlock/tamper checks and the mounted form's eight-character hint. The selected crypto/ownership/UI run passed 25 cases in three files; final build/browser evidence follows below.
+
+The user still needs to choose, enter and submit their own new wallet password. The agent has not entered one or generated a real browser wallet. The guarded local HTTPS server continues to refuse transaction registration/submission. No funded trade, push, deployment, provider, credential or SQL change is included. Coordinated ownership with the other Bundle chat: it will not build/restart or touch these files during this update.
+
+
+Final production webpack build exited 0, including TypeScript (work/release-qa/wallet-password-eight-build-20261018.log). After adding the explicit seven-character unlock refusal assertion, all 16 vault tests were rerun and pass; scoped typed lint passes. Restarted guarded HTTPS with the existing certificate, runtime handle 98567. The same signed-in Chrome tab1751427517 renders the new eight-character hint in Create wallet; both fields remain empty. Screenshot: work/release-qa/wallet-password-eight-ready-20261018.png. Real wallet creation/warmup remains pending the user's password submission, with transaction registration/submission blocked.

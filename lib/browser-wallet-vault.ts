@@ -5,6 +5,7 @@ import { privateKeyToAddress } from 'viem/accounts';
 // Client-only custody. This module has no RPC, fetch or signing entry points.
 export const VAULT_STORAGE_KEY = 'pulseforge.wallet-vault.v1';
 export const VAULT_ITERATIONS = 600_000;
+export const VAULT_MIN_PASSWORD_LENGTH = 8;
 const MAX_WALLETS = 500;
 const MAX_ENVELOPE_BYTES = 300_000;
 const aad = new TextEncoder().encode('PulseForge/browser-wallet-vault/v1');
@@ -104,10 +105,13 @@ function validatePayload(value: Payload): Payload {
 }
 async function derive(passphrase: string, salt: Uint8Array) {
   const encoded = new TextEncoder().encode(passphrase);
-  if (Array.from(passphrase).length < 12 || encoded.length > 1024) {
+  if (
+    Array.from(passphrase).length < VAULT_MIN_PASSWORD_LENGTH ||
+    encoded.length > 1024
+  ) {
     encoded.fill(0);
     throw new Error(
-      'Use a vault passphrase of at least 12 characters, up to 1024 UTF-8 bytes.',
+      `Use a wallet password of at least ${VAULT_MIN_PASSWORD_LENGTH} characters, up to 1024 UTF-8 bytes.`,
     );
   }
   try {

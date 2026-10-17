@@ -19,6 +19,23 @@ const passphrase = 'test-only vault passphrase';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('encrypted browser custody', () => {
+  it('accepts an eight-character password for encrypted creation and unlock, refusing seven', async () => {
+    await expect(createVault('fixture')).rejects.toThrow(
+      'at least 8 characters',
+    );
+    const password = 'fixture8';
+    const session = generateVaultWallets(
+      await createVault(password),
+      'solana',
+      1,
+    );
+    const encrypted = await encryptVault(session);
+    await expect(unlockVault(encrypted, 'fixture')).rejects.toThrow();
+    const restored = await unlockVault(encrypted, password);
+    expect(publicVaultWallets(restored)).toEqual(publicVaultWallets(session));
+    expect(encrypted).not.toContain(password);
+    expect(parseVaultEnvelope(encrypted).iterations).toBe(600_000);
+  });
   it('persists only ciphertext and authenticates a fresh unlock', async () => {
     const session = generateVaultWallets(
       await createVault(passphrase),
@@ -97,8 +114,10 @@ describe('encrypted browser custody', () => {
     expect(() => exportVaultPrivateKeys(session)).toThrow('does not match');
   });
   it('bounds wallet generation and rejects weak, oversized and unsupported inputs', async () => {
-    await expect(createVault('short')).rejects.toThrow('passphrase');
-    await expect(createVault('x'.repeat(1025))).rejects.toThrow('passphrase');
+    await expect(createVault('short')).rejects.toThrow('wallet password');
+    await expect(createVault('x'.repeat(1025))).rejects.toThrow(
+      'wallet password',
+    );
     const session = await createVault(passphrase);
     for (const count of [0, 101, 1.5, NaN])
       expect(() => generateVaultWallets(session, 'evm', count)).toThrow();

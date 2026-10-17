@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   VAULT_STORAGE_KEY,
+  VAULT_MIN_PASSWORD_LENGTH,
   createVault,
   encryptVault,
   unlockVault,
@@ -401,7 +402,8 @@ export function BrowserWalletVault({
               {!exists && (
                 <>
                   <small>
-                    Use a unique password with at least 12 characters.
+                    Use a unique password with at least{' '}
+                    {VAULT_MIN_PASSWORD_LENGTH} characters.
                   </small>
                   <label htmlFor={`${id}-confirm`}>Confirm password</label>
                   <Input

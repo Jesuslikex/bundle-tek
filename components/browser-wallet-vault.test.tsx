@@ -13,6 +13,7 @@ const vault = vi.hoisted(() => ({
 vi.mock('@/lib/browser-wallet-vault', () => ({
   ...vault,
   VAULT_STORAGE_KEY: 'fixture-vault',
+  VAULT_MIN_PASSWORD_LENGTH: 8,
   publicVaultWallets: (session: { wallets: unknown[] }) => session.wallets,
   parseVaultEnvelope: vi.fn(),
   importVaultWallets: vi.fn(),
@@ -87,6 +88,7 @@ afterEach(async () => {
 });
 it('creates, encrypts and saves exactly one wallet before offering warmup', async () => {
   expect(document.body.textContent).toContain('Create a Solana wallet');
+  expect(document.body.textContent).toContain('at least 8 characters');
   expect(document.querySelector('form button')!.textContent).toBe(
     'Create wallet',
   );
