@@ -69,13 +69,28 @@ it('prepares a batch and lists sells and skipped wallets', async () => {
   expect(button('Sign all 1 sells').disabled).toBe(true);
 });
 
-it('says signed sells are not sent and offers only a status refresh', () => {
+it('sends each signed sell once, only on click', async () => {
+  const fetch = vi.fn(
+    async () => new Response(JSON.stringify(batch('submitted'))),
+  );
+  vi.stubGlobal('fetch', fetch);
   act(() =>
     root.render(
       <SniperNukeBatchPanel reviewId={REVIEW} initial={batch('signed')} />,
     ),
   );
-  expect(host.textContent).toContain('not connected yet');
-  expect(button('Refresh status')).toBeTruthy();
-  expect(button('Send')).toBeUndefined();
+  expect(fetch).not.toHaveBeenCalled();
+  await act(async () => button('Send 1 signed sells').click());
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(
+    JSON.parse(
+      (fetch.mock.calls[0] as unknown as [string, { body: string }])[1].body,
+    ),
+  ).toEqual({
+    action: 'nuke-send',
+    batchId: 'b1',
+    sellId: 's1',
+    reviewId: REVIEW,
+  });
+  expect(host.textContent).toContain('Sent');
 });

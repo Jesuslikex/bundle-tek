@@ -265,8 +265,8 @@ it('saves, arms and triggers using only read-only RPC methods', async () => {
   );
 });
 
-it('offers Nuke batch prepare/register/observe/cancel but no send action', async () => {
-  for (const action of ['nuke-send', 'nuke-submit', 'send'])
+it('rejects unknown Nuke actions and Nuke prepare before a trigger', async () => {
+  for (const action of ['nuke-submit', 'send'])
     expect(
       (await post({ action, batchId: REVIEW, reviewId: REVIEW })).status,
     ).toBe(400);

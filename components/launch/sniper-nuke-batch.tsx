@@ -25,7 +25,7 @@ const STATE_LABEL: Record<string, string> = {
 
 /**
  * Prebuilt Nuke sells for a triggered guard: one reviewed batch, approved
- * once and signed locally in one step. Sending is not connected here.
+ * once and signed locally in one step. Each signed sell is sent once, only on the user's click.
  */
 export function SniperNukeBatchPanel({
   reviewId,
@@ -208,27 +208,50 @@ export function SniperNukeBatchPanel({
       {batch?.sells.some((s) => s.state === 'signed') && (
         <>
           <p>
-            Signed sells are stored but not sent. Sending them from Bundle is
-            not connected yet, so these expire unsent.
+            Signed and not sent yet. Send sells each signed transaction once;
+            nothing is retried.
           </p>
           <Button
             type="button"
-            variant="outline"
             disabled={locked}
-            onClick={() =>
-              void run(async () =>
-                replace(
-                  await post({
-                    action: 'nuke-observe',
-                    batchId: batch!.batchId,
-                  }),
-                ),
-              )
-            }
+            onClick={() => {
+              const current = batch!;
+              void run(async () => {
+                let latest = current;
+                for (const sell of current.sells.filter(
+                  (s) => s.state === 'signed',
+                ))
+                  latest = await post({
+                    action: 'nuke-send',
+                    batchId: current.batchId,
+                    sellId: sell.id,
+                  });
+                replace(latest);
+              });
+            }}
           >
-            Refresh status
+            Send {batch.sells.filter((s) => s.state === 'signed').length} signed
+            sells
           </Button>
         </>
+      )}
+      {batch?.sells.some((s) =>
+        ['signed', 'submitting', 'submitted'].includes(s.state),
+      ) && (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={locked}
+          onClick={() =>
+            void run(async () =>
+              replace(
+                await post({ action: 'nuke-observe', batchId: batch!.batchId }),
+              ),
+            )
+          }
+        >
+          Refresh status
+        </Button>
       )}
       <div aria-live="polite">
         {busy && <p>Working…</p>}

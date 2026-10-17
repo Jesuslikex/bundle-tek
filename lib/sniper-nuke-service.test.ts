@@ -20,6 +20,7 @@ import {
   observeSniperNuke,
   prepareSniperNuke,
   registerSniperNuke,
+  sendSniperNukeSell,
   type SniperNukeSellPreparer,
 } from './sniper-nuke-service';
 import { signSniperNukeBatch, sniperNukeConsent } from './sniper-nuke';
@@ -367,5 +368,111 @@ describe('Sniper Guard Nuke batch', () => {
       fresh.batchId,
     );
     expect(cancelled.sells[0].state).toBe('cancelled');
+  });
+  it('sends each signed sell exactly once and never resends an unknown outcome', async () => {
+    const { db } = database();
+    const batch = await prepareSniperNuke(
+      db,
+      'owner',
+      REVIEW,
+      balances({ [dev]: '7', [holder]: '9' }),
+      signal(),
+      prepare,
+    );
+    const registered = await registerSniperNuke(
+      db,
+      'owner',
+      REVIEW,
+      sniperNukeConsent(batch),
+      await signSniperNukeBatch(session, batch, () => {}),
+    );
+    const [first, second] = registered.sells;
+    const ok = vi.fn<SniperGuardRpc>(async () => first.signature);
+    let after = await sendSniperNukeSell(
+      db,
+      'owner',
+      REVIEW,
+      batch.batchId,
+      first.id,
+      ok,
+      signal(),
+    );
+    expect(after.sells.find((s) => s.id === first.id)!.state).toBe('submitted');
+    await sendSniperNukeSell(
+      db,
+      'owner',
+      REVIEW,
+      batch.batchId,
+      first.id,
+      ok,
+      signal(),
+    );
+    expect(ok).toHaveBeenCalledTimes(1);
+    const lost = vi.fn<SniperGuardRpc>(async () => {
+      throw new Error('timeout');
+    });
+    after = await sendSniperNukeSell(
+      db,
+      'owner',
+      REVIEW,
+      batch.batchId,
+      second.id,
+      lost,
+      signal(),
+    );
+    expect(after.sells.find((s) => s.id === second.id)!.state).toBe(
+      'submitting',
+    );
+    await sendSniperNukeSell(
+      db,
+      'owner',
+      REVIEW,
+      batch.batchId,
+      second.id,
+      lost,
+      signal(),
+    );
+    expect(lost).toHaveBeenCalledTimes(1);
+  });
+  it('refuses to send unsigned or expired sells', async () => {
+    const { db } = database();
+    const batch = await prepareSniperNuke(
+      db,
+      'owner',
+      REVIEW,
+      balances({ [dev]: '7', [holder]: '0' }),
+      signal(),
+      prepare,
+    );
+    const rpc = vi.fn<SniperGuardRpc>();
+    await sendSniperNukeSell(
+      db,
+      'owner',
+      REVIEW,
+      batch.batchId,
+      batch.sells[0].id,
+      rpc,
+      signal(),
+    );
+    await registerSniperNuke(
+      db,
+      'owner',
+      REVIEW,
+      sniperNukeConsent(batch),
+      await signSniperNukeBatch(session, batch, () => {}),
+    );
+    await expect(
+      sendSniperNukeSell(
+        db,
+        'owner',
+        REVIEW,
+        batch.batchId,
+        batch.sells[0].id,
+        rpc,
+        signal(),
+        new Date(Date.now() + 120_000),
+      ),
+    ).rejects.toThrow('expired');
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

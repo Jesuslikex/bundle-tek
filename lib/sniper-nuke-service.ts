@@ -366,6 +366,65 @@ export async function observeSniperNuke(
   return publicBatch(reviewId, await batchRows(db, owner, batchId));
 }
 
+/**
+ * One-attempt send of one signed Nuke sell, only on the user's click. State
+ * moves to submitting before the only provider call, so a lost response is
+ * never resent; observation settles it.
+ */
+export async function sendSniperNukeSell(
+  db: D1Database,
+  owner: string,
+  reviewId: string,
+  batchId: string,
+  sellId: string,
+  rpc: SniperGuardRpc,
+  signal: AbortSignal,
+  now = new Date(),
+) {
+  const row = (await batchRows(db, owner, batchId)).find(
+    (r) => r.id === sellId,
+  );
+  if (!row) return fail('Nuke sell not found.', 404);
+  if (row.state !== 'signed' || !row.signed)
+    return publicBatch(reviewId, await batchRows(db, owner, batchId));
+  const review = JSON.parse(row.review) as WarmupSigningReview;
+  if (Date.parse(review.expiresAt) <= now.getTime())
+    return fail('This Nuke sell expired. Prepare a fresh batch.', 409);
+  const claimed = await db
+    .prepare(
+      "UPDATE sniper_nuke_sells SET state='submitting',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE owner_id=? AND id=? AND state='signed'",
+    )
+    .bind(owner, sellId)
+    .run();
+  if (claimed.meta.changes)
+    try {
+      signal.throwIfAborted();
+      const signature = await rpc(
+        'sendTransaction',
+        [
+          row.signed,
+          {
+            encoding: 'base64',
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
+            maxRetries: 0,
+          },
+        ],
+        signal,
+      );
+      if (signature === row.signature)
+        await db
+          .prepare(
+            "UPDATE sniper_nuke_sells SET state='submitted',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE owner_id=? AND id=? AND state='submitting'",
+          )
+          .bind(owner, sellId)
+          .run();
+    } catch {
+      // Unknown outcome stays submitting; only observation can settle it.
+    }
+  return publicBatch(reviewId, await batchRows(db, owner, batchId));
+}
+
 /** Discards an unsigned batch so a fresh one can be prepared. */
 export async function cancelSniperNuke(
   db: D1Database,

@@ -18,6 +18,7 @@ import {
 } from '@/lib/sniper-guard-service';
 import {
   cancelSniperNuke,
+  sendSniperNukeSell,
   observeSniperNuke,
   prepareSniperNuke,
   readSniperNuke,
@@ -45,20 +46,20 @@ const failure = (error: unknown) =>
         },
         502,
       );
-// Read-only: the Nuke batch adds status reads, never a send method.
+// Reads only, except nuke-send, which alone may send one user-signed sell.
 const allowed = new Set<string>([
   ...SNIPER_GUARD_RPC_METHODS,
   'getSignatureStatuses',
   'getBlockHeight',
 ]);
-function configuredRpc(): SniperGuardRpc {
+function configuredRpc(canSend = false): SniperGuardRpc {
   const endpoint = getSolanaIndexerRpcEndpoint(),
     url = new URL(endpoint);
   if (url.protocol !== 'https:' || url.username || url.password || url.hash)
     throw new PumpPreflightError('Sniper Guard RPC is not configured.', 503);
   return (method, params, signal) => {
     signal.throwIfAborted();
-    if (!allowed.has(method))
+    if (!allowed.has(method) && !(canSend && method === 'sendTransaction'))
       throw new Error('Sniper Guard has no submission or mutation transport.');
     return balanceRpc(endpoint, method, params, signal, fetch, 2097152);
   };
@@ -112,6 +113,7 @@ type Body = {
   revision?: unknown;
   settings?: unknown;
   batchId?: unknown;
+  sellId?: unknown;
   consent?: unknown;
   signed?: unknown;
 };
@@ -152,6 +154,7 @@ export async function POST(request: Request) {
       'nuke-register': 'action,consent,reviewId,signed',
       'nuke-observe': 'action,batchId,reviewId',
       'nuke-cancel': 'action,batchId,reviewId',
+      'nuke-send': 'action,batchId,reviewId,sellId',
     };
     if (typeof action !== 'string' || expected[action] !== keys)
       return json({ error: 'Sniper Guard request differs.' }, 400);
@@ -204,6 +207,18 @@ export async function POST(request: Request) {
           reviewId,
           idOf(body.batchId),
           configuredRpc(),
+          signal,
+        ),
+      );
+    if (action === 'nuke-send')
+      return json(
+        await sendSniperNukeSell(
+          db,
+          user.userId,
+          reviewId,
+          idOf(body.batchId),
+          idOf(body.sellId),
+          configuredRpc(true),
           signal,
         ),
       );
