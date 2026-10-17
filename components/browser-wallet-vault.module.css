@@ -1,0 +1,14 @@
+.created {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  line-height: 1.6;
+}
+.address {
+  overflow-wrap: anywhere;
+  padding: 14px;
+  border: 1px solid #30303c;
+  border-radius: 10px;
+  background: #101017;
+  font-size: 13px;
+}

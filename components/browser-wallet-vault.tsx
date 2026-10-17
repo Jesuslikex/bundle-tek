@@ -26,6 +26,7 @@ import {
   type VaultSession,
   type VaultWallet,
 } from '@/lib/browser-wallet-vault';
+import styles from './browser-wallet-vault.module.css';
 import type { LaunchChain } from '@/lib/launch-plan';
 import {
   validateOwnershipChallenge,
@@ -50,14 +51,19 @@ export function BrowserWalletVault({
   savedAddresses,
   verifiedAddresses,
   onVerified,
+  onOpenWarmup,
 }: {
   chain: LaunchChain;
   onAddPublic: (addresses: string[]) => Promise<boolean>;
   savedAddresses: string[];
   verifiedAddresses: string[];
   onVerified: () => Promise<void>;
+  onOpenWarmup?: (address: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [guided, setGuided] = useState(false);
+  const [created, setCreated] = useState<VaultWallet | null>(null);
+  const [added, setAdded] = useState(false);
   const [exists, setExists] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [passphrase, setPassphrase] = useState('');
@@ -86,6 +92,8 @@ export function BrowserWalletVault({
     epoch.current++;
     ownershipRequest.current?.abort();
     setVerification(null);
+    setCreated(null);
+    setAdded(false);
     session.current = null;
     setUnlocked(false);
     setWallets([]);
@@ -221,35 +229,113 @@ export function BrowserWalletVault({
         }
       }}
     >
-      <Button onClick={() => setOpen(true)}>
-        <WalletIcon /> Generate wallets
+      <Button
+        onClick={() => {
+          setGuided(true);
+          setOpen(true);
+        }}
+      >
+        <WalletIcon /> Create wallet
       </Button>
-      <DialogTrigger render={<Button variant="outline" />}>
+      <DialogTrigger
+        render={<Button variant="outline" onClick={() => setGuided(false)} />}
+      >
         <LockKeyhole /> Browser vault
       </DialogTrigger>
       <DialogContent className="browser-vault-dialog" showCloseButton={!busy}>
         <DialogHeader>
-          <DialogTitle>Browser wallet vault</DialogTitle>
+          <DialogTitle>
+            {guided
+              ? created
+                ? 'Your wallet is ready'
+                : `Create a ${chain === 'Solana' ? 'Solana' : 'EVM'} wallet`
+              : 'Browser wallet vault'}
+          </DialogTitle>
           <DialogDescription>
-            Generate or import wallets on this device. Private keys are
-            encrypted in this browser profile. Keep an encrypted backup and your
-            passphrase. Clearing site data can erase the vault.
+            {guided
+              ? 'Your private key stays encrypted on this device. Only the public address is saved to your account.'
+              : 'Manage the encrypted wallets saved in this browser.'}
           </DialogDescription>
         </DialogHeader>
-        <p className="browser-vault-scope">
-          One vault per browser profile and site, shared across your accounts on
-          this device. It locks when hidden, closed or idle for five minutes.
-          Ownership messages can be verified without gas. Solana keys can be
-          used in the devnet tools, with a separate passphrase approval for each
-          message or transaction. Mainnet execution remains unavailable.
-        </p>
+        {guided && (
+          <p className="browser-vault-scope">
+            1. Protect your wallet · 2. Save a backup · 3. Open warmup
+          </p>
+        )}
+        {!created && (
+          <p className="browser-vault-scope">
+            Keep your password and encrypted backup. We cannot reset it. This
+            vault is shared across accounts on this browser and site. It locks
+            when closed, hidden or idle for five minutes.
+          </p>
+        )}
         {error && (
           <p role="alert" className="inline-error">
             {error}
           </p>
         )}
         {notice && <output>{notice}</output>}
-        {!unlocked ? (
+        {guided && created ? (
+          <div className={styles.created}>
+            <strong>{chain} wallet</strong>
+            <code className={styles.address}>{created.address}</code>
+            <p>
+              Your key is encrypted in this browser. Save a backup before
+              continuing: clearing site data can erase it.
+            </p>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                const stored = localStorage.getItem(VAULT_STORAGE_KEY);
+                if (!stored || stored !== persisted.current) {
+                  setError(
+                    'Vault changed. Reopen it before downloading a backup.',
+                  );
+                  return;
+                }
+                parseVaultEnvelope(stored);
+                download(stored, 'bundle-encrypted-vault.json');
+                setNotice(
+                  'Encrypted backup downloaded. Keep it with your password in a safe place.',
+                );
+              }}
+            >
+              Download encrypted backup
+            </Button>
+            {!added ? (
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  void operate(async (current) => {
+                    const saved = await onAddPublic([created.address]);
+                    if (!current()) return;
+                    if (!saved)
+                      throw new Error(
+                        'Your encrypted wallet is safe. Try saving its public address again.',
+                      );
+                    setAdded(true);
+                  })
+                }
+              >
+                {busy ? 'Saving address…' : 'Retry saving public address'}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  const address = created.address;
+                  lock();
+                  setOpen(false);
+                  if (chain === 'Solana') onOpenWarmup?.(address);
+                }}
+              >
+                {chain === 'Solana' && onOpenWarmup
+                  ? 'Continue to warmup'
+                  : 'Done'}
+              </Button>
+            )}
+          </div>
+        ) : !unlocked ? (
           <>
             <form
               onSubmit={(event) => {
@@ -265,16 +351,17 @@ export function BrowserWalletVault({
                       'A vault already exists. Reopen to unlock it.',
                     );
                   if (!exists && passphrase !== confirm)
-                    throw new Error('Passphrases do not match.');
-                  const next =
+                    throw new Error('Passwords do not match.');
+                  let next =
                     stored === null
                       ? await createVault(passphrase)
                       : await unlockVault(stored, passphrase);
                   if (!current()) return;
+                  if (guided) next = generateVaultWallets(next, family, 1);
                   let encrypted = stored;
-                  if (stored === null) {
+                  if (stored === null || guided) {
                     encrypted = await encryptVault(next);
-                    await saveBrowserVault(null, encrypted, current);
+                    await saveBrowserVault(stored, encrypted, current);
                   }
                   if (
                     !current() ||
@@ -285,13 +372,23 @@ export function BrowserWalletVault({
                   session.current = next;
                   setExists(true);
                   setUnlocked(true);
-                  setWallets(publicVaultWallets(next));
+                  const publicWallets = publicVaultWallets(next);
+                  setWallets(publicWallets);
+                  if (guided) {
+                    const wallet = publicWallets[publicWallets.length - 1];
+                    setCreated(wallet);
+                    const saved = await onAddPublic([wallet.address]);
+                    if (!current()) return;
+                    setAdded(saved);
+                    if (!saved)
+                      throw new Error(
+                        'Your encrypted wallet is safe. Try saving its public address again.',
+                      );
+                  }
                 });
               }}
             >
-              <label htmlFor={`${id}-password`}>
-                {exists ? 'Vault passphrase' : 'Create a vault passphrase'}
-              </label>
+              <label htmlFor={`${id}-password`}>Wallet password</label>
               <Input
                 id={`${id}-password`}
                 type="password"
@@ -304,10 +401,9 @@ export function BrowserWalletVault({
               {!exists && (
                 <>
                   <small>
-                    Use a unique, strong passphrase of at least 12 characters.
-                    There is no password recovery.
+                    Use a unique password with at least 12 characters.
                   </small>
-                  <label htmlFor={`${id}-confirm`}>Confirm passphrase</label>
+                  <label htmlFor={`${id}-confirm`}>Confirm password</label>
                   <Input
                     id={`${id}-confirm`}
                     type="password"
@@ -321,50 +417,60 @@ export function BrowserWalletVault({
               )}
               <Button type="submit" disabled={busy}>
                 {busy
-                  ? 'Opening vault…'
-                  : exists
-                    ? 'Unlock vault'
-                    : 'Create encrypted vault'}
+                  ? guided
+                    ? 'Creating wallet...'
+                    : 'Opening vault...'
+                  : guided
+                    ? exists
+                      ? 'Unlock and create wallet'
+                      : 'Create wallet'
+                    : exists
+                      ? 'Unlock vault'
+                      : 'Create encrypted vault'}
               </Button>
             </form>
             {!exists && (
-              <label
-                className="browser-vault-restore"
-                htmlFor={`${id}-restore`}
-              >
-                Restore an encrypted backup
-                <Input
-                  id={`${id}-restore`}
-                  type="file"
-                  accept=".json,application/json"
-                  disabled={busy}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = '';
-                    if (!file) return;
-                    void operate(async (current) => {
-                      if (file.size > 300_000)
-                        throw new Error('Vault backup is too large.');
-                      const text = await file.text();
-                      parseVaultEnvelope(text);
-                      const restored = await unlockVault(text, passphrase);
-                      if (!current()) return;
-                      await saveBrowserVault(null, text, current);
-                      if (!current()) return;
-                      persisted.current = text;
-                      session.current = restored;
-                      setExists(true);
-                      setUnlocked(true);
-                      setWallets(publicVaultWallets(restored));
-                      setNotice('Encrypted backup restored.');
-                    });
-                  }}
-                />
-                <small>
-                  Enter the backup passphrase above before selecting its file.
-                  Restoring never replaces an existing vault.
-                </small>
-              </label>
+              <details>
+                <summary>Restore a backup instead</summary>
+                <label
+                  className="browser-vault-restore"
+                  htmlFor={`${id}-restore`}
+                >
+                  Restore an encrypted backup
+                  <Input
+                    id={`${id}-restore`}
+                    type="file"
+                    accept=".json,application/json"
+                    disabled={busy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (!file) return;
+                      void operate(async (current) => {
+                        if (file.size > 300_000)
+                          throw new Error('Vault backup is too large.');
+                        const text = await file.text();
+                        parseVaultEnvelope(text);
+                        const restored = await unlockVault(text, passphrase);
+                        if (!current()) return;
+                        await saveBrowserVault(null, text, current);
+                        if (!current()) return;
+                        persisted.current = text;
+                        session.current = restored;
+                        setExists(true);
+                        setUnlocked(true);
+                        setWallets(publicVaultWallets(restored));
+                        setGuided(false);
+                        setNotice('Encrypted backup restored.');
+                      });
+                    }}
+                  />
+                  <small>
+                    Enter the backup password above before selecting its file.
+                    Restoring never replaces an existing vault.
+                  </small>
+                </label>
+              </details>
             )}
           </>
         ) : (
@@ -726,9 +832,7 @@ export function BrowserWalletVault({
                   across both wallet families, without encryption. Anyone with
                   it can control these wallets.
                 </p>
-                <label htmlFor={`${id}-export`}>
-                  Re-enter vault passphrase
-                </label>
+                <label htmlFor={`${id}-export`}>Re-enter wallet password</label>
                 <Input
                   id={`${id}-export`}
                   type="password"

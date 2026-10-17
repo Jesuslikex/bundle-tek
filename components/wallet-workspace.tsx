@@ -924,8 +924,13 @@ export function WalletWorkspace({
               savedAddresses={savedAddresses}
               verifiedAddresses={[...proofs.keys()]}
               onVerified={reload}
-              onAddPublic={(addresses) =>
-                mutate(
+              onOpenWarmup={(address) => {
+                setQuery('');
+                setSelected([address]);
+                setWarmupOpen(true);
+              }}
+              onAddPublic={async (addresses) => {
+                const saved = await mutate(
                   {
                     action: 'wallet.add',
                     folderId: currentFolder?.id ?? '',
@@ -936,8 +941,10 @@ export function WalletWorkspace({
                     })),
                   },
                   'Public addresses saved. Private keys stay in your browser vault.',
-                )
-              }
+                );
+                if (saved) setSelected(addresses);
+                return saved;
+              }}
             />
             <Button
               disabled={busy || loading || archived}

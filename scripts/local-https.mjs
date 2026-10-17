@@ -67,7 +67,7 @@ try {
 }
 console.log(`Bundle verification: ${origin}`);
 console.log(
-  'NO TRANSACTIONS: registration/submission and unrelated writes are blocked. Wallet sign-in messages are allowed; do not unlock the Bundle vault or sign trade transactions.',
+  'NO TRANSACTIONS: registration/submission and unrelated writes are blocked. Wallet sign-in and saving one public Solana wallet are allowed. Never sign trade transactions.',
 );
 const close = async () => {
   server.close();

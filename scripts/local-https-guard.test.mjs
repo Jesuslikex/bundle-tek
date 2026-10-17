@@ -170,3 +170,29 @@ await test('real HTTP forwarding preserves auth headers and blocks forbidden req
     ]);
   }
 });
+
+await test('allows one public Solana wallet while refusing bulk, secret fields and other writes', () => {
+  const path = '/api/wallet-workspace';
+  const body = {
+    action: 'wallet.add',
+    chain: 'Solana',
+    folderId: '',
+    wallets: [
+      {
+        address: '11111111111111111111111111111111',
+        label: '',
+        role: 'Recipient',
+      },
+    ],
+  };
+  assert.equal(allowedLocalPost(path, body), true);
+  for (const changed of [
+    { ...body, chain: 'Ethereum' },
+    { ...body, action: 'wallet.delete' },
+    { ...body, privateKey: 'fixture' },
+    { ...body, wallets: [...body.wallets, ...body.wallets] },
+    { ...body, wallets: [{ ...body.wallets[0], privateKey: 'fixture' }] },
+    { ...body, wallets: [{ ...body.wallets[0], address: '1'.repeat(88) }] },
+  ])
+    assert.equal(allowedLocalPost(path, changed), false);
+});

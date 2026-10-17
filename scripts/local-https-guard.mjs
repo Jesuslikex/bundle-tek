@@ -16,6 +16,32 @@ const authPosts = new Set([
 ]);
 
 export function allowedLocalPost(path, body) {
+  if (path === '/api/wallet-workspace') {
+    const wallets = body?.wallets;
+    return (
+      body?.action === 'wallet.add' &&
+      body.chain === 'Solana' &&
+      Object.keys(body).every((key) =>
+        ['action', 'chain', 'folderId', 'wallets'].includes(key),
+      ) &&
+      (body.folderId === undefined || typeof body.folderId === 'string') &&
+      Array.isArray(wallets) &&
+      wallets.length === 1 &&
+      wallets.every(
+        (wallet) =>
+          wallet &&
+          typeof wallet === 'object' &&
+          !Array.isArray(wallet) &&
+          Object.keys(wallet).every((key) =>
+            ['address', 'label', 'role'].includes(key),
+          ) &&
+          typeof wallet.address === 'string' &&
+          /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet.address) &&
+          wallet.label === '' &&
+          wallet.role === 'Recipient',
+      )
+    );
+  }
   if (readPosts.has(path) || authPosts.has(path)) return true;
   if (path === '/api/wallet-workspace/warmup/plans')
     return body?.action === 'save';

@@ -41,3 +41,8 @@ The user then completed Solana wallet sign-in. The actual HTTPS dashboard render
 An earlier MetaMask attempt reported that its connected account did not advertise Solana message signing. That account-capability check was retained; it was not bypassed and the login component was not changed. After the user retried Solana, the HTTPS session succeeded. Official MetaMask documentation confirms its Solana message-signing feature, but this run does not establish why the earlier selected account lacked it.
 
 Actual signed-in warmup preparation remains pending the user's public wallet selection. No claim of completed real warmup, funded execution or provider repeatability is made. No trade was signed or sent, no deployment/push occurred, and no production environment setting was changed. Concurrent commit ea0a120 adds Git/deployment configuration independently; this task does not edit or stage those files.
+
+
+## Follow-up: user-requested local wallet creation
+
+The user subsequently requested creating one wallet inside Bundle and simplifying setup. See CODEX-WALLET-ONBOARDING-20261017.md. That request authorizes encrypted browser-local generation and saving its public Solana address; the earlier instruction to leave the vault locked applied to the initial sign-in-only check. The HTTPS filter now narrowly admits a single public Solana wallet.add object and still refuses all packet registration and transaction submission. New passphrase entry/submission remains a human-only step. No production setting changed.
