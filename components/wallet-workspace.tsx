@@ -21,6 +21,7 @@ import { BrowserWalletVault } from '@/components/browser-wallet-vault';
 import { WalletWarmup } from '@/components/wallet-warmup';
 import { NativeWithdrawalPanel } from '@/components/native-withdrawal-panel';
 import { WalletCleanupPanel } from '@/components/wallet-cleanup-panel';
+import { CreatorFeeClaimPanel } from '@/components/creator-fee-claim-panel';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { resolveWarmupWorkspace } from '@/lib/warmup-workspace-handoff';
 
@@ -1236,6 +1237,9 @@ export function WalletWorkspace({
           )}
           {chain === 'Solana' && !archived && (
             <WalletCleanupPanel wallets={data.wallets} selected={picks} />
+          )}
+          {chain === 'Solana' && (
+            <CreatorFeeClaimPanel wallets={data.wallets} />
           )}
           {chain === 'Solana' && holdingsWallet && (
             <WalletHoldingsPanel

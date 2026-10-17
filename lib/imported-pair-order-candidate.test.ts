@@ -897,7 +897,50 @@ it.each([
           if (mode === 'extensions') bytes[170] = 0xff;
         });
     };
-    await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+    const pending = run(fixture);
+    if (mode === 'source-over')
+      await expect(pending).rejects.toMatchObject({
+        status: 409,
+        cause: {
+          pairDiagnostic: {
+            check: 'input-token-delta',
+            comparisons: expect.arrayContaining([
+              {
+                field: 'tokenAmountRaw',
+                before: '500000000',
+                after: '499999998',
+              },
+              {
+                field: 'tokenDeltaRaw',
+                before: 'equals:-1',
+                after: '-2',
+              },
+            ]),
+          },
+        },
+      });
+    else if (mode === 'output-under')
+      await expect(pending).rejects.toMatchObject({
+        status: 409,
+        cause: {
+          pairDiagnostic: {
+            check: 'output-minimum',
+            comparisons: expect.arrayContaining([
+              {
+                field: 'tokenAmountRaw',
+                before: '20000000',
+                after: '20994999',
+              },
+              {
+                field: 'tokenDeltaRaw',
+                before: 'at-least:995000',
+                after: '994999',
+              },
+            ]),
+          },
+        },
+      });
+    else await expect(pending).rejects.toMatchObject({ status: 409 });
   },
 );
 it.each(['fee-drain', 'unexpected-credit'] as const)(
@@ -912,7 +955,39 @@ it.each(['fee-drain', 'unexpected-credit'] as const)(
         BigInt(wallet.lamports) + (mode === 'fee-drain' ? -1n : 1n)
       ).toString();
     };
-    await expect(run(fixture)).rejects.toMatchObject({ status: 409 });
+    const pending = run(fixture);
+    if (mode === 'fee-drain')
+      await expect(pending).rejects.toMatchObject({
+        status: 409,
+        cause: {
+          pairDiagnostic: {
+            check: 'native-conservation',
+            comparisons: expect.arrayContaining([
+              {
+                field: 'walletLamportsRaw',
+                before: '1000000000',
+                after: '999994999',
+              },
+              {
+                field: 'nativeTradeDeltaRaw',
+                before: 'equals:0',
+                after: '-1',
+              },
+              {
+                field: 'walletAndWrappedSolDeltaRaw',
+                before: '<unavailable>',
+                after: '-5001',
+              },
+              {
+                field: 'networkFeeRaw',
+                before: '<unavailable>',
+                after: '5000',
+              },
+            ]),
+          },
+        },
+      });
+    else await expect(pending).rejects.toMatchObject({ status: 409 });
   },
 );
 it.each([

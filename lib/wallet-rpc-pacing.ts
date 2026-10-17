@@ -1,6 +1,24 @@
 import { env } from '@/lib/server-env';
 
 const nextReads = new Map<string, number>();
+/** Rolling methods/second for explicit qualification. Only the configured stock
+ * runtime endpoint may raise it via SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND. */
+export function stockQualificationMethodBudget(
+  endpoint: string,
+  configured = (env as unknown as Record<string, unknown>)
+    .SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND,
+  runtime = (env as unknown as Record<string, unknown>)
+    .SOLANA_STOCK_RUNTIME_RPC_URL,
+) {
+  if (configured === undefined || configured === '') return 9;
+  if (typeof configured !== 'string' || !/^[1-9]\d?$/.test(configured))
+    throw new Error('Invalid stock runtime RPC method budget.');
+  return typeof runtime === 'string' &&
+    runtime !== '' &&
+    new URL(runtime).href === new URL(endpoint).href
+    ? Number(configured)
+    : 9;
+}
 type Admission = { at: number; units: number };
 const qualification = new Map<
   string,
@@ -77,13 +95,18 @@ export async function paceWalletRpc(
     // Actual admissions, not scheduled timer targets: delayed timers cannot bunch
     // requests into a burst. Only explicitly opted-in calls share this budget.
     const units = qualificationMethods!;
+    const budget =
+      qualificationScope === 'stock-runtime-evidence'
+        ? stockQualificationMethodBudget(endpoint)
+        : 9;
     const pending = profile.tail.then(async () => {
       for (;;) {
         signal.throwIfAborted();
         const now = Date.now();
         profile.sent = profile.sent.filter((entry) => entry.at > now - 1000);
         const budgetAt =
-          profile.sent.reduce((sum, entry) => sum + entry.units, 0) + units > 9
+          profile.sent.reduce((sum, entry) => sum + entry.units, 0) + units >
+          budget
             ? profile.sent[0].at + 1000
             : now;
         const at = Math.max(now, profile.nextRead, budgetAt);
@@ -93,7 +116,11 @@ export async function paceWalletRpc(
         }
         profile.sent.push({ at: now, units });
         profile.nextRead =
-          now + Math.max(112 * units, interval > 200 ? interval : 0);
+          now +
+          Math.max(
+            (budget === 9 ? 112 : Math.ceil(1000 / budget)) * units,
+            interval > 200 ? interval : 0,
+          );
         return;
       }
     });

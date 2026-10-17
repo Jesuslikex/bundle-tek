@@ -74,6 +74,51 @@ test('counts setup and runtime methods together and rejects omitted or under-rep
   delete missing[0].requests[0].rpcUnits;
   assert.throws(() => summarizeStockRepeatability(missing), /method count/);
 });
+
+test('measures the rolling method budget per RPC provider', () => {
+  const rows = samples();
+  for (const r of rows)
+    Object.assign(r, {
+      rpcPacingScope: 'setup-and-runtime',
+      maximumRollingRpcMethods: 5,
+      qualificationMethodBudget: 25,
+      maximumRollingRpcMethodsByRole: {
+        'indexer-fallback': 5,
+        'stock-runtime': 5,
+      },
+      requests: [
+        ...Array.from({ length: 5 }, () => ({
+          status: 200,
+          startMs: 0,
+          providerRole: 'indexer-fallback',
+          methods: ['getSlot'],
+          rpcUnits: 1,
+        })),
+        ...Array.from({ length: 5 }, () => ({
+          status: 200,
+          startMs: 0,
+          providerRole: 'stock-runtime',
+          methods: ['getSlot'],
+          rpcUnits: 1,
+        })),
+      ],
+    });
+  expectValid(rows);
+
+  const underReported = structuredClone(rows);
+  underReported[0].maximumRollingRpcMethodsByRole['stock-runtime'] = 4;
+  assert.throws(
+    () => summarizeStockRepeatability(underReported),
+    /Per-provider pacing/,
+  );
+
+  const combined = structuredClone(rows);
+  combined[0].maximumRollingRpcMethods = 10;
+  assert.throws(
+    () => summarizeStockRepeatability(combined),
+    /setup\/runtime pacing/,
+  );
+});
 function expectValid(rows) {
   assert.equal(summarizeStockRepeatability(rows).repeatableInThisSample, true);
 }
@@ -271,4 +316,70 @@ test('rejects wallet actions, excessive pacing and inconsistent 429 accounting',
     change(rows[0]);
     assert.throws(() => summarizeStockRepeatability(rows));
   }
+});
+
+test('applies a configured stock runtime method budget per endpoint', () => {
+  const ok = samples();
+  for (const r of ok) {
+    r.qualificationMethodBudget = 25;
+    r.maximumRollingRpcMethodsByRole = {
+      'indexer-fallback': 9,
+      'stock-runtime': 20,
+    };
+    r.maximumRollingRpcMethods = 20;
+  }
+  summarizeStockRepeatability(ok);
+  for (const change of [
+    (row) => {
+      row.maximumRollingRpcMethodsByRole['stock-runtime'] = 26;
+      row.maximumRollingRpcMethods = 26;
+    },
+    (row) => {
+      row.maximumRollingRpcMethodsByRole['indexer-fallback'] = 10;
+    },
+    (row) => {
+      row.qualificationMethodBudget = 100;
+    },
+  ]) {
+    const rows = structuredClone(ok);
+    change(rows[0]);
+    assert.throws(() => summarizeStockRepeatability(rows));
+  }
+});
+
+test('reports strict quote-drift refusals separately from runtime failures', () => {
+  const refuse = (row, classification) =>
+    Object.assign(row, {
+      passed: false,
+      runtime: undefined,
+      elapsedSlots: null,
+      stage: 'order-first-runtime',
+      reason: 'fresh quote required',
+      simulationCount: 0,
+      diagnosis: { check: 'minimum-output', classification },
+    });
+  const rows = samples();
+  refuse(rows[2], 'economic-minimum-output');
+  const market = summarizeStockRepeatability(rows);
+  assert.equal(market.repeatableInThisSample, false);
+  assert.equal(market.runtimeRepeatableExcludingMarketRefusals, true);
+  assert.equal(market.attempts[2].refusalKind, 'market-quote-drift');
+  assert.deepEqual(
+    market.assets.map((x) => [x.passed, x.marketRefusals]),
+    [
+      [2, 1],
+      [3, 0],
+    ],
+  );
+  refuse(rows[3], 'simulation-token-delta');
+  const runtime = summarizeStockRepeatability(rows);
+  assert.equal(runtime.attempts[3].refusalKind, 'runtime');
+  assert.equal(runtime.runtimeRepeatableExcludingMarketRefusals, false);
+  const allMarket = samples();
+  for (const i of [0, 2, 4]) refuse(allMarket[i], 'economic-minimum-output');
+  assert.equal(
+    summarizeStockRepeatability(allMarket)
+      .runtimeRepeatableExcludingMarketRefusals,
+    false,
+  );
 });
