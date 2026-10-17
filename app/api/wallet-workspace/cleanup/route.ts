@@ -2,7 +2,11 @@ import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { walletRequest } from '@/lib/wallet-request';
 import { UUID } from '@/lib/wallet-operation';
+import { env } from '@/lib/server-env';
 import {
+  CLEANUP_MAX_ROWS,
+  isCleanupSell,
+  type WalletCleanupDocument,
   cleanupInput,
   inspectWalletCleanup,
   validatedWalletCleanup,
@@ -11,8 +15,11 @@ import {
 import {
   cleanupRpc,
   decodeWalletCleanupReceipt,
+  decodeWalletCleanupSellReceipt,
   prepareWalletCleanup,
+  prepareWalletCleanupSells,
   recheckWalletCleanup,
+  recheckWalletCleanupSell,
 } from '@/lib/wallet-cleanup-server';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 export const dynamic = 'force-dynamic';
@@ -143,7 +150,7 @@ export async function POST(request: Request) {
         );
       const batchId = crypto.randomUUID();
       const cleanups: WalletCleanup[] = [],
-        errors: { wallet: string; error: string }[] = [],
+        errors: { wallet: string; mint?: string; error: string }[] = [],
         empty: string[] = [];
       const eligible: typeof input.wallets = [];
       for (const wallet of input.wallets) {
@@ -171,21 +178,49 @@ export async function POST(request: Request) {
         }
         eligible.push(wallet);
       }
+      const stage = body.stage === 'sell' ? 'sell' : 'close';
+      if (
+        body.stage !== undefined &&
+        body.stage !== 'sell' &&
+        body.stage !== 'close'
+      )
+        return json({ error: 'Choose the sell or close cleanup stage.' }, 400);
+      const apiKey = (env as unknown as Record<string, unknown>)
+        .JUPITER_API_KEY;
+      if (stage === 'sell' && typeof apiKey !== 'string')
+        return json({ error: 'Jupiter sell routes are not configured.' }, 503);
       // Prepare together so every review in the batch shares a fresh lifetime.
       phase = 'provider';
+      let remaining = 0;
       const prepared = await Promise.allSettled(
-        eligible.map((wallet) =>
-          prepareWalletCleanup(
-            {
-              batchId,
-              wallet: wallet.address,
-              walletRevision: wallet.revision,
-              destination: input.destination,
-              keepLamports: input.keepLamports,
-            },
+        eligible.map(async (wallet): Promise<WalletCleanupDocument[]> => {
+          const context = {
+            batchId,
+            wallet: wallet.address,
+            walletRevision: wallet.revision,
+            destination: input.destination,
+          };
+          if (stage === 'close') {
+            const document = await prepareWalletCleanup(
+              { ...context, keepLamports: input.keepLamports },
+              signal,
+            );
+            return document ? [document] : [];
+          }
+          const result = await prepareWalletCleanupSells(
+            context,
+            apiKey as string,
             signal,
-          ),
-        ),
+          );
+          remaining += result.remaining;
+          for (const e of result.errors)
+            errors.push({
+              wallet: wallet.address,
+              mint: e.mint,
+              error: e.error,
+            });
+          return result.sells;
+        }),
       );
       phase = 'storage';
       for (const [index, wallet] of eligible.entries()) {
@@ -201,60 +236,66 @@ export async function POST(request: Request) {
           });
           continue;
         }
-        const document = outcome.value;
-        if (!document) {
-          empty.push(wallet.address);
+        if (!outcome.value.length) {
+          if (!errors.some((e) => e.wallet === wallet.address))
+            empty.push(wallet.address);
           continue;
         }
-        const at = now();
-        try {
-          const retained = await db
-            .prepare(
-              "INSERT INTO wallet_cleanups (id,owner_id,batch_id,wallet_address,wallet_revision,destination,document,state,signature,receipt,failure,created_at,updated_at) SELECT ?,?,?,?,?,?,?,'awaiting_signature',NULL,NULL,NULL,?,? WHERE EXISTS(SELECT 1 FROM workspace_wallets WHERE owner_id=? AND chain='Solana' AND address=? AND revision=? AND archived=0) AND ?>? RETURNING id",
-            )
-            .bind(
-              document.id,
-              user.userId,
-              batchId,
-              document.wallet,
-              document.walletRevision,
-              document.destination,
-              JSON.stringify(document),
-              at,
-              at,
-              user.userId,
-              document.wallet,
-              document.walletRevision,
-              Date.parse(document.expiresAt),
-              Date.now(),
-            )
-            .first<{ id: string }>();
-          if (!retained) throw new Error('changed');
-        } catch (error) {
-          errors.push({
-            wallet: wallet.address,
-            error:
-              error instanceof Error && /reserved/.test(error.message)
-                ? 'Wallet is reserved by another approval or launch.'
-                : 'Wallet or preparation changed before retention.',
+        for (const document of outcome.value) {
+          if (cleanups.length >= CLEANUP_MAX_ROWS) {
+            remaining++;
+            continue;
+          }
+          const at = now();
+          try {
+            const retained = await db
+              .prepare(
+                "INSERT INTO wallet_cleanups (id,owner_id,batch_id,wallet_address,wallet_revision,destination,document,state,signature,receipt,failure,created_at,updated_at) SELECT ?,?,?,?,?,?,?,'awaiting_signature',NULL,NULL,NULL,?,? WHERE EXISTS(SELECT 1 FROM workspace_wallets WHERE owner_id=? AND chain='Solana' AND address=? AND revision=? AND archived=0) AND ?>? RETURNING id",
+              )
+              .bind(
+                document.id,
+                user.userId,
+                batchId,
+                document.wallet,
+                document.walletRevision,
+                document.destination,
+                JSON.stringify(document),
+                at,
+                at,
+                user.userId,
+                document.wallet,
+                document.walletRevision,
+                Date.parse(document.expiresAt),
+                Date.now(),
+              )
+              .first<{ id: string }>();
+            if (!retained) throw new Error('changed');
+          } catch (error) {
+            errors.push({
+              wallet: wallet.address,
+              error:
+                error instanceof Error && /reserved/.test(error.message)
+                  ? 'Wallet is reserved by another approval or launch.'
+                  : 'Wallet or preparation changed before retention.',
+            });
+            break;
+          }
+          cleanups.push({
+            id: document.id,
+            batchId,
+            wallet: document.wallet,
+            walletRevision: document.walletRevision,
+            state: 'awaiting_signature',
+            signature: null,
+            document,
+            receipt: null,
+            failure: null,
+            createdAt: at,
+            updatedAt: at,
           });
-          continue;
         }
-        cleanups.push({
-          id: document.id,
-          batchId,
-          wallet: document.wallet,
-          walletRevision: document.walletRevision,
-          state: 'awaiting_signature',
-          signature: null,
-          document,
-          receipt: null,
-          failure: null,
-          createdAt: at,
-          updatedAt: at,
-        });
       }
-      return json({ batchId, cleanups, errors, empty });
+      return json({ batchId, stage, cleanups, errors, empty, remaining });
     }
 
     if (body.action === 'begin_signing' || body.action === 'cancel') {
@@ -381,12 +422,14 @@ export async function POST(request: Request) {
           },
           409,
         );
-      const outcome = await decodeWalletCleanupReceipt(
-        raw,
-        review,
-        row.signature,
-        source,
-      );
+      const outcome = isCleanupSell(review)
+        ? await decodeWalletCleanupSellReceipt(
+            raw,
+            review,
+            row.signature,
+            source,
+          )
+        : await decodeWalletCleanupReceipt(raw, review, row.signature, source);
       const failed = 'failed' in outcome;
       phase = 'storage';
       await db
@@ -442,7 +485,9 @@ export async function POST(request: Request) {
             409,
           );
         phase = 'provider';
-        await recheckWalletCleanup(review, signal);
+        await (isCleanupSell(review)
+          ? recheckWalletCleanupSell(review, signal)
+          : recheckWalletCleanup(review, signal));
         phase = 'storage';
         const armed = await db
           .prepare(

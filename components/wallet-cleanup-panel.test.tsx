@@ -8,7 +8,10 @@ import {
   encryptVault,
   VAULT_STORAGE_KEY,
 } from '@/lib/browser-wallet-vault';
-import { prepareWalletCleanup } from '@/lib/wallet-cleanup-server';
+import {
+  prepareWalletCleanup,
+  prepareWalletCleanupSells,
+} from '@/lib/wallet-cleanup-server';
 import { inspectWalletCleanup, type WalletCleanup } from '@/lib/wallet-cleanup';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import { cleanupFixture } from '../test/wallet-cleanup-fixture';
@@ -99,14 +102,26 @@ async function reviewedBatch() {
     vi.fn(async (_url: string, init: RequestInit) => {
       const body = JSON.parse(init.body as string);
       actions.push(body.action);
+      if (body.action === 'prepare' && body.stage === 'sell')
+        return Response.json({
+          batchId: review.batchId,
+          stage: 'sell',
+          cleanups: [],
+          errors: [],
+          empty: [f.wallet],
+          remaining: 0,
+        });
       if (body.action === 'prepare') {
+        expect(body.stage).toBe('close');
         expect(body.destination).toBe(f.destination);
         expect(body.wallets).toEqual([{ address: f.wallet, revision: 1 }]);
         return Response.json({
           batchId: review.batchId,
+          stage: 'close',
           cleanups: [row('awaiting_signature')],
           errors: [],
           empty: [],
+          remaining: 0,
         });
       }
       if (body.action === 'begin_signing')
@@ -160,11 +175,11 @@ async function reviewedBatch() {
   );
   const approve = button('Approve and send 1 transaction');
   expect(approve.disabled).toBe(true);
-  const [checkbox, password] = Array.from(
-    container.querySelectorAll('input'),
-  ).filter((i) => i.type === 'checkbox' || i.type === 'password');
+  const inputs = Array.from(container.querySelectorAll('input'));
+  const checkbox = inputs.filter((i) => i.type === 'checkbox').at(-1)!;
+  const password = inputs.find((i) => i.type === 'password')!;
   await act(async () => checkbox.click());
-  expect(actions).toEqual(['prepare']);
+  expect(actions).toEqual(['prepare', 'prepare']);
   return { f, review, actions, password, sent: () => sentTransaction };
 }
 
@@ -178,7 +193,13 @@ it('signs and sends each reviewed packet once only after explicit approval', asy
     for (let i = 0; i < 100 && !sent(); i++) await settle();
     await settle();
   });
-  expect(actions).toEqual(['prepare', 'begin_signing', 'register', 'submit']);
+  expect(actions).toEqual([
+    'prepare',
+    'prepare',
+    'begin_signing',
+    'register',
+    'submit',
+  ]);
   await expect(
     inspectWalletCleanup(review, sent(), true),
   ).resolves.toBeTruthy();
@@ -195,14 +216,19 @@ it('releases the signing reservation when the vault does not unlock', async () =
   );
   await act(async () => {
     button('Approve and send').click();
-    for (let i = 0; i < 100 && actions.length < 3; i++) await settle();
+    for (let i = 0; i < 100 && actions.length < 4; i++) await settle();
     await settle();
   });
   expect(sent()).toBe('');
   expect(container.querySelector('[role="alert"]')?.textContent).toMatch(
     /unlock vault/,
   );
-  expect(actions).toEqual(['prepare', 'begin_signing', 'reject_signing']);
+  expect(actions).toEqual([
+    'prepare',
+    'prepare',
+    'begin_signing',
+    'reject_signing',
+  ]);
   expect(container.textContent).toContain('cancelled');
 }, 30000);
 
@@ -218,4 +244,83 @@ it('needs selected wallets and a destination before scanning', async () => {
   await act(async () => button('Open cleanup').click());
   expect(container.textContent).toContain('Select the wallets to clean up');
   expect(button('Scan and review cleanup').disabled).toBe(true);
+});
+
+it('shows the sell batch first and offers close and sweep once sells are settled', async () => {
+  const f = cleanupFixture();
+  const {
+    sells: [sell],
+  } = await prepareWalletCleanupSells(
+    {
+      batchId: '11111111-1111-4111-8111-111111111111',
+      wallet: f.wallet,
+      walletRevision: 1,
+      destination: f.destination,
+    },
+    'key',
+    AbortSignal.timeout(10000),
+    f.fetcher,
+    f.sell.deps,
+  );
+  const stages: string[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      stages.push(body.stage);
+      return Response.json({
+        batchId: sell.batchId,
+        stage: body.stage,
+        cleanups:
+          body.stage === 'sell'
+            ? [
+                {
+                  id: sell.id,
+                  batchId: sell.batchId,
+                  wallet: sell.wallet,
+                  walletRevision: 1,
+                  state: 'cancelled',
+                  signature: null,
+                  document: sell,
+                  receipt: null,
+                  failure: null,
+                  createdAt: sell.preparedAt,
+                  updatedAt: sell.preparedAt,
+                },
+              ]
+            : [],
+        errors: [],
+        empty: body.stage === 'close' ? [f.wallet] : [],
+        remaining: 0,
+      });
+    }),
+  );
+  const wallets = [
+    wallet(f.wallet, 'Launch 1'),
+    wallet(f.destination, 'Funder'),
+  ];
+  await act(async () =>
+    root.render(
+      <WalletCleanupPanel wallets={wallets} selected={[wallets[0]]} />,
+    ),
+  );
+  await act(async () => button('Open cleanup').click());
+  await act(async () =>
+    setValue(container.querySelector('select')!, f.destination),
+  );
+  await act(async () => {
+    button('Scan and review cleanup').click();
+    await settle();
+  });
+  expect(container.textContent).toContain('Minimum SOL');
+  expect(container.textContent).toContain('0.000005 of');
+  expect(container.querySelector('output')?.textContent).toContain(
+    'at least 0.000995 SOL',
+  );
+  await act(async () => {
+    button('Continue: close accounts and sweep SOL').click();
+    await settle();
+  });
+  expect(stages).toEqual(['sell', 'close']);
+  expect(container.textContent).toContain('Nothing to clean');
 });

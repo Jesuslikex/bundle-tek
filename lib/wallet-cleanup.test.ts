@@ -15,6 +15,7 @@ import {
   cleanupMessage,
   cleanupTotals,
   inspectWalletCleanup,
+  isCleanupSell,
   signWalletCleanupBatch,
   validatedWalletCleanup,
   type CleanupTokenProgram,
@@ -23,7 +24,9 @@ import {
   classifyCleanupAccount,
   cleanupSweep,
   decodeWalletCleanupReceipt,
+  decodeWalletCleanupSellReceipt,
   prepareWalletCleanup,
+  prepareWalletCleanupSells,
   recheckWalletCleanup,
 } from './wallet-cleanup-server';
 import {
@@ -479,5 +482,109 @@ describe('prepare, sign, recheck and receipts', () => {
         'rpc.test',
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('cleanup sells', () => {
+  const sells = (f: ReturnType<typeof cleanupFixture>) =>
+    prepareWalletCleanupSells(
+      {
+        batchId,
+        wallet: f.wallet,
+        walletRevision: 1,
+        destination: f.destination,
+      },
+      'key',
+      AbortSignal.timeout(10000),
+      f.fetcher,
+      f.sell.deps,
+    );
+  it('prepares one simulated whole-balance sell per held mint and signs it like any cleanup packet', async () => {
+    const f = cleanupFixture();
+    const {
+      sells: [review],
+      errors,
+      remaining,
+    } = await sells(f);
+    expect(errors).toEqual([]);
+    expect(remaining).toBe(0);
+    expect(review).toMatchObject({
+      format: 'wallet-cleanup-sell-v1',
+      mint: f.sell.mint,
+      decimals: 6,
+      amountRaw: '5',
+      minimumOutLamports: '995000',
+      sourceAccount: f.sell.simulation.source,
+    });
+    expect(isCleanupSell(review)).toBe(true);
+    const [signed] = await signWalletCleanupBatch(
+      await f.session(f.owner),
+      [review],
+      () => {},
+    );
+    await expect(
+      inspectWalletCleanup(review, signed.transaction, true),
+    ).resolves.toMatchObject({ signature: signed.signature });
+    await expect(
+      inspectWalletCleanup(
+        { ...review, sha256: 'a'.repeat(64) },
+        signed.transaction,
+        true,
+      ),
+    ).rejects.toThrow();
+    expect(cleanupTotals([review])).toMatchObject({
+      sells: 1,
+      minimumSellOut: 995000n,
+    });
+  });
+  it('reports a holding as unsellable when the simulation does not deliver the minimum or uses another account', async () => {
+    const f = cleanupFixture();
+    f.sell.simulation.nativeChangeRaw = '1';
+    expect((await sells(f)).errors[0].error).toMatch(/did not deliver/);
+    f.sell.simulation.nativeChangeRaw = '995000';
+    f.sell.simulation.source = fill(1);
+    expect((await sells(f)).sells).toEqual([]);
+    f.sell.simulation.source = cleanupFixture().sell.simulation.source;
+    f.sell.simulation.inputAmountMatches = null;
+    expect((await sells(f)).sells).toEqual([]);
+  });
+  it('decodes finalized sell receipts and refuses partial sales', async () => {
+    const f = cleanupFixture();
+    const {
+      sells: [review],
+    } = await sells(f);
+    const [signed] = await signWalletCleanupBatch(
+      await f.session(f.owner),
+      [review],
+      () => {},
+    );
+    const ok = await decodeWalletCleanupSellReceipt(
+      f.sell.receipt(signed.transaction),
+      review,
+      signed.signature,
+      'rpc.test',
+    );
+    expect(ok).toMatchObject({
+      kind: 'sell',
+      soldRaw: '5',
+      nativeChangeLamports: '990000',
+    });
+    await expect(
+      decodeWalletCleanupSellReceipt(
+        f.sell.receipt(signed.transaction, 4n),
+        review,
+        signed.signature,
+        'rpc.test',
+      ),
+    ).rejects.toThrow(/amount differs/);
+    const failed = await decodeWalletCleanupSellReceipt(
+      f.sell.receipt(signed.transaction, 0n, {
+        InstructionError: [0, 'Custom'],
+      }),
+      review,
+      signed.signature,
+      'rpc.test',
+    );
+    expect(failed).toMatchObject({ failed: true });
   });
 });

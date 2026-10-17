@@ -4,6 +4,7 @@ import { verifySolanaSignature } from '@/lib/solana-signature';
 import { walletAddress } from './wallet-workspace';
 import { UUID } from './wallet-operation';
 import type { VaultSession } from './browser-wallet-vault';
+import { reviewUnsignedSwapEnvelope } from './unsigned-swap-order';
 
 // Wallet cleanup: per wallet, one legacy transaction that closes every empty
 // (or wrapped-SOL) token account with rent sent to the destination, then
@@ -17,6 +18,8 @@ export const CLEANUP_MAX_CLOSE = 20;
 export const CLEANUP_MAX_SKIPPED = 30;
 export const CLEANUP_MAX_WALLETS = 10;
 export const CLEANUP_LIFETIME_MS = 90_000;
+export const CLEANUP_MAX_SELLS_PER_WALLET = 3;
+export const CLEANUP_MAX_ROWS = 20;
 // Ordinary system wallet: 0-byte account rent exemption at the current rent.
 export const SYSTEM_RENT_EXEMPT_LAMPORTS = 890_880n;
 export const CLEANUP_SIGNATURE_FEE_LAMPORTS = 5_000n;
@@ -72,6 +75,57 @@ export type WalletCleanupReview = {
   expiresAt: string;
   source: string;
 };
+/** Jupiter sell of one whole token balance to native SOL, before close + sweep. */
+export type WalletCleanupSellReview = {
+  format: 'wallet-cleanup-sell-v1';
+  id: string;
+  batchId: string;
+  network: 'mainnet';
+  wallet: string;
+  walletRevision: number;
+  destination: string;
+  mint: string;
+  decimals: number;
+  sourceAccount: string;
+  amountRaw: string;
+  expectedOutLamports: string;
+  minimumOutLamports: string;
+  router: string;
+  priceImpactPct: string | null;
+  networkFeeLamports: string;
+  simulatedNativeChangeLamports: string;
+  lastValidBlockHeight: string;
+  slot: number;
+  transaction: string;
+  sha256: string;
+  preparedAt: string;
+  expiresAt: string;
+  source: string;
+};
+export type WalletCleanupDocument =
+  | WalletCleanupReview
+  | WalletCleanupSellReview;
+export const isCleanupSell = (
+  document: WalletCleanupDocument,
+): document is WalletCleanupSellReview =>
+  document.format === 'wallet-cleanup-sell-v1';
+export type WalletCleanupSellReceipt = {
+  kind: 'sell';
+  network: 'mainnet';
+  commitment: 'finalized';
+  signatureVerified: true;
+  signature: string;
+  wallet: string;
+  mint: string;
+  soldRaw: string;
+  nativeChangeLamports: string;
+  networkFeeLamports: string;
+  slot: number;
+  blockTime: number | null;
+  sha256: string;
+  observedAt: string;
+  source: string;
+};
 export type WalletCleanupReceipt = {
   network: 'mainnet';
   commitment: 'finalized';
@@ -112,8 +166,8 @@ export type WalletCleanup = {
   walletRevision: number;
   state: WalletCleanupState;
   signature: string | null;
-  document: WalletCleanupReview;
-  receipt: WalletCleanupReceipt | null;
+  document: WalletCleanupDocument;
+  receipt: WalletCleanupReceipt | WalletCleanupSellReceipt | null;
   failure: WalletCleanupFailure | null;
   createdAt: string;
   updatedAt: string;
@@ -252,7 +306,118 @@ function validClose(c: CleanupClose) {
   );
 }
 
+const ISO_LIMIT = (review: { preparedAt: string; expiresAt: string }) =>
+  !Number.isFinite(Date.parse(review.preparedAt)) ||
+  !Number.isFinite(Date.parse(review.expiresAt)) ||
+  Date.parse(review.expiresAt) <= Date.parse(review.preparedAt) ||
+  Date.parse(review.expiresAt) - Date.parse(review.preparedAt) >
+    CLEANUP_LIFETIME_MS;
+
+/** Compare a (possibly signed) single-signer packet with its reviewed unsigned bytes. */
+async function matchPacket(
+  unsignedBase64: string,
+  sha256: string,
+  wallet: string,
+  transaction: string,
+  signed: boolean,
+  message?: Uint8Array,
+) {
+  const unsigned = decode(unsignedBase64);
+  const reviewed = unsigned.slice(65);
+  if (
+    unsigned[0] !== 1 ||
+    unsigned.slice(1, 65).some((b) => b !== 0) ||
+    (message &&
+      (message.length !== reviewed.length ||
+        message.some((b, i) => b !== reviewed[i]))) ||
+    (await sha(unsigned)) !== sha256
+  )
+    throw new Error('Cleanup packet differs from its exact review.');
+  const bytes = decode(transaction);
+  if (
+    bytes.length !== unsigned.length ||
+    bytes[0] !== 1 ||
+    bytes.slice(65).some((byte, i) => byte !== reviewed[i])
+  )
+    throw new Error('Cleanup packet differs from its exact review.');
+  const signature = bytes.slice(1, 65);
+  if (
+    signed
+      ? !verifySolanaSignature(reviewed, signature, bs58.decode(wallet))
+      : signature.some((byte) => byte !== 0)
+  )
+    throw new Error('Invalid cleanup wallet signature.');
+  return {
+    bytes,
+    message: reviewed,
+    signature: signed ? bs58.encode(signature) : null,
+  };
+}
+
+async function inspectSell(
+  review: WalletCleanupSellReview,
+  transaction: string,
+  signed: boolean,
+) {
+  const wallet = walletAddress(review.wallet, 'Solana');
+  walletAddress(review.destination, 'Solana');
+  walletAddress(review.sourceAccount, 'Solana');
+  const mint = walletAddress(review.mint, 'Solana');
+  if (
+    !UUID.test(review.id) ||
+    !UUID.test(review.batchId) ||
+    review.network !== 'mainnet' ||
+    !Number.isSafeInteger(review.walletRevision) ||
+    review.walletRevision < 1 ||
+    !Number.isSafeInteger(review.slot) ||
+    review.slot < 0 ||
+    !Number.isInteger(review.decimals) ||
+    review.decimals < 0 ||
+    review.decimals > 255 ||
+    mint === WRAPPED_SOL_MINT ||
+    review.wallet === review.destination ||
+    typeof review.router !== 'string' ||
+    (review.priceImpactPct !== null &&
+      typeof review.priceImpactPct !== 'string') ||
+    ISO_LIMIT(review) ||
+    !/^[a-f0-9]{64}$/.test(review.sha256) ||
+    typeof review.source !== 'string'
+  )
+    throw new Error('Cleanup sell review differs.');
+  const minimum = uint(review.minimumOutLamports);
+  if (
+    uint(review.amountRaw) === 0n ||
+    minimum === 0n ||
+    minimum > uint(review.expectedOutLamports) ||
+    uint(review.networkFeeLamports) < CLEANUP_SIGNATURE_FEE_LAMPORTS
+  )
+    throw new Error('Cleanup sell amounts differ from the review.');
+  uint(review.lastValidBlockHeight);
+  if (!/^-?(0|[1-9]\d{0,19})$/.test(review.simulatedNativeChangeLamports))
+    throw new Error('Cleanup sell simulation differs.');
+  const envelope = await reviewUnsignedSwapEnvelope(review.transaction, wallet);
+  if (envelope.sha256 !== review.sha256)
+    throw new Error('Cleanup packet differs from its exact review.');
+  return matchPacket(
+    review.transaction,
+    review.sha256,
+    wallet,
+    transaction,
+    signed,
+  );
+}
+
 export async function inspectWalletCleanup(
+  review: WalletCleanupDocument,
+  transaction: string,
+  signed: boolean,
+) {
+  if (review && isCleanupSell(review))
+    return inspectSell(review, transaction, signed);
+  return inspectClose(review as WalletCleanupReview, transaction, signed);
+}
+
+async function inspectClose(
   review: WalletCleanupReview,
   transaction: string,
   signed: boolean,
@@ -307,30 +472,20 @@ export async function inspectWalletCleanup(
     close: review.close,
     sweepLamports: sweep,
   });
-  const bytes = decode(transaction),
-    unsigned = Uint8Array.from([1, ...new Uint8Array(64), ...message]);
-  if (
-    bytes.length !== unsigned.length ||
-    bytes[0] !== 1 ||
-    bytes.slice(65).some((byte, i) => byte !== message[i]) ||
-    (await sha(unsigned)) !== review.sha256 ||
-    encode(unsigned) !== review.transaction
-  )
-    throw new Error('Cleanup packet differs from its exact review.');
-  const signature = bytes.slice(1, 65);
-  if (
-    signed
-      ? !verifySolanaSignature(message, signature, bs58.decode(wallet))
-      : signature.some((byte) => byte !== 0)
-  )
-    throw new Error('Invalid cleanup wallet signature.');
-  return { bytes, message, signature: signed ? bs58.encode(signature) : null };
+  return matchPacket(
+    review.transaction,
+    review.sha256,
+    wallet,
+    transaction,
+    signed,
+    message,
+  );
 }
 
 /** Sign one reviewed cleanup packet with the vault seed, then erase it. */
 export async function signWalletCleanup(
   session: VaultSession,
-  review: WalletCleanupReview,
+  review: WalletCleanupDocument,
   assertCurrent: () => void,
 ) {
   const { message } = await inspectWalletCleanup(
@@ -369,7 +524,7 @@ export async function signWalletCleanup(
 /** All-or-nothing: every vault identity is checked before any signature. */
 export async function signWalletCleanupBatch(
   session: VaultSession,
-  reviews: WalletCleanupReview[],
+  reviews: WalletCleanupDocument[],
   assertCurrent: () => void,
 ) {
   if (!reviews.length || new Set(reviews.map((r) => r.batchId)).size !== 1)
@@ -433,10 +588,16 @@ export async function validatedWalletCleanup(
       !r ||
       r.signature !== row.signature ||
       r.wallet !== row.wallet ||
-      r.destination !== review.destination ||
       r.sha256 !== review.sha256 ||
-      r.closedAccounts !== review.close.length ||
-      uint(r.networkFeeLamports) > uint(review.feeLamports)
+      (isCleanupSell(review)
+        ? !('kind' in r) ||
+          r.mint !== review.mint ||
+          r.soldRaw !== review.amountRaw ||
+          uint(r.networkFeeLamports) > uint(review.networkFeeLamports)
+        : 'kind' in r ||
+          r.destination !== review.destination ||
+          r.closedAccounts !== review.close.length ||
+          uint(r.networkFeeLamports) > uint(review.feeLamports))
     )
       throw new Error('Finalized cleanup receipt differs.');
   } else if (r !== null) throw new Error('Unexpected cleanup receipt.');
@@ -448,18 +609,35 @@ export async function validatedWalletCleanup(
   return row;
 }
 
-export function cleanupTotals(reviews: WalletCleanupReview[]) {
+export function cleanupTotals(documents: WalletCleanupDocument[]) {
   let reclaim = 0n,
     sweep = 0n,
     fee = 0n,
     closed = 0,
-    skipped = 0;
-  for (const r of reviews) {
+    skipped = 0,
+    sells = 0,
+    minimumSellOut = 0n;
+  for (const r of documents) {
+    if (isCleanupSell(r)) {
+      sells++;
+      minimumSellOut += uint(r.minimumOutLamports);
+      fee += uint(r.networkFeeLamports);
+      continue;
+    }
     reclaim += uint(r.reclaimLamports);
     sweep += uint(r.sweepLamports);
     fee += uint(r.feeLamports);
     closed += r.close.length;
     skipped += r.skippedCount;
   }
-  return { reclaim, sweep, fee, received: reclaim + sweep, closed, skipped };
+  return {
+    reclaim,
+    sweep,
+    fee,
+    received: reclaim + sweep,
+    closed,
+    skipped,
+    sells,
+    minimumSellOut,
+  };
 }

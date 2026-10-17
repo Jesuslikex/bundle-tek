@@ -62,6 +62,42 @@ export function tokenAccountData(input: {
   }
   return btoa(String.fromCharCode(...bytes));
 }
+/** Synthetic initialized SPL mint with the given decimals. */
+export function mintData(decimals: number) {
+  const bytes = new Uint8Array(82);
+  bytes[44] = decimals;
+  bytes[45] = 1;
+  return btoa(String.fromCharCode(...bytes));
+}
+/** Minimal canonical unsigned v0 packet signed by `wallet` (sell stand-in). */
+export async function v0Packet(wallet: string, salt = 1) {
+  const program = fill(200 + salt);
+  const message = [
+    0x80,
+    1,
+    0,
+    1,
+    2,
+    ...bs58.decode(wallet),
+    ...bs58.decode(program),
+    ...bs58.decode(fill(3)),
+    1,
+    1,
+    1,
+    0,
+    1,
+    salt,
+    0,
+  ];
+  const bytes = Uint8Array.from([1, ...new Uint8Array(64), ...message]);
+  const digest = await crypto.subtle.digest('SHA-256', bytes.buffer);
+  return {
+    transaction: btoa(String.fromCharCode(...bytes)),
+    sha256: Array.from(new Uint8Array(digest), (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join(''),
+  };
+}
 const u64 = (value: bigint) => {
   const out = new Uint8Array(8);
   new DataView(out.buffer).setBigUint64(0, value, true);
@@ -187,6 +223,16 @@ export function cleanupFixture(n = 7) {
         return { context, value: program === TOKEN_PROGRAM ? legacy : t22 };
       }
       case 'getMultipleAccounts':
+        if ((params[0] as string[])[0] === mintB)
+          return {
+            context,
+            value: (params[0] as string[]).map(() => ({
+              lamports: '1461600',
+              owner: TOKEN_PROGRAM,
+              executable: false,
+              data: [mintData(6), 'base64'],
+            })),
+          };
         return {
           context,
           value: [
@@ -197,8 +243,9 @@ export function cleanupFixture(n = 7) {
       case 'getFeeForMessage':
         return { context, value: Number(state.feeLamports) };
       case 'simulateTransaction': {
-        const addresses = (params[1] as { accounts: { addresses: string[] } })
-          .accounts.addresses;
+        const addresses =
+          (params[1] as { accounts?: { addresses: string[] } }).accounts
+            ?.addresses ?? [];
         return {
           context,
           value: {
@@ -288,7 +335,79 @@ export function cleanupFixture(n = 7) {
       },
     };
   };
+  /** Fake Jupiter order + simulation for the holding of mintB (5 raw, 6 decimals). */
+  const sell = {
+    simulation: {
+      succeeded: true,
+      status: 'Matched fields',
+      source: fill(60 + n),
+      inputAmountMatches: true as boolean | null,
+      nativeChangeRaw: '995000' as string | null,
+    },
+    deps: {
+      prepare: (async (input: { wallet: string; amount: string }) => {
+        const packet = await v0Packet(input.wallet);
+        return {
+          executionAllowed: false,
+          side: 'Sell',
+          inputMint: mintB,
+          outputMint: WRAPPED_SOL_MINT,
+          inAmount: (BigInt(input.amount.replace('.', '')) || 0n).toString(),
+          outAmount: '1000000',
+          minimumOutAmount: '995000',
+          slippageBps: 50,
+          router: 'metis',
+          priceImpactPct: '0.1',
+          source: 'api.jup.ag',
+          observedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 30000).toISOString(),
+          preparation: {
+            ...packet,
+            lastValidBlockHeight: '200',
+            estimatedFeesLamports: '5000',
+          },
+        };
+      }) as never,
+      simulate: (async () => ({
+        succeeded: sell.simulation.succeeded,
+        routeAssessment: {
+          status: sell.simulation.status,
+          decoded: { sourceAccount: sell.simulation.source },
+        },
+        inputAmountMatches: sell.simulation.inputAmountMatches,
+        nativeChangeRaw: sell.simulation.nativeChangeRaw,
+        networkFeeLamports: '5000',
+        simulationSlot: 100,
+        source: 'rpc.test',
+      })) as never,
+    },
+    mint: mintB,
+    /** Finalized v0 receipt selling the whole holding. */
+    receipt: (transaction: string, soldRaw = 5n, err: unknown = null) => ({
+      slot: '130',
+      blockTime: null,
+      version: 0,
+      transaction: [transaction, 'base64'],
+      meta: {
+        err,
+        fee: '5000',
+        preBalances: ['20000000', '1'],
+        postBalances: ['20990000', '1'],
+        preTokenBalances: [
+          { mint: mintB, owner: wallet, uiTokenAmount: { amount: '5' } },
+        ],
+        postTokenBalances: [
+          {
+            mint: mintB,
+            owner: wallet,
+            uiTokenAmount: { amount: (5n - soldRaw).toString() },
+          },
+        ],
+      },
+    }),
+  };
   return {
+    sell,
     owner,
     wallet,
     destination,
