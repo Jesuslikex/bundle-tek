@@ -7,9 +7,22 @@ import type {
 } from '@/lib/pair-order-first-review';
 import { pairRuntimeDigest } from '@/lib/pair-runtime-trace';
 import { readPanelJson } from './read-panel-json';
+import {
+  unlockVault,
+  VAULT_STORAGE_KEY,
+  type VaultSession,
+} from '@/lib/browser-wallet-vault';
+import { signPairOrderPacket } from '@/lib/pair-order-signing';
+import type { PairOrderSigningAuthorization } from '@/lib/pair-order-authorization';
+import type { publicPairOrderExecution } from '@/lib/pair-order-execution';
 import styles from './imported-pair-order-review.module.css';
 
-type Saved = { id: string; review: PairOrderFirstReview };
+type Saved = {
+  id: string;
+  review: PairOrderFirstReview;
+  stockSigningEnabled?: boolean;
+};
+type Execution = ReturnType<typeof publicPairOrderExecution>;
 export function ImportedPairOrderReview({
   request,
   locked = false,
@@ -40,7 +53,10 @@ function PairOrderReviewSession({
     [busy, setBusy] = useState(false),
     [attempted, setAttempted] = useState(false),
     [error, setError] = useState(''),
-    [clock, setClock] = useState(Date.now);
+    [clock, setClock] = useState(Date.now),
+    [vaultPassword, setVaultPassword] = useState(''),
+    [execution, setExecution] = useState<Execution | null>(null),
+    [sendApproved, setSendApproved] = useState(false);
   const pending = useRef<AbortController | null>(null),
     active = useRef(true);
   useEffect(() => {
@@ -89,6 +105,8 @@ function PairOrderReviewSession({
     setAcknowledged(false);
     setUnavailableAcknowledged(false);
     setAttempted(false);
+    setExecution(null);
+    setSendApproved(false);
     try {
       const data = (await post({
         action: 'prepare',
@@ -156,17 +174,64 @@ function PairOrderReviewSession({
       acknowledgeIndependentDifference: acknowledged,
       acknowledgeUnavailableIndependentPrice: unavailableAcknowledged,
     };
+    const signing = saved.stockSigningEnabled === true,
+      passphrase = vaultPassword,
+      vault = signing ? localStorage.getItem(VAULT_STORAGE_KEY) : null;
+    if (signing && (!vault || !passphrase)) {
+      setError('Unlock the browser wallet vault holding this wallet first.');
+      return;
+    }
+    setVaultPassword('');
     setAttempted(true);
     setBusy(true);
     setError('');
+    let session: VaultSession | undefined;
     try {
-      await post({ action: 'approve', id: saved.id, consent });
-      // No signer is connected to this component. A future signing release needs
-      // its own window validation, single-use claim and browser-local signer.
-      if (active.current)
-        setError(
-          'Authorization received. Stock signing remains unavailable in this release.',
-        );
+      // Unlock before approval: the server signing window is only five seconds.
+      if (signing) session = await unlockVault(vault!, passphrase);
+      const current = () => {
+        if (!active.current) throw Error('Order review closed.');
+        if (signing && localStorage.getItem(VAULT_STORAGE_KEY) !== vault)
+          throw Error('Stored vault changed.');
+      };
+      current();
+      const data = (await post({
+        action: 'approve',
+        id: saved.id,
+        consent,
+      })) as unknown as PairOrderSigningAuthorization & {
+        execution?: Execution;
+      };
+      if (!signing || !session || !data.execution) {
+        if (active.current)
+          setError(
+            'Authorization received. Stock signing remains unavailable in this release.',
+          );
+        return;
+      }
+      const { execution: reserved, ...authorization } = data;
+      const signed = await signPairOrderPacket(
+        session,
+        saved.review,
+        authorization as PairOrderSigningAuthorization,
+        reserved,
+        {
+          approved: true,
+          authorizationId: authorization.id,
+          authorizationSha256: authorization.sha256,
+          packetSha256: authorization.packetSha256,
+        },
+        current,
+      );
+      session = undefined;
+      const registered = (await post({
+        action: 'register',
+        authorizationId: authorization.id,
+        signedPacket: signed.signedPacket,
+      })) as unknown as Execution;
+      if (registered.signature !== signed.signature)
+        throw Error('Registered signature differs. Nothing was sent.');
+      if (active.current) setExecution(registered);
     } catch (e) {
       if (active.current)
         setError(
@@ -175,6 +240,7 @@ function PairOrderReviewSession({
             : 'Authorization unavailable. Request a new review.',
         );
     } finally {
+      session = undefined;
       pending.current = null;
       if (active.current) {
         setBusy(false);
@@ -182,6 +248,56 @@ function PairOrderReviewSession({
         setAcknowledged(false);
         setUnavailableAcknowledged(false);
       }
+    }
+  }
+  async function send() {
+    if (
+      !execution ||
+      execution.state !== 'signed' ||
+      !execution.signature ||
+      !sendApproved ||
+      pending.current
+    )
+      return;
+    setSendApproved(false);
+    setBusy(true);
+    setError('');
+    try {
+      const result = (await post({
+        action: 'submit',
+        authorizationId: execution.authorizationId,
+        consent: {
+          authorizationId: execution.authorizationId,
+          packetSha256: execution.packetSha256,
+          signature: execution.signature,
+          sendExactSignedPacketOnce: true,
+        },
+      })) as unknown as Execution;
+      if (active.current) setExecution(result);
+    } catch (e) {
+      if (active.current)
+        setError(e instanceof Error ? e.message : 'Send outcome unknown.');
+    } finally {
+      pending.current = null;
+      if (active.current) setBusy(false);
+    }
+  }
+  async function recover() {
+    if (!execution || pending.current) return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = (await post({
+        action: 'recover',
+        authorizationId: execution.authorizationId,
+      })) as unknown as Execution;
+      if (active.current) setExecution(result);
+    } catch (e) {
+      if (active.current)
+        setError(e instanceof Error ? e.message : 'Receipt unavailable.');
+    } finally {
+      pending.current = null;
+      if (active.current) setBusy(false);
     }
   }
   const reason = locked
@@ -207,8 +323,9 @@ function PairOrderReviewSession({
     <section className={styles.panel} aria-label="Pair order review">
       <h3>Review this {review?.side.toLowerCase() ?? 'buy or sell'} order</h3>
       <p>
-        Stock signing is off while runtime qualification is pending. Reviewing
-        an order never sends it.
+        {saved?.stockSigningEnabled === true
+          ? 'Signing happens only in this browser after your explicit approval. Sending is a separate, single attempt.'
+          : 'Stock signing is off while runtime qualification is pending. Reviewing an order never sends it.'}
       </p>
       <button
         type="button"
@@ -351,13 +468,82 @@ function PairOrderReviewSession({
               slippage bound.
             </label>
           )}
+          {saved?.stockSigningEnabled === true && !execution && (
+            <label className={styles.consent}>
+              Wallet vault passphrase (unlocked only in this browser)
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={vaultPassword}
+                disabled={busy || expired || attempted}
+                onChange={(e) => setVaultPassword(e.target.value)}
+              />
+            </label>
+          )}
           <button
             type="button"
             onClick={() => void approve()}
-            disabled={busy || !!reason}
+            disabled={
+              busy ||
+              !!reason ||
+              (saved?.stockSigningEnabled === true && !vaultPassword)
+            }
           >
-            Request signing authorization
+            {saved?.stockSigningEnabled === true
+              ? 'Approve and sign locally'
+              : 'Request signing authorization'}
           </button>
+          {saved?.stockSigningEnabled === true && execution && (
+            <div aria-label="Stock order execution">
+              <p>
+                State: <strong>{execution.outcome}</strong>
+                {execution.signature && (
+                  <>
+                    {' '}
+                    · Signature{' '}
+                    <span className={styles.hash}>{execution.signature}</span>
+                  </>
+                )}
+              </p>
+              {execution.state === 'signed' && (
+                <>
+                  <label className={styles.consent}>
+                    <input
+                      type="checkbox"
+                      checked={sendApproved}
+                      disabled={busy}
+                      onChange={(e) => setSendApproved(e.target.checked)}
+                    />
+                    Send this exact signed order once. It is never resent; a
+                    lost reply stays unknown until its receipt is recovered.
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void send()}
+                    disabled={busy || !sendApproved}
+                  >
+                    Send once
+                  </button>
+                </>
+              )}
+              {execution.reservationHeld && (
+                <button
+                  type="button"
+                  onClick={() => void recover()}
+                  disabled={busy}
+                >
+                  Check finalized receipt
+                </button>
+              )}
+              {execution.receipt?.kind === 'finalized' && (
+                <p>
+                  Output {execution.receipt.outputRaw} atomic units; minimum{' '}
+                  {execution.receipt.minimumOutputRaw}{' '}
+                  {execution.receipt.minimumOutputMet ? 'met' : 'NOT met'}.
+                </p>
+              )}
+            </div>
+          )}
         </>
       )}
       {reason && <output>{reason}</output>}

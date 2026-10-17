@@ -25,6 +25,15 @@ import {
 import { pairRuntimeDigest } from './pair-runtime-trace';
 import { pairStockSigningPolicy } from './pair-stock-signing-policy';
 import { authorizePairOrderAfterRecheck } from './pair-order-authorization';
+import {
+  PairTrustedProgramError,
+  requirePairTrustedPrograms,
+} from './pair-trusted-programs';
+import {
+  pairOrderReservationAvailable,
+  publicPairOrderExecution,
+  readOwnedPairOrderExecution,
+} from './pair-order-execution';
 import { collectPairRuntimePreview } from './pair-runtime-preview';
 import { assertPairOrderQuoteBounds } from './pair-order-quote-bounds';
 import { createPairReadRpc } from './pair-read-rpc';
@@ -485,12 +494,23 @@ export async function approveOwnedPairOrderFirstReview(
           originalLifetimeValid:
             Date.now() < Date.parse(fresh.runtime.expiresAt),
           twoCompleteCodeScansMatched: fresh.runtime.codeIdentityObserved,
-          // Both remain false today: no preview alone establishes these policies.
-          trustedProgramPolicyEstablished: Boolean(
-            fresh.runtime.trustedProgramPolicyEstablished,
-          ),
-          applicationReservationsChecked: Boolean(
-            fresh.review.applicationReservationsChecked,
+          // Pinned allowlist against both complete scans, never a preview flag.
+          trustedProgramPolicyEstablished: (() => {
+            try {
+              return requirePairTrustedPrograms(
+                fresh.codeScans[0],
+                fresh.codeScans[1],
+              );
+            } catch (error) {
+              if (error instanceof PairTrustedProgramError) return false;
+              throw error;
+            }
+          })(),
+          // The insert trigger rechecks this atomically with the authorization.
+          applicationReservationsChecked: await pairOrderReservationAvailable(
+            db,
+            owner,
+            record.request.wallet,
           ),
         };
       },
@@ -499,25 +519,53 @@ export async function approveOwnedPairOrderFirstReview(
       now,
     );
     signal.throwIfAborted();
-    const saved = await db
-      .prepare(
-        'INSERT INTO pair_order_first_authorizations (id,review_id,owner_id,document,created_at,expires_at) VALUES (?,?,?,?,?,?)',
-      )
-      .bind(
-        auth.id,
-        id,
-        owner,
-        JSON.stringify(auth),
-        auth.createdAt,
-        auth.expiresAt,
-      )
-      .run();
+    const order = record.candidate.order;
+    const results = await db.batch([
+      db
+        .prepare(
+          'INSERT INTO pair_order_first_authorizations (id,review_id,owner_id,document,created_at,expires_at) VALUES (?,?,?,?,?,?)',
+        )
+        .bind(
+          auth.id,
+          id,
+          owner,
+          JSON.stringify(auth),
+          auth.createdAt,
+          auth.expiresAt,
+        ),
+      db
+        .prepare(
+          "INSERT INTO pair_order_executions (authorization_id,review_id,owner_id,wallet,packet,packet_sha256,input_mint,output_mint,minimum_output_raw,last_valid_block_height,authorization_expires_at,review_expires_at,state,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'reserved',?,?)",
+        )
+        .bind(
+          auth.id,
+          id,
+          owner,
+          record.request.wallet,
+          order.preparation.transaction,
+          order.preparation.sha256,
+          record.review.inputMint,
+          record.review.outputMint,
+          auth.minimumOutputRaw,
+          order.preparation.lastValidBlockHeight,
+          auth.expiresAt,
+          record.review.expiresAt,
+          auth.createdAt,
+          auth.createdAt,
+        ),
+    ]);
     signal.throwIfAborted();
-    if (saved.meta.changes !== 1 || Date.now() >= Date.parse(auth.expiresAt))
+    if (
+      results.some((r) => r.meta.changes !== 1) ||
+      Date.now() >= Date.parse(auth.expiresAt)
+    )
       throw new ImportedPairQuoteError(
         'Signing authorization expired. Request a new review.',
       );
-    return auth;
+    const execution = publicPairOrderExecution(
+      await readOwnedPairOrderExecution(db, owner, auth.id),
+    );
+    return { ...auth, execution };
   } finally {
     controller.abort();
     reads.close();
