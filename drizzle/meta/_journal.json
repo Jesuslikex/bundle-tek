@@ -645,6 +645,13 @@
       "when": 1792159200000,
       "tag": "0091_pair_order_independent_price_consent",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "6",
+      "when": 1792231200000,
+      "tag": "0097_pair_order_executions",
+      "breakpoints": true
     }
   ]
 }
