@@ -354,13 +354,26 @@ export function decodePairOrderReceipt(raw: unknown, row: Row) {
   if (row.output_mint === WRAPPED) {
     if (!Array.isArray(meta.preBalances) || !Array.isArray(meta.postBalances))
       throw new Error('Incomplete receipt lamport balances.');
-    // Native output: lamport delta plus the fee the wallet paid, plus any WSOL change.
+    if (meta.preBalances.length !== meta.postBalances.length)
+      throw new Error('Incomplete receipt lamport balances.');
+    // Lamports of any pre-existing account closed by this packet may have been
+    // refunded to the wallet as rent, which is not swap output. Subtract them
+    // all: this can only understate output, never overstate it. Accounts
+    // created and closed inside the packet (temporary WSOL) start at zero.
+    let closed = 0n;
+    for (let i = 1; i < meta.preBalances.length; i++) {
+      const before = uint(meta.preBalances[i]);
+      if (before > 0n && uint(meta.postBalances[i]) === 0n) closed += before;
+    }
+    // Native output: lamport delta plus the fee the wallet paid, plus any WSOL
+    // change, minus closed-account rent.
     output =
       uint(meta.postBalances[0]) -
       uint(meta.preBalances[0]) +
       fee +
-      tokenChange;
-    measurement = 'native-lamport-delta-plus-fee-and-wsol-change';
+      tokenChange -
+      closed;
+    measurement = 'native-lamport-delta-plus-fee-and-wsol-change-minus-closed';
   }
   return {
     format: 'pair-order-receipt-v1' as const,

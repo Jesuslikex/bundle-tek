@@ -575,3 +575,42 @@ it('refuses reservation inserts whose packet, mint or owner differ from the auth
     .run('alice', f.wallet, 'imported', 'i1', 'reserved');
   expect(() => f.reserve()).toThrow(/already reserved/);
 });
+
+it('never counts refunded rent from closed accounts as native SOL output', async () => {
+  const r = await submitted();
+  const row = {
+    ...((await readOwnedPairOrderExecution(
+      f.db,
+      'alice',
+      r.authorizationId,
+    )) as object),
+    output_mint: 'So11111111111111111111111111111111111111112',
+    minimum_output_raw: '10000000',
+  } as never;
+  const native = (closedRent: boolean) => {
+    const base = receipt(r);
+    return {
+      ...base,
+      meta: {
+        ...base.meta,
+        // Wallet gains 9,000,000 lamports of swap output (after a 5,000 fee),
+        // plus 2,039,280 rent when a pre-existing token account is closed.
+        preBalances: ['100000000', closedRent ? '2039280' : '0'],
+        postBalances: [
+          String(100000000 + 9000000 - 5000 + (closedRent ? 2039280 : 0)),
+          '0',
+        ],
+        postTokenBalances: [],
+      },
+    };
+  };
+  expect(decodePairOrderReceipt(native(false), row)).toMatchObject({
+    outputRaw: '9000000',
+    minimumOutputMet: false,
+  });
+  // Without the rent deduction this would read 11,039,280 and pass the minimum.
+  expect(decodePairOrderReceipt(native(true), row)).toMatchObject({
+    outputRaw: '9000000',
+    minimumOutputMet: false,
+  });
+});
