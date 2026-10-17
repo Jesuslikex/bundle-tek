@@ -150,8 +150,58 @@ export async function recoverOwnedPumpGroupBroadcast(
       /* Status retention and transport availability cannot erase chain evidence. */
     }
   }
+  let expiry: PumpGroupBroadcastRecovery['expiry'] = null;
+  if (!tip.finalized) {
+    const floor = Math.max(
+      0,
+      ...[
+        observed.receipt.expiry?.expiryBankSlot ?? null,
+        ...observed.receipt.packets.map((p) => p.slot),
+      ]
+        .filter((v): v is string => v !== null)
+        .map(Number),
+    );
+    const epoch = await rpc(
+      'getEpochInfo',
+      [{ commitment: 'finalized', ...(floor ? { minContextSlot: floor } : {}) }],
+      deadline,
+    );
+    if (!rec(epoch)) return fail('Tip expiry observation is missing.');
+    const bankSlot = pumpUnsignedInteger(epoch.absoluteSlot),
+      height = pumpUnsignedInteger(epoch.blockHeight),
+      last = BigInt(saved.review.lastValidBlockHeight);
+    if (
+      bankSlot < BigInt(floor) ||
+      bankSlot > BigInt(Number.MAX_SAFE_INTEGER) ||
+      height > bankSlot
+    )
+      return fail('Tip expiry height and slot are not linked.');
+    expiry = {
+      lastValidBlockHeight: last.toString(),
+      finalizedBlockHeight: height.toString(),
+      expiryBankSlot: bankSlot.toString(),
+      pastExpiryMargin: height > last + 32n,
+      marginBlocks: 32,
+    };
+  }
   const allKnown =
     !observed.receipt.networkFeeUnresolved && tip.networkFeeRaw !== null;
+  const packetCount = observed.receipt.packets.length,
+    landed = observed.receipt.observedPacketCount,
+    succeeded = observed.receipt.successfulPacketCount;
+  // Nothing further can change: every launch packet and the tip finalized with a
+  // known fee, or their shared blockhash is provably past the expiry margin.
+  // A tip that landed alone after the launch packets expired (with finalized mint
+  // absence) is settled too: the tip was paid and nothing else can land.
+  const settled =
+    (landed > 0 ||
+      (observed.state === 'expired-unobserved' && tip.finalized)) &&
+    observed.receipt.packets.every((p) =>
+      p.finalized
+        ? p.networkFeeRaw !== null
+        : observed.receipt.expiry?.pastExpiryMargin === true,
+    ) &&
+    (tip.finalized || expiry?.pastExpiryMargin === true);
   const commonSlot =
     tip.slot !== null &&
     observed.receipt.packets.every((p) => p.slot === tip.slot);
@@ -169,14 +219,33 @@ export async function recoverOwnedPumpGroupBroadcast(
         ? 'failed'
         : observed.state === 'expired-unobserved' && !tip.finalized
           ? 'expired-unobserved'
-          : observed.receipt.observedPacketCount > 0 || tip.finalized
-            ? 'partial'
-            : observed.state === 'pending'
-              ? 'pending'
-              : 'unknown';
-  const released = ['finalized', 'failed', 'expired-unobserved'].includes(
-    state,
-  );
+          : settled
+            ? 'partial-final'
+            : observed.receipt.observedPacketCount > 0 || tip.finalized
+              ? 'partial'
+              : observed.state === 'pending'
+                ? 'pending'
+                : 'unknown';
+  const partialGuard =
+    state === 'partial-final'
+      ? await db
+          .prepare(
+            "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='pump_group_broadcast_closure_insert'",
+          )
+          .first<{ sql: string }>()
+      : null;
+  // A database without the partial closure guard keeps reservations held.
+  const released =
+    ['finalized', 'failed', 'expired-unobserved'].includes(state) ||
+    (state === 'partial-final' && !!partialGuard?.sql.includes('partial-final'));
+  const closureState =
+    state === 'partial-final'
+      ? succeeded === packetCount
+        ? 'finalized'
+        : 'failed'
+      : state === 'expired-unobserved'
+        ? 'cancelled'
+        : state;
   if ((await rpc('getGenesisHash', [], deadline)) !== SOLANA_MAINNET_GENESIS)
     return fail('Broadcast recovery network changed.');
   deadline.throwIfAborted();
@@ -193,6 +262,7 @@ export async function recoverOwnedPumpGroupBroadcast(
     groupObservationSha256: observed.sha256,
     tip,
     bundle,
+    expiry,
     reservationsReleased: false,
     economicSettlementVerified: false as const,
     completeLaunch: false as const,
@@ -216,7 +286,17 @@ export async function recoverOwnedPumpGroupBroadcast(
     if (released) {
       const receipt: PumpGroupBroadcastTerminalReceipt = {
         format: 'pump-launch-group-broadcast-terminal-v1',
-        kind: state as 'finalized' | 'failed' | 'expired-unobserved',
+        kind:
+          state === 'partial-final'
+            ? 'partial'
+            : (state as 'finalized' | 'failed' | 'expired-unobserved'),
+        ...(state === 'partial-final'
+          ? {
+              packetCount,
+              landedPacketCount: landed,
+              succeededPacketCount: succeeded,
+            }
+          : {}),
         reviewId: id,
         contextSha256: group.review.contextSha256,
         manifestSha256: group.review.manifestSha256,
@@ -234,7 +314,8 @@ export async function recoverOwnedPumpGroupBroadcast(
         groupNetworkFeeRaw: observed.receipt.knownNetworkFeeRaw,
         tipNetworkFeeRaw: tip.networkFeeRaw,
         tipDebitRaw: tip.tipDebitRaw,
-        networkFeeUnresolved: !allKnown,
+        // Unlanded packets of a settled partial outcome never paid a fee.
+        networkFeeUnresolved: state === 'partial-final' ? false : !allKnown,
         reservationsReleased: true,
         economicSettlementVerified: false,
         signingAllowed: false,
@@ -251,7 +332,7 @@ export async function recoverOwnedPumpGroupBroadcast(
           owner,
           recovery.id,
           canonicalPumpHolderJson(receipt),
-          state === 'expired-unobserved' ? 'cancelled' : state,
+          closureState,
           recovery.observedAt,
         )
         .run();
