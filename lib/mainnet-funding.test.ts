@@ -6,6 +6,7 @@ import {
   requireSelectedFundingReview,
   validatedFundingCapture,
   mainnetFundingAsset,
+  fundingLegs,
 } from './mainnet-funding';
 import { nativeWithdrawalFixture } from '../test/native-withdrawal-fixture';
 async function fixture() {
@@ -160,5 +161,61 @@ it('rejects malformed selections, unsupported assets, changed contexts, archived
   };
   await expect(
     selectedFundingCapture(later, f.selection, f.review, Date.now()),
+  ).rejects.toThrow();
+});
+it('splits a Classic proxy route into ordered legs with a fee allowance per remaining hop', async () => {
+  const f = await fixture();
+  const proxies = [
+    'Vote111111111111111111111111111111111111111',
+    'Stake11111111111111111111111111111111111111',
+  ];
+  const document = validateFunding({
+    ...f.plan.document,
+    recipients: [{ address: f.recipient, amount: '0.01', proxies }],
+  });
+  expect(fundingLegs(document, 1)).toEqual([
+    { wallet: f.wallet, recipient: proxies[0], amountRaw: '10200000' },
+    { wallet: proxies[0], recipient: proxies[1], amountRaw: '10100000' },
+    { wallet: proxies[1], recipient: f.recipient, amountRaw: '10000000' },
+  ]);
+  for (const bad of [
+    [f.wallet],
+    [f.recipient],
+    [proxies[0], proxies[0]],
+    [...proxies, proxies[0], f.wallet],
+  ])
+    expect(() =>
+      validateFunding({
+        ...f.plan.document,
+        recipients: [{ address: f.recipient, amount: '0.01', proxies: bad }],
+      }),
+    ).toThrow();
+  expect(() =>
+    validateFunding({
+      ...f.plan.document,
+      currency: 'USDC',
+      assetAddress: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      recipients: [{ address: f.recipient, amount: '1', proxies }],
+    }),
+  ).toThrow('native SOL');
+  const plan = { ...f.plan, document };
+  const leg2 = {
+    ...f.review,
+    wallet: proxies[0],
+    recipient: proxies[1],
+    amountRaw: '10100000',
+  };
+  const capture = await selectedFundingCapture(
+    plan,
+    { ...f.selection, leg: 2 },
+    leg2,
+    Date.now(),
+  );
+  expect(capture.leg).toBe(2);
+  await expect(
+    selectedFundingCapture(plan, f.selection, leg2),
+  ).rejects.toThrow();
+  await expect(
+    selectedFundingCapture(plan, { ...f.selection, leg: 1 }, leg2),
   ).rejects.toThrow();
 });

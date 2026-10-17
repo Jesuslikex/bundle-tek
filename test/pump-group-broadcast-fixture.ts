@@ -49,6 +49,7 @@ export async function pumpGroupBroadcastFixture(
             '0086_pump_group_terminal_recovery',
             '0087_pump_group_runtime_authorization',
             '0088_pump_group_broadcast',
+            '0092_pump_group_partial_closure',
           ]
         : []),
     ])

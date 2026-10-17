@@ -23,7 +23,7 @@ Proxima's Live Workspace token tools (docs.proxima.tools/live-settings/send-toke
 
 ## Lifecycle and storage
 
-- Migration `0094_token_supply_actions` adds a new table, `token_supply_actions`, with its own events table. The lifecycle matches `native_withdrawals`: `awaiting_signature → signing → signed → submitted → finalized|failed`, or `cancelled` before a signature exists.
+- Migration `0096_token_supply_actions` adds a new table, `token_supply_actions`, with its own events table. The lifecycle matches `native_withdrawals`: `awaiting_signature → signing → signed → submitted → finalized|failed`, or `cancelled` before a signature exists.
   - Documents and signatures are immutable and history can't be deleted.
   - Signatures go into `solana_execution_signatures` with scope `supply`.
   - Wallet exclusion runs both ways:

@@ -318,8 +318,9 @@ export function PumpGroupBroadcast({
             and a bundle ID do not prove inclusion or atomicity. Signed packets
             may be submitted outside this app. Recovery checks their exact
             finalized chain bytes. The separate signed tip can also land
-            independently if it is rebroadcast; partial outcomes retain
-            reservations.
+            independently if it is rebroadcast. Partial outcomes retain
+            reservations until every packet and the tip have finalized with
+            known fees or provably expired.
           </p>
           {state.attempted || sendUncertain ? (
             <output>
@@ -616,7 +617,11 @@ export function PumpGroupBroadcast({
           </Button>
           {state.recovery && (
             <output>
-              Observed outcome: {state.recovery.state}. Tip network fee:{' '}
+              Observed outcome:{' '}
+              {state.recovery.state === 'partial-final'
+                ? 'settled partial (nothing further can land)'
+                : state.recovery.state}
+              . Tip network fee:{' '}
               {state.recovery.tip.networkFeeRaw === null
                 ? 'unresolved'
                 : holderDisplayRaw(state.recovery.tip.networkFeeRaw, 9) +

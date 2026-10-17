@@ -81,7 +81,7 @@ beforeAll(async () => {
     await mocks.db.prepare(sql).run();
   const migration = await readFile(
     new URL(
-      '../../../../drizzle/0094_token_supply_actions.sql',
+      '../../../../drizzle/0096_token_supply_actions.sql',
       import.meta.url,
     ),
     'utf8',

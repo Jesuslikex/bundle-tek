@@ -1365,3 +1365,98 @@ it('rolls back failed outcome and lock release if immutable failure Activity per
     mocks.rpc.mock.calls.filter((c) => c[1] === 'sendTransaction'),
   ).toHaveLength(0);
 });
+it('prepares a Classic proxy leg only after the previous leg of that recipient finalized', async () => {
+  const funder = 'Vote111111111111111111111111111111111111111';
+  const plan = {
+    id: 'funding-proxy-qa',
+    revision: 1,
+    archived: false,
+    updatedAt: new Date().toISOString(),
+    document: validateFunding({
+      name: 'Proxy funding QA',
+      chain: 'Solana',
+      currency: 'SOL',
+      source: 'Wallet',
+      sourceLabel: '',
+      funderAddress: funder,
+      startAt: new Date(Date.now() - 1000).toISOString(),
+      delaySeconds: 0,
+      recipients: [
+        { address: f.recipient, amount: '0.01', proxies: [f.wallet] },
+      ],
+    }),
+  };
+  await mocks.db
+    .prepare('INSERT INTO funding_plans VALUES(?,?,?,?,?,?)')
+    .bind('alice', plan.id, JSON.stringify(plan.document), 1, 0, plan.updatedAt)
+    .run();
+  const leg = (n: number, amount = '0.01') =>
+    post({
+      action: 'prepare',
+      wallet: f.wallet,
+      walletRevision: 1,
+      recipient: f.recipient,
+      amount,
+      funding: { planId: plan.id, revision: 1, item: 1, leg: n },
+    });
+  // The proxy is not leg 1's source, and leg 2 has no finalized leg 1 yet.
+  expect((await leg(1)).status).toBe(409);
+  const blocked = await leg(2);
+  expect(blocked.status).toBe(409);
+  expect(((await blocked.json()) as { error: string }).error).toContain(
+    'previous proxy leg',
+  );
+  // A direct-style selection without a leg cannot fund a proxied recipient.
+  expect(
+    (
+      await post({
+        action: 'prepare',
+        wallet: f.wallet,
+        walletRevision: 1,
+        recipient: f.recipient,
+        amount: '0.01',
+        funding: { planId: plan.id, revision: 1, item: 1 },
+      })
+    ).status,
+  ).toBe(409);
+  // Stand in for leg 1's finalized record; the route only reads its state and scope.
+  const insertTrigger = (
+    await readFile(
+      new URL(
+        '../../../../drizzle/0049_native_withdrawals.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    )
+  )
+    .split('--> statement-breakpoint')
+    .find((s) => s.includes('CREATE TRIGGER native_withdrawal_insert'))!;
+  await mocks.db.prepare('DROP TRIGGER native_withdrawal_insert').run();
+  await mocks.db
+    .prepare(
+      "INSERT INTO native_withdrawals (id,owner_id,wallet_address,wallet_revision,document,state,signature,receipt,created_at,updated_at) VALUES(?,?,?,?,?,'finalized','sig','{}',?,?)",
+    )
+    .bind(
+      crypto.randomUUID(),
+      'alice',
+      funder,
+      1,
+      JSON.stringify({
+        funding: { planId: plan.id, revision: 1, item: 1, leg: 1 },
+      }),
+      new Date().toISOString(),
+      new Date().toISOString(),
+    )
+    .run();
+  await mocks.db.prepare(insertTrigger).run();
+  const ready = await leg(2);
+  expect(ready.status).toBe(200);
+  const row = ((await ready.json()) as { withdrawal: NativeWithdrawal })
+    .withdrawal;
+  await expect(
+    requireSelectedFundingReview(row.document, plan, 1, 2),
+  ).resolves.toBeUndefined();
+  await expect(
+    requireSelectedFundingReview(row.document, plan, 1),
+  ).rejects.toThrow();
+});

@@ -33,6 +33,7 @@ import {
 } from '@/lib/pump-launch-group-client';
 import styles from './pump-launch-group-ui.module.css';
 import { PumpGroupBroadcast } from './pump-group-broadcast';
+import { SniperGuardPanel } from './sniper-guard-panel';
 import type { PumpGroupTipSignAction } from '@/lib/pump-group-broadcast-client';
 
 const endpoint = '/api/launch/pump/groups';
@@ -637,7 +638,9 @@ function Panel({
           {view.receipt && (
             <output>
               {view.receipt.format === 'pump-launch-group-broadcast-terminal-v1'
-                ? 'Complete broadcast pending-execution proof saved. '
+                ? view.receipt.kind === 'partial'
+                  ? `Partial outcome settled: ${view.receipt.landedPacketCount} of ${view.receipt.packetCount} launch packets landed, ${view.receipt.succeededPacketCount} succeeded.${view.receipt.landedPacketCount === view.receipt.packetCount ? '' : ' The rest expired unlanded and can no longer execute.'} `
+                  : 'Complete broadcast pending-execution proof saved. '
                 : view.receipt.kind === 'expired-unobserved'
                   ? 'Expired group closed after finalized mint absence.'
                   : 'Every packet finalized as a failure.'}{' '}
@@ -940,6 +943,14 @@ function Panel({
               onBusyChange={broadcastBusyChanged}
               onGroup={setView}
               onPreparedChange={setBroadcastExists}
+            />
+          )}
+          {!['cancelled', 'failed'].includes(view.state) && (
+            <SniperGuardPanel
+              key={'sniper-' + review.id}
+              reviewId={review.id}
+              group={view}
+              disabled={disabled}
             />
           )}
           {pending && (

@@ -1,0 +1,59 @@
+.panel {
+  min-width: 0;
+  max-width: 100%;
+}
+.workspace {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  min-width: 0;
+}
+.form {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.pair > * {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+.wallets {
+  display: grid;
+  gap: 0.25rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+.card {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.card dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.75rem;
+}
+.note {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+.error {
+  color: var(--destructive, #c62828);
+}
+.table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: 0.85em;
+}
+.table th,
+.table td {
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+  white-space: nowrap;
+}
