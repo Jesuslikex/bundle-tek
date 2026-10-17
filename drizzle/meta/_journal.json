@@ -708,6 +708,13 @@
       "when": 1792231200000,
       "tag": "0100_project_shares",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "6",
+      "when": 1792233000000,
+      "tag": "0101_referrals",
+      "breakpoints": true
     }
   ]
 }

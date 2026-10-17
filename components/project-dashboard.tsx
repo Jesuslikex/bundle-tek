@@ -1,5 +1,6 @@
 'use client';
 
+import { ReferralPanel } from './referral-panel';
 import { useState } from 'react';
 import {
   Archive,
@@ -139,6 +140,7 @@ export function ProjectDashboard({
         </div>
       )}
       {!archived && <AccountPerformancePanel />}
+      {!archived && !signedOut && <ReferralPanel />}
       {!archived && <AccountCostsPanel />}
       <div className="project-toolbar">
         <Tabs value={chain} onValueChange={(v) => setChain(String(v))}>
@@ -249,11 +251,7 @@ export function ProjectDashboard({
               in.
             </p>
             {/* oxlint-disable-next-line next/no-html-link-for-pages -- Sites sign-in must use a top-level document navigation. */}
-            <a
-              className={buttonVariants()}
-              href="/sign-in"
-              target="_top"
-            >
+            <a className={buttonVariants()} href="/sign-in" target="_top">
               <LogIn /> Sign in
             </a>
           </div>
