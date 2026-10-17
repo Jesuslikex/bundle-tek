@@ -7,6 +7,7 @@ import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { percentOfSupply } from '@/lib/supply-analysis';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
 import { MAX_WATCHED_WALLETS } from '@/lib/supply-watch-wallet';
+import { BubbleMapPanel } from './bubble-map-panel';
 export function ImportedHolderView({
   project,
   excludedWallets,
@@ -232,6 +233,12 @@ export function ImportedHolderView({
               that the token has no other holders.
             </p>
           )}
+          <BubbleMapPanel
+            key={result.observedAt}
+            holders={result.holders}
+            teamWallets={excludedWallets}
+            totalSupplyRaw={result.totalSupplyRaw}
+          />
         </>
       )}
     </section>
