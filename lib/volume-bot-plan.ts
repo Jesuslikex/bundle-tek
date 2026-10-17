@@ -55,6 +55,19 @@ export const VOLUME_LIMITS = {
 } as const;
 
 export class VolumePlanError extends Error {}
+/** Exact atomic units to a plain decimal string. */
+export function rawToDecimal(raw: bigint, decimals: number) {
+  const text = raw.toString().padStart(decimals + 1, '0');
+  const whole = text.slice(0, text.length - decimals),
+    fraction = text.slice(text.length - decimals).replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+/** Plain decimal text to exact atomic units, or undefined when it is not exact. */
+export function decimalToRaw(text: string, decimals: number) {
+  const match = /^(\d{1,12})(?:\.(\d+))?$/.exec(text.trim());
+  if (!match || (match[2] ?? '').length > decimals) return undefined;
+  return BigInt(match[1] + (match[2] ?? '').padEnd(decimals, '0'));
+}
 const fail = (message: string): never => {
   throw new VolumePlanError(message);
 };
@@ -65,7 +78,11 @@ const lamports = (value: unknown, label: string) => {
   return BigInt(value);
 };
 const int = (value: unknown, min: number, max: number, label: string) => {
-  if (!Number.isSafeInteger(value) || Number(value) < min || Number(value) > max)
+  if (
+    !Number.isSafeInteger(value) ||
+    Number(value) < min ||
+    Number(value) > max
+  )
     return fail(`Choose ${label} between ${min} and ${max}.`);
   return Number(value);
 };
@@ -109,10 +126,19 @@ export function volumeTerms(value: unknown): VolumeTerms {
   };
   if (amountInput?.kind === 'auto') amount = { kind: 'auto' };
   else if (amountInput?.kind === 'fixed')
-    amount = { kind: 'fixed', lamports: bounded(amountInput.lamports, 'trade amount') };
+    amount = {
+      kind: 'fixed',
+      lamports: bounded(amountInput.lamports, 'trade amount'),
+    };
   else if (amountInput?.kind === 'range') {
-    const minLamports = bounded(amountInput.minLamports, 'minimum trade amount');
-    const maxLamports = bounded(amountInput.maxLamports, 'maximum trade amount');
+    const minLamports = bounded(
+      amountInput.minLamports,
+      'minimum trade amount',
+    );
+    const maxLamports = bounded(
+      amountInput.maxLamports,
+      'maximum trade amount',
+    );
     if (BigInt(maxLamports) < BigInt(minLamports))
       fail('Maximum trade amount must be at or above the minimum.');
     amount = { kind: 'range', minLamports, maxLamports };
@@ -124,7 +150,9 @@ export function volumeTerms(value: unknown): VolumeTerms {
     input.wallets.some((w) => typeof w !== 'string' || !BASE58.test(w)) ||
     new Set(input.wallets).size !== input.wallets.length
   )
-    return fail(`Choose 1 to ${VOLUME_LIMITS.maxWallets} distinct Solana wallets.`);
+    return fail(
+      `Choose 1 to ${VOLUME_LIMITS.maxWallets} distinct Solana wallets.`,
+    );
   if (target < VOLUME_LIMITS.minTradeLamports * 2n)
     fail('Target volume must cover at least one 0.001 SOL round trip.');
   const keys = Object.keys(input).sort().join(',');
@@ -165,9 +193,11 @@ export function volumeRandom(seed: string) {
   for (let n = 0; n < 12; n++) next();
   return {
     next,
-    int: (min: number, max: number) => min + Math.floor(next() * (max - min + 1)),
+    int: (min: number, max: number) =>
+      min + Math.floor(next() * (max - min + 1)),
     big: (min: bigint, max: bigint) =>
-      min + (BigInt(Math.floor(next() * 2 ** 32)) * (max - min + 1n)) / 2n ** 32n,
+      min +
+      (BigInt(Math.floor(next() * 2 ** 32)) * (max - min + 1n)) / 2n ** 32n,
   };
 }
 export function newVolumeSeed() {
@@ -176,16 +206,25 @@ export function newVolumeSeed() {
   ).join('');
 }
 
-function roundAmounts(terms: VolumeTerms, rand: ReturnType<typeof volumeRandom>) {
+function roundAmounts(
+  terms: VolumeTerms,
+  rand: ReturnType<typeof volumeRandom>,
+  gaps: number[],
+) {
   const target = BigInt(terms.targetVolumeLamports);
   const { minTradeLamports, maxRounds } = VOLUME_LIMITS;
   const amounts: bigint[] = [];
   if (terms.amount.kind === 'auto') {
-    const average = (terms.delayMinMs + terms.delayMaxMs) / 2;
-    let rounds = Math.max(
-      1,
-      Math.floor((terms.durationSeconds * 1000) / average / 2 + 0.5),
-    );
+    // As many trades as the sampled delays fit into the duration, so the
+    // schedule always ends inside it.
+    let events = 1,
+      elapsed = 0;
+    for (const gap of gaps) {
+      if (elapsed + gap > terms.durationSeconds * 1000) break;
+      elapsed += gap;
+      events++;
+    }
+    let rounds = Math.max(1, Math.floor(events / 2));
     rounds = Math.min(
       rounds,
       Number(target / (2n * minTradeLamports)),
@@ -228,7 +267,12 @@ export function planVolumeSession(
 ) {
   const terms = volumeTerms(structuredClone(supplied));
   const rand = volumeRandom(seed);
-  const amounts = roundAmounts(terms, rand);
+  // Delays come from their own stream so trade sizing never shifts timing.
+  const timing = volumeRandom(seed.split('').reverse().join(''));
+  const gaps = Array.from({ length: 2 * VOLUME_LIMITS.maxRounds }, () =>
+    timing.int(terms.delayMinMs, terms.delayMaxMs),
+  );
+  const amounts = roundAmounts(terms, rand, gaps);
   const largest = amounts.reduce((a, b) => (a > b ? a : b));
   const fee = VOLUME_LIMITS.feePerTradeLamports;
   const requiredPerWallet =
@@ -296,7 +340,7 @@ export function planVolumeSession(
   let inBatch = new Set<string>();
   const buyBatch = new Map<number, number>();
   for (const [index, step] of order.entries()) {
-    if (index) offset += rand.int(terms.delayMinMs, terms.delayMaxMs);
+    if (index) offset += gaps[index - 1];
     const conflict =
       batch < 0 ||
       offset - batchStart > VOLUME_LIMITS.batchSpanMs ||

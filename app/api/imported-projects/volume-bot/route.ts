@@ -28,8 +28,7 @@ const json = (data: unknown, status = 200) =>
       ...(status === 429 ? { 'retry-after': '3' } : {}),
     },
   });
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function volumeDeps(): VolumeDeps {
   const endpoint = getSolanaIndexerRpcEndpoint(),
@@ -54,7 +53,8 @@ function volumeDeps(): VolumeDeps {
 
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
-  if (!user) return json({ error: 'Sign in to read Volume Bot sessions.' }, 401);
+  if (!user)
+    return json({ error: 'Sign in to read Volume Bot sessions.' }, 401);
   const projectId = new URL(request.url).searchParams.get('projectId');
   if (!projectId || !UUID.test(projectId))
     return json({ error: 'Choose a project.' }, 400);
@@ -80,7 +80,8 @@ export async function POST(request: Request) {
   let body: unknown;
   try {
     const text = await request.text();
-    if (text.length > 200_000) return json({ error: 'Request too large.' }, 413);
+    if (text.length > 200_000)
+      return json({ error: 'Request too large.' }, 413);
     body = JSON.parse(text);
   } catch {
     return json({ error: 'Invalid Volume Bot request.' }, 400);
@@ -112,16 +113,31 @@ export async function POST(request: Request) {
         .bind(JSON.stringify(['volume-bot-v1', owner]), now + 3000, now)
         .run();
       if (!claimed.meta.changes)
-        return json({ error: 'Wait a few seconds before repeating this.' }, 429);
+        return json(
+          { error: 'Wait a few seconds before repeating this.' },
+          429,
+        );
     }
     switch (action.action) {
       case 'estimate':
         return json(
-          await estimateVolumeSession(db, owner, action, signal, volumeDeps().rpc),
+          await estimateVolumeSession(
+            db,
+            owner,
+            action,
+            signal,
+            volumeDeps().rpc,
+          ),
         );
       case 'create':
         return json(
-          await createVolumeSession(db, owner, action, signal, volumeDeps().rpc),
+          await createVolumeSession(
+            db,
+            owner,
+            action,
+            signal,
+            volumeDeps().rpc,
+          ),
         );
       case 'prepare-batch':
         return json(

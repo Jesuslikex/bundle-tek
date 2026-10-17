@@ -92,9 +92,9 @@ it('parses strict actions and rate-gates provider work per owner', async () => {
   expect((await post(estimate)).status).toBe(200);
   expect(mocks.estimate.mock.calls[0][1]).toBe('alice');
   expect((await post({ ...estimate, action: 'create' })).status).toBe(429);
-  expect(
-    (await post({ action: 'send', batchId: id, index: 0 })).status,
-  ).toBe(200);
+  expect((await post({ action: 'send', batchId: id, index: 0 })).status).toBe(
+    200,
+  );
   expect(mocks.send).toHaveBeenCalledOnce();
   expect((await post({ action: 'cancel', sessionId: id })).status).toBe(200);
   expect(
@@ -105,12 +105,15 @@ it('parses strict actions and rate-gates provider work per owner', async () => {
     terms: { ...estimate.terms, delayMaxMs: 1000 },
   });
   expect(bad.status).toBe(400);
-  expect((await bad.json()).error).toMatch(/maximum delay/);
+  expect(((await bad.json()) as { error: string }).error).toMatch(
+    /maximum delay/,
+  );
 });
 
 it('lists sessions only for a valid project id', async () => {
   expect(
-    (await GET(new Request(origin + '/api/imported-projects/volume-bot'))).status,
+    (await GET(new Request(origin + '/api/imported-projects/volume-bot')))
+      .status,
   ).toBe(400);
   const ok = await GET(
     new Request(origin + `/api/imported-projects/volume-bot?projectId=${id}`),

@@ -19,8 +19,7 @@ export type VolumeBotAction =
   | { action: 'send'; batchId: string; index: number }
   | { action: 'observe'; batchId: string };
 
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const bad = (): never => {
   throw new Error('Invalid Volume Bot request.');
 };
@@ -75,7 +74,8 @@ export function parseVolumeBotRequest(body: unknown): VolumeBotAction {
     }
     case 'send':
       keys(input!, 'action,batchId,index');
-      if (!Number.isSafeInteger(input!.index) || Number(input!.index) < 0) bad();
+      if (!Number.isSafeInteger(input!.index) || Number(input!.index) < 0)
+        bad();
       return {
         action: 'send',
         batchId: uuid(input!.batchId),

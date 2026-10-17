@@ -11,10 +11,12 @@ import {
 } from './volume-bot-batch';
 import {
   planVolumeSession,
+  rawToDecimal,
   type VolumePlan,
   type VolumeTerms,
 } from './volume-bot-plan';
 
+export { rawToDecimal };
 export class VolumeBotError extends Error {
   constructor(
     message: string,
@@ -45,7 +47,10 @@ export type VolumeDeps = {
     signal: AbortSignal,
   ) => Promise<SolanaSwapPreparation>;
   /** Unsigned simulation of the exact order; throws if it would fail. */
-  simulate: (order: SolanaSwapPreparation, signal: AbortSignal) => Promise<unknown>;
+  simulate: (
+    order: SolanaSwapPreparation,
+    signal: AbortSignal,
+  ) => Promise<unknown>;
 };
 
 /** How long a prepared batch stays signable and sendable: inside one blockhash window. */
@@ -68,14 +73,6 @@ const unsigned = (value: unknown) => {
     fail('Provider returned an invalid integer.', 502);
   return BigInt(value as number | string);
 };
-/** Exact atomic units to the decimal string the swap preparation expects. */
-export function rawToDecimal(raw: bigint, decimals: number) {
-  const text = raw.toString().padStart(decimals + 1, '0');
-  const whole = text.slice(0, text.length - decimals),
-    fraction = text.slice(text.length - decimals).replace(/0+$/, '');
-  return fraction ? `${whole}.${fraction}` : whole;
-}
-
 type SessionRow = {
   id: string;
   project_id: string;
@@ -180,7 +177,10 @@ export async function estimateVolumeSession(
 ) {
   await ownedToken(db, owner, input.projectId, input.projectRevision);
   const balances = await observeBalances(db, owner, input.terms, signal, rpc);
-  return { plan: planVolumeSession(input.terms, balances, input.seed), balances };
+  return {
+    plan: planVolumeSession(input.terms, balances, input.seed),
+    balances,
+  };
 }
 
 /** Saves the plan and reserves its wallets. The plan alone signs or sends nothing. */
@@ -322,7 +322,9 @@ export async function prepareVolumeBatch(
       const buy = trades.find(
         (t) => t.round === event.round && t.side === 'Buy',
       );
-      const receipt = buy?.receipt ? (JSON.parse(buy.receipt) as Receipt) : null;
+      const receipt = buy?.receipt
+        ? (JSON.parse(buy.receipt) as Receipt)
+        : null;
       const received = BigInt(receipt?.tokenDeltaRaw ?? '0');
       if (
         !buy ||
@@ -540,8 +542,16 @@ function settlement(
       fee?: unknown;
       preBalances?: unknown[];
       postBalances?: unknown[];
-      preTokenBalances?: { owner?: string; mint?: string; uiTokenAmount?: { amount?: string } }[];
-      postTokenBalances?: { owner?: string; mint?: string; uiTokenAmount?: { amount?: string } }[];
+      preTokenBalances?: {
+        owner?: string;
+        mint?: string;
+        uiTokenAmount?: { amount?: string };
+      }[];
+      postTokenBalances?: {
+        owner?: string;
+        mint?: string;
+        uiTokenAmount?: { amount?: string };
+      }[];
     };
     transaction?: { message?: { accountKeys?: unknown[] } };
   };
@@ -564,7 +574,11 @@ function settlement(
   };
 }
 
-async function completeIfDone(db: D1Database, owner: string, sessionId: string) {
+async function completeIfDone(
+  db: D1Database,
+  owner: string,
+  sessionId: string,
+) {
   await db
     .prepare(
       "UPDATE volume_bot_sessions SET state='complete' WHERE owner_id=? AND id=? AND state='active' AND json_extract(plan,'$.batches')=(SELECT count(*) FROM volume_bot_batches b WHERE b.session_id=volume_bot_sessions.id AND b.state='closed')",
@@ -595,7 +609,10 @@ export async function observeVolumeBatch(
       [open.map((t) => t.signature), { searchTransactionHistory: true }],
       signal,
     )) as { value?: unknown[] };
-    if (!Array.isArray(statuses?.value) || statuses.value.length !== open.length)
+    if (
+      !Array.isArray(statuses?.value) ||
+      statuses.value.length !== open.length
+    )
       return fail('Volume trade status mapping differs.', 502);
     const height = unsigned(
       await rpc('getBlockHeight', [{ commitment: 'finalized' }], signal),

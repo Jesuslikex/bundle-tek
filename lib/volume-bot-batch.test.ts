@@ -110,9 +110,9 @@ it('refuses edited reviews, repeated wallets, unordered offsets and long spans',
   await expect(
     review([await trade(wallets[0], 0, 5_000), await trade(wallets[1], 1, 0)]),
   ).rejects.toThrow(/ordered/);
-  await expect(
-    review([await trade(wallets[0], 0, 31_000)]),
-  ).rejects.toThrow(/within 30 seconds/);
+  await expect(review([await trade(wallets[0], 0, 31_000)])).rejects.toThrow(
+    /within 30 seconds/,
+  );
 });
 
 it('refuses signing without exact consent, with a missing key or after expiry', async () => {

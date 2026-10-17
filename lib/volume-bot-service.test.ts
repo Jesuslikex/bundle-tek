@@ -185,10 +185,22 @@ function chain(options: { failRound?: number } = {}) {
             ],
             preTokenBalances:
               side === 'Sell'
-                ? [{ owner: wallet, mint: MINT, uiTokenAmount: { amount: '5000' } }]
+                ? [
+                    {
+                      owner: wallet,
+                      mint: MINT,
+                      uiTokenAmount: { amount: '5000' },
+                    },
+                  ]
                 : [],
             postTokenBalances: buy
-              ? [{ owner: wallet, mint: MINT, uiTokenAmount: { amount: '5000' } }]
+              ? [
+                  {
+                    owner: wallet,
+                    mint: MINT,
+                    uiTokenAmount: { amount: '5000' },
+                  },
+                ]
               : [],
           },
           transaction: { message: { accountKeys: [wallet] } },
@@ -236,7 +248,14 @@ async function runBatch(
     transactions: signed.signed.map((s) => s.transaction),
   });
   for (const trade of review.trades)
-    await sendVolumeTrade(db, 'alice', batch.id, trade.index, signal(), deps.rpc);
+    await sendVolumeTrade(
+      db,
+      'alice',
+      batch.id,
+      trade.index,
+      signal(),
+      deps.rpc,
+    );
   current = await observeVolumeBatch(db, 'alice', batch.id, signal(), deps.rpc);
   return current;
 }
@@ -258,7 +277,13 @@ it('runs a whole session batch by batch; each sell sells exactly its buy fill', 
     deps.rpc,
   );
   expect(estimate.plan.estimate.rounds).toBe(2);
-  let session = await createVolumeSession(db, 'alice', input, signal(), deps.rpc);
+  let session = await createVolumeSession(
+    db,
+    'alice',
+    input,
+    signal(),
+    deps.rpc,
+  );
   expect(session.state).toBe('active');
   // The shared lock now refuses other swaps on these wallets.
   await expect(
@@ -288,7 +313,9 @@ it('runs a whole session batch by batch; each sell sells exactly its buy fill', 
     ['0.1', '0.1'],
   );
   expect(session.realized.finalizedTrades).toBe(4);
-  expect(session.realized.volumeLamports).toBe(String(2 * 100_000_000 + 2 * 99_000_000));
+  expect(session.realized.volumeLamports).toBe(
+    String(2 * 100_000_000 + 2 * 99_000_000),
+  );
   // Completed: the wallets are free again.
   await client.execute({
     sql: "INSERT INTO solana_execution_reservations VALUES('alice',?,'imported','x','reserved')",
@@ -302,7 +329,12 @@ it('skips the sell of a buy that failed on chain', async () => {
   let session = await createVolumeSession(
     db,
     'alice',
-    { projectId: 'p1', projectRevision: 3, terms: terms(), seed: newVolumeSeed() },
+    {
+      projectId: 'p1',
+      projectRevision: 3,
+      terms: terms(),
+      seed: newVolumeSeed(),
+    },
     signal(),
     deps.rpc,
   );
@@ -323,17 +355,33 @@ it('refuses wrong consent, early next batch and sends after cancel', async () =>
   const session = await createVolumeSession(
     db,
     'alice',
-    { projectId: 'p1', projectRevision: 3, terms: terms(), seed: newVolumeSeed() },
+    {
+      projectId: 'p1',
+      projectRevision: 3,
+      terms: terms(),
+      seed: newVolumeSeed(),
+    },
     signal(),
     deps.rpc,
   );
-  const prepared = await prepareVolumeBatch(db, 'alice', session.id, signal(), deps);
+  const prepared = await prepareVolumeBatch(
+    db,
+    'alice',
+    session.id,
+    signal(),
+    deps,
+  );
   const batch = prepared.batches[0];
   const review = batch.review as VolumeBatchReview;
   await expect(
     prepareVolumeBatch(db, 'alice', session.id, signal(), deps),
   ).rejects.toThrow();
-  const signed = await signVolumeBatch(vault, review, volumeBatchConsent(review), () => {});
+  const signed = await signVolumeBatch(
+    vault,
+    review,
+    volumeBatchConsent(review),
+    () => {},
+  );
   await expect(
     registerVolumeBatch(db, 'alice', batch.id, {
       consent: { ...volumeBatchConsent(review), sha256: '0'.repeat(64) },
@@ -381,7 +429,12 @@ it('refuses foreign wallets and stale project revisions', async () => {
     createVolumeSession(
       db,
       'alice',
-      { projectId: 'p1', projectRevision: 2, terms: terms(), seed: newVolumeSeed() },
+      {
+        projectId: 'p1',
+        projectRevision: 2,
+        terms: terms(),
+        seed: newVolumeSeed(),
+      },
       signal(),
       deps.rpc,
     ),

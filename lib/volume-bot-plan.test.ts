@@ -192,3 +192,22 @@ it('rebuilds a saved plan and refuses one edited after estimate', () => {
   edited.events[0].wallet = wallets[3];
   expect(() => requireVolumePlan(edited, rich)).toThrow(/plan changed/);
 });
+
+it('auto sizing always ends inside the duration, whatever the seed', () => {
+  for (let n = 0; n < 200; n++) {
+    const seed = n.toString(16).padStart(32, '0');
+    const plan = planVolumeSession(
+      terms({
+        amount: { kind: 'auto' },
+        durationSeconds: 1800,
+        delayMinMs: 5_000,
+        delayMaxMs: 20_000,
+        targetVolumeLamports: '1000000000',
+      }),
+      rich,
+      seed,
+    );
+    expect(plan.estimate.scheduledSeconds).toBeLessThanOrEqual(1800);
+    expect(plan.estimate.volumeLamports).toBe('1000000000');
+  }
+});

@@ -104,7 +104,9 @@ const decode = (encoded: string) => {
     bytes.length > 1232 ||
     getBase64Decoder().decode(getTransactionEncoder().encode(tx)) !== encoded
   )
-    throw new Error('Volume trade packet exceeds its bound or is not canonical.');
+    throw new Error(
+      'Volume trade packet exceeds its bound or is not canonical.',
+    );
   return { tx, bytes };
 };
 
@@ -169,7 +171,9 @@ export async function requireVolumeBatchReview(supplied: VolumeBatchReview) {
       trade.batchOffsetMs < previous ||
       trade.batchOffsetMs > 30_000
     )
-      throw new Error('Volume batch offsets must be ordered within 30 seconds.');
+      throw new Error(
+        'Volume batch offsets must be ordered within 30 seconds.',
+      );
     previous = trade.batchOffsetMs;
     if (
       !['Buy', 'Sell'].includes(trade.side) ||
@@ -182,7 +186,9 @@ export async function requireVolumeBatchReview(supplied: VolumeBatchReview) {
     const { tx, bytes } = decode(trade.transaction);
     if (Object.values(tx.signatures).some((s) => s !== null))
       throw new Error('Volume batch packets must be unsigned for review.');
-    if (hex(await crypto.subtle.digest('SHA-256', bytes)) !== trade.packetSha256)
+    if (
+      hex(await crypto.subtle.digest('SHA-256', bytes)) !== trade.packetSha256
+    )
       throw new Error('Volume batch packet hash differs.');
     const message = getCompiledTransactionMessageDecoder().decode(
       tx.messageBytes,
