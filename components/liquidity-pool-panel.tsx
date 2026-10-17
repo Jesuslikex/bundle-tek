@@ -1,0 +1,269 @@
+'use client';
+import { useState } from 'react';
+import {
+  createPublicClient,
+  formatEther,
+  formatUnits,
+  getAddress,
+  http,
+  isAddress,
+  maxUint256,
+  type Address,
+  type Hex,
+} from 'viem';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { EVM_NETWORKS } from '@/lib/evm-network';
+import { connectEvmWallet, walletError } from '@/lib/evm-wallet';
+import {
+  UNISWAP_V2,
+  approveRouterCall,
+  burnLpCall,
+  factoryAbi,
+  lpPosition,
+  pairAbi,
+  removeLiquidityCall,
+  type LpPosition,
+} from '@/lib/uniswap-v2-liquidity';
+
+type Provider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+const CHAIN = 'Ethereum' as const;
+const ZERO = '0x0000000000000000000000000000000000000000';
+const client = createPublicClient({
+  transport: http(EVM_NETWORKS[CHAIN].endpoint),
+});
+const pct = (bps: number) => (bps / 100).toFixed(2) + '%';
+
+export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
+  const [token, setToken] = useState('');
+  const [account, setAccount] = useState<Address | null>(null);
+  const [position, setPosition] = useState<LpPosition | null>(null);
+  const [noPair, setNoPair] = useState(false);
+  const [action, setAction] = useState<'remove' | 'burn'>('remove');
+  const [ack, setAck] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const provider = () =>
+    (globalThis as { ethereum?: Provider }).ethereum ?? null;
+
+  async function guarded(task: () => Promise<void>) {
+    setBusy(true);
+    setError('');
+    setNote('');
+    try {
+      await task();
+    } catch (e) {
+      setError(walletError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function review() {
+    const wallet = provider();
+    if (!wallet) throw new Error('No browser wallet found. Install one first.');
+    if (!isAddress(token)) throw new Error('Enter the token contract address.');
+    const address = getAddress(
+      await connectEvmWallet(wallet as never, CHAIN),
+    ) as Address;
+    setAccount(address);
+    setAck(false);
+    const tokenAddress = getAddress(token);
+    const { factory, weth } = UNISWAP_V2[CHAIN];
+    const pair = await client.readContract({
+      address: factory,
+      abi: factoryAbi,
+      functionName: 'getPair',
+      args: [tokenAddress, weth],
+    });
+    if (pair === ZERO) {
+      setPosition(null);
+      setNoPair(true);
+      return;
+    }
+    setNoPair(false);
+    const [token0, reserves, totalSupply, lpBalance] = await Promise.all([
+      client.readContract({
+        address: pair,
+        abi: pairAbi,
+        functionName: 'token0',
+      }),
+      client.readContract({
+        address: pair,
+        abi: pairAbi,
+        functionName: 'getReserves',
+      }),
+      client.readContract({
+        address: pair,
+        abi: pairAbi,
+        functionName: 'totalSupply',
+      }),
+      client.readContract({
+        address: pair,
+        abi: pairAbi,
+        functionName: 'balanceOf',
+        args: [address],
+      }),
+    ]);
+    setPosition(
+      lpPosition({
+        pair,
+        token: tokenAddress,
+        token0,
+        reserves: [reserves[0], reserves[1]],
+        totalSupply,
+        lpBalance,
+      }),
+    );
+  }
+  // The browser wallet shows each transaction for the user to confirm.
+  async function send(to: Address, data: Hex) {
+    const hash = await provider()!.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: account, to, data }],
+    });
+    if (typeof hash !== 'string' || !/^0x[0-9a-f]{64}$/i.test(hash))
+      throw new Error('Wallet returned an unexpected transaction hash.');
+    await client.waitForTransactionReceipt({ hash: hash as Hex });
+    return hash;
+  }
+  async function confirm() {
+    if (!position || !account) return;
+    const { router } = UNISWAP_V2[CHAIN];
+    if (action === 'burn') {
+      const hash = await send(position.pair, burnLpCall(position));
+      setNote(`LP burned in ${hash}.`);
+    } else {
+      const allowance = await client.readContract({
+        address: position.pair,
+        abi: pairAbi,
+        functionName: 'allowance',
+        args: [account, router],
+      });
+      if (allowance < position.lpBalance) {
+        setNote('Approve the router in your wallet first…');
+        await send(position.pair, approveRouterCall(CHAIN, maxUint256));
+      }
+      const hash = await send(
+        router,
+        removeLiquidityCall({
+          token: getAddress(token),
+          position,
+          slippageBasisPoints: 100,
+          to: account,
+          deadlineSeconds: Math.floor(Date.now() / 1000) + 600,
+        }),
+      );
+      setNote(`Liquidity removed in ${hash}.`);
+    }
+    await review();
+  }
+
+  return (
+    <section aria-label="Liquidity pool" className="min-w-0 space-y-2">
+      <h3>Liquidity pool · Uniswap V2 on Ethereum</h3>
+      <p className="text-xs text-muted-foreground">
+        Reads your TOKEN/WETH pool position from the chain. Removing or burning
+        liquidity is sent from your own browser wallet, which asks you to
+        confirm every transaction.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Input
+          aria-label="Token contract address"
+          placeholder="0x… token address"
+          value={token}
+          onChange={(e) => {
+            setToken(e.target.value.trim());
+            setPosition(null);
+            setNoPair(false);
+          }}
+          className="min-w-0 flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || !token}
+          onClick={() => void guarded(review)}
+        >
+          {position ? 'Refresh' : 'Review pool'}
+        </Button>
+      </div>
+      {noPair && <p>No Uniswap V2 pair exists for this token and WETH yet.</p>}
+      {position && (
+        <>
+          <div className="dashboard-stats">
+            <article>
+              <span>Total liquidity</span>
+              <strong>{formatEther(position.wethReserve)} ETH</strong>
+              <small>
+                {formatUnits(position.tokenReserve, tokenDecimals)} tokens
+              </small>
+            </article>
+            <article>
+              <span>Your LP share</span>
+              <strong>{pct(position.shareBasisPoints)}</strong>
+              <small>{formatEther(position.lpBalance)} LP</small>
+            </article>
+            <article>
+              <span>Redeemable (estimate)</span>
+              <strong>{formatEther(position.redeemableEth)} ETH</strong>
+              <small>
+                {formatUnits(position.redeemableToken, tokenDecimals)} tokens
+              </small>
+            </article>
+          </div>
+          {position.lpBalance === 0n ? (
+            <p>This wallet holds no LP tokens for this pool.</p>
+          ) : (
+            <fieldset className="space-y-2">
+              <legend>Action</legend>
+              <label className="mr-4">
+                <input
+                  type="radio"
+                  checked={action === 'remove'}
+                  onChange={() => {
+                    setAction('remove');
+                    setAck(false);
+                  }}
+                />{' '}
+                Remove liquidity (get ETH and tokens back, 1% slippage limit)
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  checked={action === 'burn'}
+                  onChange={() => {
+                    setAction('burn');
+                    setAck(false);
+                  }}
+                />{' '}
+                Burn LP (permanent, nothing comes back)
+              </label>
+              <label className="block">
+                <input
+                  type="checkbox"
+                  checked={ack}
+                  onChange={(e) => setAck(e.target.checked)}
+                />{' '}
+                {action === 'burn'
+                  ? 'I understand burned LP can never be redeemed.'
+                  : `I understand removing ${pct(position.shareBasisPoints)} of the pool raises slippage, and removing 95% or more makes the token effectively untradable.`}
+              </label>
+              <Button
+                type="button"
+                disabled={busy || !ack}
+                onClick={() => void guarded(confirm)}
+              >
+                {action === 'burn' ? 'Burn all LP' : 'Remove all liquidity'}
+              </Button>
+            </fieldset>
+          )}
+        </>
+      )}
+      {note && <output>{note}</output>}
+      {error && <p role="alert">{error}</p>}
+    </section>
+  );
+}
