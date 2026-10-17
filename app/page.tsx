@@ -82,6 +82,10 @@ import { Switch } from '@/components/ui/switch';
 import { SupplyTracker } from '@/components/supply-tracker';
 import { DistributionWorkbench } from '@/components/distribution-workbench';
 import { ProjectDashboard } from '@/components/project-dashboard';
+import {
+  ProjectSharePanel,
+  SharedProjectsPanel,
+} from '@/components/project-sharing';
 import { WalletWorkspace } from '@/components/wallet-workspace';
 import { WalletTracker } from '@/components/wallet-tracker';
 import { WorkspaceActivity } from '@/components/workspace-activity';
@@ -1623,31 +1627,34 @@ export default function Home() {
             }}
           />
         ) : isLibrary ? (
-          <ProjectDashboard
-            projects={projects}
-            archived={view === 'archived'}
-            loading={persistenceState === 'loading'}
-            busy={saveBusy}
-            onOpen={openProject}
-            onNew={startProject}
-            onDuplicate={(p) => openProject(p, true)}
-            onArchive={(p) => void archiveProject(p)}
-            onReload={() => void reloadProjects()}
-            onImport={() => {
-              setActivityImportId('');
-              changeView('imports');
-            }}
-            onWallet={() => {
-              setActivityWarmupId('');
-              setActivityWithdrawalWallet('');
-              changeView('wallets');
-            }}
-            imports={importedProjects.projects}
-            importsLoading={importedProjects.loading}
-            importsError={importedProjects.error}
-            onOpenImport={openImportedProject}
-            signedOut={persistenceState === 'auth'}
-          />
+          <>
+            <ProjectDashboard
+              projects={projects}
+              archived={view === 'archived'}
+              loading={persistenceState === 'loading'}
+              busy={saveBusy}
+              onOpen={openProject}
+              onNew={startProject}
+              onDuplicate={(p) => openProject(p, true)}
+              onArchive={(p) => void archiveProject(p)}
+              onReload={() => void reloadProjects()}
+              onImport={() => {
+                setActivityImportId('');
+                changeView('imports');
+              }}
+              onWallet={() => {
+                setActivityWarmupId('');
+                setActivityWithdrawalWallet('');
+                changeView('wallets');
+              }}
+              imports={importedProjects.projects}
+              importsLoading={importedProjects.loading}
+              importsError={importedProjects.error}
+              onOpenImport={openImportedProject}
+              signedOut={persistenceState === 'auth'}
+            />
+            {persistenceState !== 'auth' && <SharedProjectsPanel />}
+          </>
         ) : view === 'wallets' ? (
           <WalletWorkspace
             key={activityWarmupId + '/' + activityWithdrawalWallet}
@@ -1763,6 +1770,14 @@ export default function Home() {
                     onChange={updateLaunchPlan}
                     onNext={() => setView('launch')}
                   />
+                  {projectId &&
+                    persistenceState === 'ready' &&
+                    projects.some((p) => p.id === projectId) && (
+                      <ProjectSharePanel
+                        key={projectId}
+                        projectId={projectId}
+                      />
+                    )}
                 </PumpTokenWorkspaceNavigation>
               ) : view === 'funding' ? (
                 <FundingForm
