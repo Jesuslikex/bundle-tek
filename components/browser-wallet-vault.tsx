@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { LockKeyhole } from 'lucide-react';
+import { LockKeyhole, Wallet as WalletIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -221,6 +221,9 @@ export function BrowserWalletVault({
         }
       }}
     >
+      <Button onClick={() => setOpen(true)}>
+        <WalletIcon /> Generate wallets
+      </Button>
       <DialogTrigger render={<Button variant="outline" />}>
         <LockKeyhole /> Browser vault
       </DialogTrigger>

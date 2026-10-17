@@ -2,6 +2,20 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
   rpc: vi.fn(),
+  gate: new Map<string, number>(),
+}));
+vi.mock('@/db', () => ({
+  getD1: () => ({
+    prepare: () => ({
+      bind: (key: string, next: number, now: number) => ({
+        run: async () => {
+          const open = (mocks.gate.get(key) ?? 0) <= now;
+          if (open) mocks.gate.set(key, next);
+          return { meta: { changes: open ? 1 : 0 } };
+        },
+      }),
+    }),
+  }),
 }));
 vi.mock('@/app/chatgpt-auth', () => ({
   getChatGPTUser: async () => mocks.user,
@@ -26,6 +40,7 @@ const post = (body: unknown, headers: Record<string, string> = { origin }) =>
   );
 beforeEach(() => {
   mocks.user = { userId: 'alice' };
+  mocks.gate.clear();
   mocks.rpc
     .mockReset()
     .mockImplementation(async (method: string) =>
@@ -58,6 +73,18 @@ it('reads funders on mainnet only, using read-only methods', async () => {
   expect(new Set(mocks.rpc.mock.calls.map((c) => c[0]))).toEqual(
     new Set(['getGenesisHash', 'getSignaturesForAddress']),
   );
+  mocks.gate.clear();
   mocks.rpc.mockResolvedValueOnce('devnet');
   expect((await post({ addresses: [A] })).status).toBe(502);
+});
+
+it('throttles repeated maps per account before any RPC call', async () => {
+  expect((await post({ addresses: [A] })).status).toBe(200);
+  const calls = mocks.rpc.mock.calls.length;
+  const again = await post({ addresses: [A] });
+  expect(again.status).toBe(429);
+  expect(again.headers.get('retry-after')).toBe('10');
+  expect(mocks.rpc.mock.calls.length).toBe(calls);
+  mocks.user = { userId: 'bob' };
+  expect((await post({ addresses: [A] })).status).toBe(200);
 });

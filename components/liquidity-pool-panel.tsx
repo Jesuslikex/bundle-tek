@@ -7,7 +7,8 @@ import {
   getAddress,
   http,
   isAddress,
-  maxUint256,
+  parseEther,
+  parseUnits,
   type Address,
   type Hex,
 } from 'viem';
@@ -18,25 +19,46 @@ import { connectEvmWallet, walletError } from '@/lib/evm-wallet';
 import {
   UNISWAP_V2,
   approveRouterCall,
+  approveTokenCall,
+  createPoolCall,
+  erc20Abi,
   burnLpCall,
   factoryAbi,
   lpPosition,
   pairAbi,
   removeLiquidityCall,
+  routerAbi,
   type LpPosition,
+  type UniswapV2Chain,
 } from '@/lib/uniswap-v2-liquidity';
 
 type Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
-const CHAIN = 'Ethereum' as const;
 const ZERO = '0x0000000000000000000000000000000000000000';
-const client = createPublicClient({
-  transport: http(EVM_NETWORKS[CHAIN].endpoint),
-});
+const clients = new Map<
+  UniswapV2Chain,
+  ReturnType<typeof createPublicClient>
+>();
+const clientFor = (chain: UniswapV2Chain) => {
+  let c = clients.get(chain);
+  if (!c) {
+    c = createPublicClient({ transport: http(EVM_NETWORKS[chain].endpoint) });
+    clients.set(chain, c);
+  }
+  return c;
+};
 const pct = (bps: number) => (bps / 100).toFixed(2) + '%';
 
-export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
+export function LiquidityPoolPanel({
+  chain = 'Ethereum',
+  tokenDecimals = 18,
+}: {
+  chain?: UniswapV2Chain;
+  tokenDecimals?: number;
+}) {
+  const CHAIN = chain;
+  const client = clientFor(chain);
   const [token, setToken] = useState('');
   const [account, setAccount] = useState<Address | null>(null);
   const [position, setPosition] = useState<LpPosition | null>(null);
@@ -46,6 +68,9 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [seedToken, setSeedToken] = useState('');
+  const [seedEth, setSeedEth] = useState('');
+  const [seedAck, setSeedAck] = useState(false);
   const provider = () =>
     (globalThis as { ethereum?: Provider }).ethereum ?? null;
 
@@ -71,7 +96,28 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
     setAccount(address);
     setAck(false);
     const tokenAddress = getAddress(token);
-    const { factory, weth } = UNISWAP_V2[CHAIN];
+    const { factory, weth, router } = UNISWAP_V2[CHAIN];
+    // Confirm the pinned router really points at the pinned factory and WETH
+    // before anything is read or sent.
+    const [routerFactory, routerWeth] = await Promise.all([
+      client.readContract({
+        address: router,
+        abi: routerAbi,
+        functionName: 'factory',
+      }),
+      client.readContract({
+        address: router,
+        abi: routerAbi,
+        functionName: 'WETH',
+      }),
+    ]);
+    if (
+      getAddress(routerFactory) !== factory ||
+      getAddress(routerWeth) !== weth
+    )
+      throw new Error(
+        'The Uniswap router on this chain does not match the pinned contracts. Nothing was sent.',
+      );
     const pair = await client.readContract({
       address: factory,
       abi: factoryAbi,
@@ -119,15 +165,69 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
     );
   }
   // The browser wallet shows each transaction for the user to confirm.
-  async function send(to: Address, data: Hex) {
+  async function send(to: Address, data: Hex, value = 0n) {
+    // The wallet may have switched network since review; never send elsewhere.
+    const chainId = await provider()!.request({ method: 'eth_chainId' });
+    if (
+      typeof chainId !== 'string' ||
+      Number.parseInt(chainId, 16) !== EVM_NETWORKS[CHAIN].id
+    )
+      throw new Error(
+        `Switch your wallet back to ${CHAIN} and review again. Nothing was sent.`,
+      );
     const hash = await provider()!.request({
       method: 'eth_sendTransaction',
-      params: [{ from: account, to, data }],
+      params: [
+        {
+          from: account,
+          to,
+          data,
+          ...(value > 0n ? { value: `0x${value.toString(16)}` } : {}),
+        },
+      ],
     });
     if (typeof hash !== 'string' || !/^0x[0-9a-f]{64}$/i.test(hash))
       throw new Error('Wallet returned an unexpected transaction hash.');
     await client.waitForTransactionReceipt({ hash: hash as Hex });
     return hash;
+  }
+  async function createPool() {
+    if (!account) return;
+    const tokenAddress = getAddress(token);
+    const tokenAmount = parseUnits(seedToken, tokenDecimals);
+    const ethAmount = parseEther(seedEth);
+    const data = createPoolCall({
+      token: tokenAddress,
+      tokenAmount,
+      ethAmount,
+      to: account,
+      deadlineSeconds: Math.floor(Date.now() / 1000) + 600,
+    });
+    const { router } = UNISWAP_V2[CHAIN];
+    const [balance, allowance] = await Promise.all([
+      client.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [account],
+      }),
+      client.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [account, router],
+      }),
+    ]);
+    if (balance < tokenAmount)
+      throw new Error('This wallet holds fewer tokens than that.');
+    if (allowance < tokenAmount) {
+      setNote('Approve the token for the router in your wallet first…');
+      await send(tokenAddress, approveTokenCall(CHAIN, tokenAmount));
+    }
+    const hash = await send(router, data, ethAmount);
+    setNote(`Pool created in ${hash}.`);
+    setSeedAck(false);
+    await review();
   }
   async function confirm() {
     if (!position || !account) return;
@@ -144,7 +244,7 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
       });
       if (allowance < position.lpBalance) {
         setNote('Approve the router in your wallet first…');
-        await send(position.pair, approveRouterCall(CHAIN, maxUint256));
+        await send(position.pair, approveRouterCall(CHAIN, position.lpBalance));
       }
       const hash = await send(
         router,
@@ -163,7 +263,7 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
 
   return (
     <section aria-label="Liquidity pool" className="min-w-0 space-y-2">
-      <h3>Liquidity pool · Uniswap V2 on Ethereum</h3>
+      <h3>Liquidity pool · Uniswap V2 on {chain}</h3>
       <p className="text-xs text-muted-foreground">
         Reads your TOKEN/WETH pool position from the chain. Removing or burning
         liquidity is sent from your own browser wallet, which asks you to
@@ -190,8 +290,57 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
           {position ? 'Refresh' : 'Review pool'}
         </Button>
       </div>
-      {noPair && <p>No Uniswap V2 pair exists for this token and WETH yet.</p>}
-      {position && (
+      {account && (noPair || position?.totalSupply === 0n) && (
+        <fieldset className="space-y-2">
+          <legend>Create the pool</legend>
+          <p>
+            No liquidity exists for this token and WETH yet. Seeding it sets the
+            starting price at your ETH ÷ token ratio.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              aria-label="Token amount"
+              placeholder="Token amount"
+              inputMode="decimal"
+              value={seedToken}
+              onChange={(e) => {
+                setSeedToken(e.target.value.trim());
+                setSeedAck(false);
+              }}
+              className="w-44"
+            />
+            <Input
+              aria-label="ETH amount"
+              placeholder="ETH amount"
+              inputMode="decimal"
+              value={seedEth}
+              onChange={(e) => {
+                setSeedEth(e.target.value.trim());
+                setSeedAck(false);
+              }}
+              className="w-44"
+            />
+          </div>
+          <label className="block">
+            <input
+              type="checkbox"
+              checked={seedAck}
+              onChange={(e) => setSeedAck(e.target.checked)}
+            />{' '}
+            I confirm sending {seedToken || '0'} tokens and {seedEth || '0'} ETH
+            into a new public pool, and that anyone can trade against it at
+            once.
+          </label>
+          <Button
+            type="button"
+            disabled={busy || !seedAck || !seedToken || !seedEth}
+            onClick={() => void guarded(createPool)}
+          >
+            Create pool
+          </Button>
+        </fieldset>
+      )}
+      {position && position.totalSupply > 0n && (
         <>
           <div className="dashboard-stats">
             <article>
