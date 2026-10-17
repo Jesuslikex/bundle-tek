@@ -1,0 +1,11 @@
+# Warmup preflight and quote read recovery
+
+Coordinated with Review current progress. That chat owns vault/onboarding/HTTPS. This change owns only wallet-warmup-preflight.tsx, wallet-warmup-quote.tsx and warmup-read-panels.test.tsx. No shared build, restart, provider change or overlap with wallet creation.
+
+Preflight and quote reads now have a 30-second UI deadline and explicit Cancel controls. The pending status explains that no wallet unlock, signing or submission occurs. Timeout/cancellation restores manual retry, ignores late responses and makes no automatic provider request. Preflight additionally labels its captured observations expired at their existing server expiry; quote retains its existing expiry behavior. These display controls do not grant authority or change server freshness, budget, network, ownership or consent predicates.
+
+Tests: focused four-file run55 passed. Broader unchanged-source run28 files/251 tests passed together under Node24, two workers, work/** excluded, duration101.63s. Selection includes every warmup-named component/model test and wallet-workspace/warmup route test discovered by rg. It covers mocked/local database behavior, not funded execution. Plain TypeScript (also covering the committed marketplace route test), scoped typed lint, formatting and diff checks pass. React review checked accessible live status, explicit buttons, effect/timer cleanup and abort-result suppression.
+
+Chrome verification uses isolated port4188 and actual production components with locally intercepted synthetic responses, visibly labelled. Verified preflight/quote pending statuses, cancellation returning enabled manual actions, successful observations, and both expiry messages. The harness refuses unmatched requests and has no credentials, saved wallet or provider. Screenshot: ignored work/warmup-read-qa/expired-observations.png. This checks component behavior without rebuilding or replacing the other chat's signed-in HTTPS handoff.
+
+Real generated-wallet provider QA remains pending the user's own password entry, confirmation and submission in the existing https://localhost:3443 Create wallet form. This task does not choose a password, generate/unlock a real wallet, download secret material, sign, fund or submit anything. No push, deploy, remote SQL, credential/provider setting or cron change.

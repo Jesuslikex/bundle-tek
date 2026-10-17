@@ -12,9 +12,18 @@ export function WalletWarmupPreflight({
 }) {
   const [report, setReport] = useState<WarmupPreflight | null>(null),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [expired, setExpired] = useState(false);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    if (!report) return;
+    const timer = setTimeout(
+      () => setExpired(true),
+      Math.max(0, Date.parse(report.expiresAt) - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [report]);
   async function inspect() {
     controller.current?.abort();
     const c = new AbortController();
@@ -22,6 +31,15 @@ export function WalletWarmupPreflight({
     setBusy(true);
     setError('');
     setReport(null);
+    setExpired(false);
+    const timeout = setTimeout(() => {
+      if (c.signal.aborted) return;
+      c.abort();
+      setBusy(false);
+      setError(
+        'Preflight took too long. Check your connection and try checking again.',
+      );
+    }, 30_000);
     try {
       const response = await fetch('/api/wallet-workspace/warmup/preflight', {
         method: 'POST',
@@ -53,6 +71,7 @@ export function WalletWarmupPreflight({
       if (!c.signal.aborted)
         setError(e instanceof Error ? e.message : 'Preflight unavailable.');
     } finally {
+      clearTimeout(timeout);
       if (!c.signal.aborted) setBusy(false);
     }
   }
@@ -61,12 +80,36 @@ export function WalletWarmupPreflight({
       <Button variant="outline" disabled={busy} onClick={inspect}>
         {busy ? 'Checking preflight…' : 'Check warmup preflight'}
       </Button>
+      {busy && (
+        <>
+          <output aria-live="polite">
+            Reading preflight only. No wallet unlock, signature or transaction
+            is requested.
+          </output>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              controller.current?.abort();
+              setBusy(false);
+              setError('Preflight cancelled. You can try checking again.');
+            }}
+          >
+            Cancel preflight
+          </Button>
+        </>
+      )}
       {error && <p role="alert">{error}</p>}
       {report && (
         <section aria-label="Warmup preflight observations">
           <h5>
             {report.status} · saved revision {revision}
           </h5>
+          {expired && (
+            <p role="alert">
+              Preflight observations expired. Check warmup preflight again
+              before continuing.
+            </p>
+          )}
           <p>
             Required per wallet: {report.requiredPerWallet} {report.currency},
             including your fee reserve.

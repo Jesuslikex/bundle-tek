@@ -36,6 +36,14 @@ export function WalletWarmupQuote({
     setError('');
     setQuote(null);
     setExpired(false);
+    const timeout = setTimeout(() => {
+      if (c.signal.aborted) return;
+      c.abort();
+      setBusy(false);
+      setError(
+        'Quote took too long. Check your connection and try quoting again.',
+      );
+    }, 30_000);
     try {
       const response = await fetch('/api/wallet-workspace/warmup/quote', {
         method: 'POST',
@@ -67,6 +75,7 @@ export function WalletWarmupQuote({
       if (!c.signal.aborted)
         setError(e instanceof Error ? e.message : 'Quote unavailable.');
     } finally {
+      clearTimeout(timeout);
       if (!c.signal.aborted) setBusy(false);
     }
   }
@@ -94,6 +103,24 @@ export function WalletWarmupQuote({
       <Button disabled={busy} variant="outline" onClick={inspect}>
         {busy ? 'Quoting buy…' : 'Quote warmup buy'}
       </Button>
+      {busy && (
+        <>
+          <output aria-live="polite">
+            Reading quote only. No wallet unlock, signature or transaction is
+            requested.
+          </output>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              controller.current?.abort();
+              setBusy(false);
+              setError('Quote cancelled. You can try quoting again.');
+            }}
+          >
+            Cancel quote
+          </Button>
+        </>
+      )}
       {error && <p role="alert">{error}</p>}
       {quote && (
         <section aria-label="Warmup swap quote">
