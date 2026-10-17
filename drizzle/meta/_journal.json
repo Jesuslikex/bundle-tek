@@ -666,6 +666,34 @@
       "when": 1792216800000,
       "tag": "0094_wallet_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "6",
+      "when": 1792217700000,
+      "tag": "0095_sniper_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "6",
+      "when": 1792218600000,
+      "tag": "0096_token_supply_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "6",
+      "when": 1792219500000,
+      "tag": "0097_pair_order_executions",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "6",
+      "when": 1792227600000,
+      "tag": "0099_volume_bot_sessions",
+      "breakpoints": true
     }
   ]
 }

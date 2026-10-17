@@ -102,3 +102,49 @@ it('preserves backoff without exposing provider errors', async () => {
   expect(r.status).toBe(429);
   expect(r.headers.get('retry-after')).toBe('15');
 });
+it('reports the server signing flag only as a display hint on preparation', async () => {
+  vi.stubEnv('SOLANA_STOCK_SIGNING_ENABLED', 'true');
+  const on = await POST(request({ action: 'prepare', request: { id: 'p' } }));
+  expect(
+    ((await on.json()) as { stockSigningEnabled: boolean }).stockSigningEnabled,
+  ).toBe(true);
+  vi.stubEnv('SOLANA_STOCK_SIGNING_ENABLED', 'yes');
+  const off = await POST(request({ action: 'prepare', request: { id: 'p' } }));
+  expect(
+    ((await off.json()) as { stockSigningEnabled: boolean })
+      .stockSigningEnabled,
+  ).toBe(false);
+  vi.unstubAllEnvs();
+});
+it('routes signed registration, one-attempt submission and recovery only with exact keys', async () => {
+  const id = '00000000-0000-4000-8000-000000000000';
+  for (const body of [
+    { action: 'register', authorizationId: id },
+    { action: 'register', authorizationId: id, signedPacket: 'x', extra: 1 },
+    { action: 'submit', authorizationId: id },
+    { action: 'recover', authorizationId: id, consent: {} },
+    { action: 'send', authorizationId: id },
+  ]) {
+    const r = await POST(request(body));
+    expect(r.status).toBe(400);
+  }
+  mocks.db.mockReturnValue({
+    prepare: () => ({
+      bind: () => ({ first: async () => null }),
+    }),
+  });
+  vi.stubEnv('SOLANA_STOCK_SIGNING_ENABLED', '');
+  for (const body of [
+    { action: 'register', authorizationId: id, signedPacket: 'x' },
+    { action: 'submit', authorizationId: id, consent: {} },
+  ]) {
+    const r = await POST(request(body));
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as { error: string }).error).toMatch(/disabled/);
+  }
+  const recovered = await POST(
+    request({ action: 'recover', authorizationId: id }),
+  );
+  expect(recovered.status).toBe(404);
+  vi.unstubAllEnvs();
+});
