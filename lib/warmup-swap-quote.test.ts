@@ -35,6 +35,36 @@ const result = {
   requestId: 'untrustedRequest',
 };
 it.each(['metis', 'jupiterz', 'dflow', 'okx'] as const)(
+  'warmup quotes request executable routing and refuse ignored exclusions: %s',
+  async (router) => {
+    const fetcher = vi.fn(async (_url: unknown) =>
+      Response.json({ ...result, router }),
+    );
+    const pending = quoteWarmupBuy(
+      doc(),
+      'qa-key',
+      AbortSignal.timeout(1000),
+      fetcher,
+    );
+    if (router === 'metis')
+      await expect(pending).resolves.toMatchObject({
+        side: 'Buy',
+        cycle: 1,
+        router: 'metis',
+        executionAllowed: false,
+      });
+    else
+      await expect(pending).rejects.toMatchObject({
+        code: 'UNSUPPORTED_ROUTER',
+      });
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    expect(url.searchParams.get('excludeRouters')).toBe('jupiterz,dflow,okx');
+    expect(url.searchParams.get('slippageBps')).toBe('50');
+    expect(url.searchParams.has('taker')).toBe(false);
+    expect(fetcher).toHaveBeenCalledOnce();
+  },
+);
+it.each(['metis', 'jupiterz', 'dflow', 'okx'] as const)(
   'aligns unsigned pair reference quotes with wallet-bound routing and rejects ignored exclusions: %s',
   async (router) => {
     const fetcher = vi.fn(async (_url: unknown) =>

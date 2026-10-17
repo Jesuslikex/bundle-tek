@@ -53,14 +53,22 @@ export async function quoteWarmupBuy(
   const amount = warmupAtoms(plan.buyAmount, 9);
   if (amount > (1n << 64n) - 1n)
     throw new WarmupQuoteError('Swap amount exceeds Solana limits.');
-  const quote = await quoteSolanaBuy(
-    { outputMint, amount: plan.buyAmount },
+  // Match the executable warmup path instead of receiving an RFQ quote with
+  // different slippage semantics. Keep the response's exact-parameter checks.
+  const quote = await quoteSolanaSwap(
+    {
+      tokenMint: outputMint,
+      amountRaw: amount.toString(),
+      side: 'Buy',
+      metisOnly: true,
+    },
     apiKey,
     signal,
     fetcher,
   );
   return {
     ...quote,
+    side: 'Buy' as const,
     cycle,
     limitations: 'Selected cycle buy only. ' + quote.limitations,
   };
