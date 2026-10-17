@@ -1068,3 +1068,51 @@ it('retains a private diagnostic cause without exposing it in the public candida
   expect(Object.keys(error)).not.toContain('cause');
   expect(JSON.stringify(error)).not.toContain('private diagnostic fixture');
 });
+function diagnosticOf(error: unknown) {
+  for (
+    let e = error as { cause?: unknown; pairDiagnostic?: unknown } | undefined,
+      i = 0;
+    e && i < 8;
+    e = e.cause as typeof e, i++
+  )
+    if (e.pairDiagnostic)
+      return e.pairDiagnostic as {
+        check: string;
+        comparisons: { field: string; before: string; after: string }[];
+      };
+  return undefined;
+}
+it('records exact token and SOL values when simulation protection refuses', async () => {
+  const fixture = (f = await pairOrderFixture());
+  fixture.orderState.onSimulation = (response, keys) => {
+    const token = response.value.accounts[
+      keys.indexOf(fixture.atas[0])
+    ] as PostAccount;
+    editToken(token, (_b, view) =>
+      view.setBigUint64(64, 20000000n + 994999n, true),
+    );
+  };
+  const tokenError = await run(fixture).catch((e: unknown) => e);
+  const token = diagnosticOf(tokenError);
+  expect(token?.check).toBe('simulation-token-delta');
+  expect(token?.comparisons.find((c) => c.field === 'deltaRaw')?.after).toBe(
+    '994999',
+  );
+  f.close();
+  const native = (f = await pairOrderFixture());
+  native.orderState.onSimulation = (response, keys) => {
+    const wallet = response.value.accounts[
+      keys.indexOf(native.wallet)
+    ] as PostAccount;
+    wallet.lamports = (BigInt(wallet.lamports) + 1n).toString();
+  };
+  const nativeDiagnostic = diagnosticOf(
+    await run(native).catch((e: unknown) => e),
+  );
+  expect(nativeDiagnostic?.check).toBe('simulation-native-conservation');
+  expect(
+    nativeDiagnostic?.comparisons.find(
+      (c) => c.field === 'tradeNativeDeltaRaw',
+    ),
+  ).toEqual({ field: 'tradeNativeDeltaRaw', before: '0', after: '1' });
+});

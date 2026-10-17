@@ -876,7 +876,11 @@ try {
               ? 'account-wsol-reserve-or-rent'
               : d.check === 'minimum-output'
                 ? 'economic-minimum-output'
-                : 'instruction-or-account-review',
+                : d.check === 'simulation-token-delta'
+                  ? 'simulation-token-delta'
+                  : d.check === 'simulation-native-conservation'
+                    ? 'simulation-native-conservation'
+                    : 'instruction-or-account-review',
   };
 } finally {
   receipt.pipelineMs =
