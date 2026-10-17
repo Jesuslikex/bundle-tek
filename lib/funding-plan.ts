@@ -12,11 +12,17 @@ export type FundingInput = {
   funderAddress: string;
   startAt: string;
   delaySeconds: number;
-  recipients: { address: string; amount: string }[];
+  // Classic funding: optional owned proxy wallets each transfer passes through, in order.
+  recipients: { address: string; amount: string; proxies?: string[] }[];
 };
 export type FundingDocument = FundingInput & {
   total: string;
-  items: { address: string; amount: string; scheduledAt: string }[];
+  items: {
+    address: string;
+    amount: string;
+    scheduledAt: string;
+    proxies?: string[];
+  }[];
 };
 export type SavedFunding = {
   id: string;
@@ -140,10 +146,32 @@ export function validateFunding(value: unknown): FundingDocument {
       BigInt(whole) * 10n ** BigInt(decimals) +
       BigInt(fraction.padEnd(decimals, '0'));
     if (atoms <= 0n) throw new Error('Each amount must be greater than zero.');
+    let proxies: string[] | undefined;
+    if (r.proxies !== undefined) {
+      if (
+        !Array.isArray(r.proxies) ||
+        r.proxies.length < 1 ||
+        r.proxies.length > 3 ||
+        v.chain !== 'Solana' ||
+        v.currency !== 'SOL' ||
+        asset
+      )
+        throw new Error('Proxy routes take 1 to 3 wallets and native SOL only.');
+      proxies = r.proxies.map((p) => address(p, v.chain));
+      const route = [funderAddress, ...proxies, publicAddress];
+      if (!funderAddress || new Set(route).size !== route.length)
+        throw new Error(
+          'Proxy wallets must differ from the funder, the recipient and each other.',
+        );
+    }
     total += atoms;
     if (total > 1000000n * 10n ** BigInt(decimals))
       throw new Error('Total exceeds the planning limit of 1000000 units.');
-    return { address: publicAddress, amount: decimal(atoms, decimals) };
+    return {
+      address: publicAddress,
+      amount: decimal(atoms, decimals),
+      ...(proxies ? { proxies } : {}),
+    };
   });
   return {
     name: v.name.trim(),
