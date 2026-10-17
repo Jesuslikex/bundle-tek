@@ -277,6 +277,7 @@ export function ImportedTradeHistory({
                   key={project.id}
                   performance={performance}
                   decimals={project.document.token.decimals}
+                  symbol={project.document.token.symbol}
                 />
               )}
               <p className="tracker-note">
