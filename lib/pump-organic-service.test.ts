@@ -79,7 +79,9 @@ async function fixture() {
   );
   const sequence = await savePumpOrganicSequence(db, 'alice', {
     projectId: 'p1',
+    launchReviewId: 'launch-1',
     mint: create.mint,
+    rentAllowanceRaw: '3000000',
     plan,
   });
   const packets = await Promise.all(

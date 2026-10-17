@@ -48,9 +48,18 @@ const EXPIRY_MARGIN_BLOCKS = 32n;
 export async function savePumpOrganicSequence(
   db: D1Database,
   owner: string,
-  supplied: { projectId: string; mint: string; plan: Plan },
+  supplied: {
+    projectId: string;
+    launchReviewId: string;
+    mint: string;
+    rentAllowanceRaw: string;
+    plan: Plan;
+  },
 ) {
-  const { projectId, mint, plan } = structuredClone(supplied);
+  const { projectId, launchReviewId, mint, rentAllowanceRaw, plan } =
+    structuredClone(supplied);
+  if (!/^(0|[1-9]\d{0,9})$/.test(rentAllowanceRaw))
+    return fail('Review an exact per-buy rent allowance.', 400);
   if (
     plan?.format !== 'pump-organic-sequence-plan-v1' ||
     plan.signingAllowed !== false ||
@@ -69,20 +78,40 @@ export async function savePumpOrganicSequence(
     text = JSON.stringify(plan);
   await db
     .prepare(
-      "INSERT INTO pump_organic_sequences(id,owner_id,project_id,mint,plan,plan_sha256,state) VALUES(?,?,?,?,?,?,'active')",
+      "INSERT INTO pump_organic_sequences(id,owner_id,project_id,launch_review_id,mint,rent_allowance_raw,plan,plan_sha256,state) VALUES(?,?,?,?,?,?,?,?,'active')",
     )
-    .bind(id, owner, projectId, mint, text, await sha(text))
+    .bind(
+      id,
+      owner,
+      projectId,
+      launchReviewId,
+      mint,
+      rentAllowanceRaw,
+      text,
+      await sha(text),
+    )
     .run();
   return { id, state: 'active' as const, plan };
 }
 
-async function readSequence(db: D1Database, owner: string, id: string) {
+export async function readPumpOrganicSequence(
+  db: D1Database,
+  owner: string,
+  id: string,
+) {
   const row = await db
     .prepare(
-      'SELECT id,mint,plan,state FROM pump_organic_sequences WHERE owner_id=? AND id=?',
+      'SELECT id,launch_review_id,mint,rent_allowance_raw,plan,state FROM pump_organic_sequences WHERE owner_id=? AND id=?',
     )
     .bind(owner, id)
-    .first<{ id: string; mint: string; plan: string; state: string }>();
+    .first<{
+      id: string;
+      launch_review_id: string;
+      mint: string;
+      rent_allowance_raw: string;
+      plan: string;
+      state: string;
+    }>();
   return row ?? fail('Organic sequence not found.', 404);
 }
 async function readBatch(db: D1Database, owner: string, id: string) {
@@ -111,7 +140,7 @@ export async function savePumpOrganicBatch(
   supplied: PumpOrganicBatchReview,
 ) {
   const { review } = await requirePumpOrganicBatchReview(supplied);
-  const sequence = await readSequence(db, owner, review.sequenceId);
+  const sequence = await readPumpOrganicSequence(db, owner, review.sequenceId);
   if (sequence.state !== 'active')
     return fail('This organic sequence was stopped.');
   const plan = JSON.parse(sequence.plan) as Plan;
@@ -254,7 +283,7 @@ export async function stopPumpOrganicSequence(
   owner: string,
   sequenceId: string,
 ) {
-  await readSequence(db, owner, sequenceId);
+  await readPumpOrganicSequence(db, owner, sequenceId);
   await db.batch([
     db
       .prepare(
@@ -368,4 +397,46 @@ export async function publicBatch(db: D1Database, owner: string, id: string) {
     })),
     signingAllowed: false as const,
   };
+}
+
+/** Owned sequences of one project with every batch and buy state, newest first. */
+export async function listPumpOrganicSequences(
+  db: D1Database,
+  owner: string,
+  projectId: string,
+) {
+  const { results } = await db
+    .prepare(
+      'SELECT id,launch_review_id,mint,plan,state,created_at FROM pump_organic_sequences WHERE owner_id=? AND project_id=? ORDER BY created_at DESC LIMIT 20',
+    )
+    .bind(owner, projectId)
+    .all<{
+      id: string;
+      launch_review_id: string;
+      mint: string;
+      plan: string;
+      state: string;
+      created_at: string;
+    }>();
+  const sequences = [];
+  for (const row of results) {
+    const { results: batches } = await db
+      .prepare(
+        'SELECT id FROM pump_organic_batches WHERE owner_id=? AND sequence_id=? ORDER BY batch',
+      )
+      .bind(owner, row.id)
+      .all<{ id: string }>();
+    sequences.push({
+      id: row.id,
+      launchReviewId: row.launch_review_id,
+      mint: row.mint,
+      state: row.state,
+      createdAt: row.created_at,
+      plan: JSON.parse(row.plan) as Plan,
+      batches: await Promise.all(
+        batches.map((b) => publicBatch(db, owner, b.id)),
+      ),
+    });
+  }
+  return sequences;
 }
