@@ -111,16 +111,16 @@ const origin = 'https://bundle.test';
 function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(
-    'CREATE TABLE pump_launch_reviews(id TEXT PRIMARY KEY,owner_id TEXT,state TEXT);CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT);CREATE TABLE imported_token_project_gates(owner_id TEXT PRIMARY KEY,next_allowed_at INTEGER);',
+    'CREATE TABLE pump_launch_reviews(id TEXT PRIMARY KEY,owner_id TEXT,state TEXT);CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT);CREATE TABLE pump_organic_sequences(id TEXT PRIMARY KEY,owner_id TEXT,launch_review_id TEXT,state TEXT,created_at TEXT);CREATE TABLE imported_token_project_gates(owner_id TEXT PRIMARY KEY,next_allowed_at INTEGER);',
   );
   sqlite
     .prepare('INSERT INTO pump_launch_reviews VALUES(?,?,?)')
     .run(REVIEW, 'alice', 'signed');
-  for (const part of readFileSync(
-    'drizzle/0095_sniper_guards.sql',
-    'utf8',
-  ).split('--> statement-breakpoint'))
-    sqlite.exec(part);
+  for (const file of ['0095_sniper_guards', '0099_sniper_nuke_sells'])
+    for (const part of readFileSync(`drizzle/${file}.sql`, 'utf8').split(
+      '--> statement-breakpoint',
+    ))
+      sqlite.exec(part);
   const db = {
     prepare(sql: string) {
       let values: unknown[] = [];
@@ -263,4 +263,19 @@ it('saves, arms and triggers using only read-only RPC methods', async () => {
       'getMultipleAccounts',
     ]),
   );
+});
+
+it('rejects unknown Nuke actions and Nuke prepare before a trigger', async () => {
+  for (const action of ['nuke-submit', 'send'])
+    expect(
+      (await post({ action, batchId: REVIEW, reviewId: REVIEW })).status,
+    ).toBe(400);
+  expect(
+    (await post({ action: 'nuke-register', reviewId: REVIEW, consent: {} }))
+      .status,
+  ).toBe(400);
+  clearGate();
+  const early = await post({ action: 'nuke-prepare', reviewId: REVIEW });
+  expect(early.ok).toBe(false);
+  expect((await read(early)).error).toBeTruthy();
 });

@@ -12,6 +12,7 @@ import {
   type SniperGuardLaunch,
   type SniperGuardSettings,
 } from './sniper-guard';
+import { stopPumpOrganicSequence } from './pump-organic-service';
 import {
   readCurveBuys,
   readLaunchTokenBalances,
@@ -29,6 +30,7 @@ export type SniperGuardBalance = {
   wallet: string;
   tokenAccount: string;
   amountRaw: string;
+  decimals?: number;
 };
 export type SniperGuardObservation = {
   cursor: string | null;
@@ -40,6 +42,8 @@ export type SniperGuardObservation = {
   evaluation: SniperGuardEvaluation;
   endReason: 'launch-complete' | 'timed' | 'capacity' | null;
   balances: SniperGuardBalance[] | null;
+  /** Organic/Stagger sequences of this launch stopped by Complete Early. */
+  stoppedSequences: string[];
 };
 export type SniperGuardView = {
   id: string;
@@ -271,6 +275,7 @@ export async function armSniperGuard(
     }),
     endReason: null,
     balances: null,
+    stoppedSequences: [],
   };
   const result = await db
     .prepare(
@@ -309,6 +314,20 @@ export async function stopSniperGuard(
   return view((await readRow(db, owner, reviewId))!);
 }
 
+async function activeOrganicSequences(
+  db: D1Database,
+  owner: string,
+  reviewId: string,
+) {
+  const { results } = await db
+    .prepare(
+      "SELECT id FROM pump_organic_sequences WHERE owner_id=? AND launch_review_id=? AND state='active' ORDER BY created_at",
+    )
+    .bind(owner, reviewId)
+    .all<{ id: string }>();
+  return results.map((r) => r.id);
+}
+
 async function ownedWallets(db: D1Database, owner: string) {
   const { results } = await db
     .prepare(
@@ -333,6 +352,11 @@ export async function observeSniperGuard(
   signal: AbortSignal,
   now: () => Date = () => new Date(),
   readLaunchState: SniperGuardLaunchStateReader = readSniperGuardLaunchState,
+  stopSequence: (
+    db: D1Database,
+    owner: string,
+    id: string,
+  ) => Promise<unknown> = stopPumpOrganicSequence,
 ) {
   const row = await readRow(db, owner, reviewId);
   if (!row) return fail('Sniper Guard not found.', 404);
@@ -361,15 +385,29 @@ export async function observeSniperGuard(
     buys,
     armedAtMs: Date.parse(row.armed_at!),
     nowMs: at.getTime(),
-    launchBuysComplete: ENDED_LAUNCH.has(launchState),
+    // Staged (Organic/Stagger) holder buys keep the launch open until every
+    // sequence for it has completed or stopped.
+    launchBuysComplete:
+      ENDED_LAUNCH.has(launchState) &&
+      !(await activeOrganicSequences(db, owner, reviewId)).length,
   });
   const overCapacity = buys.length > SNIPER_GUARD_STORED_BUYS;
   let state: SniperGuardState = 'watching',
     endReason: SniperGuardObservation['endReason'] = null,
     balances: SniperGuardBalance[] | null = null;
+  const stoppedSequences: string[] = [];
   if (evaluation.triggered) {
     state = 'triggered';
-    const sell = sniperGuardActions(settings, launch).sellWallets;
+    const response = sniperGuardActions(settings, launch);
+    // Complete Early: stop sending this launch's remaining staged holder buys.
+    // Stopping only refuses future sends of the user's own signed buys; it
+    // never signs or sends anything.
+    if (response.stopRemainingBuys)
+      for (const id of await activeOrganicSequences(db, owner, reviewId)) {
+        await stopSequence(db, owner, id);
+        stoppedSequences.push(id);
+      }
+    const sell = response.sellWallets;
     try {
       balances = await readLaunchTokenBalances(rpc, launch.mint, sell, signal);
     } catch {
@@ -392,6 +430,7 @@ export async function observeSniperGuard(
     evaluation,
     endReason,
     balances,
+    stoppedSequences,
   };
   const stamp = at.toISOString();
   const result = await db
