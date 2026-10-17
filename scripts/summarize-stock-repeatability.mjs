@@ -69,7 +69,14 @@ export function summarizeStockRepeatability(receipts) {
       typeof r.passed !== 'boolean' ||
       !Number.isInteger(r.maximumRollingRpcMethods) ||
       r.maximumRollingRpcMethods < 0 ||
-      r.maximumRollingRpcMethods > 9 ||
+      !Number.isInteger(r.qualificationMethodBudget ?? 9) ||
+      (r.qualificationMethodBudget ?? 9) < 1 ||
+      (r.qualificationMethodBudget ?? 9) > 99 ||
+      r.maximumRollingRpcMethods >
+        Math.max(9, r.qualificationMethodBudget ?? 9) ||
+      (r.maximumRollingRpcMethodsByRole?.['indexer-fallback'] ?? 0) > 9 ||
+      (r.maximumRollingRpcMethodsByRole?.['stock-runtime'] ?? 0) >
+        (r.qualificationMethodBudget ?? 9) ||
       !Number.isInteger(r.simulationCount) ||
       r.simulationCount < 0 ||
       r.simulationCount > 1 ||

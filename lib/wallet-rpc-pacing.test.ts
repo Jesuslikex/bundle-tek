@@ -1,7 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { env } from '../test/cloudflare-workers';
 import { balanceRpc } from './wallet-balances';
-import { paceWalletRpc } from './wallet-rpc-pacing';
+import {
+  paceWalletRpc,
+  stockQualificationMethodBudget,
+} from './wallet-rpc-pacing';
 afterEach(() => {
   delete (env as Record<string, unknown>).SOLANA_RPC_MIN_INTERVAL_MS;
   vi.useRealTimers();
@@ -212,4 +215,47 @@ it('keeps configured and qualification schedules independent on the same endpoin
   await Promise.all([ordinary, qualified]);
   expect(ordinaryTimes).toEqual([300, 600, 900]);
   expect(qualificationTimes).toEqual([300]);
+});
+it('raises the qualification budget only for the configured stock runtime endpoint', async () => {
+  const runtime = 'https://solana-mainnet.example.test/v2/fixture';
+  expect(stockQualificationMethodBudget(runtime, undefined, runtime)).toBe(9);
+  expect(stockQualificationMethodBudget(runtime, '25', runtime)).toBe(25);
+  expect(
+    stockQualificationMethodBudget(
+      'https://indexer.example.test/',
+      '25',
+      runtime,
+    ),
+  ).toBe(9);
+  expect(stockQualificationMethodBudget(runtime, '25', '')).toBe(9);
+  for (const bad of ['0', '100', '9.5', ' 25', 'many'])
+    expect(() => stockQualificationMethodBudget(runtime, bad, runtime)).toThrow(
+      'Invalid stock runtime RPC method budget.',
+    );
+  vi.useFakeTimers();
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND =
+    '25';
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_RPC_URL = runtime;
+  try {
+    const signal = new AbortController().signal;
+    const admitted: number[] = [];
+    const reads = Array.from({ length: 60 }, () =>
+      paceWalletRpc(runtime, signal, 1, 'stock-runtime-evidence').then(() =>
+        admitted.push(Date.now()),
+      ),
+    );
+    await vi.advanceTimersByTimeAsync(4000);
+    await Promise.all(reads);
+    const peak = Math.max(
+      ...admitted.map(
+        (time) => admitted.filter((t) => t <= time && t > time - 1000).length,
+      ),
+    );
+    expect(peak).toBeLessThanOrEqual(25);
+    expect(peak).toBeGreaterThan(9);
+  } finally {
+    delete (env as Record<string, unknown>)
+      .SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND;
+    delete (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_RPC_URL;
+  }
 });

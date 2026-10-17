@@ -272,3 +272,32 @@ test('rejects wallet actions, excessive pacing and inconsistent 429 accounting',
     assert.throws(() => summarizeStockRepeatability(rows));
   }
 });
+
+test('applies a configured stock runtime method budget per endpoint', () => {
+  const ok = samples();
+  for (const r of ok) {
+    r.qualificationMethodBudget = 25;
+    r.maximumRollingRpcMethodsByRole = {
+      'indexer-fallback': 9,
+      'stock-runtime': 20,
+    };
+    r.maximumRollingRpcMethods = 20;
+  }
+  summarizeStockRepeatability(ok);
+  for (const change of [
+    (row) => {
+      row.maximumRollingRpcMethodsByRole['stock-runtime'] = 26;
+      row.maximumRollingRpcMethods = 26;
+    },
+    (row) => {
+      row.maximumRollingRpcMethodsByRole['indexer-fallback'] = 10;
+    },
+    (row) => {
+      row.qualificationMethodBudget = 100;
+    },
+  ]) {
+    const rows = structuredClone(ok);
+    change(rows[0]);
+    assert.throws(() => summarizeStockRepeatability(rows));
+  }
+});

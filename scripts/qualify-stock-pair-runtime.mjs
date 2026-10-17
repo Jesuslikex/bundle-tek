@@ -108,7 +108,7 @@ mkdirSync(folder, { recursive: true });
 const bundle = join(folder, 'reader.mjs');
 await build({
   stdin: {
-    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint,getSolanaStockRuntimeRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc,stockPairAccountLimit} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc} from './lib/wallet-rpc-pacing';`,
+    contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint,getSolanaStockRuntimeRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc,stockPairAccountLimit} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc,stockQualificationMethodBudget} from './lib/wallet-rpc-pacing';`,
     resolveDir: process.cwd(),
     sourcefile: 'unsigned-stock-qualification.ts',
   },
@@ -151,7 +151,8 @@ const receipt = {
   providerTimings: [],
   quoteAsset: args.has('--quote-usdc') ? 'USDC' : 'SOL',
   inputUiAmount: args.has('--one-unit') ? '1' : '0.001',
-  qualificationPacing: 'unsigned-stock-qualification-nine-methods-per-second',
+  qualificationPacing:
+    'unsigned-stock-qualification-per-endpoint-method-budget',
   rpcPacingScope: 'setup-and-runtime',
   rpcPacingMs: /^\d{1,4}$/.test(process.env.SOLANA_RPC_MIN_INTERVAL_MS ?? '')
     ? Number(process.env.SOLANA_RPC_MIN_INTERVAL_MS)
@@ -913,24 +914,44 @@ try {
       valuesAvailable: true,
       comparisons: [{ field: 'httpStatus', before: '200', after: '429' }],
     };
+  // Each endpoint has its own pacing budget, so measure each endpoint alone.
+  const rolling = (rows) =>
+    rows.length
+      ? Math.max(
+          ...rows.map((r) =>
+            rows
+              .filter(
+                (other) =>
+                  other.startMs <= r.startMs &&
+                  other.startMs > r.startMs - 1000,
+              )
+              .reduce((sum, other) => sum + other.rpcUnits, 0),
+          ),
+        )
+      : 0;
   const allRpc = receipt.requests.filter((r) => r.rpcUnits !== undefined);
-  receipt.maximumRollingRpcMethods = allRpc.length
-    ? Math.max(
-        ...allRpc.map((r) =>
-          allRpc
-            .filter(
-              (other) =>
-                other.startMs <= r.startMs && other.startMs > r.startMs - 1000,
-            )
-            .reduce((sum, other) => sum + other.rpcUnits, 0),
-        ),
-      )
-    : 0;
-  if (receipt.maximumRollingRpcMethods > 9) {
+  receipt.qualificationMethodBudget =
+    lib.stockQualificationMethodBudget(runtimeEndpoint);
+  receipt.maximumRollingRpcMethodsByRole = {
+    'indexer-fallback': rolling(
+      allRpc.filter((r) => r.providerRole === 'indexer-fallback'),
+    ),
+    'stock-runtime': rolling(
+      allRpc.filter((r) => r.providerRole === 'stock-runtime'),
+    ),
+  };
+  receipt.maximumRollingRpcMethods = Math.max(
+    ...Object.values(receipt.maximumRollingRpcMethodsByRole),
+  );
+  if (
+    receipt.maximumRollingRpcMethodsByRole['indexer-fallback'] > 9 ||
+    receipt.maximumRollingRpcMethodsByRole['stock-runtime'] >
+      receipt.qualificationMethodBudget
+  ) {
     receipt.passed = false;
     receipt.runtimeRefusalBeforePacing = receipt.reason ?? null;
     receipt.reason =
-      'Qualification pacing exceeded nine RPC methods in a rolling second.';
+      'Qualification pacing exceeded the RPC method budget in a rolling second.';
   }
   receipt.firstCodeReads = receipt.logicalReads.filter(
     (r) => r.profile === 'code' && r.phase === 'before-simulation',
