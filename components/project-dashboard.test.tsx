@@ -54,3 +54,14 @@ it('counts imported tokens and offers an import as the next step', () => {
     'Paste a token address',
   );
 });
+
+it('shows trending narratives only to signed-in users on the active list', () => {
+  const onNarrativeDraft = () => {};
+  expect(render({ onNarrativeDraft })).toContain('Trending narratives');
+  expect(render({ onNarrativeDraft, signedOut: true })).not.toContain(
+    'Trending narratives',
+  );
+  expect(render({ onNarrativeDraft, archived: true })).not.toContain(
+    'Trending narratives',
+  );
+});
