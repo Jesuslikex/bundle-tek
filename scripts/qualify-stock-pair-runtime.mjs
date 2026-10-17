@@ -162,6 +162,8 @@ const sqlite = new DatabaseSync(':memory:');
 let reader,
   auditReference,
   publicKey,
+  runtimeEndpoint = null,
+  qualificationMethodBudget = null,
   pipelineStart,
   simulated = false;
 const clock = () => performance.now();
@@ -169,8 +171,11 @@ try {
   if (lib.pairStockSigningPolicy().qualified !== false)
     throw Error('Signing gate must remain disabled.');
   const endpoint = lib.getSolanaIndexerRpcEndpoint();
-  const runtimeEndpoint = lib.getSolanaStockRuntimeRpcEndpoint();
+  runtimeEndpoint = lib.getSolanaStockRuntimeRpcEndpoint();
+  qualificationMethodBudget =
+    lib.stockQualificationMethodBudget(runtimeEndpoint);
   let useRuntimeEndpoint = false;
+  receipt.qualificationMethodBudget = qualificationMethodBudget;
   receipt.runtimeProviderRole = process.env.SOLANA_STOCK_RUNTIME_RPC_URL
     ? 'configured-standard-validator'
     : 'existing-indexer-fallback';
@@ -930,8 +935,7 @@ try {
         )
       : 0;
   const allRpc = receipt.requests.filter((r) => r.rpcUnits !== undefined);
-  receipt.qualificationMethodBudget =
-    lib.stockQualificationMethodBudget(runtimeEndpoint);
+  receipt.qualificationMethodBudget = qualificationMethodBudget;
   receipt.maximumRollingRpcMethodsByRole = {
     'indexer-fallback': rolling(
       allRpc.filter((r) => r.providerRole === 'indexer-fallback'),
@@ -945,8 +949,9 @@ try {
   );
   if (
     receipt.maximumRollingRpcMethodsByRole['indexer-fallback'] > 9 ||
-    receipt.maximumRollingRpcMethodsByRole['stock-runtime'] >
-      receipt.qualificationMethodBudget
+    (qualificationMethodBudget !== null &&
+      receipt.maximumRollingRpcMethodsByRole['stock-runtime'] >
+        qualificationMethodBudget)
   ) {
     receipt.passed = false;
     receipt.runtimeRefusalBeforePacing = receipt.reason ?? null;
