@@ -27,20 +27,38 @@ import {
   lpPosition,
   pairAbi,
   removeLiquidityCall,
+  routerAbi,
   type LpPosition,
+  type UniswapV2Chain,
 } from '@/lib/uniswap-v2-liquidity';
 
 type Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
-const CHAIN = 'Ethereum' as const;
 const ZERO = '0x0000000000000000000000000000000000000000';
-const client = createPublicClient({
-  transport: http(EVM_NETWORKS[CHAIN].endpoint),
-});
+const clients = new Map<
+  UniswapV2Chain,
+  ReturnType<typeof createPublicClient>
+>();
+const clientFor = (chain: UniswapV2Chain) => {
+  let c = clients.get(chain);
+  if (!c) {
+    c = createPublicClient({ transport: http(EVM_NETWORKS[chain].endpoint) });
+    clients.set(chain, c);
+  }
+  return c;
+};
 const pct = (bps: number) => (bps / 100).toFixed(2) + '%';
 
-export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
+export function LiquidityPoolPanel({
+  chain = 'Ethereum',
+  tokenDecimals = 18,
+}: {
+  chain?: UniswapV2Chain;
+  tokenDecimals?: number;
+}) {
+  const CHAIN = chain;
+  const client = clientFor(chain);
   const [token, setToken] = useState('');
   const [account, setAccount] = useState<Address | null>(null);
   const [position, setPosition] = useState<LpPosition | null>(null);
@@ -78,7 +96,28 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
     setAccount(address);
     setAck(false);
     const tokenAddress = getAddress(token);
-    const { factory, weth } = UNISWAP_V2[CHAIN];
+    const { factory, weth, router } = UNISWAP_V2[CHAIN];
+    // Confirm the pinned router really points at the pinned factory and WETH
+    // before anything is read or sent.
+    const [routerFactory, routerWeth] = await Promise.all([
+      client.readContract({
+        address: router,
+        abi: routerAbi,
+        functionName: 'factory',
+      }),
+      client.readContract({
+        address: router,
+        abi: routerAbi,
+        functionName: 'WETH',
+      }),
+    ]);
+    if (
+      getAddress(routerFactory) !== factory ||
+      getAddress(routerWeth) !== weth
+    )
+      throw new Error(
+        'The Uniswap router on this chain does not match the pinned contracts. Nothing was sent.',
+      );
     const pair = await client.readContract({
       address: factory,
       abi: factoryAbi,
@@ -224,7 +263,7 @@ export function LiquidityPoolPanel({ tokenDecimals = 18 }) {
 
   return (
     <section aria-label="Liquidity pool" className="min-w-0 space-y-2">
-      <h3>Liquidity pool · Uniswap V2 on Ethereum</h3>
+      <h3>Liquidity pool · Uniswap V2 on {chain}</h3>
       <p className="text-xs text-muted-foreground">
         Reads your TOKEN/WETH pool position from the chain. Removing or burning
         liquidity is sent from your own browser wallet, which asks you to
