@@ -1,5 +1,7 @@
 # Warmup flow clarity and recovery
 
+Post-commit UI handoff: 5f8f50e, "Clarify warmup approvals and connect recovery and sell steps". That commit contains only the ten owned warmup component edits, the new step component/CSS, mounted workflow tests, synthetic fixture and this note. Final verification: 13 source-only files / 111 tests, typed lint/format and Node 24 production build pass. No Claude-owned files, remote action, funded trade or deploy.
+
 17 October 2026. Source baseline dc5da24, on codex/warmup-flow-clarity. Scope: Codex-owned warmup components only. Claude's app/page.tsx, wallet workspace/vault presentation, holder/supply/performance panels, global CSS and configuration remain untouched. Existing API, lib, schema and transaction-validation files are unchanged.
 
 Initial source inspection found recovery guidance without a recovery action in cycle progress, a finalized-buy message referring to a nonexistent lot selector below the Buy form, disabled approval actions without explanations, and direct JSON parsing in several warmup panels. An isolated browser harness uses production components with synthetic HTTP responses and stubbed vault/sign functions. It cannot produce a valid signature or reach a provider.
