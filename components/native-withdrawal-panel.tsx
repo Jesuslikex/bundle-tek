@@ -31,12 +31,17 @@ export function NativeWithdrawalPanel({
   initialWallet = '',
   initialToken,
   initialOpen = false,
+  initialRecipient = '',
+  initialAmount = '',
   funding,
 }: {
   wallets: WorkspaceWallet[];
   initialWallet?: string;
   initialToken?: { mint: string; decimals: number };
   initialOpen?: boolean;
+  /** Prefill from a planned send leg; the user still prepares, signs and submits it. */
+  initialRecipient?: string;
+  initialAmount?: string;
   funding?: { plan: SavedFunding; item: number };
 }) {
   const choices = wallets.filter((w) => w.chain === 'Solana');
@@ -58,10 +63,11 @@ export function NativeWithdrawalPanel({
       initialWallet || choices.find((w) => !w.archived)?.address || '',
     ),
     [recipient, setRecipient] = useState(
-      funding?.plan.document.items[funding.item - 1]?.address || '',
+      funding?.plan.document.items[funding.item - 1]?.address ||
+        initialRecipient,
     ),
     [amount, setAmount] = useState(
-      funding?.plan.document.items[funding.item - 1]?.amount || '',
+      funding?.plan.document.items[funding.item - 1]?.amount || initialAmount,
     ),
     [rows, setRows] = useState<NativeWithdrawal[]>([]),
     [historyLoaded, setHistoryLoaded] = useState(false),
