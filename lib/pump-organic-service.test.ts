@@ -24,6 +24,7 @@ import {
   savePumpOrganicSequence,
   sendPumpOrganicBuy,
   stopPumpOrganicSequence,
+  listPumpOrganicSequences,
 } from './pump-organic-service';
 
 const clients: Client[] = [];
@@ -45,6 +46,12 @@ async function fixture() {
   clients.push(client);
   await client.execute(
     'CREATE TABLE workspace_projects(owner_id TEXT,id TEXT,document TEXT,updated_at TEXT,archived INTEGER DEFAULT 0)',
+  );
+  await client.execute(
+    'CREATE TABLE solana_execution_reservations(owner_id TEXT,wallet_address TEXT,scope TEXT,intent_id TEXT,state TEXT,PRIMARY KEY(owner_id,wallet_address))',
+  );
+  await client.execute(
+    'CREATE TABLE pump_launch_reviews(owner_id TEXT,id TEXT,project_id TEXT,payer TEXT,review TEXT,state TEXT)',
   );
   await client.execute(
     "INSERT INTO workspace_projects VALUES('alice','p1','{}','now',0)",
@@ -187,6 +194,51 @@ it('saves, registers, sends each buy once and settles finalized receipts', async
   );
   expect(observed.buys.map((b) => b.state)).toEqual(['finalized', 'finalized']);
   expect(observed.state).toBe('closed');
+  const [seq] = await listPumpOrganicSequences(f.db, 'alice', 'p1');
+  expect(seq.state).toBe('complete');
+  // Completion releases the holder wallets for other work.
+  await f.client.execute({
+    sql: "INSERT INTO solana_execution_reservations VALUES('alice',?,'imported','i','held')",
+    args: [f.plan.rows[0].address],
+  });
+});
+
+it('holds the holder wallets for the life of a sequence and releases them on stop', async () => {
+  const f = await fixture();
+  const holder = f.plan.rows[0].address;
+  const reserve = () =>
+    f.client.execute({
+      sql: "INSERT INTO solana_execution_reservations VALUES('alice',?,'imported','i','held')",
+      args: [holder],
+    });
+  await expect(reserve()).rejects.toThrow('organic holder-buy');
+  await expect(
+    f.client.execute({
+      sql: "INSERT INTO pump_launch_reviews VALUES('alice','l2','p2',?,'{}','review')",
+      args: [holder],
+    }),
+  ).rejects.toThrow('organic holder-buy');
+  // A second sequence over the same wallet is refused while the first is active.
+  await expect(
+    savePumpOrganicSequence(f.db, 'alice', {
+      projectId: 'p1',
+      launchReviewId: 'launch-2',
+      mint: 'other',
+      rentAllowanceRaw: '3000000',
+      plan: f.plan,
+    }),
+  ).rejects.toThrow();
+  await stopPumpOrganicSequence(f.db, 'alice', f.sequence.id);
+  await reserve();
+  await expect(
+    savePumpOrganicSequence(f.db, 'alice', {
+      projectId: 'p1',
+      launchReviewId: 'launch-3',
+      mint: 'other',
+      rentAllowanceRaw: '3000000',
+      plan: f.plan,
+    }),
+  ).rejects.toThrow();
 });
 
 it('keeps an unknown send outcome non-retryable and expires it only past the margin', async () => {

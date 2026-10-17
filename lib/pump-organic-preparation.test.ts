@@ -29,7 +29,10 @@ async function setup(state = 'finalized') {
     'CREATE TABLE workspace_projects(owner_id TEXT,id TEXT,document TEXT,updated_at TEXT,archived INTEGER DEFAULT 0)',
   );
   await client.execute(
-    'CREATE TABLE pump_launch_reviews(owner_id TEXT,id TEXT,project_id TEXT,review TEXT,state TEXT)',
+    'CREATE TABLE pump_launch_reviews(owner_id TEXT,id TEXT,project_id TEXT,review TEXT,state TEXT,payer TEXT)',
+  );
+  await client.execute(
+    'CREATE TABLE solana_execution_reservations(owner_id TEXT,wallet_address TEXT,scope TEXT,intent_id TEXT,state TEXT)',
   );
   await client.execute(
     "INSERT INTO workspace_projects VALUES('alice','p1','{}','now',0)",
@@ -43,7 +46,7 @@ async function setup(state = 'finalized') {
   const create = await pumpCreateFixture();
   const launchId = crypto.randomUUID();
   await client.execute({
-    sql: 'INSERT INTO pump_launch_reviews VALUES(?,?,?,?,?)',
+    sql: 'INSERT INTO pump_launch_reviews(owner_id,id,project_id,review,state) VALUES(?,?,?,?,?)',
     args: [
       'alice',
       launchId,

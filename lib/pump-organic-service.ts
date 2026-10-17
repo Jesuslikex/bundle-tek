@@ -372,6 +372,13 @@ export async function observePumpOrganicBatch(
       )
       .bind(owner, batchId)
       .run();
+  // Every planned batch closed: the sequence is complete and its wallet hold ends.
+  await db
+    .prepare(
+      "UPDATE pump_organic_sequences SET state='complete' WHERE owner_id=? AND state='active' AND id=(SELECT sequence_id FROM pump_organic_batches WHERE id=?) AND json_array_length(plan,'$.batches')=(SELECT count(*) FROM pump_organic_batches b WHERE b.sequence_id=pump_organic_sequences.id AND b.state='closed')",
+    )
+    .bind(owner, batchId)
+    .run();
   return publicBatch(db, owner, batchId);
 }
 

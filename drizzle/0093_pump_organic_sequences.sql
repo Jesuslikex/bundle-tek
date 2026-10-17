@@ -62,3 +62,26 @@ END;
 CREATE TRIGGER pump_organic_batches_review_immutable BEFORE UPDATE OF owner_id,sequence_id,batch,review,review_sha256,expires_at ON pump_organic_batches BEGIN
  SELECT RAISE(ABORT,'Organic batch review is immutable');
 END;
+--> statement-breakpoint
+CREATE TRIGGER pump_organic_sequence_reservation BEFORE INSERT ON pump_organic_sequences BEGIN
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM json_each(NEW.plan,'$.rows') w WHERE
+ EXISTS(SELECT 1 FROM solana_execution_reservations x WHERE x.owner_id=NEW.owner_id AND x.wallet_address=json_extract(w.value,'$.address'))
+ OR EXISTS(SELECT 1 FROM pump_organic_sequences s,json_each(s.plan,'$.rows') o WHERE s.owner_id=NEW.owner_id AND json_extract(o.value,'$.address')=json_extract(w.value,'$.address')
+ AND (s.state='active' OR EXISTS(SELECT 1 FROM pump_organic_buys b JOIN pump_organic_batches t ON t.id=b.batch_id WHERE t.sequence_id=s.id AND b.state IN ('signed','submitting','submitted'))))
+ OR EXISTS(SELECT 1 FROM pump_launch_reviews r WHERE r.owner_id=NEW.owner_id AND r.state NOT IN ('cancelled','failed','finalized') AND (
+ r.payer=json_extract(w.value,'$.address') OR EXISTS(SELECT 1 FROM json_each(r.review,'$.input.holders') h WHERE json_extract(h.value,'$.address')=json_extract(w.value,'$.address') AND json_extract(h.value,'$.kind')!='none'))))
+ THEN RAISE(ABORT,'Organic holder wallet already reserved') END;
+END;
+--> statement-breakpoint
+CREATE TRIGGER pump_organic_shared_reservation BEFORE INSERT ON solana_execution_reservations BEGIN
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM pump_organic_sequences s,json_each(s.plan,'$.rows') o WHERE s.owner_id=NEW.owner_id AND json_extract(o.value,'$.address')=NEW.wallet_address
+ AND (s.state='active' OR EXISTS(SELECT 1 FROM pump_organic_buys b JOIN pump_organic_batches t ON t.id=b.batch_id WHERE t.sequence_id=s.id AND b.state IN ('signed','submitting','submitted'))))
+ THEN RAISE(ABORT,'Wallet reserved by an organic holder-buy sequence') END;
+END;
+--> statement-breakpoint
+CREATE TRIGGER pump_organic_launch_reservation BEFORE INSERT ON pump_launch_reviews BEGIN
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM pump_organic_sequences s,json_each(s.plan,'$.rows') o WHERE s.owner_id=NEW.owner_id
+ AND (s.state='active' OR EXISTS(SELECT 1 FROM pump_organic_buys b JOIN pump_organic_batches t ON t.id=b.batch_id WHERE t.sequence_id=s.id AND b.state IN ('signed','submitting','submitted')))
+ AND (json_extract(o.value,'$.address')=NEW.payer OR EXISTS(SELECT 1 FROM json_each(NEW.review,'$.input.holders') h WHERE json_extract(h.value,'$.address')=json_extract(o.value,'$.address') AND json_extract(h.value,'$.kind')!='none')))
+ THEN RAISE(ABORT,'Launch wallet reserved by an organic holder-buy sequence') END;
+END;
