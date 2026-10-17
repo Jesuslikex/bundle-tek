@@ -85,6 +85,7 @@ export type PumpGroupBroadcastRecovery = {
     | 'finalized'
     | 'failed'
     | 'expired-unobserved'
+    | 'partial-final'
     | 'partial'
     | 'pending'
     | 'unknown';
@@ -99,13 +100,25 @@ export type PumpGroupBroadcastRecovery = {
     tipDebitRaw: string | null;
   };
   bundle: { bundleId: string | null; finalized: boolean; slot: string | null };
+  /** Read only while the tip is unfinalized. Past the margin, its shared blockhash can no longer land. */
+  expiry?: {
+    lastValidBlockHeight: string;
+    finalizedBlockHeight: string;
+    expiryBankSlot: string;
+    pastExpiryMargin: boolean;
+    marginBlocks: 32;
+  } | null;
   reservationsReleased: boolean;
   economicSettlementVerified: false;
   completeLaunch: false;
 };
 export type PumpGroupBroadcastTerminalReceipt = {
   format: 'pump-launch-group-broadcast-terminal-v1';
-  kind: 'finalized' | 'failed' | 'expired-unobserved';
+  /** partial: settled mixed outcome. Every launch packet and the tip finalized with known fees or provably expired. */
+  kind: 'finalized' | 'failed' | 'expired-unobserved' | 'partial';
+  packetCount?: number;
+  landedPacketCount?: number;
+  succeededPacketCount?: number;
   reviewId: string;
   contextSha256: string;
   manifestSha256: string;
