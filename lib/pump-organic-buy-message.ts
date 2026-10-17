@@ -103,6 +103,7 @@ export async function buildPumpOrganicBuyMessage(
     holder: input.holder,
     mint: input.create.mint,
     quoteMint: input.create.quoteMint,
+    quoteTokenProgram: String(built.quote.tokenProgram),
     tokenAmountRaw: built.tokenAmountRaw,
     maximumQuoteCostRaw: built.maximumQuoteCostRaw,
     userBaseAccount: built.userBaseAccount,
