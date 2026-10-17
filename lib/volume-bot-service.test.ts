@@ -78,7 +78,7 @@ async function fixture() {
     });
   for (const file of [
     'drizzle/0093_pump_organic_sequences.sql',
-    'drizzle/0099_volume_bot_sessions.sql',
+    'drizzle/0098_volume_bot_sessions.sql',
   ])
     for (const sql of readFileSync(file, 'utf8').split(
       '--> statement-breakpoint',
