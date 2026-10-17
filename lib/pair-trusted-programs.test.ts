@@ -25,8 +25,8 @@ const system: PairObservedProgram = {
   deploymentSlot: null,
   upgradeAuthority: null,
   codeSha256:
-    'd8e11c483f20607a1e5f015d768e4dd294213e33b948a69640f7bacaaf25e280',
-  codeBytes: 14,
+    'c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03',
+  codeBytes: 21,
   identityKind: 'native-system',
 };
 const pinned: PairTrustedProgram[] = [
@@ -84,11 +84,15 @@ it.each([
     ),
   ).toThrow(PairTrustedProgramError);
 });
-it('keeps the shipped allowlist fail-closed for ELF programs until reviewed hashes are pinned', () => {
+it('ships every allowlisted program with exactly one reviewed hash and refuses others', () => {
+  expect(PAIR_TRUSTED_PROGRAMS).toHaveLength(12);
+  for (const p of PAIR_TRUSTED_PROGRAMS) {
+    expect(p.codeSha256).toHaveLength(1);
+    expect(p.codeSha256[0]).toMatch(/^[0-9a-f]{64}$/);
+  }
+  // A Jupiter scan with unreviewed code or authority still refuses.
   expect(() => requirePairTrustedPrograms([jup], [jup])).toThrow(
-    /reviewed pin/,
+    PairTrustedProgramError,
   );
-  for (const p of PAIR_TRUSTED_PROGRAMS)
-    if (p.identityKind === 'elf-code') expect(p.codeSha256).toEqual([]);
   expect(requirePairTrustedPrograms([system], [system])).toBe(true);
 });
