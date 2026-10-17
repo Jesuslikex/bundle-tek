@@ -6,13 +6,16 @@ import {
   signedBalanceAmount,
 } from '@/lib/wallet-balance-format';
 import { Button } from './ui/button';
+import { PnlCardPanel } from './pnl-card-panel';
 
 export function ImportedTradePerformance({
   performance,
   decimals,
+  symbol,
 }: {
   performance: ImportedPerformance;
   decimals: number;
+  symbol?: string;
 }) {
   const id = useId(),
     [show, setShow] = useState(false);
@@ -35,6 +38,9 @@ export function ImportedTradePerformance({
           performance={performance}
           decimals={decimals}
         />
+      )}
+      {show && symbol && (
+        <PnlCardPanel performance={performance} symbol={symbol} />
       )}
     </section>
   );
