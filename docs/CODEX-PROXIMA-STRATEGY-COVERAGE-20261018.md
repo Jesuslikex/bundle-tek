@@ -17,3 +17,7 @@ Final restoration ev_5d53a83087f8030c6c1256c90a9fb509d9446e597a2774e97cc75b41575
 Next implementation priorities: readable HMS input bound to existing integer intervals/deadlines; complete strategy/session term design with independent aggregate limits and recovery; separate market-cleanup source/buyer and receipt-accounting review; price-backed USD volume targets. Vendor backend authority, transaction construction, timer behavior, random distributions and actual settlement remain unknown. Continue preserving user approvals, stock signing-off gate, no-funded-test and no-deploy boundaries.
 
 This documentation is a local evidence checkpoint during the other Bundle chat's shared build. Application/test source was kept frozen; no provider, credential, schema, scheduler or publication change occurred.
+
+## 18 October continuation
+
+88fdc2b implements and tests readable HMS DCA intervals/duration; independent strategy/session ending semantics remain open. Volume USD target implementation is documented separately in CODEX-VOLUME-USD-TARGETS-20261018.md. It uses a captured server SOL/USD observation and fixes a SOL target with explicit acknowledgement, without claiming vendor conversion/settlement equivalence. The original table above records the pre-implementation comparison and retained REA evidence.

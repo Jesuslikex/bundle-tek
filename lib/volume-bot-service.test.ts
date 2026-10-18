@@ -1,3 +1,5 @@
+import type { TokenMarket } from './token-market';
+import { VOLUME_NATIVE_MINT } from './volume-usd-target';
 import { afterEach, beforeAll, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createClient, type Client } from '@libsql/client';
@@ -17,6 +19,7 @@ import {
   type VolumeBatchReview,
 } from './volume-bot-batch';
 import {
+  quoteVolumeUsdTarget,
   cancelVolumeSession,
   createVolumeSession,
   estimateVolumeSession,
@@ -79,6 +82,7 @@ async function fixture() {
   for (const file of [
     'drizzle/0093_pump_organic_sequences.sql',
     'drizzle/0098_volume_bot_sessions.sql',
+    'drizzle/0102_volume_usd_targets.sql',
   ])
     for (const sql of readFileSync(file, 'utf8').split(
       '--> statement-breakpoint',
@@ -487,4 +491,278 @@ it('keeps Volume Bot and organic holder-buy sequences off the same wallets', asy
     deps.rpc,
   );
   await expect(organic('o2', wallets[1])).rejects.toThrow(/Volume Bot/);
+});
+
+it('captures owned USD targets and binds the exact evidence into estimates and immutable sessions', async () => {
+  const { db, client } = await fixture();
+
+  const quote = (
+    await quoteVolumeUsdTarget(
+      db,
+      'alice',
+      { projectId: 'p1', projectRevision: 3, targetUsd: '80' },
+      signal(),
+      async () => market(),
+    )
+  ).quote;
+  const input = {
+    projectId: 'p1',
+    projectRevision: 3,
+    terms: terms(),
+    seed: newVolumeSeed(),
+    usdQuoteId: quote.id,
+  };
+  const { deps } = chain();
+  const estimate = await estimateVolumeSession(
+    db,
+    'alice',
+    input,
+    signal(),
+    deps.rpc,
+  );
+  expect(estimate.plan.usdTarget).toEqual(quote);
+  const session = await createVolumeSession(
+    db,
+    'alice',
+    input,
+    signal(),
+    deps.rpc,
+  );
+  expect(session.plan.usdTarget).toEqual(quote);
+  await expect(
+    client.execute({
+      sql: 'UPDATE volume_bot_sessions SET plan=plan WHERE id=?',
+      args: [session.id],
+    }),
+  ).rejects.toThrow(/immutable/);
+  await expect(
+    client.execute({
+      sql: 'UPDATE volume_bot_usd_targets SET document=document WHERE id=?',
+      args: [quote.id],
+    }),
+  ).rejects.toThrow(/immutable/);
+  await cancelVolumeSession(db, 'alice', session.id);
+  await expect(
+    createVolumeSession(db, 'alice', input, signal(), deps.rpc),
+  ).rejects.toThrow(/already used/);
+});
+it('refuses foreign, revised, changed and expired USD targets before wallet reads', async () => {
+  const { db } = await fixture();
+  const quote = (
+    await quoteVolumeUsdTarget(
+      db,
+      'alice',
+      { projectId: 'p1', projectRevision: 3, targetUsd: '80' },
+      signal(),
+      async () => market(new Date(Date.now() - 59000).toISOString()),
+    )
+  ).quote;
+  const input = {
+    projectId: 'p1',
+    projectRevision: 3,
+    terms: terms(),
+    seed: newVolumeSeed(),
+    usdQuoteId: quote.id,
+  };
+  let reads = 0;
+  const rpc = async () => {
+    reads++;
+    return { value: 10000000000 };
+  };
+  for (const change of [
+    { usdQuoteId: crypto.randomUUID() },
+    { terms: { ...terms(), targetVolumeLamports: '400000001' } },
+    { projectRevision: 4 },
+  ])
+    await expect(
+      estimateVolumeSession(
+        db,
+        'alice',
+        { ...input, ...change },
+        signal(),
+        rpc,
+      ),
+    ).rejects.toThrow();
+  expect(reads).toBe(0);
+  const { vi } = await import('vitest');
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(quote.expiresAt));
+  try {
+    await expect(
+      estimateVolumeSession(db, 'alice', input, signal(), rpc),
+    ).rejects.toThrow(/expired/);
+  } finally {
+    vi.restoreAllMocks();
+  }
+  expect(reads).toBe(0);
+});
+it('does not read markets for unowned projects and sanitizes provider failures', async () => {
+  const { db } = await fixture();
+  let reads = 0;
+  const read = async () => {
+    reads++;
+    throw new Error('private-provider-detail');
+  };
+  await expect(
+    quoteVolumeUsdTarget(
+      db,
+      'mallory',
+      { projectId: 'p1', projectRevision: 3, targetUsd: '80' },
+      signal(),
+      read,
+    ),
+  ).rejects.toThrow();
+  expect(reads).toBe(0);
+  await expect(
+    quoteVolumeUsdTarget(
+      db,
+      'alice',
+      { projectId: 'p1', projectRevision: 3, targetUsd: '80' },
+      signal(),
+      read,
+    ),
+  ).rejects.toThrow('SOL/USD market price is unavailable. Try again later.');
+});
+
+function market(at = new Date().toISOString()): TokenMarket {
+  return {
+    chain: 'Solana',
+    address: VOLUME_NATIVE_MINT,
+    source: 'api.dexscreener.com',
+    observedAt: at,
+    returnedPairCount: 1,
+    quoteOnlyPairCount: 0,
+    executionAllowed: false,
+    pairs: [
+      {
+        address: VOLUME_NATIVE_MINT,
+        dex: 'synthetic',
+        url: 'https://dexscreener.com/solana/' + VOLUME_NATIVE_MINT,
+        quoteSymbol: 'USDC',
+        priceUsd: '200',
+        liquidityUsd: 100000,
+        volume24hUsd: null,
+        change24h: null,
+        marketCapUsd: null,
+      },
+    ],
+  };
+}
+
+it('enforces captured owner, target, time and non-null evidence at the SQL boundary', async () => {
+  const { db, client } = await fixture();
+  const { deps } = chain();
+  const quote = (
+    await quoteVolumeUsdTarget(
+      db,
+      'alice',
+      { projectId: 'p1', projectRevision: 3, targetUsd: '80' },
+      signal(),
+      async () => market(),
+    )
+  ).quote;
+  const input = {
+    projectId: 'p1',
+    projectRevision: 3,
+    terms: terms(),
+    seed: newVolumeSeed(),
+    usdQuoteId: quote.id,
+  };
+  const { plan } = await estimateVolumeSession(
+    db,
+    'alice',
+    input,
+    signal(),
+    deps.rpc,
+  );
+  for (const change of [
+    { owner: 'mallory' },
+    { target: '400000001' },
+    { evidence: { ...quote, solPriceUsd: '201' } },
+    { evidence: null },
+  ]) {
+    const altered = {
+      ...plan,
+      terms: {
+        ...plan.terms,
+        targetVolumeLamports: change.target ?? plan.terms.targetVolumeLamports,
+      },
+      ...('evidence' in change ? { usdTarget: change.evidence } : {}),
+    };
+    await expect(
+      client.execute({
+        sql: "INSERT INTO volume_bot_sessions(id,owner_id,project_id,project_revision,mint,decimals,plan,plan_sha256,state) VALUES(?,?,'p1',3,?,6,?,?,'active')",
+        args: [
+          crypto.randomUUID(),
+          change.owner ?? 'alice',
+          MINT,
+          JSON.stringify(altered),
+          'a'.repeat(64),
+        ],
+      }),
+    ).rejects.toThrow(/USD target/);
+  }
+  await expect(
+    client.execute({
+      sql: 'INSERT INTO volume_bot_usd_targets VALUES(?,?,?,?,?,?)',
+      args: [
+        crypto.randomUUID(),
+        'alice',
+        'p1',
+        3,
+        '{}',
+        new Date().toISOString(),
+      ],
+    }),
+  ).rejects.toThrow();
+  const old = {
+    ...quote,
+    id: crypto.randomUUID(),
+    observedAt: '2026-01-01T00:00:00.000Z',
+    expiresAt: '2026-01-01T00:01:00.000Z',
+  };
+  await client.execute({
+    sql: 'INSERT INTO volume_bot_usd_targets VALUES(?,?,?,?,?,?)',
+    args: [old.id, 'alice', 'p1', 3, JSON.stringify(old), old.expiresAt],
+  });
+  await expect(
+    client.execute({
+      sql: "INSERT INTO volume_bot_sessions VALUES(?,'alice','p1',3,?,6,?,?,'active',?)",
+      args: [
+        crypto.randomUUID(),
+        MINT,
+        JSON.stringify({ ...plan, usdTarget: old }),
+        'a'.repeat(64),
+        new Date().toISOString(),
+      ],
+    }),
+  ).rejects.toThrow(/USD target/);
+});
+
+it('refuses USD estimates if the project changes during balance observation', async () => {
+  const { db, client } = await fixture();
+  const quote = (
+    await quoteVolumeUsdTarget(
+      db,
+      'alice',
+      { projectId: 'p1', projectRevision: 3, targetUsd: '80' },
+      signal(),
+      async () => market(),
+    )
+  ).quote;
+  const input = {
+    projectId: 'p1',
+    projectRevision: 3,
+    terms: terms(),
+    seed: newVolumeSeed(),
+    usdQuoteId: quote.id,
+  };
+  const rpc = async () => {
+    await client.execute(
+      "UPDATE imported_token_projects SET archived=1 WHERE id='p1'",
+    );
+    return { value: 10000000000 };
+  };
+  await expect(
+    estimateVolumeSession(db, 'alice', input, signal(), rpc),
+  ).rejects.toThrow(/changed or expired/);
 });

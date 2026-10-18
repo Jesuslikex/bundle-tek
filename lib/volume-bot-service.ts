@@ -1,3 +1,9 @@
+import {
+  captureVolumeUsdTarget,
+  validateVolumeUsdTarget,
+  type VolumeUsdTarget,
+} from './volume-usd-target';
+import type { TokenMarket } from './token-market';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
 import { WRAPPED_SOL } from './warmup-swap-quote';
 import type { ImportedTokenDocument } from './imported-token-project';
@@ -134,6 +140,102 @@ async function ownedToken(
   return token;
 }
 
+/** Retain only server-observed conversion evidence; no wallet read or execution. */
+export async function quoteVolumeUsdTarget(
+  db: D1Database,
+  owner: string,
+  input: { projectId: string; projectRevision: number; targetUsd: string },
+  signal: AbortSignal,
+  readMarket: (signal: AbortSignal) => Promise<TokenMarket>,
+) {
+  await ownedToken(db, owner, input.projectId, input.projectRevision);
+  let observation: TokenMarket;
+  try {
+    observation = await readMarket(signal);
+  } catch {
+    return fail('SOL/USD market price is unavailable. Try again later.', 502);
+  }
+  let quote: VolumeUsdTarget;
+  try {
+    quote = captureVolumeUsdTarget(
+      { ...input, id: crypto.randomUUID() },
+      observation,
+      Date.now(),
+    );
+  } catch {
+    return fail(
+      'USD target or a fresh liquid SOL/USD price is unavailable. Check the target and try again.',
+      409,
+    );
+  }
+  const result = await db
+    .prepare(`INSERT INTO volume_bot_usd_targets(id,owner_id,project_id,project_revision,document,expires_at)
+    SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM imported_token_projects WHERE owner_id=? AND id=? AND revision=? AND archived=0 AND chain='Solana')
+    AND ?>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND ?<=strftime('%Y-%m-%dT%H:%M:%fZ','now')`)
+    .bind(
+      quote.id,
+      owner,
+      input.projectId,
+      input.projectRevision,
+      JSON.stringify(quote),
+      quote.expiresAt,
+      owner,
+      input.projectId,
+      input.projectRevision,
+      quote.expiresAt,
+      quote.observedAt,
+    )
+    .run();
+  if (!result.meta.changes)
+    return fail(
+      'USD capture expired or the project changed. Refresh the conversion.',
+    );
+  return { quote, executionAllowed: false as const };
+}
+async function usdTargetForInput(
+  db: D1Database,
+  owner: string,
+  input: {
+    projectId: string;
+    projectRevision: number;
+    terms: VolumeTerms;
+    usdQuoteId?: string;
+  },
+) {
+  if (input.usdQuoteId === undefined) return undefined;
+  const row = await db
+    .prepare(`SELECT document FROM volume_bot_usd_targets WHERE id=? AND owner_id=? AND project_id=? AND project_revision=?
+    AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND json_extract(document,'$.observedAt')<=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    AND EXISTS(SELECT 1 FROM imported_token_projects p WHERE p.owner_id=volume_bot_usd_targets.owner_id AND p.id=volume_bot_usd_targets.project_id AND p.revision=volume_bot_usd_targets.project_revision AND p.chain='Solana' AND p.archived=0)`)
+    .bind(input.usdQuoteId, owner, input.projectId, input.projectRevision)
+    .first<{ document: string }>();
+  if (!row)
+    return fail(
+      'USD conversion changed or expired. Request a fresh conversion.',
+    );
+  let quote: VolumeUsdTarget;
+  try {
+    quote = validateVolumeUsdTarget(JSON.parse(row.document));
+  } catch {
+    return fail(
+      'Retained USD conversion is invalid. Request a fresh conversion.',
+    );
+  }
+  const now = Date.now();
+  if (
+    quote.id !== input.usdQuoteId ||
+    quote.projectId !== input.projectId ||
+    quote.projectRevision !== input.projectRevision ||
+    quote.targetVolumeLamports !== input.terms.targetVolumeLamports ||
+    Date.parse(quote.observedAt) > now ||
+    Date.parse(quote.expiresAt) <= now
+  )
+    return fail(
+      'USD conversion differs from this target or has expired. Request a fresh conversion.',
+    );
+  return quote;
+}
+
 /** Reads every selected wallet's balance from the server's provider, never from the client. */
 async function observeBalances(
   db: D1Database,
@@ -171,14 +273,17 @@ export async function estimateVolumeSession(
     projectRevision: number;
     terms: VolumeTerms;
     seed: string;
+    usdQuoteId?: string;
   },
   signal: AbortSignal,
   rpc: VolumeRpc,
 ) {
   await ownedToken(db, owner, input.projectId, input.projectRevision);
+  const usd = await usdTargetForInput(db, owner, input);
   const balances = await observeBalances(db, owner, input.terms, signal, rpc);
+  await usdTargetForInput(db, owner, input);
   return {
-    plan: planVolumeSession(input.terms, balances, input.seed),
+    plan: planVolumeSession(input.terms, balances, input.seed, usd),
     balances,
   };
 }
@@ -192,6 +297,7 @@ export async function createVolumeSession(
     projectRevision: number;
     terms: VolumeTerms;
     seed: string;
+    usdQuoteId?: string;
   },
   signal: AbortSignal,
   rpc: VolumeRpc,
@@ -202,8 +308,10 @@ export async function createVolumeSession(
     input.projectId,
     input.projectRevision,
   );
+  const usd = await usdTargetForInput(db, owner, input);
   const balances = await observeBalances(db, owner, input.terms, signal, rpc);
-  const plan = planVolumeSession(input.terms, balances, input.seed);
+  const plan = planVolumeSession(input.terms, balances, input.seed, usd);
+  await usdTargetForInput(db, owner, input);
   const text = JSON.stringify(plan),
     id = crypto.randomUUID();
   try {
@@ -223,6 +331,13 @@ export async function createVolumeSession(
       )
       .run();
   } catch (error) {
+    if (
+      error instanceof Error &&
+      /USD target|volume_usd_target_single_session/i.test(error.message)
+    )
+      fail(
+        'USD conversion expired, changed or was already used. Reload sessions before requesting a fresh conversion.',
+      );
     if (error instanceof Error && /reserved/i.test(error.message))
       fail(
         'A selected wallet is busy in another launch, swap, withdrawal or Volume Bot session.',

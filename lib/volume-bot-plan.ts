@@ -1,3 +1,7 @@
+import {
+  validateVolumeUsdTarget,
+  type VolumeUsdTarget,
+} from './volume-usd-target';
 /**
  * Volume Bot planning, modelled on Proxima's Volume Bot settings: a target
  * volume, a duration, a min/max delay between trades, auto/fixed/random trade
@@ -264,8 +268,13 @@ export function planVolumeSession(
   supplied: VolumeTerms,
   balances: VolumeWalletBalance[],
   seed: string,
+  usdTarget?: VolumeUsdTarget,
 ) {
   const terms = volumeTerms(structuredClone(supplied));
+  const usd =
+    usdTarget === undefined ? undefined : validateVolumeUsdTarget(usdTarget);
+  if (usd && usd.targetVolumeLamports !== terms.targetVolumeLamports)
+    fail('USD conversion differs from the fixed SOL target.');
   const rand = volumeRandom(seed);
   // Delays come from their own stream so trade sizing never shifts timing.
   const timing = volumeRandom(seed.split('').reverse().join(''));
@@ -375,6 +384,7 @@ export function planVolumeSession(
   const trades = BigInt(events.length);
   return {
     format: 'volume-bot-plan-v1' as const,
+    ...(usd ? { usdTarget: usd } : {}),
     terms,
     seed,
     rounds: amounts.map((amount, round) => ({
@@ -414,7 +424,12 @@ export function requireVolumePlan(
 ) {
   if (supplied?.format !== 'volume-bot-plan-v1')
     fail('Save a reviewed Volume Bot plan.');
-  const rebuilt = planVolumeSession(supplied.terms, balances, supplied.seed);
+  const rebuilt = planVolumeSession(
+    supplied.terms,
+    balances,
+    supplied.seed,
+    supplied.usdTarget,
+  );
   if (JSON.stringify(rebuilt) !== JSON.stringify(supplied))
     fail('Volume Bot plan changed. Estimate again with current balances.');
   return rebuilt;

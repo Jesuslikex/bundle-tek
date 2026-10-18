@@ -1,3 +1,5 @@
+import { observeTokenMarket } from '@/lib/token-market';
+import { VOLUME_NATIVE_MINT } from '@/lib/volume-usd-target';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { env } from '@/lib/server-env';
@@ -8,6 +10,7 @@ import { simulateImportedSwap } from '@/lib/imported-swap-simulation';
 import { VolumePlanError } from '@/lib/volume-bot-plan';
 import { parseVolumeBotRequest } from '@/lib/volume-bot-request';
 import {
+  quoteVolumeUsdTarget,
   cancelVolumeSession,
   createVolumeSession,
   estimateVolumeSession,
@@ -104,7 +107,11 @@ export async function POST(request: Request) {
     const db = getD1(),
       owner = user.userId,
       signal = AbortSignal.any([request.signal, AbortSignal.timeout(55_000)]);
-    if (['estimate', 'create', 'prepare-batch'].includes(action.action)) {
+    if (
+      ['quote-usd-target', 'estimate', 'create', 'prepare-batch'].includes(
+        action.action,
+      )
+    ) {
       const now = Date.now();
       const claimed = await db
         .prepare(
@@ -119,6 +126,15 @@ export async function POST(request: Request) {
         );
     }
     switch (action.action) {
+      case 'quote-usd-target':
+        return json(
+          await quoteVolumeUsdTarget(db, owner, action, signal, (s) =>
+            observeTokenMarket(
+              { chain: 'Solana', address: VOLUME_NATIVE_MINT },
+              AbortSignal.any([s, AbortSignal.timeout(3000)]),
+            ),
+          ),
+        );
       case 'estimate':
         return json(
           await estimateVolumeSession(

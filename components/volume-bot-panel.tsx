@@ -19,6 +19,10 @@ import {
   volumeBatchConsent,
   type VolumeBatchReview,
 } from '@/lib/volume-bot-batch';
+import {
+  validateVolumeUsdTarget,
+  type VolumeUsdTarget,
+} from '@/lib/volume-usd-target';
 import { readPanelJson } from './read-panel-json';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -143,10 +147,15 @@ function VolumeBotWorkspace({
     [rangeMax, setRangeMax] = useState('0.08'),
     [wave, setWave] = useState<VolumeTerms['wave']>('tight'),
     [selected, setSelected] = useState<string[]>([]);
+  const [targetUnit, setTargetUnit] = useState<'SOL' | 'USD'>('SOL');
+  const [usdQuote, setUsdQuote] = useState<VolumeUsdTarget | null>(null);
+  const [acceptConversion, setAcceptConversion] = useState(false);
+  const draftVersion = useRef(0);
   const [estimate, setEstimate] = useState<{
     plan: VolumePlan;
     terms: VolumeTerms;
     seed: string;
+    usdQuoteId?: string;
   } | null>(null);
   const [sessions, setSessions] = useState<VolumeSession[]>([]),
     [busy, setBusy] = useState(false),
@@ -220,7 +229,10 @@ function VolumeBotWorkspace({
     };
     if (!selected.length) throw new Error('Choose at least one wallet.');
     return {
-      targetVolumeLamports: lamports(target, 'a target volume'),
+      targetVolumeLamports:
+        targetUnit === 'USD'
+          ? currentUsdQuote().targetVolumeLamports
+          : lamports(target, 'a target volume'),
       durationSeconds: Math.round(Number(minutes) * 60),
       delayMinMs: seconds(delayMin, 'a minimum delay'),
       delayMaxMs: seconds(delayMax, 'a maximum delay'),
@@ -238,30 +250,105 @@ function VolumeBotWorkspace({
       wallets: selected,
     };
   };
-  const changed = () => setEstimate(null);
+  const changed = () => {
+    draftVersion.current++;
+    setEstimate(null);
+  };
+  const clearConversion = () => {
+    changed();
+    setUsdQuote(null);
+    setAcceptConversion(false);
+  };
+  const currentUsdQuote = () => {
+    if (
+      !usdQuote ||
+      usdQuote.targetUsd !== target ||
+      usdQuote.projectId !== project.id ||
+      usdQuote.projectRevision !== project.revision ||
+      Date.parse(usdQuote.expiresAt) <= Date.now()
+    )
+      throw new Error('Capture a fresh USD conversion before estimating.');
+    return usdQuote;
+  };
+  const captureUsd = () =>
+    run(async () => {
+      const version = draftVersion.current;
+      setEstimate(null);
+      setUsdQuote(null);
+      setAcceptConversion(false);
+      const data = (await call({
+        action: 'quote-usd-target',
+        projectId: project.id,
+        projectRevision: project.revision,
+        targetUsd: target,
+      })) as { quote: unknown; executionAllowed: boolean };
+      if (!mounted.current || version !== draftVersion.current) return;
+      const quote = validateVolumeUsdTarget(data.quote);
+      if (
+        data.executionAllowed !== false ||
+        quote.projectId !== project.id ||
+        quote.projectRevision !== project.revision ||
+        quote.targetUsd !== target ||
+        Date.parse(quote.observedAt) > Date.now() ||
+        Date.parse(quote.expiresAt) <= Date.now()
+      )
+        throw new Error('USD conversion changed or expired. Capture it again.');
+      setUsdQuote(quote);
+    });
 
   const doEstimate = () =>
     run(async () => {
+      const version = draftVersion.current;
       const t = terms(),
         seed = newVolumeSeed();
+      const quote = targetUnit === 'USD' ? currentUsdQuote() : null;
       const data = (await call({
         action: 'estimate',
         projectId: project.id,
         projectRevision: project.revision,
         terms: t,
         seed,
+        ...(quote ? { usdQuoteId: quote.id } : {}),
       })) as { plan: VolumePlan };
-      setEstimate({ plan: data.plan, terms: t, seed });
+      if (!mounted.current || version !== draftVersion.current) return;
+      if (
+        data.plan.seed !== seed ||
+        JSON.stringify(data.plan.terms) !== JSON.stringify(t) ||
+        JSON.stringify(data.plan.usdTarget) !==
+          JSON.stringify(quote ?? undefined) ||
+        data.plan.signingAllowed !== false ||
+        data.plan.executionAllowed !== false
+      )
+        throw new Error(
+          'Estimate differs from the current draft. Estimate again.',
+        );
+      if (quote && Date.parse(quote.expiresAt) <= Date.now())
+        throw new Error('USD conversion expired. Capture it again.');
+      setAcceptConversion(false);
+      setEstimate({
+        plan: data.plan,
+        terms: t,
+        seed,
+        ...(quote ? { usdQuoteId: quote.id } : {}),
+      });
     });
   const start = () =>
     run(async () => {
       if (!estimate) throw new Error('Estimate first.');
+      if (
+        estimate.usdQuoteId &&
+        (!acceptConversion || currentUsdQuote().id !== estimate.usdQuoteId)
+      )
+        throw new Error(
+          'Review and acknowledge the fixed SOL conversion first.',
+        );
       await call({
         action: 'create',
         projectId: project.id,
         projectRevision: project.revision,
         terms: estimate.terms,
         seed: estimate.seed,
+        ...(estimate.usdQuoteId ? { usdQuoteId: estimate.usdQuoteId } : {}),
       });
       setEstimate(null);
       await refresh();
@@ -418,13 +505,53 @@ function VolumeBotWorkspace({
           }}
           onChange={changed}
         >
-          <label htmlFor={`${id}-target`}>Target volume (SOL)</label>
+          <label htmlFor={`${id}-unit`}>Target currency</label>
+          <select
+            id={`${id}-unit`}
+            value={targetUnit}
+            onChange={(e) => {
+              clearConversion();
+              setTargetUnit(e.target.value as 'SOL' | 'USD');
+              setTarget(e.target.value === 'USD' ? '100' : '1');
+            }}
+          >
+            <option value="SOL">SOL</option>
+            <option value="USD">USD at captured SOL price</option>
+          </select>
+          <label htmlFor={`${id}-target`}>Target volume ({targetUnit})</label>
           <Input
             id={`${id}-target`}
             inputMode="decimal"
             value={target}
-            onChange={(e) => setTarget(e.target.value)}
+            onChange={(e) => {
+              clearConversion();
+              setTarget(e.target.value);
+            }}
           />
+          {targetUnit === 'USD' && (
+            <>
+              <Button
+                type="button"
+                onClick={captureUsd}
+                disabled={busy || locked}
+              >
+                Capture USD conversion
+              </Button>
+              {usdQuote && (
+                <p className={styles.note}>
+                  ${usdQuote.targetUsd} converts to{' '}
+                  {sol(usdQuote.targetVolumeLamports)} at $
+                  {usdQuote.solPriceUsd}/SOL. Source: {usdQuote.source}.
+                  Captured {usdQuote.observedAt}.{' '}
+                  {Date.parse(usdQuote.expiresAt) <= now
+                    ? 'Conversion expired. Capture it again.'
+                    : `Expires ${usdQuote.expiresAt}.`}{' '}
+                  This fixes a SOL turnover target. It does not guarantee USD
+                  turnover or profit.
+                </p>
+              )}
+            </>
+          )}
           <label htmlFor={`${id}-duration`}>Duration (minutes)</label>
           <Input
             id={`${id}-duration`}
@@ -514,7 +641,15 @@ function VolumeBotWorkspace({
               <p>No active Solana wallets.</p>
             )}
           </fieldset>
-          <Button type="submit" disabled={busy || locked}>
+          <Button
+            type="submit"
+            disabled={
+              busy ||
+              locked ||
+              (targetUnit === 'USD' &&
+                (!usdQuote || Date.parse(usdQuote.expiresAt) <= now))
+            }
+          >
             Estimate
           </Button>
         </form>
@@ -546,7 +681,31 @@ function VolumeBotWorkspace({
             </p>
           )}
           <p className={styles.note}>{plan.estimate.assumptions}</p>
-          <Button type="button" disabled={busy || locked} onClick={start}>
+          {plan.usdTarget && (
+            <label>
+              <input
+                type="checkbox"
+                checked={acceptConversion}
+                onChange={(e) => setAcceptConversion(e.target.checked)}
+              />{' '}
+              I understand that ${plan.usdTarget.targetUsd} uses a fixed{' '}
+              {sol(plan.usdTarget.targetVolumeLamports)} target at the captured
+              price, not guaranteed USD turnover.
+            </label>
+          )}
+          <Button
+            type="button"
+            disabled={
+              busy ||
+              locked ||
+              !!(
+                plan.usdTarget &&
+                (!acceptConversion ||
+                  Date.parse(plan.usdTarget.expiresAt) <= now)
+              )
+            }
+            onClick={start}
+          >
             Save session and reserve wallets
           </Button>
         </section>
@@ -563,6 +722,16 @@ function VolumeBotWorkspace({
             {sol(active.realized.netSolLamports)} across{' '}
             {active.realized.finalizedTrades} trades.
           </p>
+          {active.plan.usdTarget && (
+            <p className={styles.note}>
+              Requested ${active.plan.usdTarget.targetUsd}; fixed target{' '}
+              {sol(active.plan.usdTarget.targetVolumeLamports)} at $
+              {active.plan.usdTarget.solPriceUsd}/SOL, captured{' '}
+              {active.plan.usdTarget.observedAt} from{' '}
+              {active.plan.usdTarget.source}. Actual turnover is reported in
+              SOL.
+            </p>
+          )}
           {!unlocked ? (
             <div className={styles.pair}>
               <Input

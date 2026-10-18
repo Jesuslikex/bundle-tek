@@ -4,6 +4,10 @@ import { createTursoDatabase } from '@/db/turso';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
   db: null as unknown as D1Database,
+  usd: vi.fn(async (..._a: unknown[]) => ({
+    quote: {},
+    executionAllowed: false,
+  })),
   estimate: vi.fn(async (..._a: unknown[]) => ({ plan: {} })),
   create: vi.fn(async (..._a: unknown[]) => ({ id: 's', state: 'active' })),
   prepare: vi.fn(async (..._a: unknown[]) => ({ id: 's' })),
@@ -22,6 +26,7 @@ vi.mock('@/lib/solana-rpc', () => ({
 }));
 vi.mock('@/lib/volume-bot-service', async (original) => ({
   ...(await original<typeof import('@/lib/volume-bot-service')>()),
+  quoteVolumeUsdTarget: mocks.usd,
   estimateVolumeSession: mocks.estimate,
   createVolumeSession: mocks.create,
   prepareVolumeBatch: mocks.prepare,
@@ -120,4 +125,33 @@ it('lists sessions only for a valid project id', async () => {
   );
   expect(ok.status).toBe(200);
   expect(mocks.list.mock.calls[0]).toEqual([mocks.db, 'alice', id]);
+});
+
+it('authenticates and rate-gates exact USD quote requests', async () => {
+  const body = {
+    action: 'quote-usd-target',
+    projectId: id,
+    projectRevision: 1,
+    targetUsd: '80.25',
+  };
+  mocks.user = null;
+  expect((await post(body)).status).toBe(401);
+  mocks.user = { userId: 'alice' };
+  expect((await post(body, { origin: 'https://evil.test' })).status).toBe(403);
+  for (const targetUsd of ['0', '1.001', '1e2', '-1'])
+    expect((await post({ ...body, targetUsd })).status).toBe(400);
+  expect((await post({ ...body, source: 'client' })).status).toBe(400);
+  expect(mocks.usd).not.toHaveBeenCalled();
+  expect((await post(body)).status).toBe(200);
+  expect(mocks.usd.mock.calls[0][1]).toBe('alice');
+  expect(mocks.usd.mock.calls[0][2]).toEqual(body);
+  expect((await post(estimate)).status).toBe(429);
+  expect(mocks.estimate).not.toHaveBeenCalled();
+});
+it('passes only a valid retained USD quote ID to estimate and create', async () => {
+  expect((await post({ ...estimate, usdQuoteId: 'invalid' })).status).toBe(400);
+  expect((await post({ ...estimate, usdQuoteId: id })).status).toBe(200);
+  expect(
+    (mocks.estimate.mock.calls[0][2] as { usdQuoteId: string }).usdQuoteId,
+  ).toBe(id);
 });
