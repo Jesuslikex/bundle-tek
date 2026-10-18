@@ -771,6 +771,13 @@
       "when": 1792944000000,
       "tag": "0109_launch_layer_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "6",
+      "when": 1793030400000,
+      "tag": "0110_strategy_review_capacity",
+      "breakpoints": true
     }
   ]
 }

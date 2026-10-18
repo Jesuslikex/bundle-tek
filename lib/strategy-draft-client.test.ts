@@ -44,26 +44,30 @@ it('refuses changed authority in a nominally successful response', async () => {
     strategyDraftRequest('/api/test', undefined, new AbortController().signal),
   ).rejects.toThrow('authority');
 });
-it('bounds a stalled response body even when the transport ignores abort', async () => {
-  vi.useFakeTimers();
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      status: 200,
-      ok: true,
-      json: () => new Promise(() => {}),
-    }),
-  );
-  const result = expect(
-    strategyDraftRequest(
-      '/api/test',
-      { action: 'save' },
-      new AbortController().signal,
-    ),
-  ).rejects.toThrow('outcome not confirmed');
-  await vi.advanceTimersByTimeAsync(15000);
-  await result;
-});
+it.each(['drafts', 'capacity'] as const)(
+  'bounds a stalled %s response body even when the transport ignores abort',
+  async (subject) => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: () => new Promise(() => {}),
+      }),
+    );
+    const result = expect(
+      strategyDraftRequest(
+        '/api/test',
+        { action: 'save' },
+        new AbortController().signal,
+        subject,
+      ),
+    ).rejects.toThrow('outcome not confirmed');
+    await vi.advanceTimersByTimeAsync(15000);
+    await result;
+  },
+);
 it('cancels pending IO without accepting late success', async () => {
   let resolve!: (v: Response) => void;
   vi.stubGlobal(

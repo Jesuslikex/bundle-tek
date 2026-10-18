@@ -31,6 +31,7 @@ export async function strategyDraftRequest(
   url: string,
   body: object | undefined,
   signal: AbortSignal,
+  subject: 'drafts' | 'capacity' = 'drafts',
 ): Promise<Record<string, unknown>> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout>,
@@ -41,8 +42,12 @@ export async function strategyDraftRequest(
       reject(
         new Error(
           body
-            ? 'Save outcome not confirmed. Reload drafts before retrying the same save.'
-            : 'Draft request cancelled. Reload to try again.',
+            ? subject === 'capacity'
+              ? 'Review slot outcome not confirmed. Reload review slots before retrying the same request.'
+              : 'Save outcome not confirmed. Reload drafts before retrying the same save.'
+            : subject === 'capacity'
+              ? 'Review slot request cancelled. Reload review slots to try again.'
+              : 'Draft request cancelled. Reload to try again.',
         ),
       );
     };
@@ -65,11 +70,17 @@ export async function strategyDraftRequest(
           signal: controller.signal,
         });
         if (response.status === 401)
-          throw new Error('Sign in again to open strategy drafts.');
+          throw new Error(
+            subject === 'capacity'
+              ? 'Sign in again to review strategy capacity.'
+              : 'Sign in again to open strategy drafts.',
+          );
         const data: unknown = await response.json().catch(() => null);
         if (!data || typeof data !== 'object' || Array.isArray(data))
           throw new Error(
-            'Strategy drafts unavailable. Reload before retrying.',
+            subject === 'capacity'
+              ? 'Review capacity unavailable. Reload review slots before retrying.'
+              : 'Strategy drafts unavailable. Reload before retrying.',
           );
         const record = data as Record<string, unknown>;
         if (!response.ok)

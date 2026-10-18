@@ -120,6 +120,25 @@ export async function listStrategyDrafts(
     executionAllowed: false,
   };
 }
+/** Owned immutable terms for review-only consumers; never execution authority. */
+export async function readStrategyDraft(
+  db: D1Database,
+  owner: string,
+  projectId: string,
+  id: string,
+) {
+  scope(owner, projectId);
+  if (!UUID.test(id)) refused('Choose a saved strategy draft.');
+  await project(db, owner, projectId);
+  const row = await db
+    .prepare(
+      `SELECT ${columns} FROM strategy_session_drafts WHERE owner_id=? AND project_id=? AND id=?`,
+    )
+    .bind(owner, projectId, id)
+    .first<Row>();
+  if (!row) refused('Strategy draft unavailable.', 404);
+  return decode(row);
+}
 export async function saveStrategyDraft(
   db: D1Database,
   owner: string,

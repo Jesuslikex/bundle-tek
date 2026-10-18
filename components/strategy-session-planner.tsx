@@ -23,6 +23,7 @@ import { DurationInput } from './duration-input';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import styles from './strategy-session-planner.module.css';
+import { StrategyReviewCapacity } from './strategy-review-capacity';
 
 type EditorRow = {
   id: string;
@@ -114,6 +115,9 @@ function StrategyDraftWorkspace({
       !w.archived &&
       Number.isSafeInteger(w.revision) &&
       w.revision > 0,
+  );
+  const eligibleRevisions = new Map(
+    eligible.map((w) => [w.address, w.revision]),
   );
   const contextKey = JSON.stringify({
     project: project.id,
@@ -882,6 +886,30 @@ function StrategyDraftWorkspace({
                     {draft.plan.input.name}
                   </Button>
                 </div>
+                <StrategyReviewCapacity
+                  draft={draft}
+                  disabled={
+                    locked ||
+                    busy ||
+                    project.archived ||
+                    project.revision !== draft.plan.input.projectRevision ||
+                    draft.plan.input.strategies.some(
+                      (s) =>
+                        eligibleRevisions.get(s.wallet) !== s.walletRevision,
+                    )
+                  }
+                  contextKey={JSON.stringify({
+                    project: project.id,
+                    revision: project.revision,
+                    archived: project.archived,
+                    locked,
+                    draftRevision: draft.revision,
+                    wallets: draft.plan.input.strategies.map((s) => ({
+                      address: s.wallet,
+                      revision: eligibleRevisions.get(s.wallet) ?? null,
+                    })),
+                  })}
+                />
               </article>
             ))}
             {next && (
