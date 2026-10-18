@@ -1,0 +1,23 @@
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-width: 280px;
+}
+.entry small {
+  color: #a7a7b8;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.entry button {
+  min-height: 44px;
+  white-space: normal;
+}
+@media (max-width: 600px) {
+  .entry {
+    width: 100%;
+    max-width: none;
+  }
+}

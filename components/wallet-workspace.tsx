@@ -20,6 +20,7 @@ import { WalletFolderDeleteDialog } from '@/components/wallet-folder-delete-dial
 import { WalletFolderRow } from '@/components/wallet-folder-row';
 import { BrowserWalletVault } from '@/components/browser-wallet-vault';
 import { WalletWarmup } from '@/components/wallet-warmup';
+import { WalletWarmupEntry } from '@/components/wallet-warmup-entry';
 import { TokenToolsPanel } from './token-tools-panel';
 import { NativeWithdrawalPanel } from '@/components/native-withdrawal-panel';
 import { WalletCleanupPanel } from '@/components/wallet-cleanup-panel';
@@ -965,22 +966,25 @@ export function WalletWorkspace({
             <Button variant="outline" onClick={onFunding}>
               Funding review
             </Button>
-            <Button
-              variant="outline"
-              disabled={
-                loading ||
-                busy ||
-                archived ||
-                (!picks.length && rows.length !== 1) ||
-                picks.length > 20
-              }
-              onClick={() => {
+            <WalletWarmupEntry
+              loading={loading}
+              busy={busy}
+              archived={archived}
+              visibleCount={rows.length}
+              selectedCount={picks.length}
+              filtered={Boolean(query) || folder !== 'all'}
+              onShowActive={() => {
+                setArchived(false);
+                setFolder('all');
+                setQuery('');
+                setSelected([]);
+              }}
+              onClearSelection={() => setSelected([])}
+              onOpen={() => {
                 if (!picks.length && rows.length === 1) setSelected([rows[0].address]);
                 setWarmupOpen(true);
               }}
-            >
-              Wallet warmup
-            </Button>
+            />
           </div>
           {picks.length > 0 && (
             <div className="wallet-bulk-actions">
