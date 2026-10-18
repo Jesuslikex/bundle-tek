@@ -21,3 +21,7 @@ This documentation is a local evidence checkpoint during the other Bundle chat's
 ## 18 October continuation
 
 88fdc2b implements and tests readable HMS DCA intervals/duration; independent strategy/session ending semantics remain open. Volume USD target implementation is documented separately in CODEX-VOLUME-USD-TARGETS-20261018.md. It uses a captured server SOL/USD observation and fixes a SOL target with explicit acknowledgement, without claiming vendor conversion/settlement equivalence. The original table above records the pre-implementation comparison and retained REA evidence.
+
+## Exact Volume timing continuation
+
+Volume Bot now reuses the HMS duration input, preserves exact milliseconds in delay entry, and shows requested schedule limit separately from estimated scheduled time. Existing60..86400second duration,1000..600000millisecond delays and250round cap are unchanged.64targeted tests, type/lint checks and1440/375px synthetic browser verification pass. See CODEX-VOLUME-EXACT-TIMING-20261018.md. Proxima Duration/Delay-mode/backend equivalence remains unproven; no funded or hosted action occurred.

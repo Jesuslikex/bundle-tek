@@ -10,6 +10,8 @@ import {
 } from '@/lib/browser-wallet-vault';
 import {
   decimalToRaw,
+  VOLUME_LIMITS,
+  volumeTerms,
   newVolumeSeed,
   rawToDecimal,
   type VolumePlan,
@@ -24,6 +26,8 @@ import {
   validateVolumeUsdTarget,
   type VolumeUsdTarget,
 } from '@/lib/volume-usd-target';
+import { DurationInput } from './duration-input';
+import { parseDurationParts, splitDurationSeconds } from '@/lib/duration-parts';
 import { readPanelJson } from './read-panel-json';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -66,12 +70,16 @@ const sol = (lamports: string | bigint) => {
 };
 const short = (address: string) =>
   `${address.slice(0, 4)}…${address.slice(-4)}`;
-const duration = (seconds: number) =>
-  seconds >= 3600
-    ? `${Math.floor(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`
-    : seconds >= 60
-      ? `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-      : `${seconds}s`;
+const duration = (seconds: number) => {
+  const parts = splitDurationSeconds(seconds);
+  return [
+    Number(parts.hours) > 0 ? `${parts.hours}h` : '',
+    Number(parts.minutes) > 0 ? `${parts.minutes}m` : '',
+    Number(parts.seconds) > 0 || seconds === 0 ? `${parts.seconds}s` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+};
 
 async function call(payload?: object, projectId?: string) {
   const response = await fetch(
@@ -139,7 +147,9 @@ function VolumeBotWorkspace({
 }) {
   const id = useId();
   const [target, setTarget] = useState('1'),
-    [minutes, setMinutes] = useState('30'),
+    [durationParts, setDurationParts] = useState(() =>
+      splitDurationSeconds(1800),
+    ),
     [delayMin, setDelayMin] = useState('5'),
     [delayMax, setDelayMax] = useState('20'),
     [sizing, setSizing] = useState<'auto' | 'fixed' | 'range'>('auto'),
@@ -215,6 +225,13 @@ function VolumeBotWorkspace({
     }
   }, []);
 
+  const parsedDuration = parseDurationParts(
+    durationParts,
+    VOLUME_LIMITS.maxDurationSeconds,
+  );
+  const validDuration =
+    parsedDuration.seconds !== null &&
+    parsedDuration.seconds >= VOLUME_LIMITS.minDurationSeconds;
   const terms = (): VolumeTerms => {
     const lamports = (text: string, label: string) => {
       const raw = decimalToRaw(text, 9);
@@ -223,18 +240,29 @@ function VolumeBotWorkspace({
       return raw.toString();
     };
     const seconds = (text: string, label: string) => {
-      const value = Number(text);
-      if (!Number.isFinite(value) || value <= 0)
-        throw new Error(`Enter ${label} in seconds.`);
-      return Math.round(value * 1000);
+      const raw = decimalToRaw(text, 3);
+      if (
+        raw === undefined ||
+        raw < BigInt(VOLUME_LIMITS.minDelayMs) ||
+        raw > BigInt(VOLUME_LIMITS.maxDelayMs)
+      )
+        throw new Error(
+          `Enter ${label} from 1 to 600 seconds with at most three decimal places.`,
+        );
+      return Number(raw);
     };
+    if (!validDuration || parsedDuration.seconds === null)
+      throw new Error(
+        parsedDuration.error ||
+          'Choose a session duration from 1 minute to 24 hours.',
+      );
     if (!selected.length) throw new Error('Choose at least one wallet.');
-    return {
+    return volumeTerms({
       targetVolumeLamports:
         targetUnit === 'USD'
           ? currentUsdQuote().targetVolumeLamports
           : lamports(target, 'a target volume'),
-      durationSeconds: Math.round(Number(minutes) * 60),
+      durationSeconds: parsedDuration.seconds,
       delayMinMs: seconds(delayMin, 'a minimum delay'),
       delayMaxMs: seconds(delayMax, 'a maximum delay'),
       amount:
@@ -249,7 +277,7 @@ function VolumeBotWorkspace({
               },
       wave,
       wallets: selected,
-    };
+    });
   };
   const changed = () => {
     draftVersion.current++;
@@ -554,13 +582,24 @@ function VolumeBotWorkspace({
               )}
             </>
           )}
-          <label htmlFor={`${id}-duration`}>Duration (minutes)</label>
-          <Input
-            id={`${id}-duration`}
-            inputMode="numeric"
-            value={minutes}
-            onChange={(e) => setMinutes(e.target.value)}
+          <DurationInput
+            label="Session duration"
+            value={durationParts}
+            onChange={setDurationParts}
+            maximumSeconds={VOLUME_LIMITS.maxDurationSeconds}
+            disabled={busy || locked}
           />
+          <p className={styles.note}>
+            From 1 minute to 24 hours as a planned schedule limit. The schedule
+            can finish sooner at its volume target or {VOLUME_LIMITS.maxRounds}
+            -round limit. Approval and settlement waits can make wall time
+            longer.
+          </p>
+          {parsedDuration.seconds !== null && !validDuration && (
+            <p role="alert" className={styles.error}>
+              Choose a session duration from 1 minute to 24 hours.
+            </p>
+          )}
           <label htmlFor={`${id}-dmin`}>Delay between trades (seconds)</label>
           <div className={styles.pair}>
             <Input
@@ -577,6 +616,10 @@ function VolumeBotWorkspace({
               onChange={(e) => setDelayMax(e.target.value)}
             />
           </div>
+          <p className={styles.note}>
+            From 1 to 600 seconds, with up to three decimal places for exact
+            millisecond delays.
+          </p>
           <label htmlFor={`${id}-sizing`}>Trade amounts</label>
           <select
             id={`${id}-sizing`}
@@ -648,6 +691,7 @@ function VolumeBotWorkspace({
             disabled={
               busy ||
               locked ||
+              !validDuration ||
               (targetUnit === 'USD' &&
                 (!usdQuote || Date.parse(usdQuote.expiresAt) <= now))
             }
@@ -667,6 +711,8 @@ function VolumeBotWorkspace({
             </dd>
             <dt>Approvals</dt>
             <dd>{plan.estimate.approvals} batches</dd>
+            <dt>Schedule limit</dt>
+            <dd>{duration(plan.terms.durationSeconds)}</dd>
             <dt>Scheduled time</dt>
             <dd>{duration(plan.estimate.scheduledSeconds)}</dd>
             <dt>Needed per wallet</dt>

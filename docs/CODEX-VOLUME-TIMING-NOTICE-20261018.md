@@ -1,0 +1,3 @@
+# Volume Bot exact timing scope
+
+18 October 2026. Before editing UI: Codex will reuse the existing duration-parts parser and duration-input component in its owned Volume Bot panel and tests. Default remains30minutes. Persisted terms stay integer durationSeconds60..86400 and delay milliseconds1000..600000. Duration raw edits invalidate estimates, including numerically equal edits. No silent fractional-minute rounding. Existing delay input may keep millisecond precision but must reject unrepresentable decimals instead of rounding. No wallet/warmup, auth, guard, shell, token, provider, schema or execution edits. Coordinate source freeze with the other Bundle chat. No funded actions, provider changes, push or deploy.

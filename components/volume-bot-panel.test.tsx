@@ -487,3 +487,148 @@ it('discards an in-flight estimate when settings change', async () => {
   expect(container.textContent).not.toContain('Round trips');
   expect(button('Save session and reserve wallets')).toBeUndefined();
 });
+
+async function openSolTiming() {
+  respond = (payload) =>
+    payload?.action === 'estimate'
+      ? {
+          plan: planVolumeSession(
+            payload.terms as never,
+            [{ address, lamports: '10000000000' }],
+            payload.seed as string,
+          ),
+        }
+      : { sessions: [] };
+  await act(async () =>
+    root.render(
+      <VolumeBotPanel project={project} wallets={[wallet()]} locked={false} />,
+    ),
+  );
+  await act(async () => button('Open Volume Bot').click());
+  await settle();
+  await act(async () =>
+    (
+      container.querySelector('input[type=checkbox]') as HTMLInputElement
+    ).click(),
+  );
+}
+async function setSessionTime(hours: string, minutes: string, seconds: string) {
+  for (const [unit, value] of [
+    ['hours', hours],
+    ['minutes', minutes],
+    ['seconds', seconds],
+  ])
+    await changeControl(
+      container.querySelector<HTMLInputElement>(
+        `[aria-label="Session duration: ${unit}"]`,
+      )!,
+      value,
+    );
+}
+it('sends exact HMS seconds and exact millisecond delays, then invalidates even an equivalent raw edit', async () => {
+  await openSolTiming();
+  await setSessionTime('1', '2', '3');
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Minimum delay"]')!,
+    '1.234',
+  );
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Maximum delay"]')!,
+    '2.345',
+  );
+  await act(async () => button('Estimate').click());
+  await settle();
+  expect(
+    calls.find((c) => c.payload?.action === 'estimate')?.payload?.terms,
+  ).toMatchObject({
+    durationSeconds: 3723,
+    delayMinMs: 1234,
+    delayMaxMs: 2345,
+  });
+  expect(container.textContent).toContain('3,723 seconds total');
+  expect(container.textContent).toContain('1h 2m 3s');
+  expect(container.textContent).toContain('Schedule limit');
+  expect(container.textContent).toContain('Round trips');
+  await changeControl(
+    container.querySelector<HTMLInputElement>(
+      '[aria-label="Session duration: minutes"]',
+    )!,
+    '02',
+  );
+  expect(container.textContent).not.toContain('Round trips');
+  expect(container.textContent).toContain('3,723 seconds total');
+  expect(
+    calls.some((c) =>
+      ['create', 'register', 'send'].includes(String(c.payload?.action)),
+    ),
+  ).toBe(false);
+});
+it.each([
+  ['0', '0', '59'],
+  ['24', '0', '1'],
+  ['0', '60', '0'],
+  ['0', '1.5', '0'],
+  ['0', '1e2', '0'],
+  ['', '', ''],
+])(
+  'refuses invalid/out-of-range HMS %s:%s:%s without provider work',
+  async (hours, minutes, seconds) => {
+    await openSolTiming();
+    await setSessionTime(hours, minutes, seconds);
+    expect(button('Estimate').disabled).toBe(true);
+    await act(async () => button('Estimate').click());
+    expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
+    expect(
+      container.querySelector<HTMLInputElement>(
+        '[aria-label="Session duration: minutes"]',
+      )!.value,
+    ).toBe(minutes);
+  },
+);
+it.each([
+  ['0', '1', '0', 60],
+  ['24', '0', '0', 86400],
+])(
+  'keeps exact allowed duration boundary %s:%s:%s',
+  async (hours, minutes, seconds, expected) => {
+    await openSolTiming();
+    await setSessionTime(String(hours), String(minutes), String(seconds));
+    expect(button('Estimate').disabled).toBe(false);
+    await act(async () => button('Estimate').click());
+    await settle();
+    expect(
+      calls.find((c) => c.payload?.action === 'estimate')?.payload?.terms,
+    ).toMatchObject({ durationSeconds: expected });
+  },
+);
+it.each(['1.0004', '1e0', '0.999', '600.001'])(
+  'refuses unrepresentable/out-of-range delay %s instead of rounding it',
+  async (delay) => {
+    await openSolTiming();
+    await changeControl(
+      container.querySelector<HTMLInputElement>(
+        '[aria-label="Minimum delay"]',
+      )!,
+      delay,
+    );
+    await act(async () => button('Estimate').click());
+    await settle();
+    expect(container.textContent).toContain(
+      'from 1 to 600 seconds with at most three decimal places',
+    );
+    expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
+  },
+);
+it('refuses a reversed delay range locally before observing wallet balances', async () => {
+  await openSolTiming();
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Minimum delay"]')!,
+    '21',
+  );
+  await act(async () => button('Estimate').click());
+  await settle();
+  expect(container.textContent).toContain(
+    'maximum delay at or above the minimum',
+  );
+  expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
+});

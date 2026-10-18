@@ -623,7 +623,7 @@ it('does not read markets for unowned projects and sanitizes provider failures',
   ).rejects.toThrow('SOL/USD market price is unavailable. Try again later.');
 });
 
-function market(at = new Date().toISOString()): TokenMarket {
+function market(at = new Date(Date.now() - 1000).toISOString()): TokenMarket {
   return {
     chain: 'Solana',
     address: VOLUME_NATIVE_MINT,
@@ -765,4 +765,25 @@ it('refuses USD estimates if the project changes during balance observation', as
   await expect(
     estimateVolumeSession(db, 'alice', input, signal(), rpc),
   ).rejects.toThrow(/changed or expired/);
+});
+
+it('keeps the database future-observation guard even when the application clock accepts it', async () => {
+  const { db } = await fixture();
+  const { vi } = await import('vitest');
+  const future = Date.now() + 60000;
+  const observation = market(new Date(future).toISOString());
+  vi.spyOn(Date, 'now').mockReturnValue(future);
+  try {
+    await expect(
+      quoteVolumeUsdTarget(
+        db,
+        'alice',
+        { projectId: 'p1', projectRevision: 3, targetUsd: '80' },
+        signal(),
+        async () => observation,
+      ),
+    ).rejects.toThrow('USD capture expired or the project changed');
+  } finally {
+    vi.restoreAllMocks();
+  }
 });
