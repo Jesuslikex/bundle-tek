@@ -12,6 +12,7 @@ import {
   type ExchangeFundingReview as Review,
 } from '@/lib/exchange-funding-review';
 import styles from './exchange-funding-review.module.css';
+import { ExchangeOrderHistory } from './exchange-order-history';
 
 type Props = {
   plan: SavedFunding | null;
@@ -360,11 +361,16 @@ function ExchangeFundingReviewContent({
             ))}
           </dl>
           <p>{history.warning}</p>
+          <div className={styles.address}>
+            <span>Receiving funder saved with this quote</span>
+            <code>{history.funder}</code>
+          </div>
           {history.providerWarning && (
             <p>Provider note: {history.providerWarning}</p>
           )}
         </div>
       )}
+      {plan && <ExchangeOrderHistory planId={plan.id} />}
     </section>
   );
 }

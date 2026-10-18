@@ -4,6 +4,10 @@ import { readFile } from 'node:fs/promises';
 import bs58 from 'bs58';
 import { exchangePayoutFixture } from '../test/exchange-payout-fixture';
 import { verifyOwnedExchangePayout } from './exchange-payout-service';
+import {
+  listOwnedExchangeOrderHistory,
+  readOwnedExchangeOrderHistory,
+} from './exchange-order-history-service';
 import { createTursoDatabase } from '../db/turso';
 import { exchangeFundingReviewFixture } from '@/test/exchange-funding-review-fixture';
 import {
@@ -996,4 +1000,147 @@ it('never credits the same transaction and recipient to a second owned order', a
         .first<{ n: number }>()
     )?.n,
   ).toBe(1);
+});
+it('lists bounded owned history with stable same-timestamp pagination and no private references', async () => {
+  const expected: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    if (i) {
+      fixture.review.id = crypto.randomUUID();
+      await db
+        .prepare(
+          'INSERT INTO exchange_funding_quotes VALUES(?,?,?,?,?,?,?,?,?,?)',
+        )
+        .bind(
+          fixture.review.id,
+          'alice',
+          fixture.plan.id,
+          3,
+          2,
+          JSON.stringify(fixture.plan.document),
+          JSON.stringify(fixture.review),
+          'private-rate-fixture',
+          fixture.review.quotedAt,
+          fixture.review.expiresAt,
+        )
+        .run();
+    }
+    expected.push((await prepare()).terms.id);
+  }
+  const first = await listOwnedExchangeOrderHistory(
+    db,
+    'alice',
+    fixture.plan.id,
+  );
+  expect(first.items).toHaveLength(10);
+  expect(first.nextCursor).toBe(first.items[9].id);
+  const second = await listOwnedExchangeOrderHistory(
+    db,
+    'alice',
+    fixture.plan.id,
+    first.nextCursor!,
+  );
+  expect(second.items).toHaveLength(2);
+  expect(second.nextCursor).toBeNull();
+  expect([...first.items, ...second.items].map((i) => i.id)).toEqual(
+    expected.sort().reverse(),
+  );
+  expect(JSON.stringify(first)).not.toContain('private-rate-fixture');
+  expect(
+    first.items.every(
+      (i) =>
+        !i.attemptRetained && !i.receiptRetained && i.providerStatus === null,
+    ),
+  ).toBe(true);
+  expect(create).not.toHaveBeenCalled();
+  expect(lookup).not.toHaveBeenCalled();
+});
+it('keeps owned history readable after archive or wallet changes but rejects foreign and malformed cursors', async () => {
+  const review = await prepare();
+  await db
+    .prepare('UPDATE funding_plans SET archived=1,revision=revision+1')
+    .run();
+  await db.prepare('UPDATE workspace_wallets SET archived=1').run();
+  expect(
+    (await listOwnedExchangeOrderHistory(db, 'alice', fixture.plan.id)).items[0]
+      .id,
+  ).toBe(review.terms.id);
+  expect(
+    (await readOwnedExchangeOrderHistory(db, 'alice', review.terms.id)).quote
+      .funder,
+  ).toBe(fixture.funder.address);
+  await expect(
+    listOwnedExchangeOrderHistory(db, 'bob', fixture.plan.id),
+  ).rejects.toMatchObject({ status: 404 });
+  await expect(
+    listOwnedExchangeOrderHistory(
+      db,
+      'alice',
+      fixture.plan.id,
+      crypto.randomUUID(),
+    ),
+  ).rejects.toMatchObject({ status: 404 });
+  await expect(
+    listOwnedExchangeOrderHistory(db, 'alice', '../other'),
+  ).rejects.toMatchObject({ status: 400 });
+  await expect(
+    listOwnedExchangeOrderHistory(db, 'alice', fixture.plan.id, 'not-a-cursor'),
+  ).rejects.toMatchObject({ status: 400 });
+  await db
+    .prepare('INSERT INTO funding_plans VALUES(?,?,?,?,?,?)')
+    .bind(
+      'alice',
+      'another-owned-plan',
+      JSON.stringify(fixture.plan.document),
+      3,
+      0,
+      fixture.plan.updatedAt,
+    )
+    .run();
+  expect(
+    (await listOwnedExchangeOrderHistory(db, 'alice', 'another-owned-plan'))
+      .items,
+  ).toEqual([]);
+  await expect(
+    listOwnedExchangeOrderHistory(
+      db,
+      'alice',
+      'another-owned-plan',
+      review.terms.id,
+    ),
+  ).rejects.toMatchObject({ status: 404 });
+});
+it('projects verified payout detail without new RPC reads, private exchange references or payment authority', async () => {
+  const { review, verify, rpc, f } = await paidOrder();
+  await verify();
+  const page = await listOwnedExchangeOrderHistory(
+    db,
+    'alice',
+    fixture.plan.id,
+  );
+  expect(page.items[0]).toMatchObject({
+    receiptRetained: true,
+    attemptRetained: true,
+    providerStatus: 'finished',
+    ...exchangeOrderAuthority,
+  });
+  const detail = await readOwnedExchangeOrderHistory(
+    db,
+    'alice',
+    review.terms.id,
+  );
+  expect(detail).toMatchObject({
+    state: 'payout-verified',
+    payoutVerified: true,
+    currentSpendabilityVerified: false,
+    payout: {
+      signature: f.expected.signature,
+      recipient: fixture.funder.address,
+      amountRaw: '1100000000',
+    },
+    ...exchangeOrderAuthority,
+  });
+  expect(rpc).toHaveBeenCalledTimes(5);
+  expect(JSON.stringify(detail)).not.toContain('provider-fixture-1');
+  expect(JSON.stringify(detail)).not.toContain('private-rate-fixture');
+  expect(JSON.stringify(detail)).not.toContain(order().payinAddress);
 });

@@ -1,0 +1,213 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import bs58 from 'bs58';
+import { ExchangeOrderHistory } from './exchange-order-history';
+import { exchangeOrderHistoryFixture } from '@/test/exchange-order-history-fixture';
+let root: Root,
+  container: HTMLDivElement,
+  fixture: ReturnType<typeof exchangeOrderHistoryFixture>;
+const fetcher = vi.fn<typeof fetch>();
+const requestUrl = (input: RequestInfo | URL) =>
+  typeof input === 'string'
+    ? input
+    : input instanceof URL
+      ? input.href
+      : input.url;
+const button = (text: string) => {
+  const b = [...container.querySelectorAll('button')].find(
+    (b) => b.textContent === text,
+  );
+  if (!b) throw new Error('Missing ' + text);
+  return b;
+};
+const click = async (text: string) => {
+  await act(async () => button(text).click());
+};
+async function mount(planId = fixture.plan.id) {
+  await act(async () => root.render(<ExchangeOrderHistory planId={planId} />));
+}
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  fixture = exchangeOrderHistoryFixture();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  fetcher
+    .mockReset()
+    .mockImplementation(async (input) =>
+      requestUrl(input).includes('?id=')
+        ? Response.json({ order: fixture.detail })
+        : Response.json(fixture.page),
+    );
+  vi.stubGlobal('fetch', fetcher);
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+});
+it('reads only on explicit open and explains that a saved quote is not an order', async () => {
+  fixture.page.items = [];
+  await mount();
+  expect(fetcher).not.toHaveBeenCalled();
+  await click('View saved exchange orders');
+  expect(container.textContent).toContain(
+    'Getting a quote does not create an order',
+  );
+  expect(
+    fetcher.mock.calls.every(
+      ([, init]) => init?.method === undefined && init?.cache === 'no-store',
+    ),
+  ).toBe(true);
+});
+it('opens exact historical wallets and amounts with all payment controls absent', async () => {
+  await mount();
+  await click('View saved exchange orders');
+  await click('Open order 00000000');
+  expect(container.textContent).toContain('Review saved');
+  expect(container.textContent).toContain(fixture.funder.address);
+  expect(container.textContent).toContain(fixture.detail.refundAddress);
+  expect(container.textContent).toContain('1.15 SOL');
+  expect(container.textContent).toContain('1.1 SOL');
+  expect(container.querySelector('input[type=checkbox]')).toBeNull();
+  expect(
+    [...container.querySelectorAll('button')].some((b) =>
+      /sign|send|deposit|distribute/i.test(b.textContent ?? ''),
+    ),
+  ).toBe(false);
+});
+it('keeps an uncertain order held without offering another attempt', async () => {
+  fetcher.mockImplementation(async (input) =>
+    requestUrl(input).includes('?id=')
+      ? Response.json({
+          order: {
+            ...fixture.detail,
+            state: 'creation-unresolved',
+            approved: true,
+            approvalExpiresAt: fixture.review.expiresAt,
+            providerReferenceRetained: true,
+          },
+        })
+      : Response.json(fixture.page),
+  );
+  await mount();
+  await click('View saved exchange orders');
+  await click('Open order 00000000');
+  expect(container.textContent).toContain('Its hold remains in place');
+  expect(container.textContent).toContain('does not authorize a new order');
+});
+it('keeps HTML/storage failures out of user-facing text and permits explicit reload', async () => {
+  fetcher.mockResolvedValue(
+    new Response('<html>parser secret</html>', { status: 503 }),
+  );
+  await mount();
+  await click('View saved exchange orders');
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    'Reload to try again',
+  );
+  expect(container.textContent).not.toContain('parser secret');
+  fetcher.mockResolvedValue(Response.json(fixture.page));
+  await click('Reload saved orders');
+  expect(container.querySelector('[role=alert]')).toBeNull();
+});
+it('refuses changed authority or cross-plan detail instead of displaying it', async () => {
+  fetcher.mockImplementation(async (input) =>
+    requestUrl(input).includes('?id=')
+      ? Response.json({
+          order: {
+            ...fixture.detail,
+            quote: { ...fixture.review, planId: 'other' },
+            fundingAllowed: true,
+          },
+        })
+      : Response.json(fixture.page),
+  );
+  await mount();
+  await click('View saved exchange orders');
+  await click('Open order 00000000');
+  expect(
+    container.querySelector('[aria-label="Saved exchange order details"]'),
+  ).toBeNull();
+  expect(container.querySelector('[role=alert]')).not.toBeNull();
+});
+it('aborts old-plan reads and ignores a late response after context replacement', async () => {
+  let resolve!: (v: Response) => void;
+  let signal: AbortSignal | undefined;
+  fetcher.mockImplementation((_input, init) => {
+    signal = init?.signal ?? undefined;
+    return new Promise((r) => {
+      resolve = r;
+    });
+  });
+  await mount();
+  await click('View saved exchange orders');
+  await mount('other-plan');
+  expect(signal?.aborted).toBe(true);
+  await act(async () => resolve(Response.json(fixture.page)));
+  expect(container.textContent).not.toContain('1.1 SOL expected');
+  expect(button('View saved exchange orders')).not.toBeNull();
+});
+it('retains earlier rows when loading a later page and clears private history on sign-out', async () => {
+  const first = { ...fixture.page, nextCursor: fixture.id };
+  const older = {
+    ...fixture.page,
+    items: [
+      { ...fixture.page.items[0], id: '00000000-0000-4000-8000-000000000003' },
+    ],
+  };
+  fetcher.mockImplementation(async (input) =>
+    requestUrl(input).includes('&before=')
+      ? Response.json(older)
+      : Response.json(first),
+  );
+  await mount();
+  await click('View saved exchange orders');
+  await click('Load older exchange orders');
+  expect(container.querySelectorAll('li')).toHaveLength(2);
+  fetcher.mockResolvedValue(new Response('unauthorized', { status: 401 }));
+  await click('Reload saved orders');
+  expect(container.querySelectorAll('li')).toHaveLength(0);
+  expect(container.textContent).toContain(
+    'Sign in to read saved exchange orders.',
+  );
+});
+it('shows a verified receipt as historical credit without treating it as spendable balance', async () => {
+  const signature = bs58.encode(new Uint8Array(64).fill(4));
+  fetcher.mockImplementation(async (input) =>
+    requestUrl(input).includes('?id=')
+      ? Response.json({
+          order: {
+            ...fixture.detail,
+            state: 'payout-verified',
+            approved: true,
+            approvalExpiresAt: fixture.review.expiresAt,
+            providerStatus: 'finished',
+            providerReferenceRetained: true,
+            payoutVerified: true,
+            payout: {
+              signature,
+              recipient: fixture.funder.address,
+              amountRaw: fixture.review.expectedPayoutLamports,
+              slot: 120,
+              observedAt: fixture.review.quotedAt,
+            },
+          },
+        })
+      : Response.json(fixture.page),
+  );
+  await mount();
+  await click('View saved exchange orders');
+  await click('Open order 00000000');
+  expect(container.textContent).toContain('Finalized SOL payout verified');
+  expect(container.textContent).toContain(
+    'Current spendable balance has not been checked',
+  );
+  expect(container.querySelector('a')?.href).toBe(
+    'https://solscan.io/tx/' + signature,
+  );
+  expect(
+    fetcher.mock.calls.every(([, init]) => init?.method === undefined),
+  ).toBe(true);
+});

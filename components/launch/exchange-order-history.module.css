@@ -1,0 +1,99 @@
+.history {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border-top: 1px solid var(--border, #343846);
+  padding-top: 16px;
+}
+.history header,
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.history h4,
+.history h5,
+.history p {
+  margin: 0;
+}
+.history h5 {
+  font-size: 15px;
+}
+.history p,
+.history time,
+.orders span {
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.history button {
+  max-width: 100%;
+  height: auto;
+  min-height: 36px;
+  white-space: normal;
+}
+.orders {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.orders li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border, #343846);
+  border-radius: 8px;
+}
+.orders li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.orders strong {
+  font-size: 13px;
+}
+.detail {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border, #343846);
+  border-radius: 8px;
+}
+.detail dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.detail dl > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(0, 2fr);
+  gap: 10px;
+  font-size: 12px;
+}
+.detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.receipt {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.receipt a {
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+}
+@media (max-width: 480px) {
+  .detail dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+}

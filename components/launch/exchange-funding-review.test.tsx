@@ -6,6 +6,7 @@ import { exchangeFundingReviewFixture } from '@/test/exchange-funding-review-fix
 import { ExchangeFundingReview } from './exchange-funding-review';
 import { FundingPlanner } from './funding-planner';
 import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
+import bs58 from 'bs58';
 // These tests exercise funding source selection, not wallet provider execution.
 vi.mock('./devnet-funding-execution', () => ({
   DevnetFundingExecution: () => null,
@@ -93,6 +94,18 @@ it('keeps missing provider setup clear when quote history storage is not install
   expect(container.textContent).toContain(
     'Complete or restore exchange storage setup',
   );
+  expect(postCalls()).toHaveLength(0);
+});
+it('shows the historical quote funder separately from a changed current draft funder', async () => {
+  history = fixture.review;
+  const changed = bs58.encode(new Uint8Array(32).fill(6));
+  fixture.plan.document = { ...fixture.plan.document, funderAddress: changed };
+  await mount();
+  expect(container.textContent).toContain(
+    'Receiving funder saved with this quote',
+  );
+  expect(container.textContent).toContain(fixture.review.funder);
+  expect(container.textContent).toContain(changed);
   expect(postCalls()).toHaveLength(0);
 });
 it('gives a rate-limit recovery message without retrying a quote', async () => {
