@@ -1,4 +1,5 @@
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+export * from './exchange-order-schema';
 export const exchangeFundingQuoteGates = sqliteTable(
   'exchange_funding_quote_gates',
   {
