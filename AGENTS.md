@@ -29,6 +29,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex (sale-flow PR27 review), 18 October 2026: new `app/api/account-launch-activity/sale-evidence/**`, `lib/imported-sale-evidence-rpc*`, capture HTTP integration tests and handoff notes. Claude owns the acquisition review UI and sale-allocations API in PR27. No edits to the peer's frozen 0116 draft, shared schema, protected layout or Claude UI. No deploy, hosted SQL or funded trades.
+
 Codex (ChatGPT) owns the following areas it is actively extending. The original 79-commit count above is a historical snapshot; use Git for the current relationship to origin/main:
 
 - Volume Bot and same-block Volume bundles: `lib/volume-bot*`, `lib/volume-bundle*`, `lib/volume-usd*`, `app/api/volume*`, related tests and fixtures.
