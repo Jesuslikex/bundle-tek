@@ -23,6 +23,8 @@ Bounded literal inspection of the retained entry-input/index-C1cJCLGU.js identif
 
 ## Bundle gap
 
+Follow-up CODEX-PROXIMA-MEV-FUNDING-FIELD-MAP-20261018.md adds five provenance-checked REA function slices and primary documentation. It confirms separate buy/native-funding fields, differing time units and route-specific layers. In particular, documented StonkFun supports Front only, while the selected live imported/scheduled draft does not prove a new-token deployment sequence. Its373semantic unknowns and the absent server funding formulas remain explicit.
+
 A bounded search of current lib/components/app TypeScript/TSX finds no explicit front_mev/back_mev, frontMev/backMev or Front MEV/Back MEV role implementation. Existing launchFundingRecipients selects ordinary Recipient and optional Deployer assignments; pump-holder-funding constructs deployer/holder balance and allowance evidence. Jito bundles, RPC delivery disclosures, initial buys and holder funding do not establish this separate wallet-layer protocol.
 
 Full parity therefore still needs a separately specified and verified role-aware launch preparation/funding/distribution/recovery workflow, with explicit economic purpose and ownership disclosure. Required checks include exact role assignments and budgets, explained fees/rent/working capital, packet semantics and conservation, fresh custody/lifetime admission, separate user approvals, one-attempt submission and finalized recovery. Do not create an apparent holder count from intermediary wallets or describe coordinated activity as independent demand. No implementation or live execution of those layers was added by this investigation.
