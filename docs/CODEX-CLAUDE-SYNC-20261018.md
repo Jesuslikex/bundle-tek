@@ -1,5 +1,19 @@
 # Bundle collaboration checkpoint, 18 October 2026
 
+## Refreshed coordination, 18 October at 06:38 local time
+
+This section supersedes the older source/worktree inventory below. Canonical main was inspected at `cb7dce4`. The other Bundle Codex chat owns strategy/session draft work and migration 0108. This chat owns Front/Back planning persistence and migration 0109. Both are local, unfinished checkpoints; neither adds execution authority. The other chat holds the shared Git index first. Shared journal/schema hunks must be staged separately.
+
+Claude's isolated `C:\Users\Julian\Desktop\Bundle-Claude-UI` branch is now committed at `9f95a1a`, with four UI files and its status note. The render-feedback note remains untracked there. The UI is preserved and not merged. Component fixture checks passed, but the final actual app-shell rendering after the compact-button correction remains outstanding. Verify desktop plot visibility, compact buttons and phone page overflow against current main before integration. Do not describe component fixtures as signed-in production proof.
+
+Codex resumed the existing desktop status session `ac25284c-2b22-4cb5-b48b-4d439d37ebd5` with `claude-opus-5-5`, tools disabled and no fallback. Claude acknowledged this inventory and the ownership split, agreed to hold UI edits, and reported no additional separately built work known to that session. It clarified that this status session itself had only checked deployment state, not built UI; the separate UI worktree is the retained implementation evidence.
+
+The screenshot reporting production `ea0a120` was a historical check around 01:50 UTC. The later local release record reports `e5bd8cf` / `dpl_77EbCVYdQ1paeNetY4R9BvVXfHw8`. Neither this coordination message nor Claude's acknowledgement freshly checks production or its database. Do not infer live state from local main, old screenshots or an agent's acknowledgement.
+
+Current remaining integration checks: final real-shell UI matrix, completed local 0108/0109 checkpoints, and combined build/migration verification. Wrangler accepted 0108 but refused the first 0109 compound query; this chat owns the compatibility correction without relaxing admission rules. Funding, signing and execution stay disabled for the new layer plans. No push, deploy, hosted SQL, provider/credential changes or funded wallet action is authorized by this coordination request.
+
+Subsequent completed checkpoints: `c19f618` retains the other chat's strategy/session drafts and migration 0108; `07552b7` retains owned Front/Back plans and migration 0109. Both are on local main. The combined webpack build and full 110-migration Wrangler/Miniflare checks passed after the 0109 correction. Layer selection passes 104 tests across ten files; the strategy owner's selection passes 131 tests. These are scoped results, not a full repository suite. The guarded local helper is restored, sign-in returns 200 and anonymous layer history returns 401/no-store. The layer editor and downstream funding/execution remain unfinished. Claude's separate UI still needs its final full-shell check; nothing was merged from it or published.
+
 The user explicitly asked Codex and Claude to coordinate and reconcile separately built work. This note is the shared handoff, not deployment approval.
 
 ## Canonical source
