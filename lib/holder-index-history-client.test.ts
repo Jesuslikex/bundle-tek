@@ -90,3 +90,86 @@ it('rejects pages or a response that belong to another project', async () => {
     readHolderIndexHistory(project, run, new AbortController().signal, fetcher),
   ).rejects.toThrow('context differs');
 });
+
+it('sanitizes HTML, malformed payloads and server errors', async () => {
+  for (const response of [
+    new Response('<html>private upstream error</html>', { status: 502 }),
+    Response.json(null),
+    Response.json(['private upstream error']),
+    Response.json({ error: 'private upstream error' }, { status: 503 }),
+  ]) {
+    const result = readHolderIndexHistory(
+      project,
+      run,
+      new AbortController().signal,
+      vi.fn().mockResolvedValue(response),
+    );
+    await expect(result).rejects.toThrow('Saved holder history');
+    await expect(result).rejects.not.toThrow('private upstream');
+  }
+});
+
+it('bounds stalled fetch and body reads without retrying or fetching a later page', async () => {
+  vi.useFakeTimers();
+  try {
+    for (const stalledBody of [false, true]) {
+      let observed: AbortSignal | undefined;
+      const fetcher = vi.fn((_url, init) => {
+        observed = init.signal;
+        return stalledBody
+          ? Promise.resolve({
+              ok: true,
+              json: () => new Promise(() => {}),
+            } as Response)
+          : new Promise<Response>(() => {});
+      });
+      const result = readHolderIndexHistory(
+        project,
+        run,
+        new AbortController().signal,
+        fetcher,
+      );
+      const rejected = expect(result).rejects.toThrow('stopped or timed out');
+      await vi.advanceTimersByTimeAsync(30_000);
+      await rejected;
+      expect(observed?.aborted).toBe(true);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('cancels an ignored body read and refuses its late continuation', async () => {
+  const controller = new AbortController();
+  let release!: (value: unknown) => void;
+  const body = new Promise((resolve) => {
+    release = resolve;
+  });
+  const fetcher = vi.fn().mockResolvedValue({ ok: true, json: () => body });
+  const result = readHolderIndexHistory(
+    project,
+    run,
+    controller.signal,
+    fetcher,
+  );
+  const rejected = expect(result).rejects.toThrow('stopped or timed out');
+  await Promise.resolve();
+  controller.abort();
+  await rejected;
+  release(payload([page(1)], 1, 2));
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it('does not start a request when already cancelled', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const fetcher = vi.fn();
+  await expect(
+    readHolderIndexHistory(project, run, controller.signal, fetcher),
+  ).rejects.toThrow();
+  expect(fetcher).not.toHaveBeenCalled();
+});

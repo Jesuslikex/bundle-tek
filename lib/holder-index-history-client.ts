@@ -12,6 +12,64 @@ export type SavedHolderRun = {
   updatedAt: string;
   createdAt: string;
 };
+/** Bound both fetch and body reads, even when a transport ignores cancellation. */
+async function readHistoryResponse(
+  url: string,
+  parent: AbortSignal,
+  fetcher: typeof fetch,
+) {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  parent.addEventListener('abort', abort, { once: true });
+  if (parent.aborted) abort();
+  const timer = setTimeout(abort, 30_000);
+  let cancel = () => {};
+  try {
+    controller.signal.throwIfAborted();
+    return await Promise.race([
+      new Promise<never>((_resolve, reject) => {
+        cancel = () =>
+          reject(
+            new Error(
+              'Saved holder history stopped or timed out. Reload history to try again.',
+            ),
+          );
+        controller.signal.addEventListener('abort', cancel, { once: true });
+        if (controller.signal.aborted) cancel();
+      }),
+      (async () => {
+        const response = await fetcher(url, {
+          credentials: 'same-origin',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        let data: unknown;
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error(
+            'Saved holder history returned an unreadable response. Reload history to try again.',
+          );
+        }
+        controller.signal.throwIfAborted();
+        if (!response.ok)
+          throw new Error(
+            'Saved holder history unavailable. Reload history to try again.',
+          );
+        if (!data || typeof data !== 'object' || Array.isArray(data))
+          throw new Error(
+            'Saved holder history returned an unreadable response. Reload history to try again.',
+          );
+        return data;
+      })(),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    parent.removeEventListener('abort', abort);
+    controller.signal.removeEventListener('abort', cancel);
+    controller.abort();
+  }
+}
 export async function readHolderIndexHistory(
   project: { id: string; revision: number; mint: string; decimals: number },
   selected: string | null,
@@ -29,11 +87,11 @@ export async function readHolderIndexHistory(
     });
     if (runId) params.set('run', runId);
     if (cursor) params.set('cursor', String(cursor));
-    const response = await fetcher(
+    const data = (await readHistoryResponse(
       `/api/imported-projects/holder-index?${params}`,
-      { credentials: 'same-origin', cache: 'no-store', signal },
-    );
-    const data = (await response.json()) as {
+      signal,
+      fetcher,
+    )) as {
       id?: string;
       revision?: number;
       runId?: string | null;
@@ -42,8 +100,6 @@ export async function readHolderIndexHistory(
       nextCursor?: number | null;
       error?: string;
     };
-    if (!response.ok)
-      throw new Error(data.error || 'Saved holder history unavailable.');
     if (
       data.id !== project.id ||
       data.revision !== project.revision ||

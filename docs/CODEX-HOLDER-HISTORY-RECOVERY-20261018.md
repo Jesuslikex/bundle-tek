@@ -1,0 +1,9 @@
+# Bounded holder-history recovery, 18 October 2026
+
+Saved holder history previously awaited fetch and response JSON without a deadline. A stuck transport or response body could leave the panel busy indefinitely, and HTML error pages could expose JSON parser text.
+
+Each saved-history GET now bounds the complete fetch/body read to30 seconds, relays parent cancellation and rejects ignored cancellation without waiting for transport cooperation. Finally removes timers/listeners and aborts the child request. An already cancelled caller starts no request. A late response cannot advance pagination or publish restored history. HTML, null/array bodies and non-success responses produce a readable reload message without upstream body text. Existing ownership/revision/run binding, bounded page restoration and completeness checks remain unchanged. No automatic retry or provider request was added.
+
+Verification:39 tests pass in6 files covering the history client, holder model, local persistence, retry model, result rendering and route. Fake-time cases cover stalled fetch/body, cancellation, late continuation and timer cleanup; malformed/error response cases cover parser text suppression. Both changed TS files pass scoped typed lint and formatting, and whole-project tsc --noEmit passes. Logs are local ignored files work/release-qa/holder-history-bounded-regression-20261018.log and holder-history-bounded-types-20261018.log. No browser, production build, full-suite or live-provider run is claimed for this change. The separate live provider report remains CODEX-LIVE-HOLDER-ROUTE-RECHECK-20261018.md.
+
+Only the history client/test and this report change. No UI layout, holder Watch action, account flow, schema, provider setting, credentials, signing or deployment changes. Full Proxima parity remains incomplete.
