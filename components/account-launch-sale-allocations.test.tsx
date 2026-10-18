@@ -195,13 +195,14 @@ it('stays idle until asked, then captures, reviews, requires approval, saves and
   await click('Find sales');
   await until('Finalized sells in the first page');
   expect(host.textContent).toContain('Older trades are not loaded yet');
-  expect(host.textContent).not.toContain('raw units, slot 1');
+  expect(host.textContent).not.toContain('raw units), slot 1');
   await click('Load older trades');
   await until('the first 2 pages');
-  await click('1000 raw units, slot 300');
+  await click('0.001 tokens (1000 raw units), slot 300');
   await until('not retained yet');
   await click('Retain sale evidence');
   await until('Assign all of them');
+  expect(host.textContent).toContain('1 token = 1,000,000 raw units');
   await type(
     host.querySelector<HTMLInputElement>('input[inputmode=numeric]')!,
     '1000',
@@ -239,7 +240,7 @@ it('refuses a reviewed plan whose hash or units differ from the request', async 
   };
   plan = { ...plan, sha256: 'f'.repeat(64) };
   await click('Find sales');
-  await click('1000 raw units, slot 300');
+  await click('0.001 tokens (1000 raw units), slot 300');
   await until('Assign all of them');
   await type(
     host.querySelector<HTMLInputElement>('input[inputmode=numeric]')!,
@@ -267,7 +268,7 @@ const retained = () => ({
 });
 async function reviewed() {
   await click('Find sales');
-  await click('1000 raw units, slot 300');
+  await click('0.001 tokens (1000 raw units), slot 300');
   await until('Assign all of them');
   await type(
     host.querySelector<HTMLInputElement>('input[inputmode=numeric]')!,
@@ -281,7 +282,7 @@ async function reviewed() {
 }
 it('skips the allocation read until evidence is retained', async () => {
   await click('Find sales');
-  await click('1000 raw units, slot 300');
+  await click('0.001 tokens (1000 raw units), slot 300');
   await until('not retained yet');
   expect(
     request.mock.calls.some(([u]) =>

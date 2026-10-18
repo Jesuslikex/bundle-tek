@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { validatedLaunchPurchaseHistory } from '@/lib/account-launch-purchases';
 import type { PumpPurchaseCostSource } from '@/lib/pump-purchase-costs';
 import {
@@ -28,6 +29,8 @@ type Selected = {
   saved: LaunchSaleAllocationPlan | null;
 };
 const API = '/api/account-launch-activity';
+// Launch tokens have 6 decimals: 1 token = 1,000,000 raw units.
+const tokens = (raw: string) => formatNativeBalance(raw, 6);
 const short = (v: string) => `${v.slice(0, 6)}…${v.slice(-4)}`;
 
 /** Owner-driven assignment of recorded launch buys to one finalized sale.
@@ -463,8 +466,8 @@ function Panel({ reviewId, mint }: { reviewId: string; mint: string }) {
                   }
                   onClick={() => void openSale(s)}
                 >
-                  Wallet {short(s.wallet)}, {s.tokenUnitsRaw} raw units, slot{' '}
-                  {s.slot}
+                  Wallet {short(s.wallet)}, {tokens(s.tokenUnitsRaw)} tokens (
+                  {s.tokenUnitsRaw} raw units), slot {s.slot}
                 </Button>
               </li>
             ))}
@@ -494,8 +497,9 @@ function Panel({ reviewId, mint }: { reviewId: string; mint: string }) {
               <ul>
                 {selected.saved.allocations.map((a) => (
                   <li key={a.originId}>
-                    Buy <code>{short(a.originId)}</code>: {a.unitsRaw} raw units
-                    (units {a.beforeRaw} to {a.afterRaw})
+                    Buy <code>{short(a.originId)}</code>: {tokens(a.unitsRaw)}{' '}
+                    tokens ({a.unitsRaw} raw units; raw units {a.beforeRaw} to{' '}
+                    {a.afterRaw})
                   </li>
                 ))}
               </ul>
@@ -527,12 +531,15 @@ function Panel({ reviewId, mint }: { reviewId: string; mint: string }) {
           ) : (
             <>
               <p>
-                Sold {selected.evidence.entry.tokenUnitsRaw} raw units. Assign
-                all of them across the buys below.
+                Sold {tokens(selected.evidence.entry.tokenUnitsRaw)} tokens (
+                {selected.evidence.entry.tokenUnitsRaw} raw units). Enter raw
+                units: 1 token = 1,000,000 raw units. Assign all of them across
+                the buys below.
               </p>
               {eligible.map((s) => (
                 <label key={s.originId} className={styles.field}>
-                  Buy {short(s.originId)} ({s.acquiredRaw} raw units bought)
+                  Buy {short(s.originId)} ({tokens(s.acquiredRaw)} tokens
+                  bought, {s.acquiredRaw} raw units)
                   <input
                     inputMode="numeric"
                     value={units[s.originId] ?? ''}
@@ -559,8 +566,9 @@ function Panel({ reviewId, mint }: { reviewId: string; mint: string }) {
                   <ul>
                     {plan.allocations.map((a) => (
                       <li key={a.originId}>
-                        Buy <code>{short(a.originId)}</code>: {a.unitsRaw} raw
-                        units, used {a.beforeRaw} before, {a.afterRaw} after
+                        Buy <code>{short(a.originId)}</code>:{' '}
+                        {tokens(a.unitsRaw)} tokens ({a.unitsRaw} raw units),
+                        raw units used {a.beforeRaw} before, {a.afterRaw} after
                       </li>
                     ))}
                   </ul>
