@@ -3,6 +3,12 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { readWorkspaceResponse } from '@/lib/workspace-response';
 import { saveWalletPublicAddresses } from '@/lib/wallet-public-save';
+import rosterStyles from './wallet-roster-navigation.module.css';
+import {
+  sortWalletRoster,
+  WALLET_ROSTER_PAGE_SIZE,
+  type WalletRosterSort,
+} from '@/lib/wallet-roster-view';
 
 import { Folder, Plus, Download, X } from 'lucide-react';
 
@@ -97,6 +103,8 @@ export function WalletWorkspace({
   const [archived, setArchived] = useState(false);
 
   const [query, setQuery] = useState('');
+  const [rosterSort, setRosterSort] = useState<WalletRosterSort>('saved');
+  const [rosterPage, setRosterPage] = useState({ scope: '', index: 0 });
 
   const [holdingsAddress, setHoldingsAddress] = useState<string | null>(null);
   const [withdrawalChoice, setWithdrawalChoice] = useState<{
@@ -308,7 +316,33 @@ export function WalletWorkspace({
 
   const picks = rows.filter((w) => selected.includes(w.address));
 
-  const balanceTargets = picks.length ? picks : rows;
+  const orderedRows = sortWalletRoster(rows, data.balances ?? [], rosterSort);
+  const pageScope = JSON.stringify([
+    chain,
+    folder,
+    archived,
+    query,
+    rosterSort,
+  ]);
+  const pageCount = Math.max(
+    1,
+    Math.ceil(rows.length / WALLET_ROSTER_PAGE_SIZE),
+  );
+  const pageIndex =
+    rosterPage.scope === pageScope
+      ? Math.min(rosterPage.index, pageCount - 1)
+      : 0;
+  const pageRows = orderedRows.slice(
+    pageIndex * WALLET_ROSTER_PAGE_SIZE,
+    (pageIndex + 1) * WALLET_ROSTER_PAGE_SIZE,
+  );
+  const pageSelected =
+    pageRows.length > 0 && pageRows.every((w) => selected.includes(w.address));
+  const pageSelectionSize = new Set([
+    ...selected,
+    ...pageRows.map((w) => w.address),
+  ]).size;
+  const balanceTargets = picks.length ? picks : pageRows;
 
   const combined = combinedWalletBalance(balanceTargets, data.balances ?? []);
 
@@ -929,6 +963,19 @@ export function WalletWorkspace({
               verifiedAddresses={[...proofs.keys()]}
               onVerified={reload}
               onOpenWarmup={(address) => {
+                const active = sortWalletRoster(
+                  data.wallets.filter((w) => w.chain === chain && !w.archived),
+                  data.balances ?? [],
+                  rosterSort,
+                );
+                const index = Math.max(
+                  0,
+                  active.findIndex((w) => w.address === address),
+                );
+                setRosterPage({
+                  scope: JSON.stringify([chain, 'all', false, '', rosterSort]),
+                  index: Math.floor(index / WALLET_ROSTER_PAGE_SIZE),
+                });
                 setArchived(false);
                 setFolder('all');
                 setQuery('');
@@ -1016,7 +1063,14 @@ export function WalletWorkspace({
           </div>
           {picks.length > 0 && (
             <div className="wallet-bulk-actions">
-              <span>{picks.length} selected</span>
+              <span>{picks.length} selected across pages</span>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={resetSelection}
+              >
+                Clear wallet selection
+              </Button>
               <div className="wallet-membership-control" ref={managerControl}>
                 {!archived && (
                   <Button
@@ -1199,7 +1253,7 @@ export function WalletWorkspace({
           <div className="wallet-balance-summary">
             <div>
               <small>
-                {picks.length ? 'SELECTED WALLETS' : 'CURRENT VIEW'} · NATIVE
+                {picks.length ? 'SELECTED WALLETS' : 'CURRENT PAGE'} · NATIVE
                 BALANCE
               </small>
               <strong>
@@ -1210,7 +1264,7 @@ export function WalletWorkspace({
               <p>
                 {combined
                   ? `${combined.count} ${combined.count === 1 ? 'address' : 'addresses'} · ${chain === 'Solana' ? 'slot' : 'block'} ${combined.blockNumber} · ${combined.commitment} · observed ${new Date(combined.observedAt).toLocaleString()}`
-                  : 'Refresh this view or selection for balances from one snapshot.'}
+                  : 'Refresh this page or selection for balances from one snapshot.'}
               </p>
               <small>
                 Native currency only. Observations can become stale. No USD
@@ -1230,7 +1284,7 @@ export function WalletWorkspace({
 
               onClick={() => void refreshBalances()}
             >
-              Refresh {picks.length ? 'selected' : 'view'} balances
+              Refresh {picks.length ? 'selected' : 'page'} balances
             </Button>
             {balanceTargets.length > 100 && (
               <small>Select up to 100 wallets per refresh.</small>
@@ -1326,6 +1380,60 @@ export function WalletWorkspace({
               onClose={() => setHoldingsAddress(null)}
             />
           )}
+          <nav
+            className={rosterStyles.navigation}
+            aria-label="Wallet list navigation"
+          >
+            <label>
+              Sort workspace wallets
+              <select
+                aria-label="Sort workspace wallets"
+                disabled={busy || loading}
+                value={rosterSort}
+                onChange={(e) =>
+                  setRosterSort(e.target.value as WalletRosterSort)
+                }
+              >
+                <option value="saved">Saved order</option>
+                <option value="name">Wallet name</option>
+                <option value="balance-high">
+                  Observed balance: highest first
+                </option>
+                <option value="balance-low">
+                  Observed balance: lowest first
+                </option>
+              </select>
+            </label>
+            <output>
+              {rows.length} matching wallets · page {pageIndex + 1} of{' '}
+              {pageCount}. Showing {pageRows.length}.
+            </output>
+            <small>
+              Selection persists across pages, up to 100 wallets. Sorting uses
+              saved observations, not fresh balances. Public CSV exports the
+              selection or all matching wallets.
+            </small>
+            <Button
+              className={rosterStyles.previous}
+              variant="outline"
+              disabled={busy || pageIndex === 0}
+              onClick={() =>
+                setRosterPage({ scope: pageScope, index: pageIndex - 1 })
+              }
+            >
+              Previous wallet page
+            </Button>
+            <Button
+              className={rosterStyles.next}
+              variant="outline"
+              disabled={busy || pageIndex >= pageCount - 1}
+              onClick={() =>
+                setRosterPage({ scope: pageScope, index: pageIndex + 1 })
+              }
+            >
+              Next wallet page
+            </Button>
+          </nav>
           <div className="wallet-roster-table">
             <table className="project-table">
               <thead>
@@ -1338,19 +1446,30 @@ export function WalletWorkspace({
                       aria-label="Select visible wallets"
 
                       disabled={
-                        busy || loading || !rows.length || rows.length > 100
+                        busy ||
+                        loading ||
+                        !pageRows.length ||
+                        (!pageSelected && pageSelectionSize > 100)
                       }
 
-                      checked={
-                        rows.length > 0 &&
-                        rows.every((w) => selected.includes(w.address))
-                      }
+                      checked={pageSelected}
 
-                      onChange={(e) =>
-                        setSelected(
-                          e.target.checked ? rows.map((w) => w.address) : [],
-                        )
-                      }
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSelected((before) =>
+                          checked
+                            ? [
+                                ...new Set([
+                                  ...before,
+                                  ...pageRows.map((w) => w.address),
+                                ]),
+                              ]
+                            : before.filter(
+                                (address) =>
+                                  !pageRows.some((w) => w.address === address),
+                              ),
+                        );
+                      }}
                     />
                   </th>
                   <th>Wallet</th>
@@ -1362,7 +1481,7 @@ export function WalletWorkspace({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((w) => (
+                {pageRows.map((w) => (
                   <tr key={w.address}>
                     <td>
                       <input

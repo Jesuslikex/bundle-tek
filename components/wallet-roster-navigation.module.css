@@ -1,0 +1,45 @@
+.navigation {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  grid-template-areas: 'sort previous next' 'status status status' 'notes notes notes';
+  align-items: end;
+  gap: 10px;
+  margin-block: 16px;
+  min-width: 0;
+}
+.navigation > label {
+  grid-area: sort;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.navigation select {
+  min-height: 44px;
+  max-width: 100%;
+}
+.navigation > output {
+  grid-area: status;
+}
+.navigation > small {
+  grid-area: notes;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+.navigation > .previous,
+.navigation > .next {
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
+}
+.previous {
+  grid-area: previous;
+}
+.next {
+  grid-area: next;
+}
+@media (max-width: 600px) {
+  .navigation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: 'sort sort' 'status status' 'previous next' 'notes notes';
+  }
+}

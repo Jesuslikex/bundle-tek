@@ -134,3 +134,66 @@ it('clears a folder that does not contain the created wallet', async () => {
     address,
   );
 });
+
+it('pages a large roster while preserving explicit selections and the 100-wallet action cap', async () => {
+  const wallets = Array.from({ length: 110 }, (_, index) => ({
+    ...workspace.wallets[0],
+    address: 'wallet-' + String(index).padStart(3, '0'),
+    label: 'Wallet ' + index,
+  }));
+  vi.mocked(fetch).mockImplementation(() =>
+    Promise.resolve(Response.json({ ...workspace, wallets })),
+  );
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  const rows = () => host.querySelectorAll('tbody tr');
+  const click = async (text: string) =>
+    act(async () => {
+      const button = [...host.querySelectorAll('button')].find(
+        (b) => b.textContent === text,
+      );
+      expect(button).toBeDefined();
+      button!.click();
+    });
+  const selectPage = async () =>
+    act(async () =>
+      host
+        .querySelector<HTMLInputElement>(
+          '[aria-label="Select visible wallets"]',
+        )!
+        .click(),
+    );
+  expect(rows()).toHaveLength(50);
+  expect(host.textContent).toContain('110 matching wallets');
+  expect(
+    [...host.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Refresh page balances',
+    )?.disabled,
+  ).toBe(false);
+  await selectPage();
+  expect(host.textContent).toContain('50 selected across pages');
+  await click('Next wallet page');
+  expect(rows()[0].textContent).toContain('Wallet 50');
+  await selectPage();
+  expect(host.textContent).toContain('100 selected across pages');
+  await click('Next wallet page');
+  expect(rows()).toHaveLength(10);
+  expect(
+    host.querySelector<HTMLInputElement>(
+      '[aria-label="Select visible wallets"]',
+    )!.disabled,
+  ).toBe(true);
+  await click('Previous wallet page');
+  await selectPage();
+  expect(host.textContent).toContain('50 selected across pages');
+  await click('Clear wallet selection');
+  expect(host.textContent).not.toContain('selected across pages');
+  expect(
+    vi.mocked(fetch).mock.calls.every((call) => call[1]?.method !== 'POST'),
+  ).toBe(true);
+  await act(async () => state.vault!.onOpenWarmup!(wallets[109].address));
+  expect(host.textContent).toContain('page 3 of 3');
+  expect(rows()).toHaveLength(10);
+  expect(host.querySelector('[data-testid="warmup"]')?.textContent).toContain(
+    wallets[109].address,
+  );
+});
