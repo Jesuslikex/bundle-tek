@@ -31,7 +31,7 @@ export async function strategyDraftRequest(
   url: string,
   body: object | undefined,
   signal: AbortSignal,
-  subject: 'drafts' | 'capacity' = 'drafts',
+  subject: 'drafts' | 'capacity' | 'checks' = 'drafts',
 ): Promise<Record<string, unknown>> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout>,
@@ -41,13 +41,15 @@ export async function strategyDraftRequest(
       controller.abort();
       reject(
         new Error(
-          body
-            ? subject === 'capacity'
-              ? 'Review slot outcome not confirmed. Reload review slots before retrying the same request.'
-              : 'Save outcome not confirmed. Reload drafts before retrying the same save.'
-            : subject === 'capacity'
-              ? 'Review slot request cancelled. Reload review slots to try again.'
-              : 'Draft request cancelled. Reload to try again.',
+          subject === 'checks'
+            ? 'Condition check cancelled or timed out. No review slots changed.'
+            : body
+              ? subject === 'capacity'
+                ? 'Review slot outcome not confirmed. Reload review slots before retrying the same request.'
+                : 'Save outcome not confirmed. Reload drafts before retrying the same save.'
+              : subject === 'capacity'
+                ? 'Review slot request cancelled. Reload review slots to try again.'
+                : 'Draft request cancelled. Reload to try again.',
         ),
       );
     };
@@ -71,16 +73,20 @@ export async function strategyDraftRequest(
         });
         if (response.status === 401)
           throw new Error(
-            subject === 'capacity'
-              ? 'Sign in again to review strategy capacity.'
-              : 'Sign in again to open strategy drafts.',
+            subject === 'checks'
+              ? 'Sign in again to check strategy conditions.'
+              : subject === 'capacity'
+                ? 'Sign in again to review strategy capacity.'
+                : 'Sign in again to open strategy drafts.',
           );
         const data: unknown = await response.json().catch(() => null);
         if (!data || typeof data !== 'object' || Array.isArray(data))
           throw new Error(
-            subject === 'capacity'
-              ? 'Review capacity unavailable. Reload review slots before retrying.'
-              : 'Strategy drafts unavailable. Reload before retrying.',
+            subject === 'checks'
+              ? 'Condition check unavailable. Check again when ready.'
+              : subject === 'capacity'
+                ? 'Review capacity unavailable. Reload review slots before retrying.'
+                : 'Strategy drafts unavailable. Reload before retrying.',
           );
         const record = data as Record<string, unknown>;
         if (!response.ok)

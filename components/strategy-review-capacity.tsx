@@ -14,6 +14,7 @@ import {
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { Button } from '@/components/ui/button';
 import styles from './strategy-session-planner.module.css';
+import { StrategyCandidateCheckPanel } from './strategy-candidate-check';
 const endpoint = '/api/imported-projects/strategy-capacity';
 export function StrategyReviewCapacity({
   draft,
@@ -324,6 +325,13 @@ export function StrategyReviewCapacity({
                       >
                         Release review slot {index + 1}.{h.candidate + 1}
                       </Button>
+                      <StrategyCandidateCheckPanel
+                        key={`${h.id}:${view.revision}:${Number(disabled || draft.archived)}`}
+                        draft={draft}
+                        capacity={view}
+                        holdId={h.id}
+                        blocked={disabled || draft.archived}
+                      />
                     </li>
                   );
                 })}

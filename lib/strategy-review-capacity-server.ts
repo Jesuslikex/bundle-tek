@@ -25,9 +25,9 @@ type Row = {
   created_at: string;
   updated_at: string;
 };
-const refused = (message: string, status = 409): never => {
+function refused(message: string, status = 409): never {
   throw new StrategyDraftError(message, status);
-};
+}
 async function scope(
   db: D1Database,
   owner: string,
@@ -83,6 +83,83 @@ export async function readStrategyReviewCapacity(
   draftId: string,
 ) {
   return result(await scope(db, owner, projectId, draftId));
+}
+/** Fresh public ownership/revision context for a read-only candidate check. */
+export async function currentStrategyReviewContext(
+  db: D1Database,
+  owner: string,
+  projectId: string,
+  draftId: string,
+  revision: number,
+  holdId: string,
+) {
+  if (!Number.isSafeInteger(revision) || revision < 1 || !UUID.test(holdId))
+    refused('Reload review slots before checking this candidate.', 400);
+  const current = await scope(db, owner, projectId, draftId);
+  const hold = current.state.holds.find(
+    (h) => h.id === holdId && h.state === 'held',
+  );
+  if (current.draft.archived || current.row?.revision !== revision || !hold)
+    refused('The draft or review slot changed. Reload review slots.');
+  const p = await db
+    .prepare(
+      "SELECT revision,archived,document,strftime('%Y-%m-%dT%H:%M:%fZ','now') AS database_at FROM imported_token_projects WHERE owner_id=? AND id=?",
+    )
+    .bind(owner, projectId)
+    .first<{
+      revision: number;
+      archived: number;
+      document: string;
+      database_at: string;
+    }>();
+  const token = p
+    ? (JSON.parse(p.document) as { token: Record<string, unknown> }).token
+    : null;
+  if (
+    !p ||
+    p.archived ||
+    p.revision !== current.draft.plan.input.projectRevision ||
+    !token ||
+    (['chain', 'address', 'decimals', 'symbol'] as const).some(
+      (k) => token[k] !== current.draft.plan.token[k],
+    )
+  )
+    refused('Project changed. Open the draft and save reviewed current terms.');
+  if (!capacityDate(p.database_at))
+    throw Error('Database clock is unavailable.');
+  const addresses = JSON.stringify([
+    ...new Set(current.draft.plan.input.strategies.map((s) => s.wallet)),
+  ]);
+  const roster = await db
+    .prepare(
+      "SELECT address,revision FROM workspace_wallets WHERE owner_id=? AND chain='Solana' AND archived=0 AND address IN (SELECT value FROM json_each(?)) LIMIT 17",
+    )
+    .bind(owner, addresses)
+    .all<{ address: string; revision: number }>();
+  if (
+    current.draft.plan.input.strategies.some(
+      (s) =>
+        roster.results.filter((w) => w.address === s.wallet).length !== 1 ||
+        roster.results.find((w) => w.address === s.wallet)?.revision !==
+          s.walletRevision,
+    )
+  )
+    refused(
+      'A strategy wallet changed. Open the draft and review current wallets.',
+    );
+  const fingerprint = await capacityDigest({
+    draftRevision: current.draft.revision,
+    plan: current.planSha256,
+    capacity: current.row.sha256,
+    project: p!.document,
+  });
+  return {
+    draft: current.draft,
+    capacity: result(current),
+    hold: hold!,
+    fingerprint,
+    databaseAt: p.database_at,
+  };
 }
 /** Claims input capacity for an unsigned review only. No executor or financial reservation consumes this ledger. */
 export async function changeStrategyReviewCapacity(

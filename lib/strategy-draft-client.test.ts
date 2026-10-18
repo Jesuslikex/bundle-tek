@@ -44,7 +44,7 @@ it('refuses changed authority in a nominally successful response', async () => {
     strategyDraftRequest('/api/test', undefined, new AbortController().signal),
   ).rejects.toThrow('authority');
 });
-it.each(['drafts', 'capacity'] as const)(
+it.each(['drafts', 'capacity', 'checks'] as const)(
   'bounds a stalled %s response body even when the transport ignores abort',
   async (subject) => {
     vi.useFakeTimers();
@@ -63,7 +63,11 @@ it.each(['drafts', 'capacity'] as const)(
         new AbortController().signal,
         subject,
       ),
-    ).rejects.toThrow('outcome not confirmed');
+    ).rejects.toThrow(
+      subject === 'checks'
+        ? 'No review slots changed'
+        : 'outcome not confirmed',
+    );
     await vi.advanceTimersByTimeAsync(15000);
     await result;
   },
