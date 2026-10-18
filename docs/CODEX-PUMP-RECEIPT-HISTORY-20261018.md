@@ -1,0 +1,51 @@
+# Retained finalized launch receipt history
+
+18 October 2026. This checkpoint adds an explicit account-history capture path for the exact finalized transactions of an owned signed Pump group. It addresses the missing durable receipt inputs identified in `CODEX-ACCOUNT-PANEL-REGRESSION-20261018.md`. Purchase principal/rent classification and launch-to-sale acquisition integration remain incomplete; this is not a completed launch P&L feature or full Proxima parity.
+
+## Behavior
+
+Each recent group in account launch activity has a collapsed **Saved launch receipts** section. Opening it makes no request. **Load saved evidence** reads the most recent immutable snapshot without RPC. **Save finalized receipts** explicitly reads the configured existing provider and saves a snapshot. Neither action asks for wallet unlock, signs, sends, approves, changes reservations or settles a launch. Technical identifiers and metadata coverage stay inside a further disclosure.
+
+An uncertain save retains its request identity for retry. A confirmed response clears it; a saved-only reload also clears that identity when it finds that exact saved request. Retries of a retained identity return the original snapshot without provider configuration or another RPC call. Request identities bind to the authenticated owner and selected group; they cannot substitute another group's evidence.
+
+The summary separates successful, failed and unobserved packets, balance coverage and the presence of instruction metadata. Missing receipts/amounts remain unknown. The UI explicitly withholds acquisition cost and launch profit. It includes sign-in, cancellation, context invalidation, a 50-second client deadline, pacing/setup errors and reload/retry actions. The API has bounded bodies and shorter collection/request deadlines. No fetch occurs on mount, disclosure opening or background timers.
+
+## Evidence and boundaries
+
+`collectPumpGroupReceiptEvidence` composes the existing real signed-group verifier and finalized-effects collector. Only genesis and finalized exact-transaction reads are accepted. The collector sees the same detached JSON retained by the wrapper. Transaction bytes, packet identity/order, network, slot floors, balance conservation, owner/program/mint/precision and known failed-transaction checks continue through the existing implementation. Partial observations preserve successful packets; an entirely missing observation is not saved.
+
+The private document retains slot, exact transaction bytes and selected execution metadata: outcome, network fee, pre/post SOL and token balances, loaded addresses and inner instructions when supplied. Logs, rewards and provider extras are excluded. This is a selected metadata envelope, not a complete raw RPC archive or proof that every input for future economic classification is present. Missing/unsupported instruction or account evidence must stay unqualified in the future acquisition decoder.
+
+Reopening a stored document checks its hash, original owner/group/signature registration and row metadata, then reruns the real effects collector against the retained receipts with an in-memory replay provider. The computed report must match the saved report; only its local observation timestamp/digest are excluded from that comparison. No external call occurs in replay. Signed transaction verification does not cryptographically authenticate provider-reported execution metadata or independently prove consensus/bank execution. Hashes preserve document integrity, not economic truth.
+
+The public API returns a validated summary, not signed transaction bytes, signatures, receipt bodies or custody material. Both model and SQL retain `acquisitionBasisVerified=false` and all execution/signing/reservation authorities off. The existing manual chain-effects reader is unchanged and still performs no writes.
+
+## Storage
+
+Append-only migration `0113_pump_group_receipt_evidence`, reserved after journal entry0112, adds owner/request identities, exact group/context/signature hashes, immutable evidence and indexed observation time. Parent identity is rechecked after collection and before/after publication. An atomic conditional insert and insertion trigger bind the actual current review/signature registration. Updates and deletes are rejected. A same-identity insert conflict recovers the retained original instead of replacing it with a newer response.
+
+Insertion validates packet bytes against the registered signed group, document/row context, timestamp, authority flags and size. Storage is bounded to 2 MiB per snapshot, eight snapshots per group and 128 per owner. A five-second owner/group gate precedes new provider collection; retained retries bypass collection and that gate. Capacity is also enforced atomically by SQL. Capacity exhaustion refuses new captures while existing snapshots remain readable. No automatic eviction or replacement exists.
+
+This migration was applied only in disposable test databases. It was not applied to the user's local/hosted application database, and no hosted deployment or environment configuration changed. The live application will report storage unavailable until its normal approved migration/release process installs the table and triggers.
+
+## Verification
+
+Pinned Node24.19.0, two Vitest workers, `envDir:false`, and an offline preload rejecting unmocked external Node fetch/socket calls: **86/86 tests across13 files**, exit0. All14 owned source/configuration hashes were unchanged during the final run. Evidence: `work/release-qa/receipt-evidence-final-20261018.log`, `.json`, `.config.mjs` and `.source-proof.json`. Earlier exploratory seven-test and57-test passes are separate receipts, not additional unique final coverage.
+
+The final cases cover actual route-to-service-to-local SQLite capture and replay, real signed-packet verification with declared synthetic signing/provider fixtures, owner isolation, partial and absent receipts, token-quote precision, incomplete balance metadata, mismatched bytes/metadata/report aggregates, authority escalation, unexpected input, size/cancellation, concurrent same-identity admission, pacing, changed parent, immutable rows and missing installation. The full114-entry journal also applies to disposable native SQLite and actual local D1 through Miniflare, retaining its migration-created objects. The D1 test establishes the complete migration chain; receipt-data admission/recovery uses the local SQLite adapter in this checkpoint. It does not claim funded execution or live provider reliability.
+
+Eleven owned TS/TSX paths passed scoped type-aware lint; all13 formattable source/configuration files passed formatting. React review covered request cleanup, explicit actions, stale-response isolation, native disclosures, status/error semantics, button reachability and the absence of server/SDK imports in the client summary model.
+
+The isolated Next16.4.0 webpack production build is terminal0 (exec18374), including TypeScript and all six static pages. It used pinned Node24.19.0 and committed baseline `6879492916bfd983dffd56ebf63d5fa4f4f49265` plus the14 owned overlays:2,202 copied source inputs and all14 root overlays remained byte-identical during the build. Compilation took38 seconds, TypeScript44 seconds and static generation2.5 seconds. Snapshot: `work/release-qa/receipt-evidence-build-20261018`; manifest/proof/log: `work/receipt-evidence-qa/build-manifest.json`, `build-retry-proof.json`, `production-build-retry.log`. Later uncommitted imported-planner changes in the other chat are outside this snapshot. Shared dependencies are a junction, and Next warns about parent lockfile/workspace-root inference; this is not a hermetic build claim.
+
+The first build failed solely because the offline test preload blocked the existing Geist/Geist Mono font fetches. Its failed log/proof remain at `production-build.log` and `build-proof.json`. The successful retry used the same snapshot, with a derived build-only guard allowing loopback plus `fonts.googleapis.com` and `fonts.gstatic.com`; other external Node fetch/socket traffic stayed blocked. No app, font source, provider, environment file or deployed security setting changed. After the passing tests/build, the formatter only wrapped the new component mount's attributes. `format-mount-proof.json` records before/after hashes and an identical TypeScript syntax tree, including literal/JSX text. No semantic source change followed the verified run.
+
+The actual account-activity and receipt components rendered with synthetic responses in the Codex browser at1440,375 and320 pixels. Opening disclosures left request count0. Empty load, partial save,503 failure and saved-only recovery behaved as expected. Both action buttons measured44px tall. No horizontal overflow was observed; long IDs/hashes wrap. The fixture used actual current component-module CSS and the existing generated `.next` theme, not a newly rendered full signed-in application. Screenshots: `work/receipt-evidence-qa/mobile-375.png`, `mobile-320-recovered.png`. Source/theme hashes: `source-hashes.json`. The temporary tab was closed, viewport reset and only the owned4198 fixture server stopped; the user's HTTPS helper, wallet/session and Proxima page were preserved.
+
+The previous failed broad integration run remains failed in its original evidence. These focused passes do not relabel it green or establish a full current-checkout regression.
+
+## Next acquisition integration
+
+Use a qualified actual-receipt/account decoder to separate quote principal, protocol payments, account-rent roles/refunds and per-wallet received units. Establish explicit conservative shared fee/tip allocations and preserve each quote asset's integer units. Then admit immutable owner-scoped launch acquisition sources with concurrent consumption guards into real sale selection and performance. Cross-wallet transfers need inherited-basis provenance. Current simulation amounts, caps and these balance-change summaries cannot substitute for that work.
+
+No funding, real wallet unlock, real signing/send, transaction, provider/credential change, hosted SQL, push or deployment occurred. Concurrent launch-entry and imported-planner work, protected shell/layout sources and the user's unstaged `AGENTS.md` are preserved.

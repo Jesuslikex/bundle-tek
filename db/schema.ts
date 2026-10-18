@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 export * from './exchange-funding-schema';
+export * from './pump-receipt-evidence-schema';
 export * from './launch-layer-schema';
 export * from './strategy-session-schema';
 export * from './strategy-review-capacity-schema';
