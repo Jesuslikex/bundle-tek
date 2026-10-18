@@ -21,7 +21,7 @@ The dedicated browser was restored to /account and its sidebar collapsed after c
 
 | Area | Observed Proxima UI | Bundle checkpoint and open work |
 | --- | --- | --- |
-| Wallet preparation | Folders, search, create, fund, withdraw, activity generation, export and wallet metrics | Simplified encrypted create/backup/warmup handoff committed4160215/e36562f. Human password submission still pending. Real generated-wallet read-only QA remains open. Funding/trading deliberately excluded here. |
+| Wallet preparation | Folders, search, create, fund, withdraw, activity generation, export and wallet metrics | Simplified encrypted create/backup/warmup handoff committed4160215/e36562f. User has now completed password setup. Generated-wallet public persistence, history, preflight and quote were browser/provider verified by the owner chat ine282012. Preparation is refused; funded trading and backup restoration remain separate/unproven. |
 | Warmup | Activity generation control visible in wallet workspace | Bundle plan/history/preflight, matched buy/sell, separate approvals and receipt recovery have source and fixture/local database tests. History0509c30 and preflight/quote5c439d0 recover from stalled reads. Proxima's exact activity-generation semantics were not exercised. |
 | Wallet marketplace | Count25/50/100/200, funding gaps/age, tiers, source, region, balance and transaction ranges, separate balance/price/net, preview and history | Catalog foundation plus d6ef9d9 exact SOL/ranges/reset. No supplier connected. Regions, reservations, purchase/payment, encrypted delivery, order history and recovery are missing. Fixture inventory must never be presented as live supply. |
 | Token workspace | Stats, chart/tape, wallet/team/tracked filters and Market/Limit/Grid | Existing imported-token-market, quote/trade-wallet and conditional components. Prior owner browser checks do not prove every current path or market provider. Keep its layout ownership separate. |
@@ -38,11 +38,11 @@ The dedicated browser was restored to /account and its sidebar collapsed after c
 
 Marketplace d6ef9d9:35 tests across four files, API range refusal/forwarding, component response-context/reset behavior and exact-integer selection. Actual Chrome synthetic desktop/375px rendering, no horizontal overflow. No supplier or checkout proof.
 
-Warmup5c439d0:28 files/251 tests passed together, covering UI/model/API/local database/signing/recovery regressions. Actual preflight/quote components were checked in an isolated synthetic browser harness. Human password entry, real generated-wallet persistence, authenticated history/preflight and funded execution remain unverified. The existing signed-in HTTPS form/server was preserved.
+Warmup5c439d0:28 files/251 tests passed together, covering UI/model/API/local database/signing/recovery regressions. Actual preflight/quote components were checked in an isolated synthetic browser harness. At that earlier warmup checkpoint, human password entry and generated-wallet checks were pending. The owner chat subsequently verified real public persistence, authenticated history/preflight and live quote ine282012 (CODEX-GENERATED-WALLET-READONLY-20261018.md). Funded execution remains unverified and unauthorized. Its guarded HTTPS form/server was preserved.
 
 ## Next bounded work
 
-1. After the user completes wallet creation: verify encrypted backup/public save/Continue to warmup and authenticated public-history/preflight without funding. This is the current credential handoff, not a request for payment.
+1. Generated-wallet public save/Continue to warmup and authenticated history/preflight/quote are now verified ine282012. Keep zero-balance/preparation refusal clear; backup restoration and funded execution remain separate checks, with no funding authorization inferred.
 2. Add meaningful complete/partial/unknown holder coverage and provider reconciliation before claiming full supply monitoring.
 3. Marketplace requires a legitimate supplier contract and delivery architecture before checkout implementation or provider configuration. UI range work does not supply wallets.
 4. Qualify stock-pair runtime repeatably with the existing32-slot rule, both code scans, custody/Clock/minimum checks and signing off. A paid-provider decision cannot be inferred from this UI task.
@@ -64,3 +64,8 @@ Fresh retained REA inspection verifies fixed/random amount and separate HMS timi
 ## Strategy semantic audit
 
 CODEX-PROXIMA-STRATEGY-COVERAGE-20261018.md links fresh retained DCA Advanced, Limit ladder, Volume Bot and Cleanup form evidence to Bundle source. Critical distinction: Proxima's project Cleanup declares sell-to-buy market redistribution; Bundle's wallet cleanup is token-account/SOL recovery. The names do not establish parity. Also, vendor volume targets are USD while Bundle uses SOL, and vendor strategy/session endings are separate. These are explicit remaining requirements, not completed features. The existing local signing/session regression has now finished68tests successfully; no funded or automation proof is inferred.
+
+
+## Integrated local build
+
+The other Bundle chat completed shared production compilation and TypeScript on the frozen DCA/warmup source before committinge282012. Verified log work/release-qa/generated-wallet-final-build-20261018.log reports compilation37.5seconds and TypeScript12.5seconds; owner confirmed exit0 and guarded HTTPS health200/submission403. No deploy or push occurred. The DCA side separately passed39 model/UI tests and68 route/sizing/market tests, with overlap not summed as unique tests. DCA target saves use an isolated browser fixture; real generated-wallet read-only checks belong to the owner's separate evidence. Full parity remains incomplete.

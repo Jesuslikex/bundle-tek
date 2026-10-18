@@ -25,3 +25,8 @@ Chrome rendered the real component with public production CSS in an isolated4190
 Review current progress explicitly approved this DCA selector/summary scope. Its vault/onboarding, app/page, protected token/holder/performance layouts and shared CSS are untouched. Its warmup quote-helper dirty files are excluded from this commit. Source is frozen for that chat's one shared build and guarded HTTPS recovery; this task does not build/restart it. No provider/credential setting, wallet key/password action, funding, signing, submission, migration, cron, push or deployment.
 
 Still open for full Proxima parity: HMS timing controls, multi-strategy composition and independent strategy/session ending semantics, wider strategy/venue coverage, supplier-backed marketplace and full holder/financial audit. This checkpoint completes per-cycle input review only, not the full goal or autonomous execution.
+
+
+## Shared build outcome
+
+The owner confirmed shared build handle50032 exited0 after the source freeze, then committed its independent warmup fix/evidence ase282012. Read-only inspection of work/release-qa/generated-wallet-final-build-20261018.log confirms successful compilation37.5seconds and TypeScript12.5seconds. This includes the stable DCA source committed6c71fbb. No further app/test edits occurred during that build. The DCA fixture4190 process/tab was closed; owner's HTTPS3443/3188 was preserved. Build success is not a deployment, funded trade or full Proxima parity claim.
