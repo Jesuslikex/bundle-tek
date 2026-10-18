@@ -35,6 +35,8 @@ An additional signed-in375px viewport check stalled the browser-control connecti
 
 ## Browser recovery continuation
 
+The signed-in phone-width blocker recorded below is now resolved. See CODEX-MOBILE-WALLET-WARMUP-20261018.md for the actual320/375/430px flow, local empty-tag guard repair, saved r2 persistence and final0SOL Hold evidence. The historical Chrome connection failure remains separate from the successful built-in-browser check.
+
 After the user reloaded Chrome, browser inventory, session naming/tab listing and direct screenshot of the existing Bundle tab still timed out. No new application defect was established and no application code was changed. The guarded local HTTPS auth health returns200; the transaction-submit probe returns403. These probes use no authentication cookie, wallet key or transaction.
 
 The user then explicitly requested the Codex browser connection. Opened the actual trusted HTTPS application in the built-in browser (browser2, tab2). Browser accessibility and screenshot capture work there: the real Dashboard rendered and its Sign in link opened /sign-in. This is a separate signed-out session; neither Chrome authentication nor its encrypted wallet vault was copied or inspected. The sign-in tab is retained for the user to sign in, with the wallet locked and no transaction approvals. The real signed-in mobile continuation remains pending that sign-in. Screenshot: work/release-qa/codex-browser-signin-20261018.png. Existing desktop and synthetic mobile evidence above remain distinct from this pending real mobile check.

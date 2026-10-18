@@ -34,8 +34,10 @@ export function allowedLocalPost(path, body) {
           typeof wallet === 'object' &&
           !Array.isArray(wallet) &&
           Object.keys(wallet).every((key) =>
-            ['address', 'label', 'role'].includes(key),
+            ['address', 'label', 'role', 'tags'].includes(key),
           ) &&
+          (wallet.tags === undefined ||
+            (Array.isArray(wallet.tags) && wallet.tags.length === 0)) &&
           typeof wallet.address === 'string' &&
           /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet.address) &&
           wallet.label === '' &&

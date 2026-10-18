@@ -191,12 +191,21 @@ await test('allows one public Solana wallet while refusing bulk, secret fields a
     ],
   };
   assert.equal(allowedLocalPost(path, body), true);
+  assert.equal(
+    allowedLocalPost(path, {
+      ...body,
+      wallets: [{ ...body.wallets[0], tags: [] }],
+    }),
+    true,
+  );
   for (const changed of [
     { ...body, chain: 'Ethereum' },
     { ...body, action: 'wallet.delete' },
     { ...body, privateKey: 'fixture' },
     { ...body, wallets: [...body.wallets, ...body.wallets] },
     { ...body, wallets: [{ ...body.wallets[0], privateKey: 'fixture' }] },
+    { ...body, wallets: [{ ...body.wallets[0], tags: ['unexpected'] }] },
+    { ...body, wallets: [{ ...body.wallets[0], tags: 'unexpected' }] },
     { ...body, wallets: [{ ...body.wallets[0], address: '1'.repeat(88) }] },
   ])
     assert.equal(allowedLocalPost(path, changed), false);
