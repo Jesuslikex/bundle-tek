@@ -25,3 +25,9 @@ This documentation is a local evidence checkpoint during the other Bundle chat's
 ## Exact Volume timing continuation
 
 Volume Bot now reuses the HMS duration input, preserves exact milliseconds in delay entry, and shows requested schedule limit separately from estimated scheduled time. Existing60..86400second duration,1000..600000millisecond delays and250round cap are unchanged.64targeted tests, type/lint checks and1440/375px synthetic browser verification pass. See CODEX-VOLUME-EXACT-TIMING-20261018.md. Proxima Duration/Delay-mode/backend equivalence remains unproven; no funded or hosted action occurred.
+
+## Numeric waves and captured DCA start delay
+
+eb13ac5 adds Organic intensity0.0..1.0 to Volume, retaining legacy serialized plans and all per-batch approvals. Its focused historical REA slice establishes the client control, not vendor executor distribution.84tests/sixfiles, typed checks, combined build and1440/375px synthetic UI checks pass. See CODEX-VOLUME-WAVE-20261018.md for exact artifact hashes, semantic unknowns and remaining Bundle-mode/tip-budget gaps.
+
+The DCA composer now also accepts an explicit HMS start delay, capturing one visible UTC start for the existing schedule. Changes to delay or mode invalidate that capture; failed saves/retries never slide it.58tests/eightfiles, typed checks, combined build and1440/375/320px synthetic UI checks pass. See CODEX-DCA-START-DELAY-20261018.md. It does not establish independent multi-strategy/session stop semantics or change cycle approval/signing.

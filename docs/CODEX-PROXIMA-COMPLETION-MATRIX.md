@@ -1,5 +1,15 @@
 # Proxima reconstruction completion matrix
 
+## Latest local UX checkpoint, 18 October 2026
+
+The full goal remains incomplete. The long dated entries below are historical evidence, not a current release checklist. Production and GitHub were rechecked before eb13ac5: production dpl_4ocNd22BwNpvTsTeHyxTWDUMZ3Pa and origin/main both point to ea0a120. Newer local work is not deployed. No hosted migration was run in this continuation; the separately reported remote0101/local0102 difference still needs release verification.
+
+Volume has exact HMS timing (120faf9), captured USD targets and numeric Organic intensity (eb13ac5). The intensity checkpoint passed84 tests/six files, plain TypeScript/scoped lint, a combined build and isolated1440/375px UI checks. Legacy plans retain six pre-edit serialized digests. Historical Proxima client analysis confirms its slider control, not backend distribution. Same-block Volume Bundle mode and total tip budget remain open. Read CODEX-VOLUME-WAVE-20261018.md.
+
+The DCA start-delay continuation is described in CODEX-DCA-START-DELAY-20261018.md. It translates an explicitly captured delay into the existing fixed UTC schedule and preserves per-cycle approval. It does not establish Proxima's independent per-strategy/session-wide ending semantics. Other Bundle-chat warmup commits remain separately owned and verified.
+
+Do not infer complete market coverage, audited P&L, stock runtime repeatability/signing, all launch/chain adapters, marketplace purchases, funded launch/buy/sell/Jito proof or public release from these UX checks. Those require their own current evidence and any necessary user authorization.
+
 ## 16 October first QuickNode qualification sample
 
 The fixed3SOL/3USDC configured-validator sample completed on ebdcba6:0/3 each, all references unchanged, zero429. Four wallet observations hit HTTP413 at7/8 accounts; a separate bounded probe confirms this Free trial accepts5 accounts and rejects6 with error-32615. Two other attempts correctly refused worsened initial minima. All26 accepted Clocks were equal and correlate to raw duplicate hashes; no simulation/code-scan/32-slot pass was reached. Source/receipt hashes and offline summaries verify; all safeguards and signing-off state remain. See CODEX-PAIR-QUICKNODE-FIXED-SAMPLE-20261016.md/.json. A context-preserving provider-count compatibility design remains open; no free-to-paid upgrade or further deploy occurred.

@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   dcaTradeSessionInput,
   dcaPerCycleBudget,
+  dcaStartAfter,
 } from '@/lib/dca-trade-session';
 import {
   decodeTradeSession,
@@ -57,6 +58,11 @@ export function DcaTradeSession({
       splitDurationSeconds(60),
     ),
     [start, setStart] = useState(''),
+    [startMode, setStartMode] = useState<'calendar' | 'delay'>('calendar'),
+    [startDelayParts, setStartDelayParts] = useState(() =>
+      splitDurationSeconds(60),
+    ),
+    [delayedStart, setDelayedStart] = useState<string | null>(null),
     [end, setEnd] = useState(''),
     [ending, setEnding] = useState<'deadline' | 'duration'>('deadline'),
     [durationParts, setDurationParts] = useState<DurationParts>(() => ({
@@ -89,6 +95,8 @@ export function DcaTradeSession({
   const retry = useRef<{ key: string; id: string } | null>(null);
   const intervalSeconds = parseDurationParts(intervalParts, 86400).seconds;
   const durationSeconds = parseDurationParts(durationParts).seconds;
+  const startDelaySeconds = parseDurationParts(startDelayParts, 86400).seconds;
+  const selectedStart = startMode === 'calendar' ? start : delayedStart;
   const interval = intervalSeconds === null ? '' : String(intervalSeconds);
   const duration = durationSeconds === null ? '' : String(durationSeconds);
   const lastCycleOffset =
@@ -243,6 +251,9 @@ export function DcaTradeSession({
     sizing,
     sellUnit,
     start,
+    startMode,
+    startDelayParts,
+    delayedStart,
     interval,
     intervalParts,
     end,
@@ -291,7 +302,7 @@ export function DcaTradeSession({
       if (
         !selected ||
         !amountTerms ||
-        !start ||
+        !selectedStart ||
         !/^[1-9]\d?$/.test(cycles) ||
         !/^[1-9]\d{0,4}$/.test(interval)
       )
@@ -313,7 +324,7 @@ export function DcaTradeSession({
             ? { supplySizing: amountTerms.supplySizing }
             : {}),
           cycles: Number(cycles),
-          startAt: new Date(start).toISOString(),
+          startAt: new Date(selectedStart).toISOString(),
           intervalSeconds: Number(interval),
           ...(sizing === 'randomized'
             ? {
@@ -348,7 +359,7 @@ export function DcaTradeSession({
   }, [
     wallets,
     wallet,
-    start,
+    selectedStart,
     end,
     ending,
     duration,
@@ -640,17 +651,82 @@ export function DcaTradeSession({
             disabled={disabled}
             maximumSeconds={86400}
           />
-          <label htmlFor={startId}>
-            DCA start in your local timezone
-            <Input
-              id={startId}
-              type="datetime-local"
-              value={start}
+          <label>
+            Schedule start method
+            <select
+              value={startMode}
               disabled={disabled}
-              onChange={(e) => setStart(e.target.value)}
-              onInput={(e) => setStart(e.currentTarget.value)}
-            />
+              onChange={(event) => {
+                setStartMode(event.target.value as 'calendar' | 'delay');
+                setDelayedStart(null);
+              }}
+            >
+              <option value="calendar">Calendar date and time</option>
+              <option value="delay">Start after a delay</option>
+            </select>
           </label>
+          {startMode === 'calendar' ? (
+            <label htmlFor={startId}>
+              DCA start in your local timezone
+              <Input
+                id={startId}
+                type="datetime-local"
+                value={start}
+                disabled={disabled}
+                onChange={(e) => setStart(e.target.value)}
+                onInput={(e) => setStart(e.currentTarget.value)}
+              />
+            </label>
+          ) : (
+            <div className="space-y-2">
+              <DurationInput
+                label="DCA start delay"
+                value={startDelayParts}
+                onChange={(parts) => {
+                  setStartDelayParts(parts);
+                  setDelayedStart(null);
+                }}
+                disabled={disabled}
+                maximumSeconds={86400}
+              />
+              <Button
+                disabled={disabled || startDelaySeconds === null}
+                onClick={() => {
+                  if (startDelaySeconds === null || disabled) return;
+                  setDelayedStart(null);
+                  try {
+                    setDelayedStart(
+                      dcaStartAfter(Date.now(), startDelaySeconds),
+                    );
+                  } catch (error) {
+                    setMessage(
+                      error instanceof Error
+                        ? error.message
+                        : 'DCA start unavailable.',
+                    );
+                  }
+                }}
+              >
+                Set start from delay
+              </Button>
+              {delayedStart && (
+                <p className="text-sm" aria-label="Captured DCA start">
+                  Scheduled start: {delayedStart} (UTC).
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">
+                The delay starts when you set it here. Review the fixed UTC
+                times below before saving. Saving or retrying keeps those times;
+                set the start again to begin a new delay. Each due cycle still
+                needs your approval and signature.
+              </p>
+              {!delayedStart && (
+                <p className="text-sm">
+                  Set the start to review and save this schedule.
+                </p>
+              )}
+            </div>
+          )}
           <p className="col-span-full text-sm text-muted-foreground">
             Intervals support 1 to 86400 seconds. Buy budgets exclude network
             fees; every cycle rereads available funds. Even-split remainder

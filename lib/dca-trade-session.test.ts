@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { dcaTradeSessionInput, dcaPerCycleBudget } from './dca-trade-session';
+import {
+  dcaTradeSessionInput,
+  dcaPerCycleBudget,
+  dcaStartAfter,
+} from './dca-trade-session';
 import { dcaSupplyInput } from './dca-supply-sizing';
 import {
   decodeTradeSession,
@@ -23,6 +27,43 @@ const input = {
   startAt: '2026-10-13T12:00:00.000Z',
   intervalSeconds: 60,
 };
+it('captures an exact delay into the existing immutable UTC schedule and duration', () => {
+  const now = Date.parse('2026-10-18T03:00:00.123Z');
+  expect(dcaStartAfter(now, 1)).toBe('2026-10-18T03:00:01.123Z');
+  expect(dcaStartAfter(now, 86400)).toBe('2026-10-19T03:00:00.123Z');
+  const startAt = dcaStartAfter(now, 3661);
+  const { request, terms } = dcaTradeSessionInput(
+    { ...input, startAt, durationSeconds: 180 },
+    token,
+  );
+  expect(request.schedule.startAt).toBe('2026-10-18T04:01:01.123Z');
+  expect(sessionEntryNotBefore(terms, 3)).toBe('2026-10-18T04:03:01.123Z');
+  expect(terms.endsAt).toBe('2026-10-18T04:04:01.123Z');
+  expect(tradeSessionTerms(request, token)).toEqual(terms);
+  expect(request).not.toHaveProperty('delaySeconds');
+});
+it('refuses invalid or out-of-range delay and clock inputs before producing a start', () => {
+  const now = Date.parse(input.startAt);
+  for (const delay of [
+    0,
+    -1,
+    86401,
+    1.1,
+    NaN,
+    Infinity,
+    Number.MAX_SAFE_INTEGER,
+  ])
+    expect(() => dcaStartAfter(now, delay)).toThrow();
+  for (const clock of [
+    NaN,
+    Infinity,
+    1.1,
+    Number.MAX_SAFE_INTEGER,
+    Date.parse('2099-12-31T23:59:59Z'),
+    Date.parse('1999-01-01T00:00:00Z'),
+  ])
+    expect(() => dcaStartAfter(clock, 60)).toThrow();
+});
 it('anchors a duration to the scheduled start and persists only the enforced UTC deadline', () => {
   const result = dcaTradeSessionInput(
     { ...input, durationSeconds: 180 },

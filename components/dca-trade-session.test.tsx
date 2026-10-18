@@ -204,6 +204,83 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+const setDelayedStart = () =>
+  Array.from(container.querySelectorAll('button')).find(
+    (button) => button.textContent === 'Set start from delay',
+  )!;
+it('captures the reviewed delayed start once and keeps it across a failed save retry', async () => {
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Date.parse('2026-10-18T03:00:00.123Z'));
+  await fill();
+  await setField('Schedule start method', 'delay');
+  expect(saveButton().disabled).toBe(true);
+  expect(container.querySelectorAll('li')).toHaveLength(0);
+  await setField('DCA start delay: minutes', '2');
+  await setField('DCA start delay: seconds', '5');
+  await act(async () => setDelayedStart().click());
+  expect(container.textContent).toContain('2026-10-18T03:02:05.123Z');
+  clock.mockReturnValue(Date.parse('2026-10-18T03:01:00.123Z'));
+  await setField('Total DCA input', '0.000000012');
+  await act(async () => saveButton().click());
+  expect(requests[0].body.schedule).toEqual({
+    startAt: '2026-10-18T03:02:05.123Z',
+    spacingSeconds: 60,
+  });
+  expect(requests[0].body).not.toHaveProperty('delaySeconds');
+  await act(async () =>
+    requests[0].resolve(
+      Response.json({ error: 'Retry this draft' }, { status: 503 }),
+    ),
+  );
+  await act(async () => saveButton().click());
+  expect(requests[1].body).toEqual(requests[0].body);
+  await respond(1);
+  expect(saved).toHaveBeenCalledOnce();
+  expect(saved.mock.calls[0][0].terms.schedule.startAt).toBe(
+    '2026-10-18T03:02:05.123Z',
+  );
+  expect(requests).toHaveLength(2);
+});
+it('clears a delayed review on any delay edit and never resurrects it through a mode switch', async () => {
+  await fill();
+  await setField('Schedule start method', 'delay');
+  await act(async () => setDelayedStart().click());
+  expect(saveButton().disabled).toBe(false);
+  await setField('DCA start delay: seconds', '60');
+  expect(setDelayedStart().disabled).toBe(true);
+  expect(saveButton().disabled).toBe(true);
+  expect(container.querySelectorAll('li')).toHaveLength(0);
+  await setField('DCA start delay: seconds', '0');
+  expect(setDelayedStart().disabled).toBe(false);
+  expect(saveButton().disabled).toBe(true);
+  await act(async () => setDelayedStart().click());
+  await setField('Schedule start method', 'calendar');
+  expect(saveButton().disabled).toBe(false);
+  await setField('Schedule start method', 'delay');
+  expect(saveButton().disabled).toBe(true);
+  expect(requests).toHaveLength(0);
+});
+it('does not capture delayed starts while the workspace is locked', async () => {
+  await fill();
+  await setField('Schedule start method', 'delay');
+  await act(async () =>
+    root.render(
+      <DcaTradeSession
+        project={project}
+        wallets={wallets}
+        locked
+        onSaved={saved}
+      />,
+    ),
+  );
+  expect(setDelayedStart().disabled).toBe(true);
+  await act(async () => setDelayedStart().click());
+  expect(saveButton().disabled).toBe(true);
+  expect(container.querySelectorAll('li')).toHaveLength(0);
+  expect(requests).toHaveLength(0);
 });
 it('previews exact cycle amounts and saves only after an explicit click without signing', async () => {
   expect(requests).toHaveLength(0);
