@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Archive, Clock3, Plus, Save, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,9 @@ import { MainnetFundingHistoryPanel } from './mainnet-funding-history';
 import { FundingExecutionHistoryPanel } from './funding-execution-history';
 import { chainQuoteAssets } from '@/lib/quote-catalog';
 import { LaunchFundingPicker } from './launch-funding-picker';
+import { useFundingPlanStorage } from './use-funding-plan-storage';
+import recoveryStyles from './funding-planner-recovery.module.css';
+import type { FundingMutation } from '@/lib/funding-plan-storage';
 import type { LaunchWalletAssignments } from '@/lib/launch-wallets';
 import {
   CHAINS,
@@ -38,16 +41,16 @@ export function FundingPlanner({
   plan: LaunchPlanInput;
   launchWallets?: LaunchWalletAssignments;
 }) {
-  const [draft, setDraft] = useState<Omit<FundingInput, 'recipients'>>({
+  const [draft, setDraft] = useState<Omit<FundingInput, 'recipients'>>(() => ({
     name: `${plan.tokenName} funding`,
     chain: plan.chain,
     currency: CURRENCIES_BY_CHAIN[plan.chain][0],
     source: 'Manual',
     sourceLabel: '',
     funderAddress: '',
-    startAt: '',
+    startAt: new Date(Date.now() + 300000).toISOString(),
     delaySeconds: 10,
-  });
+  }));
   const [assetSearch, setAssetSearch] = useState('');
   const fundingAssets = chainQuoteAssets(draft.chain);
   const visibleAssets = fundingAssets
@@ -61,18 +64,27 @@ export function FundingPlanner({
     (a) => a.address === draft.assetAddress,
   );
   const [lines, setLines] = useState('');
-  const [saved, setSaved] = useState<SavedFunding[]>([]);
   const [selected, setSelected] = useState<{
     id: string;
     revision: number;
   } | null>(null);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [handoffBusy, setHandoffBusy] = useState(false);
-  const [reload, setReload] = useState(0);
+  const [draftId, setDraftId] = useState(() => crypto.randomUUID());
   const [historyId, setHistoryId] = useState<string | null>(null);
+  const onCommitted = (attempt: FundingMutation, revision: number) => {
+    if (attempt.action === 'save') {
+      setSelected({ id: attempt.id, revision });
+      setHistoryId(attempt.id);
+    } else
+      setSelected((current) => (current?.id === attempt.id ? null : current));
+  };
+  const storage = useFundingPlanStorage(onCommitted);
+  const { plans: saved, error, notice, setError, setNotice } = storage;
+  const loading = storage.phase === 'load';
+  const busy =
+    storage.phase === 'save' ||
+    storage.phase === 'recover' ||
+    Boolean(storage.pending);
   const [executionRevision, setExecutionRevision] = useState(0);
   const refreshExecution = useCallback(
     () => setExecutionRevision((value) => value + 1),
@@ -82,40 +94,6 @@ export function FundingPlanner({
   const mainnetPlan = saved.find(
     (row) => row.id === selected?.id && row.revision === selected.revision,
   );
-  useEffect(() => {
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const response = await fetch('/api/funding', {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        const data = (await response.json()) as {
-          plans: SavedFunding[];
-          error?: string;
-        };
-        if (!response.ok)
-          throw new Error(data.error || 'Funding plans unavailable.');
-        if (!controller.signal.aborted) {
-          setSaved(data.plans);
-          setError('');
-          setDraft((v) =>
-            v.startAt
-              ? v
-              : { ...v, startAt: new Date(Date.now() + 300000).toISOString() },
-          );
-        }
-      } catch (e) {
-        if (!controller.signal.aborted)
-          setError(
-            e instanceof Error ? e.message : 'Funding plans unavailable.',
-          );
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    })();
-    return () => controller.abort();
-  }, [reload]);
   let preview: ReturnType<typeof validateFunding> | null = null;
   let invalid = '';
   try {
@@ -160,6 +138,7 @@ export function FundingPlanner({
     setError('');
   };
   const fresh = () => {
+    setDraftId(crypto.randomUUID());
     setHistoryId(null);
     setSelected(null);
     setLines('');
@@ -176,49 +155,16 @@ export function FundingPlanner({
       delaySeconds: 10,
     });
   };
-  async function persist(
-    action: 'save' | 'archive' | 'restore',
-    row?: SavedFunding,
-  ) {
-    setBusy(true);
-    setError('');
-    setNotice('');
-    try {
-      const id = row?.id ?? selected?.id ?? crypto.randomUUID();
-      const response = await fetch('/api/funding', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          id,
-          expectedRevision: row?.revision ?? selected?.revision ?? 0,
-          document: action === 'save' ? preview : undefined,
-        }),
-      });
-      const data = (await response.json()) as {
-        revision: number;
-        error?: string;
-      };
-      if (!response.ok)
-        throw new Error(data.error || 'Funding plan could not be saved.');
-      if (action === 'save') {
-        setSelected({ id, revision: data.revision });
-        setHistoryId(id);
-      } else if (selected?.id === id) setSelected(null);
-      setNotice(
-        action === 'save'
-          ? 'Funding draft saved. No funds moved.'
-          : action === 'archive'
-            ? 'Funding draft archived.'
-            : 'Funding draft restored.',
-      );
-      setReload((v) => v + 1);
-      setLoading(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Funding plan unavailable.');
-    } finally {
-      setBusy(false);
-    }
+  function persist(action: 'save' | 'archive' | 'restore', row?: SavedFunding) {
+    if (busy || loading || handoffBusy) return;
+    const document = action === 'save' ? preview : row?.document;
+    if (!document) return;
+    void storage.save({
+      action,
+      id: row?.id ?? selected?.id ?? draftId,
+      expectedRevision: row?.revision ?? selected?.revision ?? 0,
+      document,
+    });
   }
   return (
     <section className="funding-planner" aria-label="Funding plan editor">
@@ -530,23 +476,73 @@ export function FundingPlanner({
       <div className="funding-actions">
         <Button
           disabled={busy || handoffBusy || loading || !preview}
-          onClick={() => void persist('save')}
+          onClick={() => persist('save')}
         >
           <Save />
-          {busy ? 'Saving…' : selected ? 'Save changes' : 'Save funding draft'}
+          {storage.phase === 'save'
+            ? 'Saving…'
+            : storage.pending
+              ? 'Check save outcome'
+              : selected
+                ? 'Save changes'
+                : 'Save funding draft'}
         </Button>
         <Button
           variant="outline"
           disabled={busy || handoffBusy || loading}
-          onClick={() => {
-            setLoading(true);
-            setReload((v) => v + 1);
-          }}
+          onClick={() => void storage.load()}
         >
           Reload saved plans
         </Button>
         <span>{selected ? `Revision ${selected.revision}` : 'New draft'}</span>
       </div>
+      {storage.phase && (
+        <output className="funding-actions">
+          <span>
+            {storage.phase === 'load'
+              ? 'Loading saved funding plans…'
+              : storage.phase === 'save'
+                ? 'Saving this funding draft…'
+                : 'Checking the original save…'}
+          </span>
+          <Button variant="outline" onClick={storage.cancel}>
+            {storage.phase === 'save'
+              ? 'Stop waiting for save'
+              : 'Cancel loading'}
+          </Button>
+        </output>
+      )}
+      {storage.pending && (
+        <section
+          aria-label="Funding save recovery"
+          className={`source-note ${recoveryStyles.recovery}`}
+        >
+          <p>
+            The original request is retained while its outcome is checked. Keep
+            this page open. Checking only reads saved data. Retrying repeats the
+            exact same draft ID and revision; it does not move funds.
+          </p>
+          <p>
+            Draft: <code>{storage.pending.id}</code> · expected revision{' '}
+            {storage.pending.expectedRevision}
+          </p>
+          <div className="funding-actions">
+            <Button
+              disabled={Boolean(storage.phase) || handoffBusy}
+              onClick={() => void storage.recover()}
+            >
+              Check original save
+            </Button>
+            <Button
+              variant="outline"
+              disabled={Boolean(storage.phase) || handoffBusy}
+              onClick={() => void storage.retry()}
+            >
+              Retry exact same request
+            </Button>
+          </div>
+        </section>
+      )}
       {error && (
         <p role="alert" className="tracker-error">
           {error}
@@ -744,7 +740,7 @@ export function FundingPlanner({
                 disabled={busy || handoffBusy}
                 aria-label={`${row.archived ? 'Restore' : 'Archive'} ${row.document.name}`}
                 onClick={() =>
-                  void persist(row.archived ? 'restore' : 'archive', row)
+                  persist(row.archived ? 'restore' : 'archive', row)
                 }
               >
                 {row.archived ? <RotateCcw /> : <Archive />}

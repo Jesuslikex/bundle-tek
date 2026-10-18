@@ -1,0 +1,43 @@
+# Funding editor request and save recovery
+
+18 October 2026. Codex-owned `components/launch/**` work, coordinated with the other Bundle chat before editing. The account/session/activity files, shared shell, providers, wallet vault, signing flows and migration history are outside this change.
+
+## Result
+
+Saved-plan loading, saving and checking a save now have a 30-second deadline and a visible cancellation control. The deadline covers waiting for the response body as well as the initial response. Cancelling loading preserves the editable draft and makes Reload reachable. Cancelled, timed-out, unmounted and superseded requests cannot publish late state, including transports that ignore AbortSignal.
+
+A save retains its exact draft ID, action, expected revision and canonical contents before dispatch. A lost, unreadable, mismatched or server-error acknowledgement is an **unknown outcome**, not a claim of rollback. The editor and financial review stay blocked until that outcome is checked. A structured initial pre-write rejection from the existing route (400/401/403/409/413/415) instead returns to editing with a safe message; a known revision conflict invalidates that cached revision. Such a rejection of a retry does not resolve an earlier unknown attempt. The recovery panel offers:
+
+- **Check original save:** an owner-filtered read through the existing `GET /api/funding?id=...`. Only the next revision with the exact expected document/archive state confirms the original change. A missing or old revision remains unknown. A different/later winning revision is reported as a conflict and does not replace the editable draft.
+- **Retry exact same request:** an explicit repeat of the retained ID/action/expected revision/payload. The existing owner/ID uniqueness and compare-and-swap revision fence admit at most one mutation at that revision. There is no automatic POST retry and no replacement create ID after a lost response.
+
+The panel instructs the user to keep the page open. Pending client request state is not a durable browser outbox across reload/sign-out; committed plans remain in the existing owned server history. The change adds no provider transfer, deposit, payout, quote conversion, signature or financial submission.
+
+Saved envelopes are decoded before they can select a revision for review. IDs, revisions, archive flags and timestamps are checked, exact total/scheduled items are recomputed and compared, and malformed/duplicate/oversized lists are refused. HTML service pages and parser diagnostics become readable messages. Existing source routing and exact saved-document/revision/archival checks remain. Unknown outcomes additionally disable review; no consent is prechecked or bypassed.
+
+## Verification
+
+- Final pinned Node 24 offline run: **68 tests in four files passed together**, exit 0. Report/configuration: `work/release-qa/funding-recovery-rejections-20261018.json` and matching `.config.mjs`. Environment files were disabled and external unmocked Node requests blocked. Earlier scoped artifacts remain historical rather than being overwritten.
+- Sixteen actual FundingPlanner tests compose the real funding route, Turso adapter and committed `0007` SQL in disposable in-memory libSQL. Authentication/database selection and the two historical execution display children are substituted. The controlled transport can hold/rewrite responses, and wallet-folder reads use an empty synthetic roster; funding GET/POST handlers are real. Cases cover normal create/update and refresh, stalled GET/body loading, cancellation, readable errors, lost create/update/archive/restore responses, identical retry with one retained row/event, foreign/missing evidence, conflicting revisions, malformed acknowledgements, stalled recovery, double click and unmount/late responses. A real route validation-rejection regression confirms zero plan/event writes and an editable preserved draft.
+- Sixteen storage-model tests cover exact envelopes/outcomes and safe parsing. The unchanged exchange integration and funding-route selections contribute 16 and 20 cases respectively, including CEX/Wallet/Manual routing, concurrent revision fencing and event rollback. These counts are distinct within the single final run.
+- Final five-file type-aware lint and six-file formatting checks passed. Plain whole-project `tsc --noEmit` subsequently passed, exit 0. The earlier attempt stopped on the separately owned `components/account-launch-activity.test.tsx:57` type error; its owner repaired it, and this chat did not edit that file.
+
+## Rendered scope
+
+The actual production component and hook were bundled into a synthetic fixture in the user's existing Chrome session. Its storage is in-memory synthetic data; provider and external requests are refused. The two historical execution display children are omitted. The fixture uses retained compiled theme CSS and the current scoped recovery CSS. It is not a signed-in real-server or live-provider test.
+
+Browser actions proved that cancelling a stalled initial load preserves edited name/recipient values, normal Reload remains reachable, one lost save response retains one record and one POST, Stop waiting exposes the unknown outcome, and Check original save confirms revision 1 without another POST. No wallet, provider or funded action was invoked.
+
+After final review added the definite-rejection branch, the fixture was rebuilt from the final source. A separate synthetic rejection produced one attempted POST and zero records, retained the edited values and left Save/New enabled. The subsequent lost-response save added exactly one attempt/record; read-only recovery confirmed revision 1 without a further POST. Final phone geometry again passed at 375 and 320. Additional proof: `definite-rejection.png`, `final-mobile-unknown.png`, `final-mobile-recovered.png`. The second fixture tab/server were also closed and the viewport reset.
+
+At desktop 1440 the page client/scroll widths were 1440/1440. Phone 375 measured 360/360 and narrow 320 measured 305/305; the table retains internal scrolling while recovery controls wrap. Screenshots and fixture sources are retained under `work/funding-recovery-qa/`: `desktop-unknown.png`, `mobile-unknown.png` and `mobile-recovered.png`. The first standalone fixture build needed an empty production environment shim; no real environment values were supplied. Browser viewport was reset, the temporary tab closed and only the owned loopback4196 fixture stopped. No normal application helper was restarted and no public fixture assets were created.
+
+## Coordinated checks and remaining scope
+
+The preliminary shared build in the activity owner's report passed before the final definite-rejection correction and is historical for that earlier funding source. The final isolated Node 24.19.0 **Next build exited 0**, with compilation in 49 seconds, TypeScript in 39.1 seconds and six static pages in 2.5 seconds. Its wrapper (handle 39985) exited **1** because `components/account-launch-activity.tsx` changed in the canonical checkout during the build: the other chat added an account-costs follow-up after `f3be26d`. That new follow-up is outside the build copy and was preserved, not reverted. Of the 1,844 non-Markdown manifest entries, the funding files and every other entry remained unchanged. This qualifies the copied final funding implementation with `f3be26d`, **not the latest combined checkout**. The earlier standalone whole-project TypeScript pass likewise predates that other chat's costs follow-up.
+
+Evidence: `work/release-qa/funding-recovery-final-build-20261018.exit.json`, matching `.manifest.json`, `.log` and source-copy directory. Log SHA-256: `02f4c36b6865183ac771b55923f71889910d947f080d473b67a51a27c526a2f6`. The original source-verifier failure is retained without overwriting or relabelling it green. Environment/key files were excluded and node_modules is a shared junction. The parent-workspace tracing-root warning means application output is isolated, not dependencies. Neither build changed root `.next` or restarted the normal HTTPS helper. The activity owner's tests are not added to this 68-test count.
+
+The original integrated full run still has its retained one-failure result; the lazy-panel test fix passed its focused verification separately. This change requires a later combined full-source baseline and does not establish complete Proxima parity, provider reliability or funded execution.
+
+No push, deployment, hosted SQL, provider/credential/cron change, real wallet unlock/sign/send or funded transaction occurred. All concurrent account/activity work and the user's uncommitted AGENTS coordination record are preserved.
