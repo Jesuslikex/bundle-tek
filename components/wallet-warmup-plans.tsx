@@ -40,6 +40,7 @@ export function WalletWarmupPlans({
   );
   const [busy, setBusy] = useState(true);
   const [saveUnconfirmed, setSaveUnconfirmed] = useState(false);
+  const [mustReopen, setMustReopen] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const controller = useRef<AbortController | null>(null);
@@ -132,6 +133,8 @@ export function WalletWarmupPlans({
     try {
       if (action === 'save' && !plan)
         throw new Error('Review the current plan before saving.');
+      if (action === 'save' && mustReopen)
+        throw new Error('Reopen the latest draft before saving changes.');
       if (action === 'save' && plan && Date.parse(plan.startAt) < Date.now())
         throw new Error(
           'Reviewed start time has passed. Choose a fresh start time and review the warmup plan again.',
@@ -184,7 +187,10 @@ export function WalletWarmupPlans({
           setSelected(plans.find((p) => p.id === id) ?? null);
           pendingSave.current = null;
           setSaveUnconfirmed(false);
-        } else if (selected?.id === id) setSelected(null);
+        } else if (selected?.id === id) {
+          setSelected(null);
+          setMustReopen(false);
+        }
         setNotice(
           action === 'save'
             ? 'Warmup plan saved. No swaps scheduled.'
@@ -210,17 +216,31 @@ export function WalletWarmupPlans({
       const plans = await read(c.signal);
       if (!c.signal.aborted) {
         const recovered = plans.find((p) => p.id === pendingSave.current);
-        setSelected(recovered ?? null);
         if (recovered) {
+          setSelected(recovered);
           setName(recovered.document.name);
           pendingSave.current = null;
           setSaveUnconfirmed(false);
+          setMustReopen(false);
+          onLoad(recovered.document);
+          setNotice(
+            'Saved draft found. Review it before making further changes.',
+          );
+        } else if (selected) {
+          const latest = plans.find((p) => p.id === selected.id);
+          const changed =
+            !latest ||
+            latest.revision !== selected.revision ||
+            latest.archived !== selected.archived;
+          setMustReopen(changed);
+          setNotice(
+            changed
+              ? 'This saved draft changed or is unavailable. Your edits are kept. Reopen the latest draft, or choose New draft to save a separate copy.'
+              : 'Draft list refreshed. Your current edits are kept.',
+          );
+        } else {
+          setNotice('Saved plans reloaded. Your current draft is kept.');
         }
-        setNotice(
-          recovered
-            ? 'Saved draft found. Review it before making further changes.'
-            : 'Saved plans reloaded. Reopen a plan before saving changes.',
-        );
       }
     } catch (e) {
       if (!c.signal.aborted)
@@ -243,7 +263,7 @@ export function WalletWarmupPlans({
       />
       <div className={styles.saveActions}>
         <Button
-          disabled={busy || !plan || Boolean(selected?.archived)}
+          disabled={busy || !plan || mustReopen || Boolean(selected?.archived)}
           onClick={() => mutate('save')}
         >
           {selected ? 'Save changes' : 'Save draft'}
@@ -256,6 +276,7 @@ export function WalletWarmupPlans({
             draftId.current = null;
             pendingSave.current = null;
             setSaveUnconfirmed(false);
+            setMustReopen(false);
             setName('Wallet warmup');
             setNotice('Saving will create a new plan.');
           }}
@@ -291,6 +312,14 @@ export function WalletWarmupPlans({
         saved
       </small>
       {!plan && <p>Review your draft above to enable Save.</p>}
+      {error && saveUnconfirmed && !busy && (
+        <p>
+          The save was not confirmed. Reload saved plans before retrying.
+          Retrying this draft keeps the same identity.
+        </p>
+      )}
+      {notice && <output>{notice}</output>}
+      {error && <p role="alert">{error}</p>}
       {selected?.archived && (
         <p>
           This saved plan is archived. Restore it before saving changes or
@@ -316,6 +345,7 @@ export function WalletWarmupPlans({
                   disabled={busy || p.archived || !matches}
                   onClick={() => {
                     setSelected(p);
+                    setMustReopen(false);
                     setName(p.document.name);
                     onLoad(p.document);
                     setNotice(
@@ -333,6 +363,7 @@ export function WalletWarmupPlans({
                     disabled={busy}
                     onClick={() => {
                       setSelected(p);
+                      setMustReopen(false);
                       setName(p.document.name);
                       onLoad(p.document, true);
                       setNotice(
@@ -433,14 +464,6 @@ export function WalletWarmupPlans({
             </article>
           );
         })}
-      {error && saveUnconfirmed && !busy && (
-        <p>
-          The save was not confirmed. Reload saved plans before retrying.
-          Retrying this draft keeps the same identity.
-        </p>
-      )}
-      {notice && <output>{notice}</output>}
-      {error && <p role="alert">{error}</p>}
     </section>
   );
 }

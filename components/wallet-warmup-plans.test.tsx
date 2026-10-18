@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WalletWarmupPlans } from './wallet-warmup-plans';
 import { buildWarmupPlan } from '@/lib/wallet-warmup';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
+import { warmupUiFixture } from '../test/warmup-ui-fixture';
 let container: HTMLDivElement, root: Root;
 const wallet = '11111111111111111111111111111111',
   id = '6ef53658-0746-4567-9e63-af3d4428d144';
@@ -40,7 +41,7 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 const alert = () => container.querySelector('[role="alert"]')?.textContent;
-async function mount(fetcher: ReturnType<typeof vi.fn>) {
+async function mount(fetcher: ReturnType<typeof vi.fn>, onLoad = vi.fn()) {
   vi.stubGlobal('fetch', fetcher);
   await act(async () =>
     root.render(
@@ -49,7 +50,7 @@ async function mount(fetcher: ReturnType<typeof vi.fn>) {
         addresses={[wallet]}
         walletRevisions={[{ address: wallet, revision: 3 }]}
         plan={plan}
-        onLoad={() => {}}
+        onLoad={onLoad}
       />,
     ),
   );
@@ -269,16 +270,56 @@ it('recovers a save that completed after cancellation by reloading its original 
         }),
     )
     .mockResolvedValueOnce(Response.json({ plans: [stored] }));
-  await mount(fetcher);
+  const onLoad = vi.fn();
+  await mount(fetcher, onLoad);
   await click('Save draft');
   await click('Cancel plan request');
   await click('Reload drafts');
   expect(container.textContent).toContain('Saved draft found');
   expect(container.textContent).toContain('Editing draft');
+  expect(onLoad).toHaveBeenCalledWith(stored.document);
   await act(async () => resolve(Response.json({ ok: true })));
   expect(fetcher).toHaveBeenCalledTimes(3);
   expect(container.textContent).toContain('Editing draft');
 });
+it.each(['changed', 'missing', 'archived'] as const)(
+  'blocks stale saves after reload finds the draft %s',
+  async (state) => {
+    const stored = warmupUiFixture().plan;
+    const latest = {
+      ...stored,
+      revision: stored.revision + 1,
+      archived: state === 'archived',
+    };
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ plans: [stored] }))
+      .mockResolvedValueOnce(
+        Response.json({ plans: state === 'missing' ? [] : [latest] }),
+      );
+    const onLoad = vi.fn();
+    await mount(fetcher, onLoad);
+    await click('Edit draft');
+    onLoad.mockClear();
+    await click('Reload drafts');
+    expect(container.textContent).toContain('Your edits are kept');
+    const save = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Save changes',
+    )!;
+    expect(save.disabled).toBe(true);
+    expect(onLoad).not.toHaveBeenCalled();
+    if (state === 'changed') {
+      await click('Edit draft');
+      expect(onLoad).toHaveBeenCalledWith(latest.document);
+      expect(save.disabled).toBe(false);
+    } else {
+      await click('New draft');
+      expect(container.textContent).toContain('New saved draft');
+      expect(save.disabled).toBe(false);
+    }
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  },
+);
 
 it('refuses an expired reviewed start locally and provides a review recovery action', async () => {
   const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ plans: [] }));
@@ -287,4 +328,26 @@ it('refuses an expired reviewed start locally and provides a review recovery act
   await click('Save draft');
   expect(alert()).toContain('Choose a fresh start time and review');
   expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('keeps the editing draft identity and revision across a normal reload', async () => {
+  const stored = warmupUiFixture().plan;
+  const fetcher = vi.fn(async (_url: string, init?: RequestInit) =>
+    init?.method === 'POST' ? broken() : Response.json({ plans: [stored] }),
+  );
+  const onLoad = vi.fn();
+  await mount(fetcher, onLoad);
+  await click('Edit draft');
+  onLoad.mockClear();
+  await click('Reload drafts');
+  expect(container.textContent).toContain('Editing draft');
+  expect(onLoad).not.toHaveBeenCalled();
+  await click('Save changes');
+  const writes = fetcher.mock.calls.filter(
+    (call) => call[1]?.method === 'POST',
+  );
+  expect(writes).toHaveLength(1);
+  expect(JSON.parse(writes[0][1]!.body as string)).toMatchObject({
+    id: stored.id,
+    expectedRevision: stored.revision,
+  });
 });
