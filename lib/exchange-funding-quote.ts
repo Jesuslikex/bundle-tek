@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { validateFunding } from './funding-plan';
 import { walletAddress } from './wallet-workspace';
+import { decodeExchangeFundingReview } from './exchange-funding-review';
 
 export class ExchangeFundingError extends Error {
   constructor(
@@ -234,7 +235,7 @@ export async function previewOwnedExchangeFunding(
       'The exchange quote expired during review. Request a fresh quote.',
     );
   const id = crypto.randomUUID();
-  const review = {
+  const review = decodeExchangeFundingReview({
     format: 'exchange-funding-quote-v1' as const,
     provider: 'ChangeNOW' as const,
     id,
@@ -260,7 +261,7 @@ export async function previewOwnedExchangeFunding(
     fundingAllowed: false as const,
     signingAllowed: false as const,
     executionAllowed: false as const,
-  };
+  });
   const saved = await db
     .prepare(`INSERT INTO exchange_funding_quotes(id,owner_id,plan_id,plan_revision,funder_revision,plan_document,review,provider_reference,created_at,expires_at)
     SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM funding_plans p JOIN workspace_wallets w ON w.owner_id=p.owner_id AND w.chain='Solana' AND w.address=json_extract(p.document,'$.funderAddress')
@@ -313,7 +314,21 @@ export async function readOwnedExchangeFundingQuote(
       'Owned exchange funding review not found.',
       404,
     );
-  return JSON.parse(row.review) as Awaited<
-    ReturnType<typeof previewOwnedExchangeFunding>
-  >;
+  return decodeExchangeFundingReview(JSON.parse(row.review));
+}
+
+export async function readLatestOwnedExchangeFundingQuote(
+  db: D1Database,
+  owner: string,
+  planId: string,
+) {
+  if (!/^[a-zA-Z0-9-]{1,64}$/.test(planId))
+    throw new ExchangeFundingError('Choose a saved funding draft.', 400);
+  const row = await db
+    .prepare(
+      'SELECT review FROM exchange_funding_quotes WHERE owner_id=? AND plan_id=? ORDER BY created_at DESC,id DESC LIMIT 1',
+    )
+    .bind(owner, planId)
+    .first<{ review: string }>();
+  return row ? decodeExchangeFundingReview(JSON.parse(row.review)) : null;
 }

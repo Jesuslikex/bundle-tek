@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { FundingWalletPicker } from './funding-wallet-picker';
 import { FundingFeeReviewPanel } from './funding-fee-review';
 import { SolanaFundingReview } from './solana-funding-review';
+import { ExchangeFundingReview } from './exchange-funding-review';
 import { DevnetFundingExecution } from './devnet-funding-execution';
 import { MainnetFundingExecution } from './mainnet-funding-execution';
 import { MainnetFundingHistoryPanel } from './mainnet-funding-history';
@@ -230,8 +231,8 @@ export function FundingPlanner({
             reviews. Solana mainnet transfers require one exact recipient,
             individual signing approval and separate submission approval.
             Immediate SOL and standard SPL drafts also support approved devnet
-            transfers. Exchange connections and background scheduled execution
-            remain unavailable.
+            transfers. CEX drafts support quote review when configured. Exchange
+            deposits and background scheduled execution remain unavailable.
           </p>
         </div>
         <Button
@@ -411,7 +412,10 @@ export function FundingPlanner({
           />
         </label>
         <label className="funding-wide" htmlFor="funding-funder">
-          Funder public address (optional)
+          Funder public address
+          {draft.source === 'CEX'
+            ? ' (receives exchange payout)'
+            : ' (optional)'}
           <Input
             id="funding-funder"
             placeholder="Public address only"
@@ -549,56 +553,87 @@ export function FundingPlanner({
         </p>
       )}
       {notice && <output className="funding-notice">{notice}</output>}
-      {selected && preview && preview.chain === 'Solana' && (
-        <SolanaFundingReview
-          key={
-            selected.id +
-            '/' +
-            selected.revision +
-            '/' +
-            JSON.stringify(preview)
-          }
-          id={selected.id}
-          revision={selected.revision}
+      {preview?.source === 'Manual' && (
+        <p className="source-note">
+          Manual drafts record allocations. To review wallet transfers, choose
+          Wallet as the source, enter your funder and save the draft.
+        </p>
+      )}
+      {preview?.source === 'CEX' && (
+        <ExchangeFundingReview
+          key={`exchange:${selected?.id}:${selected?.revision}:${JSON.stringify(preview)}`}
+          plan={mainnetPlan ?? null}
+          draft={preview}
           enabled={
             !busy &&
             !loading &&
             !handoffBusy &&
-            saved.some(
-              (row) =>
-                row.id === selected.id &&
-                !row.archived &&
-                row.revision === selected.revision &&
-                JSON.stringify(row.document) === JSON.stringify(preview),
+            Boolean(
+              mainnetPlan &&
+              !mainnetPlan.archived &&
+              JSON.stringify(mainnetPlan.document) === JSON.stringify(preview),
             )
           }
         />
       )}
-      {selected && preview && preview.chain !== 'Solana' && (
-        <FundingFeeReviewPanel
-          key={
-            selected.id +
-            '/' +
-            selected.revision +
-            '/' +
-            JSON.stringify(preview)
-          }
-          id={selected.id}
-          revision={selected.revision}
-          enabled={
-            !busy &&
-            !loading &&
-            !handoffBusy &&
-            saved.some(
-              (row) =>
-                row.id === selected.id &&
-                !row.archived &&
-                row.revision === selected.revision &&
-                JSON.stringify(row.document) === JSON.stringify(preview),
-            )
-          }
-        />
-      )}
+      {selected &&
+        preview &&
+        preview.chain === 'Solana' &&
+        preview.source === 'Wallet' && (
+          <SolanaFundingReview
+            key={
+              'solana-review/' +
+              selected.id +
+              '/' +
+              selected.revision +
+              '/' +
+              JSON.stringify(preview)
+            }
+            id={selected.id}
+            revision={selected.revision}
+            enabled={
+              !busy &&
+              !loading &&
+              !handoffBusy &&
+              saved.some(
+                (row) =>
+                  row.id === selected.id &&
+                  !row.archived &&
+                  row.revision === selected.revision &&
+                  JSON.stringify(row.document) === JSON.stringify(preview),
+              )
+            }
+          />
+        )}
+      {selected &&
+        preview &&
+        preview.chain !== 'Solana' &&
+        preview.source === 'Wallet' && (
+          <FundingFeeReviewPanel
+            key={
+              'evm-review/' +
+              selected.id +
+              '/' +
+              selected.revision +
+              '/' +
+              JSON.stringify(preview)
+            }
+            id={selected.id}
+            revision={selected.revision}
+            enabled={
+              !busy &&
+              !loading &&
+              !handoffBusy &&
+              saved.some(
+                (row) =>
+                  row.id === selected.id &&
+                  !row.archived &&
+                  row.revision === selected.revision &&
+                  JSON.stringify(row.document) === JSON.stringify(preview),
+              )
+            }
+          />
+        )}
       {selected &&
         preview?.chain === 'Solana' &&
         (preview.assetAddress || preview.currency === 'SOL') &&

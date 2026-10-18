@@ -6,6 +6,7 @@ import {
   exchangeFundingSelection,
   previewOwnedExchangeFunding,
   readOwnedExchangeFundingQuote,
+  readLatestOwnedExchangeFundingQuote,
 } from '@/lib/exchange-funding-quote';
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) =>
@@ -15,11 +16,34 @@ export async function GET(request: Request) {
   if (!user)
     return json({ error: 'Sign in to read exchange funding reviews.' }, 401);
   try {
+    const params = new URL(request.url).searchParams;
+    if (params.toString() === 'status=1')
+      return json({
+        provider: 'ChangeNOW',
+        quotesConfigured: Boolean(
+          env.BUNDLE_EXCHANGE_QUOTES_ENABLED === 'true' &&
+          env.CHANGENOW_API_KEY,
+        ),
+        orderCreationAllowed: false,
+        fundingAllowed: false,
+        signingAllowed: false,
+        executionAllowed: false,
+      });
+    if (params.size === 1 && params.has('planId'))
+      return json({
+        quote: await readLatestOwnedExchangeFundingQuote(
+          getD1(),
+          user.userId,
+          params.get('planId') ?? '',
+        ),
+      });
+    if (params.size !== 1 || !params.has('id'))
+      return json({ error: 'Choose one saved review or funding draft.' }, 400);
     return json({
       quote: await readOwnedExchangeFundingQuote(
         getD1(),
         user.userId,
-        new URL(request.url).searchParams.get('id') ?? '',
+        params.get('id') ?? '',
       ),
     });
   } catch (error) {

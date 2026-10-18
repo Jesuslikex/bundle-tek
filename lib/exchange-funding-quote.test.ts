@@ -9,6 +9,7 @@ import {
   exchangeFundingSelection,
   previewOwnedExchangeFunding,
   readOwnedExchangeFundingQuote,
+  readLatestOwnedExchangeFundingQuote,
 } from './exchange-funding-quote';
 
 const client = createClient({ url: ':memory:' });
@@ -267,6 +268,15 @@ it('retains the opaque rate only in owned server storage and reloads without a p
   expect(await readOwnedExchangeFundingQuote(db, 'alice', quote.id)).toEqual(
     quote,
   );
+  expect(
+    await readLatestOwnedExchangeFundingQuote(db, 'alice', input.planId),
+  ).toEqual(quote);
+  expect(
+    await readLatestOwnedExchangeFundingQuote(db, 'bob', input.planId),
+  ).toBeNull();
+  expect(
+    await readLatestOwnedExchangeFundingQuote(db, 'alice', 'another-draft'),
+  ).toBeNull();
   await expect(
     readOwnedExchangeFundingQuote(db, 'bob', quote.id),
   ).rejects.toMatchObject({ status: 404 });

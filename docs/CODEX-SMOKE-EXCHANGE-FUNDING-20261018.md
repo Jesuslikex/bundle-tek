@@ -22,7 +22,7 @@ Configuration is off by default. `BUNDLE_EXCHANGE_QUOTES_ENABLED` and `CHANGENOW
 
 ## Remaining complete flow
 
-1. Add the review UI and provider setup when authorized. The quote adapter and owned reload API are implemented; provider availability and permission for this Bundle integration are not established by Smoke's historical results.
+1. Provider setup remains pending authorization. The quote adapter, owned reload API and review UI are now implemented; see CODEX-EXCHANGE-FUNDING-UI-20261018.md. Provider availability and permission for this Bundle integration are not established by Smoke's historical results.
 2. Review the exact deposit, receiving funder, network, provider costs, expiry and refund destination. Obtain separate unchecked approval for one order creation. Retain an ambiguous result for reconciliation rather than retrying it.
 3. Show provider-verified deposit instructions only after a matching order is saved. Keep deposit state separate from provider payout state, verification requests and refunds.
 4. Verify the payout independently on the intended network, at the receiving funder and exact expected amount, with finalized transaction evidence. A provider's `finished` label or an increased balance alone is insufficient.

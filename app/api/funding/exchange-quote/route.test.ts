@@ -3,6 +3,7 @@ const state = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
   preview: vi.fn(),
   read: vi.fn(),
+  latest: vi.fn(),
   db: {},
 }));
 vi.mock('@/app/chatgpt-auth', () => ({
@@ -13,6 +14,7 @@ vi.mock('@/lib/exchange-funding-quote', async (original) => ({
   ...(await original<typeof import('@/lib/exchange-funding-quote')>()),
   previewOwnedExchangeFunding: state.preview,
   readOwnedExchangeFundingQuote: state.read,
+  readLatestOwnedExchangeFundingQuote: state.latest,
 }));
 import { GET, POST } from './route';
 import { ExchangeFundingError } from '@/lib/exchange-funding-quote';
@@ -42,6 +44,42 @@ beforeEach(() => {
   state.read
     .mockReset()
     .mockResolvedValue({ durableReview: true, signingAllowed: false });
+  state.latest.mockReset().mockResolvedValue(null);
+});
+it('returns setup status without reading stored reviews or exposing provider configuration', async () => {
+  const response = await GET(
+    new Request('https://bundle.test/api/funding/exchange-quote?status=1'),
+  );
+  expect(await response.json()).toEqual({
+    provider: 'ChangeNOW',
+    quotesConfigured: false,
+    orderCreationAllowed: false,
+    fundingAllowed: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(state.read).not.toHaveBeenCalled();
+  expect(state.latest).not.toHaveBeenCalled();
+});
+it('reads latest history for the authenticated owner without requesting a quote', async () => {
+  const response = await GET(
+    new Request(
+      'https://bundle.test/api/funding/exchange-quote?planId=saved-draft',
+    ),
+  );
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ quote: null });
+  expect(state.latest).toHaveBeenCalledWith(state.db, 'alice', 'saved-draft');
+  expect(state.preview).not.toHaveBeenCalled();
+  expect(
+    (
+      await GET(
+        new Request(
+          'https://bundle.test/api/funding/exchange-quote?planId=x&id=y',
+        ),
+      )
+    ).status,
+  ).toBe(400);
 });
 it('requires authentication and exact same origin', async () => {
   state.user = null;
