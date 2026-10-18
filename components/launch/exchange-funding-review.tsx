@@ -13,6 +13,7 @@ import {
 } from '@/lib/exchange-funding-review';
 import styles from './exchange-funding-review.module.css';
 import { ExchangeOrderHistory } from './exchange-order-history';
+import { ExchangeOrderReview } from './exchange-order-review';
 
 type Props = {
   plan: SavedFunding | null;
@@ -371,6 +372,16 @@ function ExchangeFundingReviewContent({
             <p>Provider note: {history.providerWarning}</p>
           )}
         </div>
+      )}
+      {history && enabled && (
+        <ExchangeOrderReview
+          quote={history}
+          blockedReason={
+            stale || history.expectedPayoutLamports !== raw
+              ? 'This quote differs from the current funding draft, wallet or payout amount. Request a fresh quote before saving a review.'
+              : ''
+          }
+        />
       )}
       {plan && <ExchangeOrderHistory planId={plan.id} />}
     </section>

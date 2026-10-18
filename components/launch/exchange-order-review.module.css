@@ -1,0 +1,59 @@
+.panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border-top: 1px solid var(--border, #343846);
+  padding-top: 16px;
+}
+.panel h4,
+.panel p {
+  margin: 0;
+}
+.panel p,
+.panel output,
+.panel dl {
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.panel select {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border, #343846);
+  border-radius: 6px;
+  background: var(--background, #11131a);
+  color: inherit;
+}
+.panel button {
+  height: auto;
+  min-height: 36px;
+  max-width: 100%;
+  white-space: normal;
+}
+.panel dl {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.panel dl > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(0, 2fr);
+  gap: 10px;
+}
+.panel dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  .panel dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+}

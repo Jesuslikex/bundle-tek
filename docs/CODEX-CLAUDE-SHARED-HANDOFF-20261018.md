@@ -91,3 +91,7 @@ Read CODEX-LAYER-OBSERVATION-FILTERS-20261018.md. REA freshly captured the exist
 ## Exchange review preparation API
 
 Read CODEX-EXCHANGE-ORDER-REVIEW-API-20261018.md. New strict ownedquote/refund preparation POST and immutable review recovery GET use existingservice/SQL/publicprojection. No approval, provider transport, deposit or financial authority. Final13files/252tests;3filetypedlint/format+TypeScript pass after test-only annotationfix. UI stillpending. Otherchat0114drafts preserved; no schema/provider/hostedSQL/deploy.
+
+## Visible quote and refund review
+
+Read CODEX-EXCHANGE-REFUND-REVIEW-UI-20261018.md. New opt-in refund review selects a separate proven wallet, saves exact quote/refund terms and recovers unknown saves before another attempt. Final14files/266tests,4TSXtypedlint/5fileformat+TypeScript, Chrome375/320/1440lostresponse→GETrecovery withonewrite. No order approval/creation/provider or signing path. UI-pending statement in previous checkpoint is superseded; live orders/deposits remain open. Otherchat0114drafts preserved; no hostedSQL/deploy.

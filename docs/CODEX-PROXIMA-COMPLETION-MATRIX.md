@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+The exchange quote screen now exposes explicit proven refund-wallet review preparation and unknown-save recovery, with no order consent or creation. CODEX-EXCHANGE-REFUND-REVIEW-UI-20261018.md records266tests/14files and responsive synthetic Chrome proof ofonewrite/lost-response/GETrecovery. This supersedes the unwired refund-review gap; live provider orders/deposits and funded proof remain open.
+
 Fresh REA funding/setup recheck confirms the existing imported/scheduled SOL draft still separates Front/Back/holders and displays distinct funding totals, without revealing their calculation. Bundle saved-observation role/status filters and exact selected-role native ceiling now improve inspection of large role tables, with no funding authority. CODEX-LAYER-OBSERVATION-FILTERS-20261018.md records120tests/10files and responsive synthetic Chrome evidence. Full staged funding/execution and funded proof remain open.
 
 Saved exchange history now exposes explicit finalized payout verification through the owned read-only API, with exact saved-order binding, cancellation and GET recovery. CODEX-EXCHANGE-PAYOUT-UI-20261018.md records240tests/11files and synthetic responsive Chrome checks. This supersedes the unwired payout API gap only; live provider order/deposit integration, fresh spendability and funded proof remain open.

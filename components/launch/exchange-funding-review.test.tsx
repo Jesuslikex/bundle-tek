@@ -342,3 +342,15 @@ it.each(['Wallet', 'Manual'] as const)(
     expect(postCalls()).toHaveLength(0);
   },
 );
+
+it('exposes the separate refund-review entry for a saved quote without extra reads or approval controls', async () => {
+  history = fixture.review;
+  await mount();
+  expect(button('Review refund wallet')).toBeDefined();
+  expect(container.textContent).toContain(
+    'payout amount. Request a fresh quote',
+  );
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  expect(postCalls()).toHaveLength(0);
+  expect(container.querySelector('input[type=checkbox]')).toBeNull();
+});
