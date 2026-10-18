@@ -39,5 +39,5 @@ it('disables all selections for expired evidence, unsupported inventory and acti
       renderToStaticMarkup(
         <ImportedSellPresets {...props} onAmountChange={() => {}} />,
       ).match(/\sdisabled=""/g) ?? [],
-    ).toHaveLength(4);
+    ).toHaveLength(5);
 });

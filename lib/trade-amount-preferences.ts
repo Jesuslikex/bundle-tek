@@ -5,11 +5,51 @@ import {
   IMPORTED_SUPPLY_SELL_PRESETS,
 } from './imported-balance-review';
 export type TradeAmountPresets = {
-  format: 'trade-amount-presets-v1';
+  format: 'trade-amount-presets-v1' | 'trade-amount-presets-v2';
   buySol: string[];
   sellBalanceBps: number[];
   sellSupplyBps: number[];
+  keyboard?: TradePresetKeyboard;
 };
+export type TradePresetKeyboard = {
+  buy: string[];
+  sellBalance: string[];
+  sellSupply: string[];
+};
+export function defaultTradePresetKeyboard(): TradePresetKeyboard {
+  return {
+    buy: '12345678'.split(''),
+    sellBalance: 'qwertyui'.split(''),
+    sellSupply: 'asdfghjk'.split(''),
+  };
+}
+export function requireTradePresetKeyboard(
+  value: unknown,
+): TradePresetKeyboard {
+  presetKeys(value, 'buy,sellBalance,sellSupply');
+  const v = value as TradePresetKeyboard;
+  const all: string[] = [];
+  for (const list of [v.buy, v.sellBalance, v.sellSupply]) {
+    if (
+      !Array.isArray(list) ||
+      list.length !== 8 ||
+      list.some((key) => typeof key !== 'string' || !/^[a-z0-9]?$/.test(key))
+    )
+      throw Error(
+        'Use eight key positions per list, with one lowercase letter or digit, or blank.',
+      );
+    all.push(...list.filter(Boolean));
+  }
+  if (new Set(all).size !== all.length)
+    throw Error('Each preset key must be unique across buy and sell lists.');
+  return {
+    buy: [...v.buy],
+    sellBalance: [...v.sellBalance],
+    sellSupply: [...v.sellSupply],
+  };
+}
+export const tradePresetKeyboard = (p: TradeAmountPresets) =>
+  p.keyboard ?? defaultTradePresetKeyboard();
 const fail = (): never => {
   throw Error('Choose 1 to 8 distinct positive presets for each amount type.');
 };
@@ -31,9 +71,19 @@ export function defaultTradeAmountPresets(): TradeAmountPresets {
   };
 }
 export function requireTradeAmountPresets(value: unknown): TradeAmountPresets {
-  presetKeys(value, 'buySol,format,sellBalanceBps,sellSupplyBps');
+  const extended =
+    (value as TradeAmountPresets | null)?.format === 'trade-amount-presets-v2';
+  presetKeys(
+    value,
+    extended
+      ? 'buySol,format,keyboard,sellBalanceBps,sellSupplyBps'
+      : 'buySol,format,sellBalanceBps,sellSupplyBps',
+  );
   const v = value as TradeAmountPresets;
-  if (v.format !== 'trade-amount-presets-v1') fail();
+  if (!extended && v.format !== 'trade-amount-presets-v1') fail();
+  const keyboard = extended
+    ? requireTradePresetKeyboard(v.keyboard)
+    : undefined;
   for (const list of [v.buySol, v.sellBalanceBps, v.sellSupplyBps])
     if (!Array.isArray(list) || list.length < 1 || list.length > 8) fail();
   const buySol = v.buySol.map((amount) => {
@@ -54,6 +104,7 @@ export function requireTradeAmountPresets(value: unknown): TradeAmountPresets {
     buySol,
     sellBalanceBps: [...v.sellBalanceBps],
     sellSupplyBps: [...v.sellSupplyBps],
+    ...(keyboard ? { keyboard } : {}),
   };
 }
 export function presetPercentToBps(value: string) {

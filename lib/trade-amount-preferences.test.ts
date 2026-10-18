@@ -5,7 +5,32 @@ import {
   presetPercentToBps,
   presetPercentLabel,
   requireTradeAmountPreferenceView,
+  defaultTradePresetKeyboard,
 } from './trade-amount-preferences';
+it('retains v1 records and validates canonical unique v2 key maps without activation or authority', () => {
+  const legacy = defaultTradeAmountPresets();
+  expect(requireTradeAmountPresets(legacy)).toEqual(legacy);
+  const keyboard = defaultTradePresetKeyboard();
+  const next = { ...legacy, format: 'trade-amount-presets-v2', keyboard };
+  expect(requireTradeAmountPresets(next)).toEqual(next);
+  expect(
+    requireTradeAmountPresets({
+      ...next,
+      keyboard: { ...keyboard, buy: Array(8).fill('') },
+    }).keyboard?.buy,
+  ).toEqual(Array(8).fill(''));
+  for (const invalid of [
+    { ...next, keyboard: { ...keyboard, enabled: true } },
+    { ...next, keyboard: { ...keyboard, buy: 'q2345678'.split('') } },
+    { ...next, keyboard: { ...keyboard, buy: 'Q2345678'.split('') } },
+    { ...next, keyboard: { ...keyboard, buy: ['Control+1'] } },
+    { ...next, keyboard: { ...keyboard, buy: '!2345678'.split('') } },
+    { ...next, keyboard: { ...keyboard, buy: '1234567'.split('') } },
+    { ...legacy, keyboard },
+    { ...next, format: 'trade-amount-presets-v3' },
+  ])
+    expect(() => requireTradeAmountPresets(invalid)).toThrow();
+});
 it('preserves existing Bundle defaults and canonicalizes exact native atoms without floating point', () => {
   const defaults = defaultTradeAmountPresets();
   expect(defaults).toEqual({

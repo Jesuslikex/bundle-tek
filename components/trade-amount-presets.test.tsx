@@ -45,11 +45,14 @@ beforeEach(async () => {
   client = createClient({ url: 'file::memory:' });
   state.db = createTursoDatabase(client);
   state.sessionOwner = state.apiOwner = 'alice';
-  for (const sql of readFileSync(
-    'drizzle/0111_trade_amount_preferences.sql',
-    'utf8',
-  ).split('--> statement-breakpoint'))
-    if (sql.trim()) await client.execute(sql);
+  for (const file of [
+    '0111_trade_amount_preferences',
+    '0112_trade_preset_keyboard',
+  ])
+    for (const sql of readFileSync(`drizzle/${file}.sql`, 'utf8').split(
+      '--> statement-breakpoint',
+    ))
+      if (sql.trim()) await client.execute(sql);
   requests = [];
   quoteReply = null;
   onAmount = vi.fn<(value: string) => void>();
@@ -96,10 +99,14 @@ async function flush() {
     await Promise.all(requests);
   });
 }
-async function mount(disabled = false) {
+async function mount(disabled = false, contextKey = 'fixture-one') {
   await act(async () =>
     root.render(
-      <BuyAmountPresets disabled={disabled} onAmountChange={onAmount} />,
+      <BuyAmountPresets
+        disabled={disabled}
+        contextKey={contextKey}
+        onAmountChange={onAmount}
+      />,
     ),
   );
   await flush();
@@ -132,6 +139,135 @@ async function input(label: string, value: string) {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+async function key(
+  target: Element,
+  value: string,
+  options: KeyboardEventInit = {},
+) {
+  await act(async () => {
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: value,
+        bubbles: true,
+        cancelable: true,
+        ...options,
+      }),
+    );
+  });
+}
+it('refuses duplicate key assignments locally without writing preferences or triggering a trade', async () => {
+  await mount();
+  await open();
+  const count = requests.length;
+  await input('Buy SOL key 1', 'q');
+  await click('Save amount presets');
+  expect(host.textContent).toContain('Each preset key must be unique');
+  expect(requests).toHaveLength(count);
+  expect(onAmount).not.toHaveBeenCalled();
+});
+it('saves custom key mappings for this account, restores them after reload, and starts disarmed', async () => {
+  await mount();
+  await open();
+  await input('Buy SOL key 1', '9');
+  await click('Save amount presets');
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await mount();
+  await open();
+  expect(
+    host.querySelector<HTMLInputElement>('input[aria-label="Buy SOL key 1"]')
+      ?.value,
+  ).toBe('9');
+  const panel = host.querySelector<HTMLElement>(
+    '[aria-label="Buy preset keyboard panel"] button[aria-pressed]',
+  )!;
+  panel.focus();
+  await key(panel, '9');
+  expect(onAmount).not.toHaveBeenCalled();
+  await click('Enable preset keys');
+  await key(panel, '1');
+  expect(onAmount).not.toHaveBeenCalled();
+  await key(panel, '9');
+  expect(onAmount).toHaveBeenLastCalledWith('0.01');
+  const count = onAmount.mock.calls.length;
+  state.sessionOwner = state.apiOwner = 'bob';
+  await mount();
+  panel.focus();
+  await key(panel, '9');
+  await key(panel, '1');
+  expect(onAmount).toHaveBeenCalledTimes(count);
+  await open();
+  expect(
+    host.querySelector<HTMLInputElement>('input[aria-label="Buy SOL key 1"]')
+      ?.value,
+  ).toBe('1');
+});
+it('requires focused-panel opt-in and suppresses typing, repeat, modifiers, focus loss, backgrounding, locks and changed token context', async () => {
+  await mount();
+  const panel = host.querySelector<HTMLElement>(
+    '[aria-label="Buy preset keyboard panel"] button[aria-pressed]',
+  )!;
+  panel.focus();
+  await key(panel, '1');
+  expect(onAmount).not.toHaveBeenCalled();
+  await click('Enable preset keys');
+  const outerKey = vi.fn();
+  document.addEventListener('keydown', outerKey);
+  await key(panel, '1');
+  document.removeEventListener('keydown', outerKey);
+  expect(outerKey).not.toHaveBeenCalled();
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  for (const options of [
+    { repeat: true },
+    { ctrlKey: true },
+    { altKey: true },
+    { metaKey: true },
+    { shiftKey: true },
+    { isComposing: true },
+  ])
+    await key(panel, '1', options);
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  const typing = document.createElement('input');
+  panel.appendChild(typing);
+  await act(async () => {
+    typing.focus();
+  });
+  await key(typing, '1');
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  panel.focus();
+  await key(panel, 'Escape');
+  await key(panel, '1');
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  await click('Enable preset keys');
+  const outside = document.createElement('button');
+  document.body.appendChild(outside);
+  await act(async () => outside.focus());
+  panel.focus();
+  await key(panel, '1');
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  outside.remove();
+  await click('Enable preset keys');
+  await act(async () => window.dispatchEvent(new Event('blur')));
+  await key(panel, '1');
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  await click('Enable preset keys');
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  await key(panel, '1');
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  await click('Enable preset keys');
+  await mount(true);
+  await key(panel, '1');
+  await mount(false);
+  panel.focus();
+  await key(panel, '1');
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  await click('Enable preset keys');
+  await mount(false, 'fixture-two');
+  panel.focus();
+  await key(panel, '1');
+  expect(onAmount).toHaveBeenCalledTimes(1);
+  typing.remove();
+});
 it('adds, saves and reloads account presets through actual owned SQL, then fills an amount only on a click', async () => {
   await mount();
   expect(onAmount).not.toHaveBeenCalled();
@@ -259,11 +395,20 @@ it('uses saved custom sell percentages through fresh inventory checks and refuse
   expect(onAmount).toHaveBeenLastCalledWith('0.001');
   await click('0.01%');
   expect(onAmount).toHaveBeenLastCalledWith('0.0001');
+  const keyPanel = host.querySelector<HTMLElement>(
+    '[aria-label="Sell preset keyboard panel"] button[aria-pressed]',
+  )!;
+  await click('Enable preset keys');
+  await key(keyPanel, 'q');
+  expect(onAmount).toHaveBeenLastCalledWith('0.001');
+  await key(keyPanel, 'a');
+  expect(onAmount).toHaveBeenLastCalledWith('0.0001');
   f.report.observedAt = new Date(Date.now() - 61000).toISOString();
   f.report.expiresAt = new Date(Date.now() - 1000).toISOString();
   await act(async () => render());
   const count = onAmount.mock.calls.length;
   await click('MAX');
+  await key(keyPanel, 'q');
   expect(onAmount).toHaveBeenCalledTimes(count);
   const refreshedAt = Date.now() + 2000;
   vi.spyOn(Date, 'now').mockReturnValue(refreshedAt);
@@ -275,6 +420,9 @@ it('uses saved custom sell percentages through fresh inventory checks and refuse
     await new Promise((resolve) => setTimeout(resolve, 10));
   });
   expect(button('33.33%').disabled).toBe(false);
+  keyPanel.focus();
+  await key(keyPanel, 'q');
+  expect(onAmount).toHaveBeenCalledTimes(count);
   await click('33.33%');
   expect(onAmount).toHaveBeenCalledTimes(count + 1);
   expect(onAmount).toHaveBeenLastCalledWith('0.001');

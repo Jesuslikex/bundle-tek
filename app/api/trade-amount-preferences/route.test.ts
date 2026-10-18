@@ -2,7 +2,10 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createClient } from '@libsql/client';
 import { readFileSync } from 'node:fs';
 import { createTursoDatabase } from '@/db/turso';
-import { defaultTradeAmountPresets } from '@/lib/trade-amount-preferences';
+import {
+  defaultTradeAmountPresets,
+  defaultTradePresetKeyboard,
+} from '@/lib/trade-amount-preferences';
 import { GET, POST } from './route';
 const state = vi.hoisted(() => ({
   owner: 'alice' as string | null,
@@ -29,13 +32,61 @@ beforeEach(async () => {
   client = createClient({ url: 'file::memory:' });
   state.db = createTursoDatabase(client);
   state.owner = 'alice';
-  for (const sql of readFileSync(
-    'drizzle/0111_trade_amount_preferences.sql',
-    'utf8',
-  ).split('--> statement-breakpoint'))
-    if (sql.trim()) await client.execute(sql);
+  for (const file of [
+    '0111_trade_amount_preferences',
+    '0112_trade_preset_keyboard',
+  ])
+    for (const sql of readFileSync(`drizzle/${file}.sql`, 'utf8').split(
+      '--> statement-breakpoint',
+    ))
+      if (sql.trim()) await client.execute(sql);
 });
 afterEach(() => client.close());
+it('upgrades a retained amount-only document through its exact revision and rejects malformed key maps at API and SQL boundaries', async () => {
+  const legacy = defaultTradeAmountPresets();
+  expect(
+    (await POST(request({ revision: 0, preferences: legacy }))).status,
+  ).toBe(200);
+  expect(await (await get()).json()).toMatchObject({
+    revision: 1,
+    preferences: legacy,
+  });
+  const keyboard = defaultTradePresetKeyboard();
+  keyboard.buy[0] = '9';
+  const preferences = {
+    ...legacy,
+    format: 'trade-amount-presets-v2',
+    keyboard,
+  };
+  expect((await POST(request({ revision: 1, preferences }))).status).toBe(200);
+  expect(await (await get()).json()).toMatchObject({
+    revision: 2,
+    preferences,
+  });
+  for (const invalid of [
+    { ...preferences, keyboard: { ...keyboard, buy: 'q2345678'.split('') } },
+    { ...preferences, keyboard: { ...keyboard, buy: '!2345678'.split('') } },
+    { ...preferences, keyboard: { ...keyboard, buy: ['1'] } },
+    { ...preferences, keyboard: { ...keyboard, execute: true } },
+    { ...preferences, keyboard: undefined },
+    { ...preferences, format: undefined },
+  ]) {
+    expect(
+      (await POST(request({ revision: 2, preferences: invalid }))).status,
+    ).toBe(400);
+    await expect(
+      client.execute({
+        sql: 'UPDATE trade_amount_preferences SET revision=3,document=? WHERE owner_id=?',
+        args: [JSON.stringify(invalid), 'alice'],
+      }),
+    ).rejects.toThrow();
+  }
+  expect(await (await get()).json()).toMatchObject({
+    revision: 2,
+    preferences,
+  });
+  expect((await POST(request({ revision: 1, preferences }))).status).toBe(409);
+});
 it('returns unsaved defaults without inserting rows, persists owner preferences and reloads exact terms', async () => {
   const initial = await get();
   expect(initial.headers.get('cache-control')).toBe('no-store');

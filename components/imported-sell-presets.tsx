@@ -12,7 +12,11 @@ import {
   useTradeAmountPresets,
   TradeAmountPresetSettings,
 } from './trade-amount-presets';
-import { presetPercentLabel } from '@/lib/trade-amount-preferences';
+import {
+  presetPercentLabel,
+  tradePresetKeyboard,
+} from '@/lib/trade-amount-preferences';
+import { TradePresetKeyboardPanel } from './trade-preset-keyboard';
 export function ImportedSellPresets({
   report,
   context,
@@ -42,101 +46,120 @@ export function ImportedSellPresets({
     };
   }, [report.observedAt, report.expiresAt]);
   if (context.side !== 'Sell') return null;
-  return (
-    <section aria-label="Sell balance percentages">
-      <p>
-        Choose a percentage of the observed unfrozen token units. Amounts round
-        down to whole atomic units.
-      </p>
-      {presets.preferences.sellBalanceBps.map((basisPoints) => {
-        const label = presetPercentLabel(basisPoints);
-        let amount: string | null = null;
-        try {
-          amount = importedBalanceBasisPointAmount(
+  const keyboard = tradePresetKeyboard(presets.preferences);
+  const option = (basisPoints: number, index: number, supplyMode: boolean) => {
+    const label = presetPercentLabel(basisPoints);
+    const calculate = (at?: number) =>
+      supplyMode && supply
+        ? importedSupplyBasisPointAmount(
             report,
             context,
+            supply,
             basisPoints,
-            now,
-          );
+            at,
+          )
+        : importedBalanceBasisPointAmount(report, context, basisPoints, at);
+    let amount: string | null = null;
+    try {
+      amount = calculate(now);
+    } catch {
+      /* Invalid evidence stays unavailable. */
+    }
+    return {
+      basisPoints,
+      label,
+      key: (supplyMode ? keyboard.sellSupply : keyboard.sellBalance)[index],
+      disabled: locked || expired || amount === null,
+      select: () => {
+        if (locked || expired) return;
+        try {
+          onAmountChange(calculate());
         } catch {
-          /* Invalid, expired or unsupported observations never produce a preset. */
+          setNow(Date.now());
         }
-        return (
-          <Button
-            key={basisPoints}
-            type="button"
-            variant="outline"
-            disabled={locked || expired || amount === null}
-            aria-label={`Set sell amount to ${label} of observed unfrozen balance`}
-            onClick={() => {
-              if (locked || expired) return;
-              try {
-                onAmountChange(
-                  importedBalanceBasisPointAmount(report, context, basisPoints),
-                );
-              } catch {
-                setNow(Date.now());
-              }
-            }}
-          >
-            {basisPoints === 10000 ? 'MAX' : label}
-          </Button>
-        );
-      })}
-      {supply && (
-        <section aria-label="Sell supply percentages">
-          <p>
-            Percentage of saved total supply, observed{' '}
-            {new Date(supply.observedAt).toLocaleString()}.
-          </p>
-          {presets.preferences.sellSupplyBps.map((basisPoints) => {
-            const label = presetPercentLabel(basisPoints);
-            let amount: string | null = null;
-            try {
-              amount = importedSupplyBasisPointAmount(
-                report,
-                context,
-                supply,
-                basisPoints,
-                now,
+      },
+    };
+  };
+  const balanceOptions = presets.preferences.sellBalanceBps.map((bps, i) =>
+    option(bps, i, false),
+  );
+  const supplyOptions = supply
+    ? presets.preferences.sellSupplyBps.map((bps, i) => option(bps, i, true))
+    : [];
+  return (
+    <section aria-label="Sell balance percentages">
+      <TradePresetKeyboardPanel
+        label="Sell preset keyboard panel"
+        scope={JSON.stringify([
+          context,
+          report.observedAt,
+          report.expiresAt,
+          supply,
+          presets.ownerId,
+          presets.view?.revision,
+          presets.preferences,
+        ])}
+        blocked={
+          locked ||
+          expired ||
+          presets.busy ||
+          Boolean(presets.error) ||
+          !report.preparationSupported
+        }
+        actions={[
+          ...balanceOptions.map((o) => ({ ...o, label: `${o.label} balance` })),
+          ...supplyOptions.map((o) => ({
+            ...o,
+            label: `${o.label} saved supply`,
+          })),
+        ]}
+      >
+        <p>
+          Choose a percentage of the observed unfrozen token units. Amounts
+          round down to whole atomic units.
+        </p>
+        {balanceOptions.map(({ basisPoints, label, disabled, select }) => {
+          return (
+            <Button
+              key={basisPoints}
+              type="button"
+              variant="outline"
+              disabled={disabled}
+              aria-label={`Set sell amount to ${label} of observed unfrozen balance`}
+              onClick={select}
+            >
+              {basisPoints === 10000 ? 'MAX' : label}
+            </Button>
+          );
+        })}
+        {supply && (
+          <section aria-label="Sell supply percentages">
+            <p>
+              Percentage of saved total supply, observed{' '}
+              {new Date(supply.observedAt).toLocaleString()}.
+            </p>
+            {supplyOptions.map(({ basisPoints, label, disabled, select }) => {
+              return (
+                <Button
+                  key={basisPoints}
+                  type="button"
+                  variant="outline"
+                  disabled={disabled}
+                  aria-label={`Set sell amount to ${label} of saved total supply`}
+                  onClick={select}
+                >
+                  {label}
+                </Button>
               );
-            } catch {
-              /* Uncovered or invalid evidence leaves the preset disabled. */
-            }
-            return (
-              <Button
-                key={basisPoints}
-                type="button"
-                variant="outline"
-                disabled={locked || expired || amount === null}
-                aria-label={`Set sell amount to ${label} of saved total supply`}
-                onClick={() => {
-                  if (locked || expired) return;
-                  try {
-                    onAmountChange(
-                      importedSupplyBasisPointAmount(
-                        report,
-                        context,
-                        supply,
-                        basisPoints,
-                      ),
-                    );
-                  } catch {
-                    setNow(Date.now());
-                  }
-                }}
-              >
-                {label}
-              </Button>
-            );
-          })}
-          <p className="text-xs text-muted-foreground">
-            Supply may have changed since observation. Presets round down and
-            must fit the observed unfrozen balance of this wallet; preparation
-            rechecks current holdings.
-          </p>
-        </section>
-      )}
+            })}
+            <p className="text-xs text-muted-foreground">
+              Supply may have changed since observation. Presets round down and
+              must fit the observed unfrozen balance of this wallet; preparation
+              rechecks current holdings.
+            </p>
+          </section>
+        )}
+      </TradePresetKeyboardPanel>
       <TradeAmountPresetSettings store={presets} />
       {expired ? (
         <output>Balance observation expired. Check trade balance again.</output>

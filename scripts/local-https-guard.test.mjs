@@ -13,6 +13,33 @@ await test('allows bounded presentation-only preset settings without wallet, sig
     },
     body = { ownerId: 'fixture-owner', revision: 0, preferences };
   assert.equal(allowedLocalPost(path, body), true);
+  const keyboard = {
+    buy: '12345678'.split(''),
+    sellBalance: 'qwertyui'.split(''),
+    sellSupply: 'asdfghjk'.split(''),
+  };
+  const v2 = {
+    ...body,
+    preferences: {
+      ...preferences,
+      format: 'trade-amount-presets-v2',
+      keyboard,
+    },
+  };
+  assert.equal(allowedLocalPost(path, v2), true);
+  for (const invalid of [
+    { ...keyboard, execute: true },
+    { ...keyboard, buy: 'q2345678'.split('') },
+    { ...keyboard, buy: ['Control+1'] },
+    { ...keyboard, buy: '!2345678'.split('') },
+  ])
+    assert.equal(
+      allowedLocalPost(path, {
+        ...v2,
+        preferences: { ...v2.preferences, keyboard: invalid },
+      }),
+      false,
+    );
   for (const changed of [
     { ...body, action: 'submit' },
     { ...body, transaction: 'packet' },

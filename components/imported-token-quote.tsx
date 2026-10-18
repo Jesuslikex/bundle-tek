@@ -282,6 +282,7 @@ export function ImportedTokenQuote({
           />
           {side === 'Buy' && (
             <BuyAmountPresets
+              contextKey={`${project.id}:${project.revision}:${project.document.token.address}`}
               disabled={busy || savingSettings}
               onAmountChange={onAmountChange}
             />

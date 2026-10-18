@@ -31,8 +31,33 @@ export function allowedLocalPost(path, body) {
     required.every((k) => Object.hasOwn(body, k));
   if (path === '/api/trade-amount-preferences') {
     const p = body?.preferences;
-    const presetKeys = ['format', 'buySol', 'sellBalanceBps', 'sellSupplyBps'];
+    const extended = p?.format === 'trade-amount-presets-v2';
+    const presetKeys = [
+      'format',
+      'buySol',
+      'sellBalanceBps',
+      'sellSupplyBps',
+      ...(extended ? ['keyboard'] : []),
+    ];
     const list = (v) => Array.isArray(v) && v.length >= 1 && v.length <= 8;
+    const keyboard = p?.keyboard;
+    const keyLists =
+      keyboard &&
+      typeof keyboard === 'object' &&
+      !Array.isArray(keyboard) &&
+      Object.keys(keyboard).sort().join(',') === 'buy,sellBalance,sellSupply'
+        ? [keyboard.buy, keyboard.sellBalance, keyboard.sellSupply]
+        : null;
+    const validKeyboard =
+      keyLists &&
+      keyLists.every(
+        (v) =>
+          Array.isArray(v) &&
+          v.length === 8 &&
+          v.every((k) => typeof k === 'string' && /^[a-z0-9]?$/.test(k)),
+      ) &&
+      new Set(keyLists.flat().filter(Boolean)).size ===
+        keyLists.flat().filter(Boolean).length;
     return Boolean(
       keys(['ownerId', 'preferences', 'revision']) &&
       typeof body.ownerId === 'string' &&
@@ -44,9 +69,9 @@ export function allowedLocalPost(path, body) {
       p &&
       typeof p === 'object' &&
       !Array.isArray(p) &&
-      Object.keys(p).length === 4 &&
+      Object.keys(p).length === presetKeys.length &&
       Object.keys(p).every((k) => presetKeys.includes(k)) &&
-      p.format === 'trade-amount-presets-v1' &&
+      (extended ? validKeyboard : p.format === 'trade-amount-presets-v1') &&
       list(p.buySol) &&
       p.buySol.every(
         (v) =>

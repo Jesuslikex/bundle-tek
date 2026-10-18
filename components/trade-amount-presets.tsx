@@ -13,12 +13,14 @@ import {
   presetPercentLabel,
   presetPercentToBps,
   requireTradeAmountPresets,
+  tradePresetKeyboard,
   type TradeAmountPresets,
   type TradeAmountPreferenceView,
 } from '@/lib/trade-amount-preferences';
 import { tradeAmountPreferenceRequest } from '@/lib/trade-amount-preferences-client';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { TradePresetKeyboardPanel } from './trade-preset-keyboard';
 const auth = createAuthClient();
 const changedEvent = 'bundle:trade-amount-presets';
 export function useTradeAmountPresets() {
@@ -125,6 +127,7 @@ const fields = (p: TradeAmountPresets) => ({
   buySol: [...p.buySol],
   sellBalance: p.sellBalanceBps.map((n) => presetPercentLabel(n).slice(0, -1)),
   sellSupply: p.sellSupplyBps.map((n) => presetPercentLabel(n).slice(0, -1)),
+  keyboard: tradePresetKeyboard(p),
 });
 function PresetEditor({ store }: { store: Store }) {
   const [draft, setDraft] = useState(() => fields(store.preferences)),
@@ -149,10 +152,11 @@ function PresetEditor({ store }: { store: Store }) {
     setMessage('');
     try {
       const preferences = requireTradeAmountPresets({
-        format: 'trade-amount-presets-v1',
+        format: 'trade-amount-presets-v2',
         buySol: draft.buySol,
         sellBalanceBps: draft.sellBalance.map(presetPercentToBps),
         sellSupplyBps: draft.sellSupply.map(presetPercentToBps),
+        keyboard: draft.keyboard,
       });
       const next = await store.save(preferences, base);
       if (next) {
@@ -229,6 +233,55 @@ function PresetEditor({ store }: { store: Store }) {
           </fieldset>
         );
       })}
+      <details>
+        <summary>Customize preset keys</summary>
+        <p>
+          One lowercase letter or digit per position. Blank disables a position.
+          Keys must be unique across all lists. Enable keys separately in each
+          panel; they only fill amounts.
+        </p>
+        {(['buy', 'sellBalance', 'sellSupply'] as const).map((kind) => {
+          const label = {
+            buy: 'Buy SOL',
+            sellBalance: 'Sell balance %',
+            sellSupply: 'Sell saved supply %',
+          }[kind];
+          return (
+            <fieldset key={kind} className="my-3">
+              <legend>{label} keys</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {draft.keyboard[kind].map((key, index) => (
+                  <label key={index}>
+                    Position {index + 1}
+                    <Input
+                      aria-label={`${label} key ${index + 1}`}
+                      value={key}
+                      maxLength={1}
+                      autoComplete="off"
+                      disabled={store.busy}
+                      onChange={(event) => {
+                        setDraft({
+                          ...draft,
+                          keyboard: {
+                            ...draft.keyboard,
+                            [kind]: draft.keyboard[kind].map((v, i) =>
+                              i === index
+                                ? event.target.value.toLowerCase()
+                                : v,
+                            ),
+                          },
+                        });
+                        setDirty(true);
+                        setMessage('');
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          );
+        })}
+      </details>
       {conflict && (
         <p role="alert">
           Presets changed in another tab. Reload saved presets before saving
@@ -296,9 +349,11 @@ export function TradeAmountPresetSettings({ store }: { store: Store }) {
 export function BuyAmountPresets({
   disabled,
   onAmountChange,
+  contextKey = 'standalone',
 }: {
   disabled: boolean;
   onAmountChange: (value: string) => void;
+  contextKey?: string;
 }) {
   const store = useTradeAmountPresets();
   return (
@@ -311,22 +366,41 @@ export function BuyAmountPresets({
             : 'Default amount presets'}{' '}
         · fills the amount only.
       </p>
-      <div className="flex flex-wrap gap-2">
-        {store.preferences.buySol.map((amount) => (
-          <Button
-            type="button"
-            key={amount}
-            variant="outline"
-            disabled={disabled}
-            aria-label={`Set buy amount to ${amount} SOL`}
-            onClick={() => {
-              if (!disabled) onAmountChange(amount);
-            }}
-          >
-            {amount} SOL
-          </Button>
-        ))}
-      </div>
+      <TradePresetKeyboardPanel
+        label="Buy preset keyboard panel"
+        scope={JSON.stringify([
+          contextKey,
+          store.ownerId,
+          store.view?.revision,
+          store.preferences,
+        ])}
+        blocked={disabled || store.busy || Boolean(store.error)}
+        actions={store.preferences.buySol.map((amount, index) => ({
+          key: tradePresetKeyboard(store.preferences).buy[index],
+          label: `${amount} SOL`,
+          disabled,
+          select: () => {
+            if (!disabled) onAmountChange(amount);
+          },
+        }))}
+      >
+        <div className="flex flex-wrap gap-2">
+          {store.preferences.buySol.map((amount) => (
+            <Button
+              type="button"
+              key={amount}
+              variant="outline"
+              disabled={disabled}
+              aria-label={`Set buy amount to ${amount} SOL`}
+              onClick={() => {
+                if (!disabled) onAmountChange(amount);
+              }}
+            >
+              {amount} SOL
+            </Button>
+          ))}
+        </div>
+      </TradePresetKeyboardPanel>
       <TradeAmountPresetSettings store={store} />
     </section>
   );
