@@ -139,7 +139,16 @@ it('cancels stale context requests and keeps sign-in and retry actions reachable
   request.mockResolvedValueOnce(new Response(null, { status: 429 }));
   await click('Save finalized receipts');
   expect(host.textContent).toContain('Wait five seconds');
-  expect(host.querySelectorAll('button:disabled')).toHaveLength(0);
+  for (const label of [
+    'Load saved evidence',
+    'Save finalized receipts',
+    'Load saved buys',
+  ]) {
+    expect(
+      [...host.querySelectorAll('button')].find((b) => b.textContent === label)
+        ?.disabled,
+    ).toBe(false);
+  }
 });
 it('times out pending requests without losing the exact retry identity', async () => {
   vi.useFakeTimers();

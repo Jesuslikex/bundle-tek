@@ -8,6 +8,7 @@ import {
 } from '@/lib/account-launch-evidence';
 import styles from './account-launch-evidence.module.css';
 import { AccountLaunchPaymentsPanel } from './account-launch-payments';
+import { AccountLaunchPurchasesPanel } from './account-launch-purchases';
 
 export function AccountLaunchEvidencePanel({
   reviewId,
@@ -202,6 +203,11 @@ export function AccountLaunchEvidencePanel({
           </details>
         </>
       )}
+      <AccountLaunchPurchasesPanel
+        reviewId={reviewId}
+        mint={mint}
+        receipt={entry ? { id: entry.id, sha256: entry.sha256 } : undefined}
+      />
     </details>
   );
 }

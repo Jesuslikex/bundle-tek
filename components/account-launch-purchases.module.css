@@ -1,0 +1,114 @@
+.panel {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+.panel summary::before {
+  content: '›';
+}
+.panel[open] > summary::before,
+.details[open] > summary::before {
+  transform: rotate(90deg);
+}
+.panel p {
+  margin-block: 0.75rem;
+  line-height: 1.6;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-block: 1rem;
+}
+.actions button,
+.panel > button {
+  min-height: 44px;
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+}
+.totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+.totals > div {
+  padding: 0.85rem;
+  background: var(--card, #151720);
+  border-radius: 0.75rem;
+}
+.totals dt {
+  font-size: 0.85rem;
+  color: var(--muted-foreground, #a7afc1);
+}
+.totals dd {
+  margin: 0.35rem 0 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-block: 1rem;
+  padding: 0.75rem;
+  line-height: 1.5;
+  border-radius: 0.75rem;
+  background: var(--card, #151720);
+}
+.consent input {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 0.2rem;
+}
+.details {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+.details details {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+}
+.details code {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.details dd {
+  margin: 0.25rem 0 0.75rem;
+}
+.panel output {
+  display: block;
+  margin-block: 0.75rem;
+}
+@media (max-width: 480px) {
+  .panel {
+    padding: 0.8rem;
+  }
+  .totals {
+    grid-template-columns: 1fr;
+  }
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .actions button {
+    width: 100%;
+  }
+  .panel > button {
+    width: 100%;
+  }
+}
