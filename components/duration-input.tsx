@@ -10,12 +10,14 @@ export function DurationInput({
   onChange,
   disabled,
   maximumSeconds,
+  emptyLabel = 'Set a duration to review its exact total.',
 }: {
   label: string;
   value: DurationParts;
   onChange: (value: DurationParts) => void;
   disabled?: boolean;
   maximumSeconds?: number;
+  emptyLabel?: string;
 }) {
   const id = useId();
   const parsed = parseDurationParts(value, maximumSeconds);
@@ -58,7 +60,7 @@ export function DurationInput({
       ) : (
         <output id={`${id}-result`} aria-live="polite">
           {parsed.seconds === null
-            ? 'Set a duration to review its exact total.'
+            ? emptyLabel
             : `${parsed.seconds.toLocaleString('en-US')} seconds total`}
         </output>
       )}

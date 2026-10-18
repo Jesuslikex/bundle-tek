@@ -757,6 +757,13 @@
       "when": 1792771200000,
       "tag": "0107_volume_bundle_recovery",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "6",
+      "when": 1792857600000,
+      "tag": "0108_strategy_session_drafts",
+      "breakpoints": true
     }
   ]
 }

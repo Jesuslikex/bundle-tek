@@ -30,6 +30,7 @@ import { ImportedSwapPreparation } from './imported-swap-preparation';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
 import { SessionEntryOutcomesPanel } from './session-entry-outcomes';
 import { DcaTradeSession } from './dca-trade-session';
+import { StrategySessionPlanner } from './strategy-session-planner';
 import { CounterTradePanel } from './counter-trade-panel';
 import { VolumeBotPanel } from './volume-bot-panel';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
@@ -337,6 +338,11 @@ export function ImportedTradeSessions({
       aria-label="Multi-wallet trade sessions"
     >
       <h4>Multi-wallet trade sessions</h4>
+      <StrategySessionPlanner
+        project={project}
+        wallets={wallets}
+        locked={locked || busy}
+      />
       <DcaTradeSession
         key={`${project.id}:${project.revision}:${project.archived}`}
         project={project}
