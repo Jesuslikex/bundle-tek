@@ -8,6 +8,7 @@ const readPosts = new Set([
   '/api/wallet-workspace/balances',
 ]);
 const authPosts = new Set([
+  '/api/auth/sign-up/email',
   '/api/auth/sign-in/email',
   '/api/auth/sign-out',
   '/api/auth/get-session',
@@ -56,7 +57,13 @@ function refuse(res, status, message) {
     'cache-control': 'no-store',
     'x-bundle-local-mode': 'no-transactions',
   });
-  res.end(JSON.stringify({ error: message, code: 'LOCAL_VERIFICATION_ONLY' }));
+  res.end(
+    JSON.stringify({
+      error: message,
+      message,
+      code: 'LOCAL_VERIFICATION_ONLY',
+    }),
+  );
 }
 
 /** The private upstream is reachable only through this exact-origin filter. */

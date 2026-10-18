@@ -16,7 +16,6 @@ await test('allows only warmup review actions, never packet registration or subm
     '/api/imported-projects/swaps',
     '/api/wallet-workspace/withdrawals',
     '/api/wallet-workspace',
-    '/api/auth/sign-up/email',
   ])
     assert.equal(allowedLocalPost(target, { action: 'submit' }), false);
   assert.equal(
@@ -113,12 +112,18 @@ await test('real HTTP forwarding preserves auth headers and blocks forbidden req
       body: '{"email":"fixture@example.invalid","password":"synthetic"}',
     });
     assert.equal(login.status, 200);
+    const signup = await request('/api/auth/sign-up/email', {
+      body: '{"name":"Fixture","email":"fixture@example.invalid","password":"synthetic"}',
+    });
+    assert.equal(signup.status, 200);
+    assert.equal(seen[3].path, '/api/auth/sign-up/email');
     for (const action of ['register', 'submit']) {
       const refused = await request('/api/wallet-workspace/warmup/signing', {
         body: JSON.stringify({ action }),
       });
       assert.equal(refused.status, 403);
       assert.match(refused.body, /LOCAL_VERIFICATION_ONLY/);
+      assert.equal(typeof JSON.parse(refused.body).message, 'string');
     }
     assert.equal(
       (await request('/api/wallet-workspace/withdrawals')).status,
@@ -162,7 +167,7 @@ await test('real HTTP forwarding preserves auth headers and blocks forbidden req
       ).status,
       413,
     );
-    assert.equal(seen.length, 3);
+    assert.equal(seen.length, 4);
   } finally {
     await Promise.all([
       new Promise((resolve) => edge.close(resolve)),
