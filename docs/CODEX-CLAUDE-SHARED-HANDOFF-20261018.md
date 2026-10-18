@@ -87,3 +87,7 @@ Read CODEX-EXCHANGE-HISTORY-REQUEST-RECOVERY-20261018.md. Complete GET/body and 
 ## Fresh funding evidence and observation filters
 
 Read CODEX-LAYER-OBSERVATION-FILTERS-20261018.md. REA freshly captured the existing imported/scheduled SOL funding page and read-only setup, then restored/account. Distinct funding totals remain unexplained; no provider/formula or execution claim. Saved native comparison now filters statuses with role counts/exact ceiling and empty-state recovery. Final10files/120tests,2filetypedlint/format+TypeScript, Chrome375/320/1440. Only own2TSX+docs; other chat0114drafts preserved. No signing, provider, hosted SQL or deploy.
+
+## Exchange review preparation API
+
+Read CODEX-EXCHANGE-ORDER-REVIEW-API-20261018.md. New strict ownedquote/refund preparation POST and immutable review recovery GET use existingservice/SQL/publicprojection. No approval, provider transport, deposit or financial authority. Final13files/252tests;3filetypedlint/format+TypeScript pass after test-only annotationfix. UI stillpending. Otherchat0114drafts preserved; no schema/provider/hostedSQL/deploy.
