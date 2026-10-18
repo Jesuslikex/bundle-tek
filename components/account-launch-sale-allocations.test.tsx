@@ -54,8 +54,8 @@ beforeEach(async () => {
   evidence = null;
   request.mockReset();
   request.mockImplementation(async (input, init) => {
-    const url = String(input);
-    const body = init?.body ? JSON.parse(String(init.body)) : null;
+    const url = input as string;
+    const body = init?.body ? JSON.parse(init.body as string) : null;
     const summary = {
       receiptId: saleId,
       mint: f.context.mint,
@@ -173,12 +173,11 @@ async function click(label: string) {
 const until = (text: string) =>
   vi.waitFor(() => expect(host.textContent).toContain(text));
 async function type(input: HTMLInputElement, value: string) {
-  const set = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    'value',
-  )!.set!;
   await act(async () => {
-    set.call(input, value);
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
@@ -210,7 +209,7 @@ it('stays idle until asked, then captures, reviews, requires approval, saves and
   expect(
     writes.map(([u, i]) => [
       u,
-      JSON.parse(String(i!.body)).action ?? 'capture',
+      JSON.parse(i!.body as string).action ?? 'capture',
     ]),
   ).toEqual([
     ['/api/account-launch-activity/sale-evidence', 'capture'],
