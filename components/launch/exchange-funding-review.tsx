@@ -273,8 +273,10 @@ function ExchangeFundingReviewContent({
         <li>4. Distribute</li>
       </ol>
       <p className={styles.note}>
-        Deposit, payout verification and distribution handoff are not connected
-        yet. No deposit address or payment is requested here.
+        Deposit and distribution handoff are not connected yet. For retained
+        orders with a finished provider report, open Saved exchange orders below
+        to verify the finalized payout. No deposit address or payment is
+        requested here.
       </p>
       <div className={styles.address}>
         <span>Receiving funder</span>

@@ -47,6 +47,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 it('reads only on explicit open and explains that a saved quote is not an order', async () => {
   fixture.page.items = [];
@@ -357,4 +358,65 @@ it('aborts payout checks when the funding plan changes and ignores late results'
   expect(signal?.aborted).toBe(true);
   await act(async () => resolve(Response.json({ order: verifiedPayout() })));
   expect(container.textContent).not.toContain(fixture.funder.address);
+});
+
+it('releases a stuck history read at its deadline and supports explicit reload without a retry', async () => {
+  vi.useFakeTimers();
+  let signal!: AbortSignal;
+  fetcher.mockImplementationOnce((_input, init) => {
+    signal = init!.signal!;
+    return new Promise<Response>(() => {});
+  });
+  await mount();
+  await click('View saved exchange orders');
+  expect(button('Reload saved orders').disabled).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(30000));
+  expect(signal.aborted).toBe(true);
+  expect(button('Reload saved orders').disabled).toBe(false);
+  expect(container.querySelector('[role=alert]')).not.toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  await click('Reload saved orders');
+  expect(container.querySelectorAll('li')).toHaveLength(1);
+});
+it('stops a history body reader that ignores cancellation and ignores its late result', async () => {
+  let resolve!: (v: unknown) => void;
+  fetcher.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  } as Response);
+  await mount();
+  await click('View saved exchange orders');
+  await click('Stop loading saved history');
+  await act(async () => resolve(fixture.page));
+  expect(container.querySelectorAll('li')).toHaveLength(0);
+  await click('Reload saved orders');
+  expect(container.querySelectorAll('li')).toHaveLength(1);
+});
+it('settles a payout response body timeout and offers saved-result recovery without sending again', async () => {
+  await openPayout();
+  vi.useFakeTimers();
+  let resolve!: (v: unknown) => void;
+  fetcher.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  } as Response);
+  await click('Verify finalized payout');
+  await act(async () => vi.advanceTimersByTimeAsync(35000));
+  expect(container.textContent).toContain(
+    'a receipt may already have been saved',
+  );
+  expect(button('Reload this saved order').disabled).toBe(false);
+  await act(async () => resolve({ order: verifiedPayout() }));
+  expect(container.textContent).not.toContain('Finalized payout:');
+  expect(
+    fetcher.mock.calls.filter(([, init]) => init?.method === 'POST'),
+  ).toHaveLength(1);
 });

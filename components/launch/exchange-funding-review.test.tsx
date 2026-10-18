@@ -137,8 +137,9 @@ it('loads setup and saved history with no provider mutation or payment action', 
   expect(fetcher).toHaveBeenCalledTimes(3);
   expect(postCalls()).toHaveLength(0);
   expect(container.textContent).toContain(
-    'Deposit, payout verification and distribution handoff are not connected',
+    'Deposit and distribution handoff are not connected',
   );
+  expect(container.textContent).toContain('verify the finalized payout');
   expect(
     Array.from(container.querySelectorAll('button')).some((b) =>
       /sign|deposit|distribute/i.test(b.textContent ?? ''),

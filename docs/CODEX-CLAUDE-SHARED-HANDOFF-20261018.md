@@ -79,3 +79,7 @@ Read CODEX-EXCHANGE-PAYOUT-API-20261018.md. The REA chat added a strict authenti
 ## Exchange payout history action
 
 Read CODEX-EXCHANGE-PAYOUT-UI-20261018.md. The REA chat wires explicit saved-order finalized verification, exact response binding, progress/cancellation and GET recovery in its exchange history component. Final11files/240tests, scoped lint/format and TypeScript before the newer other-chat purchase-cost drafts; synthetic Chrome375/320/1440 proof. No account/schema/layout/provider/financial authority or deploy change. Provider order/deposit and funded proof remain open.
+
+## Bounded exchange history recovery
+
+Read CODEX-EXCHANGE-HISTORY-REQUEST-RECOVERY-20261018.md. Complete GET/body and verification/body reads now have bounded cancellation, late-result refusal and explicit stopped-history reload; quote text points to the working payout check. Final12files/246tests, six-file typed lint/format and TypeScript pass. Synthetic Chrome375stop/reload proof. Other chat purchase-cost drafts/0114claim preserved. No provider, signing, hosted SQL or deployment change.

@@ -1,0 +1,9 @@
+# Bounded exchange history reads
+
+18 October 2026, continuation after448c61e. The saved exchange order UI now bounds complete GET and verification requests, including response body parsing, with a shared client helper. GETs stop after30seconds; payout verification after35seconds. Parent cancellation aborts the child signal and settles ignored transport/body readers; timers and listeners are removed on every exit. Late results cannot replace a newer view. There are no automatic retries.
+
+A visible Stop loading saved history action releases the loading state and offers an explicit reload. Verification keeps its separate stop-waiting language because the server might already have saved a receipt. The exchange quote panel now accurately points to finalized verification in saved history while explaining that deposit and distribution handoff are still unavailable.
+
+Verification: pinned Node24 and offline envDir:false Vitest, two workers;12exchange files/246tests all pass together. Controlled-clock tests cover the exact30second deadline, cancellation before start, cleanup after success/failure, a body reader ignoring cancellation, late responses and35second verification recovery with exactly one POST. Six changed TypeScript/TSX files pass typed lint and formatting; whole-project TypeScript terminal0. Other concurrent payment drafts were not changed or staged.
+
+Actual component Chrome fixture at375px: stuck history, explicit stop, clear message, then successful saved-history reload with no sideways scroll. Proof image: work/exchange-payout-ui-qa-20261018/history-stopped-375.png. Prior responsive receipt evidence remains in CODEX-EXCHANGE-PAYOUT-UI-20261018.md. Browser responses are synthetic; no provider, funded action, hosted SQL or deployment was exercised. No new full-suite or production build is claimed. Exchange provider setup, orders/deposits and funded proof remain open.

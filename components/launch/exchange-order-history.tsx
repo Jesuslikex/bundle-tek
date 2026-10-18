@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { readWorkspaceResponse } from '@/lib/workspace-response';
+import { exchangeUiRequest } from '@/lib/exchange-ui-request';
 import { exchangeSolDisplay } from '@/lib/exchange-funding-review';
 import {
   decodeExchangeOrderHistory,
@@ -50,19 +51,28 @@ function History({ planId }: { planId: string }) {
         : 'planId=' +
           encodeURIComponent(planId) +
           (before ? '&before=' + encodeURIComponent(before) : '');
-      const response = await fetch('/api/funding/exchange-orders?' + query, {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      if (response.status === 401 && request === generation.current) {
-        failure = 'Sign in to read saved exchange orders.';
-        setPage(null);
-        setDetail(null);
-      }
-      const body = await readWorkspaceResponse(
-        response,
-        'Saved exchange orders are unavailable. Reload to try again.',
-        'Sign in to read saved exchange orders.',
+      const body = await exchangeUiRequest(
+        controller.signal,
+        async (signal) => {
+          const response = await fetch(
+            '/api/funding/exchange-orders?' + query,
+            {
+              cache: 'no-store',
+              signal,
+            },
+          );
+          signal.throwIfAborted();
+          if (response.status === 401 && request === generation.current) {
+            failure = 'Sign in to read saved exchange orders.';
+            setPage(null);
+            setDetail(null);
+          }
+          return readWorkspaceResponse(
+            response,
+            'Saved exchange orders are unavailable. Reload to try again.',
+            'Sign in to read saved exchange orders.',
+          );
+        },
       );
       if (controller.signal.aborted || request !== generation.current) return;
       if (id) {
@@ -108,32 +118,34 @@ function History({ planId }: { planId: string }) {
     let failure =
       'Verification did not return a confirmed result. Reload this saved order before trying again; a receipt may already have been saved.';
     try {
-      const signal = AbortSignal.any([
+      const body = await exchangeUiRequest(
         controller.signal,
-        AbortSignal.timeout(35000),
-      ]);
-      const response = await fetch('/api/funding/exchange-payout', {
-        method: 'POST',
-        cache: 'no-store',
-        signal,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: selected.id, sha256: selected.sha256 }),
-      });
-      signal.throwIfAborted();
-      if (controller.signal.aborted || request !== generation.current) return;
-      if (response.status === 401) {
-        failure = 'Sign in to verify a saved payout.';
-        setPage(null);
-        setDetail(null);
-      } else if (response.status === 429) {
-        failure =
-          'Verification is rate limited. Wait at least 15 seconds before checking again. You can reload saved evidence without contacting the provider.';
-      } else if (response.status === 409) {
-        failure =
-          'The saved order or finalized payment evidence could not be matched. Reload this order; its hold remains in place.';
-      }
-      const body = await readWorkspaceResponse(response, failure, failure);
-      signal.throwIfAborted();
+        async (signal) => {
+          const response = await fetch('/api/funding/exchange-payout', {
+            method: 'POST',
+            cache: 'no-store',
+            signal,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ id: selected.id, sha256: selected.sha256 }),
+          });
+          signal.throwIfAborted();
+          if (controller.signal.aborted || request !== generation.current)
+            throw new Error('Context changed.');
+          if (response.status === 401) {
+            failure = 'Sign in to verify a saved payout.';
+            setPage(null);
+            setDetail(null);
+          } else if (response.status === 429) {
+            failure =
+              'Verification is rate limited. Wait at least 15 seconds before checking again. You can reload saved evidence without contacting the provider.';
+          } else if (response.status === 409) {
+            failure =
+              'The saved order or finalized payment evidence could not be matched. Reload this order; its hold remains in place.';
+          }
+          return readWorkspaceResponse(response, failure, failure);
+        },
+        35000,
+      );
       const saved = decodeExchangeOrderHistoryDetail(body.order);
       if (
         saved.id !== selected.id ||
@@ -218,6 +230,22 @@ function History({ planId }: { planId: string }) {
                 ? 'Checking finalized payout evidence…'
                 : 'Loading saved exchange history…'}
             </output>
+          )}
+          {busy && !verifying && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                generation.current++;
+                pending.current?.abort();
+                setBusy(false);
+                setError(
+                  'Stopped loading saved history. Reload saved orders to try again.',
+                );
+              }}
+            >
+              Stop loading saved history
+            </Button>
           )}
           {verifying && (
             <Button
