@@ -14,7 +14,8 @@ const saleId = 'cccccccc-cccc-cccc-cccc-cccccccccccc',
   projectId = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 const json = (v: unknown, status = 200) =>
   new Response(JSON.stringify(v), { status });
-let saved: unknown = null,
+let lose = false,
+  saved: unknown = null,
   evidence: unknown = null,
   plan: Record<string, unknown>;
 beforeEach(async () => {
@@ -52,6 +53,7 @@ beforeEach(async () => {
   plan = { ...core, sha256: await launchPurchaseDigest(core) };
   saved = null;
   evidence = null;
+  lose = false;
   request.mockReset();
   request.mockImplementation(async (input, init) => {
     const url = input as string;
@@ -125,6 +127,13 @@ beforeEach(async () => {
     }
     if (url.includes('/purchases')) return json(f.history);
     if (url.includes('/sale-allocations')) {
+      // Real contract: allocation reads need retained sale evidence.
+      if (!evidence)
+        return json({ error: 'Retained sale evidence was not found.' }, 404);
+      if (init?.method === 'POST' && body.action === 'record' && lose) {
+        saved = plan;
+        throw new TypeError('Failed to fetch');
+      }
       if (init?.method === 'POST' && body.action === 'review')
         return json({ plan, executionAllowed: false, profitCalculated: false });
       if (init?.method === 'POST' && body.action === 'record') {
@@ -244,4 +253,113 @@ it('explains a missing import instead of showing an empty sales list', async () 
   request.mockImplementationOnce(async () => json({ projects: [] }));
   await click('Find sales');
   await until('No imported token matches this mint');
+});
+
+const retained = () => ({
+  sha256: 'a'.repeat(64),
+  observedAt: 'x',
+  slot: 300,
+  tokenUnitsRaw: '1000',
+  networkFeeLamports: '0',
+  nativeSettlementRaw: '0',
+  executionAllowed: false,
+  profitCalculated: false,
+});
+async function reviewed() {
+  await click('Find sales');
+  await click('1000 raw units, slot 300');
+  await until('Assign all of them');
+  await type(
+    host.querySelector<HTMLInputElement>('input[inputmode=numeric]')!,
+    '1000',
+  );
+  await click('Review assignment');
+  await until(String(plan.sha256));
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(),
+  );
+}
+it('skips the allocation read until evidence is retained', async () => {
+  await click('Find sales');
+  await click('1000 raw units, slot 300');
+  await until('not retained yet');
+  expect(
+    request.mock.calls.some(([u]) =>
+      (u as string).includes('/sale-allocations'),
+    ),
+  ).toBe(false);
+});
+it('never sends a second record after a lost save, and recovers from a saved-only read', async () => {
+  evidence = retained();
+  lose = true;
+  await reviewed();
+  await click('Save assignment');
+  await until('Failed to fetch');
+  expect(button('Save assignment')).toBeUndefined();
+  expect(
+    host.querySelector<HTMLInputElement>('input[type=checkbox]'),
+  ).toBeNull();
+  expect(button('Find sales')!.disabled).toBe(true);
+  await click('Check saved status');
+  await until('Saved. These buys were recorded');
+  const records = request.mock.calls.filter(
+    ([, i]) =>
+      i?.method === 'POST' &&
+      (JSON.parse(i.body as string) as { action?: string }).action === 'record',
+  );
+  expect(records).toHaveLength(1);
+});
+it('clears all state when the launch changes and ignores the old response', async () => {
+  evidence = retained();
+  await reviewed();
+  let release!: () => void;
+  request.mockImplementationOnce(
+    (_u, i) =>
+      new Promise((resolve, reject) => {
+        i?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('x', 'AbortError')),
+        );
+        release = () => resolve(json({ projects: [] }));
+      }),
+  );
+  await act(async () =>
+    root.render(
+      <AccountLaunchSaleAllocationsPanel
+        reviewId={f.context.reviewId}
+        mint="Other111111111111111111111111111111111111"
+      />,
+    ),
+  );
+  expect(host.textContent).not.toContain(String(plan.sha256));
+  expect(host.textContent).not.toContain('Finalized sells');
+  release?.();
+});
+it('rejects an oversized response without buffering it whole', async () => {
+  request.mockImplementationOnce(async () => new Response('x'.repeat(1048577)));
+  await click('Find sales');
+  await until('Response is too large');
+});
+it('drops consent when only the launch review changes, and does not restore it on return', async () => {
+  evidence = retained();
+  await reviewed();
+  const other = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+  await act(async () =>
+    root.render(
+      <AccountLaunchSaleAllocationsPanel
+        reviewId={other}
+        mint={f.context.mint}
+      />,
+    ),
+  );
+  expect(button('Save assignment')).toBeUndefined();
+  await act(async () =>
+    root.render(
+      <AccountLaunchSaleAllocationsPanel
+        reviewId={f.context.reviewId}
+        mint={f.context.mint}
+      />,
+    ),
+  );
+  expect(button('Save assignment')).toBeUndefined();
+  expect(host.querySelector('input[type=checkbox]')).toBeNull();
 });
