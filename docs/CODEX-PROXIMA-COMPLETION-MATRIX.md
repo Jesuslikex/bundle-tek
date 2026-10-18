@@ -2,6 +2,8 @@
 
 ## Latest local UX checkpoint, 18 October 2026
 
+Fresh user-directed REA inspection also confirms a distinct missing launch feature: separate Front MEV and Back MEV funding roles, followed by distribution and launch. The selected SOL draft has one Front MEV and two Back MEV wallets, separately from five holders. Existing Jito/RPC notices and deployer/holder funding do not implement that flow. See CODEX-PROXIMA-FRONT-BACK-MEV-20261018.md. No financial action or backend parity is claimed.
+
 The full goal remains incomplete. The long dated entries below are historical evidence, not a current release checklist. Production and GitHub were rechecked before eb13ac5: production dpl_4ocNd22BwNpvTsTeHyxTWDUMZ3Pa and origin/main both point to ea0a120. Newer local work is not deployed. No hosted migration was run in this continuation; the separately reported remote0101/local0102 difference still needs release verification.
 
 Volume has exact HMS timing (120faf9), captured USD targets and numeric Organic intensity (eb13ac5). The intensity checkpoint passed84 tests/six files, plain TypeScript/scoped lint, a combined build and isolated1440/375px UI checks. Legacy plans retain six pre-edit serialized digests. Historical Proxima client analysis confirms its slider control, not backend distribution. Same-block Volume Bundle mode and total tip budget remain open. Read CODEX-VOLUME-WAVE-20261018.md.

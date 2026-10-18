@@ -1,5 +1,9 @@
 # Bundle transaction delivery and MEV audit
 
+## Scope correction: Front / Back MEV launch wallets
+
+The user's later clarification concerns separately funded launch-wallet roles. Fresh REA inspection of the selected SOL funding page and its Launch Setup dialog confirms one Front MEV wallet, two Back MEV wallets and five holders, with separate nonzero MEV funding targets and Distribute/Launch steps. These are not established by this document's RPC/Jito delivery audit. In particular, the BNB image noted in the earlier passive capture was insufficient to identify the launch's quote chain; the new setup explicitly shows SOL. Read CODEX-PROXIMA-FRONT-BACK-MEV-20261018.md for live evidence, historical client hints, private capture references and the currently missing Bundle role-aware flow. No funds were moved and no launch submitted.
+
 18 October 2026. Source at 0d6ecff plus display-only delivery notices. Audit is static source inspection, regression tests and one passive Proxima page observation. No transaction, provider setting, credential, private wallet access or deployment changed.
 
 ## Current paths
