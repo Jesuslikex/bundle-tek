@@ -1,3 +1,7 @@
+import {
+  captureVolumeUsdTarget,
+  VOLUME_NATIVE_MINT,
+} from '@/lib/volume-usd-target';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -224,14 +228,7 @@ it('signs an approved batch locally, registers it and sends each trade once', as
   const pass = container.querySelector(
     'input[type=password]',
   ) as HTMLInputElement;
-  await act(async () => {
-    const set = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      'value',
-    )!.set!;
-    set.call(pass, 'panel synthetic vault');
-    pass.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await changeControl(pass, 'panel synthetic vault');
   await act(async () => button('Unlock wallets').click());
   await vi.waitFor(() =>
     expect(container.textContent).toContain('Wallets unlocked'),
@@ -262,3 +259,227 @@ it('signs an approved batch locally, registers it and sends each trade once', as
     calls.filter((c) => c.payload?.action === 'send').map((c) => c.payload),
   ).toEqual([{ action: 'send', batchId: review.id, index: 0 }]);
 }, 30_000);
+
+function usdQuote() {
+  const at = new Date().toISOString();
+  return captureVolumeUsdTarget(
+    {
+      id: '00000000-0000-4000-8000-000000000010',
+      projectId: PROJECT,
+      projectRevision: 2,
+      targetUsd: '100',
+    },
+    {
+      chain: 'Solana',
+      address: VOLUME_NATIVE_MINT,
+      observedAt: at,
+      source: 'api.dexscreener.com',
+      returnedPairCount: 1,
+      quoteOnlyPairCount: 0,
+      executionAllowed: false,
+      pairs: [
+        {
+          address: VOLUME_NATIVE_MINT,
+          dex: 'synthetic',
+          url: 'https://dexscreener.com',
+          quoteSymbol: 'USDC',
+          priceUsd: '200',
+          liquidityUsd: 100000,
+          volume24hUsd: null,
+          change24h: null,
+          marketCapUsd: null,
+        },
+      ],
+    },
+    Date.now(),
+  );
+}
+async function changeControl(
+  element: HTMLInputElement | HTMLSelectElement,
+  value: string,
+) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      element instanceof HTMLSelectElement
+        ? HTMLSelectElement.prototype
+        : HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(element, value);
+    element.dispatchEvent(
+      new Event(element instanceof HTMLSelectElement ? 'change' : 'input', {
+        bubbles: true,
+      }),
+    );
+  });
+}
+async function openUsd() {
+  await act(async () =>
+    root.render(
+      <VolumeBotPanel project={project} wallets={[wallet()]} locked={false} />,
+    ),
+  );
+  await act(async () => button('Open Volume Bot').click());
+  await settle();
+  await changeControl(container.querySelector('select')!, 'USD');
+  await act(async () =>
+    (
+      container.querySelector('input[type=checkbox]') as HTMLInputElement
+    ).click(),
+  );
+}
+it('captures USD explicitly and requires an unchecked fixed-SOL acknowledgement before saving', async () => {
+  const quote = usdQuote();
+  respond = (payload) =>
+    payload?.action === 'quote-usd-target'
+      ? { quote, executionAllowed: false }
+      : payload?.action === 'estimate'
+        ? {
+            plan: planVolumeSession(
+              payload.terms as never,
+              [{ address, lamports: '10000000000' }],
+              payload.seed as string,
+              quote,
+            ),
+          }
+        : payload?.action === 'create'
+          ? { id: 's' }
+          : { sessions: [] };
+  await openUsd();
+  expect(button('Estimate').disabled).toBe(true);
+  expect(calls.some((c) => c.payload?.action === 'quote-usd-target')).toBe(
+    false,
+  );
+  await act(async () => button('Capture USD conversion').click());
+  await settle();
+  expect(container.textContent).toContain('$100 converts to 0.5 SOL');
+  await act(async () => button('Estimate').click());
+  await settle();
+  const save = button('Save session and reserve wallets');
+  expect(save.disabled).toBe(true);
+  const ack = [...container.querySelectorAll('input[type=checkbox]')].at(
+    -1,
+  ) as HTMLInputElement;
+  expect(ack.checked).toBe(false);
+  await act(async () => ack.click());
+  expect(save.disabled).toBe(false);
+  await act(async () => save.click());
+  await settle();
+  expect(
+    calls.find((c) => c.payload?.action === 'create')?.payload?.usdQuoteId,
+  ).toBe(quote.id);
+  expect(
+    calls.some((c) =>
+      ['register', 'send', 'prepare-batch'].includes(String(c.payload?.action)),
+    ),
+  ).toBe(false);
+});
+it('clears captured conversion when the target changes and refuses expired conversion', async () => {
+  const quote = usdQuote();
+  respond = (p) =>
+    p?.action === 'quote-usd-target'
+      ? { quote, executionAllowed: false }
+      : { sessions: [] };
+  await openUsd();
+  await act(async () => button('Capture USD conversion').click());
+  await settle();
+  const input = container.querySelector(
+    'input[inputmode=decimal]',
+  ) as HTMLInputElement;
+  await changeControl(input, '120');
+  expect(container.textContent).not.toContain('$100 converts');
+  expect(button('Estimate').disabled).toBe(true);
+  await changeControl(input, '100');
+  await act(async () => button('Capture USD conversion').click());
+  await settle();
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Date.parse(quote.expiresAt));
+  try {
+    await act(async () => button('Estimate').click());
+    await settle();
+    expect(container.textContent).toContain('Capture a fresh USD conversion');
+  } finally {
+    clock.mockRestore();
+  }
+  expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
+});
+it('ignores a pending USD capture after the target draft changes', async () => {
+  const quote = usdQuote();
+  let resolve!: (v: unknown) => void;
+  respond = (p) =>
+    p?.action === 'quote-usd-target'
+      ? new Promise((r) => {
+          resolve = r;
+        })
+      : { sessions: [] };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, options: RequestInit) => {
+      const payload = options.body ? JSON.parse(options.body as string) : null;
+      calls.push({ url, payload });
+      return Response.json(await respond(payload));
+    }),
+  );
+  await openUsd();
+  await act(async () => button('Capture USD conversion').click());
+  await changeControl(
+    container.querySelector<HTMLInputElement>('input[inputmode=decimal]')!,
+    '120',
+  );
+  await act(async () => resolve({ quote, executionAllowed: false }));
+  await settle();
+  expect(container.textContent).not.toContain('$100 converts');
+  expect(button('Estimate').disabled).toBe(true);
+});
+
+it('discards an in-flight estimate when settings change', async () => {
+  let resolve!: (v: unknown) => void;
+  let pending: Record<string, unknown> | null = null;
+  respond = (p) => {
+    if (p?.action === 'estimate') {
+      pending = p;
+      return new Promise((r) => {
+        resolve = r;
+      });
+    }
+    return { sessions: [] };
+  };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, options: RequestInit) => {
+      const payload = options.body ? JSON.parse(options.body as string) : null;
+      calls.push({ url, payload });
+      return Response.json(await respond(payload));
+    }),
+  );
+  await act(async () =>
+    root.render(
+      <VolumeBotPanel project={project} wallets={[wallet()]} locked={false} />,
+    ),
+  );
+  await act(async () => button('Open Volume Bot').click());
+  await settle();
+  await act(async () =>
+    (
+      container.querySelector('input[type=checkbox]') as HTMLInputElement
+    ).click(),
+  );
+  await act(async () => button('Estimate').click());
+  await changeControl(
+    container.querySelector<HTMLInputElement>('input[inputmode=decimal]')!,
+    '2',
+  );
+  const request = pending! as Record<string, unknown>;
+  await act(async () =>
+    resolve({
+      plan: planVolumeSession(
+        request.terms as never,
+        [{ address, lamports: '10000000000' }],
+        request.seed as string,
+      ),
+    }),
+  );
+  await settle();
+  expect(container.textContent).not.toContain('Round trips');
+  expect(button('Save session and reserve wallets')).toBeUndefined();
+});

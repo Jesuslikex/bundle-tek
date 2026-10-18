@@ -715,6 +715,13 @@
       "when": 1792233000000,
       "tag": "0101_referrals",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "6",
+      "when": 1792339200000,
+      "tag": "0102_volume_usd_targets",
+      "breakpoints": true
     }
   ]
 }

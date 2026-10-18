@@ -8,6 +8,13 @@ export type VolumeBotAction =
       projectRevision: number;
       terms: VolumeTerms;
       seed: string;
+      usdQuoteId?: string;
+    }
+  | {
+      action: 'quote-usd-target';
+      projectId: string;
+      projectRevision: number;
+      targetUsd: string;
     }
   | { action: 'prepare-batch' | 'cancel'; sessionId: string }
   | {
@@ -33,9 +40,31 @@ export function parseVolumeBotRequest(body: unknown): VolumeBotAction {
   const input = body as Record<string, unknown> | null;
   if (!input || typeof input !== 'object' || Array.isArray(input)) bad();
   switch (input!.action) {
+    case 'quote-usd-target': {
+      keys(input!, 'action,projectId,projectRevision,targetUsd');
+      if (
+        !Number.isSafeInteger(input!.projectRevision) ||
+        Number(input!.projectRevision) < 1 ||
+        typeof input!.targetUsd !== 'string' ||
+        !/^(0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(input!.targetUsd) ||
+        BigInt(input!.targetUsd.replace('.', '')) === 0n
+      )
+        bad();
+      return {
+        action: 'quote-usd-target',
+        projectId: uuid(input!.projectId),
+        projectRevision: Number(input!.projectRevision),
+        targetUsd: input!.targetUsd as string,
+      };
+    }
     case 'estimate':
     case 'create': {
-      keys(input!, 'action,projectId,projectRevision,seed,terms');
+      keys(
+        input!,
+        Object.hasOwn(input!, 'usdQuoteId')
+          ? 'action,projectId,projectRevision,seed,terms,usdQuoteId'
+          : 'action,projectId,projectRevision,seed,terms',
+      );
       if (
         !Number.isSafeInteger(input!.projectRevision) ||
         Number(input!.projectRevision) < 1 ||
@@ -49,6 +78,9 @@ export function parseVolumeBotRequest(body: unknown): VolumeBotAction {
         projectRevision: Number(input!.projectRevision),
         terms: volumeTerms(input!.terms),
         seed: input!.seed as string,
+        ...(Object.hasOwn(input!, 'usdQuoteId')
+          ? { usdQuoteId: uuid(input!.usdQuoteId) }
+          : {}),
       };
     }
     case 'prepare-batch':
