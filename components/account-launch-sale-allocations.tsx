@@ -32,14 +32,15 @@ const short = (v: string) => `${v.slice(0, 6)}…${v.slice(-4)}`;
 
 /** Owner-driven assignment of recorded launch buys to one finalized sale.
  * Nothing is fetched on mount, nothing retries, and no transaction is signed. */
-export function AccountLaunchSaleAllocationsPanel({
-  reviewId,
-  mint,
-}: {
+export function AccountLaunchSaleAllocationsPanel(props: {
   reviewId: string;
   mint: string;
 }) {
-  const context = `${reviewId}:${mint}`;
+  // A new launch or mint remounts with empty state; the old panel's in-flight
+  // request is aborted on unmount and can no longer publish.
+  return <Panel key={`${props.reviewId}:${props.mint}`} {...props} />;
+}
+function Panel({ reviewId, mint }: { reviewId: string; mint: string }) {
   const [busy, setBusy] = useState(''),
     [error, setError] = useState(''),
     [signIn, setSignIn] = useState(false),
@@ -54,13 +55,16 @@ export function AccountLaunchSaleAllocationsPanel({
     [plan, setPlan] = useState<LaunchSaleAllocationPlan | null>(null),
     [approved, setApproved] = useState(false),
     [unknownSave, setUnknownSave] = useState(false);
-  const active = useRef<AbortController | null>(null);
+  const active = useRef<AbortController | null>(null),
+    // A record POST whose outcome is unknown. No further record POST is sent
+    // until a saved-only read of this exact sale resolves it.
+    pending = useRef<{ saleId: string; hash: string } | null>(null);
   useEffect(
     () => () => {
       active.current?.abort();
       active.current = null;
     },
-    [context],
+    [],
   );
   const clearPlan = () => {
     setPlan(null);
@@ -98,14 +102,45 @@ export function AccountLaunchSaleAllocationsPanel({
   }
   async function getJson(url: string, signal: AbortSignal, init?: RequestInit) {
     const response = await fetch(url, { cache: 'no-store', signal, ...init });
-    const text = await response.text();
-    if (text.length > 1048576) throw Error('Response is too large.');
+    const reader = response.body?.getReader();
+    if (!reader)
+      throw Error('The response could not be read. Reload before retrying.');
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    const cancel = () => {
+      void reader.cancel().catch(() => {});
+    };
+    signal.addEventListener('abort', cancel, { once: true });
     let data: unknown = null;
     try {
-      data = JSON.parse(text);
-    } catch {
-      throw Error('The response could not be read. Reload before retrying.');
+      while (true) {
+        signal.throwIfAborted();
+        const part = await reader.read();
+        signal.throwIfAborted();
+        if (part.done) break;
+        size += part.value.byteLength;
+        if (size > 1048576) throw Error('Response is too large.');
+        chunks.push(part.value);
+      }
+      const bytes = new Uint8Array(size);
+      let offset = 0;
+      for (const c of chunks) {
+        bytes.set(c, offset);
+        offset += c.byteLength;
+      }
+      try {
+        data = JSON.parse(
+          new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+        );
+      } catch {
+        throw Error('The response could not be read. Reload before retrying.');
+      }
+    } finally {
+      signal.removeEventListener('abort', cancel);
+      cancel();
+      reader.releaseLock();
     }
+    signal.throwIfAborted();
     if (response.status === 401) {
       setSignIn(true);
       throw Error('Sign in to review sale acquisitions.');
@@ -144,6 +179,7 @@ export function AccountLaunchSaleAllocationsPanel({
           label:
             p.document?.token?.symbol || p.document?.token?.name || short(p.id),
         }));
+      signal.throwIfAborted();
       setProjects(list);
       if (list.length === 1) await loadSales(list[0].id, null, signal);
     });
@@ -185,6 +221,7 @@ export function AccountLaunchSaleAllocationsPanel({
         slot: String(r.document.slot),
         createdAt: r.createdAt,
       }));
+    signal.throwIfAborted();
     setProjectId(id);
     setSales((old) => (after ? [...old, ...found] : found));
     setPages((n) => (after ? n + 1 : 1));
@@ -199,20 +236,26 @@ export function AccountLaunchSaleAllocationsPanel({
     clearPlan();
     if (id) void run('Loading finalized sales…', (s) => loadSales(id, null, s));
   };
-  const openSale = (sale: Sale) =>
-    run('Loading saved sale…', async (signal) => {
+  // Allocation reads require retained evidence (the server answers 404 without it).
+  const readSaved = async (sale: Sale, signal: AbortSignal) =>
+    validatedLaunchSaleRead(
+      await getJson(
+        `${API}/sale-allocations?saleReceiptId=${encodeURIComponent(sale.id)}`,
+        signal,
+      ),
+      { saleReceiptId: sale.id, wallet: sale.wallet, mint },
+    );
+  const openSale = (sale: Sale) => {
+    if (pending.current && pending.current.saleId !== sale.id) return;
+    return run('Loading saved sale…', async (signal) => {
       clearPlan();
-      setUnknownSave(false);
       const ctx = { saleReceiptId: sale.id, wallet: sale.wallet, mint };
       const q = `?saleReceiptId=${encodeURIComponent(sale.id)}`;
       const evidence = validatedSaleEvidence(
         await getJson(`${API}/sale-evidence${q}`, signal),
         ctx,
       );
-      const saved = await validatedLaunchSaleRead(
-        await getJson(`${API}/sale-allocations${q}`, signal),
-        ctx,
-      );
+      const saved = evidence.entry ? await readSaved(sale, signal) : null;
       if (!sources) {
         const history = await validatedLaunchPurchaseHistory(
           await getJson(
@@ -221,11 +264,22 @@ export function AccountLaunchSaleAllocationsPanel({
           ),
           { reviewId, mint },
         );
+        signal.throwIfAborted();
         setSources(history.sources);
+      }
+      signal.throwIfAborted();
+      const p = pending.current;
+      if (p?.saleId === sale.id) {
+        if (saved && saved.sha256 !== p.hash)
+          throw Error('A different assignment is saved for this sale.');
+        // Saved with the approved hash, or nothing committed: resolved either way.
+        pending.current = null;
+        setUnknownSave(false);
       }
       setUnits({});
       setSelected({ sale, evidence, saved });
     });
+  };
   const capture = () =>
     selected &&
     run('Retaining finalized sale evidence…', async (signal) => {
@@ -242,7 +296,11 @@ export function AccountLaunchSaleAllocationsPanel({
         ),
         ctx,
       );
-      setSelected({ ...selected, evidence });
+      const saved = evidence.entry
+        ? await readSaved(selected.sale, signal)
+        : null;
+      signal.throwIfAborted();
+      setSelected({ ...selected, evidence, saved });
     });
   const selection = () =>
     Object.entries(units)
@@ -273,56 +331,56 @@ export function AccountLaunchSaleAllocationsPanel({
         throw Error(
           'The sale acquisition response differs. Reload the sale before saving.',
         );
-      setPlan(
-        await validatedLaunchSalePlan(
-          data.plan,
-          {
-            saleReceiptId: selected.sale.id,
-            wallet: selected.sale.wallet,
-            mint,
-          },
-          exact,
-        ),
+      const checked = await validatedLaunchSalePlan(
+        data.plan,
+        {
+          saleReceiptId: selected.sale.id,
+          wallet: selected.sale.wallet,
+          mint,
+        },
+        exact,
       );
+      signal.throwIfAborted();
+      setPlan(checked);
     });
-  const save = () =>
-    selected &&
-    plan &&
-    approved &&
-    run('Saving acquisitions…', async (signal) => {
-      const ctx = {
-        saleReceiptId: selected.sale.id,
-        wallet: selected.sale.wallet,
-        mint,
-      };
-      const exact = plan.allocations.map((a) => ({
+  const save = () => {
+    if (!selected || !plan || !approved || pending.current || busy) return;
+    const approvedPlan = plan,
+      sale = selected.sale;
+    pending.current = { saleId: sale.id, hash: approvedPlan.sha256 };
+    setUnknownSave(true);
+    clearPlan();
+    return run('Saving acquisitions…', async (signal) => {
+      const ctx = { saleReceiptId: sale.id, wallet: sale.wallet, mint };
+      const exact = approvedPlan.allocations.map((a) => ({
         originId: a.originId,
         unitsRaw: a.unitsRaw,
       }));
-      setUnknownSave(true);
       const saved = await validatedLaunchSaleRead(
         await post(
           `${API}/sale-allocations`,
           {
             action: 'record',
-            saleReceiptId: selected.sale.id,
+            saleReceiptId: sale.id,
             allocations: exact,
             approved: true,
-            policy: plan.policy,
-            planSha256: plan.sha256,
+            policy: approvedPlan.policy,
+            planSha256: approvedPlan.sha256,
           },
           signal,
         ),
         ctx,
       );
-      if (saved?.sha256 !== plan.sha256)
+      if (saved?.sha256 !== approvedPlan.sha256)
         throw Error(
           'The saved plan differs from this approval. Reload the sale.',
         );
+      signal.throwIfAborted();
+      pending.current = null;
       setUnknownSave(false);
-      clearPlan();
       setSelected({ ...selected, saved });
     });
+  };
 
   const eligible =
     selected && sources
@@ -341,7 +399,7 @@ export function AccountLaunchSaleAllocationsPanel({
         <Button
           type="button"
           variant="outline"
-          disabled={!!busy}
+          disabled={!!busy || unknownSave}
           onClick={() => void findProjects()}
         >
           Find sales
@@ -375,7 +433,7 @@ export function AccountLaunchSaleAllocationsPanel({
           <select
             value={projectId}
             onChange={(e) => chooseProject(e.target.value)}
-            disabled={!!busy}
+            disabled={!!busy || unknownSave}
           >
             <option value="">Choose…</option>
             {projects.map((p) => (
@@ -400,7 +458,9 @@ export function AccountLaunchSaleAllocationsPanel({
                 <Button
                   type="button"
                   variant={selected?.sale.id === s.id ? 'default' : 'outline'}
-                  disabled={!!busy}
+                  disabled={
+                    !!busy || (unknownSave && selected?.sale.id !== s.id)
+                  }
                   onClick={() => void openSale(s)}
                 >
                   Wallet {short(s.wallet)}, {s.tokenUnitsRaw} raw units, slot{' '}
@@ -413,7 +473,7 @@ export function AccountLaunchSaleAllocationsPanel({
             <Button
               type="button"
               variant="outline"
-              disabled={!!busy}
+              disabled={!!busy || unknownSave}
               onClick={() =>
                 void run('Loading older trades…', (sig) =>
                   loadSales(projectId, cursor, sig),
@@ -476,7 +536,7 @@ export function AccountLaunchSaleAllocationsPanel({
                   <input
                     inputMode="numeric"
                     value={units[s.originId] ?? ''}
-                    disabled={!!busy}
+                    disabled={!!busy || unknownSave}
                     onChange={(e) => {
                       clearPlan();
                       setUnits({ ...units, [s.originId]: e.target.value });
@@ -518,7 +578,7 @@ export function AccountLaunchSaleAllocationsPanel({
                   </label>
                   <Button
                     type="button"
-                    disabled={!approved || !!busy}
+                    disabled={!approved || !!busy || unknownSave}
                     onClick={() => void save()}
                   >
                     Save assignment
