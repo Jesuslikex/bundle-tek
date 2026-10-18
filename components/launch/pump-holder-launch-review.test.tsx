@@ -202,6 +202,29 @@ it('prepares every holder in order, displays zero slots and simulated costs with
   expect(mocks.sign).not.toHaveBeenCalled();
   expect(mocks.wallet).not.toHaveBeenCalled();
 });
+it('opens planning with the actual mint candidate without unlocking or signing', async () => {
+  await click('Plan Front / Back layers');
+  await vi.waitFor(async () => {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(
+      container.querySelector(
+        'section[aria-label="Front and Back layer planning"]',
+      ),
+    ).not.toBeNull();
+  });
+  const panel = container.querySelector(
+    'section[aria-label="Front and Back layer planning"]',
+  )!;
+  expect(panel.textContent).toContain(f.launch.review.input.create.mint);
+  expect(panel.textContent).toContain(
+    'Saving here does not configure the ordinary launch below',
+  );
+  expect(mocks.wallet).not.toHaveBeenCalled();
+  expect(mocks.mint).not.toHaveBeenCalled();
+  expect(mocks.sign).not.toHaveBeenCalled();
+});
 it('requires two signing consents and separate broadcast consent, passes the complete signer map and clears both sessions', async () => {
   await prepare();
   consent();

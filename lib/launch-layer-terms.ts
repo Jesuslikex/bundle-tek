@@ -147,6 +147,9 @@ export type LaunchLayerContext = {
 export function parseLaunchLayerRequest(value: unknown): LaunchLayerRequest {
   return requestSchema.parse(value);
 }
+export function parseLaunchLayerEnvelope(value: unknown): LaunchLayerEnvelope {
+  return envelopeSchema.parse(value);
+}
 
 function buildTerms(
   value: unknown,
