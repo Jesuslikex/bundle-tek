@@ -1,5 +1,7 @@
 # Launch layer terms foundation
 
+Continuation: `CODEX-OWNED-LAUNCH-LAYERS-20261018.md` connects this model to owned immutable planning storage and an authenticated API. The original standalone scope below is historical. The role editor, actual funding/shortfalls, staged execution and recovery are still incomplete; every authority flag remains false.
+
 18 October 2026. Codex-owned pure model and tests only. Reference contract and limitations: CODEX-PROXIMA-MEV-FUNDING-FIELD-MAP-20261018.md. Full Front/Back funding, execution, recovery and Proxima parity remain unfinished.
 
 ## Implemented

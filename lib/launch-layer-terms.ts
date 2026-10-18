@@ -144,6 +144,9 @@ export type LaunchLayerContext = {
   workspace: WalletWorkspace;
   target: z.infer<typeof targetSchema>;
 };
+export function parseLaunchLayerRequest(value: unknown): LaunchLayerRequest {
+  return requestSchema.parse(value);
+}
 
 function buildTerms(
   value: unknown,
