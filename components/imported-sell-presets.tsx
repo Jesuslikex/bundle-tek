@@ -2,14 +2,17 @@
 import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import {
-  importedSellPercentage,
-  IMPORTED_SELL_PERCENTAGES,
+  importedBalanceBasisPointAmount,
   type ImportedBalanceContext,
-  importedSupplySellAmount,
-  IMPORTED_SUPPLY_SELL_PRESETS,
+  importedSupplyBasisPointAmount,
   type ImportedSellSupply,
 } from '@/lib/imported-balance-review';
 import type { ImportedSwapBalance } from '@/lib/imported-swap-balance';
+import {
+  useTradeAmountPresets,
+  TradeAmountPresetSettings,
+} from './trade-amount-presets';
+import { presetPercentLabel } from '@/lib/trade-amount-preferences';
 export function ImportedSellPresets({
   report,
   context,
@@ -24,15 +27,20 @@ export function ImportedSellPresets({
   supply?: ImportedSellSupply;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const presets = useTradeAmountPresets();
   const expired = Date.parse(report.expiresAt) <= now;
   useEffect(() => {
     const expires = Date.parse(report.expiresAt);
+    const refresh = window.setTimeout(() => setNow(Date.now()), 0);
     const timer = window.setTimeout(
       () => setNow(Date.now()),
       Math.max(0, expires - Date.now()),
     );
-    return () => window.clearTimeout(timer);
-  }, [report.expiresAt]);
+    return () => {
+      window.clearTimeout(refresh);
+      window.clearTimeout(timer);
+    };
+  }, [report.observedAt, report.expiresAt]);
   if (context.side !== 'Sell') return null;
   return (
     <section aria-label="Sell balance percentages">
@@ -40,31 +48,38 @@ export function ImportedSellPresets({
         Choose a percentage of the observed unfrozen token units. Amounts round
         down to whole atomic units.
       </p>
-      {IMPORTED_SELL_PERCENTAGES.map((percent) => {
+      {presets.preferences.sellBalanceBps.map((basisPoints) => {
+        const label = presetPercentLabel(basisPoints);
         let amount: string | null = null;
         try {
-          amount = importedSellPercentage(report, context, percent, now);
+          amount = importedBalanceBasisPointAmount(
+            report,
+            context,
+            basisPoints,
+            now,
+          );
         } catch {
           /* Invalid, expired or unsupported observations never produce a preset. */
         }
         return (
           <Button
-            key={percent}
+            key={basisPoints}
+            type="button"
             variant="outline"
             disabled={locked || expired || amount === null}
-            aria-label={`Set sell amount to ${percent}% of observed unfrozen balance`}
+            aria-label={`Set sell amount to ${label} of observed unfrozen balance`}
             onClick={() => {
               if (locked || expired) return;
               try {
                 onAmountChange(
-                  importedSellPercentage(report, context, percent),
+                  importedBalanceBasisPointAmount(report, context, basisPoints),
                 );
               } catch {
                 setNow(Date.now());
               }
             }}
           >
-            {percent === 100 ? 'MAX' : `${percent}%`}
+            {basisPoints === 10000 ? 'MAX' : label}
           </Button>
         );
       })}
@@ -74,14 +89,15 @@ export function ImportedSellPresets({
             Percentage of saved total supply, observed{' '}
             {new Date(supply.observedAt).toLocaleString()}.
           </p>
-          {IMPORTED_SUPPLY_SELL_PRESETS.map((preset) => {
+          {presets.preferences.sellSupplyBps.map((basisPoints) => {
+            const label = presetPercentLabel(basisPoints);
             let amount: string | null = null;
             try {
-              amount = importedSupplySellAmount(
+              amount = importedSupplyBasisPointAmount(
                 report,
                 context,
                 supply,
-                preset.basisPoints,
+                basisPoints,
                 now,
               );
             } catch {
@@ -89,20 +105,20 @@ export function ImportedSellPresets({
             }
             return (
               <Button
-                key={preset.basisPoints}
+                key={basisPoints}
                 type="button"
                 variant="outline"
                 disabled={locked || expired || amount === null}
-                aria-label={`Set sell amount to ${preset.label} of saved total supply`}
+                aria-label={`Set sell amount to ${label} of saved total supply`}
                 onClick={() => {
                   if (locked || expired) return;
                   try {
                     onAmountChange(
-                      importedSupplySellAmount(
+                      importedSupplyBasisPointAmount(
                         report,
                         context,
                         supply,
-                        preset.basisPoints,
+                        basisPoints,
                       ),
                     );
                   } catch {
@@ -110,7 +126,7 @@ export function ImportedSellPresets({
                   }
                 }}
               >
-                {preset.label}
+                {label}
               </Button>
             );
           })}
@@ -121,6 +137,7 @@ export function ImportedSellPresets({
           </p>
         </section>
       )}
+      <TradeAmountPresetSettings store={presets} />
       {expired ? (
         <output>Balance observation expired. Check trade balance again.</output>
       ) : !report.preparationSupported ? (

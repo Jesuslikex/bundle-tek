@@ -778,6 +778,13 @@
       "when": 1793030400000,
       "tag": "0110_strategy_review_capacity",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "6",
+      "when": 1793116800000,
+      "tag": "0111_trade_amount_preferences",
+      "breakpoints": true
     }
   ]
 }

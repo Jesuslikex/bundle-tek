@@ -3,6 +3,29 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { allowedLocalPost, localHttpsHandler } from './local-https-guard.mjs';
 
+await test('allows bounded presentation-only preset settings without wallet, signing or execute fields', () => {
+  const path = '/api/trade-amount-preferences',
+    preferences = {
+      format: 'trade-amount-presets-v1',
+      buySol: ['0.01'],
+      sellBalanceBps: [2500, 5000, 10000],
+      sellSupplyBps: [10, 100],
+    },
+    body = { ownerId: 'fixture-owner', revision: 0, preferences };
+  assert.equal(allowedLocalPost(path, body), true);
+  for (const changed of [
+    { ...body, action: 'submit' },
+    { ...body, transaction: 'packet' },
+    { ...body, preferences: { ...preferences, privateKey: 'unused' } },
+    { ...body, preferences: { ...preferences, buySol: Array(9).fill('0.01') } },
+    { ...body, preferences: { ...preferences, sellBalanceBps: [10001] } },
+    { ...body, preferences: { ...preferences, buySol: ['1e-3'] } },
+    { ...body, ownerId: '' },
+    { ...body, revision: -1 },
+  ])
+    assert.equal(allowedLocalPost(path, changed), false);
+});
+
 await test('admits only bounded manual market observations and unsigned strategy inspection', () => {
   const id = '00000000-0000-4000-8000-000000000001',
     pool = '11111111111111111111111111111111';

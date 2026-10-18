@@ -29,6 +29,38 @@ export function allowedLocalPost(path, body) {
     !Array.isArray(body) &&
     Object.keys(body).every((k) => allowed.includes(k)) &&
     required.every((k) => Object.hasOwn(body, k));
+  if (path === '/api/trade-amount-preferences') {
+    const p = body?.preferences;
+    const presetKeys = ['format', 'buySol', 'sellBalanceBps', 'sellSupplyBps'];
+    const list = (v) => Array.isArray(v) && v.length >= 1 && v.length <= 8;
+    return Boolean(
+      keys(['ownerId', 'preferences', 'revision']) &&
+      typeof body.ownerId === 'string' &&
+      body.ownerId.length >= 1 &&
+      body.ownerId.length <= 128 &&
+      Number.isSafeInteger(body.revision) &&
+      body.revision >= 0 &&
+      body.revision < 1e9 &&
+      p &&
+      typeof p === 'object' &&
+      !Array.isArray(p) &&
+      Object.keys(p).length === 4 &&
+      Object.keys(p).every((k) => presetKeys.includes(k)) &&
+      p.format === 'trade-amount-presets-v1' &&
+      list(p.buySol) &&
+      p.buySol.every(
+        (v) =>
+          typeof v === 'string' &&
+          v.length <= 40 &&
+          /^(0|[1-9]\d*)(\.\d{1,9})?$/.test(v),
+      ) &&
+      list(p.sellBalanceBps) &&
+      list(p.sellSupplyBps) &&
+      [...p.sellBalanceBps, ...p.sellSupplyBps].every(
+        (n) => Number.isSafeInteger(n) && n >= 1 && n <= 10000,
+      ),
+    );
+  }
   if (
     path === '/api/imported-projects/strategy-checks' ||
     path === '/api/imported-projects/strategy-previews'

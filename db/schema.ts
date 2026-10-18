@@ -13,6 +13,7 @@ export * from './exchange-funding-schema';
 export * from './launch-layer-schema';
 export * from './strategy-session-schema';
 export * from './strategy-review-capacity-schema';
+export * from './trade-amount-preferences-schema';
 export * from './volume-bundle-schema';
 export * from './volume-recovery-schema';
 export * from './holder-index-schema';

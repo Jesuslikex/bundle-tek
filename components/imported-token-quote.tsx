@@ -8,6 +8,7 @@ import type { SolanaSwapQuote } from '@/lib/warmup-swap-quote';
 import { warmupAtoms } from '@/lib/wallet-warmup';
 import { solanaTokenAtoms } from '@/lib/solana-token-amount';
 import { ImportedSwapWallet } from './imported-swap-wallet';
+import { BuyAmountPresets } from './trade-amount-presets';
 import type { ImportedSwapReceipt } from '@/lib/imported-approval-history';
 import {
   currentImportedSellHandoff,
@@ -279,6 +280,12 @@ export function ImportedTokenQuote({
             disabled={savingSettings}
             onChange={(e) => onAmountChange(e.target.value)}
           />
+          {side === 'Buy' && (
+            <BuyAmountPresets
+              disabled={busy || savingSettings}
+              onAmountChange={onAmountChange}
+            />
+          )}
           <Button
             variant="outline"
             disabled={busy || savingSettings}

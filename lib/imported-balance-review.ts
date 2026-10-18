@@ -104,12 +104,31 @@ export function importedSupplySellAmount(
   basisPoints: number,
   now = Date.now(),
 ) {
+  if (!IMPORTED_SUPPLY_SELL_PRESETS.some((p) => p.basisPoints === basisPoints))
+    throw Error('Choose a supported supply preset.');
+  return importedSupplyBasisPointAmount(
+    report,
+    context,
+    supply,
+    basisPoints,
+    now,
+  );
+}
+export function importedSupplyBasisPointAmount(
+  report: ImportedSwapBalance,
+  context: ImportedBalanceContext,
+  supply: ImportedSellSupply,
+  basisPoints: number,
+  now = Date.now(),
+) {
   const r = validatedImportedBalance(report, context, now);
   if (
     r.side !== 'Sell' ||
     !r.preparationSupported ||
     Date.parse(r.expiresAt) <= now ||
-    !IMPORTED_SUPPLY_SELL_PRESETS.some((p) => p.basisPoints === basisPoints) ||
+    !Number.isSafeInteger(basisPoints) ||
+    basisPoints < 1 ||
+    basisPoints > 10000 ||
     supply.mint !== context.mint ||
     supply.decimals !== context.tokenDecimals ||
     !u64(supply.totalSupplyRaw) ||
@@ -134,15 +153,27 @@ export function importedSellPercentage(
   percent: number,
   now = Date.now(),
 ) {
+  if (!IMPORTED_SELL_PERCENTAGES.some((p) => p === percent))
+    throw Error('Choose a supported balance preset.');
+  return importedBalanceBasisPointAmount(report, context, percent * 100, now);
+}
+export function importedBalanceBasisPointAmount(
+  report: ImportedSwapBalance,
+  context: ImportedBalanceContext,
+  basisPoints: number,
+  now = Date.now(),
+) {
   const r = validatedImportedBalance(report, context, now);
   if (
     r.side !== 'Sell' ||
-    !IMPORTED_SELL_PERCENTAGES.some((p) => p === percent) ||
+    !Number.isSafeInteger(basisPoints) ||
+    basisPoints < 1 ||
+    basisPoints > 10000 ||
     !r.preparationSupported ||
     Date.parse(r.expiresAt) <= now
   )
     throw new Error('Fresh supported sell inventory required.');
-  const units = (BigInt(r.unfrozenRaw) * BigInt(percent)) / 100n;
+  const units = (BigInt(r.unfrozenRaw) * BigInt(basisPoints)) / 10000n;
   if (units === 0n)
     throw new Error('Percentage is smaller than one atomic unit.');
   return formatNativeBalance(units.toString(), context.tokenDecimals);
