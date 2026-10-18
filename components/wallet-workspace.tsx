@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { readWorkspaceResponse } from '@/lib/workspace-response';
+import { saveWalletPublicAddresses } from '@/lib/wallet-public-save';
 
 import { Folder, Plus, Download, X } from 'lucide-react';
 
@@ -143,6 +144,8 @@ export function WalletWorkspace({
   const folderActionFocus = useRef<HTMLElement | null>(null);
   const rootFolderButton = useRef<HTMLButtonElement>(null);
   const balanceRequest = useRef<AbortController | null>(null);
+  const publicSaveRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => publicSaveRequest.current?.abort(), [chain]);
   const managerControl = useRef<HTMLDivElement>(null);
   const managerButton = useRef<HTMLButtonElement>(null);
   const managerSearch = useRef<HTMLInputElement>(null);
@@ -926,25 +929,49 @@ export function WalletWorkspace({
               verifiedAddresses={[...proofs.keys()]}
               onVerified={reload}
               onOpenWarmup={(address) => {
+                setArchived(false);
+                setFolder('all');
                 setQuery('');
+                setInitialWarmup(null);
                 setSelected([address]);
                 setWarmupOpen(true);
               }}
               onAddPublic={async (addresses) => {
-                const saved = await mutate(
-                  {
-                    action: 'wallet.add',
+                publicSaveRequest.current?.abort();
+                const controller = new AbortController();
+                publicSaveRequest.current = controller;
+                setBusy(true);
+                setError('');
+                setNotice('');
+                try {
+                  const workspace = await saveWalletPublicAddresses({
+                    chain,
+                    addresses,
                     folderId: currentFolder?.id ?? '',
-                    wallets: addresses.map((address) => ({
-                      address,
-                      label: '',
-                      role: 'Recipient',
-                    })),
-                  },
-                  'Public addresses saved. Private keys stay in your browser vault.',
-                );
-                if (saved) setSelected(addresses);
-                return saved;
+                    signal: controller.signal,
+                  });
+                  if (controller.signal.aborted) return false;
+                  setData(workspace);
+                  setSelected(addresses);
+                  setNotice(
+                    'Public addresses saved. Private keys stay in your browser vault.',
+                  );
+                  return true;
+                } catch (error) {
+                  if (!controller.signal.aborted)
+                    setError(
+                      error instanceof Error
+                        ? error.message
+                        : 'Could not save public addresses.',
+                    );
+                  return false;
+                } finally {
+                  if (
+                    publicSaveRequest.current === controller &&
+                    !controller.signal.aborted
+                  )
+                    setBusy(false);
+                }
               }}
             />
             <Button
@@ -981,7 +1008,8 @@ export function WalletWorkspace({
               }}
               onClearSelection={() => setSelected([])}
               onOpen={() => {
-                if (!picks.length && rows.length === 1) setSelected([rows[0].address]);
+                if (!picks.length && rows.length === 1)
+                  setSelected([rows[0].address]);
                 setWarmupOpen(true);
               }}
             />
@@ -1429,9 +1457,18 @@ export function WalletWorkspace({
                         Edit
                       </Button>
                       {!w.archived && (
-                        <Button variant="outline" disabled={busy || loading}
-                          aria-label={'Open warmup for ' + (w.label || w.address)}
-                          onClick={() => { setQuery(''); setSelected([w.address]); setWarmupOpen(true); }}>
+                        <Button
+                          variant="outline"
+                          disabled={busy || loading}
+                          aria-label={
+                            'Open warmup for ' + (w.label || w.address)
+                          }
+                          onClick={() => {
+                            setQuery('');
+                            setSelected([w.address]);
+                            setWarmupOpen(true);
+                          }}
+                        >
                           Warmup
                         </Button>
                       )}
