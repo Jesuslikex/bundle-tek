@@ -12,6 +12,46 @@ let host: HTMLDivElement,
 const request = vi.fn<typeof fetch>();
 const saleId = 'cccccccc-cccc-cccc-cccc-cccccccccccc',
   projectId = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+let malformed = false;
+const row = (
+  id: string,
+  side: 'Buy' | 'Sell',
+  wallet: string,
+  units: string,
+  slot: number,
+) => ({
+  id,
+  projectId,
+  preparationId: '99999999-9999-4999-8999-999999999999',
+  projectRevision: 1,
+  walletRevision: 1,
+  createdAt: '2026-10-18T00:00:00.000Z',
+  document: {
+    network: 'mainnet',
+    mint: f.context.mint,
+    decimals: 6,
+    preparationSha256: '9'.repeat(64),
+    signature:
+      '99eUso3aSbE9tqGSTXzo3TLfKb9RkMTURrHKQ1K7Zh3BbeqPevr5E1iCbpTjqHuTFLtfxTTD5ekfVuZFzQyEQf8',
+    wallet,
+    signatureVerified: true,
+    commitment: 'finalized',
+    side,
+    tokenUnitsRaw: units,
+    source: 'rpc.example',
+    observedAt: '2026-10-18T00:00:00.000Z',
+    slot,
+    blockTime: null,
+    networkFeeLamports: '5000',
+    nativeChangeRaw: side === 'Sell' ? '5000' : '-5000',
+    rentChangeRaw: '0',
+    nativeSettlementRaw: side === 'Sell' ? '5000' : '-5000',
+  },
+});
+const receiptRows = (wallet: string) => [
+  row(saleId, 'Sell', wallet, malformed ? 'bad' : '1000', 300),
+  row('ffffffff-ffff-4fff-8fff-ffffffffffff', 'Buy', wallet, '1', 1),
+];
 const json = (v: unknown, status = 200) =>
   new Response(JSON.stringify(v), { status });
 let lose = false,
@@ -54,6 +94,7 @@ beforeEach(async () => {
   saved = null;
   evidence = null;
   lose = false;
+  malformed = false;
   request.mockReset();
   request.mockImplementation(async (input, init) => {
     const url = input as string;
@@ -81,31 +122,10 @@ beforeEach(async () => {
       });
     if (url.startsWith('/api/imported-projects/receipts'))
       return json({
+        projectId,
         mint: f.context.mint,
-        receipts: [
-          {
-            id: saleId,
-            createdAt: '2026-10-18T00:00:00Z',
-            document: {
-              side: 'Sell',
-              commitment: 'finalized',
-              wallet: s.wallet,
-              tokenUnitsRaw: '1000',
-              slot: 300,
-            },
-          },
-          {
-            id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
-            createdAt: '2026-10-18T00:00:00Z',
-            document: {
-              side: 'Buy',
-              commitment: 'finalized',
-              wallet: s.wallet,
-              tokenUnitsRaw: '1',
-              slot: 1,
-            },
-          },
-        ],
+        decimals: 6,
+        receipts: receiptRows(s.wallet),
         nextCursor: url.includes('cursor') ? null : saleId,
       });
     if (url.includes('/sale-evidence')) {
@@ -363,4 +383,12 @@ it('drops consent when only the launch review changes, and does not restore it o
   );
   expect(button('Save assignment')).toBeUndefined();
   expect(host.querySelector('input[type=checkbox]')).toBeNull();
+});
+
+it('refuses a malformed trade row with a safe error and no sale controls', async () => {
+  malformed = true;
+  await click('Find sales');
+  await until('Retained trade evidence differs');
+  expect(button('raw units), slot')).toBeUndefined();
+  expect(host.textContent).not.toContain('Finalized sells in');
 });
