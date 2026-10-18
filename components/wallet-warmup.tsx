@@ -13,6 +13,8 @@ import { WalletWarmupPlans } from '@/components/wallet-warmup-plans';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { WarmupPlanSummary } from './warmup-plan-summary';
 import { readPanelJson } from './read-panel-json';
+import styles from './wallet-warmup.module.css';
+const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 type HistoryResult = {
   address: string;
@@ -56,6 +58,14 @@ export function WalletWarmup({
       .toISOString()
       .slice(0, 16);
   });
+  const [freshStart, setFreshStart] = useState(!initialPlan);
+  const panel = useRef<HTMLElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const customTokens = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    panel.current?.focus({ preventScroll: true });
+    panel.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  }, []);
   const [plan, setPlan] = useState<WarmupPlan | null>(null);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<HistoryResult[]>([]);
@@ -130,7 +140,12 @@ export function WalletWarmup({
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return (
-    <section className="wallet-warmup-panel" aria-labelledby={`${id}-title`}>
+    <section
+      ref={panel}
+      tabIndex={-1}
+      className={`wallet-warmup-panel ${styles.panel}`}
+      aria-labelledby={`${id}-title`}
+    >
       <div className="wallet-roster-actions">
         <h3 id={`${id}-title`}>Wallet warmup</h3>
         <Button variant="ghost" onClick={onClose}>
@@ -138,19 +153,21 @@ export function WalletWarmup({
         </Button>
       </div>
       <p>
-        {addresses.length} selected {chain} wallets. Review small buy/sell
-        cycles and inspect existing activity.
+        {addresses.length} selected {chain}{' '}
+        {addresses.length === 1 ? 'wallet' : 'wallets'}. Plan and check
+        everything before any transaction.
       </p>
-      <p>
-        Start by checking wallet history, then choose your tokens and review a
-        plan. You can save a plan for an unfunded wallet. Saving does not fund
-        the wallet or start trades.
+      <ol className={styles.steps} aria-label="Warmup setup steps">
+        <li>1. Check wallet</li>
+        <li>2. Choose token and amount</li>
+        <li>3. Review and save</li>
+      </ol>
+      <p className={styles.help}>
+        An unfunded wallet can use history, drafts and quotes. Saving does not
+        fund the wallet or start trades. Every swap needs separate approval;
+        activity does not prove wallet age or launch eligibility.
       </p>
-      <p className="text-muted-foreground">
-        Each swap requires a fresh quote and your approval before execution.
-        There is no background scheduler. Activity cannot guarantee launch
-        eligibility or establish wallet creation age.
-      </p>
+      <h4>1. Check your wallet</h4>
       <Button variant="outline" disabled={busy} onClick={inspect}>
         {busy ? 'Checking activity…' : 'Check wallet history'}
       </Button>
@@ -222,6 +239,14 @@ export function WalletWarmup({
         </div>
       )}
       <form
+        ref={form}
+        tabIndex={-1}
+        className={styles.setup}
+        aria-label="Warmup draft setup"
+        onInvalidCapture={(event) => {
+          if (event.target instanceof HTMLElement)
+            event.target.closest('details')?.setAttribute('open', '');
+        }}
         onSubmit={(e) => {
           e.preventDefault();
           try {
@@ -234,17 +259,61 @@ export function WalletWarmup({
                 feeReserve: reserve,
                 cycles: Number(cycles),
                 intervalMinutes: Number(interval),
-                startAt: start ? new Date(start).toISOString() : '',
+                startAt: freshStart
+                  ? new Date(Date.now() + 30 * 60000).toISOString()
+                  : start
+                    ? new Date(start).toISOString()
+                    : '',
               }),
             );
             setError('');
           } catch (e) {
             setPlan(null);
             setError(e instanceof Error ? e.message : 'Invalid warmup plan.');
+            if (customTokens.current) customTokens.current.open = true;
           }
         }}
       >
-        <div className="warmup-fields">
+        <h4>2. Choose your draft</h4>
+        {chain === 'Solana' && (
+          <div className={styles.tokenChoice}>
+            <Button
+              type="button"
+              variant={tokens === USDC ? 'default' : 'outline'}
+              aria-pressed={tokens === USDC}
+              onClick={() => edit(() => setTokens(USDC))}
+            >
+              Use USDC
+            </Button>
+            <span>
+              {tokens === USDC
+                ? 'USDC selected for review. No swap is requested.'
+                : 'Choose USDC or enter a custom token below.'}
+            </span>
+          </div>
+        )}
+        <details
+          ref={customTokens}
+          className={styles.options}
+          open={chain !== 'Solana' ? true : undefined}
+        >
+          <summary>Custom token addresses</summary>
+          <label>
+            Token addresses, one per line
+            <textarea
+              className="warmup-token-input"
+              value={tokens}
+              onChange={(e) => edit(() => setTokens(e.target.value))}
+              rows={3}
+              maxLength={500}
+            />
+          </label>
+          <small>
+            Up to 10 addresses. Token identity and liquidity are checked
+            separately. Each sell uses its matching buy lot.
+          </small>
+        </details>
+        <div className={styles.amount}>
           <label htmlFor={`${id}-amount`}>
             Buy amount per cycle ({unit.symbol})
             <Input
@@ -255,83 +324,102 @@ export function WalletWarmup({
               required
             />
           </label>
-          <label htmlFor={`${id}-reserve`}>
-            Fee reserve per wallet ({unit.symbol})
-            <Input
-              id={`${id}-reserve`}
-              value={reserve}
-              onChange={(e) => edit(() => setReserve(e.target.value))}
-              inputMode="decimal"
-              required
-            />
-          </label>
-          <label htmlFor={`${id}-cycles`}>
-            Cycles per wallet
-            <Input
-              id={`${id}-cycles`}
-              type="number"
-              min={1}
-              max={20}
-              value={cycles}
-              onChange={(e) => edit(() => setCycles(e.target.value))}
-              required
-            />
-          </label>
-          <label htmlFor={`${id}-interval`}>
-            Minutes between cycles
-            <Input
-              id={`${id}-interval`}
-              type="number"
-              min={15}
-              max={10080}
-              value={interval}
-              onChange={(e) => edit(() => setInterval(e.target.value))}
-              required
-            />
-          </label>
-          <label htmlFor={`${id}-start`}>
-            Start time
-            <Input
-              id={`${id}-start`}
-              type="datetime-local"
-              value={start}
-              onChange={(e) => edit(() => setStart(e.target.value))}
-              required
-            />
-          </label>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            edit(() => {
-              const date = new Date(Date.now() + 5 * 60000);
-              setStart(
-                new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-                  .toISOString()
-                  .slice(0, 16),
-              );
-            })
-          }
-        >
-          Start in 5 minutes
-        </Button>
-        <label>
-          Token addresses, one per line
-          <textarea
-            className="warmup-token-input"
-            value={tokens}
-            onChange={(e) => edit(() => setTokens(e.target.value))}
-            rows={3}
-            maxLength={500}
-            required
+        <details className={styles.options}>
+          <summary>Budget and timing options</summary>
+          <p>
+            {cycles} cycles, {interval} minutes apart. {reserve} {unit.symbol}{' '}
+            reserved per wallet. Review the complete budget before saving.
+          </p>
+          <div className="warmup-fields">
+            <label htmlFor={`${id}-reserve`}>
+              Fee reserve per wallet ({unit.symbol})
+              <Input
+                id={`${id}-reserve`}
+                value={reserve}
+                onChange={(e) => edit(() => setReserve(e.target.value))}
+                inputMode="decimal"
+                required
+              />
+            </label>
+            <label htmlFor={`${id}-cycles`}>
+              Cycles per wallet
+              <Input
+                id={`${id}-cycles`}
+                type="number"
+                min={1}
+                max={20}
+                value={cycles}
+                onChange={(e) => edit(() => setCycles(e.target.value))}
+                required
+              />
+            </label>
+            <label htmlFor={`${id}-interval`}>
+              Minutes between cycles
+              <Input
+                id={`${id}-interval`}
+                type="number"
+                min={15}
+                max={10080}
+                value={interval}
+                onChange={(e) => edit(() => setInterval(e.target.value))}
+                required
+              />
+            </label>
+            <label htmlFor={`${id}-start`}>
+              Start time
+              <Input
+                id={`${id}-start`}
+                type="datetime-local"
+                value={start}
+                onChange={(e) =>
+                  edit(() => {
+                    setStart(e.target.value);
+                    setFreshStart(false);
+                  })
+                }
+                required={!freshStart}
+              />
+            </label>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              edit(() => {
+                const date = new Date(Date.now() + 5 * 60000);
+                setFreshStart(false);
+                setStart(
+                  new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+                    .toISOString()
+                    .slice(0, 16),
+                );
+              })
+            }
+          >
+            Start in 5 minutes
+          </Button>
+        </details>
+        <label className={styles.freshStart}>
+          <input
+            type="checkbox"
+            checked={freshStart}
+            onChange={() => edit(() => setFreshStart(!freshStart))}
           />
+          Use a fresh start time, 30 minutes after review
         </label>
-        <small>
-          Enter up to 10 mint/contract addresses. Tokens rotate by cycle. Token
-          identity and liquidity have not been checked. Each sell uses only
-          tokens acquired by its matching buy.
-        </small>
+        {!freshStart && start && (
+          <p className={styles.help}>
+            A saved start time must still be in the future. Select a fresh start
+            time above to refresh it, or choose a custom time in Budget and
+            timing options.
+          </p>
+        )}
+        <p className={styles.help}>
+          {freshStart
+            ? 'The start time is set when you click Review. Nothing is scheduled.'
+            : 'The custom start time is kept until you change it.'}
+        </p>
         <div>
           <Button type="submit">Review warmup plan</Button>
         </div>
@@ -344,7 +432,8 @@ export function WalletWarmup({
         addresses={addresses}
         walletRevisions={walletRevisions}
         plan={plan}
-        onLoad={(doc) => {
+        onLoad={(doc, useFreshStart = false) => {
+          setFreshStart(useFreshStart);
           setAmount(doc.amount);
           setReserve(doc.feeReserve);
           setTokens(doc.tokens.join('\n'));
@@ -358,6 +447,11 @@ export function WalletWarmup({
           );
           setPlan(null);
           setError('');
+          form.current?.focus({ preventScroll: true });
+          form.current?.scrollIntoView?.({
+            block: 'start',
+            behavior: 'smooth',
+          });
         }}
       />
       {plan && (

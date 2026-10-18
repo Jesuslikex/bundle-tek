@@ -971,10 +971,13 @@ export function WalletWorkspace({
                 loading ||
                 busy ||
                 archived ||
-                !picks.length ||
+                (!picks.length && rows.length !== 1) ||
                 picks.length > 20
               }
-              onClick={() => setWarmupOpen(true)}
+              onClick={() => {
+                if (!picks.length && rows.length === 1) setSelected([rows[0].address]);
+                setWarmupOpen(true);
+              }}
             >
               Wallet warmup
             </Button>
@@ -1421,6 +1424,13 @@ export function WalletWorkspace({
                       >
                         Edit
                       </Button>
+                      {!w.archived && (
+                        <Button variant="outline" disabled={busy || loading}
+                          aria-label={'Open warmup for ' + (w.label || w.address)}
+                          onClick={() => { setQuery(''); setSelected([w.address]); setWarmupOpen(true); }}>
+                          Warmup
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
 

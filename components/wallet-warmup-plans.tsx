@@ -1,4 +1,5 @@
 'use client';
+import styles from './wallet-warmup.module.css';
 import { readPanelJson } from './read-panel-json';
 import { ImportedPreparationHistory } from './imported-preparation-history';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -26,7 +27,7 @@ export function WalletWarmupPlans({
   addresses: string[];
   walletRevisions: Array<{ address: string; revision: number }>;
   plan: WarmupPlan | null;
-  onLoad: (document: SavedWarmup['document']) => void;
+  onLoad: (document: SavedWarmup['document'], freshStart?: boolean) => void;
   initialPlan?: SavedWarmup;
 }) {
   const fieldId = useId();
@@ -37,10 +38,34 @@ export function WalletWarmupPlans({
   const [selected, setSelected] = useState<SavedWarmup | null>(
     initialPlan ?? null,
   );
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
+  const [saveUnconfirmed, setSaveUnconfirmed] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const controller = useRef<AbortController | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftId = useRef<string | null>(null);
+  const pendingSave = useRef<string | null>(null);
+  function beginRequest() {
+    controller.current?.abort();
+    if (timer.current) clearTimeout(timer.current);
+    const c = new AbortController();
+    controller.current = c;
+    timer.current = setTimeout(() => {
+      if (controller.current !== c || c.signal.aborted) return;
+      c.abort();
+      setBusy(false);
+      setError(
+        'Plan request took too long. Reload saved plans to check whether a save completed, then try again.',
+      );
+    }, 30000);
+    return c;
+  }
+  function finishRequest(c: AbortController) {
+    if (controller.current !== c) return;
+    if (timer.current) clearTimeout(timer.current);
+    if (!c.signal.aborted) setBusy(false);
+  }
   async function read(signal: AbortSignal) {
     const response = await fetch('/api/wallet-workspace/warmup/plans', {
       cache: 'no-store',
@@ -63,8 +88,7 @@ export function WalletWarmupPlans({
     return data.plans;
   }
   useEffect(() => {
-    const c = new AbortController();
-    controller.current = c;
+    const c = beginRequest();
     fetch('/api/wallet-workspace/warmup/plans', {
       cache: 'no-store',
       signal: c.signal,
@@ -90,24 +114,35 @@ export function WalletWarmupPlans({
           setError(
             e instanceof Error ? e.message : 'Warmup plans unavailable.',
           );
-      });
-    return () => controller.current?.abort();
+      })
+      .finally(() => finishRequest(c));
+    return () => {
+      controller.current?.abort();
+      if (timer.current) clearTimeout(timer.current);
+    };
   }, []);
   async function mutate(
     action: 'save' | 'archive' | 'restore',
     target: SavedWarmup | null = selected,
   ) {
-    controller.current?.abort();
-    const c = new AbortController();
-    controller.current = c;
+    const c = beginRequest();
     setBusy(true);
     setNotice('');
     setError('');
     try {
       if (action === 'save' && !plan)
         throw new Error('Review the current plan before saving.');
-      const id = target?.id ?? crypto.randomUUID(),
+      if (action === 'save' && plan && Date.parse(plan.startAt) < Date.now())
+        throw new Error(
+          'Reviewed start time has passed. Choose a fresh start time and review the warmup plan again.',
+        );
+      if (!target && !draftId.current) draftId.current = crypto.randomUUID();
+      const id = target?.id ?? draftId.current!,
         expectedRevision = target?.revision ?? 0;
+      if (action === 'save') {
+        pendingSave.current = id;
+        setSaveUnconfirmed(true);
+      }
       const response = await fetch('/api/wallet-workspace/warmup/plans', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -136,6 +171,7 @@ export function WalletWarmupPlans({
       const data = (await readPanelJson(response, 'Warmup save failed.')) as {
         error?: string;
       } | null;
+      if (c.signal.aborted) return;
       if (!response.ok)
         throw new Error(
           typeof data?.error === 'string' && data.error
@@ -144,9 +180,11 @@ export function WalletWarmupPlans({
         );
       const plans = await read(c.signal);
       if (!c.signal.aborted) {
-        if (action === 'save')
+        if (action === 'save') {
           setSelected(plans.find((p) => p.id === id) ?? null);
-        else if (selected?.id === id) setSelected(null);
+          pendingSave.current = null;
+          setSaveUnconfirmed(false);
+        } else if (selected?.id === id) setSelected(null);
         setNotice(
           action === 'save'
             ? 'Warmup plan saved. No swaps scheduled.'
@@ -161,31 +199,39 @@ export function WalletWarmupPlans({
           e instanceof Error ? e.message : 'Warmup storage unavailable.',
         );
     } finally {
-      if (!c.signal.aborted) setBusy(false);
+      finishRequest(c);
     }
   }
   async function reload() {
-    controller.current?.abort();
-    const c = new AbortController();
-    controller.current = c;
+    const c = beginRequest();
     setBusy(true);
     setError('');
     try {
-      await read(c.signal);
+      const plans = await read(c.signal);
       if (!c.signal.aborted) {
-        setSelected(null);
-        setNotice('Saved plans reloaded. Reopen a plan before saving changes.');
+        const recovered = plans.find((p) => p.id === pendingSave.current);
+        setSelected(recovered ?? null);
+        if (recovered) {
+          setName(recovered.document.name);
+          pendingSave.current = null;
+          setSaveUnconfirmed(false);
+        }
+        setNotice(
+          recovered
+            ? 'Saved draft found. Review it before making further changes.'
+            : 'Saved plans reloaded. Reopen a plan before saving changes.',
+        );
       }
     } catch (e) {
       if (!c.signal.aborted)
         setError(e instanceof Error ? e.message : 'Warmup plans unavailable.');
     } finally {
-      if (!c.signal.aborted) setBusy(false);
+      finishRequest(c);
     }
   }
   return (
-    <section aria-label="Saved warmup plans">
-      <h4>Saved warmup plans</h4>
+    <section className={styles.saved} aria-label="Saved warmup plans">
+      <h4>3. Review and save</h4>
       <p>
         Save the public configuration. Reopen and review a future start before
         saving changes. No swaps are scheduled.
@@ -210,6 +256,9 @@ export function WalletWarmupPlans({
           disabled={busy}
           onClick={() => {
             setSelected(null);
+            draftId.current = null;
+            pendingSave.current = null;
+            setSaveUnconfirmed(false);
             setName('Wallet warmup');
             setNotice('Saving will create a new plan.');
           }}
@@ -220,6 +269,26 @@ export function WalletWarmupPlans({
           Reload warmup plans
         </Button>
       </div>
+      {busy && (
+        <div>
+          <output>
+            Reading or saving a public draft. No transactions are started.
+          </output>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              controller.current?.abort();
+              if (timer.current) clearTimeout(timer.current);
+              setBusy(false);
+              setError(
+                'Plan request cancelled. Reload saved plans to check whether a save completed.',
+              );
+            }}
+          >
+            Cancel plan request
+          </Button>
+        </div>
+      )}
       <small>
         {selected ? `Editing r${selected.revision}` : 'New saved draft'} ·{' '}
         {saved.length}/100 saved
@@ -267,6 +336,23 @@ export function WalletWarmupPlans({
                 >
                   Open
                 </Button>
+                {!p.archived && matches && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      setSelected(p);
+                      setName(p.document.name);
+                      onLoad(p.document, true);
+                      setNotice(
+                        'Fresh start selected. Review the complete plan and save changes; nothing is scheduled.',
+                      );
+                      setError('');
+                    }}
+                  >
+                    Review with fresh start
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   disabled={busy}
@@ -291,48 +377,55 @@ export function WalletWarmupPlans({
                   cycles={p.document.cycles}
                 />
               )}
-              <WalletWarmupHistoryRuns
-                key={'runs:' + p.id + ':' + p.revision}
-                plan={p}
-              />
-              {p.document.chain === 'Solana' && (
-                <WarmupCycleWorkflow
-                  key={'progress:' + p.id + ':' + p.revision}
-                  plan={p}
-                  canReview={matches}
-                />
-              )}
-              {p.document.chain === 'Solana' && (
-                <WarmupBuyReceiptHistory
-                  key={'buy-receipts:' + p.id + ':' + p.revision}
+              <details className={styles.advanced}>
+                <summary>Transactions and recovery</summary>
+                <p>
+                  Advanced controls for explicit transaction reviews and past
+                  activity. Nothing runs automatically.
+                </p>
+                <WalletWarmupHistoryRuns
+                  key={'runs:' + p.id + ':' + p.revision}
                   plan={p}
                 />
-              )}
-              {p.document.chain === 'Solana' && (
-                <WarmupApprovalHistory
-                  key={'approvals:' + p.id + ':' + p.revision}
-                  plan={p}
-                />
-              )}
-              {p.document.chain === 'Solana' && (
-                <WarmupSellReceipts
-                  key={'sell-receipts:' + p.id + ':' + p.revision}
-                  planId={p.id}
-                />
-              )}
-              <WalletWarmupPlanHistory
-                key={'history:' + p.id + ':' + p.revision}
-                id={p.id}
-                revision={p.revision}
-                name={p.document.name}
-              />
-              {p.document.chain === 'Solana' && (
-                <ImportedPreparationHistory
-                  scope="warmup"
+                {p.document.chain === 'Solana' && (
+                  <WarmupCycleWorkflow
+                    key={'progress:' + p.id + ':' + p.revision}
+                    plan={p}
+                    canReview={matches}
+                  />
+                )}
+                {p.document.chain === 'Solana' && (
+                  <WarmupBuyReceiptHistory
+                    key={'buy-receipts:' + p.id + ':' + p.revision}
+                    plan={p}
+                  />
+                )}
+                {p.document.chain === 'Solana' && (
+                  <WarmupApprovalHistory
+                    key={'approvals:' + p.id + ':' + p.revision}
+                    plan={p}
+                  />
+                )}
+                {p.document.chain === 'Solana' && (
+                  <WarmupSellReceipts
+                    key={'sell-receipts:' + p.id + ':' + p.revision}
+                    planId={p.id}
+                  />
+                )}
+                <WalletWarmupPlanHistory
+                  key={'history:' + p.id + ':' + p.revision}
                   id={p.id}
                   revision={p.revision}
+                  name={p.document.name}
                 />
-              )}
+                {p.document.chain === 'Solana' && (
+                  <ImportedPreparationHistory
+                    scope="warmup"
+                    id={p.id}
+                    revision={p.revision}
+                  />
+                )}
+              </details>
               {!matches && (
                 <small>
                   Select this plan&apos;s {p.document.addresses.length} wallets
@@ -342,6 +435,12 @@ export function WalletWarmupPlans({
             </article>
           );
         })}
+      {error && saveUnconfirmed && !busy && (
+        <p>
+          The save was not confirmed. Reload saved plans before retrying.
+          Retrying this draft keeps the same identity.
+        </p>
+      )}
       {notice && <output>{notice}</output>}
       {error && <p role="alert">{error}</p>}
     </section>

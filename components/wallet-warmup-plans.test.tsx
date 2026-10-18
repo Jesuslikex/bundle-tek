@@ -23,6 +23,8 @@ const plan = buildWarmupPlan(
   now,
 );
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(now));
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -35,6 +37,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 const alert = () => container.querySelector('[role="alert"]')?.textContent;
 async function mount(fetcher: ReturnType<typeof vi.fn>) {
@@ -189,4 +192,99 @@ it('preserves a JSON revision-conflict explanation without resending the mutatio
   await click('Save warmup draft');
   expect(alert()).toBe('Saved plan changed. Reload before saving.');
   expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it('times out stalled plan reads, enables manual retry and ignores a late response', async () => {
+  vi.useFakeTimers();
+  let resolve!: (response: Response) => void;
+  const fetcher = vi.fn(
+    () =>
+      new Promise<Response>((r) => {
+        resolve = r;
+      }),
+  );
+  await mount(fetcher);
+  await act(async () => vi.advanceTimersByTime(30000));
+  expect(alert()).toContain('Plan request took too long');
+  const reload = Array.from(container.querySelectorAll('button')).find(
+    (b) => b.textContent === 'Reload warmup plans',
+  )!;
+  expect(reload.disabled).toBe(false);
+  await act(async () =>
+    resolve(Response.json({ plans: [{ id: 'late-untrusted' }] })),
+  );
+  expect(container.textContent).toContain('0/100 saved');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('reuses a new draft identity on explicit save retry instead of creating duplicates', async () => {
+  const uuid = vi.fn().mockReturnValueOnce(id).mockReturnValueOnce('other-id');
+  vi.stubGlobal('crypto', { randomUUID: uuid });
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ plans: [] }))
+    .mockResolvedValueOnce(broken())
+    .mockResolvedValueOnce(broken());
+  await mount(fetcher);
+  await click('Save warmup draft');
+  await click('Save warmup draft');
+  const first = JSON.parse(
+    (fetcher.mock.calls[1][1] as RequestInit).body as string,
+  ) as { id: string };
+  const second = JSON.parse(
+    (fetcher.mock.calls[2][1] as RequestInit).body as string,
+  ) as { id: string };
+  expect(first.id).toBe(id);
+  expect(second.id).toBe(first.id);
+  expect(uuid).toHaveBeenCalledTimes(1);
+  expect(container.textContent).toContain('Reload saved plans before retrying');
+});
+it('recovers a save that completed after cancellation by reloading its original identity', async () => {
+  const stored: SavedWarmup = {
+    id,
+    revision: 1,
+    archived: false,
+    updatedAt: new Date(now).toISOString(),
+    document: {
+      name: 'Wallet warmup',
+      chain: 'Solana',
+      addresses: plan.addresses,
+      tokens: plan.tokens,
+      amount: plan.buyAmount,
+      feeReserve: plan.feeReserve,
+      cycles: plan.cycles,
+      intervalMinutes: plan.intervalMinutes,
+      startAt: plan.startAt,
+      totalBudget: plan.totalBudget,
+      walletRevisions: [{ address: wallet, revision: 3 }],
+    },
+  };
+  let resolve!: (response: Response) => void;
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ plans: [] }))
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((r) => {
+          resolve = r;
+        }),
+    )
+    .mockResolvedValueOnce(Response.json({ plans: [stored] }));
+  await mount(fetcher);
+  await click('Save warmup draft');
+  await click('Cancel plan request');
+  await click('Reload warmup plans');
+  expect(container.textContent).toContain('Saved draft found');
+  expect(container.textContent).toContain('Editing r1');
+  await act(async () => resolve(Response.json({ ok: true })));
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  expect(container.textContent).toContain('Editing r1');
+});
+
+it('refuses an expired reviewed start locally and provides a review recovery action', async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ plans: [] }));
+  await mount(fetcher);
+  await act(async () => vi.advanceTimersByTime(61 * 60000));
+  await click('Save warmup draft');
+  expect(alert()).toContain('Choose a fresh start time and review');
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });
