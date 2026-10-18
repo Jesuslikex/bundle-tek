@@ -1,28 +1,39 @@
 # Shared Bundle integration handoff
 
-18 October 2026. This checkpoint answers the user's request to reconcile Codex and Claude's separately built work. It supersedes older inventories in the sync notes; historical test and deployment records remain historical.
+18 October 2026. This refresh reconciles the completed workspace, layer and preference work with the latest coordination rules. Historical test and release reports retain their original scope.
 
 ## One integration baseline
 
-Use `C:\Users\Julian\Desktop\Bundle`, branch `main`. The inspected head was `6c97471`. The local saved `origin/main` reference was `ea0a120`, 70 commits behind main. No fetch, push, hosted SQL or deployment was performed for this check. That count describes local Git references, not freshly verified GitHub or production state.
+The canonical checkout is `C:\Users\Julian\Desktop\Bundle`, local `main`. The complete regression ran at `08ca7c2`. Its test-only readiness fix and report are committed as `1a99360`. At that checkpoint the local `origin/main` reference was `ea0a120`, 80 commits behind. These are local Git references, not fresh GitHub or production verification. No fetch, push, deployment or hosted SQL was performed for this reconciliation.
 
-Claude's UI worktree is `C:\Users\Julian\Desktop\Bundle-Claude-UI`, branch `claude/bundle-ui-20261016`, head `9f95a1a`. Its only remaining working-tree entry is an untracked historical render-feedback document. All five files from that commit match their copied integration commit `353f762` exactly: `git diff 9f95a1a 353f762 --` those five paths produces no differences. The original commit is not an ancestor because integration used a separate commit identity. Do not merge the stale branch again or conclude its UI was lost from the ancestry check alone. Shell qualification followed in `936c37b`; see the token UI integration report for its exact scope.
+The current coordination and claims record is `AGENTS.md`. Preserve its user-authored uncommitted update, including the other Bundle chat's account-session claim. Codex works on local main. Claude starts branches from `origin/main` and delivers PRs; Claude does not commit into this main checkout. Never force-push main, rewrite published history, or remove another agent's branch/worktree. A PR based on the older remote must be reconciled with current local main without reintroducing superseded code.
 
-## Current ownership
+All `drizzle/**` and `db/**` changes are reserved for Codex. The local journal ends at `0112_trade_preset_keyboard`; the next number at this checkpoint is **0113**. Recheck the journal and claim the number in AGENTS before writing it. Never edit, rename or renumber an already-committed migration.
 
-- This REA/Codex chat owns the pending persistent chart and wallet workspace: imported token projects, approved market/candle presentation changes, wallet inventory/navigation, new workspace frame/CSS/tests, and related comparison/report documents. Those dirty files are not part of the completed integrated UI checkpoint. Final default-height containment and real-app responsive qualification remain open before their commit.
-- The other Bundle chat, **Review current progress**, owns strategy previews (`9d0a9c9`, health note `6c97471`) and the next explicit account-owned trade amount preset feature. Its reserved paths include `components/imported-token-quote.tsx`, `components/imported-sell-presets.tsx`, new preference model/API/panel/tests, and the next migration/schema/journal changes. It has acknowledged the reconciliation request and is checking for duplicate work before source edits.
-- Existing shell and layout ownership still applies. Do not edit `app/page.tsx` or expand protected layout scope without the agreed exact patch approval. Prior owner approvals cover the current bounded UI changes only.
-- Coordinate the shared Git index and build/helper before use. Stage explicit owned paths or hunks. Preserve every unrelated dirty file. Separate worktrees are development areas; main is the integration record.
+Shell/layout protection remains: `app/page.tsx` and protected layout changes need the agreed approved exact patch. Earlier bounded approvals do not authorize new layout changes. Coordinate the shared index, build and helper; stage explicit owned paths or hunks and preserve concurrent edits.
 
-## Verification and acceptance
+## Integrated work and active ownership
 
-The corrected full baseline passed 565 files and 4,971 tests, recorded in `CODEX-FULL-SUITE-20261018.md` and committed as `15e6218`. That run predates the pending workspace UI and newer strategy preview code. The strategy owner separately reports 211 focused tests; the current pending UI selection separately passed 20 tests in seven files, TypeScript, scoped lint and a combined build. These results are not interchangeable with a final-source full-suite pass.
+Claude's earlier UI commit `9f95a1a` was copied into integration commit `353f762`. The five integration paths matched between those two commits; the different commit identity does not mean the work was lost. Later legitimate changes mean today's files need not equal that old worktree. Do not merge the stale UI branch again as a shortcut.
 
-Remaining UI acceptance includes the complete 310px chart plus a usable wallet row at supported desktop sizes, contained scrolling, narrow-screen fallback, retained view state, visible stale/error/monitor notices, and unchanged approval/signing gates. A layout test is not proof of funded execution, provider reliability, audited P&L or marketplace fulfillment. The completion matrix remains the feature-gap record.
+This REA/Codex chat completed the persistent chart/wallet workspace (`2a8997d`), retained launch-layer history (`6896fc3`) and saved native SOL versus declared layer ceilings (`016ed6a`). Their reports distinguish actual signed-in local layout checks from synthetic component fixtures and historical observations. They add no new funding/execution authority. The next owned implementation is funding editor request and unknown-save recovery under `components/launch/**`. Its initial audit is ignored `work/release-qa/funding-editor-recovery-audit-20261018.md`; the source fix is not implemented yet.
+
+The other Bundle chat, **Review current progress**, completed held strategy previews (`9d0a9c9`), account amount preferences (`a00d9fe`) and explicit focused preset keys (`73baa62`, acceptance note `08ca7c2`). It now owns the account-session scope recorded in AGENTS: `components/bundle-account.tsx`, new `components/account-sessions*`, `lib/account-sessions*`, `app/api/account-sessions/**` and their tests. Its initial audit is ignored `work/release-qa/account-session-audit-20261018.md`. It may resume that separate source work after the completed freeze, coordinating test/build/index use. No password policy, provider, credential or schema change is included in that claim.
+
+## Verification and next combined run
+
+The older corrected baseline of 565 files and 4,971 tests predates these newer features. Separate feature reports retain their exact focused counts; overlapping runs must not be added together or called a full-source pass.
+
+The new combined offline run finished with **one failure**: 572 Vitest files, 5,026 tests, 5,025 passed; all 35 native tests in eight script files passed. There were zero unhandled errors. All 1,784 frozen source/configuration hashes and harness hashes stayed unchanged, HEAD stayed at the captured commit, and the index stayed empty. The user's AGENTS edit is outside the application snapshot and was preserved. Original failed evidence remains under `work/release-qa/full-suite-integrated-20261018`.
+
+The sole failure was a one-second readiness assertion for the real lazy-loaded Front/Back planner. Commit `1a99360` replaces polling with React `act` plus Vitest's dynamic-import completion API. All 69 tests across eight related files passed together afterward, with scoped type-aware lint and formatting. No production code changed. Read `CODEX-INTEGRATED-REGRESSION-20261018.md` for commands, artifacts and limits. A new combined full-source green run is still required after the separately owned changes are ready. This focused pass does not erase the failed original run.
 
 ## Claude contact and release boundary
 
-Claude subscription authentication was available. A read-only attempt to resume the original UI author session with explicit `claude-opus-5-5`, tools disabled and no fallback returned the weekly usage limit, resetting 22 October at 07:00 Europe/London. No acknowledgement was obtained from that attempt. No Haiku model was used. This CLI session cannot establish the state of every independent Claude Desktop thread; the worktree and commit comparisons are the verified implementation evidence.
+The original Claude CLI UI author was last contacted with explicit `claude-opus-5-5`, tools disabled and no fallback; it returned the weekly limit resetting 22 October at 07:00 Europe/London. No acknowledgement or review was obtained. No Haiku fallback was used. That result does not establish every independent Claude Desktop session's state.
 
-The screenshot reporting 31 local commits and production `ea0a120` is an older status, not current deployment verification. Consult a fresh deployment check before publishing. This reconciliation grants no permission to push, deploy, migrate hosted data, change credentials/providers, enable signing or perform funded wallet actions. Keep current safeguards unchanged.
+The approved REA debugging endpoint was last unreachable; the funding audit claims no new live Proxima capture. Fresh public primary documentation is separate evidence. No debugging-browser launch workaround was attempted.
+
+The completion matrix remains the feature-gap record. Offline tests and layout checks do not establish funded Jito/launch execution, provider reliability, full holder coverage, audited P&L, stock qualification, marketplace fulfillment or complete Proxima parity. Older production release records are not fresh deployment checks.
+
+This reconciliation authorizes no push, deployment, hosted SQL, provider/credential/cron change, real wallet unlock/sign/send or funded transaction. Stock signing and all consent gates remain unchanged.

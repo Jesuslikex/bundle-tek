@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+- The integrated run at `08ca7c2` completed with one failure: 5,025/5,026 Vitest tests passed across 572 files, plus all 35 native tests in eight files. All 1,784 frozen source/configuration hashes and the harness stayed unchanged. Test-only fix `1a99360` replaces the lazy Front/Back panel's short polling wait with actual dynamic-import completion; 69 tests in eight related files pass afterward. This is still not a new full-suite green result. See `CODEX-INTEGRATED-REGRESSION-20261018.md`; the original failed evidence is retained, and a new combined run remains required.
+
 - Saved Front/Back reviews now compare each role's declared native ceilings with owned retained SOL observations; missing/invalid evidence stays unknown, stock buy amounts remain separate, and mixed snapshots are not pooled. This is historical comparison only, with no fresh provider, required-funding, custody or execution claim. See `CODEX-LAYER-SAVED-SOL-COMPARISON-20261018.md` for124 focused tests and synthetic rendering limits.
 - Reusable account-owned amount preferences are committed as `a00d9fe`, with separate owner verification in `CODEX-TRADE-AMOUNT-PRESETS-20261018.md`. Configurable preset keys follow in `73baa62`; see `CODEX-PRESET-KEYBOARD-20261018.md` for the owner's distinct checks and local migration0112. Key activation is temporary and explicit; selection fills the existing amount callbacks and invalidates the quote, without quote/sign/submit. Broader delivery settings, advanced valuation/exit preferences and backend execution gaps remain open.
 
