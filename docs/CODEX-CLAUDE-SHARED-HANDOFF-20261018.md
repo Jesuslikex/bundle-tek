@@ -99,3 +99,7 @@ Read CODEX-EXCHANGE-REFUND-REVIEW-UI-20261018.md. New opt-in refund review selec
 ## Internal exchange HTTP transport
 
 Read CODEX-EXCHANGE-ORDER-TRANSPORT-20261018.md. Disabled-by-default fixedorigin SOL adapter now composes with immutable order/service guards in syntheticHTTP/localSQL. Noappcaller,env/provider/credentialchange orlivecall. Final16files/287tests,3filetypedlint/format+TypeScript; no UI/build/fullsuite/funded claim. Missingrefundecho andambiguousresponse remainheld; no retriesorweakenedreceiptchecks. Otherchataccountpurchasedrafts untouched;0114committedseparately ina77decf.
+
+## One-quote qualification harness
+
+Read CODEX-EXCHANGE-QUOTE-QUALIFICATION-20261018.md. New boundedGET-onlyharness usesactualquote/review/reload in disposablememorySQL, sanitizedstartup/refusalreceipts andexplicit synthetic/live distinction.6nativecases+100Vitestcases,2mjslint/format/syntaxpass. Actualstartupmissingkey0HTTP; livecheckpendinguserkeyfilepath. Noapp/provider/env/credential/hostedSQL/financialchange. OtherchatpurchaseUI/API/testdraftspreserved.

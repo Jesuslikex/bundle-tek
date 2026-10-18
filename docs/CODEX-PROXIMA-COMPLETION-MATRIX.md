@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+Current exchange access now has a one-quote GET-only qualification command with actual disposable quote/refund review/reload, sanitized refusal receipts and explicit synthetic/live flags. CODEX-EXCHANGE-QUOTE-QUALIFICATION-20261018.md records6nativecases plus100existingVitestcases. Startup was refused for missing provider key with0HTTP; live qualification remains pending. No provider setting or financial authority changed.
+
 An internal disabled-by-default ChangeNOW order/status HTTP adapter now passes synthetic transport/service/SQL conformance. No application consumer or environment enablement exists. CODEX-EXCHANGE-ORDER-TRANSPORT-20261018.md records287tests/16files and the official/Smoke contract limits. Live provider access, consented creation API/UI, deposit flow and funded proof remain open.
 
 The exchange quote screen now exposes explicit proven refund-wallet review preparation and unknown-save recovery, with no order consent or creation. CODEX-EXCHANGE-REFUND-REVIEW-UI-20261018.md records266tests/14files and responsive synthetic Chrome proof ofonewrite/lost-response/GETrecovery. This supersedes the unwired refund-review gap; live provider orders/deposits and funded proof remain open.
