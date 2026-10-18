@@ -13,7 +13,9 @@
     "format": "oxfmt",
     "db:generate": "drizzle-kit generate",
     "db:check-migrations": "node scripts/check-wrangler-migrations.mjs",
-    "test": "vitest run --config vitest.config.mjs --maxWorkers=2",
+    "test": "npm run test:unit && npm run test:scripts",
+    "test:unit": "vitest run --config vitest.config.mjs --maxWorkers=2",
+    "test:scripts": "node --test scripts/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run test && npm run typecheck && npm run build",
     "db:migrate": "node --env-file=.env.local scripts/migrate-turso.mjs --remote"

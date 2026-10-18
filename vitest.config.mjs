@@ -14,7 +14,8 @@ export default defineConfig({
   },
   test: {
     // Ignored release snapshots contain historical tests, not current source.
-    exclude: [...configDefaults.exclude, 'work/**'],
+    // Native Node script tests run separately through npm run test:scripts.
+    exclude: [...configDefaults.exclude, 'work/**', 'scripts/**/*.test.mjs'],
     environment: 'node',
     setupFiles: [path.join(root, 'test/vercel-compat.ts')],
     // Miniflare-backed route suites start local D1 and run many sequential

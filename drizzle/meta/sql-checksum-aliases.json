@@ -1,6 +1,30 @@
 {
   "version": 1,
   "migrations": {
+    "0035_tracked_evm_holdings": {
+      "canonicalSha256": "add3aa32f8dd0e543ff5c18a716bd4689742f85dc9aa364900e93edba6928485",
+      "legacySha256": [
+        "8f5c2629967ac8d4ceacf24b4ac998711e49b9a680d80559b5fea813d2942ea8"
+      ]
+    },
+    "0036_imported_pool_candles": {
+      "canonicalSha256": "2133a358fa86a7f7a83d624674dc8805066ffe30d7ae6cbadf60e0af84517a47",
+      "legacySha256": [
+        "afa654c7bf582ce30136ee464d0a4ed79296a92e89b4d4a3955aa38a15e63fab"
+      ]
+    },
+    "0057_conditional_level_lifecycle": {
+      "canonicalSha256": "93ac97642f8e8ac293a061edef3a66cc853191e2008f7f2ff5c9bd4c496f1877",
+      "legacySha256": [
+        "c822ba38a28e3bc23784ef41e4d740a258a43ce6df6a5bcdffe7138e049249db"
+      ]
+    },
+    "0066_wallet_mint_holdings": {
+      "canonicalSha256": "c54afad5cca86da37340f5b0ad6ccf8ae526c5ee1e8c1d77a5c24f8cdcdd7f3a",
+      "legacySha256": [
+        "009769d28fed4b112e441ff45950860376172a11692d5842b0bb887da2c38e6c"
+      ]
+    },
     "0082_pump_group_reviews": {
       "canonicalSha256": "741a0a3005e7d4a2eebc0f0b25e0039dc0ee5b2711e48df5efb58545c3bfc724",
       "legacySha256": [
