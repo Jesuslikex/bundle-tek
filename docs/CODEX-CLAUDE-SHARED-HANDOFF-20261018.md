@@ -24,6 +24,8 @@ That chat separately committed saved Pump group account activity as `f3be26d`, w
 
 ## Verification and next combined run
 
+The marketplace selection checkpoint is separately owned by this REA chat: six existing model/UI/test/CSS paths plus its report, with no inventory-provider or checkout change. It passes43 scoped tests, TypeScript/lint/format, responsive synthetic Chrome checks and an isolated production build based on committed `b600167` plus those six files. See `CODEX-MARKETPLACE-SELECTION-20261018.md`. The other chat's recorded group fee/tip work is committed as `b600167`, documented separately in `CODEX-PUMP-RECORDED-COSTS-20261018.md`; it is not complete P&L. These checkpoints remain local. Preserve any newer dirty files and recheck the source before starting the next full regression.
+
 The older corrected baseline of 565 files and 4,971 tests predates these newer features. Separate feature reports retain their exact focused counts; overlapping runs must not be added together or called a full-source pass.
 
 The new combined offline run finished with **one failure**: 572 Vitest files, 5,026 tests, 5,025 passed; all 35 native tests in eight script files passed. There were zero unhandled errors. All 1,784 frozen source/configuration hashes and harness hashes stayed unchanged, HEAD stayed at the captured commit, and the index stayed empty. The user's AGENTS edit is outside the application snapshot and was preserved. Original failed evidence remains under `work/release-qa/full-suite-integrated-20261018`.

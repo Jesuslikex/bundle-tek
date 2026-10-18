@@ -80,6 +80,103 @@ async function field(name: string, value: string) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+function catalogTransport() {
+  const fetcher = vi.fn(async (url: string) =>
+    Response.json(
+      selectMarketplaceInventory(
+        marketplaceFixture(),
+        marketplaceFilters.parse(
+          Object.fromEntries(new URL(url, 'https://bundle.test').searchParams),
+        ),
+        Date.now(),
+      ),
+    ),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  return fetcher;
+}
+async function toggle(text: string) {
+  const label = [...container.querySelectorAll('label')].find(
+    (item) => item.textContent?.trim() === text,
+  )!;
+  await act(async () =>
+    label.querySelector<HTMLInputElement>('input')!.click(),
+  );
+}
+it('keeps reported source choices available while combining filters and supports a custom quantity', async () => {
+  const fetcher = catalogTransport();
+  await submit();
+  await field('count', '7');
+  await toggle('Classic');
+  await toggle('Exchange');
+  await toggle('Funding only');
+  await toggle('Light history');
+  await submit();
+  const query = new URL(fetcher.mock.calls.at(-1)![0], 'https://bundle.test')
+    .searchParams;
+  expect(query.get('count')).toBe('7');
+  expect(JSON.parse(query.get('sources')!)).toEqual(['Classic', 'Exchange']);
+  expect(JSON.parse(query.get('tiers')!)).toEqual([
+    'funding-only',
+    'light-history',
+  ]);
+  expect(query.has('source')).toBe(false);
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(3);
+  await field('source', 'Classic');
+  await submit();
+  const single = new URL(fetcher.mock.calls.at(-1)![0], 'https://bundle.test')
+    .searchParams;
+  expect(single.get('source')).toBe('Classic');
+  expect(single.has('sources')).toBe(false);
+});
+it('sorts captured rows and phone cards without fetching again or changing exact totals', async () => {
+  const fetcher = catalogTransport();
+  await submit();
+  const total = container.querySelector('output')?.textContent;
+  const sortButton = [...container.querySelectorAll('th button')].find(
+    (button) => button.textContent?.startsWith('Price ↑'),
+  )!;
+  await act(async () => (sortButton as HTMLButtonElement).click());
+  expect(container.querySelector('tbody tr code')?.textContent).toBe(
+    marketplaceFixture().listings[2].address,
+  );
+  expect(
+    container.querySelector('th[aria-sort="descending"]')?.textContent,
+  ).toContain('Price');
+  expect(
+    container.querySelector('[aria-label="Wallet inventory cards"] li code')
+      ?.textContent,
+  ).toBe(marketplaceFixture().listings[2].address);
+  expect(container.querySelector('output')?.textContent).toBe(total);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('tbody tr')?.textContent).toContain(
+    '0.100000002 SOL',
+  );
+});
+it('presets invalidate stale rows, reset clears multiple choices, and invalid custom counts never fetch', async () => {
+  const fetcher = catalogTransport();
+  await submit();
+  const preset = container.querySelector<HTMLButtonElement>(
+    '[aria-label="Choose 100 wallets"]',
+  )!;
+  await act(async () => preset.click());
+  expect(
+    (container.querySelector('input[name=count]') as HTMLInputElement).value,
+  ).toBe('100');
+  expect(container.querySelector('table')).toBeNull();
+  await toggle('Classic');
+  await toggle('Established');
+  await act(async () =>
+    container.querySelector<HTMLFormElement>('form')!.reset(),
+  );
+  expect(
+    (container.querySelector('input[name=count]') as HTMLInputElement).value,
+  ).toBe('25');
+  expect(container.querySelector('input[type=hidden]')).toBeNull();
+  await field('count', '201');
+  await submit();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
 it('sends exact SOL ranges as lamports and blocks inverted ranges before fetching', async () => {
   const fetcher = vi.fn(async (_url: string) =>
     Response.json({}, { status: 503 }),
@@ -164,11 +261,7 @@ it('renders provider coverage and exact totals, then clears stale rows when filt
   await submit();
   expect(container.textContent).toContain('Partial provider coverage');
   expect(container.textContent).toContain('3.300000003 SOL');
-  await act(async () => {
-    const select = container.querySelector('select')!;
-    select.value = '50';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await field('count', '50');
   expect(container.querySelector('table')).toBeNull();
 });
 it('does not publish an old request after filters change', async () => {
@@ -183,11 +276,7 @@ it('does not publish an old request after filters change', async () => {
     ),
   );
   await submit();
-  await act(async () => {
-    container
-      .querySelector('select')!
-      .dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await field('count', '50');
   await act(async () => {
     resolve(
       Response.json(

@@ -6,9 +6,23 @@ import {
   marketplaceFilters,
   marketplaceLamports,
   marketplaceSol,
+  sortMarketplaceListings,
+  type MarketplaceSort,
   type MarketplaceResult,
 } from '@/lib/marketplace-catalog';
 import styles from './marketplace-panel.module.css';
+const tierLabels = {
+  'funding-only': 'Funding only',
+  'light-history': 'Light history',
+  established: 'Established',
+} as const;
+const displaySortLabels = {
+  price: 'Price',
+  balance: 'SOL balance',
+  net: 'Price less balance',
+  funded: 'Funding time',
+  transactions: 'Transactions',
+} as const;
 
 export function MarketplacePanel() {
   const [result, setResult] = useState<MarketplaceResult | null>(null);
@@ -17,6 +31,15 @@ export function MarketplacePanel() {
   const [signIn, setSignIn] = useState(false),
     [expired, setExpired] = useState(false);
   const pending = useRef<AbortController | null>(null);
+  const [count, setCount] = useState('25');
+  const [source, setSource] = useState('');
+  const [sourceOptions, setSourceOptions] = useState<string[]>([]);
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
+  const [sort, setSort] = useState<{
+    key: MarketplaceSort;
+    descending: boolean;
+  }>({ key: 'price', descending: false });
   useEffect(() => () => pending.current?.abort(), []);
   useEffect(() => {
     if (!result) return;
@@ -61,6 +84,10 @@ export function MarketplacePanel() {
             amounts[key] ? marketplaceLamports(value) : value,
           );
       const parsed = marketplaceFilters.safeParse(Object.fromEntries(params));
+      if (params.toString().length > 2048)
+        throw new Error(
+          'Choose fewer sources or shorter filters before refreshing.',
+        );
       if (!parsed.success)
         throw new Error(
           'Check your filter ranges. Maximum values must be at or above their minimums.',
@@ -101,6 +128,7 @@ export function MarketplacePanel() {
       )
         throw new Error('Inventory snapshot has expired. Refresh to continue.');
       setResult(data);
+      setSourceOptions(data.sources);
     } catch (reason) {
       if (!controller.signal.aborted)
         setError(
@@ -112,6 +140,39 @@ export function MarketplacePanel() {
       if (pending.current === controller) setBusy(false);
     }
   }
+  const sortHeader = (key: MarketplaceSort, title: string) => (
+    <th
+      scope="col"
+      aria-sort={
+        sort.key === key
+          ? sort.descending
+            ? 'descending'
+            : 'ascending'
+          : 'none'
+      }
+    >
+      <button
+        type="button"
+        className={styles.sortButton}
+        onClick={() =>
+          setSort((current) => ({
+            key,
+            descending: current.key === key ? !current.descending : false,
+          }))
+        }
+      >
+        {title}
+        {sort.key === key ? (sort.descending ? ' ↓' : ' ↑') : ''}
+      </button>
+    </th>
+  );
+  const displayed = result
+    ? sortMarketplaceListings(result.listings, sort.key, sort.descending)
+    : [];
+  const netCost = (item: MarketplaceResult['listings'][number]) =>
+    marketplaceSol(
+      String(BigInt(item.purchasePriceLamports) - BigInt(item.balanceLamports)),
+    );
   return (
     <section className={styles.panel} aria-labelledby="marketplace-title">
       <header>
@@ -127,17 +188,46 @@ export function MarketplacePanel() {
       <form
         onSubmit={load}
         onChange={invalidate}
-        onReset={invalidate}
+        onReset={() => {
+          invalidate();
+          setCount('25');
+          setSource('');
+          setSelectedSources([]);
+          setSelectedTiers([]);
+          setSort({ key: 'price', descending: false });
+        }}
         className={styles.filters}
       >
-        <label>
-          Wallet count
-          <select name="count" defaultValue="25">
-            {[25, 50, 100, 200].map((v) => (
-              <option key={v}>{v}</option>
+        <div>
+          <label>
+            Wallet count
+            <input
+              name="count"
+              type="number"
+              min="1"
+              max="200"
+              step="1"
+              required
+              value={count}
+              onChange={(event) => setCount(event.target.value)}
+            />
+          </label>
+          <div className={styles.countPresets}>
+            {[25, 50, 100, 200].map((value) => (
+              <button
+                type="button"
+                key={value}
+                aria-label={`Choose ${value} wallets`}
+                onClick={() => {
+                  setCount(String(value));
+                  invalidate();
+                }}
+              >
+                {value}
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
         <label>
           Minimum funding age (days)
           <input
@@ -167,19 +257,93 @@ export function MarketplacePanel() {
             since reported funding, not wallet creation age.
           </p>
           <div className={styles.rangeGrid}>
-            <label>
-              History tier
-              <select name="tier" defaultValue="">
-                <option value="">All tiers</option>
-                <option value="funding-only">Funding only</option>
-                <option value="light-history">Light history</option>
-                <option value="established">Established</option>
-              </select>
-            </label>
+            <fieldset className={styles.choices}>
+              <legend>History tiers</legend>
+              <small>
+                Choose any combination. None selected means all tiers.
+              </small>
+              {(['funding-only', 'light-history', 'established'] as const).map(
+                (value, index) => (
+                  <label key={value}>
+                    <input
+                      type="checkbox"
+                      checked={selectedTiers.includes(value)}
+                      onChange={(event) =>
+                        setSelectedTiers((current) =>
+                          event.target.checked
+                            ? [...current, value]
+                            : current.filter((item) => item !== value),
+                        )
+                      }
+                    />
+                    {['Funding only', 'Light history', 'Established'][index]}
+                  </label>
+                ),
+              )}
+              {selectedTiers.length > 0 && (
+                <input
+                  type="hidden"
+                  name="tiers"
+                  value={JSON.stringify(selectedTiers)}
+                />
+              )}
+            </fieldset>
             <label>
               Funding source
-              <input name="source" maxLength={80} placeholder="Any source" />
+              <input
+                name="source"
+                maxLength={80}
+                placeholder="One exact source or choose below"
+                value={source}
+                onChange={(event) => {
+                  setSource(event.target.value);
+                  setSelectedSources([]);
+                }}
+              />
             </label>
+            <fieldset className={styles.choices}>
+              <legend>Reported funding sources</legend>
+              <small>
+                {sourceOptions.length
+                  ? 'Choose up to 20. These are provider labels, not verified provenance.'
+                  : 'Refresh inventory to load reported choices, or enter one exact source.'}
+              </small>
+              <div className={styles.sourceChoices}>
+                {[...new Set([...sourceOptions, ...selectedSources])]
+                  .sort()
+                  .map((value) => (
+                    <label key={value}>
+                      <input
+                        type="checkbox"
+                        checked={selectedSources.includes(value)}
+                        disabled={
+                          selectedSources.length >= 20 &&
+                          !selectedSources.includes(value)
+                        }
+                        onChange={(event) => {
+                          setSource('');
+                          setSelectedSources((current) =>
+                            event.target.checked
+                              ? [...current, value]
+                              : current.filter((item) => item !== value),
+                          );
+                        }}
+                      />
+                      {value}
+                      {!sourceOptions.includes(value)
+                        ? ' (not in latest catalog)'
+                        : ''}
+                    </label>
+                  ))}
+              </div>
+              {selectedSources.length > 0 && (
+                <input
+                  type="hidden"
+                  name="sources"
+                  value={JSON.stringify(selectedSources)}
+                />
+              )}
+            </fieldset>
             <label>
               Minimum balance (SOL)
               <input
@@ -289,26 +453,28 @@ export function MarketplacePanel() {
               </caption>
               <thead>
                 <tr>
-                  <th>Wallet</th>
-                  <th>Balance</th>
-                  <th>Price</th>
+                  <th scope="col">Wallet</th>
+                  {sortHeader('balance', 'Balance')}
+                  {sortHeader('price', 'Price')}
+                  {sortHeader('net', 'Price less balance')}
                   <th>Source / tier</th>
-                  <th>Funded</th>
-                  <th>Transactions</th>
+                  {sortHeader('funded', 'Funded')}
+                  {sortHeader('transactions', 'Transactions')}
                 </tr>
               </thead>
               <tbody>
-                {result.listings.map((item) => (
+                {displayed.map((item) => (
                   <tr key={item.id}>
                     <td>
                       <code>{item.address}</code>
                     </td>
                     <td>{marketplaceSol(item.balanceLamports)} SOL</td>
                     <td>{marketplaceSol(item.purchasePriceLamports)} SOL</td>
+                    <td>{netCost(item)} SOL</td>
                     <td>
                       {item.source}
                       <br />
-                      {item.tier}
+                      {tierLabels[item.tier]}
                     </td>
                     <td>{new Date(item.fundedAt).toLocaleString()}</td>
                     <td>{item.transactionCount}</td>
@@ -316,6 +482,79 @@ export function MarketplacePanel() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className={styles.mobileInventory}>
+            <label>
+              Sort displayed wallets
+              <select
+                value={`${sort.key}:${sort.descending ? 'desc' : 'asc'}`}
+                onChange={(event) => {
+                  const [key, direction] = event.target.value.split(':');
+                  setSort({
+                    key: key as MarketplaceSort,
+                    descending: direction === 'desc',
+                  });
+                }}
+              >
+                {(
+                  ['price', 'balance', 'net', 'funded', 'transactions'] as const
+                ).flatMap((key) =>
+                  ['asc', 'desc'].map((direction) => (
+                    <option
+                      key={`${key}:${direction}`}
+                      value={`${key}:${direction}`}
+                    >
+                      {displaySortLabels[key]} ·{' '}
+                      {key === 'funded'
+                        ? direction === 'asc'
+                          ? 'oldest first'
+                          : 'newest first'
+                        : direction === 'asc'
+                          ? 'low to high'
+                          : 'high to low'}
+                    </option>
+                  )),
+                )}
+              </select>
+            </label>
+            <p>
+              Display order only. Selected wallets and totals stay the same.
+            </p>
+            <ul aria-label="Wallet inventory cards">
+              {displayed.map((item) => (
+                <li key={item.id}>
+                  <code>{item.address}</code>
+                  <dl>
+                    <div>
+                      <dt>Balance</dt>
+                      <dd>{marketplaceSol(item.balanceLamports)} SOL</dd>
+                    </div>
+                    <div>
+                      <dt>Price</dt>
+                      <dd>{marketplaceSol(item.purchasePriceLamports)} SOL</dd>
+                    </div>
+                    <div>
+                      <dt>Price less balance</dt>
+                      <dd>{netCost(item)} SOL</dd>
+                    </div>
+                    <div>
+                      <dt>Transactions</dt>
+                      <dd>{item.transactionCount}</dd>
+                    </div>
+                    <div>
+                      <dt>Source / tier</dt>
+                      <dd>
+                        {item.source} / {tierLabels[item.tier]}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Funded</dt>
+                      <dd>{new Date(item.fundedAt).toLocaleString()}</dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
           </div>
           {!result.listings.length && (
             <p>No entries meet these filters in this provider snapshot.</p>

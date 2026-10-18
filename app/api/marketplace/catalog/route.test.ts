@@ -20,6 +20,36 @@ const get = (query = '') =>
   GET(
     new Request(`https://bundle.example.com/api/marketplace/catalog${query}`),
   );
+it('forwards custom count and canonical multiple filters without relaxing duplicate-key rejection', async () => {
+  mocks.read.mockResolvedValue({ purchaseEnabled: false, listings: [] });
+  const query = new URLSearchParams({
+    count: '7',
+    sources: JSON.stringify(['Exchange', 'Classic']),
+    tiers: JSON.stringify(['established', 'funding-only']),
+  });
+  expect((await get('?' + query)).status).toBe(200);
+  expect(mocks.read.mock.calls[0][0]).toMatchObject({
+    count: 7,
+    sources: ['Classic', 'Exchange'],
+    tiers: ['established', 'funding-only'],
+  });
+  mocks.read.mockClear();
+  expect(
+    (
+      await get(
+        '?sources=' +
+          encodeURIComponent('["Classic"]') +
+          '&sources=' +
+          encodeURIComponent('["Exchange"]'),
+      )
+    ).status,
+  ).toBe(400);
+  expect(
+    (await get('?sources=' + encodeURIComponent('["Classic","Classic"]')))
+      .status,
+  ).toBe(400);
+  expect(mocks.read).not.toHaveBeenCalled();
+});
 beforeEach(() => {
   mocks.user = { userId: 'owner' };
   mocks.read.mockReset();

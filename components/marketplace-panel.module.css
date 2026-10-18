@@ -86,6 +86,61 @@
   opacity: 0.6;
   cursor: wait;
 }
+.countPresets {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.filters .countPresets button {
+  padding: 8px 4px;
+  background: #18243c;
+}
+.choices {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #34415b;
+  border-radius: 8px;
+}
+.choices legend {
+  font-size: 13px;
+}
+.choices small {
+  display: block;
+  color: #aeb9cc;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.filters .choices label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  overflow-wrap: anywhere;
+}
+.filters .choices input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+.sourceChoices {
+  max-height: 180px;
+  overflow-y: auto;
+}
+.sortButton {
+  padding: 4px 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.sortButton:focus-visible {
+  outline: 2px solid #93b3ff;
+  outline-offset: 3px;
+}
 .filters :focus-visible {
   outline: 2px solid #93b3ff;
   outline-offset: 3px;
@@ -137,7 +192,62 @@
 .notice h2 {
   font-size: 16px;
 }
+.mobileInventory {
+  display: none;
+}
 @media (max-width: 700px) {
+  .scroll {
+    display: none;
+  }
+  .mobileInventory {
+    display: block;
+    min-width: 0;
+  }
+  .mobileInventory label {
+    display: grid;
+    gap: 8px;
+  }
+  .mobileInventory select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #34415b;
+    border-radius: 8px;
+    background: #131b29;
+    color: inherit;
+  }
+  .mobileInventory ul {
+    margin: 16px 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 12px;
+  }
+  .mobileInventory li {
+    min-width: 0;
+    border: 1px solid #34415b;
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .mobileInventory code {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+  }
+  .mobileInventory dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 0;
+  }
+  .mobileInventory dt {
+    color: #aeb9cc;
+    font-size: 12px;
+  }
+  .mobileInventory dd {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+  }
   .panel {
     padding: 28px 16px;
   }

@@ -22,12 +22,39 @@ const label = z
   .refine((v) =>
     v.split('').every((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127),
   );
+const tier = z.enum(['funding-only', 'light-history', 'established']);
+function queryArray(value: unknown) {
+  if (typeof value !== 'string' || value.length > 1800) return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+const sources = z.preprocess(
+  queryArray,
+  z
+    .array(label)
+    .min(1)
+    .max(20)
+    .refine((values) => new Set(values).size === values.length)
+    .transform((values) => [...values].sort()),
+);
+const tiers = z.preprocess(
+  queryArray,
+  z
+    .array(tier)
+    .min(1)
+    .max(3)
+    .refine((values) => new Set(values).size === values.length)
+    .transform((values) => [...values].sort()),
+);
 export const marketplaceListing = z
   .object({
     id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/),
     address: wallet,
     source: label,
-    tier: z.enum(['funding-only', 'light-history', 'established']),
+    tier,
     fundedAt: timestamp,
     balanceLamports: amount,
     purchasePriceLamports: amount,
@@ -49,12 +76,7 @@ export type MarketplaceInventory = z.infer<typeof marketplaceInventory>;
 
 export const marketplaceFilters = z
   .object({
-    count: z.coerce
-      .number()
-      .pipe(
-        z.union([z.literal(25), z.literal(50), z.literal(100), z.literal(200)]),
-      )
-      .default(25),
+    count: z.coerce.number().int().min(1).max(200).default(25),
     minimumAgeDays: z.coerce.number().int().min(1).max(36500).default(1),
     maximumAgeDays: z.coerce.number().int().min(1).max(36500).optional(),
     minimumGapMinutes: z.coerce.number().int().min(0).max(525600).default(30),
@@ -74,11 +96,15 @@ export const marketplaceFilters = z
       .max(Number.MAX_SAFE_INTEGER)
       .optional(),
     source: label.optional(),
-    tier: z.enum(['funding-only', 'light-history', 'established']).optional(),
+    tier: tier.optional(),
+    sources: sources.optional(),
+    tiers: tiers.optional(),
   })
   .strict()
   .refine(
     (f) =>
+      !(f.source && f.sources) &&
+      !(f.tier && f.tiers) &&
       amount.safeParse(f.minimumBalanceLamports).success &&
       (f.maximumBalanceLamports === undefined ||
         amount.safeParse(f.maximumBalanceLamports).success) &&
@@ -150,7 +176,9 @@ export function selectMarketplaceInventory(
           BigInt(item.purchasePriceLamports) <=
             BigInt(f.maximumPriceLamports)) &&
         (!f.source || item.source === f.source) &&
-        (!f.tier || item.tier === f.tier),
+        (!f.tier || item.tier === f.tier) &&
+        (!f.sources || f.sources.includes(item.source)) &&
+        (!f.tiers || f.tiers.includes(item.tier)),
     )
     .sort((a, b) => {
       const delta =
@@ -203,6 +231,42 @@ export function marketplaceSol(raw: string) {
       .padStart(9, '0')
       .replace(/0+$/, '') || '0'
   }`;
+}
+
+export type MarketplaceSort =
+  | 'price'
+  | 'balance'
+  | 'net'
+  | 'funded'
+  | 'transactions';
+/** Display order only; never reselects wallets or changes captured totals. */
+export function sortMarketplaceListings(
+  listings: MarketplaceListing[],
+  sort: MarketplaceSort,
+  descending: boolean,
+) {
+  const value = (row: MarketplaceListing) =>
+    sort === 'price'
+      ? BigInt(row.purchasePriceLamports)
+      : sort === 'balance'
+        ? BigInt(row.balanceLamports)
+        : sort === 'net'
+          ? BigInt(row.purchasePriceLamports) - BigInt(row.balanceLamports)
+          : sort === 'transactions'
+            ? BigInt(row.transactionCount)
+            : BigInt(Date.parse(row.fundedAt));
+  return [...listings].sort((a, b) => {
+    const left = value(a),
+      right = value(b);
+    const difference = left < right ? -1 : left > right ? 1 : 0;
+    return difference
+      ? difference * (descending ? -1 : 1)
+      : a.id < b.id
+        ? -1
+        : a.id > b.id
+          ? 1
+          : 0;
+  });
 }
 
 /** Exact user-facing SOL conversion. Never round a spending/filter boundary. */

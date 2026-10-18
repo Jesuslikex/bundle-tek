@@ -4,10 +4,84 @@ import {
   marketplaceSol,
   marketplaceLamports,
   selectMarketplaceInventory,
+  sortMarketplaceListings,
 } from './marketplace-catalog';
 import { marketplaceFixture } from '../test/marketplace-fixture';
 const now = Date.parse('2026-10-17T12:00:00Z');
 const filters = marketplaceFilters.parse({});
+it('admits custom quantities within the existing 200-wallet ceiling and preserves default/legacy filters', () => {
+  for (const count of [1, 7, 25, 42, 50, 100, 199, 200])
+    expect(marketplaceFilters.parse({ count }).count).toBe(count);
+  for (const count of [0, -1, 1.5, 201, NaN, Infinity])
+    expect(marketplaceFilters.safeParse({ count }).success).toBe(false);
+  expect(marketplaceFilters.parse({}).count).toBe(25);
+  expect(
+    JSON.stringify(
+      marketplaceFilters.parse({ source: 'Classic', tier: 'light-history' }),
+    ),
+  ).not.toMatch(/sources|tiers/);
+});
+it('applies multiple reported sources and tiers before count, spacing and exact totals', () => {
+  const data = marketplaceFixture(now);
+  data.listings[0].tier = 'funding-only';
+  data.listings[2].tier = 'established';
+  const selected = marketplaceFilters.parse({
+    count: 2,
+    sources: JSON.stringify(['Exchange', 'Classic']),
+    tiers: JSON.stringify(['established', 'funding-only']),
+  });
+  const result = selectMarketplaceInventory(data, selected, now);
+  expect(result.filters.sources).toEqual(['Classic', 'Exchange']);
+  expect(result.listings.map((row) => row.id)).toEqual([
+    'wallet-1',
+    'wallet-3',
+  ]);
+  expect(result.matchingCount).toBe(2);
+  expect(result.purchaseEnabled).toBe(false);
+  expect(result.totalPriceLamports).toBe('2200000002');
+  expect(
+    selectMarketplaceInventory(
+      data,
+      marketplaceFilters.parse({ sources: ['Absent'] }),
+      now,
+    ).listings,
+  ).toEqual([]);
+});
+it('rejects conflicting legacy/multiple filters, duplicates and malformed or oversized arrays', () => {
+  for (const query of [
+    { source: 'Classic', sources: ['Classic'] },
+    { tier: 'light-history', tiers: ['light-history'] },
+    { sources: [] },
+    { sources: ['Classic', 'Classic'] },
+    { sources: Array.from({ length: 21 }, (_, i) => String(i)) },
+    { tiers: ['unknown'] },
+    { tiers: ['established', 'established'] },
+    { sources: 'not json' },
+    { sources: '{}' },
+    { tiers: '[]' },
+  ])
+    expect(marketplaceFilters.safeParse(query).success).toBe(false);
+});
+it('sorts exact displayed values without mutating selection or losing one-lamport differences', () => {
+  const rows = marketplaceFixture(now).listings;
+  rows[0].purchasePriceLamports = '9007199254740993';
+  rows[1].purchasePriceLamports = '9007199254740992';
+  rows[2].purchasePriceLamports = '1';
+  rows[2].balanceLamports = '2';
+  const before = JSON.stringify(rows);
+  expect(
+    sortMarketplaceListings(rows, 'price', false).map((row) => row.id),
+  ).toEqual(['wallet-3', 'wallet-2', 'wallet-1']);
+  expect(
+    sortMarketplaceListings(rows, 'price', true).map((row) => row.id),
+  ).toEqual(['wallet-1', 'wallet-2', 'wallet-3']);
+  expect(sortMarketplaceListings(rows, 'net', false)[0].id).toBe('wallet-3');
+  expect(sortMarketplaceListings(rows, 'funded', false)[0].id).toBe('wallet-3');
+  expect(
+    sortMarketplaceListings(rows, 'transactions', false).map((row) => row.id),
+  ).toEqual(['wallet-1', 'wallet-2', 'wallet-3']);
+  expect(JSON.stringify(rows)).toBe(before);
+});
 it('filters real supplied entries and preserves partial coverage without inventing inventory', () => {
   const result = selectMarketplaceInventory(
     marketplaceFixture(now),

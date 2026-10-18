@@ -1,5 +1,7 @@
 # Live marketplace comparison
 
+Later local update,18October: `CODEX-MARKETPLACE-SELECTION-20261018.md` supersedes this comparison's fixed-count, single-source/tier, unsortable-table and missing per-row-difference rows. Phone cards were also added. The table below records the earlier source checkpoint and is retained as historical evidence. Qualified provider, chain/timezone/folder evidence and checkout/delivery/history gaps remain; no new live marketplace capture or purchase proof is implied.
+
 18 October 2026. Read-only REA observation of the existing signed-in Proxima session, compared with local Bundle main `84a9b03`. No purchase, wallet import/export, funding, signing, filter-value edit or provider setup occurred. Application source remains frozen for the separate full offline suite.
 
 ## Evidence and limits
