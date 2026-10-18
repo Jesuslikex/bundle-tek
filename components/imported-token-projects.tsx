@@ -16,6 +16,10 @@ import {
   ImportedTokenQuote,
 } from './imported-token-quote';
 import { ImportedTokenMarket } from './imported-token-market';
+import {
+  ImportedWorkspaceFrame,
+  ImportedWorkspaceViews,
+} from './imported-workspace-frame';
 import { ImportedSupplyTracker } from './imported-supply-tracker';
 import { HolderIndexPanel } from './holder-index-panel';
 import { ImportedEvmWalletBalances } from './imported-evm-wallet-balances';
@@ -188,6 +192,107 @@ export function ImportedTokenProjects({
       if (!controller.signal.aborted) setBusy(false);
     }
   }
+  const tokenPicker = (
+    <details className="token-project-picker" open={!current}>
+      <summary>Choose or import a token</summary>
+      <p>
+        Importing does not launch a token or establish authenticity. Supported
+        Solana swaps require a fresh preparation, your exact wallet signature
+        and a separate mainnet submission.
+      </p>
+      <form
+        className="imported-project-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void run('import');
+        }}
+      >
+        <label>
+          Token network{' '}
+          <select
+            aria-label="Token network"
+            value={chain}
+            disabled={busy}
+            onChange={(e) => setChain(e.target.value)}
+          >
+            {['Solana', ...Object.keys(EVM_NETWORKS)].map((network) => (
+              <option key={network}>{network}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Token address{' '}
+          <Input
+            aria-label="Token address"
+            placeholder="Enter a mint or contract address"
+            value={address}
+            disabled={busy}
+            maxLength={44}
+            onChange={(e) => setAddress(e.target.value)}
+            required
+          />
+        </label>
+        <Button type="submit" disabled={busy || !address.trim()}>
+          {busy ? 'Loading…' : 'Import token'}
+        </Button>
+      </form>
+      <div className="wallet-roster-actions">
+        <h2>Imported projects</h2>
+        <Button
+          variant="outline"
+          disabled={busy}
+          onClick={() => void run('reload')}
+        >
+          Reload imported projects
+        </Button>
+        <Button
+          variant="outline"
+          aria-pressed={archived}
+          disabled={busy}
+          onClick={() => {
+            setArchived(!archived);
+            setSelected('');
+            setSellSelection(null);
+          }}
+        >
+          {archived ? 'Show active imports' : 'Show archived imports'}
+        </Button>
+      </div>
+      {!projects.some((p) => p.archived === archived) && !busy && (
+        <p>No {archived ? 'archived' : 'active'} imports.</p>
+      )}
+      <div className="warmup-history">
+        {projects
+          .filter((p) => p.archived === archived)
+          .map((project) => (
+            <article key={project.id}>
+              <strong>
+                {project.document.token.name} ({project.document.token.symbol})
+              </strong>
+              <p>
+                {project.document.token.chain} · r{project.revision} ·{' '}
+                {project.archived ? 'Archived' : 'Active'}
+              </p>
+              <code className="warmup-address">
+                {project.document.token.address}
+              </code>
+              <div>
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    setSelected(project.id);
+                    setSellSelection(null);
+                  }}
+                >
+                  Open import {project.document.token.symbol}
+                </Button>
+              </div>
+            </article>
+          ))}
+      </div>
+    </details>
+  );
   return (
     <section
       className="settings-panel imported-projects"
@@ -203,106 +308,7 @@ export function ImportedTokenProjects({
           </p>
         )}
       </div>
-      <details className="token-project-picker" open={!current}>
-        <summary>Choose or import a token</summary>
-        <p>
-          Importing does not launch a token or establish authenticity. Supported
-          Solana swaps require a fresh preparation, your exact wallet signature
-          and a separate mainnet submission.
-        </p>
-        <form
-          className="imported-project-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run('import');
-          }}
-        >
-          <label>
-            Token network{' '}
-            <select
-              aria-label="Token network"
-              value={chain}
-              disabled={busy}
-              onChange={(e) => setChain(e.target.value)}
-            >
-              {['Solana', ...Object.keys(EVM_NETWORKS)].map((network) => (
-                <option key={network}>{network}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Token address{' '}
-            <Input
-              aria-label="Token address"
-              placeholder="Enter a mint or contract address"
-              value={address}
-              disabled={busy}
-              maxLength={44}
-              onChange={(e) => setAddress(e.target.value)}
-              required
-            />
-          </label>
-          <Button type="submit" disabled={busy || !address.trim()}>
-            {busy ? 'Loading…' : 'Import token'}
-          </Button>
-        </form>
-        <div className="wallet-roster-actions">
-          <h2>Imported projects</h2>
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={() => void run('reload')}
-          >
-            Reload imported projects
-          </Button>
-          <Button
-            variant="outline"
-            aria-pressed={archived}
-            disabled={busy}
-            onClick={() => {
-              setArchived(!archived);
-              setSelected('');
-              setSellSelection(null);
-            }}
-          >
-            {archived ? 'Show active imports' : 'Show archived imports'}
-          </Button>
-        </div>
-        {!projects.some((p) => p.archived === archived) && !busy && (
-          <p>No {archived ? 'archived' : 'active'} imports.</p>
-        )}
-        <div className="warmup-history">
-          {projects
-            .filter((p) => p.archived === archived)
-            .map((project) => (
-              <article key={project.id}>
-                <strong>
-                  {project.document.token.name} ({project.document.token.symbol}
-                  )
-                </strong>
-                <p>
-                  {project.document.token.chain} · r{project.revision} ·{' '}
-                  {project.archived ? 'Archived' : 'Active'}
-                </p>
-                <code className="warmup-address">
-                  {project.document.token.address}
-                </code>
-                <div>
-                  <Button
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => {
-                      setSelected(project.id);
-                      setSellSelection(null);
-                    }}
-                  >
-                    Open import {project.document.token.symbol}
-                  </Button>
-                </div>
-              </article>
-            ))}
-        </div>
-      </details>
+      {!current && tokenPicker}
       {error && <p role="alert">{error}</p>}
       {current && (
         <section
@@ -357,38 +363,45 @@ export function ImportedTokenProjects({
               </details>
             </div>
             <div className="imported-token-header-actions">
-              <div className="wallet-roster-actions">
-                {!current.archived && (
+              {tokenPicker}
+              <details className="imported-token-actions-menu">
+                <summary>Project actions</summary>
+                <div className="wallet-roster-actions">
+                  {!current.archived && (
+                    <Button
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void run('refresh', current)}
+                    >
+                      Refresh imported identity
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     disabled={busy}
-                    onClick={() => void run('refresh', current)}
+                    onClick={() =>
+                      void run(
+                        current.archived ? 'restore' : 'archive',
+                        current,
+                      )
+                    }
                   >
-                    Refresh imported identity
+                    {current.archived
+                      ? 'Restore imported project'
+                      : 'Archive imported project'}
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(current.archived ? 'restore' : 'archive', current)
-                  }
-                >
-                  {current.archived
-                    ? 'Restore imported project'
-                    : 'Archive imported project'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setSelected('');
-                    setSellSelection(null);
-                  }}
-                >
-                  Close imported details
-                </Button>
-              </div>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      setSelected('');
+                      setSellSelection(null);
+                    }}
+                  >
+                    Close imported details
+                  </Button>
+                </div>
+              </details>
               <div className="wallet-roster-actions">
                 <Button variant="outline" onClick={openChart}>
                   Open token chart and supply workspace
@@ -415,9 +428,7 @@ export function ImportedTokenProjects({
               </div>
             </div>
           </header>
-          <div
-            className={`imported-live-workspace${compactWorkspace ? ' imported-live-workspace--compact' : ''}`}
-          >
+          <ImportedWorkspaceFrame compact={compactWorkspace}>
             <section
               ref={chartReview}
               id={importedChartWorkspaceId(current.id)}
@@ -447,49 +458,76 @@ export function ImportedTokenProjects({
                   >
                     <ImportedTokenQuote project={current} state={swap} />
                   </section>
-                  <section
-                    className="imported-workspace-wallets"
-                    aria-label="Token wallet and holder views"
-                  >
-                    <ImportedSwapWalletPanel
-                      project={current}
-                      state={swap}
-                      onReviewBuy={reviewBuy}
-                      onSaved={(saved) => {
-                        onProjectsChange?.([saved]);
-                        setProjects((items) =>
-                          items.map((item) =>
-                            item.id === saved.id &&
-                            item.revision < saved.revision
-                              ? saved
-                              : item,
-                          ),
-                        );
-                      }}
-                    />
-                    <ImportedSupplyTracker
-                      key={`supply:${current.id}:${current.revision}`}
-                      project={current}
-                      onOpenChart={openChart}
-                    />
-                    {current.document.token.chain === 'Solana' && (
-                      <HolderIndexPanel
-                        key={`holder-index:${current.id}:${current.revision}`}
-                        project={current}
-                        onOpenChart={openChart}
-                      />
-                    )}
-                    <TokenOperationHistory
-                      projectId={current.id}
-                      revision={current.revision}
-                      project={current}
-                      onReviewBuy={reviewBuy}
-                    />
-                  </section>
+                  <ImportedWorkspaceViews
+                    tabbed={compactWorkspace}
+                    key={`views:${current.id}:${current.revision}:${selectedHandoff?.sequence ?? 0}`}
+                    views={[
+                      {
+                        id: 'wallets',
+                        title: 'My wallets',
+                        content: (
+                          <ImportedSwapWalletPanel
+                            project={current}
+                            state={swap}
+                            onReviewBuy={reviewBuy}
+                            onSaved={(saved) => {
+                              onProjectsChange?.([saved]);
+                              setProjects((items) =>
+                                items.map((item) =>
+                                  item.id === saved.id &&
+                                  item.revision < saved.revision
+                                    ? saved
+                                    : item,
+                                ),
+                              );
+                            }}
+                          />
+                        ),
+                      },
+                      {
+                        id: 'supply',
+                        title: 'Supply and alerts',
+                        content: (
+                          <ImportedSupplyTracker
+                            key={`supply:${current.id}:${current.revision}`}
+                            project={current}
+                            onOpenChart={openChart}
+                          />
+                        ),
+                      },
+                      ...(current.document.token.chain === 'Solana'
+                        ? [
+                            {
+                              id: 'holders',
+                              title: 'Holders',
+                              content: (
+                                <HolderIndexPanel
+                                  key={`holder-index:${current.id}:${current.revision}`}
+                                  project={current}
+                                  onOpenChart={openChart}
+                                />
+                              ),
+                            },
+                          ]
+                        : []),
+                      {
+                        id: 'activity',
+                        title: 'Activity',
+                        content: (
+                          <TokenOperationHistory
+                            projectId={current.id}
+                            revision={current.revision}
+                            project={current}
+                            onReviewBuy={reviewBuy}
+                          />
+                        ),
+                      },
+                    ]}
+                  />
                 </>
               )}
             </ImportedSwapDesk>
-          </div>
+          </ImportedWorkspaceFrame>
           {current.document.token.chain !== 'Solana' && (
             <ImportedEvmWalletBalances
               key={`evm-balance:${current.id}:${current.revision}`}

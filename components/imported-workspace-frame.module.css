@@ -1,0 +1,417 @@
+.frame {
+  min-width: 0;
+}
+
+.views {
+  min-width: 0;
+}
+
+.frame > .views {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.navigation {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+}
+
+.navigation > button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.navigation > button[aria-selected='true'] {
+  color: var(--foreground);
+  border-color: var(--border);
+  background: var(--secondary);
+}
+
+.navigation > button:focus-visible,
+.panel:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 12px;
+}
+
+.notice {
+  margin: 0;
+  padding: 3px 12px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.updated {
+  margin-left: 6px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  font-size: 10px;
+}
+
+.panel[hidden] {
+  display: none !important;
+}
+
+.frame.docked {
+  height: var(--workspace-fit-height);
+  grid-template-rows: var(--workspace-chart-height) minmax(224px, 1fr);
+  gap: 12px;
+}
+
+.frame.docked > [aria-label='Open token chart'],
+.frame.docked > :global(.imported-workspace-trading),
+.frame.docked > .views {
+  align-self: stretch;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.frame.docked > .views {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.docked .panel {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+@media (min-width: 1101px) and (min-height: 640px) {
+  :global(.imported-token-details):has(> .frame)
+    :global(.imported-token-header-actions)
+    > :global(.token-project-picker) {
+    margin: 0;
+  }
+
+  :global(.imported-token-details):has(> .frame)
+    :global(.imported-token-header)
+    :global(.token-project-picker)[open],
+  :global(.imported-token-details):has(> .frame)
+    :global(.imported-token-actions-menu)[open] {
+    width: 100%;
+  }
+
+  :global(.imported-token-details):has(> .frame)
+    :global(.imported-token-header-actions) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: start;
+    max-width: min(65%, 700px);
+  }
+
+  :global(.imported-token-details):has(> .frame)
+    :global(.imported-token-header-actions)
+    > :global(.wallet-roster-actions) {
+    margin-block: 4px;
+  }
+
+  :global(.imported-token-details):has(> .frame)
+    :global(.imported-token-actions-menu)
+    > :global(.wallet-roster-actions) {
+    margin-block: 8px;
+  }
+}
+
+/* Reserve actual desktop room for a full plot and an actual wallet row. */
+@media (min-width: 1360px) and (min-height: 800px) {
+  :global(.imported-token-details):has(
+    > .frame:global(.imported-live-workspace--compact)
+  ) {
+    margin-block: 8px;
+    padding: 10px;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-heading) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-heading)
+    > h2,
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-heading)
+    > code {
+    grid-column: 1 / -1;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-heading)
+    > p {
+    grid-column: 1;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.token-identity-review) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.token-identity-review)[open] {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-heading)
+    h2 {
+    font-size: 18px;
+    line-height: 22px;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-heading)
+    p {
+    margin-block: 2px;
+    line-height: 16px;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-heading)
+    code {
+    line-height: 16px;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.token-identity-review) {
+    margin-top: 2px;
+    line-height: 18px;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-header-actions)
+    button {
+    min-height: 30px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  :global(.imported-token-details):has(
+      > .frame:global(.imported-live-workspace--compact)
+    )
+    :global(.imported-token-header-actions)
+    summary {
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  .frame:global(.imported-live-workspace--compact) {
+    margin-top: 10px;
+  }
+
+  .frame:global(.imported-live-workspace--compact)
+    :global(.imported-market-pane) {
+    padding: 10px;
+  }
+
+  .frame:global(.imported-live-workspace--compact) :global(.token-stats-strip) {
+    padding: 4px 10px;
+    margin-bottom: 4px;
+  }
+
+  .frame:global(.imported-live-workspace--compact)
+    :global(.token-stats-strip)
+    dt {
+    font-size: 11px;
+    line-height: 13px;
+  }
+
+  .frame:global(.imported-live-workspace--compact)
+    :global(.token-stats-strip)
+    dd {
+    margin-top: 2px;
+    line-height: 18px;
+  }
+
+  .frame:global(.imported-live-workspace--compact)
+    :global(.token-stats-source) {
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 14px;
+  }
+
+  .frame:global(.imported-live-workspace--compact)
+    :global(.imported-market-pane .wallet-roster-actions) {
+    margin-block: 4px;
+    gap: 6px;
+  }
+
+  .frame:global(.imported-live-workspace--compact)
+    :global(.imported-market-pane .wallet-roster-actions)
+    button {
+    height: auto;
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .frame:global(.imported-live-workspace--compact)
+    :global(.imported-market-pane .wallet-roster-actions)
+    select {
+    height: 28px;
+    min-height: 0;
+  }
+
+  .frame:global(.imported-live-workspace--compact)
+    :global(.imported-market-toolbar)
+    select {
+    max-width: min(220px, 100%);
+  }
+
+  .docked .navigation {
+    padding: 4px;
+  }
+
+  .docked .navigation button {
+    min-height: 30px;
+    padding: 4px 9px;
+    line-height: 18px;
+  }
+
+  .docked .notice {
+    padding: 2px 8px;
+    line-height: 14px;
+  }
+
+  .docked .panel {
+    padding: 6px 8px;
+  }
+
+  .frame .panel :global([aria-label='Project trade wallets']) {
+    margin: 0;
+  }
+
+  .docked .panel :global([aria-label='Project trade wallets']) > h4 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .frame .panel :global(.imported-wallet-table-toolbar) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .frame .panel :global(.imported-wallet-table-toolbar) > details[open] {
+    flex-basis: 100%;
+  }
+
+  .docked .panel :global(.imported-wallet-table-toolbar) button {
+    height: auto;
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .docked .panel :global(.imported-wallet-inventory-controls) > summary {
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .docked .panel :global(.imported-trade-wallet-table) caption {
+    padding: 2px 0;
+    font-size: 11px;
+    line-height: 14px;
+  }
+
+  .docked .panel :global(.imported-trade-wallet-table) th {
+    padding: 4px;
+    font-size: 11px;
+    line-height: 14px;
+  }
+
+  .docked .panel :global(.imported-trade-wallet-table) td {
+    padding: 6px 4px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .docked .panel :global(.imported-trade-wallet-table) td code,
+  .docked .panel :global(.imported-trade-wallet-table) td small {
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 14px;
+  }
+
+  .docked .panel :global(.imported-trade-wallet-table) td:last-child button {
+    display: inline-flex;
+    height: auto;
+    min-height: 26px;
+    padding: 4px 6px;
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  .docked
+    .panel
+    :global(.imported-trade-wallet-table)
+    td:last-child
+    button
+    + button {
+    margin: 0 0 0 4px;
+  }
+}

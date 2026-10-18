@@ -1,5 +1,12 @@
 'use client';
-import { Fragment, useEffect, useId, useRef, useState } from 'react';
+import {
+  Fragment,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import {
   validatedInventoryItems,
@@ -27,6 +34,7 @@ export function ImportedTradeWallets({
   locked,
   onReview,
   project,
+  actions,
 }: {
   wallets: WorkspaceWallet[];
   folders: WalletFolder[];
@@ -39,6 +47,7 @@ export function ImportedTradeWallets({
     amount?: string,
   ) => void;
   project?: ImportedTokenProject;
+  actions?: ReactNode;
 }) {
   const [inventory, setInventory] = useState<ImportedWalletInventory[] | null>(
       null,
@@ -217,31 +226,6 @@ export function ImportedTradeWallets({
       className="imported-trade-wallets"
     >
       <h4>My trade wallets</h4>
-      <p>
-        Select a wallet to review a buy or sell. Saved SOL observations may be
-        old. Preparation checks fresh balances and each transaction requires
-        signing approval.
-      </p>
-      {project && (
-        <>
-          <Button
-            variant="outline"
-            disabled={locked || reading}
-            onClick={() => void readInventory()}
-          >
-            {reading
-              ? 'Reading project inventory…'
-              : 'Review saved token inventory'}
-          </Button>
-          <p>
-            Token observations have separate timestamps. Supply share uses the
-            project supply observed at {project.document.token.observedAt}.
-            Frozen units are separate; unfrozen units do not prove
-            transferability. Refresh one wallet at a time, with 15 seconds
-            between provider reads.
-          </p>
-        </>
-      )}
       {staleWallets.size > 0 && (
         <output>
           Token inventory changed after a finalized trade. Refresh affected
@@ -250,58 +234,89 @@ export function ImportedTradeWallets({
         </output>
       )}
       {inventoryError && <p role="alert">{inventoryError}</p>}
-      <div className="imported-trade-wallet-filters">
-        <label htmlFor={searchId}>
-          Search trade wallets
-          <Input
-            id={searchId}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(0);
-            }}
-            placeholder="Label, address, tag or folder"
-          />
-        </label>
-        <label>
-          Trade wallet folder
-          <select
-            value={folder}
-            onChange={(e) => {
-              setFolder(e.target.value);
-              setPage(0);
-            }}
-          >
-            <option value="">All folders</option>
-            <option value=":unfiled">No active folder</option>
-            {activeFolders.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Trade wallet role
-          <select
-            value={role}
-            onChange={(e) => {
-              setRole(e.target.value);
-              setPage(0);
-            }}
-          >
-            <option value="">All roles</option>
-            {['Recipient', 'Deployer', 'Funder'].map((r) => (
-              <option key={r}>{r}</option>
-            ))}
-          </select>
-        </label>
+      <div className="imported-wallet-table-toolbar">
+        {actions}
+        <details className="imported-wallet-inventory-controls">
+          <summary>
+            Wallet filters and inventory
+            {search || folder || role ? ' · filters active' : ''}
+          </summary>
+
+          {project && (
+            <>
+              <Button
+                variant="outline"
+                disabled={locked || reading}
+                onClick={() => void readInventory()}
+              >
+                {reading
+                  ? 'Reading project inventory…'
+                  : 'Review saved token inventory'}
+              </Button>
+              <p>
+                Token observations have separate timestamps. Supply share uses
+                the project supply observed at{' '}
+                {project.document.token.observedAt}. Frozen units are separate;
+                unfrozen units do not prove transferability. Refresh one wallet
+                at a time, with 15 seconds between provider reads.
+              </p>
+            </>
+          )}
+
+          <div className="imported-trade-wallet-filters">
+            <label htmlFor={searchId}>
+              Search trade wallets
+              <Input
+                id={searchId}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(0);
+                }}
+                placeholder="Label, address, tag or folder"
+              />
+            </label>
+            <label>
+              Trade wallet folder
+              <select
+                value={folder}
+                onChange={(e) => {
+                  setFolder(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <option value="">All folders</option>
+                <option value=":unfiled">No active folder</option>
+                {activeFolders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Trade wallet role
+              <select
+                value={role}
+                onChange={(e) => {
+                  setRole(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <option value="">All roles</option>
+                {['Recipient', 'Deployer', 'Funder'].map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </details>
       </div>
       <div className="imported-trade-wallet-table">
         <table>
           <caption>
             {rows.length} matching active Solana wallets. Reviews select one
-            wallet at a time.
+            wallet at a time. Saved observations require a fresh trade review.
           </caption>
           <thead>
             <tr>
@@ -485,6 +500,10 @@ export function ImportedTradeWallets({
           </tbody>
         </table>
       </div>
+      <p>
+        Saved SOL observations may be old. Each trade needs a fresh review and
+        signing approval.
+      </p>
       {rows.length > 25 && (
         <nav aria-label="Trade wallet pages">
           <Button

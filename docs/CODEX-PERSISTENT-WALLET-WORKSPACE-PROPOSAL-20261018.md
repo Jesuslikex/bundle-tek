@@ -1,5 +1,7 @@
 # Persistent chart and wallet workspace proposal
 
+Historical proposal. The implementation, actual signed-in browser checks and final validation are recorded in `CODEX-PERSISTENT-WALLET-WORKSPACE-INTEGRATION-20261018.md`. Statements below about unapplied patches describe the proposal checkpoint only.
+
 18 October 2026. Proposal against application source `84a9b03`. The original full offline suite has terminated with its source and harness unchanged; the other Bundle chat is correcting baseline test-runner/checksum issues before revalidation. Application source and the local helper remain held. The UI changes are not integrated or live. An exact unapplied patch is retained at `docs/patches/CODEX-PERSISTENT-WALLET-WORKSPACE-20261018.patch`; working copies remain in ignored `work/persistent-workspace`.
 
 ## Reference and requirement
@@ -19,7 +21,7 @@ Bundle's accepted layout checkpoint brings the start of wallet controls upward b
 
 No canonical file listed above has been edited. No app/page.tsx, quote/signing component, API, provider, dependency, credential or migration change is proposed.
 
-The combined six-file review patch is 50907 bytes, SHA256 `e00a0fbf21e64b1c515928558bd2bc2006847f8c8c642a6bd2a62e6c40f26b7b`. It includes the protected composition, two owned wallet files, new frame/CSS and a prepared test file. Tests cover mounted state/timers, keyboard tabs, successful cross-panel navigation and measured fit/scroll fallback. Those tests have only been syntax-parsed, not executed. The patch has not been applied.
+The combined six-file review patch is 50907 bytes, SHA256 `e00a0fbf21e64b1c515928558bd2bc2006847f8c8c642a6bd2a62e6c40f26b7b`. It includes the protected composition, two owned wallet files, new frame/CSS and a prepared test file. At the proposal commit those tests were syntax-parsed only. The subsequent isolated verification below executed all four against the unchanged ignored copies. The patch has not been applied.
 
 ## Claude owner review
 
@@ -33,6 +35,14 @@ Claude also called out hidden monitor announcements, the assumption that `.works
 
 Ignored copies pass Oxfmt formatting and TypeScript syntax parsing. A static AST comparison finds identical multisets of 36 existing JSX disabled/value/checked/required/aria-pressed expressions and eight direct fetch calls across the protected composition and two owned wallet files. This is limited structural evidence, not typechecking, authorization equivalence or behavioral proof. Reports: `proposal-static-check.json` and `safeguard-audit.json` in the proposal folder.
 
+The suite owner explicitly allowed a separate four-case, one-worker jsdom run while the corrected main suite runs, because it has no D1/Miniflare/server/provider activity and changes no canonical source. `work/persistent-workspace/vitest.config.mjs` uses envDir=false and the shared offline preload. Result: one file, four tests passed, 104ms case time and 1.97s total. `frame-tests.json` retains the exact results. An isolated no-emit TypeScript project containing only the new frame, its test and a CSS declaration also passed. Neither check typechecks the complete proposed wallet integration, compiles the CSS through Next, or proves browser layout; geometry in the test is declared synthetic data. Current baseline is `fd4e571`, with no intervening changes to the proposal's target components.
+
+The four cases prove retained checkbox/DOM identity and an existing timer across view/mode changes without unmounting; keyboard wrap/focus and labelled-panel relationships; revealing the retained wallet panel through its presentation context; and full-plot geometry remaining invariant across page/internal scrolling, with flow fallback on narrow or expanded-header conditions. They do not test a funded wallet, provider response, actual signature approval or browser dimensions.
+
+The suite owner subsequently permitted one lightweight esbuild composition check entirely inside ignored work. `compile-proposal.mjs` overlays exactly the five proposed source files onto actual `app/page.tsx` and current-main imports. It passed in 5533ms with no warnings, including all five overlays and the actual shell among 4694 inputs. `compile-only-report.json` records the output hashes. This checks browser bundling/import composition, not TypeScript for every wallet component, Next's CSS-module build, application execution or rendering. The generated entry refuses every fetch if executed, loads no environment file and supplies no account/vault state; it was not executed.
+
+Opening a minimal local HTML probe was rejected by the browser URL policy because file: is not an allowed protocol. No local-file permission, protection or alternate browser/server path was used to bypass that decision. Browser verification will use the normal allowed local app after the source freeze. No fixture assets were placed in public and no helper process was restarted.
+
 After the suite owner releases the freeze:
 
 1. Rebase the exact proposal onto the actual current source, inspect intervening changes and announce owned paths before applying. Preserve the original full-suite evidence and do not mix its failures with new layout results.
@@ -40,4 +50,4 @@ After the suite owner releases the freeze:
 3. Render the current full client shell at 1920×945, 1920×900, 1440×900, 1360px, constrained desktop and 375/320px. Measure the full plot, first actual wallet row, table actions, active/frozen/error states and internal scrolling. If docking cannot fit the complete plot and useful wallet content, refine the layout or fall back; never shrink the plot or hide warnings to manufacture a pass.
 4. Check expanded picker/actions/help, actual workspace versus body scrolling, trade tape access, responsive overflow and observer stability. Complete relevant tests, plain TypeScript, scoped lint, CSS-module build and rendered checks before integration/commit.
 
-No runtime tests, application build, provider read, funded test, push, deployment or hosted SQL ran for this proposal. No passing full-suite outcome or complete Proxima parity is claimed. The suite owner released the index for this explicit documentation-only checkpoint; its source/config/checksum changes and full-suite report are excluded.
+No Next application build/render, provider read, funded test, push, deployment or hosted SQL ran for this proposal. Only the four isolated layout tests and the separately described compile-only composition check have executed. No passing full-suite outcome or complete Proxima parity is claimed. The suite owner released the index for the original documentation-only checkpoint, then refroze HEAD/index for the corrected full run. This follow-up verification note stays unstaged until that freeze ends; the owner's full-suite report remains separate.

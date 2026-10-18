@@ -348,15 +348,7 @@ export function PoolCandleChart({
           </output>
         )}
       {/* oxlint-disable jsx-a11y/prefer-tag-over-role -- SVG candle plot uses an accessible image role. */}
-      <details className="candle-chart-help">
-        <summary>Explore the chart</summary>
-        <p>
-          Drag horizontally to explore loaded history. Click or tap the chart to
-          inspect the nearest recorded candle. With the chart focused, use
-          Left/Right or Home/End to inspect. Shift+Left/Right moves the chart
-          window. Use +/− to zoom around the inspected candle.
-        </p>
-      </details>
+
       {trendTool && (
         <p role="status">
           {trendStart ? 'Place the second point' : 'Place the first point'} by
@@ -800,6 +792,15 @@ export function PoolCandleChart({
         </svg>
       </button>
       {/* oxlint-enable jsx-a11y/prefer-tag-over-role */}
+      <details className="candle-chart-help">
+        <summary>Explore the chart</summary>
+        <p>
+          Drag horizontally to explore loaded history. Click or tap the chart to
+          inspect the nearest recorded candle. With the chart focused, use
+          Left/Right or Home/End to inspect. Shift+Left/Right moves the chart
+          window. Use +/− to zoom around the inspected candle.
+        </p>
+      </details>
       <figcaption>
         {rows.length} of {snapshot.candles.length} loaded {snapshot.interval}{' '}
         candles. {new Date(start * 1000).toLocaleString()} to{' '}
@@ -1294,6 +1295,10 @@ export function ImportedPoolCandles({
         </label>
         <Button
           variant="outline"
+          aria-label={
+            busy ? 'Loading candles…' : 'Refresh candles for this pool'
+          }
+          title="Refresh pool candles"
           disabled={
             busy ||
             feedRunning ||
@@ -1302,10 +1307,12 @@ export function ImportedPoolCandles({
           }
           onClick={() => void refresh()}
         >
-          {busy ? 'Loading candles…' : 'Refresh pool candles'}
+          {busy ? 'Loading candles…' : 'Refresh candles'}
         </Button>
         <Button
           variant="outline"
+          aria-label="Load older candles"
+          title="Load older candles"
           disabled={
             busy ||
             feedRunning ||
@@ -1317,10 +1324,20 @@ export function ImportedPoolCandles({
           }
           onClick={() => void refresh('older')}
         >
-          Load older candles
+          Older candles
         </Button>
         <Button
           variant="outline"
+          aria-label={
+            followState.status === 'running'
+              ? 'Stop updates for pool candles'
+              : 'Start updates for pool candles'
+          }
+          title={
+            followState.status === 'running'
+              ? 'Stop candle updates'
+              : 'Start candle updates'
+          }
           disabled={
             followState.status !== 'running' &&
             (busy || feedRunning || project.archived)
@@ -1331,9 +1348,7 @@ export function ImportedPoolCandles({
               : follower.current?.start()
           }
         >
-          {followState.status === 'running'
-            ? 'Stop candle updates'
-            : 'Start candle updates'}
+          {followState.status === 'running' ? 'Stop updates' : 'Start updates'}
         </Button>
       </div>
       {error && <p role="alert">{error}</p>}

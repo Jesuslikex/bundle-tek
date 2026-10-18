@@ -255,7 +255,7 @@ it('requests the selected denomination and uses it for manual refresh without ac
   expect(
     container.querySelector('svg[aria-label*="SOL price"]'),
   ).not.toBeNull();
-  await click('Refresh pool candles');
+  await click('Refresh candles');
   expect(JSON.parse(pending[2].init!.body as string).currency).toBe('sol');
   await act(async () =>
     pending[2].resolve(

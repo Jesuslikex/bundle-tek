@@ -273,6 +273,8 @@ export function ImportedTokenMarket({
         )}
         <Button
           variant="outline"
+          aria-label="Refresh market observation"
+          title="Refresh market observation"
           disabled={
             busy ||
             feedState.status === 'running' ||
@@ -281,10 +283,20 @@ export function ImportedTokenMarket({
           }
           onClick={() => void refresh()}
         >
-          Refresh market observation
+          Refresh market
         </Button>
         <Button
           variant="outline"
+          aria-label={
+            feedState.status === 'running'
+              ? 'Stop feed for market observations'
+              : 'Start feed for market observations'
+          }
+          title={
+            feedState.status === 'running'
+              ? 'Stop market feed'
+              : 'Start market feed'
+          }
           disabled={
             feedState.status !== 'running' &&
             (busy || project.archived || !MARKET_CHAINS[chain])
@@ -295,19 +307,10 @@ export function ImportedTokenMarket({
               : feed.current?.start()
           }
         >
-          {feedState.status === 'running'
-            ? 'Stop market feed'
-            : 'Start market feed'}
+          {feedState.status === 'running' ? 'Stop feed' : 'Start feed'}
         </Button>
       </div>
-      <output
-        className="imported-market-feed-status"
-        style={{ display: 'block', marginTop: 8 }}
-      >
-        {feedState.status === 'running'
-          ? `Market feed running. ${feedState.reads} successful feed reads this session.`
-          : `Market feed ${feedState.status}. ${feedState.reason}`}
-      </output>
+
       {!MARKET_CHAINS[chain] && (
         <p>
           This market provider currently supports Solana, Ethereum, Base and
@@ -361,6 +364,14 @@ export function ImportedTokenMarket({
           </p>
         </>
       )}
+      <output
+        className="imported-market-feed-status"
+        style={{ display: 'block', marginTop: 8 }}
+      >
+        {feedState.status === 'running'
+          ? `Market feed running. ${feedState.reads} successful feed reads this session.`
+          : `Market feed ${feedState.status}. ${feedState.reason}`}
+      </output>
       <details className="market-data-coverage">
         <summary>Market data coverage and feed behavior</summary>
         <p>

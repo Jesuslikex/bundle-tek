@@ -3,7 +3,9 @@ import { subscribeImportedWalletReview } from '@/lib/imported-wallet-review-even
 import { ImportedTradeSessions } from './imported-trade-sessions';
 import { ImportedPairTradeWalletReview } from './imported-pair-trade-wallet-review';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useImportedWorkspaceWalletView } from './imported-workspace-frame';
+import { readPanelJson } from './read-panel-json';
 import { Button } from '@/components/ui/button';
 import type { WorkspaceWallet, WalletFolder } from '@/lib/wallet-workspace';
 import type { WalletBalance } from '@/lib/wallet-balance-format';
@@ -22,6 +24,28 @@ import {
   importedHandoffWallet,
   type ImportedSellHandoff,
 } from '@/lib/imported-sell-handoff';
+
+async function readTradeWalletRoster(response: Response) {
+  const unavailable =
+    'Wallet list unavailable. Reload trade wallets to try again.';
+  const body = await readPanelJson(response, unavailable);
+  const data = body as {
+    wallets?: WorkspaceWallet[];
+    folders?: WalletFolder[];
+    balances?: WalletBalance[];
+    error?: unknown;
+  } | null;
+  if (
+    !response.ok ||
+    !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data) ||
+    !Array.isArray(data.wallets)
+  )
+    throw new Error(typeof data?.error === 'string' ? data.error : unavailable);
+  return { ...data, wallets: data.wallets };
+}
+
 export function ImportedSwapWallet({
   project,
   side,
@@ -45,6 +69,27 @@ export function ImportedSwapWallet({
   onAmountChange: (amount: string) => void;
   onWalletTradeReview: (side: 'Buy' | 'Sell', amount?: string) => void;
 }) {
+  const showWallets = useImportedWorkspaceWalletView();
+  const reviewSection = useRef<HTMLDetailsElement>(null);
+  const openWalletReview = useCallback(() => {
+    showWallets?.();
+    requestAnimationFrame(() => {
+      const review = reviewSection.current;
+      if (!review?.isConnected) return;
+      review.open = true;
+      const pane = review.closest<HTMLElement>('[role="tabpanel"]');
+      const dock = review.closest<HTMLElement>('[data-wallet-dock="docked"]');
+      if (pane && dock) {
+        pane.scrollTop +=
+          review.getBoundingClientRect().top - pane.getBoundingClientRect().top;
+      } else {
+        review.scrollIntoView({ block: 'nearest' });
+      }
+      review
+        .querySelector<HTMLElement>('summary')
+        ?.focus({ preventScroll: true });
+    });
+  }, [showWallets]);
   const [folders, setFolders] = useState<WalletFolder[]>([]);
   const [balances, setBalances] = useState<WalletBalance[]>([]);
   const [wallets, setWallets] = useState<WorkspaceWallet[]>([]),
@@ -64,14 +109,7 @@ export function ImportedSwapWallet({
       cache: 'no-store',
     })
       .then(async (response) => {
-        const data = (await response.json()) as {
-          wallets: WorkspaceWallet[];
-          folders?: WalletFolder[];
-          balances?: WalletBalance[];
-          error?: string;
-        };
-        if (!response.ok || !Array.isArray(data.wallets))
-          throw new Error(data.error || 'Wallet list unavailable.');
+        const data = await readTradeWalletRoster(response);
         if (!controller.signal.aborted) {
           setFolders(Array.isArray(data.folders) ? data.folders : []);
           setBalances(Array.isArray(data.balances) ? data.balances : []);
@@ -106,14 +144,7 @@ export function ImportedSwapWallet({
         signal: controller.signal,
         cache: 'no-store',
       });
-      const data = (await response.json()) as {
-        wallets: WorkspaceWallet[];
-        folders?: WalletFolder[];
-        balances?: WalletBalance[];
-        error?: string;
-      };
-      if (!response.ok || !Array.isArray(data.wallets))
-        throw new Error(data.error || 'Wallet list unavailable.');
+      const data = await readTradeWalletRoster(response);
       if (!controller.signal.aborted) {
         setFolders(Array.isArray(data.folders) ? data.folders : []);
         setBalances(Array.isArray(data.balances) ? data.balances : []);
@@ -153,6 +184,7 @@ export function ImportedSwapWallet({
           setReviewedCurrentWallet(true);
           setError('');
           onWalletTradeReview(review.side);
+          openWalletReview();
           return null;
         },
       ),
@@ -165,6 +197,7 @@ export function ImportedSwapWallet({
       saving,
       loading,
       onWalletTradeReview,
+      openWalletReview,
     ],
   );
   const selectedWallet = wallets.find((item) => item.address === selected);
@@ -227,122 +260,22 @@ export function ImportedSwapWallet({
       }
     }
   }
+  const rosterActions = (
+    <Button
+      variant="outline"
+      disabled={loading || saving || locked}
+      onClick={() => void reload()}
+    >
+      Reload trade wallets
+    </Button>
+  );
   return (
     <section aria-label="Imported swap wallet">
-      <label>
-        Wallet for balance review{' '}
-        <select
-          aria-label="Wallet for balance review"
-          value={wallet ? selected : ''}
-          disabled={loading || saving || locked}
-          onChange={(e) => {
-            setSelected(e.target.value);
-            setReviewedCurrentWallet(true);
-          }}
-        >
-          <option value="">Select an active Solana wallet</option>
-          {wallets.map((item) => (
-            <option key={item.address} value={item.address}>
-              {item.label} · {item.address.slice(0, 6)}…{item.address.slice(-4)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <Button
-        variant="outline"
-        disabled={loading || saving || locked}
-        onClick={() => void reload()}
-      >
-        Reload trade wallets
-      </Button>
-      <Button
-        variant="outline"
-        disabled={loading || saving || locked || !wallet}
-        onClick={() => void save()}
-      >
-        {saving ? 'Saving settings…' : 'Save trade settings'}
-      </Button>
-      {project.document.tradeSettings && (
-        <p>
-          Saved trade settings: {project.document.tradeSettings.side}{' '}
-          {project.document.tradeSettings.amount} · wallet revision{' '}
-          {project.document.tradeSettings.walletRevision}. Settings only; no
-          order submitted.
-        </p>
-      )}
-      {!loading && selected && !wallet && (
-        <p role="alert">
-          {handoff && !reviewedCurrentWallet
-            ? 'Receipt wallet is archived, unavailable or has changed revision. Choose a current active wallet explicitly before preparing a sell.'
-            : 'Saved wallet is unavailable. Select an active wallet.'}
-        </p>
-      )}
-      {wallet &&
-        project.document.tradeSettings?.wallet === wallet.address &&
-        project.document.tradeSettings.walletRevision !== wallet.revision && (
-          <p>
-            Saved wallet revision has changed. Review this wallet and save
-            current settings.
-          </p>
-        )}
-      <p>
-        Public balance review only. Selecting an address does not connect or
-        unlock its signer.
-      </p>
+      {loading && <output>Loading saved trade wallets…</output>}
+      {loading && rosterActions}
       {error && <p role="alert">{error}</p>}
-      {wallet && side === 'Sell' && (
-        <ImportedSellAcquisitions
-          key={[
-            project.id,
-            project.revision,
-            wallet.address,
-            wallet.revision,
-            handoff?.receiptId ?? '',
-          ].join(':')}
-          project={project}
-          wallet={wallet}
-          amount={amount}
-          locked={locked || saving}
-          initialBuyReceiptId={
-            handoff?.wallet === wallet.address ? handoff.receiptId : undefined
-          }
-          onReviewBuy={onReviewBuy}
-          onAmountChange={onAmountChange}
-        />
-      )}
-      {wallet && side === 'Buy' && (
-        <ImportedSwapPreparation
-          key={`prepare:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}:${amount}:${handoff?.receiptId ?? ''}`}
-          project={project}
-          wallet={wallet}
-          side={side}
-          amount={amount}
-          locked={locked || saving}
-          onReviewBuy={onReviewBuy}
-        />
-      )}
-      {wallet && (
-        <ImportedSwapBalanceCheck
-          key={`${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}:${amount}`}
-          project={project}
-          wallet={wallet}
-          side={side}
-          amount={amount}
-          locked={locked || saving}
-          onAmountChange={onAmountChange}
-        />
-      )}
-      {wallet && project.document.token.chain === 'Solana' && (
-        <ImportedPairTradeWalletReview
-          key={`pair:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}`}
-          project={project}
-          wallet={wallet}
-          side={side}
-          locked={locked || saving || loading}
-        />
-      )}
-      <details className="imported-project-wallet-inventory" open>
-        <summary>Project trade wallets</summary>
+
+      <div className="imported-project-wallet-inventory">
         {!loading && (
           <ImportedTradeWallets
             key={`${project.id}:${project.revision}`}
@@ -352,11 +285,127 @@ export function ImportedSwapWallet({
             balances={balances}
             selected={wallet?.address ?? ''}
             locked={locked || saving}
+            actions={rosterActions}
             onReview={(item, direction, reviewedAmount) => {
               setSelected(item.address);
               setReviewedCurrentWallet(true);
               onWalletTradeReview(direction, reviewedAmount);
+              openWalletReview();
             }}
+          />
+        )}
+      </div>
+      <p>
+        Public balance review only. Selecting an address does not connect or
+        unlock its signer.
+      </p>
+      <details
+        className="imported-selected-wallet-review"
+        ref={reviewSection}
+        open={Boolean(handoff)}
+      >
+        <summary>Selected wallet review</summary>
+
+        <label>
+          Wallet for balance review{' '}
+          <select
+            aria-label="Wallet for balance review"
+            value={wallet ? selected : ''}
+            disabled={loading || saving || locked}
+            onChange={(e) => {
+              setSelected(e.target.value);
+              setReviewedCurrentWallet(true);
+            }}
+          >
+            <option value="">Select an active Solana wallet</option>
+            {wallets.map((item) => (
+              <option key={item.address} value={item.address}>
+                {item.label} · {item.address.slice(0, 6)}…
+                {item.address.slice(-4)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          variant="outline"
+          disabled={loading || saving || locked || !wallet}
+          onClick={() => void save()}
+        >
+          {saving ? 'Saving settings…' : 'Save trade settings'}
+        </Button>
+        {project.document.tradeSettings && (
+          <p>
+            Saved trade settings: {project.document.tradeSettings.side}{' '}
+            {project.document.tradeSettings.amount} · wallet revision{' '}
+            {project.document.tradeSettings.walletRevision}. Settings only; no
+            order submitted.
+          </p>
+        )}
+        {!loading && selected && !wallet && (
+          <p role="alert">
+            {handoff && !reviewedCurrentWallet
+              ? 'Receipt wallet is archived, unavailable or has changed revision. Choose a current active wallet explicitly before preparing a sell.'
+              : 'Saved wallet is unavailable. Select an active wallet.'}
+          </p>
+        )}
+        {wallet &&
+          project.document.tradeSettings?.wallet === wallet.address &&
+          project.document.tradeSettings.walletRevision !== wallet.revision && (
+            <p>
+              Saved wallet revision has changed. Review this wallet and save
+              current settings.
+            </p>
+          )}
+
+        {wallet && side === 'Sell' && (
+          <ImportedSellAcquisitions
+            key={[
+              project.id,
+              project.revision,
+              wallet.address,
+              wallet.revision,
+              handoff?.receiptId ?? '',
+            ].join(':')}
+            project={project}
+            wallet={wallet}
+            amount={amount}
+            locked={locked || saving}
+            initialBuyReceiptId={
+              handoff?.wallet === wallet.address ? handoff.receiptId : undefined
+            }
+            onReviewBuy={onReviewBuy}
+            onAmountChange={onAmountChange}
+          />
+        )}
+        {wallet && side === 'Buy' && (
+          <ImportedSwapPreparation
+            key={`prepare:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}:${amount}:${handoff?.receiptId ?? ''}`}
+            project={project}
+            wallet={wallet}
+            side={side}
+            amount={amount}
+            locked={locked || saving}
+            onReviewBuy={onReviewBuy}
+          />
+        )}
+        {wallet && (
+          <ImportedSwapBalanceCheck
+            key={`${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}:${amount}`}
+            project={project}
+            wallet={wallet}
+            side={side}
+            amount={amount}
+            locked={locked || saving}
+            onAmountChange={onAmountChange}
+          />
+        )}
+        {wallet && project.document.token.chain === 'Solana' && (
+          <ImportedPairTradeWalletReview
+            key={`pair:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}`}
+            project={project}
+            wallet={wallet}
+            side={side}
+            locked={locked || saving || loading}
           />
         )}
       </details>

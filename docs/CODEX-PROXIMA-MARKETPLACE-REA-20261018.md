@@ -41,3 +41,11 @@ Prioritize a qualified provider contract and richer read-only catalog fields bef
 Purchase parity separately requires immutable owned quotes/reviews, explicit user authorization, one-attempt payment/recovery, verified delivery matching the listing, browser-vault import and owned recoverable history. The observed purchase button does not establish any of these backend details. No checkout or wallet-acquisition authority was added here; those stages remain incomplete.
 
 The parallel persistent-chart proposal remains the next local UI integration step after the full-suite freeze ends. This comparison broadens the concrete parity requirements; it does not replace them with a narrower catalog-preview target.
+
+## Separate wallet-page cross-check
+
+Read-only navigation to the existing `/wallets` page completed as `ev_6a494f7abe1d0cc6e913a056c341534e04f461e175b45a499598e2896fffd6e3`. The immediate snapshot preceded content load, so the loaded semantic inspection `ev_a2bb6d4df9fcccbd43876e268ba2d3e1a5a8f12ebe277db90cf1b66e0b06e315` and screenshot `ev_2414d3618ab555e789cbe85af7e805df2c0627c7a223550fdac9684b7fcc1700` are the relevant UI evidence. The latter was captured at `2026-10-18T07:27:56.344Z`, 1920×945, 165138 bytes, SHA256 `bc8da27cc22483a8c800990f8a29a7d1ce64cca2b5d6083800635f108ccd4269`.
+
+Observed: network/folder rail, folder archive/deleted-wallet views, search, bulk selection, Create/Funding/Withdraw/Generate Activity/Delete/Manage controls, and a wallet table with balance, volume, P&L, launch and funding columns. Generate Activity, Delete and Manage are disabled when no wallets are selected. No wallet selection or operation was performed; create/export/funding/withdrawal/activity controls were not activated. In particular, this does not prove the Generate Activity configuration, execution backend, P&L accounting or warmup success.
+
+Bundle source already contains folder/search/archive management, browser-vault creation, public CSV export, funding/withdrawal entry points and guided warmup components. The observed Proxima toolbar is not grounds to report those as wholly absent. A comparable global wallet volume/P&L/launch-history summary requires its own scoped data and accounting evidence; project-local observations and UI labels cannot substitute for it.
