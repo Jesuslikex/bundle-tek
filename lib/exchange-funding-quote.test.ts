@@ -182,7 +182,7 @@ it.each([
   { network: 'eth' },
   { fromAmount: '1.0' },
   { toAmount: '1.09' },
-  { fromAmount: 1.15 },
+  { fromAmount: -1.15 },
   { toAmount: '1.1000000001' },
   { fromAmount: '1e3' },
   { rateId: '' },
@@ -330,6 +330,51 @@ it('keeps precise provider amounts above Number.MAX_SAFE_INTEGER', async () => {
     expectedPayoutLamports: '12345678000000001',
     providerCostLamports: '8',
   });
+});
+it('retains exact lamports from numeric JSON amount tokens without binary rounding', async () => {
+  const text = JSON.stringify(providerQuote())
+    .replace('"fromAmount":"1.15"', '"fromAmount":12345678.000000009')
+    .replace('"toAmount":"1.1"', '"toAmount":12345678.000000001');
+  fetcher.mockResolvedValue(new Response(text));
+  expect(
+    await run('alice', {
+      ...input,
+      minimumPayoutLamports: '12345678000000001',
+    }),
+  ).toMatchObject({
+    depositLamports: '12345678000000009',
+    expectedPayoutLamports: '12345678000000001',
+    providerCostLamports: '8',
+  });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it('times out a stalled response body without retaining a quote or retrying', async () => {
+  vi.useFakeTimers();
+  try {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelled = true;
+      },
+    });
+    fetcher.mockResolvedValue(new Response(body));
+    const result = run();
+    const rejected = expect(result).rejects.toMatchObject({ status: 503 });
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(15_000);
+    await rejected;
+    expect(cancelled).toBe(true);
+    expect(
+      (
+        await db
+          .prepare('SELECT COUNT(*) AS n FROM exchange_funding_quotes')
+          .first<{ n: number }>()
+      )?.n,
+    ).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 it('database guards refuse edits, forged authority and a foreign owner', async () => {
   await run();

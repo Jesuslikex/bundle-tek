@@ -2,6 +2,11 @@ import { z } from 'zod';
 import { validateFunding } from './funding-plan';
 import { walletAddress } from './wallet-workspace';
 import { decodeExchangeFundingReview } from './exchange-funding-review';
+import { exchangeUiRequest } from './exchange-ui-request';
+import {
+  ExchangeQuoteResponseError,
+  readExactExchangeQuoteResponse,
+} from './exchange-quote-response';
 
 export class ExchangeFundingError extends Error {
   constructor(
@@ -84,6 +89,7 @@ export async function previewOwnedExchangeFunding(
       'Exchange funding quotes are not configured. Saved drafts remain available.',
       503,
     );
+  const key = options.key;
   const now = options.now ?? Date.now;
   const read = () =>
     db
@@ -153,42 +159,44 @@ export async function previewOwnedExchangeFunding(
       429,
     );
   signal.throwIfAborted();
-  let response: Response;
-  try {
-    response = await (options.fetchImpl ?? fetch)(
-      'https://api.changenow.io/v2/private-transfer/estimated-amount?' +
-        new URLSearchParams({
-          currency: 'sol',
-          network: 'sol',
-          toAmount: decimal(requested),
-        }),
-      {
-        method: 'GET',
-        headers: { 'x-changenow-api-key': options.key },
-        redirect: 'error',
-        signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
-      },
-    );
-  } catch {
-    throw new ExchangeFundingError(
-      'Exchange quote unavailable. No provider order was created.',
-      503,
-    );
-  }
-  if (!response.ok)
-    throw new ExchangeFundingError(
-      response.status === 429
-        ? 'Exchange quote rate limit reached. Wait before requesting another quote.'
-        : 'Exchange quote unavailable. No provider order was created.',
-      response.status === 429 ? 429 : 503,
-    );
   let body: unknown;
   try {
-    body = await response.json();
-  } catch {
+    body = await exchangeUiRequest(
+      signal,
+      async (child) => {
+        const response = await (options.fetchImpl ?? fetch)(
+          'https://api.changenow.io/v2/private-transfer/estimated-amount?' +
+            new URLSearchParams({
+              currency: 'sol',
+              network: 'sol',
+              toAmount: decimal(requested),
+            }),
+          {
+            method: 'GET',
+            headers: { 'x-changenow-api-key': key },
+            redirect: 'error',
+            signal: child,
+            cache: 'no-store',
+          },
+        );
+        if (!response.ok)
+          throw new ExchangeFundingError(
+            response.status === 429
+              ? 'Exchange quote rate limit reached. Wait before requesting another quote.'
+              : 'Exchange quote unavailable. No provider order was created.',
+            response.status === 429 ? 429 : 503,
+          );
+        return readExactExchangeQuoteResponse(response, child);
+      },
+      15000,
+    );
+  } catch (error) {
+    if (error instanceof ExchangeFundingError) throw error;
     throw new ExchangeFundingError(
-      'The exchange returned an unreadable quote.',
-      502,
+      error instanceof ExchangeQuoteResponseError
+        ? error.message
+        : 'Exchange quote unavailable. No provider order was created.',
+      error instanceof ExchangeQuoteResponseError ? 502 : 503,
     );
   }
   const quote = z
