@@ -125,10 +125,10 @@ it('retains existing saved rows when a reload returns HTML, then allows a succes
     .mockResolvedValueOnce(Response.json({ plans: [other] }));
   await mount(fetcher);
   expect(container.textContent).toContain('1/100 saved');
-  await click('Reload warmup plans');
+  await click('Reload drafts');
   expect(alert()).toBe('Warmup plans unavailable.');
   expect(container.textContent).toContain('1/100 saved');
-  await click('Reload warmup plans');
+  await click('Reload drafts');
   expect(alert()).toBeUndefined();
   expect(container.querySelector('output')?.textContent).toContain(
     'Saved plans reloaded.',
@@ -141,7 +141,7 @@ it('sanitizes an HTML mutation failure without changing the reviewed save payloa
     .mockResolvedValueOnce(Response.json({ plans: [] }))
     .mockResolvedValueOnce(broken());
   await mount(fetcher);
-  await click('Save warmup draft');
+  await click('Save draft');
   expect(alert()).toBe('Warmup save failed.');
   expect(container.querySelector('output')).toBeNull();
   expect(fetcher).toHaveBeenCalledTimes(2);
@@ -173,7 +173,7 @@ it('does not show save success when the subsequent plan refresh returns HTML', a
     .mockResolvedValueOnce(Response.json({ ok: true }))
     .mockResolvedValueOnce(broken());
   await mount(fetcher);
-  await click('Save warmup draft');
+  await click('Save draft');
   expect(alert()).toBe('Warmup plans unavailable.');
   expect(container.querySelector('output')).toBeNull();
   expect(fetcher).toHaveBeenCalledTimes(3);
@@ -189,7 +189,7 @@ it('preserves a JSON revision-conflict explanation without resending the mutatio
       ),
     );
   await mount(fetcher);
-  await click('Save warmup draft');
+  await click('Save draft');
   expect(alert()).toBe('Saved plan changed. Reload before saving.');
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
@@ -207,7 +207,7 @@ it('times out stalled plan reads, enables manual retry and ignores a late respon
   await act(async () => vi.advanceTimersByTime(30000));
   expect(alert()).toContain('Plan request took too long');
   const reload = Array.from(container.querySelectorAll('button')).find(
-    (b) => b.textContent === 'Reload warmup plans',
+    (b) => b.textContent === 'Reload drafts',
   )!;
   expect(reload.disabled).toBe(false);
   await act(async () =>
@@ -225,8 +225,8 @@ it('reuses a new draft identity on explicit save retry instead of creating dupli
     .mockResolvedValueOnce(broken())
     .mockResolvedValueOnce(broken());
   await mount(fetcher);
-  await click('Save warmup draft');
-  await click('Save warmup draft');
+  await click('Save draft');
+  await click('Save draft');
   const first = JSON.parse(
     (fetcher.mock.calls[1][1] as RequestInit).body as string,
   ) as { id: string };
@@ -270,9 +270,9 @@ it('recovers a save that completed after cancellation by reloading its original 
     )
     .mockResolvedValueOnce(Response.json({ plans: [stored] }));
   await mount(fetcher);
-  await click('Save warmup draft');
+  await click('Save draft');
   await click('Cancel plan request');
-  await click('Reload warmup plans');
+  await click('Reload drafts');
   expect(container.textContent).toContain('Saved draft found');
   expect(container.textContent).toContain('Editing draft');
   await act(async () => resolve(Response.json({ ok: true })));
@@ -284,7 +284,7 @@ it('refuses an expired reviewed start locally and provides a review recovery act
   const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ plans: [] }));
   await mount(fetcher);
   await act(async () => vi.advanceTimersByTime(61 * 60000));
-  await click('Save warmup draft');
+  await click('Save draft');
   expect(alert()).toContain('Choose a fresh start time and review');
   expect(fetcher).toHaveBeenCalledTimes(1);
 });

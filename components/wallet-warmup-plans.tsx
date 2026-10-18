@@ -232,10 +232,7 @@ export function WalletWarmupPlans({
   return (
     <section className={styles.saved} aria-label="Saved warmup plans">
       <h4>3. Review and save</h4>
-      <p>
-        Save the public configuration. Reopen and review a future start before
-        saving changes. No swaps are scheduled.
-      </p>
+      <p>Save a draft to return to it later. No trades are scheduled.</p>
       <label htmlFor={fieldId}>Warmup plan name</label>
       <Input
         id={fieldId}
@@ -249,7 +246,7 @@ export function WalletWarmupPlans({
           disabled={busy || !plan || Boolean(selected?.archived)}
           onClick={() => mutate('save')}
         >
-          {selected ? 'Save warmup changes' : 'Save warmup draft'}
+          {selected ? 'Save changes' : 'Save draft'}
         </Button>
         <Button
           variant="outline"
@@ -263,10 +260,10 @@ export function WalletWarmupPlans({
             setNotice('Saving will create a new plan.');
           }}
         >
-          New saved warmup
+          New draft
         </Button>
         <Button variant="outline" disabled={busy} onClick={reload}>
-          Reload warmup plans
+          Reload drafts
         </Button>
       </div>
       {busy && (
@@ -293,13 +290,7 @@ export function WalletWarmupPlans({
         {selected ? 'Editing draft' : 'New saved draft'} · {saved.length}/100
         saved
       </small>
-      {!plan && (
-        <p>
-          Review the warmup plan above to enable saving. Editing or reopening
-          its settings requires a new review; saving alone does not schedule
-          transactions.
-        </p>
-      )}
+      {!plan && <p>Review your draft above to enable Save.</p>}
       {selected?.archived && (
         <p>
           This saved plan is archived. Restore it before saving changes or

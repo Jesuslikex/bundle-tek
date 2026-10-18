@@ -38,7 +38,7 @@ export function WalletWarmupPreflight({
       c.abort();
       setBusy(false);
       setError(
-        'Preflight took too long. Check your connection and try checking again.',
+        'Draft check took too long. Check your connection and try again.',
       );
     }, 30_000);
     try {
@@ -50,7 +50,7 @@ export function WalletWarmupPreflight({
       });
       const data = (await readPanelJson(
         response,
-        'Warmup preflight unavailable. Try checking again.',
+        'Draft check unavailable. Try again.',
       )) as {
         id?: string;
         revision?: number;
@@ -58,8 +58,9 @@ export function WalletWarmupPreflight({
         error?: string;
       };
       if (!data || typeof data !== 'object')
-        throw new Error('Warmup preflight unavailable. Try checking again.');
-      if (!response.ok) throw new Error(data.error || 'Preflight unavailable.');
+        throw new Error('Draft check unavailable. Try again.');
+      if (!response.ok)
+        throw new Error(data.error || 'Draft check unavailable.');
       if (
         data.id !== id ||
         data.revision !== revision ||
@@ -70,7 +71,7 @@ export function WalletWarmupPreflight({
       if (!c.signal.aborted) setReport(data.report);
     } catch (e) {
       if (!c.signal.aborted)
-        setError(e instanceof Error ? e.message : 'Preflight unavailable.');
+        setError(e instanceof Error ? e.message : 'Draft check unavailable.');
     } finally {
       clearTimeout(timeout);
       if (!c.signal.aborted) setBusy(false);
@@ -79,23 +80,23 @@ export function WalletWarmupPreflight({
   return (
     <div>
       <Button variant="outline" disabled={busy} onClick={inspect}>
-        {busy ? 'Checking preflight…' : 'Check warmup preflight'}
+        {busy ? 'Checking draft…' : 'Check draft'}
       </Button>
       {busy && (
         <>
           <output aria-live="polite">
-            Reading preflight only. No wallet unlock, signature or transaction
-            is requested.
+            Checking this draft. No wallet unlock, signature or transaction is
+            requested.
           </output>
           <Button
             variant="ghost"
             onClick={() => {
               controller.current?.abort();
               setBusy(false);
-              setError('Preflight cancelled. You can try checking again.');
+              setError('Draft check cancelled. You can try again when ready.');
             }}
           >
-            Cancel preflight
+            Cancel draft check
           </Button>
         </>
       )}
@@ -108,8 +109,7 @@ export function WalletWarmupPreflight({
           <h5>{report.status}</h5>
           {expired && (
             <p role="alert">
-              Preflight observations expired. Check warmup preflight again
-              before continuing.
+              This check has expired. Check the draft again before continuing.
             </p>
           )}
           <p>
@@ -119,6 +119,9 @@ export function WalletWarmupPreflight({
           {report.issues.map((issue) => (
             <p key={issue}>{issue}</p>
           ))}
+          {report.status === 'Hold' && (
+            <p>You can still edit and save this draft. No trades will start.</p>
+          )}
           {report.wallets.map((w) => (
             <div key={w.address}>
               {report.wallets.length > 1 && (

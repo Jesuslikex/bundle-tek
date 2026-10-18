@@ -36,7 +36,7 @@ for (const panel of ['preflight', 'quote'] as const) {
       await act(async () => container.querySelector('button')!.click());
       expect(container.querySelector('[role="alert"]')?.textContent).toBe(
         panel === 'preflight'
-          ? 'Warmup preflight unavailable. Try checking again.'
+          ? 'Draft check unavailable. Try again.'
           : 'Warmup quote unavailable. Try quoting again.',
       );
       expect(container.textContent).not.toMatch(
@@ -55,8 +55,7 @@ for (const panel of ['preflight', 'quote'] as const) {
 }
 
 for (const panel of ['preflight', 'quote'] as const) {
-  const label =
-    panel === 'preflight' ? 'Check warmup preflight' : 'Quote warmup buy';
+  const label = panel === 'preflight' ? 'Check draft' : 'Quote warmup buy';
   const mount = async () =>
     act(async () =>
       root.render(
@@ -114,7 +113,7 @@ for (const panel of ['preflight', 'quote'] as const) {
     vi.stubGlobal('fetch', fetcher);
     await mount();
     await click(label);
-    await click(`Cancel ${panel}`);
+    await click(`Cancel ${panel === 'preflight' ? 'draft check' : panel}`);
     expect(container.querySelector('button')!.disabled).toBe(false);
     await act(async () =>
       finish(
@@ -167,7 +166,7 @@ it('marks preflight observations expired without requesting another read or appr
   expect(container.querySelector('[role=alert]')).toBeNull();
   await act(async () => vi.advanceTimersByTimeAsync(5000));
   expect(container.querySelector('[role=alert]')?.textContent).toContain(
-    'Preflight observations expired',
+    'This check has expired',
   );
   expect(container.querySelector('button')!.disabled).toBe(false);
   expect(fetcher).toHaveBeenCalledTimes(1);

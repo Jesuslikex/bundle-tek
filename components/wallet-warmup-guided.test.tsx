@@ -49,7 +49,7 @@ it('reviews and saves a USDC draft with a fresh start without manually finding a
   await click('Use USDC');
   await click('Review warmup plan');
   expect(host.textContent).toContain('0.013 SOL');
-  await click('Save warmup draft');
+  await click('Save draft');
   expect(fixture.plan.document.tokens).toEqual([
     'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
   ]);
@@ -86,19 +86,19 @@ it('refreshes an expired saved draft explicitly and requires review before any n
   await mount();
   await click('Use USDC');
   await click('Review warmup plan');
-  await click('Save warmup draft');
+  await click('Save draft');
   await act(async () => vi.advanceTimersByTime(31 * 60000));
-  await click('Reload warmup plans');
+  await click('Reload drafts');
   const before = fixture.calls.filter((c) => c.action === 'save').length;
   await click('Review with fresh start');
   expect(host.textContent).toContain('Fresh start selected');
   expect(fixture.calls.filter((c) => c.action === 'save')).toHaveLength(before);
   const save = Array.from(host.querySelectorAll('button')).find(
-    (b) => b.textContent === 'Save warmup changes',
+    (b) => b.textContent === 'Save changes',
   )!;
   expect(save.disabled).toBe(true);
   await click('Review warmup plan');
-  await click('Save warmup changes');
+  await click('Save changes');
   expect(Date.parse(fixture.plan.document.startAt)).toBe(
     Date.now() + 30 * 60000,
   );

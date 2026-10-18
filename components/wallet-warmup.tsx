@@ -153,9 +153,8 @@ export function WalletWarmup({
         </Button>
       </div>
       <p>
-        {addresses.length} selected {chain}{' '}
-        {addresses.length === 1 ? 'wallet' : 'wallets'}. Plan and check
-        everything before any transaction.
+        {addresses.length} {chain}{' '}
+        {addresses.length === 1 ? 'wallet' : 'wallets'} selected.
       </p>
       <ol className={styles.steps} aria-label="Warmup setup steps">
         <li>1. Check wallet</li>
