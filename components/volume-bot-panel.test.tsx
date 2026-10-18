@@ -679,3 +679,34 @@ it('refuses a reversed delay range locally before observing wallet balances', as
   );
   expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
 });
+it('keeps optional trade settings collapsed and provides an explicit error recovery path', async () => {
+  await openSolTiming();
+  const minimum = container.querySelector<HTMLInputElement>(
+    '[aria-label="Minimum delay"]',
+  )!;
+  const settings = minimum.closest('details')!;
+  expect(settings.open).toBe(false);
+  expect(
+    container.querySelector('input[type=checkbox]')!.closest('details'),
+  ).toBeNull();
+  await changeControl(minimum, '0');
+  await act(async () => button('Estimate').click());
+  await settle();
+  expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
+  await act(async () => button('Edit trade settings').click());
+  expect(settings.open).toBe(true);
+  expect(document.activeElement).toBe(settings.querySelector('summary'));
+  await changeControl(minimum, '5');
+  await act(async () => button('Estimate').click());
+  await settle();
+  expect(
+    container.querySelector('[aria-label="Volume Bot estimate"]'),
+  ).toBeTruthy();
+  expect(
+    calls.some((c) =>
+      ['create', 'prepare', 'sign', 'submit'].includes(
+        String(c.payload?.action),
+      ),
+    ),
+  ).toBe(false);
+});

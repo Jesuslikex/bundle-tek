@@ -162,6 +162,7 @@ function VolumeBotWorkspace({
   const [usdQuote, setUsdQuote] = useState<VolumeUsdTarget | null>(null);
   const [acceptConversion, setAcceptConversion] = useState(false);
   const draftVersion = useRef(0);
+  const tradeSettings = useRef<HTMLDetailsElement>(null);
   const [estimate, setEstimate] = useState<{
     plan: VolumePlan;
     terms: VolumeTerms;
@@ -536,9 +537,28 @@ function VolumeBotWorkspace({
       </section>
       <TransactionDeliveryNotice transport="rpc" />
       {error && (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
+        <div>
+          <p role="alert" className={styles.error}>
+            {error}
+          </p>
+          {!active && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (!tradeSettings.current) return;
+                tradeSettings.current.open = true;
+                tradeSettings.current.querySelector('summary')?.focus();
+                tradeSettings.current.scrollIntoView?.({
+                  block: 'center',
+                  behavior: 'smooth',
+                });
+              }}
+            >
+              Edit trade settings
+            </Button>
+          )}
+        </div>
       )}
       {!active && (
         <form
@@ -548,6 +568,10 @@ function VolumeBotWorkspace({
             void doEstimate();
           }}
           onChange={changed}
+          onInvalidCapture={(event) => {
+            if (event.target instanceof HTMLElement)
+              event.target.closest('details')?.setAttribute('open', '');
+          }}
         >
           <label htmlFor={`${id}-unit`}>Target currency</label>
           <select
@@ -614,89 +638,96 @@ function VolumeBotWorkspace({
               Choose a session duration from 1 minute to 24 hours.
             </p>
           )}
-          <label htmlFor={`${id}-dmin`}>Delay between trades (seconds)</label>
-          <div className={styles.pair}>
-            <Input
-              id={`${id}-dmin`}
-              aria-label="Minimum delay"
-              inputMode="decimal"
-              value={delayMin}
-              onChange={(e) => setDelayMin(e.target.value)}
-            />
-            <Input
-              aria-label="Maximum delay"
-              inputMode="decimal"
-              value={delayMax}
-              onChange={(e) => setDelayMax(e.target.value)}
-            />
-          </div>
-          <p className={styles.note}>
-            From 1 to 600 seconds, with up to three decimal places for exact
-            millisecond delays.
-          </p>
-          <label htmlFor={`${id}-sizing`}>Trade amounts</label>
-          <select
-            id={`${id}-sizing`}
-            value={sizing}
-            onChange={(e) => setSizing(e.target.value as typeof sizing)}
-          >
-            <option value="auto">Auto (from duration)</option>
-            <option value="fixed">Fixed</option>
-            <option value="range">Random range</option>
-          </select>
-          {sizing === 'fixed' && (
-            <Input
-              aria-label="Fixed amount in SOL"
-              inputMode="decimal"
-              value={fixed}
-              onChange={(e) => setFixed(e.target.value)}
-            />
-          )}
-          {sizing === 'range' && (
+          <details ref={tradeSettings} className={styles.settings}>
+            <summary>Trade settings</summary>
+            <p className={styles.note}>
+              Optional delay, trade amounts and wave intensity. The defaults are
+              included in your estimate.
+            </p>
+            <label htmlFor={`${id}-dmin`}>Delay between trades (seconds)</label>
             <div className={styles.pair}>
               <Input
-                aria-label="Minimum amount in SOL"
+                id={`${id}-dmin`}
+                aria-label="Minimum delay"
                 inputMode="decimal"
-                value={rangeMin}
-                onChange={(e) => setRangeMin(e.target.value)}
+                value={delayMin}
+                onChange={(e) => setDelayMin(e.target.value)}
               />
               <Input
-                aria-label="Maximum amount in SOL"
+                aria-label="Maximum delay"
                 inputMode="decimal"
-                value={rangeMax}
-                onChange={(e) => setRangeMax(e.target.value)}
+                value={delayMax}
+                onChange={(e) => setDelayMax(e.target.value)}
               />
             </div>
-          )}
-          <label htmlFor={`${id}-wave`}>
-            Wave intensity: {(waveIntensity / 10).toFixed(1)}
-          </label>
-          <input
-            id={`${id}-wave`}
-            aria-label="Wave intensity"
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={waveIntensity / 10}
-            className={styles.wave}
-            aria-valuetext={(waveIntensity / 10).toFixed(1)}
-            disabled={busy || locked}
-            onChange={(event) => {
-              const raw = decimalToRaw(event.target.value, 1);
-              if (raw !== undefined && raw >= 0n && raw <= 10n)
-                setWaveIntensity(Number(raw));
-            }}
-          />
-          <div className={styles.waveLabels}>
-            <span>Tight</span>
-            <span>Big waves</span>
-          </div>
-          <p className={styles.note}>
-            Higher intensity makes longer buy and sell streaks, limited to
-            eligible wallets and at most six buys in a row. Each wallet sells
-            only after its own buy settles, with a separate reviewed batch.
-          </p>
+            <p className={styles.note}>
+              From 1 to 600 seconds, with up to three decimal places for exact
+              millisecond delays.
+            </p>
+            <label htmlFor={`${id}-sizing`}>Trade amounts</label>
+            <select
+              id={`${id}-sizing`}
+              value={sizing}
+              onChange={(e) => setSizing(e.target.value as typeof sizing)}
+            >
+              <option value="auto">Auto (from duration)</option>
+              <option value="fixed">Fixed</option>
+              <option value="range">Random range</option>
+            </select>
+            {sizing === 'fixed' && (
+              <Input
+                aria-label="Fixed amount in SOL"
+                inputMode="decimal"
+                value={fixed}
+                onChange={(e) => setFixed(e.target.value)}
+              />
+            )}
+            {sizing === 'range' && (
+              <div className={styles.pair}>
+                <Input
+                  aria-label="Minimum amount in SOL"
+                  inputMode="decimal"
+                  value={rangeMin}
+                  onChange={(e) => setRangeMin(e.target.value)}
+                />
+                <Input
+                  aria-label="Maximum amount in SOL"
+                  inputMode="decimal"
+                  value={rangeMax}
+                  onChange={(e) => setRangeMax(e.target.value)}
+                />
+              </div>
+            )}
+            <label htmlFor={`${id}-wave`}>
+              Wave intensity: {(waveIntensity / 10).toFixed(1)}
+            </label>
+            <input
+              id={`${id}-wave`}
+              aria-label="Wave intensity"
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={waveIntensity / 10}
+              className={styles.wave}
+              aria-valuetext={(waveIntensity / 10).toFixed(1)}
+              disabled={busy || locked}
+              onChange={(event) => {
+                const raw = decimalToRaw(event.target.value, 1);
+                if (raw !== undefined && raw >= 0n && raw <= 10n)
+                  setWaveIntensity(Number(raw));
+              }}
+            />
+            <div className={styles.waveLabels}>
+              <span>Tight</span>
+              <span>Big waves</span>
+            </div>
+            <p className={styles.note}>
+              Higher intensity makes longer buy and sell streaks, limited to
+              eligible wallets and at most six buys in a row. Each wallet sells
+              only after its own buy settles, with a separate reviewed batch.
+            </p>
+          </details>
           <fieldset className={styles.wallets}>
             <legend>Wallets</legend>
             {wallets.length ? (
