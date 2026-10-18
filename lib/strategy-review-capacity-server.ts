@@ -159,6 +159,7 @@ export async function currentStrategyReviewContext(
     hold: hold!,
     fingerprint,
     databaseAt: p.database_at,
+    tokenProgram: token.tokenProgram,
   };
 }
 /** Claims input capacity for an unsigned review only. No executor or financial reservation consumes this ledger. */

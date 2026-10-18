@@ -17,6 +17,64 @@ const authPosts = new Set([
 ]);
 
 export function allowedLocalPost(path, body) {
+  const uuid = (v) =>
+    typeof v === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
+  const revision = (v) => Number.isSafeInteger(v) && v >= 1 && v < 1000000000;
+  const boundedPool = (v) =>
+    typeof v === 'string' && /^[a-zA-Z0-9]{32,66}$/.test(v);
+  const keys = (allowed, required = allowed) =>
+    body &&
+    typeof body === 'object' &&
+    !Array.isArray(body) &&
+    Object.keys(body).every((k) => allowed.includes(k)) &&
+    required.every((k) => Object.hasOwn(body, k));
+  if (
+    path === '/api/imported-projects/strategy-checks' ||
+    path === '/api/imported-projects/strategy-previews'
+  ) {
+    const preview = path.endsWith('strategy-previews');
+    return Boolean(
+      keys([
+        'projectId',
+        'draftId',
+        'revision',
+        'holdId',
+        ...(preview ? ['conditionPool'] : []),
+      ]) &&
+      uuid(body.projectId) &&
+      uuid(body.draftId) &&
+      uuid(body.holdId) &&
+      revision(body.revision) &&
+      (!preview ||
+        body.conditionPool === null ||
+        boundedPool(body.conditionPool)),
+    );
+  }
+  if (path === '/api/imported-projects/market')
+    return Boolean(
+      keys(['id', 'revision']) && uuid(body.id) && revision(body.revision),
+    );
+  if (path === '/api/imported-projects/trades')
+    return Boolean(
+      keys(['id', 'revision', 'pool']) &&
+      uuid(body.id) &&
+      revision(body.revision) &&
+      boundedPool(body.pool),
+    );
+  if (path === '/api/imported-projects/candles')
+    return Boolean(
+      keys(
+        ['id', 'revision', 'pool', 'interval', 'currency', 'mode'],
+        ['id', 'revision', 'pool', 'interval'],
+      ) &&
+      uuid(body.id) &&
+      revision(body.revision) &&
+      boundedPool(body.pool) &&
+      ['1m', '5m', '1h', '1d'].includes(body.interval) &&
+      (body.currency === undefined || ['sol', 'usd'].includes(body.currency)) &&
+      (body.mode === undefined || ['latest', 'older'].includes(body.mode)),
+    );
   if (path === '/api/wallet-workspace') {
     const wallets = body?.wallets;
     return (

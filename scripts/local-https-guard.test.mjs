@@ -3,6 +3,56 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { allowedLocalPost, localHttpsHandler } from './local-https-guard.mjs';
 
+await test('admits only bounded manual market observations and unsigned strategy inspection', () => {
+  const id = '00000000-0000-4000-8000-000000000001',
+    pool = '11111111111111111111111111111111';
+  const calls = [
+    ['market', { id, revision: 1 }],
+    ['trades', { id, revision: 1, pool }],
+    ['candles', { id, revision: 1, pool, interval: '1m' }],
+    [
+      'strategy-checks',
+      { projectId: id, draftId: id, revision: 1, holdId: id },
+    ],
+    [
+      'strategy-previews',
+      {
+        projectId: id,
+        draftId: id,
+        revision: 1,
+        holdId: id,
+        conditionPool: null,
+      },
+    ],
+  ];
+  for (const [name, body] of calls) {
+    const path =
+      '/api/imported-projects/' + (typeof name === 'string' ? name : '');
+    assert.equal(allowedLocalPost(path, body), true);
+    for (const changed of [
+      { ...body, action: 'submit' },
+      { ...body, transaction: 'packet' },
+      { ...body, revision: 0 },
+      { ...body, revision: 1e9 },
+      {},
+    ])
+      assert.equal(allowedLocalPost(path, changed), false);
+  }
+  const path = '/api/imported-projects/candles',
+    base = { id, revision: 1, pool, interval: '1h' };
+  assert.equal(
+    allowedLocalPost(path, { ...base, mode: 'older', currency: 'sol' }),
+    true,
+  );
+  for (const changed of [
+    { ...base, mode: 'follow' },
+    { ...base, interval: '10m' },
+    { ...base, pool: 'https://provider.invalid' },
+    { ...base, currency: 'eur' },
+  ])
+    assert.equal(allowedLocalPost(path, changed), false);
+});
+
 await test('allows only warmup review actions, never packet registration or submission', () => {
   const path = '/api/wallet-workspace/warmup/signing';
   for (const action of ['review', 'cancel', 'recover'])
@@ -168,6 +218,59 @@ await test('real HTTP forwarding preserves auth headers and blocks forbidden req
       413,
     );
     assert.equal(seen.length, 4);
+    const id = '00000000-0000-4000-8000-000000000001',
+      pool = '11111111111111111111111111111111';
+    for (const [name, body] of [
+      ['market', { id, revision: 1 }],
+      ['trades', { id, revision: 1, pool }],
+      ['candles', { id, revision: 1, pool, interval: '1m', mode: 'older' }],
+      [
+        'strategy-checks',
+        { projectId: id, draftId: id, revision: 1, holdId: id },
+      ],
+      [
+        'strategy-previews',
+        {
+          projectId: id,
+          draftId: id,
+          revision: 1,
+          holdId: id,
+          conditionPool: null,
+        },
+      ],
+    ]) {
+      const path =
+        '/api/imported-projects/' + (typeof name === 'string' ? name : '');
+      assert.equal(
+        (await request(path, { body: JSON.stringify(body) })).status,
+        200,
+      );
+      const before = seen.length;
+      assert.equal(
+        (
+          await request(path, {
+            body: JSON.stringify({ ...body, action: 'submit' }),
+          })
+        ).status,
+        403,
+      );
+      assert.equal(seen.length, before);
+    }
+    assert.equal(
+      (
+        await request('/api/imported-projects/candles', {
+          body: JSON.stringify({
+            id,
+            revision: 1,
+            pool,
+            interval: '1m',
+            mode: 'follow',
+          }),
+        })
+      ).status,
+      403,
+    );
+    assert.equal(seen.length, 9);
   } finally {
     await Promise.all([
       new Promise((resolve) => edge.close(resolve)),

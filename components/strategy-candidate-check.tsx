@@ -8,6 +8,7 @@ import {
 } from '@/lib/strategy-candidate-check';
 import { strategyDraftRequest } from '@/lib/strategy-draft-client';
 import { Button } from '@/components/ui/button';
+import { StrategyUnsignedPreviewPanel } from './strategy-unsigned-preview';
 
 export function StrategyCandidateCheckPanel({
   draft,
@@ -159,8 +160,8 @@ export function StrategyCandidateCheckPanel({
             </p>
           ) : value.status === 'dca-due' ? (
             <p>
-              This DCA cycle is due by the server clock. Quotes, fees, balances,
-              signing and execution are still unchecked.
+              This DCA cycle is due by the server clock. Preview it to check
+              current balances, a quote and simulation.
             </p>
           ) : (
             <>
@@ -203,6 +204,17 @@ export function StrategyCandidateCheckPanel({
             This is a temporary read-only check. It does not approve a trade or
             change review capacity.
           </p>
+          {!blocked &&
+            !expired &&
+            (value.status === 'dca-due' || selected?.condition === 'met') && (
+              <StrategyUnsignedPreviewPanel
+                key={JSON.stringify([contextKey, value.checkedAt, pair])}
+                draft={draft}
+                capacity={capacity}
+                holdId={holdId}
+                conditionPool={value.kind === 'Limit' ? pair : null}
+              />
+            )}
           <details>
             <summary>Check details</summary>
             <p>
