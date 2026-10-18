@@ -474,3 +474,93 @@ it('keeps a reviewed deadline enforced and visible when its optional section is 
   expect(requests[0].body.endsAt).toBe(deadline);
   await respond(0);
 });
+
+it('reviews and saves an exact per-cycle SOL input with an explicit aggregate budget', async () => {
+  await fill();
+  await setField('DCA input mode', 'per-cycle');
+  expect(saveButton().disabled).toBe(true);
+  expect(
+    container.querySelector('[aria-label="DCA total input budget"]'),
+  ).toBeNull();
+  await setField('Input per DCA cycle', '0.000000003');
+  expect(
+    container.querySelector('[aria-label="DCA total input budget"]')
+      ?.textContent,
+  ).toContain('0.000000009 SOL across 3 cycles');
+  expect(container.querySelectorAll('li')).toHaveLength(3);
+  expect(container.textContent).toContain('Cycle 3: 0.000000003 SOL');
+  expect(requests).toHaveLength(0);
+  await setField('DCA cycles', '4');
+  expect(container.textContent).toContain('0.000000012 SOL across 4 cycles');
+  await act(async () => saveButton().click());
+  expect(
+    (requests[0].body.entries as { amount: string }[]).map((e) => e.amount),
+  ).toEqual(Array(4).fill('0.000000003'));
+  expect(requests[0].body).not.toHaveProperty('amountMode');
+  await respond(0);
+});
+it('supports token and supply-percentage cycle targets with visible conservative rounding', async () => {
+  await fill();
+  await setField('DCA side', 'Sell');
+  await setField('DCA input mode', 'per-cycle');
+  await setField('Input per DCA cycle', '0.000002');
+  expect(container.textContent).toContain('0.000006 TEST across 3 cycles');
+  await setField('Sell amount unit', 'supply');
+  expect(saveButton().disabled).toBe(true);
+  await setField('Input per DCA cycle', '10');
+  expect(container.textContent).toContain('30% total');
+  expect(container.textContent).toContain(
+    'cycle inputs can differ by one atom',
+  );
+  expect(container.textContent).toContain('Cycle 1: 0.000002 TEST');
+  expect(container.textContent).toContain('Cycle 3: 0.000001 TEST');
+  await act(async () => saveButton().click());
+  expect(requests[0].body.supplySizing).toMatchObject({
+    totalPercent: '30',
+    totalSupplyRaw: '17',
+  });
+  expect(
+    (requests[0].body.entries as { amount: string }[]).map((e) => e.amount),
+  ).toEqual(['0.000002', '0.000002', '0.000001']);
+  await respond(0);
+});
+it('clears per-cycle input before randomized total-budget sizing so it cannot be reinterpreted', async () => {
+  await fill();
+  await setField('DCA input mode', 'per-cycle');
+  await setField('Input per DCA cycle', '0.1');
+  expect(saveButton().disabled).toBe(false);
+  await setField('DCA amount sizing', 'randomized');
+  expect(container.textContent).toContain(
+    'Randomized sizing uses a total budget',
+  );
+  expect(saveButton().disabled).toBe(true);
+  const mode = Array.from(container.querySelectorAll('label'))
+    .find((l) => l.textContent?.startsWith('DCA input mode'))!
+    .querySelector('select')!;
+  expect(mode.value).toBe('total');
+  expect(mode.disabled).toBe(true);
+  expect(requests).toHaveLength(0);
+});
+it('explains overflow, invalid counts and over-100% totals without producing a save request', async () => {
+  await fill();
+  await setField('DCA input mode', 'per-cycle');
+  await setField('Input per DCA cycle', '9223372036.854775808');
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    'Total DCA input exceeds',
+  );
+  expect(saveButton().disabled).toBe(true);
+  await setField('Input per DCA cycle', '0.1');
+  await setField('DCA cycles', '26');
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    '2 to 25',
+  );
+  await setField('DCA cycles', '3');
+  await setField('DCA side', 'Sell');
+  await setField('Sell amount unit', 'supply');
+  await setField('Input per DCA cycle', '40');
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    'at most 100',
+  );
+  expect(saveButton().disabled).toBe(true);
+  expect(requests).toHaveLength(0);
+});

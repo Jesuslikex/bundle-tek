@@ -1,6 +1,9 @@
 'use client';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { dcaTradeSessionInput } from '@/lib/dca-trade-session';
+import {
+  dcaTradeSessionInput,
+  dcaPerCycleBudget,
+} from '@/lib/dca-trade-session';
 import {
   decodeTradeSession,
   validatedTradeSessionControls,
@@ -41,6 +44,7 @@ export function DcaTradeSession({
   const [side, setSide] = useState<'Buy' | 'Sell'>('Buy'),
     [wallet, setWallet] = useState(''),
     [amount, setAmount] = useState(''),
+    [amountMode, setAmountMode] = useState<'total' | 'per-cycle'>('total'),
     [sellUnit, setSellUnit] = useState<'tokens' | 'supply'>('tokens'),
     [cycles, setCycles] = useState('5'),
     [interval, setInterval] = useState('60'),
@@ -97,61 +101,97 @@ export function DcaTradeSession({
       : useSupply
         ? '% of saved supply'
         : project.document.token.symbol;
-  const amountTerms = useMemo<{
-    totalRaw: string;
-    randomization?: DcaRandomization;
-    supplySizing?: DcaSupplySizing;
-  } | null>(() => {
+  const amountResult = useMemo<{
+    terms: {
+      totalRaw: string;
+      randomization?: DcaRandomization;
+      supplySizing?: DcaSupplySizing;
+    } | null;
+    error: string;
+  }>(() => {
     try {
+      const inputAmount =
+        amountMode === 'per-cycle'
+          ? dcaPerCycleBudget(
+              amount,
+              useSupply
+                ? 6
+                : side === 'Buy'
+                  ? 9
+                  : project.document.token.decimals,
+              Number(cycles),
+            )
+          : amount;
       if (useSupply) {
         const sized = dcaSupplyInput(project.document.token, {
-          totalPercent: amount,
+          totalPercent: inputAmount,
           ...(sizing === 'randomized'
             ? { minimumPercent: cycleMinimum, maximumPercent: cycleMaximum }
             : {}),
         });
         return {
-          totalRaw: sized.totalRaw,
-          supplySizing: sized.sizing,
+          terms: {
+            totalRaw: sized.totalRaw,
+            supplySizing: sized.sizing,
+            ...(sizing === 'randomized'
+              ? {
+                  randomization: {
+                    format: 'bounded-dca-allocation-v1' as const,
+                    totalRaw: sized.totalRaw,
+                    minimumRaw: sized.minimumRaw!,
+                    maximumRaw: sized.maximumRaw!,
+                  },
+                }
+              : {}),
+          },
+          error: '',
+        };
+      }
+      const decimals = side === 'Buy' ? 9 : project.document.token.decimals,
+        totalRaw = solanaTokenAtoms(inputAmount, decimals).toString();
+      return {
+        terms: {
+          totalRaw,
           ...(sizing === 'randomized'
             ? {
                 randomization: {
                   format: 'bounded-dca-allocation-v1' as const,
-                  totalRaw: sized.totalRaw,
-                  minimumRaw: sized.minimumRaw!,
-                  maximumRaw: sized.maximumRaw!,
+                  totalRaw,
+                  minimumRaw: solanaTokenAtoms(
+                    cycleMinimum,
+                    decimals,
+                  ).toString(),
+                  maximumRaw: solanaTokenAtoms(
+                    cycleMaximum,
+                    decimals,
+                  ).toString(),
                 },
               }
             : {}),
-        };
-      }
-      const decimals = side === 'Buy' ? 9 : project.document.token.decimals,
-        totalRaw = solanaTokenAtoms(amount, decimals).toString();
-      return {
-        totalRaw,
-        ...(sizing === 'randomized'
-          ? {
-              randomization: {
-                format: 'bounded-dca-allocation-v1' as const,
-                totalRaw,
-                minimumRaw: solanaTokenAtoms(cycleMinimum, decimals).toString(),
-                maximumRaw: solanaTokenAtoms(cycleMaximum, decimals).toString(),
-              },
-            }
-          : {}),
+        },
+        error: '',
       };
-    } catch {
-      return null;
+    } catch (error) {
+      return {
+        terms: null,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Enter a supported DCA amount.',
+      };
     }
   }, [
     useSupply,
     side,
     sizing,
     amount,
+    amountMode,
+    cycles,
     cycleMinimum,
     cycleMaximum,
     project.document.token,
   ]);
+  const amountTerms = amountResult.terms;
   const selectedWallet = wallets.find(
     (w) => w.address === wallet && w.chain === 'Solana' && !w.archived,
   );
@@ -164,6 +204,7 @@ export function DcaTradeSession({
     wallet,
     walletRevision: selectedWallet?.revision,
     amount,
+    amountMode,
     cycles,
     cycleMinimum,
     cycleMaximum,
@@ -440,8 +481,26 @@ export function DcaTradeSession({
               project requires a new session.
             </p>
           )}
+          <label>
+            DCA input mode
+            <select
+              value={amountMode}
+              disabled={disabled || sizing === 'randomized'}
+              onChange={(e) => {
+                setAmountMode(e.target.value as 'total' | 'per-cycle');
+                setAmount('');
+                setAllocation(null);
+              }}
+            >
+              <option value="total">Total budget across all cycles</option>
+              <option value="per-cycle">Per-cycle target</option>
+            </select>
+          </label>
           <label htmlFor={amountId}>
-            Total DCA input ({unit})
+            {amountMode === 'per-cycle'
+              ? 'Input per DCA cycle'
+              : 'Total DCA input'}{' '}
+            ({unit})
             <Input
               id={amountId}
               inputMode="decimal"
@@ -450,6 +509,34 @@ export function DcaTradeSession({
               onChange={(e) => setAmount(e.target.value)}
             />
           </label>
+          {amount && amountResult.error && (
+            <p role="alert" className="col-span-full">
+              {amountResult.error}
+            </p>
+          )}
+          {amountTerms && (
+            <p
+              className="col-span-full text-sm"
+              aria-label="DCA total input budget"
+            >
+              Total input budget:{' '}
+              {formatNativeBalance(
+                amountTerms.totalRaw,
+                side === 'Buy' ? 9 : project.document.token.decimals,
+              )}{' '}
+              {side === 'Buy' ? 'SOL' : project.document.token.symbol} across{' '}
+              {cycles} cycles. Fees and rent are additional.
+              {amountMode === 'per-cycle' && useSupply && (
+                <>
+                  {' '}
+                  Target: {amount}% of saved supply per cycle,{' '}
+                  {amountTerms.supplySizing?.totalPercent}% total. The total
+                  rounds down to token atoms, then splits evenly; cycle inputs
+                  can differ by one atom. Review every exact amount below.
+                </>
+              )}
+            </p>
+          )}
           <label htmlFor={cyclesId}>
             DCA cycles
             <Input
@@ -465,9 +552,15 @@ export function DcaTradeSession({
             <select
               value={sizing}
               disabled={disabled}
-              onChange={(e) =>
-                setSizing(e.target.value as 'even' | 'randomized')
-              }
+              onChange={(e) => {
+                const next = e.target.value as 'even' | 'randomized';
+                setSizing(next);
+                if (next === 'randomized' && amountMode === 'per-cycle') {
+                  setAmountMode('total');
+                  setAmount('');
+                  setAllocation(null);
+                }
+              }}
             >
               <option value="even">Even split</option>
               <option value="randomized">Randomized within bounds</option>
@@ -506,10 +599,11 @@ export function DcaTradeSession({
                 Generate random allocation
               </Button>
               <p className="col-span-full text-sm text-muted-foreground">
-                Generate once to preview all amounts. Every cycle stays within
-                these bounds and the total input stays exact. Saving, retries
-                and signing reuse this allocation. Change the amount, cycle
-                count, wallet or bounds to generate a new preview.
+                Randomized sizing uses a total budget. Generate once to preview
+                all amounts. Every cycle stays within these bounds and the total
+                input stays exact. Saving, retries and signing reuse this
+                allocation. Change the amount, cycle count, wallet or bounds to
+                generate a new preview.
               </p>
             </fieldset>
           )}

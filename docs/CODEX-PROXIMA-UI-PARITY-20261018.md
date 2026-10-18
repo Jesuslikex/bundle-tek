@@ -54,3 +54,8 @@ No new funded test, provider/credential setting, deployment, push, cron or remot
 ## Tracker follow-up
 
 The previously unresolved tracker form is now observed through REA, and Bundle has reviewed public-watchlist newline/comma/generic-JSON imports with metadata, capacity and archived-entry handling. See CODEX-TRACKER-BULK-IMPORT-20261018.md for exact evidence, supported format,73-test regression and synthetic desktop/phone checks. This answers tracker form/format questions only. Vendor-specific exports, real-time follow behavior, settings/referrals and remaining strategy configurations still require separate evidence. The full goal remains incomplete.
+
+
+## DCA per-cycle follow-up
+
+Fresh retained REA inspection verifies fixed/random amount and separate HMS timing/ending controls on the unsaved vendor DCA form. Bundle now supports per-cycle SOL/token/saved-supply targets with explicit total input and exact rounded cycle previews, preserving its existing server limits and approvals. Model checkpoint92c3659 and the subsequent UI checkpoint are described in CODEX-DCA-PER-CYCLE-20261018.md. HMS controls and multi-strategy/strategy-vs-session endings remain open; no automation or funded proof is claimed.
