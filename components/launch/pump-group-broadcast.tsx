@@ -1,4 +1,5 @@
 'use client';
+import { TransactionDeliveryNotice } from '@/components/transaction-delivery-notice';
 import {
   useEffect,
   useEffectEvent,
@@ -236,6 +237,7 @@ export function PumpGroupBroadcast({
         final packet. This supports up to four launch packets plus one tip. A
         consumed send attempt is never sent again by this app.
       </p>
+      <TransactionDeliveryNotice transport="jito-bundle" />
       {group.review.packets.length > 4 && (
         <output>
           This group has five launch packets. It cannot fit an additional

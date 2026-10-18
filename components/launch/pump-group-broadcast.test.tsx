@@ -385,3 +385,16 @@ it('restores the original signed tip file without unlocking keys, signing or sub
     ),
   ).toBe(false);
 });
+
+it('shows Jito transport limitations before any signature or submission', () => {
+  expect(container.textContent).toContain('Delivery: Jito bundle');
+  expect(container.textContent).toContain(
+    'Dedicated sandwich protection has not been verified',
+  );
+  expect(signer).not.toHaveBeenCalled();
+  expect(
+    fetcher.mock.calls.some(([, init]) =>
+      String(init.body).includes('broadcast-submit'),
+    ),
+  ).toBe(false);
+});

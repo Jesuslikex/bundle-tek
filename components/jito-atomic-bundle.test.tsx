@@ -34,6 +34,8 @@ it('exposes bounded group preparation and separate signing/submission rather tha
     <JitoAtomicBundle projectId={id} session={session} locked={false} />,
   );
   for (const text of [
+    'Delivery: Jito bundle',
+    'Dedicated sandwich protection has not been verified',
     'up to 4 wallet swaps',
     'Prepare and review selected Jito swaps',
     'Jito tip (lamports)',

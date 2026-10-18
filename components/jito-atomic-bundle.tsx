@@ -1,4 +1,5 @@
 'use client';
+import { TransactionDeliveryNotice } from '@/components/transaction-delivery-notice';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   requireJitoManifest,
@@ -206,6 +207,7 @@ export function JitoAtomicBundle({
           never falls back to individual submission or automatically retries a
           bundle.
         </p>
+        <TransactionDeliveryNotice transport="jito-bundle" />
         <Button disabled={busy} variant="outline" onClick={() => run()}>
           Load bundle approvals and history
         </Button>

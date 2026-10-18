@@ -1,0 +1,3 @@
+# MEV transport disclosure scope
+
+18 October 2026. Codex will edit only its Volume Bot, Jito swap-bundle and Pump group-broadcast review components, their tests, and a new shared display-only delivery notice. The other Bundle chat retains wallet/warmup, browser recovery, shared HTTPS and shell/token files. Current source uses configured RPC sendTransaction for ordinary swaps/warmup/Volume and Jito sendBundle for swap/launch groups. No explicit sandwich-mitigation marker construction was found. Do not label configured RPC public, private or protected from its variable name alone. No packets, hashes, approvals, signing, transports, retry rules, provider configuration or credentials will change. No transaction or deploy.

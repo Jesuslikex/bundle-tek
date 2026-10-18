@@ -149,6 +149,10 @@ it('estimates with the chosen settings and saves the session', async () => {
     },
   });
   expect(container.textContent).toContain('1 SOL');
+  expect(container.textContent).toContain('Delivery: configured Solana RPC');
+  expect(container.textContent).toContain(
+    'does not request dedicated sandwich protection',
+  );
   await act(async () => button('Save session and reserve wallets').click());
   await vi.waitFor(() =>
     expect(calls.some((c) => c.payload?.action === 'create')).toBe(true),

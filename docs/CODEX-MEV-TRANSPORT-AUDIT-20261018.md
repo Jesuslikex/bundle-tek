@@ -1,0 +1,33 @@
+# Bundle transaction delivery and MEV audit
+
+18 October 2026. Source at 0d6ecff plus display-only delivery notices. Audit is static source inspection, regression tests and one passive Proxima page observation. No transaction, provider setting, credential, private wallet access or deployment changed.
+
+## Current paths
+
+| Flow | Authoritative implementation | Requested delivery |
+| --- | --- | --- |
+| Imported Buy/Sell, DCA and conditional entry execution | app/api/imported-projects/signing/route.ts; getSolanaRpcEndpoint('mainnet'); balanceRpc | sendTransaction to configured mainnet RPC, skipPreflight false, maxRetries 0. Persistent submission state precedes the call; uncertain outcomes require recovery. |
+| Warmup trades | app/api/wallet-workspace/warmup/signing/route.ts | Same configured-mainnet RPC family and one-attempt sendTransaction. This chat did not edit warmup files. |
+| Volume Bot trades | app/api/imported-projects/volume-bot/route.ts; lib/volume-bot-service.ts::sendVolumeTrade | Configured indexer RPC, individual sendTransaction calls. A signing batch is not a Jito atomic bundle. |
+| Pump create-only, initial buys, holder execution and organic steps | lib/pump-launch-service.ts, pump-initial-buy-review.ts, pump-holder-execution.ts, pump-organic-service.ts | Each service's approved single-packet sendTransaction callback. These are not converted to Jito by the existence of the separate group feature. |
+| Sniper Guard Nuke sells | lib/sniper-nuke-service.ts; app/api/launch/pump/sniper-guard/route.ts | Configured indexer RPC permits sendTransaction only for the explicit nuke-send action. It is not a sandwich-protection mechanism. |
+| Stock-pair execution library | lib/pair-order-execution.ts | Its send routine uses sendTransaction. Stock signing remains off; presence of this library is not permission or proof of a live execution path. |
+| Jito swap bundles | lib/jito-bundle-server.ts::submitJitoBundle; lib/jito-provider.ts; lib/jito-bundle.ts | sendBundle to fixed https://mainnet.block-engine.jito.wtf/api/v1/bundles. Complete exact signed vector, reviewed tip, one durable attempt; no individual-RPC fallback. |
+| Complete Pump launch groups | lib/pump-group-broadcast-service.ts::submitOwnedPumpGroupBroadcast; lib/pump-group-broadcast.ts | Same fixed Jito bundle endpoint. Ordered launch packets plus separately approved signed tip, complete simulation/code admission, durable consumed attempt and read-only recovery. The group's ordinary RPC callback rejects sendTransaction. |
+
+Provider variable names do not establish public/private relay behavior. This pass does not inspect or expose configured endpoint values. No explicit jitodontfront construction or bundleOnly option was found in bounded application TS/TSX searches. This does not prove that every externally generated unsigned packet lacks such an account. Therefore the UI says dedicated sandwich protection is not verified, rather than claiming protection is absent at all providers or guaranteed by Jito.
+
+Minimum-output checks bound accepted swap execution amounts; they do not establish protection from transaction reordering. The three new notices distinguish configured-RPC Volume delivery from the two owned Jito review panels. Notices contain no approval, signing or send action. All send paths, packet builders, hashes, fees, consent and recovery state machines are unchanged.
+
+## External and vendor evidence
+
+Primary documentation checked 18 October: https://docs.jito.wtf/lowlatencytxnsend/#sandwich-mitigation . Jito documents a read-only account marker requiring placement first in its accepted bundle, with specific shared-signer prefix rules. Its disclaimer limits this mechanism to its block engine and does not guarantee all ordering protection. Its transaction endpoint also forces skip_preflight true. Changing ordinary RPC delivery is therefore a transaction/transport design task, not a label or URL substitution. A future protection option must bind any marker and fee changes into the unsigned bytes before review, simulation, exact hashing and explicit consent. Existing signed packets must never be patched, silently rerouted or automatically resent.
+
+Current REA discovery ev_3fe144115fe36e89be377b8abcc7296c615a14c6483001c6f9542dddfe56bfce confirms Chrome 155 and the approved Proxima target. Passive one-second page inspection ev_0ee2c17e4d33c5315f785a2dc0f97030999bad3442600899ad83cc84eea88d9b captured the current funding screen. Accessibility contains a Mev label and a BNB network image, which do not establish a Solana toggle, relay or execution guarantee. No clicks, navigation, key/storage/cookie/console text or network-body capture was requested. Complete private evidence is retained outside Git: C:/Users/Julian/Desktop/REA/results/proxima-mev-passive-20261018.json. Coverage is policy-filtered and attach-limited; no full Proxima MEV-parity claim is made. Historical PONS_PROXIMA_EVIDENCE.md describes a different EVM launch-specific MEV contract surface and must not be presented as Solana sandwich protection.
+
+## Verification boundary
+
+Current UI tests, plain TypeScript and eight-file typed lint pass. The initial unexcluded main test command also discovered old tests inside ignored work/release-qa snapshots. Those copies are historical and must not count as current-source coverage. Final root-only counts and the separate scratch exclusion fix are recorded after the clean discovery run. No new browser rendering, full suite, funded proof, build or production verification is claimed by this UI notice pass. The other chat owns Chrome recovery and the signed-in mobile warmup check; its dirty warmup note is preserved.
+
+
+Current root-only UI verification after scratch exclusion:21 tests in exactly four current files pass on Node24.19.0, report work/mev-delivery-ui-tests-20261018.json. Covers notice semantics/no action controls, both mounted Jito surfaces, configured RPC Volume delivery, original unchecked consent, one local synthetic batch send, lost-result recovery and context invalidation. The Volume signing fixture emitted non-failing React act warnings; no warning-free claim. Plain TypeScript and eight-file type-aware lint passed before the other chat's subsequent independent auth fixes. The other chat reports a combined production build exit0 including this frozen MEV display source; its auth note owns that build and server restart. No claim of new rendered MEV browser checks. The live backend regression46726 was started before test-discovery exclusion and remains pending; its current-root and historical results will be separated when terminal. No application source changed during that run.

@@ -1,4 +1,5 @@
 'use client';
+import { TransactionDeliveryNotice } from '@/components/transaction-delivery-notice';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
@@ -491,6 +492,7 @@ function VolumeBotWorkspace({
         signs it, and each trade is sent at its time. It only runs while this
         panel is open. Each sell sells exactly what its own buy received.
       </p>
+      <TransactionDeliveryNotice transport="rpc" />
       {error && (
         <p role="alert" className={styles.error}>
           {error}
