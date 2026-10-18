@@ -20,6 +20,7 @@ import {
 } from '@/lib/launch-layer-client';
 import type { LaunchLayerEnvelope } from '@/lib/launch-layer-terms';
 import styles from './pump-layer-planner.module.css';
+import { LaunchLayerHistory } from './launch-layer-history';
 
 const endpoint = '/api/launch/layers';
 const names: Record<LayerRole, string> = {
@@ -143,6 +144,7 @@ function Planner({
   const [draft, setDraft] = useState<LayerDraft | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
+  const snapshotReview = useRef<HTMLDetailsElement>(null);
   const [historyRead, setHistoryRead] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -695,8 +697,56 @@ function Planner({
         </>
       )}
       {historyRead && !saved && <p>No saved layer plan for this project.</p>}
+      <LaunchLayerHistory
+        projectId={selection.projectId}
+        mint={selection.target.mint}
+        disabled={blocked}
+        onOpen={(entry) =>
+          void run(
+            'Opening saved planning snapshot…',
+            async (signal, current) => {
+              const response = await fetch(
+                endpoint +
+                  '?projectId=' +
+                  encodeURIComponent(selection.projectId) +
+                  '&id=' +
+                  encodeURIComponent(entry.id),
+                { signal, cache: 'no-store' },
+              );
+              const body = await read(response);
+              const plan = parseSavedLayer(body.plan, selection.projectId);
+              if (
+                plan.id !== entry.id ||
+                plan.sha256 !== entry.sha256 ||
+                plan.createdAt !== entry.createdAt ||
+                plan.projectUpdatedAt !== entry.projectUpdatedAt ||
+                plan.envelope.terms.binding.target.kind !== entry.target.kind ||
+                plan.envelope.terms.binding.target.mint !== entry.target.mint
+              )
+                throw new Error(
+                  'Opened snapshot differs from its history entry. Reload history before retrying.',
+                );
+              if (current()) {
+                setSaved(plan);
+                setNotice(
+                  'Saved snapshot opened. Your editable draft is unchanged; reuse still requires current references and a new review.',
+                );
+                requestAnimationFrame(() => {
+                  const detail = snapshotReview.current;
+                  if (!current() || !detail?.isConnected) return;
+                  detail.open = true;
+                  detail.scrollIntoView({ block: 'nearest' });
+                  detail
+                    .querySelector<HTMLElement>('summary')
+                    ?.focus({ preventScroll: true });
+                });
+              }
+            },
+          )
+        }
+      />
       {saved && (
-        <details className={styles.history}>
+        <details ref={snapshotReview} className={styles.history}>
           <summary>
             Saved planning snapshot ·{' '}
             {new Date(saved.createdAt).toLocaleString()}

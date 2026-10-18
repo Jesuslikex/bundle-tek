@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseLaunchLayerHistory } from './launch-layer-history';
 import { validateProjectDocument, projectIdValid } from './workspace-project';
 import {
   createLaunchLayerTerms,
@@ -447,4 +448,58 @@ export async function readOwnedLaunchLayerPlan(
     return null;
   }
   return decode(db, owner, row);
+}
+
+/** Bounded metadata index only. Opening a record still verifies its full snapshot. */
+export async function listOwnedLaunchLayerPlans(
+  db: D1Database,
+  owner: string,
+  projectId: string,
+) {
+  if (!projectIdValid(projectId))
+    return fail('Choose an owned saved launch project.', 400);
+  const owned = await db
+    .prepare('SELECT id FROM workspace_projects WHERE owner_id=? AND id=?')
+    .bind(owner, projectId)
+    .first();
+  if (!owned) return fail('Saved launch project not found.', 404);
+  const rows = await db
+    .prepare(`SELECT id,project_revision,created_at,sha256,
+    json_extract(document,'$.envelope.terms.binding.target.kind') AS target_kind,
+    json_extract(document,'$.envelope.terms.binding.target.mint') AS target_mint
+    FROM launch_layer_plans WHERE owner_id=? AND project_id=? ORDER BY created_at DESC,id DESC LIMIT 101`)
+    .bind(owner, projectId)
+    .all<{
+      id: string;
+      project_revision: string;
+      created_at: string;
+      sha256: string;
+      target_kind: string;
+      target_mint: string;
+    }>();
+  try {
+    return parseLaunchLayerHistory(
+      {
+        projectId,
+        items: rows.results.map((row) => ({
+          id: row.id,
+          projectUpdatedAt: row.project_revision,
+          createdAt: row.created_at,
+          sha256: row.sha256,
+          target: { kind: row.target_kind, mint: row.target_mint },
+        })),
+        complete: true,
+        planningOnly: true,
+        fundingAllowed: false,
+        signingAllowed: false,
+        executionAllowed: false,
+      },
+      projectId,
+    );
+  } catch {
+    return fail(
+      'Saved planning history is inconsistent. No snapshot was opened.',
+      503,
+    );
+  }
 }

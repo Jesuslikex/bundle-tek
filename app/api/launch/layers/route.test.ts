@@ -3,6 +3,7 @@ const state = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
   context: vi.fn(),
   read: vi.fn(),
+  list: vi.fn(),
   save: vi.fn(),
   db: {},
 }));
@@ -14,6 +15,7 @@ vi.mock('@/lib/launch-layer-service', async (original) => ({
   ...(await original<typeof import('@/lib/launch-layer-service')>()),
   readLaunchLayerContext: state.context,
   readOwnedLaunchLayerPlan: state.read,
+  listOwnedLaunchLayerPlans: state.list,
   saveOwnedLaunchLayerPlan: state.save,
 }));
 import { GET, POST } from './route';
@@ -40,6 +42,7 @@ beforeEach(() => {
   state.user = { userId: 'alice' };
   state.context.mockReset().mockResolvedValue({ fundingAllowed: false });
   state.read.mockReset().mockResolvedValue(null);
+  state.list.mockReset().mockResolvedValue({ items: [], planningOnly: true });
   state.save.mockReset().mockResolvedValue({
     planningOnly: true,
     fundingAllowed: false,
@@ -54,6 +57,25 @@ it('requires authentication before context, history or save access', async () =>
   expect(state.context).not.toHaveBeenCalled();
   expect(state.save).not.toHaveBeenCalled();
   expect(state.read).not.toHaveBeenCalled();
+  expect((await get('history=source')).status).toBe(401);
+  expect(state.list).not.toHaveBeenCalled();
+});
+it('lists history only for the authenticated owner with no caching', async () => {
+  const response = await get('history=source');
+  expect(response.status).toBe(200);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(state.list).toHaveBeenCalledWith(state.db, 'alice', 'source');
+  expect(await response.json()).toEqual({
+    history: { items: [], planningOnly: true },
+  });
+  for (const query of [
+    'history=a&history=b',
+    'history=a&id=b',
+    'history=a&owner=b',
+    'history=a&projectId=b',
+  ])
+    expect((await get(query)).status).toBe(400);
+  expect(state.list).toHaveBeenCalledTimes(1);
 });
 it('forwards only the authenticated owner and selected saved context without caching', async () => {
   const f = launchLayerFixture(),

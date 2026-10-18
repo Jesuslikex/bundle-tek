@@ -8,7 +8,15 @@ import { PumpLayerPlanner } from './pump-layer-planner';
 import { layerUiFixture } from '../../test/launch-layer-ui-fixture';
 import { layerTestStorage } from '../../test/launch-layer-storage';
 import { GET, POST } from '@/app/api/launch/layers/route';
+import {
+  saveOwnedLaunchLayerPlan,
+  listOwnedLaunchLayerPlans,
+} from '@/lib/launch-layer-service';
 const state = vi.hoisted(() => ({ db: null as D1Database | null }));
+const originalScroll = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'scrollIntoView',
+);
 vi.mock('@/app/chatgpt-auth', () => ({
   getChatGPTUser: async () => ({ userId: 'alice' }),
 }));
@@ -22,6 +30,17 @@ let intercept:
   | ((url: string, options: RequestInit) => Promise<Response> | undefined)
   | undefined;
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+async function until(assertion: () => void) {
+  await vi.waitFor(
+    async () => {
+      await act(async () => {
+        await flush();
+      });
+      assertion();
+    },
+    { timeout: 5000, interval: 10 },
+  );
+}
 const button = (text: string) => {
   const found = [...host.querySelectorAll('button')].find(
     (b) => b.textContent === text,
@@ -98,6 +117,13 @@ async function loadAndFill() {
 }
 beforeEach(async () => {
   vi.stubGlobal('crypto', webcrypto);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+    setTimeout(() => callback(performance.now()), 0),
+  );
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+  });
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -134,6 +160,172 @@ afterEach(async () => {
   storage.client.close();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  if (originalScroll)
+    Object.defineProperty(
+      HTMLElement.prototype,
+      'scrollIntoView',
+      originalScroll,
+    );
+  else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+});
+it('browses older mint snapshots through the real API without changing the editable draft', async () => {
+  const older = await saveOwnedLaunchLayerPlan(
+    storage.db,
+    'alice',
+    f.input,
+    f.now,
+  );
+  await saveOwnedLaunchLayerPlan(
+    storage.db,
+    'alice',
+    { ...f.input, target: { kind: 'new', mint: f.address(98) } },
+    () => f.now() + 1000,
+  );
+  await loadAndFill();
+  const values = [
+    ...host.querySelectorAll<HTMLInputElement>('fieldset input'),
+  ].map((input) => input.value);
+  await click('Browse saved planning history');
+  await until(() =>
+    expect(
+      host.querySelectorAll('button[aria-label^="Open snapshot"]'),
+    ).toHaveLength(2),
+  );
+  const open = host.querySelector<HTMLButtonElement>(
+    `button[aria-label="Open snapshot ${older.id}"]`,
+  )!;
+  await act(async () => {
+    open.click();
+    await flush();
+  });
+  await until(() =>
+    expect(host.textContent).toContain(
+      'Saved snapshot opened. Your editable draft is unchanged',
+    ),
+  );
+  expect(
+    [...host.querySelectorAll<HTMLInputElement>('fieldset input')].map(
+      (input) => input.value,
+    ),
+  ).toEqual(values);
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0);
+  await until(() =>
+    expect(host.querySelector('details[open]')?.textContent).toContain(
+      older.id,
+    ),
+  );
+  expect(host.textContent).toContain('Use saved ceilings as a new draft');
+  expect(host.textContent).not.toContain('Save reviewed planning snapshot');
+});
+it('cancels history reads and ignores an uncooperative late response', async () => {
+  let release!: (response: Response) => void;
+  intercept = (url) =>
+    url.includes('?history=')
+      ? new Promise((resolve) => {
+          release = resolve;
+        })
+      : undefined;
+  await click('Browse saved planning history');
+  expect(host.textContent).toContain('Loading planning history…');
+  await click('Cancel history loading');
+  const history = await listOwnedLaunchLayerPlans(
+    storage.db,
+    'alice',
+    f.selection.projectId,
+  );
+  await act(async () => {
+    release(Response.json({ history }));
+    await flush();
+  });
+  expect(host.textContent).toContain('History loading cancelled');
+  expect(host.textContent).not.toContain('No saved planning snapshots yet');
+  intercept = undefined;
+  await click('Reload planning history');
+  await until(() =>
+    expect(host.textContent).toContain('No saved planning snapshots yet'),
+  );
+});
+it('keeps a pending history response out of a different mint context', async () => {
+  let release!: (response: Response) => void;
+  intercept = (url) =>
+    url.includes('?history=')
+      ? new Promise((resolve) => {
+          release = resolve;
+        })
+      : undefined;
+  await click('Browse saved planning history');
+  await render({
+    ...f.selection,
+    target: { kind: 'new', mint: f.address(98) },
+  });
+  const history = await listOwnedLaunchLayerPlans(
+    storage.db,
+    'alice',
+    f.selection.projectId,
+  );
+  await act(async () => {
+    release(Response.json({ history }));
+    await flush();
+  });
+  expect(host.textContent).not.toContain('Loading planning history');
+  expect(host.textContent).not.toContain('No saved planning snapshots yet');
+  expect(host.textContent).toContain(f.address(98));
+});
+it('releases a timed-out history read even when the transport ignores abort', async () => {
+  let release!: (response: Response) => void;
+  intercept = (url) =>
+    url.includes('?history=')
+      ? new Promise((resolve) => {
+          release = resolve;
+        })
+      : undefined;
+  vi.useFakeTimers();
+  await act(async () => {
+    button('Browse saved planning history').click();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(30000);
+  });
+  expect(host.textContent).toContain('History loading timed out');
+  expect(button('Reload planning history').disabled).toBe(false);
+  await act(async () => {
+    release(Response.json({ history: null }));
+    await Promise.resolve();
+  });
+  expect(host.textContent).toContain('History loading timed out');
+  expect(host.textContent).not.toContain('could not be confirmed');
+});
+it('refuses a detail record that differs from its selected history metadata', async () => {
+  await saveOwnedLaunchLayerPlan(storage.db, 'alice', f.input, f.now);
+  await click('Browse saved planning history');
+  await until(() =>
+    expect(
+      host.querySelectorAll('button[aria-label^="Open snapshot"]'),
+    ).toHaveLength(1),
+  );
+  intercept = (url) =>
+    url.includes('&id=')
+      ? (async () => {
+          const response = await GET(new Request('https://bundle.test' + url));
+          const body = (await response.json()) as { plan: { sha256: string } };
+          body.plan.sha256 = '0'.repeat(64);
+          return Response.json(body);
+        })()
+      : undefined;
+  await act(async () => {
+    host
+      .querySelector<HTMLButtonElement>('button[aria-label^="Open snapshot"]')!
+      .click();
+    await flush();
+  });
+  await until(() =>
+    expect(host.querySelector('[role=alert]')?.textContent).toContain(
+      'differs from its history entry',
+    ),
+  );
+  expect(host.textContent).not.toContain('Saved snapshot opened');
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0);
 });
 it('releases a timed-out save even if its transport ignores cancellation', async () => {
   await loadAndFill();

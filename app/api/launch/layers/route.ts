@@ -2,6 +2,7 @@ import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import {
   LaunchLayerError,
+  listOwnedLaunchLayerPlans,
   readLaunchLayerContext,
   readOwnedLaunchLayerPlan,
   saveOwnedLaunchLayerPlan,
@@ -25,6 +26,14 @@ export async function GET(request: Request) {
     return json({ error: 'Sign in to read saved launch layers.' }, 401);
   const p = new URL(request.url).searchParams;
   try {
+    if (p.size === 1 && p.has('history'))
+      return json({
+        history: await listOwnedLaunchLayerPlans(
+          getD1(),
+          user.userId,
+          p.get('history')!,
+        ),
+      });
     if (p.size === 1 && p.has('context')) {
       const text = p.get('context')!;
       if (new TextEncoder().encode(text).byteLength > 2048)

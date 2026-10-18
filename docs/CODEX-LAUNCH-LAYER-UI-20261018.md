@@ -1,5 +1,7 @@
 # Front/Back planning editor
 
+Later history continuation: `CODEX-LAUNCH-LAYER-HISTORY-20261018.md` adds an owned index and verified selection for all retained snapshots. The latest-only limitation below describes this original editor checkpoint.
+
 18 October 2026. Continuation of `07552b7`, after ownership notice `CODEX-LAUNCH-LAYER-UI-NOTICE-20261018.md`. This is the visible planning editor, not a staged funding or execution release. The broad Proxima goal remains incomplete.
 
 ## Delivered flow

@@ -1,0 +1,23 @@
+# Browsable launch-layer snapshot history
+
+18 October 2026. Local continuation of the Front/Back planning editor. Previously only the latest retained snapshot was visible. This adds a bounded owned history index and lets the user open an older snapshot without replacing the editable draft.
+
+## Contract and interaction
+
+Authenticated GET `/api/launch/layers?history=PROJECT_ID` requires one exact query parameter and returns no-store metadata for the owned source project. Foreign and missing projects return 404. Archived projects remain readable. The existing storage cap is 100 immutable snapshots; the query reads at most 101 metadata rows and refuses inconsistent/oversized history. Date and ID descending ordering is checked, as are duplicate IDs, canonical times/public mints, hash shape and all false authority flags. No full source documents, wallet rosters or role budgets are returned by this index.
+
+Index metadata is navigation evidence, not a verification of the complete saved snapshot. Selecting an entry separately reads the existing owned detail endpoint, which verifies its full retained snapshot and checks current references. The UI also compares record ID, SHA, dates and target against the selected index entry before showing it. No index row can directly become an editable or executable plan. Existing reopen checks and fresh review are unchanged.
+
+Browse loads on opening; reload, empty, readable error, cancel and 30-second deadline states are explicit. The list shows date, full public mint, new/imported kind and whether the mint matches the candidate being edited. Opening focuses and expands the existing saved-snapshot review. The editable ceilings and existing review are not replaced. A different mint remains historical and cannot use the existing reopen action. Generation/unmount checks prevent cancelled, timed-out or old-context responses publishing later.
+
+## Ownership and verification
+
+This chat announced edits to its existing layer planner/service/route and new history component/model before changing them. The other chat owns amount presets, quote/sell panels, migration0111 and its guard work; those files are excluded. No protected app/page.tsx or token layout edit is included. No provider request, dependency, signing, authorization or SQL migration change is needed.
+
+The final focused selection passes 113 tests across seven files: history model, layer service, layer API, planner UI, existing client/terms and holder parent. Mounted UI tests use the real route/service, Turso adapter and actual0109 SQL in disposable local SQLite, substituting only authentication and database selection. They cover multiple mint snapshots, stable ordering, archived/foreign ownership, readonly browsing, unchanged draft values, detail/index mismatch, cancellation, timeout with uncooperative fetch and changed-context late responses. They do not establish real-account or hosted acceptance. Scoped nine-file typed lint and formatting pass. A first combined typecheck found the other chat's missing metadataUri fixture; its owner corrected it. Final combined build results are recorded below when terminal.
+
+The browser used the user's existing Chrome profile and normal trusted local3443 helper, with actual working planner/history source bundled into a clearly labelled synthetic component fixture. Synthetic context/history/detail responses were held in memory; every write and external request was blocked in that fixture. This is rendering/interaction proof, not real-account authentication or provider evidence. Opening loaded two different mint records; selecting the older record expanded/focused the retained review and left reuse disabled for that different candidate. At375 and320px the document client/scroll widths were360/360 and305/305; no inputs, selects or buttons extended horizontally outside375px. Ignored screenshots: work/layer-ui-qa/history-desktop.png and history-phone.png. The fixture tab was closed, viewport reset, and all three temporary public assets plus their empty directory removed before the shared build. No separate server, CDP reconnect, certificate or protection change was used.
+
+Final combined build exited0 on both chats' frozen source: webpack32.3s, TypeScript13.8s, six static pages1411ms and traces complete. The existing trusted local HTTPS helper was restored afterwards. No migration was introduced here; the other chat separately checked its unchanged/pending112-file local migration chain. The historical4,971-test full baseline does not cover these newer features;113 is this checkpoint's focused scope.
+
+No push, deploy, hosted SQL, credentials/provider changes, wallet unlock, signature or funded action. Funding/execution and complete Proxima parity remain unfinished.

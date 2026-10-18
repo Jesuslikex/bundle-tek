@@ -6,11 +6,65 @@ import { launchLayerFixture } from '../test/launch-layer-fixture';
 import { quoteCatalog } from './quote-catalog';
 import {
   readLaunchLayerContext,
+  listOwnedLaunchLayerPlans,
   readOwnedLaunchLayerPlan,
   saveOwnedLaunchLayerPlan,
 } from './launch-layer-service';
 let client: Client, db: D1Database, f: ReturnType<typeof launchLayerFixture>;
 const save = () => saveOwnedLaunchLayerPlan(db, 'alice', f.input, f.now);
+it('lists all owned snapshot metadata in stable order, including archived source history', async () => {
+  expect(
+    (await listOwnedLaunchLayerPlans(db, 'alice', f.selection.projectId)).items,
+  ).toEqual([]);
+  const first = await save();
+  f.layers.delays.fundingDelaySeconds++;
+  const second = await save();
+  await db
+    .prepare(
+      'UPDATE workspace_projects SET archived=1 WHERE owner_id=? AND id=?',
+    )
+    .bind('alice', f.selection.projectId)
+    .run();
+  const history = await listOwnedLaunchLayerPlans(
+    db,
+    'alice',
+    f.selection.projectId,
+  );
+  expect(history).toMatchObject({
+    complete: true,
+    planningOnly: true,
+    fundingAllowed: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(history.items.map((item) => item.id)).toEqual(
+    [first.id, second.id].sort().reverse(),
+  );
+  expect(
+    history.items.every((item) => item.target.mint === f.selection.target.mint),
+  ).toBe(true);
+  expect(
+    history.items.every(
+      (item) => !('envelope' in item) && !('sourceDocument' in item),
+    ),
+  ).toBe(true);
+  expect(
+    (
+      await readOwnedLaunchLayerPlan(
+        db,
+        'alice',
+        f.selection.projectId,
+        first.id,
+      )
+    )?.current,
+  ).toBe(false);
+  await expect(
+    listOwnedLaunchLayerPlans(db, 'bob', f.selection.projectId),
+  ).rejects.toMatchObject({ status: 404 });
+  await expect(
+    listOwnedLaunchLayerPlans(db, 'alice', 'missing-project'),
+  ).rejects.toMatchObject({ status: 404 });
+});
 it('expands every ordered role without dropping a missing funder', async () => {
   const migration = await readFile(
     'drizzle/0109_launch_layer_plans.sql',

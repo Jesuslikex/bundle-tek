@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+- Front/Back planning now has an owned browsable index of all retained snapshots (maximum100) and separate verified detail loading, including older/different mint history. Browsing preserves the editable draft; existing reopen/current-context and review gates remain. See `CODEX-LAUNCH-LAYER-HISTORY-20261018.md` for113 focused tests and synthetic browser scope. This adds no staged funding or execution authority.
+
 - The corrected offline baseline passed 565 files/4,971 tests (`15e6218` report, runner fixes `fd4e571`). It predates the pending workspace UI and newer strategy/preference work. Local `9d0a9c9` adds held unsigned strategy previews with fresh conditions and fee checks; this is not signing or autonomous execution. Its separate 211-test re-verification and artifact correction are documented in `CODEX-STRATEGY-UNSIGNED-PREVIEWS-20261018.md`.
 - The persistent chart/wallet implementation and actual signed-in local browser evidence are in `CODEX-PERSISTENT-WALLET-WORKSPACE-INTEGRATION-20261018.md`. It adds mounted lower views and wallet-first review navigation, keeping the full plot and first row together where desktop room permits. Smaller layouts use flow; broader financial/marketplace parity remains unfinished. The shared ownership checkpoint is `CODEX-CLAUDE-SHARED-HANDOFF-20261018.md`.
 
