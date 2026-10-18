@@ -500,7 +500,7 @@ export async function simulateVolumePumpBundle(
 }
 
 /** Raw CPI evidence supplements account bytes; logs and caller-provided net deltas are never used. */
-function reviewVolumePumpInner(
+export function reviewVolumePumpInner(
   review: VolumeBundleConstruction,
   route: VolumePumpRoute,
   keys: string[],

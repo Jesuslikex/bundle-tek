@@ -750,6 +750,13 @@
       "when": 1792684800000,
       "tag": "0106_exchange_payout_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "6",
+      "when": 1792771200000,
+      "tag": "0107_volume_bundle_recovery",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,12 @@
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
 import {
+  validateVolumePumpRoute,
+  type VolumePumpRoute,
+} from './volume-bundle-route';
+import { reviewVolumePumpInner } from './volume-bundle-simulation';
+import { withdrawalFailureReason } from './withdrawal-failure';
+import {
   getTransactionDecoder,
   getTransactionEncoder,
   getCompiledTransactionMessageDecoder,
@@ -55,10 +61,64 @@ const integer = (value: unknown) => {
   }
   return volumeUint(value);
 };
+/** Verifies an already signed packet. Never creates a signature or contacts a provider. */
+export async function inspectVolumeSignedPacket(
+  supplied: VolumeBundleConstruction,
+  encoded: string,
+) {
+  const review = await requireVolumeBundleConstruction(supplied);
+  if (typeof encoded !== 'string' || encoded.length > 1644)
+    volumeReject('Bounded signed packet required.');
+  const raw = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+  const tx = getTransactionDecoder().decode(raw);
+  const unsigned = getTransactionDecoder().decode(
+    Uint8Array.from(atob(review.transaction), (c) => c.charCodeAt(0)),
+  );
+  const [sig] = Object.values(tx.signatures);
+  if (
+    raw.length > 1232 ||
+    getBase64Decoder().decode(getTransactionEncoder().encode(tx)) !== encoded ||
+    Object.keys(tx.signatures).join(',') !== review.wallet ||
+    !sig ||
+    !nacl.sign.detached.verify(
+      Uint8Array.from(tx.messageBytes),
+      Uint8Array.from(sig),
+      bs58.decode(review.wallet),
+    ) ||
+    tx.messageBytes.length !== unsigned.messageBytes.length ||
+    tx.messageBytes.some((b, i) => b !== unsigned.messageBytes[i])
+  )
+    return volumeReject('Signed packet differs from reserved construction.');
+  return {
+    signature: bs58.encode(sig),
+    signedPacketSha256: await volumeBytesDigest(raw),
+  };
+}
 /** Receipt accounting only. Caller must collect authenticated finalized RPC evidence; route/code/custody admission stays separate. */
 export async function verifyVolumeBundleSettlement(
   supplied: VolumeBundleConstruction,
   suppliedReceipt: VolumeFinalizedReceipt,
+) {
+  return verifySettlement(supplied, suppliedReceipt);
+}
+/** Captured native Pump policy: sells debit program-owned lamports directly. */
+export async function verifyVolumePumpSettlement(
+  supplied: VolumeBundleConstruction,
+  suppliedRoute: VolumePumpRoute,
+  receipt: VolumeFinalizedReceipt,
+) {
+  const route = await validateVolumePumpRoute(
+    supplied,
+    suppliedRoute.identities,
+  );
+  if (JSON.stringify(route) !== JSON.stringify(suppliedRoute))
+    volumeReject('Settlement route differs.');
+  return verifySettlement(supplied, receipt, route);
+}
+async function verifySettlement(
+  supplied: VolumeBundleConstruction,
+  suppliedReceipt: VolumeFinalizedReceipt,
+  pump?: VolumePumpRoute,
 ) {
   const review = await requireVolumeBundleConstruction(supplied),
     receipt = structuredClone(suppliedReceipt);
@@ -70,7 +130,8 @@ export async function verifyVolumeBundleSettlement(
     !Number.isSafeInteger(result.slot) ||
     result.slot < 1 ||
     !meta ||
-    meta.err !== null ||
+    (!pump && meta.err !== null) ||
+    meta.err === undefined ||
     !Array.isArray(result.transaction) ||
     result.transaction.length !== 2 ||
     result.transaction[1] !== 'base64' ||
@@ -78,35 +139,14 @@ export async function verifyVolumeBundleSettlement(
     result.transaction[0].length > 1644
   )
     volumeReject(
-      'A successful finalized receipt is required. Holds must remain on unknown or failed evidence.',
+      'A complete finalized receipt is required. Unknown evidence retains its hold.',
     );
-  const raw = Uint8Array.from(atob(result.transaction[0]), (c) =>
-    c.charCodeAt(0),
+  const packet = await inspectVolumeSignedPacket(review, result.transaction[0]);
+  if (packet.signature !== receipt.signature)
+    volumeReject('Finalized wallet signature differs.');
+  const tx = getTransactionDecoder().decode(
+    Uint8Array.from(atob(result.transaction[0]), (c) => c.charCodeAt(0)),
   );
-  const tx = getTransactionDecoder().decode(raw);
-  if (
-    raw.length > 1232 ||
-    getBase64Decoder().decode(getTransactionEncoder().encode(tx)) !==
-      result.transaction[0]
-  )
-    volumeReject('Receipt packet is not canonical.');
-  const unsigned = getTransactionDecoder().decode(
-    Uint8Array.from(atob(review.transaction), (c) => c.charCodeAt(0)),
-  );
-  const [sig] = Object.values(tx.signatures);
-  if (
-    Object.keys(tx.signatures).join(',') !== review.wallet ||
-    !sig ||
-    !nacl.sign.detached.verify(
-      Uint8Array.from(tx.messageBytes),
-      Uint8Array.from(sig),
-      bs58.decode(review.wallet),
-    ) ||
-    bs58.encode(sig) !== receipt.signature ||
-    tx.messageBytes.length !== unsigned.messageBytes.length ||
-    tx.messageBytes.some((b, i) => b !== unsigned.messageBytes[i])
-  )
-    volumeReject('Finalized packet or wallet signature differs.');
   const message = getCompiledTransactionMessageDecoder().decode(
       tx.messageBytes,
     ),
@@ -117,7 +157,7 @@ export async function verifyVolumeBundleSettlement(
     message.version !== 0 ||
     (message.addressTableLookups?.length ?? 0)
   )
-    volumeReject('Lookup settlement is unsupported.');
+    return volumeReject('Lookup settlement is unsupported.');
   const tokenIndex = keys.indexOf(review.input.tokenAccount),
     tipIndex = keys.indexOf(review.input.tipRecipient);
   if (
@@ -145,7 +185,8 @@ export async function verifyVolumeBundleSettlement(
     volumeReject('Native conservation or readonly balances differ.');
   if (
     fee > BigInt(review.input.networkFeeCapLamports) ||
-    after[tipIndex] - before[tipIndex] !== BigInt(review.input.tipLamports) ||
+    after[tipIndex] - before[tipIndex] !==
+      (meta.err === null ? BigInt(review.input.tipLamports) : 0n) ||
     before[tokenIndex] !== after[tokenIndex]
   )
     volumeReject('Fee, tip or token-account rent changed.');
@@ -198,9 +239,70 @@ export async function verifyVolumeBundleSettlement(
     !own.has(tokenIndex) ||
     target?.programId !== VOLUME_TOKEN ||
     target.mint !== review.input.mint ||
-    target.uiTokenAmount.amount !== '0'
+    (meta.err === null && target.uiTokenAmount.amount !== '0')
   )
     volumeReject('Use an existing empty standard SPL token account.');
+  if (pump) {
+    const curveIndex = keys.indexOf(pump.accounts.associated_bonding_curve),
+      curve = pre.get(curveIndex),
+      curvePost = post.get(curveIndex);
+    if (
+      pre.size !== 2 ||
+      post.size !== 2 ||
+      !curve ||
+      !curvePost ||
+      curve.owner !== pump.accounts.bonding_curve ||
+      curve.mint !== review.input.mint ||
+      curve.programId !== VOLUME_TOKEN ||
+      curve.uiTokenAmount.decimals !== 6 ||
+      target.uiTokenAmount.decimals !== 6 ||
+      curvePost.owner !== curve.owner ||
+      curvePost.mint !== curve.mint ||
+      curvePost.programId !== curve.programId ||
+      curvePost.uiTokenAmount.decimals !== curve.uiTokenAmount.decimals ||
+      curvePost.uiTokenAmount.amount !== curve.uiTokenAmount.amount ||
+      (meta.err === null &&
+        integer(curve.uiTokenAmount.amount) <
+          BigInt(review.input.tokenAmountRaw))
+    )
+      volumeReject('Complete unchanged Pump token inventories required.');
+    if (meta.err !== null) {
+      const error = withdrawalFailureReason(meta.err);
+      if (
+        (error.instructionIndex !== undefined &&
+          error.instructionIndex >= message.instructions.length) ||
+        after[0] - before[0] !== -fee ||
+        before.some((value, i) => i > 0 && after[i] !== value)
+      )
+        volumeReject(
+          'Finalized failure must roll back all balances except the payer fee.',
+        );
+      return {
+        format: 'volume-bundle-settlement-v1' as const,
+        outcome: 'failed' as const,
+        constructionSha256: review.sha256,
+        signature: receipt.signature,
+        slot: result.slot,
+        signedPacketSha256: packet.signedPacketSha256,
+        buyLamports: '0',
+        sellLamports: '0',
+        actualVolumeLamports: '0',
+        feeLamports: fee.toString(),
+        tipLamports: '0',
+        netLamports: (-fee).toString(),
+        tokenInventoryDeltaRaw: '0',
+        accountingVerified: true as const,
+        executionAllowed: false as const,
+        signingAllowed: false as const,
+        durableTransitionRequired: true as const,
+        routeAndCustodyAdmissionRequired: true as const,
+        routeSha256: pump.sha256,
+        pumpAccountingVerified: true as const,
+        atomicRollbackVerified: true as const,
+        error,
+      };
+    }
+  }
   let buyTokens = 0n,
     sellTokens = 0n,
     buySol = 0n,
@@ -214,7 +316,7 @@ export async function verifyVolumeBundleSettlement(
     meta.innerInstructions.length > end
   )
     volumeReject('Inner transfer evidence required.');
-  for (const group of meta.innerInstructions) {
+  for (const group of pump ? [] : meta.innerInstructions) {
     if (
       !Number.isSafeInteger(group.index) ||
       group.index < 0 ||
@@ -307,6 +409,26 @@ export async function verifyVolumeBundleSettlement(
     tip = BigInt(review.input.tipLamports);
   const net = after[0] - before[0],
     loss = -net;
+  if (pump) {
+    buySol = reviewVolumePumpInner(
+      review,
+      pump,
+      keys,
+      meta.innerInstructions,
+    ).buyLamports;
+    sellSol = net + buySol + tip + fee;
+    buyTokens = sellTokens = targetRaw;
+    buyTransfers = sellTransfers = 1;
+    const allowed = new Set([
+      review.wallet,
+      review.input.tipRecipient,
+      pump.accounts.bonding_curve,
+      pump.accounts.creator_vault,
+      pump.accounts.fee_recipient,
+    ]);
+    if (keys.some((key, i) => !allowed.has(key) && before[i] !== after[i]))
+      volumeReject('Unexpected Pump native movement.');
+  }
   if (
     buyTransfers !== 1 ||
     sellTransfers !== 1 ||
@@ -323,10 +445,11 @@ export async function verifyVolumeBundleSettlement(
     );
   return {
     format: 'volume-bundle-settlement-v1' as const,
+    outcome: 'succeeded' as const,
     constructionSha256: review.sha256,
     signature: receipt.signature,
     slot: result.slot,
-    signedPacketSha256: await volumeBytesDigest(raw),
+    signedPacketSha256: packet.signedPacketSha256,
     buyLamports: buySol.toString(),
     sellLamports: sellSol.toString(),
     actualVolumeLamports: (buySol + sellSol).toString(),
@@ -339,5 +462,8 @@ export async function verifyVolumeBundleSettlement(
     signingAllowed: false as const,
     durableTransitionRequired: true as const,
     routeAndCustodyAdmissionRequired: true as const,
+    ...(pump
+      ? { routeSha256: pump.sha256, pumpAccountingVerified: true as const }
+      : {}),
   };
 }

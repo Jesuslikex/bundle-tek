@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 import { volumeProgramFixture } from '../test/volume-program-fixture';
-import { validateVolumeProgramRuntime } from './volume-bundle-programs';
+import {
+  validateVolumeProgramRuntime,
+  requireVolumeProgramPolicy,
+} from './volume-bundle-programs';
+import { volumeDigest } from './volume-bundle-construction';
 import type { VolumeSimulationRpc } from './volume-bundle-simulation';
 it('denies an unset production policy before any RPC', async () => {
   const f = await volumeProgramFixture();
@@ -19,6 +23,18 @@ it('denies an unset production policy before any RPC', async () => {
   ).rejects.toThrow(/separately reviewed/);
   expect(calls).toBe(0);
 });
+it.each(['programData', 'upgradeAuthority', 'deploymentSlot'])(
+  'refuses malformed reviewed %s even with a recomputed policy hash',
+  async (kind) => {
+    const f = await volumeProgramFixture();
+    f.policy.programs[0][
+      kind as 'programData' | 'upgradeAuthority' | 'deploymentSlot'
+    ] = kind === 'deploymentSlot' ? '0' : 'invalid';
+    const { sha256: _old, ...terms } = f.policy;
+    f.policy.sha256 = await volumeDigest(terms);
+    await expect(requireVolumeProgramPolicy(f.policy)).rejects.toThrow();
+  },
+);
 it('compares two full code scans around the actual unsigned simulation with a separate policy', async () => {
   const f = await volumeProgramFixture();
   const result = await validateVolumeProgramRuntime(

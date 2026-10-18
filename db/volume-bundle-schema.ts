@@ -59,7 +59,7 @@ export const volumeBundleReservations = sqliteTable(
     ),
     uniqueIndex('volume_bundle_active_round')
       .on(t.sessionId, t.round)
-      .where(sql`${t.state} IN ('held','attempted')`),
+      .where(sql`${t.state} IN ('held','attempted','settled')`),
     uniqueIndex('volume_bundle_wallet_lock')
       .on(t.ownerId, t.wallet)
       .where(sql`${t.state} IN ('held','attempted')`),

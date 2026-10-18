@@ -11,6 +11,7 @@ import {
 import { sql } from 'drizzle-orm';
 export * from './exchange-funding-schema';
 export * from './volume-bundle-schema';
+export * from './volume-recovery-schema';
 export * from './holder-index-schema';
 export * from './jito-bundle-schema';
 export * from './conditional-monitor-schema';

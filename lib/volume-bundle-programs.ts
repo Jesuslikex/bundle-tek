@@ -2,6 +2,7 @@ import {
   collectPumpProgramIdentities,
   type PumpProgramIdentity,
 } from './pump-group-code-identity';
+import { address } from '@solana/kit';
 import { pumpGroupProgramDataLink } from './pump-launch-group-deployments';
 import { pumpRpcAccount, pumpAccountBytes } from './pump-launch-simulation';
 import {
@@ -87,8 +88,10 @@ export async function requireVolumeProgramPolicy(
         volumeReject('Unsupported program loader policy.');
       if (v.loader === 'BPFLoaderUpgradeab1e11111111111111111111111') {
         if (!v.programData || !v.deploymentSlot)
-          volumeReject('Reviewed deployment metadata required.');
-        volumeUint(v.deploymentSlot);
+          return volumeReject('Reviewed deployment metadata required.');
+        address(v.programData);
+        if (v.upgradeAuthority !== null) address(v.upgradeAuthority);
+        volumeUint(v.deploymentSlot, true);
       } else if (
         v.programData !== null ||
         v.deploymentSlot !== null ||

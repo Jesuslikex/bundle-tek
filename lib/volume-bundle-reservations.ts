@@ -147,7 +147,7 @@ type ReservationRow = {
   runtime_sha256: string;
   document: string;
   tip_cap: number;
-  state: 'held' | 'attempted' | 'cancelled';
+  state: 'held' | 'attempted' | 'cancelled' | 'settled';
   attempt_id: string | null;
   expires_at: string;
   created_at: string;
@@ -180,7 +180,7 @@ export async function readVolumeBundleReservation(
     runtime.construction.input.sessionId !== row.session_id ||
     runtime.construction.input.sessionRevision !== row.session_revision ||
     runtime.construction.input.round !== row.round ||
-    !['held', 'attempted', 'cancelled'].includes(row.state)
+    !['held', 'attempted', 'cancelled', 'settled'].includes(row.state)
   )
     volumeReject('Stored reservation identity differs.');
   return {
@@ -332,7 +332,7 @@ export async function reserveVolumeBundleRound(
   }
   return readVolumeBundleReservation(db, owner, input.id);
 }
-/** Conservative pre-attempt marker only: no approval, signature or send. Once marked, there is no release path here. */
+/** Conservative pre-attempt marker only: no approval, signature or send. Only verified recovery can settle an attempt. */
 export async function markVolumeBundleAttempted(
   db: D1Database,
   owner: string,
@@ -382,17 +382,27 @@ export async function readVolumeBundleTipBudget(
   const saved = await session(db, owner, sessionId);
   const row = await db
     .prepare(
-      "SELECT COALESCE(SUM(tip_cap),0) AS held FROM volume_bundle_reservations WHERE owner_id=? AND session_id=? AND state IN ('held','attempted')",
+      `SELECT COALESCE(SUM(CASE WHEN r.state IN ('held','attempted') THEN r.tip_cap ELSE 0 END),0) AS held,
+       COALESCE(SUM(CASE WHEN r.state='settled' THEN s.tip_spent ELSE 0 END),0) AS spent
+       FROM volume_bundle_reservations r LEFT JOIN volume_bundle_settlements s ON s.reservation_id=r.id AND s.owner_id=r.owner_id WHERE r.owner_id=? AND r.session_id=?`,
     )
     .bind(owner, sessionId)
-    .first<{ held: number }>();
+    .first<{ held: number; spent: number }>();
   const held = row?.held ?? 0;
-  if (!Number.isSafeInteger(held) || held < 0 || held > saved.row.tip_budget)
+  const spent = row?.spent ?? 0;
+  if (
+    !Number.isSafeInteger(held) ||
+    !Number.isSafeInteger(spent) ||
+    held < 0 ||
+    spent < 0 ||
+    held + spent > saved.row.tip_budget
+  )
     volumeReject('Stored tip budget differs.');
   return {
     totalLamports: String(saved.row.tip_budget),
     heldLamports: String(held),
-    availableLamports: String(saved.row.tip_budget - held),
+    spentLamports: String(spent),
+    availableLamports: String(saved.row.tip_budget - held - spent),
     executionAllowed: false as const,
   };
 }
