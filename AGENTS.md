@@ -29,6 +29,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex (wallet/Proxima chat),18October2026: durable launch-to-sale consumption, new `lib/launch-sale-*`, exact source reader in `lib/pump-purchase-cost-service.ts`, new migration0116 reserved after0115, db/schema metadata, fixtures/tests/notes. Original launch and sale parsers; global owner/origin counters, legacy-link mutual exclusion, explicit record/reload only. No UI/provider/trading/signing changes. Scoped checks only while peer full suite runs; index free.
+
 Codex (ChatGPT) owns the following areas it is actively extending. The original 79-commit count above is a historical snapshot; use Git for the current relationship to origin/main:
 
 - Volume Bot and same-block Volume bundles: `lib/volume-bot*`, `lib/volume-bundle*`, `lib/volume-usd*`, `app/api/volume*`, related tests and fixtures.
