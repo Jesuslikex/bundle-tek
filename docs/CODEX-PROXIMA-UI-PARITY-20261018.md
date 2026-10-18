@@ -49,3 +49,8 @@ Warmup5c439d0:28 files/251 tests passed together, covering UI/model/API/local da
 5. Inspect remaining strategy, tracker, settings, referral and mobile reference controls in bounded read-only captures, then implement independently testable slices. Do not copy unknown signing/automation behavior from interface labels.
 
 No new funded test, provider/credential setting, deployment, push, cron or remote migration is authorized by this ledger. Completed local changes are committed so the other Bundle chat can inspect them.
+
+
+## Tracker follow-up
+
+The previously unresolved tracker form is now observed through REA, and Bundle has reviewed public-watchlist newline/comma/generic-JSON imports with metadata, capacity and archived-entry handling. See CODEX-TRACKER-BULK-IMPORT-20261018.md for exact evidence, supported format,73-test regression and synthetic desktop/phone checks. This answers tracker form/format questions only. Vendor-specific exports, real-time follow behavior, settings/referrals and remaining strategy configurations still require separate evidence. The full goal remains incomplete.

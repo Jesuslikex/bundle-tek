@@ -28,6 +28,10 @@ import { EvmTrackedTransactions } from './evm-tracked-transactions';
 import { WalletHoldingsPanel } from './wallet-holdings-panel';
 import { TrackedTransactionPanel } from './tracked-transaction-panel';
 import { TrackedTransactionHistory } from './tracked-transaction-history';
+import {
+  reviewTrackerImport,
+  type TrackerImportReview,
+} from '@/lib/tracker-bulk-import';
 
 const key = (wallet: Pick<TrackedWallet, 'address' | 'network'>) =>
   `${wallet.network}:${wallet.address}`;
@@ -68,6 +72,27 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [addresses, setAddresses] = useState('');
   const [label, setLabel] = useState('');
+  const [bulkReview, setBulkReview] = useState<{
+    context: string;
+    result: TrackerImportReview;
+  } | null>(null);
+  const [bulkFailure, setBulkFailure] = useState<{
+    context: string;
+    message: string;
+  } | null>(null);
+  const bulkContext = JSON.stringify({
+    addresses,
+    network,
+    label,
+    group,
+    icon,
+    favorite,
+    wallets,
+  });
+  const currentBulkReview =
+    bulkReview?.context === bulkContext ? bulkReview.result : null;
+  const bulkError =
+    bulkFailure?.context === bulkContext ? bulkFailure.message : '';
   const [selected, setSelected] = useState<TrackedWallet | null>(null);
   const [holdingsKey, setHoldingsKey] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState<string | null>(null);
@@ -240,6 +265,8 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
     wallet?: TrackedWallet,
   ) {
     setEditor(mode);
+    setBulkReview(null);
+    setBulkFailure(null);
     setEditing(wallet ?? null);
     setAddresses(wallet?.address ?? '');
     setLabel(wallet?.label ?? '');
@@ -339,13 +366,44 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
           className="tracker-editor"
           onSubmit={async (e) => {
             e.preventDefault();
-            const entries =
-              editor === 'bulk'
-                ? addresses
-                    .split(/\r?\n/)
-                    .map((line) => line.trim())
-                    .filter(Boolean)
-                : [addresses.trim()];
+            if (editor === 'bulk') {
+              if (busy || loading || loadFailed) return;
+              if (!currentBulkReview) {
+                try {
+                  const result = reviewTrackerImport(
+                    addresses,
+                    { network, label, group, icon, favorite },
+                    wallets,
+                  );
+                  setBulkReview({ context: bulkContext, result });
+                  setBulkFailure(null);
+                  setError('');
+                } catch (error) {
+                  setBulkFailure({
+                    context: bulkContext,
+                    message:
+                      error instanceof Error
+                        ? error.message
+                        : 'Watchlist could not be reviewed.',
+                  });
+                }
+                return;
+              }
+              if (!currentBulkReview.wallets.length) return;
+              if (
+                await mutate({
+                  action: 'add',
+                  wallets: currentBulkReview.wallets,
+                })
+              ) {
+                setEditor(null);
+                setBulkReview(null);
+                setAddresses('');
+                setLabel('');
+              }
+              return;
+            }
+            const entries = [addresses.trim()];
             if (
               await mutate(
                 editor === 'edit' && editing
@@ -409,7 +467,7 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
             </label>
             <label>
               {editor === 'bulk'
-                ? 'Batch label (optional)'
+                ? 'Fallback label (optional)'
                 : 'Label (optional)'}
               <Input
                 value={label}
@@ -464,13 +522,13 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
             </label>
           </div>
           <label>
-            {editor === 'bulk'
-              ? 'One public address per line'
-              : 'Public address'}
+            {editor === 'bulk' ? 'Public watchlist text' : 'Public address'}
             {editor === 'bulk' ? (
               <textarea
                 aria-label="Public addresses"
                 rows={5}
+                maxLength={20_000}
+                aria-describedby="tracker-bulk-help"
                 value={addresses}
                 onChange={(e) => setAddresses(e.target.value)}
                 required
@@ -486,13 +544,98 @@ export function WalletTracker({ onSupply }: { onSupply: () => void }) {
               />
             )}
           </label>
+          {editor === 'bulk' && (
+            <>
+              <p id="tracker-bulk-help">
+                Paste newline- or comma-separated public addresses, or a JSON
+                array of addresses or objects with address, name, icon and
+                bookmark. Icons must match the choices above. The selected
+                network and group apply to every row. Never paste private keys
+                or seed phrases.
+              </p>
+              <p>
+                Preview first. Nothing is saved until you confirm the reviewed
+                public addresses.
+              </p>
+              {(loading || loadFailed) && (
+                <p>
+                  Load your saved watchlist before previewing, so existing
+                  entries and available slots can be checked. Use Reload tracker
+                  below if loading failed.
+                </p>
+              )}
+              {currentBulkReview && (
+                <section aria-label="Public watchlist import preview">
+                  <h3>
+                    {currentBulkReview.wallets.length} new public address
+                    {currentBulkReview.wallets.length === 1 ? '' : 'es'}
+                  </h3>
+                  <p>
+                    {currentBulkReview.total} rows reviewed as{' '}
+                    {currentBulkReview.format}. {currentBulkReview.skipped}{' '}
+                    already saved entries will be skipped, including{' '}
+                    {currentBulkReview.archivedSkipped} archived. Existing
+                    labels and archived states stay unchanged.
+                  </p>
+                  {!currentBulkReview.wallets.length && (
+                    <p>
+                      No new entries. To track an archived wallet again, restore
+                      it in the Archived view.
+                    </p>
+                  )}
+                  <div className="overflow-x-auto">
+                    <table className="project-table">
+                      <caption>
+                        New watchlist entries on {trackerNetworkLabel(network)}.
+                        Public tracking only.
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th>Address</th>
+                          <th>Label</th>
+                          <th>Group</th>
+                          <th>Icon</th>
+                          <th>Favorite</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentBulkReview.wallets.map((wallet) => (
+                          <tr key={key(wallet)}>
+                            <td className="break-all">{wallet.address}</td>
+                            <td>{wallet.label || 'No label'}</td>
+                            <td>{wallet.group || 'No group'}</td>
+                            <td>{wallet.icon}</td>
+                            <td>{wallet.favorite ? 'Yes' : 'No'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
+              {bulkError && <p role="alert">{bulkError}</p>}
+            </>
+          )}
           <div className="tracker-actions">
-            <Button type="submit" disabled={busy}>
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                (editor === 'bulk' &&
+                  (loading ||
+                    loadFailed ||
+                    currentBulkReview?.wallets.length === 0))
+              }
+            >
               {busy
                 ? 'Saving…'
                 : editor === 'edit'
                   ? 'Save wallet changes'
-                  : 'Save to tracker'}
+                  : editor === 'bulk'
+                    ? currentBulkReview
+                      ? `Save ${currentBulkReview.wallets.length} public address${currentBulkReview.wallets.length === 1 ? '' : 'es'}`
+                      : 'Preview watchlist'
+                    : 'Save to tracker'}
             </Button>
             <Button
               type="button"
