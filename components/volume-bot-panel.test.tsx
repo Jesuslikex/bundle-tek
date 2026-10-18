@@ -732,9 +732,9 @@ it('previews same-block tips locally, invalidates edits and returns to scheduled
     'Running this mode is not available yet',
   );
   await act(async () => button('Preview bundle budget').click());
-  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-    'Choose one',
-  );
+  expect(button('Preview bundle budget').disabled).toBe(true);
+  expect(container.textContent).toContain('Select at least one wallet');
+  expect(container.querySelector('[role="alert"]')).toBeNull();
   await act(async () =>
     container
       .querySelector<HTMLInputElement>('input[type="checkbox"]')!
@@ -769,3 +769,56 @@ it('previews same-block tips locally, invalidates edits and returns to scheduled
   expect(container.textContent).toContain('Mode: Scheduled swaps');
   expect(calls.every((c) => c.payload === null)).toBe(true);
 });
+
+it.each(['project', 'revision', 'archive'] as const)(
+  'removes a same-block preview when the containing %s changes',
+  async (change) => {
+    respond = () => ({ sessions: [] });
+    await act(async () =>
+      root.render(
+        <VolumeBotPanel
+          project={project}
+          wallets={[wallet()]}
+          locked={false}
+        />,
+      ),
+    );
+    await act(async () => button('Open Volume Bot').click());
+    await settle();
+    const mode = [...container.querySelectorAll('select')].find((select) =>
+      select.querySelector('option[value="bundle"]'),
+    )!;
+    await changeControl(mode, 'bundle');
+    await act(async () =>
+      container
+        .querySelector<HTMLInputElement>('input[type="checkbox"]')!
+        .click(),
+    );
+    await act(async () => button('Preview bundle budget').click());
+    expect(
+      container.querySelector('[aria-label="Bundle budget preview"]'),
+    ).not.toBeNull();
+    const changed = {
+      ...project,
+      ...(change === 'project'
+        ? { id: '00000000-0000-4000-8000-000000000002' }
+        : change === 'revision'
+          ? { revision: project.revision + 1 }
+          : { archived: true }),
+    };
+    await act(async () =>
+      root.render(
+        <VolumeBotPanel
+          project={changed}
+          wallets={[wallet()]}
+          locked={false}
+        />,
+      ),
+    );
+    expect(
+      container.querySelector('[aria-label="Bundle budget preview"]'),
+    ).toBeNull();
+    expect(button('Preview bundle budget').disabled).toBe(true);
+    expect(calls.every((call) => call.payload === null)).toBe(true);
+  },
+);

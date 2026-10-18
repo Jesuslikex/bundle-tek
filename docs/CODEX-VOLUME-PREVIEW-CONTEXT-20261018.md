@@ -1,0 +1,31 @@
+# Same-block Volume preview context and recovery
+
+Continuation of the Proxima parity objective after1f68162. The previous checkpoint made authoritative progress through committed onboarding fixes and restored REA. Full parity remains incomplete; this pass improves the local same-block budget workflow without enabling execution.
+
+## Fresh reference evidence
+
+The existing dedicated Proxima browser and approved temporary relay were reachable. Passive account inspection ev_307509ce0376b1a5238caf4c24d90b71618a7a54ffbb560813020e71abfe50e4 confirmed the open page. The pinned, invocation-only REA adapter then recaptured Configure, Advanced, Bundle, Delay, Organic and Cancel, all completed: ev_5edfca7221f269ab2ce6189a1647d1724254db76898ca5a3dbb434e55cee9374.
+
+The Bundle explanation still states one wallet buys and sells in the same block. Organic exposes wave intensity; Fee Target remains optional; Duration and Delay select different timing controls. No values, wallets, Estimate or run controls were changed. This establishes configuration UI behavior only, not transaction atomicity, execution, settlement, tip charging/refunds or live reliability. The stale-preview defect below is independently found in Bundle, not an observed vendor defect or proven vendor advantage.
+
+Complete private capture: /opt/rea/results/volume-fresh-config-20261018.json, SHA2567ee1c75b29603db639f5827606759b1ba19417c693dfe41a1b5beace6bfeb9f6. The initial navigation capture caught loading and was not used as settled feature evidence. A subsequent passive settled capture was ev_f1678bd4b6a3f961125c8c165ebc1d077aac207b006cac2afacd63d0ba08df81. Final restoration returned to the original account URL: ev_667cd3d5ce6ed5ef4f9a0f48bbb6ef76164bf8f0fc28367ba02478500149d26f, private /opt/rea/results/volume-fresh-restore-20261018.json SHA256a4ce1e240aa4adbc057fc12612189e6070421d5cf03fe133c9962872d7980e84. No storage keys/values, credentials, raw network bodies/headers, browser installation or profile/config change.
+
+## Bundle change
+
+Before this change a local estimate remained visible after a selected wallet revision changed, was removed, archived or moved off Solana, or the project became locked. The same address could retain a selection tied to its old revision. Eight new cases failed against the original source while two unchanged-behavior controls passed.
+
+Selections now retain exact public-address revisions. A changed selected-wallet scope or project availability clears the estimate before rendering it, removes only unavailable or changed selections, and shows a request to check selection and preview again. Amounts remain entered. Equivalent refreshes and changes to unselected wallets preserve the preview. Locking disables form inputs; unlocking does not resurrect the previous preview. The existing parent project ID/revision key still resets project context, now tested explicitly, including archive changes.
+
+Preview stays disabled until at least one eligible wallet is explicitly selected; the form explains the next step. Eligible wallets need a positive integer revision. An invalid required field inside collapsed Timing opens the section and receives focus, so browser validation does not strand the user. Optional preview details now describe this screen's actual arithmetic-only boundary rather than implying all backend groundwork is absent. No API, vault, construction, simulation, reservation, signing or submit call is added.
+
+## Validation scope
+
+Final focused run:11 files/192 tests passed in14.60s. Mounted planner tests cover selection guidance, exact arithmetic, unchanged refresh, unselected-wallet refresh, selected revision/archive/network/removal changes, no resurrection, preserved inputs, lock/unlock, partial selection retention, invalid revision and hidden required-field recovery. Existing parent tests cover project ID/revision/archive changes and scheduled-mode return. Volume model, budget, construction, route, simulation, program validation, reservation and recovery regressions are included. Standalone TypeScript, three-file type-aware lint and formatting pass.
+
+Coordinated production webpack build98528 passed with exit0, compilation58s and Next TypeScript64s, static6/6 and route tracing complete. It includes the other chat's frozen exchange-history checkpoint e75b634 plus this Volume source, and excludes its isolated Claude UI patch. Only the verified normal guarded HTTPS PID23844 was stopped for building; the normal launcher restored3443/3188 with temporary handle34661. Trusted HTTPS checks: /sign-in200; anonymous Volume API401/no-store and exchange-orders API401/no-store. No migration or hosted update was needed. Build output noted the existing ignored parent package-lock warning; compilation and checks still passed.
+
+Synthetic browser fixture used actual planner/CSS plus current production global styles and synthetic public addresses, blocked API calls and exposed only local test controls. Final-source spot-check repeated the cases after the selected-only scope refinement. At375px, a selected wallet revision removed the preview and required reselection; locking disabled every input and removed the preview, unlocking required a new explicit preview, and an empty hidden timing field reopened/focused correctly. Preview rendering had no document overflow at320/375/1440px (scroll widths305/360/1425). This is component UI proof, not a new authenticated Volume session or provider/financial acceptance. Temporary viewport reset, fixture tab closed and owned4312 listener stopped; no other chat's fixture or Chrome debugging process was touched.
+
+Scoped React review checked stable hook ordering, guarded render-time state reconciliation with no effects/async state race, associated labels, native disabled semantics and live status outputs. No backend contracts, generated plan formats/seeds, exact integer budgets, program policies or execution gates changed. VOLUME_PROGRAM_POLICY remains null and signing/execution false.
+
+Other chat exchange-order history files remain concurrent and excluded from this checkpoint. Its isolated Claude chart patch remains excluded and not merge-ready. No funding, real signing/transaction, provider/credential change, remote migration, push or deployment occurred.

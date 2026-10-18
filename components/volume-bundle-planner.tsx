@@ -31,10 +31,46 @@ export function VolumeBundlePlanner({
     delay: '10',
     minutes: '30',
   });
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<
+    { address: string; revision: number }[]
+  >([]);
   const [plan, setPlan] = useState<VolumeBundlePlan | null>(null);
   const [error, setError] = useState('');
-  const eligible = wallets.filter((w) => w.chain === 'Solana' && !w.archived);
+  const [notice, setNotice] = useState('');
+  const eligible = wallets.filter(
+    (w) =>
+      w.chain === 'Solana' &&
+      !w.archived &&
+      Number.isSafeInteger(w.revision) &&
+      w.revision > 0,
+  );
+  const scope = JSON.stringify({
+    locked,
+    wallets: selected.map((selection) => ({
+      address: selection.address,
+      revision:
+        eligible.find((w) => w.address === selection.address)?.revision ?? null,
+    })),
+  });
+  const [observedScope, setObservedScope] = useState(scope);
+  // Reset during render so a changed prop cannot commit an obsolete estimate.
+  // Keep entered amounts; only selections with unchanged revisions survive.
+  if (observedScope !== scope) {
+    setObservedScope(scope);
+    setPlan(null);
+    setError('');
+    const current = selected.filter((selection) =>
+      eligible.some(
+        (w) =>
+          w.address === selection.address && w.revision === selection.revision,
+      ),
+    );
+    setSelected(current);
+    if (plan || current.length !== selected.length)
+      setNotice(
+        'Wallets or project availability changed. Check your selection and preview again.',
+      );
+  }
   const field = (key: keyof typeof draft, label: string) => (
     <div key={key} className={styles.form}>
       <label htmlFor={`${id}-${key}`}>{label}</label>
@@ -42,6 +78,7 @@ export function VolumeBundlePlanner({
         id={`${id}-${key}`}
         inputMode={key === 'minutes' ? 'numeric' : 'decimal'}
         value={draft[key]}
+        disabled={locked}
         onChange={(e) =>
           setDraft((current) => ({ ...current, [key]: e.target.value }))
         }
@@ -58,14 +95,24 @@ export function VolumeBundlePlanner({
       </p>
       <form
         className={styles.form}
+        onInvalidCapture={(event) => {
+          if (!(event.target instanceof HTMLInputElement)) return;
+          const details = event.target.closest('details');
+          if (details) {
+            details.open = true;
+            event.target.focus();
+          }
+        }}
         onChange={() => {
           setPlan(null);
           setError('');
+          setNotice('');
         }}
         onSubmit={(e) => {
           e.preventDefault();
           setPlan(null);
           setError('');
+          setNotice('');
           try {
             const raw = (text: string, label: string) => {
               const value = decimalToRaw(text, 9);
@@ -83,7 +130,12 @@ export function VolumeBundlePlanner({
               throw new Error('Enter whole minutes from 1 to 1440.');
             if (
               selected.some(
-                (w) => !eligible.some((wallet) => wallet.address === w),
+                (selection) =>
+                  !eligible.some(
+                    (wallet) =>
+                      wallet.address === selection.address &&
+                      wallet.revision === selection.revision,
+                  ),
               )
             )
               throw new Error(
@@ -98,7 +150,7 @@ export function VolumeBundlePlanner({
                   durationSeconds: Number(draft.minutes) * 60,
                   delayMinMs: Number(delayMs),
                   delayMaxMs: Number(delayMs),
-                  wallets: selected,
+                  wallets: selected.map((w) => w.address),
                 },
                 newVolumeSeed(),
               ),
@@ -130,12 +182,21 @@ export function VolumeBundlePlanner({
             <label key={w.address}>
               <input
                 type="checkbox"
-                checked={selected.includes(w.address)}
+                checked={selected.some(
+                  (selection) =>
+                    selection.address === w.address &&
+                    selection.revision === w.revision,
+                )}
                 onChange={(e) =>
                   setSelected((current) =>
                     e.target.checked
-                      ? [...current, w.address]
-                      : current.filter((a) => a !== w.address),
+                      ? [
+                          ...current,
+                          { address: w.address, revision: w.revision },
+                        ]
+                      : current.filter(
+                          (selection) => selection.address !== w.address,
+                        ),
                   )
                 }
               />{' '}
@@ -143,10 +204,22 @@ export function VolumeBundlePlanner({
             </label>
           ))}
         </fieldset>
-        <Button type="submit" disabled={locked || !eligible.length}>
+        {eligible.length > 0 && !selected.length && (
+          <p className={styles.note}>
+            Select at least one wallet to preview the bundle budget.
+          </p>
+        )}
+        <Button type="submit" disabled={locked || !selected.length}>
           Preview bundle budget
         </Button>
       </form>
+      {locked && (
+        <output className={styles.note}>
+          Bundle previews are unavailable while this project is locked or
+          archived.
+        </output>
+      )}
+      {notice && <output className={styles.note}>{notice}</output>}
       {error && (
         <p role="alert" className={styles.error}>
           {error}
@@ -178,18 +251,18 @@ export function VolumeBundlePlanner({
             promise.
           </p>
           <details>
-            <summary>What remains before running</summary>
+            <summary>About this preview</summary>
             <p>
               Network fees assume 0.00005 SOL per swap and 0.000005 SOL for a
               separate tip transaction. These estimates do not include rent or
               swap losses and are not a funding quote.
             </p>
             <p>
-              Both legs must be built together, independently checked and
-              simulated with exact buy output. Durable session reservations,
-              explicit approval, bundle submission and verified settlement
-              accounting are still required. This preview contains no
-              transactions and cannot be saved as a running session.
+              This screen calculates a local budget only. It does not construct
+              transactions or reserve funds. Running requires reviewed program
+              identities, fresh validation and simulation, explicit approval,
+              and verified settlement. Execution remains disabled, and this
+              preview cannot be saved as a running session.
             </p>
           </details>
         </section>
