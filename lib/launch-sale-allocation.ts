@@ -1,6 +1,15 @@
 import type { PumpPurchaseCostSource } from './pump-purchase-costs';
 import type { ImportedSaleEvidence } from './imported-sale-evidence';
 import { pumpHolderDigest } from './pump-holder-review';
+/** Expected review/refusal outcome, safe to show to the owner. */
+export class LaunchSaleAllocationError extends Error {
+  constructor(
+    message: string,
+    public status = 409,
+  ) {
+    super(message);
+  }
+}
 export const LAUNCH_SALE_POLICY = 'recorded-launch-units-v1' as const;
 export type LaunchSaleInput = {
   source: PumpPurchaseCostSource;
@@ -16,7 +25,7 @@ const uint = (v: unknown, positive = false) => {
     BigInt(v) > 18446744073709551615n ||
     (positive && BigInt(v) === 0n)
   )
-    throw Error('Recorded acquisition units differ.');
+    throw new LaunchSaleAllocationError('Recorded acquisition units differ.');
   return BigInt(v);
 };
 /** Bookkeeping only: original server readers must replay sale and buy evidence.
@@ -38,7 +47,7 @@ export async function planLaunchSaleAllocation(
     e.profitCalculated !== false ||
     e.report.decimals !== 6
   )
-    throw Error(
+    throw new LaunchSaleAllocationError(
       'Select one to eight distinct recorded launch buys for a six-decimal sale.',
     );
   inputs.sort((a, b) => a.source.originId.localeCompare(b.source.originId));
@@ -59,7 +68,7 @@ export async function planLaunchSaleAllocation(
           /^[a-f0-9]{64}$/.test(h),
         )
       )
-        throw Error(
+        throw new LaunchSaleAllocationError(
           'Recorded launch source, chronology or remaining units differ.',
         );
       return {
@@ -77,7 +86,9 @@ export async function planLaunchSaleAllocation(
     allocations.reduce((n, a) => n + BigInt(a.unitsRaw), 0n) !==
     uint(e.report.acquiredRaw, true)
   )
-    throw Error('Assign the complete sale to recorded acquisitions.');
+    throw new LaunchSaleAllocationError(
+      'Assign the complete sale to recorded acquisitions.',
+    );
   const core = {
     format: 'launch-sale-allocation-v1' as const,
     policy: LAUNCH_SALE_POLICY,

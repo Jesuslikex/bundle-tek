@@ -4,11 +4,12 @@ import { readOwnedImportedSaleSource } from './imported-sale-evidence-service';
 import { readOwnedPumpPurchaseAcquisitionSource } from './pump-purchase-cost-service';
 import {
   LAUNCH_SALE_POLICY,
+  LaunchSaleAllocationError,
   planLaunchSaleAllocation,
   type LaunchSaleAllocation,
 } from './launch-sale-allocation';
-const fail = (message: string): never => {
-  throw Error(message);
+const fail = (message: string, status = 409): never => {
+  throw new LaunchSaleAllocationError(message, status);
 };
 type Row = {
   owner_id: string;
