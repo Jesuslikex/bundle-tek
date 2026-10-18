@@ -1,0 +1,40 @@
+# Smoke funding reuse for Bundle
+
+The user chose Smoke's exchange-funding approach on 18 October 2026. This is distinct from Proxima's Front/Back launch-wallet roles and from transaction-delivery protection. There is no public Husher adapter in either checked source tree. Bundle's existing `useHusher` preference is not evidence of a working provider integration.
+
+## Checked source and chosen approach
+
+The current Smoke checkout at `C:\Users\Julian\Desktop\Smoke` contains `server/changenow.mjs`, `server/cross-chain.mjs`, `server/private-payout.mjs`, funding queue components, and `docs/product/two-provider-routing.md` / `privacy-target.md`. Its ChangeNOW adapter separates an exchange quote, one claimed provider order, deposit submission and provider payout tracking. Ambiguous creation or submission outcomes retain tracking instead of automatically retrying. Smoke has substantial uncommitted work; no Smoke file or credential was modified or copied.
+
+Smoke's Husher comparison is research. Its parallel ChangeNOW/SideShift split and separate Houdini route have different semantics and verification limits. They are not being enabled or described as equivalent to Husher. The current provider integration selected for Bundle's first quote is a native SOL ChangeNOW same-asset exchange route, following Smoke's net-output quote contract. It does not provide an anonymity guarantee.
+
+Public Proxima documentation describes optional CEX distribution, reviewing allocations and preserving native gas during custom-quote conversion: https://docs.proxima.tools/create-launch/funding/. It does not identify its backend exchange provider. The user's Husher information is retained as user-supplied context, not independently established backend evidence.
+
+## Initial quote boundary
+
+The new `lib/exchange-funding-quote.ts` and authenticated `POST /api/funding/exchange-quote` begin integration with existing saved CEX funding drafts. The server reads the authenticated owner's active draft and active saved Solana funder, checks both requested revisions, recomputes the distribution total and requires an explicitly selected expected payout at least that large. Proxy routes and nonnative/non-Solana assets are refused in this initial adapter.
+
+The response separates the provider's exact deposit amount, expected payout, same-asset provider cost, distribution total and unallocated payout. The last number is not a fee estimate or proof of sufficient retained gas. Provider keys and opaque rate references do not enter the public response. The adapter uses one fixed-origin GET with redirects refused, validates currency/network/amount/expiry and rereads owned context afterward. It does not retry 429s or transport errors. A quote is not a deposit receipt, payout verification or permission to distribute.
+
+Migration 0103 adds dedicated shared owner/provider pacing and saved quote reviews. The owner gate admits one quote every 15 seconds, while the global provider gate spaces quote calls by at least 250 milliseconds. These are conservative application limits, not a provider-plan capacity claim. They do not use or slow wallet/provider queues elsewhere. A denied or failed request is not retried automatically. The private rate reference stays in server storage, separate from the public review. A conditional insert and database trigger require the same active owner, draft document/revision/timestamp and current funder revision. Reviews cannot be updated, and their order/funding/signing/execution flags must remain false in the database. Authenticated `GET /api/funding/exchange-quote?id=...` reloads historical review evidence without a new provider call, including when quote creation is disabled. An expired historical review remains history, not fresh funding permission. Saved wallet membership is not proof of control of its private key; this quote grants no signing authority.
+
+Configuration is off by default. `BUNDLE_EXCHANGE_QUOTES_ENABLED` and `CHANGENOW_API_KEY` are server settings only; neither was configured in this work. No Smoke credential was read or transferred. The new migration must be applied before quote creation is enabled. No provider order creation, deposit address, payment packet or signing permission is exposed by this checkpoint.
+
+## Remaining complete flow
+
+1. Add the review UI and provider setup when authorized. The quote adapter and owned reload API are implemented; provider availability and permission for this Bundle integration are not established by Smoke's historical results.
+2. Review the exact deposit, receiving funder, network, provider costs, expiry and refund destination. Obtain separate unchecked approval for one order creation. Retain an ambiguous result for reconciliation rather than retrying it.
+3. Show provider-verified deposit instructions only after a matching order is saved. Keep deposit state separate from provider payout state, verification requests and refunds.
+4. Verify the payout independently on the intended network, at the receiving funder and exact expected amount, with finalized transaction evidence. A provider's `finished` label or an increased balance alone is insufficient.
+5. Reread the current plan, wallets, payout and spendable balance. Prepare existing distribution review under its existing consent/signing safeguards. Never automatically change a CEX draft into a signable Wallet draft or automatically distribute on payout.
+6. Add the UI, reload recovery and account-isolation tests, then perform specifically approved funded qualification separately. Front/Back layer funding also requires its own simulation-derived budgets and staged execution/recovery; the layer ceilings in a07bbe9 are not required-funding calculations.
+
+No push, deployment, hosted SQL, provider/credential/cron change, wallet unlock, signature or transaction is authorized by this note.
+
+## Verification
+
+Pinned Node24: 94 passing cases across seven distinct files, in two runs with the overlapping exchange cases counted once (exchange service/API, existing funding API, funding transactions, fee review, launch funding and mainnet funding). New service tests execute actual owner-scoped queries and the actual 0103 SQL against disposable in-memory libSQL, with synthetic provider responses. They cover private-reference retention, historical owner isolation, exact atomic amounts above Number precision, archived/stale records, changed context during quotes, expiry, malformed and HTML responses, 429/no-retry behavior, owner/global pacing, immutable records and database refusal of executable evidence. Route tests cover authentication, same origin, JSON/byte limits, typed errors and cancellation. Plain TypeScript and five-file typed lint pass. This does not establish provider connectivity or a funded payout.
+
+The normal Drizzle generator was blocked by the pre-existing non-snapshot `drizzle/meta/sql-checksum-aliases.json`. The two new schema declarations were generated through Drizzle into an isolated ignored output directory, then the resulting two tables/index were added as migration 0103 with explicit insert/update guards and the existing journal convention. No prior migration, checksum alias or applied history was changed. The migration remains local and unapplied to hosting.
+
+The checksum-checked local Turso runner applied all 104 journal entries to a fresh disposable database (522 schema objects). A fresh whole-file Wrangler run also applied all 104 and matched its ledger: `C:\Users\Julian\AppData\Local\Temp\bundle-wrangler-migrations-IJys00\report.json`. Its final 0103 SHA256 was checked against the current source before commit. An earlier Wrangler run predates the last timestamp guard and is not used as final-source proof. The other chat's successful shared build predates the final persistence changes; no final production build, browser UI, live provider or hosted migration check is claimed for this checkpoint. No wallet/Volume/Claude-owned UI file was edited.

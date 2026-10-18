@@ -9,6 +9,7 @@ import {
   primaryKey,
 } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+export * from './exchange-funding-schema';
 export * from './holder-index-schema';
 export * from './jito-bundle-schema';
 export * from './conditional-monitor-schema';

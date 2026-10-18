@@ -722,6 +722,13 @@
       "when": 1792339200000,
       "tag": "0102_volume_usd_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "6",
+      "when": 1792425600000,
+      "tag": "0103_exchange_funding_quotes",
+      "breakpoints": true
     }
   ]
 }
