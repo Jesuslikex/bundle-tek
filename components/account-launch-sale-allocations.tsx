@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
+import { importedTradeReceipt } from '@/lib/imported-trade-ledger';
+import { UUID } from '@/lib/wallet-operation';
 import { validatedLaunchPurchaseHistory } from '@/lib/account-launch-purchases';
 import type { PumpPurchaseCostSource } from '@/lib/pump-purchase-costs';
 import {
@@ -196,39 +198,39 @@ function Panel({ reviewId, mint }: { reviewId: string; mint: string }) {
         (after ? `&cursor=${encodeURIComponent(after)}` : ''),
       signal,
     )) as {
-      mint?: string;
-      receipts?: {
-        id: string;
-        createdAt: string;
-        document: {
-          side: string;
-          wallet: string;
-          tokenUnitsRaw: string;
-          slot: string | number;
-          commitment: string;
-        };
-      }[];
-      nextCursor?: string | null;
+      projectId?: unknown;
+      mint?: unknown;
+      decimals?: unknown;
+      receipts?: unknown;
+      nextCursor?: unknown;
     };
-    if (data?.mint !== mint || !Array.isArray(data.receipts))
+    if (
+      data?.projectId !== id ||
+      data.mint !== mint ||
+      data.decimals !== 6 ||
+      !Array.isArray(data.receipts) ||
+      data.receipts.length > 50 ||
+      (data.nextCursor !== null &&
+        (typeof data.nextCursor !== 'string' || !UUID.test(data.nextCursor)))
+    )
       throw Error('Finalized trades for this token are unavailable.');
+    // Every row is admitted by the shared ledger parser before it can render.
     const found = data.receipts
-      .filter(
-        (r) =>
-          r.document?.side === 'Sell' && r.document.commitment === 'finalized',
-      )
+      .map((r) => importedTradeReceipt(r, id, mint, 6))
+      .filter((r) => r.document.side === 'Sell')
       .map((r) => ({
         id: r.id,
         wallet: r.document.wallet,
-        tokenUnitsRaw: String(r.document.tokenUnitsRaw),
+        tokenUnitsRaw: r.document.tokenUnitsRaw,
         slot: String(r.document.slot),
         createdAt: r.createdAt,
       }));
+    const nextCursor = data.nextCursor as string | null;
     signal.throwIfAborted();
     setProjectId(id);
     setSales((old) => (after ? [...old, ...found] : found));
     setPages((n) => (after ? n + 1 : 1));
-    setCursor(data.nextCursor ?? null);
+    setCursor(nextCursor);
     if (!after) setSelected(null);
   }
   const chooseProject = (id: string) => {
