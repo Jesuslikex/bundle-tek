@@ -1,0 +1,18 @@
+{
+  "target": "disposable-local-file-only",
+  "baselineMigrations": 102,
+  "finalMigrations": 117,
+  "newlyApplied": 15,
+  "repeatNewlyApplied": 0,
+  "matchingChecksums": 117,
+  "pending": 0,
+  "baselineLedgerUnchanged": true,
+  "existingDataHashUnchanged": true,
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeyViolations": 0,
+  "passed": true
+}

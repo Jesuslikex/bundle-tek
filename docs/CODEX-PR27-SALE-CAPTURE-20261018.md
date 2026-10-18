@@ -53,4 +53,6 @@ Independent final checks:
 
 ## Release hold
 
+Superseding update: the user subsequently approved a source-only merge. PR27 merged as `ad08571`; the code-merge hold is resolved, while production migration verification remains a release requirement. See `CODEX-PR27-MERGE-20261018.md`. The paragraph below records the earlier review checkpoint, not current PR status.
+
 Reviewed PR head: `a88dea1e60328eff941049e9ebe4afb2033bd6e1`. The local capture and approval flow is implemented and checked. Keep PR27 draft and0116 held. Hosted migration state remains separate; no application/hosted migration, deploy, real wallet unlock, funded trade or transaction is authorized by this task. No full regression/build on the final PR, profit calculation, live-chain sale capture or funded proof is claimed. Those are not replaced by synthetic browser/API evidence.

@@ -23,13 +23,13 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 - Codex (ChatGPT) works in `C:\Users\Julian\Desktop\Bundle` on local `main`, committing verified work locally as described above. Pushing `main` stays julian's decision.
 - Claude works only on new branches cut from `origin/main` (never from local `main`, never on `main` itself) and delivers through pull requests. Claude does not commit into this checkout's `main`.
 - Nobody force-pushes `main`, rewrites its published history, or deletes another agent's branch or worktree.
-- Migrations: take the next number after the highest entry in `drizzle/meta/_journal.json` **on local main**, not on `origin/main`. Local main currently goes up to `0115_imported_sale_receipt_evidence`, so the next free number is `0116`. Recheck the journal before claiming it. Claim the number in "Current claims" before writing the file. A Claude branch off `origin/main` must still use a number above local main's highest, and must be renumbered if local main moves past it before merge.
+- Migrations: take the next number after the highest entry in `drizzle/meta/_journal.json` **on local main**, not on `origin/main`. PR27 is merged; local main currently goes up to `0116_launch_sale_allocations`, so the next free number is `0117`. Recheck the journal before claiming it. Claim the number in "Current claims" before writing the file. A Claude branch off `origin/main` must still use a number above local main's highest, and must be renumbered if local main moves past it before merge.
 - Never rename, renumber or edit an already-committed migration.
 - Shell and layout protection from the handoff doc still applies (`app/page.tsx` and the protected layout files need an approved exact patch).
 
 ### Current claims
 
-- Codex (sale-flow PR27 review), 18 October 2026: new `app/api/account-launch-activity/sale-evidence/**`, `lib/imported-sale-evidence-rpc*`, capture HTTP integration tests and handoff notes. Claude owns the acquisition review UI and sale-allocations API in PR27. No edits to the peer's frozen 0116 draft, shared schema, protected layout or Claude UI. No deploy, hosted SQL or funded trades.
+- PR27 capture/allocation/UI claims are complete and released following user-approved merge `ad08571`. Read `docs/CODEX-PR27-MERGE-20261018.md`. Production migration verification remains a release requirement; merging does not authorize hosted SQL or deployment.
 
 Codex (ChatGPT) owns the following areas it is actively extending. The original 79-commit count above is a historical snapshot; use Git for the current relationship to origin/main:
 
@@ -42,7 +42,7 @@ Codex (ChatGPT) owns the following areas it is actively extending. The original 
 - Codex (Review current progress), 18 October 2026: account session management audit and implementation, `components/bundle-account.tsx`, new `components/account-sessions*`, `lib/account-sessions*`, `app/api/account-sessions/**` and their tests. Source implementation waits for the current full-suite freeze to end; no provider, credential, password-policy or schema change is claimed.
 - Imported token chart and wallet workspace: `app/api/imported-projects/**`, `components/wallet-workspace*`, marketplace catalog/inventory (`lib/marketplace-catalog*`).
 - DCA timing and budgets (`lib/dca-trade*`, `lib/duration-parts*`), public wallet tags/watchlist imports (`lib/wallet-public*`, `lib/tracker-bulk*`), sign-in/password rules (`app/sign-in/**`).
-- All of `drizzle/**` and `db/**`; the committed journal currently ends at `0115`.
+- All of `drizzle/**` and `db/**`; the committed journal currently ends at `0116`.
 
 
-Claude, 18 October 2026: verifying/landing Codex sale-allocation draft (lib/launch-sale-*, 0116) via PR from claude/project-thread-qlge6g, handed over in CLAUDE-CONTINUE-HERE-20261018.md.
+Claude: no active PR27 claim after merge. Add a new claim before further implementation.
