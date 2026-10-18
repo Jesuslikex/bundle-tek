@@ -177,7 +177,12 @@ async function quoteSolanaSwap(
         ? 'Jupiter quote service authentication failed.'
         : response.status === 429
           ? 'Jupiter quote service rate limit reached. Retry later.'
-          : 'Jupiter quote service unavailable or no route found.',
+          : response.status === 400 && input.taker
+            ? 'Jupiter could not prepare this wallet order. Check warmup preflight, the input balance and SOL for fees and account rent. A market quote does not establish wallet readiness.'
+            : 'Jupiter quote service unavailable or no route found.',
+      response.status === 400 && input.taker
+        ? 'PROVIDER_REJECTED'
+        : 'QUOTE_UNAVAILABLE',
     );
   const reader = response.body?.getReader();
   if (!reader) throw new WarmupQuoteError('Empty quote response.');

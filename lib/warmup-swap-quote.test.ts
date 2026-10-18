@@ -1,6 +1,8 @@
 import { it, expect, vi } from 'vitest';
 import {
   quoteWarmupBuy,
+  prepareSolanaSwap,
+  WarmupQuoteError,
   quoteSolanaBuy,
   quoteSolanaSell,
   quoteSolanaPair,
@@ -385,4 +387,74 @@ it('shortens RFQ expiry and sanitizes failed provider response messages', async 
       async () => new Response('x'.repeat(262145)),
     ),
   ).rejects.toThrow('size limit');
+});
+
+it('explains a wallet-bound provider refusal without echoing provider details or retrying', async () => {
+  const fetcher = vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json(
+        { error: 'Failed to get quotes: fixture-private-detail' },
+        { status: 400 },
+      ),
+  );
+  const error = await prepareSolanaSwap(
+    {
+      tokenMint: mint,
+      side: 'Buy',
+      amount: '0.001',
+      decimals: 9,
+      wallet: '11111111111111111111111111111111',
+    },
+    'fixture-key',
+    AbortSignal.timeout(1000),
+    fetcher,
+  ).catch((value) => value);
+  expect(error).toBeInstanceOf(WarmupQuoteError);
+  expect(error.code).toBe('PROVIDER_REJECTED');
+  expect(error.message).toContain('Check warmup preflight');
+  expect(error.message).toContain(
+    'A market quote does not establish wallet readiness',
+  );
+  expect(error.message).not.toContain('fixture-private-detail');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const requestInput = fetcher.mock.calls[0][0];
+  const url =
+    requestInput instanceof URL
+      ? requestInput
+      : new URL(
+          typeof requestInput === 'string' ? requestInput : requestInput.url,
+        );
+  expect(url.searchParams.get('taker')).toBe(
+    '11111111111111111111111111111111',
+  );
+});
+it('keeps authentication, rate-limit and market-only failures distinct from wallet preparation', async () => {
+  for (const [status, message] of [
+    [401, 'authentication failed'],
+    [429, 'rate limit reached'],
+    [503, 'unavailable or no route'],
+  ] as const) {
+    await expect(
+      prepareSolanaSwap(
+        {
+          tokenMint: mint,
+          side: 'Buy',
+          amount: '0.001',
+          decimals: 9,
+          wallet: '11111111111111111111111111111111',
+        },
+        'fixture-key',
+        AbortSignal.timeout(1000),
+        async () => new Response('private upstream body', { status }),
+      ),
+    ).rejects.toThrow(message);
+  }
+  await expect(
+    quoteWarmupBuy(
+      doc(),
+      'fixture-key',
+      AbortSignal.timeout(1000),
+      async () => new Response('private upstream body', { status: 400 }),
+    ),
+  ).rejects.toThrow('unavailable or no route');
 });
