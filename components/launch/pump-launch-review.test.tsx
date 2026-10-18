@@ -482,3 +482,32 @@ it('opens an unsigned history review in the real review screen without approving
   expect(mocks.sign).not.toHaveBeenCalled();
   expect(requests).toHaveLength(0);
 });
+
+it('opens Front/Back planning for a create-only candidate without holder buys or signing', async () => {
+  expect(plan.holdersBuy).toBe(0);
+  expect(plan.holdersBuyQuote).toBe('0');
+  const before = fetcher.mock.calls.length;
+  await click('Plan Front / Back layers');
+  await act(async () => {
+    await vi.dynamicImportSettled();
+  });
+  const panel = container.querySelector(
+    'section[aria-label="Front and Back layer planning"]',
+  );
+  expect(panel).not.toBeNull();
+  expect(panel?.textContent).toContain('Mint candidate: ' + backup.mint);
+  expect(panel?.textContent).toContain(
+    'Saving here does not configure the ordinary launch below',
+  );
+  expect(fetcher.mock.calls.length).toBe(before);
+  expect(requests).toEqual([]);
+  expect(mocks.unlock).not.toHaveBeenCalled();
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.atomicSign).not.toHaveBeenCalled();
+  await click('Close layer planning');
+  expect(
+    container.querySelector(
+      'section[aria-label="Front and Back layer planning"]',
+    ),
+  ).toBeNull();
+});

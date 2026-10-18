@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+Standard Pump create-only and holder reviews now share the public-mint-bound Front/Back planner entry. Exact selection changes close/dispose old planning; no holder buy is needed to expose the ordinary entry. CODEX-STANDARD-LAUNCH-LAYER-ENTRY-20261018.md records 142 tests in 12 files, scoped lint/TypeScript and synthetic Chrome checks at desktop/375/320. StonkFun/imported entry points, staged funding and execution remain unfinished.
+
 The combined run at b66b3f8 completed with one account-panel test failure: 5,107/5,108 Vitest tests across 580 files passed, plus all 35 native tests in eight files. All 1,805 source hashes and the harness stayed unchanged. The lazy holder-planner readiness case now passes. See CODEX-PARITY-INTEGRATION-REGRESSION-20261018.md for retained failed evidence and the account-owner handoff. This is not a full green release qualification.
 
 - Marketplace catalog selection now supports custom quantities1–200, multiple reported sources/tiers, exact per-row price-less-balance, sortable display and complete phone cards. Provider inventory fields, minimum age, bounds and purchase-disabled policy remain. `CODEX-MARKETPLACE-SELECTION-20261018.md` records43 focused tests, responsive synthetic Chrome checks and a passing production-copy build on committed `b600167` plus the six marketplace files. A qualified supplier, multi-chain inventory, folder/timezone evidence and purchase/payment/delivery/history remain unfinished; this supersedes only the earlier fixed-count/single-filter/table gaps.

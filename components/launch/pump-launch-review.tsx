@@ -2,6 +2,7 @@
 import { useEffectEvent, useEffect, useId, useRef, useState } from 'react';
 import { PumpHolderLaunchReview } from './pump-holder-launch-review';
 import { PumpOrganicHolderBuys } from './pump-organic-holder-buys';
+import { LaunchLayerPlanningEntry } from './launch-layer-planning-entry';
 import {
   PumpLaunchHistory,
   type SavedLaunchSelection,
@@ -559,6 +560,14 @@ function PumpLaunchReviewContent({
           <p className={styles.wrap}>
             New coin address: <code>{mint.mint}</code>
           </p>
+          <LaunchLayerPlanningEntry
+            selection={{
+              projectId: project.id,
+              projectUpdatedAt: project.updatedAt,
+              target: { kind: 'new', mint: mint.mint },
+            }}
+            disabled={busy}
+          />
           <Button
             type="button"
             variant="outline"

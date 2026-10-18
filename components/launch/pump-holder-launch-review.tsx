@@ -52,6 +52,7 @@ import {
   type HolderProject,
   type HolderSizing,
 } from '@/lib/pump-holder-launch-client';
+import { LaunchLayerPlanningEntry } from './launch-layer-planning-entry';
 const PumpLaunchGroupReview = dynamic(
   () =>
     import('./pump-launch-group-review').then(
@@ -59,11 +60,7 @@ const PumpLaunchGroupReview = dynamic(
     ),
   { loading: () => <p>Loading complete launch groups...</p> },
 );
-const PumpLayerPlanner = dynamic(
-  () =>
-    import('./pump-layer-planner').then((loaded) => loaded.PumpLayerPlanner),
-  { loading: () => <p>Loading layer planning…</p> },
-);
+
 type Limit = { address: string; fee: string; quote: string; minimum: string };
 const endpoint = '/api/launch/pump/holders';
 const pendingKey = (id: string) => 'bundle.pump-holders-signed.v1:' + id;
@@ -109,7 +106,6 @@ function PumpHolderLaunchReviewContent({
     [actionBusy, setBusy] = useState(false),
     [groupBusy, setGroupBusy] = useState(false),
     [groupsOpen, setGroupsOpen] = useState(false),
-    [layersOpen, setLayersOpen] = useState(false),
     [error, setError] = useState(''),
     [now, setNow] = useState(() => Date.now());
   const groupContextRef = useRef('');
@@ -853,24 +849,14 @@ function PumpHolderLaunchReviewContent({
           <p className={styles.wrap}>
             Coin address: <code>{mint.mint}</code>
           </p>
-          <Button
-            variant="outline"
+          <LaunchLayerPlanningEntry
+            selection={{
+              projectId: project.id,
+              projectUpdatedAt: project.updatedAt,
+              target: { kind: 'new', mint: mint.mint },
+            }}
             disabled={busy}
-            aria-expanded={layersOpen}
-            onClick={() => setLayersOpen((open) => !open)}
-          >
-            {layersOpen ? 'Close layer planning' : 'Plan Front / Back layers'}
-          </Button>
-          {layersOpen && (
-            <PumpLayerPlanner
-              selection={{
-                projectId: project.id,
-                projectUpdatedAt: project.updatedAt,
-                target: { kind: 'new', mint: mint.mint },
-              }}
-              disabled={busy}
-            />
-          )}
+          />
           <Button
             variant="outline"
             disabled={busy}

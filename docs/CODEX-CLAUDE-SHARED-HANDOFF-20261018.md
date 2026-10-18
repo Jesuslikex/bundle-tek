@@ -46,3 +46,8 @@ This reconciliation authorizes no push, deployment, hosted SQL, provider/credent
 ## Combined run terminal at b66b3f8
 
 Read CODEX-PARITY-INTEGRATION-REGRESSION-20261018.md. Session 30484 finished with one account empty-state test failure, 5,107/5,108 Vitest tests and all 35 native tests passing. All 1,805 source hashes and harness hashes matched; HEAD/index were unchanged. The account-area owner has the exact failure for diagnosis. The source freeze is now released. This REA chat next owns the shared standard/holder launch-layer planning entry, preserving account ownership and all execution gates. Draft files in work remain unapplied and unverified. No push or deploy.
+
+
+## Standard launch planner entry
+
+The REA chat extracted the shared public-mint-bound layer entry into components/launch/launch-layer-planning-entry.tsx and mounted it in ordinary create-only and holder reviews. Read CODEX-STANDARD-LAUNCH-LAYER-ENTRY-20261018.md for the final 12-file/142-test pass, scoped checks, synthetic Chrome evidence and explicit remaining StonkFun/imported/funding gaps. The account owner separately committed its integration fixture fix in 32fca77; do not relabel the earlier failed combined run as passing. Preserve the account owner's newer receipt/schema/migration drafts and all user AGENTS text. No push or deploy.
