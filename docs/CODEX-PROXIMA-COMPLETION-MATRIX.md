@@ -1,5 +1,16 @@
 # Proxima reconstruction completion matrix
 
+## Current integration status, 18 October 2026
+
+The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
+
+- The production release record `CODEX-PRODUCTION-RELEASE-20261018.md` reports the accepted release of product source `e5bd8cf` as `dpl_77EbCVYdQ1paeNetY4R9BvVXfHw8`, with migrations through 0107 applied. That is a recorded release result, not a fresh production check by this matrix edit. Older statements below describing only source `ea0a120` and pending migration 0102 are superseded by that release record.
+- Local `e75b634` adds authenticated read-only exchange-order history to the funding panel, with stable owned pagination, historical funder/refund context and exact retained payout receipt summaries. Nine files/221 targeted tests, plain TypeScript and scoped typed lint pass; see `CODEX-EXCHANGE-HISTORY-WORK-20261018.md` for final build/HTTP scope. This new history checkpoint has not been pushed or deployed by its owner. It adds no live order, deposit, signing, provider refresh or distribution authority.
+- Claude's preserved token-workspace UI is now checkpointed as `9f95a1a` on `claude/bundle-ui-20261016`. It is isolated and not merge-ready: the final desktop compact toolbar correction still needs the actual client-shell browser matrix. Earlier component-only 320..1920 checks and a successful current-source build do not establish that final visual proof. See the status note in the Claude UI worktree.
+- Smoke-style funding now has immutable quote/order/consent/attempt/reconciliation and finalized native SOL payout foundations. Live provider contract qualification, explicit order/deposit UI, deposit/refund proofs, safe hold closure and independently approved fresh-balance distribution remain unfinished. A historical incoming receipt does not prove current spendability or authorize distribution.
+
+Keep local, remote Git and deployed source separate. Do not infer funded launch/buy/sell/Jito proof, stock-pair signing qualification, complete holder coverage, audited P&L, every launch adapter or marketplace purchase execution from these checkpoints.
+
 ## Latest local UX checkpoint, 18 October 2026
 
 Fresh user-directed REA inspection also confirms a distinct missing launch feature: separate Front MEV and Back MEV funding roles, followed by distribution and launch. The selected SOL draft has one Front MEV and two Back MEV wallets, separately from five holders. Existing Jito/RPC notices and deployer/holder funding do not implement that flow. See CODEX-PROXIMA-FRONT-BACK-MEV-20261018.md. No financial action or backend parity is claimed.
