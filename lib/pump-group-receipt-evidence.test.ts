@@ -3,6 +3,8 @@ import { createClient, type Client } from '@libsql/client';
 import { readFileSync } from 'node:fs';
 import { createTursoDatabase } from '../db/turso';
 import { pumpGroupChainEffectsFixture } from '../test/pump-group-chain-effects-fixture';
+import { pumpGroupPaymentFixture } from '../test/pump-group-payment-fixture';
+import { validatedAccountLaunchEvidence } from './account-launch-evidence';
 import {
   canonicalPumpHolderJson,
   pumpHolderDigest,
@@ -484,4 +486,59 @@ it('runs the real HTTP route through owner-scoped SQL and cryptographic receipt 
       )
     ).rows[0].n,
   ).toBe(1);
+});
+
+it('derives and reloads reconciled payments through the real saved-evidence route without altering the immutable source', async () => {
+  const fixture = await pumpGroupPaymentFixture(false, 'create', f),
+    { client, db } = await database();
+  httpContext.db = db;
+  const rpc = vi.fn(fixture.rpc);
+  httpContext.rpc = rpc;
+  const url = 'https://bundle.example/api/account-launch-activity/evidence',
+    requestId = id();
+  const saved = await POST(
+    new Request(url, {
+      method: 'POST',
+      headers: {
+        origin: 'https://bundle.example',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ reviewId: f.review.id, requestId }),
+    }),
+  );
+  expect(saved.status, await saved.clone().text()).toBe(200);
+  const value = validatedAccountLaunchEvidence(await saved.json(), {
+    reviewId: f.review.id,
+    mint: f.review.input.create.mint,
+  });
+  expect(value.entry?.payments).toMatchObject({
+    complete: true,
+    purchaseQuoteSubtotalRaw: '18000',
+    accountFundingSubtotalLamports: '70500000',
+    acquisitionBasisVerified: false,
+    executionAllowed: false,
+  });
+  const stored = (
+    await client.execute(
+      'SELECT evidence,sha256 FROM pump_group_receipt_evidence',
+    )
+  ).rows[0];
+  if (typeof stored.evidence !== 'string' || typeof stored.sha256 !== 'string')
+    throw new Error('Expected immutable JSON evidence and its hash.');
+  expect(stored.sha256).toBe(value.entry?.sha256);
+  expect(stored.evidence).not.toContain('pump-group-payments-v1');
+  rpc.mockClear();
+  httpContext.endpoint.mockClear();
+  expect(
+    await (await GET(new Request(url + '?reviewId=' + f.review.id))).json(),
+  ).toEqual(value);
+  expect(rpc).not.toHaveBeenCalled();
+  expect(httpContext.endpoint).not.toHaveBeenCalled();
+  expect(
+    (
+      await client.execute(
+        'SELECT evidence,sha256 FROM pump_group_receipt_evidence',
+      )
+    ).rows[0],
+  ).toEqual(stored);
 });

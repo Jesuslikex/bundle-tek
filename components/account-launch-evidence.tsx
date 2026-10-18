@@ -7,6 +7,7 @@ import {
   type AccountLaunchEvidence,
 } from '@/lib/account-launch-evidence';
 import styles from './account-launch-evidence.module.css';
+import { AccountLaunchPaymentsPanel } from './account-launch-payments';
 
 export function AccountLaunchEvidencePanel({
   reviewId,
@@ -166,9 +167,15 @@ export function AccountLaunchEvidencePanel({
           <p>
             {entry.balanceCoverageComplete
               ? 'Receipt balance coverage is complete.'
-              : 'Receipt balance coverage is incomplete. Missing amounts remain unknown.'}{' '}
+              : entry.payments?.complete &&
+                  entry.payments.packets.some((p) =>
+                    p.wallets.some((w) => w.preTokenBalanceRecovered),
+                  )
+                ? 'Some starting token balances are established by the saved creation trace.'
+                : 'Saved balance metadata is incomplete. Unresolved amounts remain unknown.'}{' '}
             Acquisition cost and launch profit are not verified.
           </p>
+          <AccountLaunchPaymentsPanel value={entry.payments} />
           <small>
             Saved{' '}
             <time dateTime={entry.observedAt}>

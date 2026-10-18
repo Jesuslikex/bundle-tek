@@ -17,6 +17,7 @@ export type AccountLaunchEvidence = {
     balanceCoverageComplete: boolean;
     acquisitionBasisVerified: false;
     executionAllowed: false;
+    payments?: AccountLaunchPayments;
   };
 };
 export function validatedAccountLaunchEvidence(
@@ -39,7 +40,10 @@ export function validatedAccountLaunchEvidence(
   if (e === null) return v;
   if (
     !e ||
-    Object.keys(e).sort().join(',') !==
+    Object.keys(e)
+      .filter((key) => key !== 'payments')
+      .sort()
+      .join(',') !==
       'acquisitionBasisVerified,balanceCoverageComplete,executionAllowed,failedPackets,id,instructionMetadataPackets,missingPackets,observedAt,packetCount,sha256,successfulPackets' ||
     !uuid(e.id) ||
     typeof e.sha256 !== 'string' ||
@@ -53,7 +57,7 @@ export function validatedAccountLaunchEvidence(
       e.failedPackets,
       e.missingPackets,
       e.instructionMetadataPackets,
-    ].every((n) => Number.isSafeInteger(n) && n >= 0 && n <= 64) ||
+    ].every((n) => Number.isSafeInteger(n) && n >= 0 && n <= 201) ||
     e.packetCount < 1 ||
     e.successfulPackets + e.failedPackets + e.missingPackets !==
       e.packetCount ||
@@ -65,5 +69,27 @@ export function validatedAccountLaunchEvidence(
     e.executionAllowed !== false
   )
     throw new Error('Saved launch receipt summary differs.');
+  if (Object.hasOwn(e, 'payments')) {
+    const payments = validatedAccountLaunchPayments(e.payments, {
+      ...context,
+      evidenceSha256: e.sha256,
+    });
+    if (
+      payments.packets.length !== e.packetCount ||
+      payments.packets.filter((p) => p.outcome === 'success').length !==
+        e.successfulPackets ||
+      payments.packets.filter((p) => p.outcome === 'failed').length !==
+        e.failedPackets ||
+      payments.packets.filter((p) => p.outcome === 'not-observed').length !==
+        e.missingPackets
+    )
+      throw new Error(
+        'Saved launch payment coverage differs from receipt coverage.',
+      );
+  }
   return v;
 }
+import {
+  validatedAccountLaunchPayments,
+  type AccountLaunchPayments,
+} from './account-launch-payments';

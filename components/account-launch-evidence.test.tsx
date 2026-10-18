@@ -7,6 +7,7 @@ import {
   recordedCostReviewId as reviewId,
   recordedCostMint as mint,
 } from '@/test/pump-group-recorded-costs-fixture';
+import { accountLaunchPaymentsFixture } from '@/test/account-launch-payments-fixture';
 const response = {
   reviewId,
   mint,
@@ -153,4 +154,86 @@ it('times out pending requests without losing the exact retry identity', async (
   request.mockResolvedValueOnce(Response.json(response));
   await click('Save finalized receipts');
   expect(request.mock.calls[1][1]?.body).toBe(first?.body);
+});
+
+it('loads the payment breakdown from the same saved response without another request and rejects altered evidence binding', async () => {
+  const complete = {
+    ...response,
+    entry: {
+      ...response.entry,
+      packetCount: 1,
+      successfulPackets: 1,
+      failedPackets: 0,
+      missingPackets: 0,
+      instructionMetadataPackets: 1,
+      balanceCoverageComplete: true,
+      payments: accountLaunchPaymentsFixture,
+    },
+  };
+  await mount();
+  request.mockResolvedValueOnce(Response.json(complete));
+  await click('Load saved evidence');
+  const summary = [...host.querySelectorAll('summary')].find(
+    (e) => e.textContent === 'Purchase payments',
+  )!;
+  expect(summary.parentElement?.hasAttribute('open')).toBe(false);
+  await act(async () => summary.click());
+  expect(host.textContent).toContain('0.000001 SOL');
+  expect(request).toHaveBeenCalledTimes(1);
+  request.mockResolvedValueOnce(
+    Response.json({
+      ...complete,
+      entry: {
+        ...complete.entry,
+        payments: {
+          ...accountLaunchPaymentsFixture,
+          evidenceSha256: '0'.repeat(64),
+        },
+      },
+    }),
+  );
+  await click('Load saved evidence');
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  expect(host.textContent).not.toContain('0.000001 SOL');
+});
+
+it('explains creation-trace recovery without contradictory missing-balance labels', async () => {
+  const payments = {
+    ...accountLaunchPaymentsFixture,
+    packets: [
+      {
+        ...accountLaunchPaymentsFixture.packets[0],
+        wallets: [
+          {
+            ...accountLaunchPaymentsFixture.packets[0].wallets[0],
+            preTokenBalanceRecovered: true,
+          },
+        ],
+      },
+    ],
+  };
+  await mount();
+  request.mockResolvedValueOnce(
+    Response.json({
+      ...response,
+      entry: {
+        ...response.entry,
+        packetCount: 1,
+        successfulPackets: 1,
+        failedPackets: 0,
+        missingPackets: 0,
+        instructionMetadataPackets: 1,
+        balanceCoverageComplete: false,
+        payments,
+      },
+    }),
+  );
+  await click('Load saved evidence');
+  expect(host.textContent).toContain(
+    'Some starting token balances are established by the saved creation trace.',
+  );
+  expect(host.textContent).not.toContain(
+    'Receipt balance coverage is incomplete',
+  );
+  expect(host.querySelector('[role="alert"]')).toBeNull();
 });

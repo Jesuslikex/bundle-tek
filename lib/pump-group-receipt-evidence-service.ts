@@ -12,6 +12,7 @@ import {
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 import type { PumpLaunchGroupReview } from './pump-launch-group-review';
 import type { verifyPumpLaunchGroupSignatures } from './pump-launch-group-signatures';
+import { projectVerifiedPumpGroupPayments } from './pump-group-payments';
 
 type Parent = {
   review: string;
@@ -119,7 +120,13 @@ async function convert(
   );
   if (row.sha256 !== e.sha256 || row.created_at !== e.report.observedAt)
     return fail('Saved launch receipt row differs.');
-  return summary(row.id, e);
+  const value = summary(row.id, e);
+  value.entry!.payments = await projectVerifiedPumpGroupPayments(
+    e,
+    p.group,
+    signal,
+  );
+  return value;
 }
 async function existing(db: D1Database, owner: string, requestId: string) {
   return db
