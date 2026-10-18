@@ -23,10 +23,25 @@ import {
   POST as postRoute,
 } from '@/app/api/account-launch-activity/sale-allocations/route';
 import {
+  GET as getEvidence,
+  POST as postEvidence,
+} from '@/app/api/account-launch-activity/sale-evidence/route';
+import {
   canonicalPumpHolderJson as canonical,
   pumpHolderDigest,
 } from './pump-holder-review';
-const http = vi.hoisted(() => ({ db: null as unknown as D1Database }));
+const http = vi.hoisted(() => ({
+  db: null as unknown as D1Database,
+  rpc: null as unknown as (...args: never[]) => Promise<unknown>,
+}));
+vi.mock('@/lib/imported-sale-evidence-rpc', async (original) => ({
+  ...(await original<typeof import('@/lib/imported-sale-evidence-rpc')>()),
+  createImportedSaleEvidenceRpc: () => http.rpc,
+}));
+vi.mock('@/lib/solana-rpc', async (original) => ({
+  ...(await original<typeof import('@/lib/solana-rpc')>()),
+  getSolanaRpcEndpoint: () => 'https://synthetic-rpc.invalid',
+}));
 vi.mock('@/app/chatgpt-auth', () => ({
   getChatGPTUser: async () => ({ userId: 'alice' }),
 }));
@@ -214,7 +229,8 @@ beforeAll(async () => {
   }
   await migration('0115_imported_sale_receipt_evidence');
   await migration('0116_launch_sale_allocations');
-  for (const f of sales)
+  // The last sale is captured through the real HTTP route in its own test.
+  for (const f of sales.slice(0, -1))
     await retainOwnedImportedSaleEvidence(
       g.db,
       'alice',
@@ -223,6 +239,7 @@ beforeAll(async () => {
       f.rpc,
     );
   http.db = g.db;
+  http.rpc = sales[5].rpc as typeof http.rpc;
 }, 240000);
 afterAll(() => {
   for (const c of clients) c.close();
@@ -401,11 +418,9 @@ it('recovers a committed insert with a lost response and preserves history after
   expect(saved).toBe(true);
   expect((await read(g.db, 'alice', id, signal())).plan).toEqual(p);
 }, 120000);
-it('runs signed-in HTTP review, exact approval, save and reload through real services and SQL without RPC', async () => {
+it('runs signed-in HTTP capture, review, exact approval, save and reload through real services and SQL', async () => {
   const id = sales[5].p.receiptId,
     url = 'https://bundle.example/api/account-launch-activity/sale-allocations',
-    reads = g.reads.length,
-    sends = g.sends.length,
     post = (body: unknown) =>
       postRoute(
         new Request(url, {
@@ -422,6 +437,32 @@ it('runs signed-in HTTP review, exact approval, save and reload through real ser
       expect(r.status).toBe(200);
       return (await r.json()) as { plan: { sha256: string } | null };
     };
+  const evidenceUrl =
+    'https://bundle.example/api/account-launch-activity/sale-evidence';
+  const before = await getEvidence(
+    new Request(`${evidenceUrl}?saleReceiptId=${id}`),
+  );
+  expect(((await before.json()) as { entry: unknown }).entry).toBeNull();
+  const captured = await postEvidence(
+    new Request(evidenceUrl, {
+      method: 'POST',
+      headers: {
+        origin: 'https://bundle.example',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ saleReceiptId: id }),
+    }),
+  );
+  expect(captured.status).toBe(200);
+  const summary = (await captured.json()) as {
+    receiptId: string;
+    entry: { executionAllowed: boolean } | null;
+  };
+  expect(summary.receiptId).toBe(id);
+  expect(summary.entry?.executionAllowed).toBe(false);
+  expect(JSON.stringify(summary)).not.toContain('signedTransaction');
+  const reads = g.reads.length,
+    sends = g.sends.length;
   expect((await load()).plan).toBeNull();
   const reviewed = await post({
     action: 'review',
