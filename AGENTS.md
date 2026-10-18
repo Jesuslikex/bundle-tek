@@ -23,7 +23,7 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 - Codex (ChatGPT) works in `C:\Users\Julian\Desktop\Bundle` on local `main`, committing verified work locally as described above. Pushing `main` stays julian's decision.
 - Claude works only on new branches cut from `origin/main` (never from local `main`, never on `main` itself) and delivers through pull requests. Claude does not commit into this checkout's `main`.
 - Nobody force-pushes `main`, rewrites its published history, or deletes another agent's branch or worktree.
-- Migrations: take the next number after the highest entry in `drizzle/meta/_journal.json` **on local main**, not on `origin/main`. Local main currently goes up to `0114_pump_purchase_cost_sources`, so the next free number is `0115`. Recheck the journal before claiming it. Claim the number in "Current claims" before writing the file. A Claude branch off `origin/main` must still use a number above local main's highest, and must be renumbered if local main moves past it before merge.
+- Migrations: take the next number after the highest entry in `drizzle/meta/_journal.json` **on local main**, not on `origin/main`. Local main currently goes up to `0115_imported_sale_receipt_evidence`, so the next free number is `0116`. Recheck the journal before claiming it. Claim the number in "Current claims" before writing the file. A Claude branch off `origin/main` must still use a number above local main's highest, and must be renumbered if local main moves past it before merge.
 - Never rename, renumber or edit an already-committed migration.
 - Shell and layout protection from the handoff doc still applies (`app/page.tsx` and the protected layout files need an approved exact patch).
 
@@ -40,7 +40,7 @@ Codex (ChatGPT) owns the following areas it is actively extending. The original 
 - Codex (Review current progress), 18 October 2026: account session management audit and implementation, `components/bundle-account.tsx`, new `components/account-sessions*`, `lib/account-sessions*`, `app/api/account-sessions/**` and their tests. Source implementation waits for the current full-suite freeze to end; no provider, credential, password-policy or schema change is claimed.
 - Imported token chart and wallet workspace: `app/api/imported-projects/**`, `components/wallet-workspace*`, marketplace catalog/inventory (`lib/marketplace-catalog*`).
 - DCA timing and budgets (`lib/dca-trade*`, `lib/duration-parts*`), public wallet tags/watchlist imports (`lib/wallet-public*`, `lib/tracker-bulk*`), sign-in/password rules (`app/sign-in/**`).
-- All of `drizzle/**` and `db/**`; the committed journal currently ends at `0114`.
+- All of `drizzle/**` and `db/**`; the committed journal currently ends at `0115`.
 
 
 Claude: no active claims. Add one here before starting.

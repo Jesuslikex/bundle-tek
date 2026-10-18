@@ -1082,6 +1082,28 @@ export const importedSwapReceipts = sqliteTable(
     ),
   ],
 );
+export const importedSaleReceiptEvidence = sqliteTable(
+  'imported_sale_receipt_evidence',
+  {
+    ownerId: text('owner_id').notNull(),
+    receiptId: text('receipt_id')
+      .notNull()
+      .references(() => importedSwapReceipts.id),
+    signature: text('signature').notNull(),
+    parent: text('parent').notNull(),
+    parentSha256: text('parent_sha256').notNull(),
+    evidence: text('evidence').notNull(),
+    sha256: text('sha256').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ownerId, t.receiptId] }),
+    uniqueIndex('imported_sale_receipt_evidence_signature').on(
+      t.ownerId,
+      t.signature,
+    ),
+  ],
+);
 export const importedSwapSigningEvents = sqliteTable(
   'imported_swap_signing_events',
   {
