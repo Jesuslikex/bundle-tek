@@ -463,7 +463,7 @@ export async function simulateVolumePumpBundle(
   const final = await snapshot();
   if (
     before
-      .slice(0, keys.length)
+      .slice(0, addresses.length - 1)
       .some((a, i) => JSON.stringify(a) !== JSON.stringify(final[i]))
   )
     volumeReject('Live pre-state changed during unsigned simulation.');

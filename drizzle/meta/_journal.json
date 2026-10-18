@@ -736,6 +736,13 @@
       "when": 1792512000000,
       "tag": "0104_exchange_funding_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "6",
+      "when": 1792598400000,
+      "tag": "0105_volume_bundle_reservations",
+      "breakpoints": true
     }
   ]
 }
