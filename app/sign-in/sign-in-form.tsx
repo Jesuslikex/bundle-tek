@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import styles from './sign-in.module.css';
 import { WalletLogin } from './wallet-login';
+import { ACCOUNT_MIN_PASSWORD_LENGTH } from '@/lib/account-password-policy';
 function value(form: FormData, name: string) {
   const field = form.get(name);
   if (typeof field !== 'string') throw new Error('Invalid form field');
@@ -104,11 +105,17 @@ export function SignInForm({
             name="password"
             type="password"
             required
-            minLength={12}
+            minLength={register ? ACCOUNT_MIN_PASSWORD_LENGTH : undefined}
             maxLength={128}
+            aria-describedby={register ? 'account-password-help' : undefined}
             autoComplete={register ? 'new-password' : 'current-password'}
           />
         </label>
+        {register && (
+          <p id="account-password-help">
+            Use at least {ACCOUNT_MIN_PASSWORD_LENGTH} characters.
+          </p>
+        )}
         {error && <p role="alert">{error}</p>}
         <button disabled={busy} type="submit">
           {busy ? 'Please wait…' : register ? 'Create account' : 'Sign in'}

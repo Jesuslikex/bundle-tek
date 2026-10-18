@@ -3,6 +3,54 @@ import { createClient } from '@libsql/client';
 import { readFileSync } from 'node:fs';
 import { createBundleAuth } from './auth';
 describe('Bundle sessions with real libSQL', () => {
+  it('accepts an eight-character account password, rejects seven, and verifies it on sign-in', async () => {
+    const db = createClient({ url: 'file::memory:' });
+    try {
+      for (const sql of readFileSync(
+        'drizzle/0080_remarkable_winter_soldier.sql',
+        'utf8',
+      ).split('--> statement-breakpoint'))
+        if (sql.trim()) await db.execute(sql);
+      const auth = createBundleAuth(db, {
+        secret: 'test-only-eight-character-disposable-secret',
+        baseURL: 'http://localhost:3000',
+      });
+      const request = (route: string, password: string) =>
+        auth.handler(
+          new Request(`http://localhost:3000/api/auth/${route}/email`, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              origin: 'http://localhost:3000',
+            },
+            body: JSON.stringify({
+              email: 'eight@example.com',
+              name: 'Eight',
+              password,
+            }),
+          }),
+        );
+      expect((await request('sign-up', 'Test-78')).status).toBe(400);
+      expect(
+        (await db.execute('SELECT count(*) AS count FROM user')).rows[0].count,
+      ).toBe(0);
+      expect((await request('sign-up', 'Test-789')).status).toBe(200);
+      const signedIn = await request('sign-in', 'Test-789');
+      expect(signedIn.status).toBe(200);
+      const cookie = signedIn.headers.get('set-cookie');
+      expect(cookie).toBeTruthy();
+      expect(
+        (
+          await auth.api.getSession({
+            headers: new Headers({ cookie: cookie! }),
+          })
+        )?.user.email,
+      ).toBe('eight@example.com');
+      expect((await request('sign-in', 'Wrong789')).status).toBe(401);
+    } finally {
+      db.close();
+    }
+  });
   it('authenticates cookies, rejects forged identity', async () => {
     const db = createClient({ url: 'file::memory:' });
     try {

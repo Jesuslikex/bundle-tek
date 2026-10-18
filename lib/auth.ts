@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/libsql';
 import { getTursoClient } from '@/db/turso';
 import * as schema from '@/db/auth-schema';
 import { solanaLogin } from './solana-login';
+import { ACCOUNT_MIN_PASSWORD_LENGTH } from './account-password-policy';
 let instance: ReturnType<typeof createAuth> | undefined;
 export function getAuth() {
   return (instance ??= createAuth());
@@ -62,7 +63,10 @@ export function createBundleAuth(
     account: {
       accountLinking: { enabled: true, disableImplicitLinking: true },
     },
-    emailAndPassword: { enabled: true, minPasswordLength: 12 },
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: ACCOUNT_MIN_PASSWORD_LENGTH,
+    },
     rateLimit: { enabled: true, storage: 'database' },
   });
 }
