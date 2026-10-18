@@ -32,6 +32,7 @@ import { readPanelJson } from './read-panel-json';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import styles from './volume-bot-panel.module.css';
+import { VolumeBundlePlanner } from './volume-bundle-planner';
 
 const endpoint = '/api/imported-projects/volume-bot';
 type Trade = {
@@ -114,6 +115,8 @@ export function VolumeBotPanel({
   locked: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'scheduled' | 'bundle'>('scheduled');
+  const modeId = useId();
   if (project.document.token.chain !== 'Solana') return null;
   return (
     <section aria-label="Volume Bot" className={styles.panel}>
@@ -125,6 +128,26 @@ export function VolumeBotPanel({
         {open ? 'Close' : 'Open'} Volume Bot
       </Button>
       {open && (
+        <div className={styles.workspace}>
+          <label htmlFor={modeId}>Volume mode</label>
+          <select
+            id={modeId}
+            value={mode}
+            onChange={(e) => setMode(e.target.value as 'scheduled' | 'bundle')}
+          >
+            <option value="scheduled">Scheduled swaps</option>
+            <option value="bundle">Same-block bundles (preview only)</option>
+          </select>
+        </div>
+      )}
+      {open && mode === 'bundle' && (
+        <VolumeBundlePlanner
+          key={`${project.id}:${project.revision}`}
+          wallets={wallets}
+          locked={locked || project.archived}
+        />
+      )}
+      {open && mode === 'scheduled' && (
         <VolumeBotWorkspace
           key={`${project.id}:${project.revision}`}
           project={project}
@@ -529,9 +552,10 @@ function VolumeBotWorkspace({
         <details>
           <summary>Bundle mode and tips</summary>
           <p className={styles.note}>
-            Same-block buy/sell bundles and a total session tip budget are not
-            available here. Wave intensity changes the schedule, not transaction
-            delivery. Network and swap costs are estimated separately below.
+            Switch to Same-block bundles for a local tip-budget preview.
+            Execution is not available there. Wave intensity changes this
+            schedule, not transaction delivery. Network and swap costs are
+            estimated separately below.
           </p>
         </details>
       </section>

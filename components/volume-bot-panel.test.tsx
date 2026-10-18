@@ -130,7 +130,7 @@ it('estimates with the chosen settings and saves the session', async () => {
   expect(mode.textContent).toContain('sent individually');
   expect(mode.textContent).toContain('no same-block guarantee');
   expect(mode.querySelector('details')!.open).toBe(false);
-  expect(mode.textContent).toContain('total session tip budget are not');
+  expect(mode.textContent).toContain('local tip-budget preview');
   expect(calls.every((c) => c.payload === null)).toBe(true);
   await act(async () =>
     (
@@ -334,7 +334,12 @@ async function openUsd() {
   );
   await act(async () => button('Open Volume Bot').click());
   await settle();
-  await changeControl(container.querySelector('select')!, 'USD');
+  await changeControl(
+    Array.from(container.querySelectorAll('select')).find((select) =>
+      select.querySelector('option[value="USD"]'),
+    )!,
+    'USD',
+  );
   await act(async () =>
     (
       container.querySelector('input[type=checkbox]') as HTMLInputElement
@@ -709,4 +714,58 @@ it('keeps optional trade settings collapsed and provides an explicit error recov
       ),
     ),
   ).toBe(false);
+});
+
+it('previews same-block tips locally, invalidates edits and returns to scheduled swaps', async () => {
+  await act(async () =>
+    root.render(
+      <VolumeBotPanel project={project} wallets={[wallet()]} locked={false} />,
+    ),
+  );
+  await act(async () => button('Open Volume Bot').click());
+  await settle();
+  const mode = Array.from(container.querySelectorAll('select')).find((select) =>
+    select.querySelector('option[value="bundle"]'),
+  )!;
+  await changeControl(mode, 'bundle');
+  expect(container.textContent).toContain(
+    'Running this mode is not available yet',
+  );
+  await act(async () => button('Preview bundle budget').click());
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    'Choose one',
+  );
+  await act(async () =>
+    container
+      .querySelector<HTMLInputElement>('input[type="checkbox"]')!
+      .click(),
+  );
+  await act(async () => button('Preview bundle budget').click());
+  expect(
+    container.querySelector('[aria-label="Bundle budget preview"]')
+      ?.textContent,
+  ).toContain('10 bundles, 20 trades');
+  expect(container.textContent).toContain('0.0001 SOL');
+  expect(container.textContent).not.toContain(
+    'Save session and reserve wallets',
+  );
+  expect(calls.every((c) => c.payload === null)).toBe(true);
+  const tips = Array.from(container.querySelectorAll('label')).find(
+    (l) => l.textContent === 'Total session tip limit (SOL)',
+  )!;
+  await changeControl(
+    container.querySelector<HTMLInputElement>(`[id="${tips.htmlFor}"]`)!,
+    '0.000001',
+  );
+  expect(
+    container.querySelector('[aria-label="Bundle budget preview"]'),
+  ).toBeNull();
+  await act(async () => button('Preview bundle budget').click());
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    'session tip budget from',
+  );
+  await changeControl(mode, 'scheduled');
+  await settle();
+  expect(container.textContent).toContain('Mode: Scheduled swaps');
+  expect(calls.every((c) => c.payload === null)).toBe(true);
 });

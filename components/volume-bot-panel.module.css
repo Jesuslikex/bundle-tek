@@ -8,6 +8,16 @@
   margin-top: 0.75rem;
   min-width: 0;
 }
+.workspace > select {
+  min-height: 44px;
+  max-width: 100%;
+  min-width: 0;
+  color: inherit;
+  background: var(--background, #fff);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
 .form {
   display: grid;
   gap: 0.4rem;
@@ -37,6 +47,18 @@
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 0.25rem 0.75rem;
+}
+.card dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .card dl {
+    grid-template-columns: 1fr;
+  }
+  .card dd {
+    margin: 0 0 8px;
+  }
 }
 .note {
   font-size: 0.85em;
