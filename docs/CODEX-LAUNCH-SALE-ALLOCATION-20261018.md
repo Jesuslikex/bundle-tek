@@ -1,0 +1,19 @@
+# Launch sale allocation, 18 October 2026
+
+This checkpoint adds durable unit assignment from original launch buys to retained imported sales. It does not create substitute swap-buy receipts, infer current wallet holdings or calculate profit. Remaining units mean unassigned recorded acquisition units; unrecorded external sales/transfers are outside that quantity.
+
+An exact private source reader replays each original launch cost batch, terminal cost proof and primary receipt, returning its original finalized buy slot. The sale reader independently replays the retained signed swap packet and finalized metadata. A review accepts one to eight distinct buy origins, exact positive units, the same wallet/mint, six decimals and a buy slot strictly earlier than the sale. Assignments must cover the complete sale and fit each origin's unassigned units. Native and token quote economics remain separate and are not converted to acquisition basis here.
+
+The new owner-scoped ledger uses global buy origins derived from actual packet signature, mint and wallet, without imported workspace identity. All interval arithmetic uses BigInt; SQLite checks addition and complete-sale totals digit by digit, including u64 values beyond signed SQLite integers. Every insert atomically compares the previously consumed interval, original immutable source digests, parent launch documents and retained sale evidence. A concurrent stale review cannot reuse an already-consumed interval. No separate counter or partial multi-row write is needed.
+
+The existing swap-lot ledger and the new ledger exclude each other by both owner/sale ID and owner/signature. SQL guards cover both insertion directions and legacy updates. Active shared wallet approvals prevent new accounting assignment. Already-saved history remains readable. Records are immutable, bounded to eight sources and 16 KiB per sale, with a 4,000-sale owner limit. Exact approval binds the reviewed plan hash. Retrying a saved plan returns its original result; a different selection/hash refuses. Committed rows survive lost responses or late cancellation and can be recovered through a database-only read.
+
+Reads verify original buy/sale proofs, complete allocation documents and contiguous nonoverlapping origin intervals across all saved sales for the owner's wallet/mint. They recheck the ledger snapshot before publishing. Source and sale evidence remain private server inputs; no RPC is called by allocation review, save or history. No public route or UI is added yet. History replay is intentionally comprehensive; large-history latency and HTTP budget admission remain unqualified.
+
+## Validation
+
+Validation results will be recorded after the final source checks finish. Test data uses generated fixture keys and controlled receipt metadata, never real funds or execution. Arithmetic/SQL tests seed explicit controlled parent records; the separate integration fixture exercises original launch preparation/authorization/signature registration, terminal recovery/cost storage and original sale packet/receipt parsers. Historical sale admission is seeded, not a real user's approval workflow. Disposable SQL clocks follow the existing fixed fixture Date; production clocks and timing rules are unchanged.
+
+## Remaining work
+
+Authenticated sale-evidence capture/reload and acquisition review UI, mixed launch/swap baskets, explicit corrections/reversals, performance accounting and large-history runtime qualification remain unfinished. The whole sale must currently use launch origins or the existing swap ledger. Original venue program/economic guarantees and full Proxima parity are unproven. Acquisition-basis, profit, signing and execution authority remain false. No application/hosted database migration, funding, real wallet action, provider/credential change, push or deployment is authorized or performed by this checkpoint.

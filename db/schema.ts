@@ -7,6 +7,7 @@ import {
   uniqueIndex,
   blob,
   primaryKey,
+  foreignKey,
 } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 export * from './exchange-funding-schema';
@@ -1102,6 +1103,39 @@ export const importedSaleReceiptEvidence = sqliteTable(
       t.ownerId,
       t.signature,
     ),
+  ],
+);
+export const launchSaleAllocations = sqliteTable(
+  'launch_sale_allocations',
+  {
+    ownerId: text('owner_id').notNull(),
+    saleReceiptId: text('sale_receipt_id').notNull(),
+    saleSignature: text('sale_signature').notNull(),
+    wallet: text('wallet').notNull(),
+    mint: text('mint').notNull(),
+    document: text('document').notNull(),
+    sha256: text('sha256').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ownerId, t.saleReceiptId] }),
+    uniqueIndex('launch_sale_allocations_owner_id_sale_signature_unique').on(
+      t.ownerId,
+      t.saleSignature,
+    ),
+    index('launch_sale_allocations_inventory').on(
+      t.ownerId,
+      t.wallet,
+      t.mint,
+      t.saleReceiptId,
+    ),
+    foreignKey({
+      columns: [t.ownerId, t.saleReceiptId],
+      foreignColumns: [
+        importedSaleReceiptEvidence.ownerId,
+        importedSaleReceiptEvidence.receiptId,
+      ],
+    }),
   ],
 );
 export const importedSwapSigningEvents = sqliteTable(

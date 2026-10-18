@@ -119,6 +119,7 @@ async function context(
     plan,
     receiptId,
     reviewId,
+    selected,
   };
 }
 async function batch(db: D1Database, owner: string, receiptId: string) {
@@ -174,6 +175,51 @@ async function origin(db: D1Database, owner: string, originId: string) {
     )
     .bind(owner, originId)
     .first<Source>();
+}
+/** Private accounting input. Replay the exact original cost batch and receipt;
+ * never publish its parent/signed metadata through HTTP. */
+export async function readOwnedPumpPurchaseAcquisitionSource(
+  db: D1Database,
+  owner: string,
+  originId: string,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  if (!/^[a-f0-9]{64}$/.test(originId))
+    return fail('Select one recorded buy origin.', 400);
+  await guards(db);
+  const row = await origin(db, owner, originId);
+  if (!row) return fail('Recorded launch buy origin was not found.', 404);
+  const current = await context(
+    db,
+    owner,
+    row.review_id,
+    row.receipt_id,
+    signal,
+  );
+  const saved = await batch(db, owner, row.receipt_id);
+  if (!saved) return fail('The original buy cost batch is missing.');
+  validateBatch(saved, owner, current);
+  const source = current.plan.sources.find((s) => s.originId === originId);
+  if (!source) return fail('The original buy cost source is missing.');
+  validateSource(row, owner, source);
+  const packet = current.selected.evidence.report.packets[source.packetIndex];
+  if (!packet || packet.outcome !== 'success' || packet.slot === null)
+    return fail('Finalized buy slot is unavailable.');
+  if (
+    canonical(await origin(db, owner, originId)) !== canonical(row) ||
+    canonical(await parent(db, owner, row.review_id)) !== current.parent
+  )
+    return fail('The recorded buy source changed.');
+  signal.throwIfAborted();
+  return {
+    source,
+    row,
+    batch: saved,
+    slot: packet.slot,
+    decimals: 6 as const,
+    receiptSha256: current.selected.evidence.sha256,
+  };
 }
 /** Explicit database-only preview. No caller-authored cost input and no RPC. */
 export async function readOwnedPumpPurchaseCostPlan(
