@@ -45,4 +45,4 @@ Codex (ChatGPT) owns the following areas it is actively extending. The original 
 - All of `drizzle/**` and `db/**`; the committed journal currently ends at `0115`.
 
 
-Claude: no active claims. Add one here before starting.
+Claude, 18 October 2026: verifying/landing Codex sale-allocation draft (lib/launch-sale-*, 0116) via PR from claude/project-thread-qlge6g, handed over in CLAUDE-CONTINUE-HERE-20261018.md.

@@ -43,6 +43,8 @@ export async function nativeWarmupFixture(
     walletSeed?: number;
     seedRentOnly?: boolean;
     token2022?: boolean;
+    signer?: { address: string; keyPair: CryptoKeyPair };
+    mint?: string;
   } = {},
 ) {
   const origin = options.slot ?? 100;
@@ -56,8 +58,8 @@ export async function nativeWarmupFixture(
   const pair = nacl.sign.keyPair.fromSeed(
       new Uint8Array(32).fill(options.walletSeed ?? 7),
     ),
-    wallet = bs58.encode(pair.publicKey),
-    mint = key(3);
+    wallet = options.signer?.address ?? bs58.encode(pair.publicKey),
+    mint = options.mint ?? key(3);
   const [nativeAta] = await getProgramDerivedAddress({
     programAddress: address(ATA),
     seeds: [bs58.decode(wallet), bs58.decode(TOKEN), bs58.decode(NATIVE)],
@@ -494,10 +496,18 @@ export async function nativeWarmupFixture(
   const signedBytes = getTransactionEncoder().encode({
     messageBytes,
     signatures: {
-      [wallet]: nacl.sign.detached(
-        Uint8Array.from(messageBytes),
-        pair.secretKey,
-      ) as SignatureBytes,
+      [wallet]: (options.signer
+        ? new Uint8Array(
+            await crypto.subtle.sign(
+              'Ed25519',
+              options.signer.keyPair.privateKey,
+              Uint8Array.from(messageBytes),
+            ),
+          )
+        : nacl.sign.detached(
+            Uint8Array.from(messageBytes),
+            pair.secretKey,
+          )) as SignatureBytes,
     },
   });
   const signed = {

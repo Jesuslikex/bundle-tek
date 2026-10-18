@@ -9,8 +9,12 @@ import type { ImportedSaleParent } from '../lib/imported-sale-evidence';
 import { SOLANA_MAINNET_GENESIS } from '../lib/wallet-balances';
 
 /** Synthetic Metis packet and finalized metadata, never a funded swap. */
-export async function importedSaleEvidenceFixture(token2022 = false) {
+export async function importedSaleEvidenceFixture(
+  token2022 = false,
+  options: NonNullable<Parameters<typeof nativeWarmupFixture>[0]> = {},
+) {
   const f = await nativeWarmupFixture({
+    ...options,
     side: 'Sell',
     lookup: true,
     v2: token2022,

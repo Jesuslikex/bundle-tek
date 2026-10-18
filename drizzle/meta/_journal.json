@@ -813,6 +813,13 @@
       "when": 1793462400000,
       "tag": "0115_imported_sale_receipt_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "6",
+      "when": 1793548800000,
+      "tag": "0116_launch_sale_allocations",
+      "breakpoints": true
     }
   ]
 }
