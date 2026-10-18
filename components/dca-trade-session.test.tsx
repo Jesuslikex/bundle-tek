@@ -49,7 +49,10 @@ async function setField(name: string, value: string) {
     const label = Array.from(container.querySelectorAll('label')).find((l) =>
       l.textContent?.startsWith(name),
     );
-    const element = label?.querySelector('input,select') as
+    const direct = Array.from(container.getElementsByTagName('input')).find(
+      (input) => input.getAttribute('aria-label') === name,
+    );
+    const element = (direct ?? label?.querySelector('input,select')) as
       | HTMLInputElement
       | HTMLSelectElement;
     if (!element) throw new Error('Missing field ' + name);
@@ -407,12 +410,20 @@ it('includes the reviewed UTC deadline in immutable saved terms and blocks an en
 it('reviews a duration from scheduled start and saves the exact existing deadline contract', async () => {
   await fill();
   await setField('DCA stop rule', 'duration');
+  expect(container.textContent).toContain('longer than 120 seconds');
   expect(saveButton().disabled).toBe(true);
-  for (const value of ['0', '120', '180.5', '1e3']) {
-    await setField('DCA duration', value);
+  for (const [minutes, seconds] of [
+    ['0', '0'],
+    ['2', '0'],
+    ['3', '0.5'],
+    ['0', '1e3'],
+  ]) {
+    await setField('DCA duration: minutes', minutes);
+    await setField('DCA duration: seconds', seconds);
     expect(saveButton().disabled).toBe(true);
   }
-  await setField('DCA duration', '180');
+  await setField('DCA duration: minutes', '3');
+  await setField('DCA duration: seconds', '0');
   await setField('DCA start', '2026-10-14T12:00');
   const expectedEnd = new Date(
     new Date('2026-10-14T12:00').getTime() + 180000,
@@ -430,7 +441,8 @@ it('clears hidden ending inputs on a rule switch rather than saving a stale dead
   await setField('DCA end', '2026-10-13T12:05');
   await setField('DCA stop rule', 'duration');
   expect(saveButton().disabled).toBe(true);
-  await setField('DCA duration', '180');
+  await setField('DCA duration: minutes', '3');
+  await setField('DCA duration: seconds', '0');
   expect(saveButton().disabled).toBe(false);
   await setField('DCA stop rule', 'deadline');
   expect(container.textContent).not.toContain('DCA stops at');
@@ -563,4 +575,48 @@ it('explains overflow, invalid counts and over-100% totals without producing a s
   );
   expect(saveButton().disabled).toBe(true);
   expect(requests).toHaveLength(0);
+});
+
+it('saves HMS intervals as the original exact integer spacing with the same eligibility schedule', async () => {
+  await fill();
+  await setField('Time between DCA cycles: minutes', '2');
+  await setField('Time between DCA cycles: seconds', '5');
+  expect(container.textContent).toContain('125 seconds total');
+  expect(saveButton().disabled).toBe(false);
+  const final = new Date(
+    new Date('2026-10-13T12:00').getTime() + 250000,
+  ).toISOString();
+  expect(container.textContent).toContain(final);
+  await act(async () => saveButton().click());
+  expect(requests[0].body.schedule).toMatchObject({ spacingSeconds: 125 });
+  await respond(0);
+});
+it('keeps the 24-hour interval limit and refuses excess unit values without a request', async () => {
+  await fill();
+  await setField('Time between DCA cycles: hours', '24');
+  await setField('Time between DCA cycles: minutes', '0');
+  expect(saveButton().disabled).toBe(false);
+  await setField('Time between DCA cycles: seconds', '1');
+  expect(saveButton().disabled).toBe(true);
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    '86,400',
+  );
+  await setField('Time between DCA cycles: seconds', '0');
+  await setField('Time between DCA cycles: minutes', '60');
+  expect(saveButton().disabled).toBe(true);
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    '0 to 59',
+  );
+  expect(requests).toHaveLength(0);
+});
+
+it('clears saved status on a raw HMS edit even when it represents the same seconds', async () => {
+  await fill();
+  await act(async () => saveButton().click());
+  await respond(0);
+  expect(container.textContent).toContain('DCA session saved.');
+  await setField('Time between DCA cycles: minutes', '01');
+  expect(container.textContent).not.toContain('DCA session saved.');
+  expect(saveButton().disabled).toBe(false);
+  expect(requests).toHaveLength(1);
 });

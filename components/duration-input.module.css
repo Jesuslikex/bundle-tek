@@ -1,0 +1,33 @@
+.field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.field legend {
+  margin-bottom: 0.4rem;
+}
+.units {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.units label {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+.units input {
+  width: 100%;
+  min-width: 0;
+}
+.field output,
+.error {
+  display: block;
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+}
+.error {
+  color: #ffb497;
+}

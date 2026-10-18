@@ -27,6 +27,12 @@ import {
   type DcaSupplySizing,
 } from '@/lib/dca-supply-sizing';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
+import { DurationInput } from './duration-input';
+import {
+  parseDurationParts,
+  splitDurationSeconds,
+  type DurationParts,
+} from '@/lib/duration-parts';
 
 export function DcaTradeSession({
   project,
@@ -47,11 +53,17 @@ export function DcaTradeSession({
     [amountMode, setAmountMode] = useState<'total' | 'per-cycle'>('total'),
     [sellUnit, setSellUnit] = useState<'tokens' | 'supply'>('tokens'),
     [cycles, setCycles] = useState('5'),
-    [interval, setInterval] = useState('60'),
+    [intervalParts, setIntervalParts] = useState(() =>
+      splitDurationSeconds(60),
+    ),
     [start, setStart] = useState(''),
     [end, setEnd] = useState(''),
     [ending, setEnding] = useState<'deadline' | 'duration'>('deadline'),
-    [duration, setDuration] = useState(''),
+    [durationParts, setDurationParts] = useState<DurationParts>(() => ({
+      hours: '',
+      minutes: '',
+      seconds: '',
+    })),
     [sizing, setSizing] = useState<'even' | 'randomized'>('even'),
     [cycleMinimum, setCycleMinimum] = useState(''),
     [cycleMaximum, setCycleMaximum] = useState(''),
@@ -68,15 +80,24 @@ export function DcaTradeSession({
   const pending = useRef<AbortController | null>(null);
   const amountId = useId(),
     cyclesId = useId(),
-    intervalId = useId(),
     startId = useId();
   const endId = useId();
-  const durationId = useId();
   const minimumId = useId(),
     maximumId = useId();
   const cycleMinimumId = useId(),
     cycleMaximumId = useId();
   const retry = useRef<{ key: string; id: string } | null>(null);
+  const intervalSeconds = parseDurationParts(intervalParts, 86400).seconds;
+  const durationSeconds = parseDurationParts(durationParts).seconds;
+  const interval = intervalSeconds === null ? '' : String(intervalSeconds);
+  const duration = durationSeconds === null ? '' : String(durationSeconds);
+  const lastCycleOffset =
+    interval &&
+    /^[1-9]\d?$/.test(cycles) &&
+    Number(cycles) >= 2 &&
+    Number(cycles) <= 25
+      ? (Number(cycles) - 1) * Number(interval)
+      : null;
   useEffect(
     () => () => {
       if (pending.current) {
@@ -223,9 +244,11 @@ export function DcaTradeSession({
     sellUnit,
     start,
     interval,
+    intervalParts,
     end,
     ending,
     duration,
+    durationParts,
     rangeEnabled,
     pair,
     minimum,
@@ -610,16 +633,13 @@ export function DcaTradeSession({
         </fieldset>
         <fieldset className="grid gap-3 @min-[520px]:grid-cols-2">
           <legend className="mb-2 font-medium">Timing</legend>
-          <label htmlFor={intervalId}>
-            Seconds between DCA cycles
-            <Input
-              id={intervalId}
-              inputMode="numeric"
-              value={interval}
-              disabled={disabled}
-              onChange={(e) => setInterval(e.target.value)}
-            />
-          </label>
+          <DurationInput
+            label="Time between DCA cycles"
+            value={intervalParts}
+            onChange={setIntervalParts}
+            disabled={disabled}
+            maximumSeconds={86400}
+          />
           <label htmlFor={startId}>
             DCA start in your local timezone
             <Input
@@ -649,7 +669,7 @@ export function DcaTradeSession({
                 onChange={(e) => {
                   setEnding(e.target.value as 'deadline' | 'duration');
                   setEnd('');
-                  setDuration('');
+                  setDurationParts({ hours: '', minutes: '', seconds: '' });
                 }}
               >
                 <option value="deadline">Calendar deadline (optional)</option>
@@ -657,16 +677,21 @@ export function DcaTradeSession({
               </select>
             </label>
             {ending === 'duration' ? (
-              <label htmlFor={durationId}>
-                DCA duration in seconds
-                <Input
-                  id={durationId}
-                  inputMode="numeric"
-                  value={duration}
+              <>
+                <DurationInput
+                  label="DCA duration"
+                  value={durationParts}
+                  onChange={setDurationParts}
                   disabled={disabled}
-                  onChange={(e) => setDuration(e.target.value)}
                 />
-              </label>
+                {lastCycleOffset !== null && (
+                  <p className="col-span-full text-sm">
+                    Choose a duration longer than{' '}
+                    {lastCycleOffset.toLocaleString('en-US')} seconds to include
+                    the final planned cycle.
+                  </p>
+                )}
+              </>
             ) : (
               <label htmlFor={endId}>
                 DCA end in your local timezone (optional)

@@ -69,3 +69,8 @@ CODEX-PROXIMA-STRATEGY-COVERAGE-20261018.md links fresh retained DCA Advanced, L
 ## Integrated local build
 
 The other Bundle chat completed shared production compilation and TypeScript on the frozen DCA/warmup source before committinge282012. Verified log work/release-qa/generated-wallet-final-build-20261018.log reports compilation37.5seconds and TypeScript12.5seconds; owner confirmed exit0 and guarded HTTPS health200/submission403. No deploy or push occurred. The DCA side separately passed39 model/UI tests and68 route/sizing/market tests, with overlap not summed as unique tests. DCA target saves use an isolated browser fixture; real generated-wallet read-only checks belong to the owner's separate evidence. Full parity remains incomplete.
+
+
+## HMS timing follow-up
+
+DCA interval and duration now have hours/minutes/seconds controls with exact seconds output and original saved schedule/deadline semantics. CODEX-DCA-HMS-20261018.md records59 passing helper/component/model tests, TypeScript/typed lint and synthetic desktop/375px browser checks. The current combined build is coordinated with the other Bundle chat and is not yet claimed complete. Multi-strategy and separate session-wide endings remain open.
