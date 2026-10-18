@@ -1,6 +1,6 @@
 # Current offline full-suite audit, 18 October 2026
 
-Status: original full run finished with failures; focused corrections pass. A fresh combined run is required before calling the corrected source fully green.
+Status: corrected-source complete offline run passed on `fd4e571`: 557 Vitest files/4,938 tests and eight native Node files/33 tests, zero failures, skips or unhandled errors. Original failed evidence and focused reruns remain separately retained. This is a current regression baseline, not complete Proxima parity or production/funded acceptance.
 
 The previous integrated full-suite record covers 307 files/2,153 tests on older source. Current main `84a9b032a5eaaa51acfa20d7fb5e64c3be24ef37` has 565 test files after the strategy, volume, funding, launch and token-layout changes. This audit checks integration across the current application rather than inferring broad readiness from focused selections.
 
@@ -45,3 +45,28 @@ Under the same offline preload, `work/release-qa/full-suite-proxima-focused-2026
 - Scoped typed lint for `vitest.config.mjs`, formatting of that config plus package/alias JSON, and `git diff --check` passed.
 
 The peer's documentation-only checkpoint `5517191` preserves the unapplied wallet workspace proposal. No application source changed during this audit or these corrections. The original full result plus focused reruns must not be relabelled as a clean corrected-source full run. No production build is claimed for these metadata/test-entry corrections; no provider, real account, wallet, remote migration, funding, signature, transaction, push or deployment was performed.
+
+## Corrected-source complete rerun
+
+Corrections checkpoint `fd4e5717db591acb57842286a3471568ba242da3`. Execution handle 62516, Vitest child PID47732 at launch, start 07:25:10.088Z, actual terminal 07:54:23.686Z. New evidence prefix `work/release-qa/full-suite-proxima-fixed-20261018`; original failed evidence is unchanged. Snapshot 1,746 files, digest `5fa5e94c1f876581f7d358afc3a9298e2023309cec034c2deb554347414579d7`. The wrapper ran557 Vitest files followed by all eight native Node files, retaining both process exits before final source/harness verification. Same offline preflight and child network boundary, envDirfalse, two Vitest workers; source/HEAD/index held through actual terminal.
+
+Final results:
+
+- Vitest557/557 files and4,938/4,938 tests passed; no failed, pending or todo tests. Reporter end: zero unhandled errors. Vitest duration1,751.36seconds. JSON's677 suites include nested describe blocks and are not a file count.
+- Native Node8/8 files and33/33 tests passed, with zero failures, cancellations, skips or todo. Combined coverage is565 files and4,971 tests across two runners, not a single Vitest count.
+- Both runner exits0, source verification exit0 and `harnessUnchanged:true`. Final snapshot verification reports exactly1,746 unchanged files and an empty changed list. The runner preflight again proved external native fetch/socket refusal and successful loopback HTTP.
+- The unchanged signing recovery suite passed40/40 cases within this fresh full run as well as the focused rerun. The original Miniflare EADDRINUSE remains preserved; no fixture-network root-cause fix is claimed.
+- The other Bundle chat independently reviewed the three corrected metadata files without running more tests or changing source. Its inventory covers all eight current native test files. For each added alias, replacing only the working copy's one CRLF yields the exact Git SQL bytes. It found no concrete current coverage omission or checksum-admission weakening. Local review evidence: `work/persistent-workspace/baseline-fix-review.json`.
+
+Final artifact SHA256 values:
+
+| Artifact suffix under corrected-run prefix | SHA256 |
+| --- | --- |
+| `.json` | `ff77b3a2839a4d8ddeff46628f191e26f1b41d59dab21c643abf301b408fb2d7` |
+| `.log` | `703cfef52227741b4eff8da374ae353f5c0ab1115c8e8bdcd7fe4f0df8f9a7d9` |
+| `.exit.json` | `8b5fbd144285d02879ef50b8748fb7bd64e36a44631506f07cea2476a5a5c435` |
+| `.source-verify.json` | `0fdce8cc7767c6b2861dca88190ba236eda74de3eab7b7e314de4fbd99e586cd` |
+
+Application source, runtime helper and provider configuration were not changed. Peer documentation and ignored prototypes remained separate. No new build, hosted/real-session acceptance, remote SQL, funding, real signature/transaction, push or deployment is claimed. After this notes checkpoint, later UI or financial-source changes require their own verification; this full run must stay attributed to the frozen corrected source.
+
+Remaining product gaps include the persistent wallet/chart integration, binding a reviewed strategy condition and pool to an immutable unsigned preview, real wallet-funds reservations and strategy settlement, production program/route qualification, and independently authorized live acceptance. Passing the present repository tests does not prove those missing behaviors.
