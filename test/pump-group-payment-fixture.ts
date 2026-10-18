@@ -29,7 +29,10 @@ import type { PumpLaunchRpc } from '../lib/pump-launch-simulation';
 export async function pumpGroupPaymentFixture(
   stock = false,
   mode: 'create' | 'prefund' | 'split' = 'create',
-  baseline?: Awaited<ReturnType<typeof pumpGroupChainEffectsFixture>>,
+  baseline?: Pick<
+    Awaited<ReturnType<typeof pumpGroupChainEffectsFixture>>,
+    'review' | 'signed' | 'group' | 'rpc'
+  >,
 ) {
   const f = baseline ?? (await pumpGroupChainEffectsFixture(stock)),
     { built } = await requirePumpLaunchGroupReview(f.review, false);
