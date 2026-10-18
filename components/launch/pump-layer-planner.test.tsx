@@ -4,6 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { layerNativeFixture } from '../../test/launch-layer-native-fixture';
 import { PumpLayerPlanner } from './pump-layer-planner';
 import { layerUiFixture } from '../../test/launch-layer-ui-fixture';
 import { layerTestStorage } from '../../test/launch-layer-storage';
@@ -216,6 +218,51 @@ it('browses older mint snapshots through the real API without changing the edita
   );
   expect(host.textContent).toContain('Use saved ceilings as a new draft');
   expect(host.textContent).not.toContain('Save reviewed planning snapshot');
+});
+it('compares retained native observations through the real owned route without provider calls or writes', async () => {
+  const fixture = await layerNativeFixture();
+  const saved = await saveOwnedLaunchLayerPlan(
+    storage.db,
+    'alice',
+    f.input,
+    f.now,
+  );
+  await storage.client.executeMultiple(
+    await readFile('drizzle/0012_messy_zzzax.sql', 'utf8'),
+  );
+  await storage.client.execute({
+    sql: 'INSERT INTO wallet_balance_snapshots VALUES(?,?,?,?,?)',
+    args: [
+      'alice',
+      'Solana',
+      f.address(1),
+      JSON.stringify(fixture.document(f.address(1), '0')),
+      123,
+    ],
+  });
+  await click('Load saved wallets and layer history');
+  await click('Load saved SOL observations');
+  await until(() =>
+    expect(host.textContent).toContain('Below ceiling by 0.002105 SOL'),
+  );
+  expect(host.textContent).toContain('No saved observation');
+  expect(host.textContent).toContain('no combined SOL balance is shown');
+  expect(host.textContent).toContain(
+    'not current spendability or required funding',
+  );
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0);
+  expect(calls.some((call) => call.url.includes('balances=1'))).toBe(true);
+  expect(
+    (
+      await storage.client.execute(
+        'SELECT COUNT(*) AS n FROM wallet_balance_snapshots',
+      )
+    ).rows[0].n,
+  ).toBe(1);
+  expect(
+    (await storage.client.execute('SELECT id FROM launch_layer_plans')).rows[0]
+      .id,
+  ).toBe(saved.id);
 });
 it('cancels history reads and ignores an uncooperative late response', async () => {
   let release!: (response: Response) => void;

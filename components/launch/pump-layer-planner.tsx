@@ -21,6 +21,7 @@ import {
 import type { LaunchLayerEnvelope } from '@/lib/launch-layer-terms';
 import styles from './pump-layer-planner.module.css';
 import { LaunchLayerHistory } from './launch-layer-history';
+import { LaunchLayerNativeCoverage } from './launch-layer-native-coverage';
 
 const endpoint = '/api/launch/layers';
 const names: Record<LayerRole, string> = {
@@ -771,6 +772,11 @@ function Planner({
             Plan ID: <code>{saved.id}</code>
           </p>
           <BudgetReview envelope={saved.envelope} />
+          <LaunchLayerNativeCoverage
+            key={`${saved.id}:${saved.sha256}:${saved.current}`}
+            plan={saved}
+            disabled={blocked}
+          />
           <Button
             variant="outline"
             disabled={

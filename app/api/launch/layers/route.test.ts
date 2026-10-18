@@ -4,6 +4,7 @@ const state = vi.hoisted(() => ({
   context: vi.fn(),
   read: vi.fn(),
   list: vi.fn(),
+  native: vi.fn(),
   save: vi.fn(),
   db: {},
 }));
@@ -11,6 +12,9 @@ vi.mock('@/app/chatgpt-auth', () => ({
   getChatGPTUser: async () => state.user,
 }));
 vi.mock('@/db', () => ({ getD1: () => state.db }));
+vi.mock('@/lib/launch-layer-native-service', () => ({
+  readOwnedLayerNativeEvidence: state.native,
+}));
 vi.mock('@/lib/launch-layer-service', async (original) => ({
   ...(await original<typeof import('@/lib/launch-layer-service')>()),
   readLaunchLayerContext: state.context,
@@ -43,6 +47,11 @@ beforeEach(() => {
   state.context.mockReset().mockResolvedValue({ fundingAllowed: false });
   state.read.mockReset().mockResolvedValue(null);
   state.list.mockReset().mockResolvedValue({ items: [], planningOnly: true });
+  state.native.mockReset().mockResolvedValue({
+    fundingAllowed: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
   state.save.mockReset().mockResolvedValue({
     planningOnly: true,
     fundingAllowed: false,
@@ -59,6 +68,27 @@ it('requires authentication before context, history or save access', async () =>
   expect(state.read).not.toHaveBeenCalled();
   expect((await get('history=source')).status).toBe(401);
   expect(state.list).not.toHaveBeenCalled();
+  expect((await get('projectId=source&id=record&balances=1')).status).toBe(401);
+  expect(state.native).not.toHaveBeenCalled();
+});
+it('forwards only exact owned saved-observation selections and keeps reads uncached', async () => {
+  const response = await get('projectId=source&id=record&balances=1');
+  expect(response.status).toBe(200);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(state.native).toHaveBeenCalledWith(
+    state.db,
+    'alice',
+    'source',
+    'record',
+  );
+  for (const query of [
+    'projectId=a&id=b&balances=0',
+    'projectId=a&balances=1',
+    'projectId=a&id=b&balances=1&owner=b',
+    'projectId=a&id=b&balances=1&balances=1',
+  ])
+    expect((await get(query)).status).toBe(400);
+  expect(state.native).toHaveBeenCalledTimes(1);
 });
 it('lists history only for the authenticated owner with no caching', async () => {
   const response = await get('history=source');

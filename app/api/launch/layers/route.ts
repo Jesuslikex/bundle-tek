@@ -1,5 +1,6 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
+import { readOwnedLayerNativeEvidence } from '@/lib/launch-layer-native-service';
 import {
   LaunchLayerError,
   listOwnedLaunchLayerPlans,
@@ -26,6 +27,20 @@ export async function GET(request: Request) {
     return json({ error: 'Sign in to read saved launch layers.' }, 401);
   const p = new URL(request.url).searchParams;
   try {
+    if (
+      p.size === 3 &&
+      p.has('projectId') &&
+      p.has('id') &&
+      p.get('balances') === '1'
+    )
+      return json({
+        evidence: await readOwnedLayerNativeEvidence(
+          getD1(),
+          user.userId,
+          p.get('projectId')!,
+          p.get('id')!,
+        ),
+      });
     if (p.size === 1 && p.has('history'))
       return json({
         history: await listOwnedLaunchLayerPlans(
