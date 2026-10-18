@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+Fresh REA funding/setup recheck confirms the existing imported/scheduled SOL draft still separates Front/Back/holders and displays distinct funding totals, without revealing their calculation. Bundle saved-observation role/status filters and exact selected-role native ceiling now improve inspection of large role tables, with no funding authority. CODEX-LAYER-OBSERVATION-FILTERS-20261018.md records120tests/10files and responsive synthetic Chrome evidence. Full staged funding/execution and funded proof remain open.
+
 Saved exchange history now exposes explicit finalized payout verification through the owned read-only API, with exact saved-order binding, cancellation and GET recovery. CODEX-EXCHANGE-PAYOUT-UI-20261018.md records240tests/11files and synthetic responsive Chrome checks. This supersedes the unwired payout API gap only; live provider order/deposit integration, fresh spendability and funded proof remain open.
 
 Imported target search and Next/Previous keyset paging now remove the newest100 selection dead end. Continuations bind source/search and a current owned anchor; changing search/page clears prior planning. CODEX-IMPORTED-PICKER-PAGING-20261018.md records141tests/11files, typed lint/TypeScript and actual-component Chrome evidence reaching record101 by page and search. The live list may change and does not claim immutable/exhaustive inventory coverage. This supersedes the earlier older-record search/paging gap only; funding/execution and broader parity remain incomplete.

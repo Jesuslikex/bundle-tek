@@ -83,3 +83,7 @@ Read CODEX-EXCHANGE-PAYOUT-UI-20261018.md. The REA chat wires explicit saved-ord
 ## Bounded exchange history recovery
 
 Read CODEX-EXCHANGE-HISTORY-REQUEST-RECOVERY-20261018.md. Complete GET/body and verification/body reads now have bounded cancellation, late-result refusal and explicit stopped-history reload; quote text points to the working payout check. Final12files/246tests, six-file typed lint/format and TypeScript pass. Synthetic Chrome375stop/reload proof. Other chat purchase-cost drafts/0114claim preserved. No provider, signing, hosted SQL or deployment change.
+
+## Fresh funding evidence and observation filters
+
+Read CODEX-LAYER-OBSERVATION-FILTERS-20261018.md. REA freshly captured the existing imported/scheduled SOL funding page and read-only setup, then restored/account. Distinct funding totals remain unexplained; no provider/formula or execution claim. Saved native comparison now filters statuses with role counts/exact ceiling and empty-state recovery. Final10files/120tests,2filetypedlint/format+TypeScript, Chrome375/320/1440. Only own2TSX+docs; other chat0114drafts preserved. No signing, provider, hosted SQL or deploy.

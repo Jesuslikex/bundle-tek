@@ -31,7 +31,21 @@ function Comparison({
 }) {
   const id = useId();
   const [role, setRole] = useState('all');
-  const rows = result.rows.filter((row) => role === 'all' || row.role === role);
+  const [status, setStatus] = useState('all');
+  const roleRows = result.rows.filter(
+    (row) => role === 'all' || row.role === role,
+  );
+  const classify = (difference: string | null) =>
+    difference === null
+      ? 'unavailable'
+      : BigInt(difference) < 0n
+        ? 'below'
+        : 'covered';
+  const rows = roleRows.filter(
+    (row) => status === 'all' || classify(row.differenceRaw) === status,
+  );
+  const count = (state: string) =>
+    roleRows.filter((row) => classify(row.differenceRaw) === state).length;
   return (
     <>
       <p>
@@ -80,9 +94,54 @@ function Comparison({
             </option>
           ))}
       </select>
+      <label htmlFor={id + '-status'}>Show comparison</label>
+      <select
+        id={id + '-status'}
+        value={status}
+        onChange={(event) => setStatus(event.target.value)}
+      >
+        <option value="all">All comparisons</option>
+        <option value="below">Below declared ceiling</option>
+        <option value="unavailable">Missing or invalid observation</option>
+        <option value="covered">At or above declared ceiling</option>
+      </select>
       <p>
-        Showing {rows.length} of {result.rows.length} role wallets.
+        Selected role: {count('below')} below ceiling, {count('unavailable')}{' '}
+        unavailable, {count('covered')} at or above ceiling. These are saved
+        comparisons, not funding readiness.
       </p>
+      <p>
+        Selected role native ceiling:{' '}
+        {formatNativeBalance(
+          String(
+            roleRows.reduce((sum, row) => sum + BigInt(row.ceilingRaw), 0n),
+          ),
+          9,
+        )}{' '}
+        SOL. Filters do not calculate required funding or combine different
+        balance snapshots.
+      </p>
+      <output>
+        Showing {rows.length} of {result.rows.length} role wallets.
+      </output>
+      {(role !== 'all' || status !== 'all') && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setRole('all');
+            setStatus('all');
+          }}
+        >
+          Clear observation filters
+        </Button>
+      )}
+      {!rows.length && (
+        <p>
+          No saved comparisons match these filters. Clear the filters to view
+          all role wallets.
+        </p>
+      )}
       <div className={styles.nativeComparison}>
         <table>
           <caption>

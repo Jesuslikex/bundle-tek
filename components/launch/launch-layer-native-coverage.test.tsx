@@ -158,3 +158,56 @@ it('releases a timeout and ignores a late response, including after snapshot rep
   expect(host.querySelector('table')).toBeNull();
   expect(host.querySelector('[role=alert]')).toBeNull();
 });
+
+it('filters below-ceiling and unavailable rows, shows exact role totals and clears an empty combination without provider reads', async () => {
+  f.evidence.rows[0].observation!.raw = '0';
+  f.evidence.rows[1].observation = null;
+  f.evidence.rows[1].issue = 'invalid';
+  f.evidence.rows[2].observation!.raw = '2106000';
+  f.evidence.rows[3].observation!.raw = '0';
+  f.evidence.rows[4].observation = null;
+  f.evidence.rows[4].issue = 'missing';
+  await click('Load saved SOL observations');
+  await until(() => expect(host.querySelectorAll('tbody tr')).toHaveLength(7));
+  expect(host.textContent).toContain(
+    '2 below ceiling, 2 unavailable, 3 at or above ceiling',
+  );
+  expect(host.textContent).toContain('no combined SOL balance is shown');
+  expect(host.textContent).toContain('not funding readiness');
+  const [role, status] = Array.from(host.querySelectorAll('select'));
+  const choose = async (select: HTMLSelectElement, value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype,
+        'value',
+      )!.set!.call(select, value);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  expect(status.labels?.[0].textContent).toBe('Show comparison');
+  await choose(status, 'below');
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
+  await choose(status, 'unavailable');
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
+  expect(host.querySelector('tbody')?.textContent).toContain(
+    'No saved observation',
+  );
+  expect(host.querySelector('tbody')?.textContent).toContain(
+    'Invalid saved observation',
+  );
+  await choose(role, 'front');
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(0);
+  expect(host.textContent).toContain('No saved comparisons match');
+  expect(host.textContent).toContain(
+    'Selected role native ceiling: 0.002106 SOL',
+  );
+  await choose(status, 'covered');
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
+  expect(host.querySelector('tbody')?.textContent).toContain(
+    'Equal to ceiling',
+  );
+  await click('Clear observation filters');
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(7);
+  expect(role.value).toBe('all');
+  expect(status.value).toBe('all');
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
