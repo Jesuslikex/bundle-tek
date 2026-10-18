@@ -75,3 +75,7 @@ Read CODEX-IMPORTED-PICKER-PAGING-20261018.md. The REA chat removed the newest10
 ## Finalized exchange payout API
 
 Read CODEX-EXCHANGE-PAYOUT-API-20261018.md. The REA chat added a strict authenticated owned-review payout verification route and bounded read-only RPC adapter, reusing existing immutable receipt verification/storage and public history projection. Final11files/232tests, six-file format/typed lint and whole-project TypeScript pass. Real route/local SQL fixtures cover concurrency, cancellation, replay and provider429; no live provider, UI wiring, new migration, authority, push or deploy. Journal now ends at0113; recheck before claiming0114. User AGENTS and account/payment ownership preserved.
+
+## Exchange payout history action
+
+Read CODEX-EXCHANGE-PAYOUT-UI-20261018.md. The REA chat wires explicit saved-order finalized verification, exact response binding, progress/cancellation and GET recovery in its exchange history component. Final11files/240tests, scoped lint/format and TypeScript before the newer other-chat purchase-cost drafts; synthetic Chrome375/320/1440 proof. No account/schema/layout/provider/financial authority or deploy change. Provider order/deposit and funded proof remain open.

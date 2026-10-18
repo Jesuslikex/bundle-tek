@@ -211,3 +211,150 @@ it('shows a verified receipt as historical credit without treating it as spendab
     fetcher.mock.calls.every(([, init]) => init?.method === undefined),
   ).toBe(true);
 });
+
+function pendingPayout() {
+  return {
+    ...fixture.detail,
+    state: 'payout-unverified' as const,
+    approved: true,
+    approvalExpiresAt: fixture.review.expiresAt,
+    providerStatus: 'finished' as const,
+    providerReferenceRetained: true,
+  };
+}
+function verifiedPayout() {
+  return {
+    ...pendingPayout(),
+    state: 'payout-verified' as const,
+    payoutVerified: true,
+    payout: {
+      signature: bs58.encode(new Uint8Array(64).fill(4)),
+      recipient: fixture.funder.address,
+      amountRaw: fixture.review.expectedPayoutLamports,
+      slot: 120,
+      observedAt: fixture.review.quotedAt,
+    },
+  };
+}
+async function openPayout() {
+  fetcher.mockImplementation(async (input) =>
+    requestUrl(input).includes('?id=')
+      ? Response.json({ order: pendingPayout() })
+      : Response.json(fixture.page),
+  );
+  await mount();
+  await click('View saved exchange orders');
+  await click('Open order 00000000');
+}
+it('verifies only the exact selected saved order, updates its row and keeps every authority disabled', async () => {
+  await openPayout();
+  expect(fetcher.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(
+    true,
+  );
+  fetcher.mockResolvedValueOnce(Response.json({ order: verifiedPayout() }));
+  await click('Verify finalized payout');
+  const [url, init] = fetcher.mock.calls.at(-1)!;
+  expect(url).toBe('/api/funding/exchange-payout');
+  expect(init).toMatchObject({
+    method: 'POST',
+    cache: 'no-store',
+    headers: { 'content-type': 'application/json' },
+  });
+  expect(JSON.parse(init?.body as string)).toEqual({
+    id: fixture.id,
+    sha256: fixture.detail.sha256,
+  });
+  expect(container.textContent).toContain('Finalized SOL payout verified');
+  expect(container.textContent).toContain(
+    'Payout receipt saved; open to read verified details',
+  );
+  expect(container.textContent).toContain(
+    'Current spendable balance has not been checked',
+  );
+  expect(container.querySelector('input')).toBeNull();
+});
+it.each([429, 409, 503])(
+  'shows bounded recovery for status%s without exposing provider or HTML diagnostics or retrying',
+  async (status) => {
+    await openPayout();
+    fetcher.mockResolvedValueOnce(
+      new Response('<html>private provider URL and key</html>', { status }),
+    );
+    await click('Verify finalized payout');
+    expect(container.querySelector('[role=alert]')).not.toBeNull();
+    expect(container.textContent).not.toContain('private provider');
+    expect(
+      fetcher.mock.calls.filter(([, init]) => init?.method === 'POST'),
+    ).toHaveLength(1);
+    expect(button('Reload this saved order').disabled).toBe(false);
+    if (status === 429) expect(container.textContent).toContain('15 seconds');
+  },
+);
+it('clears private history when payout verification returns401', async () => {
+  await openPayout();
+  fetcher.mockResolvedValueOnce(new Response('', { status: 401 }));
+  await click('Verify finalized payout');
+  expect(container.querySelectorAll('li')).toHaveLength(0);
+  expect(container.textContent).not.toContain(fixture.funder.address);
+  expect(container.textContent).toContain('Sign in to verify');
+});
+it('refuses changed digest, unexpected authority and an unverified success response', async () => {
+  for (const order of [
+    { ...verifiedPayout(), sha256: 'b'.repeat(64) },
+    { ...verifiedPayout(), fundingAllowed: true },
+    pendingPayout(),
+  ]) {
+    await openPayout();
+    fetcher.mockResolvedValueOnce(Response.json({ order }));
+    await click('Verify finalized payout');
+    expect(container.querySelector('[role=alert]')).not.toBeNull();
+    expect(container.textContent).not.toContain('Finalized payout:');
+    await click('Close saved exchange orders');
+  }
+});
+it('admits one request, cancels waiting and recovers a saved receipt through GET while ignoring late success', async () => {
+  await openPayout();
+  let resolve!: (v: Response) => void;
+  let signal: AbortSignal | undefined;
+  fetcher.mockImplementationOnce((_input, init) => {
+    signal = init?.signal ?? undefined;
+    return new Promise((r) => {
+      resolve = r;
+    });
+  });
+  await act(async () => {
+    button('Verify finalized payout').click();
+    button('Verify finalized payout').click();
+  });
+  expect(
+    fetcher.mock.calls.filter(([, init]) => init?.method === 'POST'),
+  ).toHaveLength(1);
+  expect(container.textContent).toContain('Checking finalized payout evidence');
+  await click('Stop waiting for payout check');
+  expect(signal?.aborted).toBe(true);
+  expect(container.textContent).toContain(
+    'A receipt may already have been saved',
+  );
+  await act(async () => resolve(Response.json({ order: verifiedPayout() })));
+  expect(container.textContent).not.toContain('Finalized payout:');
+  fetcher.mockResolvedValueOnce(Response.json({ order: verifiedPayout() }));
+  await click('Reload this saved order');
+  expect(container.textContent).toContain('Finalized SOL payout verified');
+  expect(fetcher.mock.calls.at(-1)?.[1]?.method).toBeUndefined();
+});
+it('aborts payout checks when the funding plan changes and ignores late results', async () => {
+  await openPayout();
+  let resolve!: (v: Response) => void;
+  let signal: AbortSignal | undefined;
+  fetcher.mockImplementationOnce((_input, init) => {
+    signal = init?.signal ?? undefined;
+    return new Promise((r) => {
+      resolve = r;
+    });
+  });
+  await click('Verify finalized payout');
+  await mount('other-plan');
+  expect(signal?.aborted).toBe(true);
+  await act(async () => resolve(Response.json({ order: verifiedPayout() })));
+  expect(container.textContent).not.toContain(fixture.funder.address);
+});

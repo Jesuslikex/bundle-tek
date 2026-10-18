@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+Saved exchange history now exposes explicit finalized payout verification through the owned read-only API, with exact saved-order binding, cancellation and GET recovery. CODEX-EXCHANGE-PAYOUT-UI-20261018.md records240tests/11files and synthetic responsive Chrome checks. This supersedes the unwired payout API gap only; live provider order/deposit integration, fresh spendability and funded proof remain open.
+
 Imported target search and Next/Previous keyset paging now remove the newest100 selection dead end. Continuations bind source/search and a current owned anchor; changing search/page clears prior planning. CODEX-IMPORTED-PICKER-PAGING-20261018.md records141tests/11files, typed lint/TypeScript and actual-component Chrome evidence reaching record101 by page and search. The live list may change and does not claim immutable/exhaustive inventory coverage. This supersedes the earlier older-record search/paging gap only; funding/execution and broader parity remain incomplete.
 
 The saved Block-0 launch review now exposes an explicit owned imported-token picker for scheduled plans. Its compact authenticated GET excludes foreign/archived/non-Solana records, binds source/revision, and starts with no selected token. Reload/change clears the old planner; timeout/cancel and safe error recovery are implemented. CODEX-IMPORTED-LAYER-PICKER-20261018.md records135tests/11files, typed lint, isolated TypeScript and responsive synthetic Chrome evidence. The newest100record limit is disclosed; older-record search/paging, staged funding and execution remain open. This supersedes the prior unwired-picker status only.

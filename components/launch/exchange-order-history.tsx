@@ -21,9 +21,11 @@ function History({ planId }: { planId: string }) {
     [page, setPage] = useState<ExchangeOrderHistoryPage | null>(null),
     [detail, setDetail] = useState<ExchangeOrderHistoryDetail | null>(null),
     [busy, setBusy] = useState(false),
+    [verifying, setVerifying] = useState(false),
     [error, setError] = useState('');
   const pending = useRef<AbortController | null>(null),
-    generation = useRef(0);
+    generation = useRef(0),
+    verificationActive = useRef(false);
   useEffect(
     () => () => {
       generation.current++;
@@ -33,6 +35,8 @@ function History({ planId }: { planId: string }) {
   );
   async function read(id?: string, before?: string) {
     pending.current?.abort();
+    verificationActive.current = false;
+    setVerifying(false);
     const controller = new AbortController(),
       request = ++generation.current;
     pending.current = controller;
@@ -90,6 +94,83 @@ function History({ planId }: { planId: string }) {
         setBusy(false);
     }
   }
+  async function verify() {
+    if (!detail || busy || verificationActive.current) return;
+    const selected = detail;
+    verificationActive.current = true;
+    pending.current?.abort();
+    const controller = new AbortController(),
+      request = ++generation.current;
+    pending.current = controller;
+    setBusy(true);
+    setVerifying(true);
+    setError('');
+    let failure =
+      'Verification did not return a confirmed result. Reload this saved order before trying again; a receipt may already have been saved.';
+    try {
+      const signal = AbortSignal.any([
+        controller.signal,
+        AbortSignal.timeout(35000),
+      ]);
+      const response = await fetch('/api/funding/exchange-payout', {
+        method: 'POST',
+        cache: 'no-store',
+        signal,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: selected.id, sha256: selected.sha256 }),
+      });
+      signal.throwIfAborted();
+      if (controller.signal.aborted || request !== generation.current) return;
+      if (response.status === 401) {
+        failure = 'Sign in to verify a saved payout.';
+        setPage(null);
+        setDetail(null);
+      } else if (response.status === 429) {
+        failure =
+          'Verification is rate limited. Wait at least 15 seconds before checking again. You can reload saved evidence without contacting the provider.';
+      } else if (response.status === 409) {
+        failure =
+          'The saved order or finalized payment evidence could not be matched. Reload this order; its hold remains in place.';
+      }
+      const body = await readWorkspaceResponse(response, failure, failure);
+      signal.throwIfAborted();
+      const saved = decodeExchangeOrderHistoryDetail(body.order);
+      if (
+        saved.id !== selected.id ||
+        saved.sha256 !== selected.sha256 ||
+        saved.quote.planId !== planId ||
+        !saved.payoutVerified
+      )
+        throw new Error('Payout context differs.');
+      if (controller.signal.aborted || request !== generation.current) return;
+      setDetail(saved);
+      setPage((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) =>
+                item.id === saved.id
+                  ? {
+                      ...item,
+                      receiptRetained: true,
+                      providerStatus: saved.providerStatus,
+                    }
+                  : item,
+              ),
+            }
+          : current,
+      );
+    } catch {
+      if (!controller.signal.aborted && request === generation.current)
+        setError(failure);
+    } finally {
+      if (request === generation.current) {
+        verificationActive.current = false;
+        setVerifying(false);
+        setBusy(false);
+      }
+    }
+  }
   return (
     <section className={styles.history} aria-label="Saved exchange orders">
       <header>
@@ -102,6 +183,8 @@ function History({ planId }: { planId: string }) {
             if (open) {
               generation.current++;
               pending.current?.abort();
+              verificationActive.current = false;
+              setVerifying(false);
               setBusy(false);
               setOpen(false);
             } else {
@@ -129,7 +212,31 @@ function History({ planId }: { planId: string }) {
               Reload saved orders
             </Button>
           </div>
-          {busy && <output>Loading saved exchange history…</output>}
+          {busy && (
+            <output>
+              {verifying
+                ? 'Checking finalized payout evidence…'
+                : 'Loading saved exchange history…'}
+            </output>
+          )}
+          {verifying && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                generation.current++;
+                pending.current?.abort();
+                verificationActive.current = false;
+                setVerifying(false);
+                setBusy(false);
+                setError(
+                  'Stopped waiting for verification. A receipt may already have been saved. Reload this order to recover its result.',
+                );
+              }}
+            >
+              Stop waiting for payout check
+            </Button>
+          )}
           {error && <p role="alert">{error}</p>}
           {page && !page.items.length && (
             <p>
@@ -237,10 +344,40 @@ function History({ planId }: { planId: string }) {
                 </p>
               )}
               {detail.state === 'payout-unverified' && (
-                <p>
-                  A finished provider report is not an on-chain payout proof. No
-                  verified payout receipt is saved for this order.
-                </p>
+                <div className={styles.receipt}>
+                  <p>
+                    A finished provider report is not an on-chain payout proof.
+                    No verified payout receipt is saved for this order.
+                  </p>
+                  <p>
+                    Check the saved payout reference against finalized Solana
+                    evidence. This reads the chain and saves a matching receipt;
+                    it does not move funds.
+                  </p>
+                  <div className={styles.actions}>
+                    <Button
+                      type="button"
+                      disabled={busy || !detail.providerReferenceRetained}
+                      onClick={() => void verify()}
+                    >
+                      Verify finalized payout
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void read(detail.id)}
+                    >
+                      Reload this saved order
+                    </Button>
+                  </div>
+                  {!detail.providerReferenceRetained && (
+                    <p>
+                      A retained provider order reference is required before
+                      verification.
+                    </p>
+                  )}
+                </div>
               )}
               {detail.state === 'refund-unverified' && (
                 <p>

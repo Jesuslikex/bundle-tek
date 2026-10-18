@@ -1,0 +1,13 @@
+# Exchange payout verification in saved history
+
+18 October 2026. Extends backend b4f73ff with an explicit action inside the existing owned ExchangeOrderHistory component. No protected layout or other agent's source changes.
+
+Only payout-unverified records offer verification. Missing retained provider references explain why the action is disabled. The POST includes only the selected review ID and digest; success must decode the existing strict all-authority-false history shape and match plan, ID and digest with a verified payout. Success updates the detail and list receipt label. Historical receipt evidence remains separate from current spendability and distribution approval.
+
+The screen shows progress, blocks duplicate requests synchronously, allows stopping the wait and aborts context changes. A cancelled or failed request explains that a receipt might already be retained and provides an exact saved-order GET reload. Late responses cannot overwrite newer context. Authentication failures clear private history;429 and409 provide static recovery messages, and provider/HTML/parser content is never displayed. The browser request has a35-second timeout; no automatic retry is introduced.
+
+Verification:11exchange files/240tests pass together, including16history component tests and the real API/local SQL fixture tests. Two changed TSX files pass type-aware lint and formatting. Whole-project TypeScript passed before the other chat's newer pump-purchase-costs drafts; this is not a qualification of those later drafts. React review covered keyed context reset, request lifetime cleanup, exact consent/authority shape, accessible status/error output and duplicate-action prevention. The initial added multi-case test failed because it reopened an already-open panel; the fixture test was corrected to close between cases, then the full scoped run passed.
+
+Chrome rendered the actual component against synthetic responses: rate-limit message, finalized receipt, updated history row and no horizontal overflow at375,320and1440px. Screenshots: work/exchange-payout-ui-qa-20261018/finalized-375.png and finalized-1440.png. The local preview stopped during a browser interruption; its process handle was missing, so it was restarted. No live provider call or funded test occurred. This verifies the component flow, not a signed-in production rollout or production build.
+
+No migration, provider, credential, wallet unlock, signature, payment or deployment change. Exchange provider order/deposit integration and funded end-to-end proof remain open. The other Bundle chat's receipt/purchase-cost drafts were preserved.
