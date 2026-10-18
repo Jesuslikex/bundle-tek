@@ -4405,3 +4405,246 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* Token workspace density pass (Claude visible UI, 16 Oct): compact token
+   header, chart-first market pane, stable trading column. Scoped; appended only. */
+.settings-panel.imported-projects:has(.imported-token-details) > .page-title {
+  padding: 16px 24px 4px;
+}
+.settings-panel.imported-projects:has(.imported-token-details)
+  > .page-title
+  .eyebrow {
+  margin-bottom: 4px;
+}
+.settings-panel.imported-projects:has(.imported-token-details)
+  > .page-title
+  h1 {
+  font-size: 20px;
+  margin: 0;
+}
+.imported-token-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 20px;
+}
+.imported-token-heading {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.imported-token-heading h2 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.3;
+}
+.wallet-warmup-panel .imported-token-heading p {
+  margin-block: 2px 4px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.imported-token-heading code {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.imported-token-header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.imported-token-header-actions .wallet-roster-actions {
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 0;
+}
+.imported-token-header-actions .imported-workspace-layout-controls {
+  gap: 6px;
+  margin-top: 0;
+}
+.imported-token-header-actions button {
+  max-width: 100%;
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+}
+.imported-token-heading .token-identity-review {
+  margin-top: 4px;
+  font-size: 13px;
+}
+/* Long option text (dates, pool labels) must not widen the page on phones. */
+.imported-live-workspace label {
+  min-width: 0;
+  max-width: 100%;
+}
+.imported-live-workspace .wallet-warmup-panel label {
+  grid-template-columns: minmax(0, 1fr);
+}
+.imported-live-workspace select {
+  min-width: 0;
+  max-width: 100%;
+}
+.imported-live-workspace .imported-market-toolbar select {
+  max-width: min(320px, 100%);
+}
+.imported-market-feed-status,
+.imported-market-read-line {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.candle-chart-tools {
+  margin: 8px 0;
+}
+.candle-chart-tools > summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.candle-chart-tools[open] > summary ~ * {
+  margin-top: 8px;
+}
+@media (max-width: 700px) {
+  .imported-token-header-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+  .imported-token-header-actions .wallet-roster-actions {
+    justify-content: flex-start;
+  }
+}
+@media (min-width: 1101px) and (min-height: 640px) {
+  .imported-live-workspace.imported-live-workspace--compact {
+    gap: 14px;
+    margin: 14px 0;
+  }
+  .imported-live-workspace--compact .imported-market-pane {
+    padding: 12px 16px;
+  }
+  /* Section headings stay in the accessibility tree but take no rows;
+     the stats strip and toolbar already label the pane visually. */
+  .imported-live-workspace--compact .imported-market-pane > h3,
+  .imported-live-workspace--compact
+    .imported-market-pane
+    section[aria-label='Selected pool candles']
+    > h4 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .imported-live-workspace--compact .imported-market-pane {
+    position: relative;
+  }
+  .imported-live-workspace--compact .token-stats-strip {
+    margin: 0 0 6px;
+    padding: 6px 12px;
+  }
+  .imported-live-workspace--compact .token-stats-strip dl {
+    gap: 8px;
+  }
+  .imported-live-workspace--compact .token-stats-strip dt {
+    font-size: 10px;
+  }
+  .imported-live-workspace--compact .token-stats-strip dd {
+    margin-top: 2px;
+    font-size: 15px;
+  }
+  .imported-live-workspace--compact .token-stats-source {
+    margin-top: 4px;
+    font-size: 11px;
+  }
+  /* Label text beside its select keeps the candle controls on one row. */
+  .imported-live-workspace--compact
+    section[aria-label='Selected pool candles']
+    > .wallet-roster-actions
+    label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .imported-live-workspace--compact .candle-chart-help {
+    margin: 0;
+    font-size: 12px;
+  }
+  .imported-live-workspace--compact .candle-chart-help > summary {
+    line-height: 18px;
+  }
+  .imported-live-workspace--compact
+    .imported-market-pane
+    .wallet-roster-actions {
+    gap: 6px;
+    margin: 6px 0;
+  }
+  .imported-live-workspace--compact
+    .imported-market-pane
+    .wallet-roster-actions
+    button {
+    height: 30px;
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+  .imported-live-workspace--compact
+    .imported-market-pane
+    .wallet-roster-actions
+    select {
+    height: 30px;
+    font-size: 12px;
+  }
+  .imported-live-workspace--compact .imported-market-pane p {
+    margin-block: 6px;
+  }
+  .imported-live-workspace--compact .imported-market-feed-status {
+    margin-top: 0 !important;
+    font-size: 11px;
+    line-height: 16px;
+  }
+  /* Chart pane height leaves room for the wallet area below it at ~900px
+     tall. With the compacted rows above, the 310px candle plot ends inside
+     this height; secondary rows below it scroll within the pane. */
+  .imported-live-workspace--compact > [aria-label='Open token chart'] {
+    max-height: clamp(530px, calc(100dvh - 360px), 780px);
+  }
+  .imported-live-workspace--compact > .imported-workspace-trading {
+    padding: 16px;
+  }
+}
+
+/* Codex follow-up: preserve the full plot in constrained desktop panes. */
+@media (min-width: 1101px) and (min-height: 640px) {
+  .imported-live-workspace--compact .imported-market-pane .token-stats-source {
+    margin: 4px 0 0;
+    line-height: 14px;
+  }
+  @container imported-market (max-width: 1000px) {
+    .imported-live-workspace--compact .imported-market-board {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}
+
+/* Supersedes the earlier cap without shrinking the 310px candle plot. */
+@media (min-width: 1101px) and (min-height: 640px) {
+  .imported-live-workspace--compact > [aria-label='Open token chart'] {
+    max-height: clamp(550px, calc(100dvh - 340px), 800px);
+  }
+}
+
+/* The shell's 40px minimum must not override compact desktop targets. */
+@media (min-width: 1101px) and (min-height: 640px) {
+  .imported-live-workspace--compact
+    .imported-market-pane
+    .wallet-roster-actions
+    button {
+    min-height: 30px;
+    padding-block: 4px;
+    line-height: 20px;
+  }
+}

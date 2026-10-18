@@ -236,7 +236,11 @@ export function ImportedTokenMarket({
   }, [refresh, project.archived, chain]);
   const latest = observations[0],
     pair = latest?.pairs.find((p) => p.address === selected);
-  usePublishPairMarketSelection(project.id, project.revision, pair?.address ?? null);
+  usePublishPairMarketSelection(
+    project.id,
+    project.revision,
+    pair?.address ?? null,
+  );
   return (
     <section
       className="wallet-warmup-panel imported-market-pane"
@@ -250,22 +254,6 @@ export function ImportedTokenMarket({
           observedAt={latest.observedAt}
         />
       )}
-      <details className="market-data-coverage">
-        <summary>Market data coverage and feed behavior</summary>
-        <p>
-          Public DEX Screener pair metrics. Refresh once or start the
-          visible-project feed. The latest 20 observations and up to 20
-          base-token pairs per read are retained. New reads replace the oldest
-          sample. Provider prices are not executable quotes, wallet P&amp;L or
-          verified trades.
-        </p>
-        <p>
-          While enabled, reads repeat 30 seconds after each successful response.
-          Hiding this tab, going offline, leaving this project or a failed read
-          stops the feed. Restart explicitly to continue. This samples provider
-          metrics and prices; it is not a tick or candle stream.
-        </p>
-      </details>
       <div className="wallet-roster-actions imported-market-toolbar">
         {latest && latest.pairs.length > 0 && (
           <label>
@@ -312,7 +300,10 @@ export function ImportedTokenMarket({
             : 'Start market feed'}
         </Button>
       </div>
-      <output style={{ display: 'block', marginTop: 8 }}>
+      <output
+        className="imported-market-feed-status"
+        style={{ display: 'block', marginTop: 8 }}
+      >
         {feedState.status === 'running'
           ? `Market feed running. ${feedState.reads} successful feed reads this session.`
           : `Market feed ${feedState.status}. ${feedState.reason}`}
@@ -334,11 +325,6 @@ export function ImportedTokenMarket({
       {!latest && !busy && <p>No market observations saved.</p>}
       {latest && (
         <>
-          <p>
-            {latest.source} · read{' '}
-            {new Date(latest.observedAt).toLocaleString()} · captured project r
-            {latest.projectRevision} · {observations.length}/20 saved reads.
-          </p>
           {latest.projectRevision !== project.revision && (
             <p>
               Project metadata changed since this observation. Prices remain
@@ -352,59 +338,79 @@ export function ImportedTokenMarket({
             </p>
           )}
           {pair && (
-            <>
-              <div className="imported-market-board">
-                <ImportedPoolCandles
-                  key={pair.address}
-                  project={project}
-                  pool={pair.address}
-                  feedRunning={feedState.status === 'running'}
-                />
-                <ImportedPoolTrades
-                  key={`trades:${pair.address}`}
-                  project={project}
-                  pool={pair.address}
-                  feedRunning={feedState.status === 'running'}
-                  compact
-                />
-              </div>
-              <details className="market-analysis-tools">
-                <summary>Market observations and conditions</summary>
-                <p>
-                  {latest.returnedPairCount} returned pairs;{' '}
-                  {latest.quoteOnlyPairCount} quote-token pairs omitted because
-                  their base-token USD price does not price this token. Metrics
-                  below belong to the selected pool, without aggregation.
-                </p>
-                <MarketConditionReview
-                  key={`${project.id}:${project.revision}:${pair.address}`}
-                  project={project}
-                  observation={latest}
-                  feedRunning={feedState.status === 'running'}
-                  pair={pair.address}
-                  onReviewBuy={onReviewBuy}
-                />
-                <p className="warmup-address">
-                  Pair: {pair.address} ·{' '}
-                  <a href={pair.url} target="_blank" rel="noreferrer">
-                    View on DEX Screener
-                  </a>
-                </p>
-                <p>
-                  Exact USD price: {pair.priceUsd ?? 'unavailable'}. Reported
-                  market cap {money(pair.marketCapUsd)}, liquidity{' '}
-                  {money(pair.liquidityUsd)}. Provider valuations and windows
-                  can lag. Read time does not establish when the provider last
-                  observed a trade.
-                </p>
-                <MarketObservationChart
-                  observations={observations}
-                  pair={pair.address}
-                />
-              </details>
-            </>
+            <div className="imported-market-board">
+              <ImportedPoolCandles
+                key={pair.address}
+                project={project}
+                pool={pair.address}
+                feedRunning={feedState.status === 'running'}
+              />
+              <ImportedPoolTrades
+                key={`trades:${pair.address}`}
+                project={project}
+                pool={pair.address}
+                feedRunning={feedState.status === 'running'}
+                compact
+              />
+            </div>
           )}
+          <p className="imported-market-read-line">
+            {latest.source} · read{' '}
+            {new Date(latest.observedAt).toLocaleString()} · captured project r
+            {latest.projectRevision} · {observations.length}/20 saved reads.
+          </p>
         </>
+      )}
+      <details className="market-data-coverage">
+        <summary>Market data coverage and feed behavior</summary>
+        <p>
+          Public DEX Screener pair metrics. Refresh once or start the
+          visible-project feed. The latest 20 observations and up to 20
+          base-token pairs per read are retained. New reads replace the oldest
+          sample. Provider prices are not executable quotes, wallet P&amp;L or
+          verified trades.
+        </p>
+        <p>
+          While enabled, reads repeat 30 seconds after each successful response.
+          Hiding this tab, going offline, leaving this project or a failed read
+          stops the feed. Restart explicitly to continue. This samples provider
+          metrics and prices; it is not a tick or candle stream.
+        </p>
+      </details>
+      {latest && pair && (
+        <details className="market-analysis-tools">
+          <summary>Market observations and conditions</summary>
+          <p>
+            {latest.returnedPairCount} returned pairs;{' '}
+            {latest.quoteOnlyPairCount} quote-token pairs omitted because their
+            base-token USD price does not price this token. Metrics below belong
+            to the selected pool, without aggregation.
+          </p>
+          <MarketConditionReview
+            key={`${project.id}:${project.revision}:${pair.address}`}
+            project={project}
+            observation={latest}
+            feedRunning={feedState.status === 'running'}
+            pair={pair.address}
+            onReviewBuy={onReviewBuy}
+          />
+          <p className="warmup-address">
+            Pair: {pair.address} ·{' '}
+            <a href={pair.url} target="_blank" rel="noreferrer">
+              View on DEX Screener
+            </a>
+          </p>
+          <p>
+            Exact USD price: {pair.priceUsd ?? 'unavailable'}. Reported market
+            cap {money(pair.marketCapUsd)}, liquidity {money(pair.liquidityUsd)}
+            . Provider valuations and windows can lag. Read time does not
+            establish when the provider last observed a trade.
+          </p>
+          <MarketObservationChart
+            observations={observations}
+            pair={pair.address}
+          />
+        </details>
       )}
     </section>
   );

@@ -904,26 +904,6 @@ export function PoolCandleChart({
           guide labels use the selected scale.
         </p>
       )}
-      {projectId && (
-        <div
-          className="flex flex-wrap items-center gap-2"
-          aria-label="Drawing storage"
-        >
-          <Button type="button" variant="outline" onClick={saveDrawings}>
-            Save chart drawings
-          </Button>
-          <Button type="button" variant="outline" onClick={restoreDrawings}>
-            Restore chart drawings
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Stored in this browser only. Restore replaces current drawings. Save
-            again after editing; clearing browser data removes saved drawings.
-          </p>
-        </div>
-      )}
-      {drawingStorageMessage && (
-        <output className="block">{drawingStorageMessage}</output>
-      )}
       <label>
         Inspect candle{' '}
         <select
@@ -951,73 +931,97 @@ export function PoolCandleChart({
           {selected.volume.toLocaleString()}
         </p>
       )}
-      <div
-        className="flex flex-wrap items-center gap-2"
-        aria-label="Chart drawings"
-      >
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={guideTool}
-          disabled={guides.length >= 8}
-          onClick={() => {
-            drag.current = null;
-            setTrendTool(false);
-            setTrendStart(null);
-            setTrendMessage('');
-            setGuideTool(!guideTool);
-          }}
-        >
-          {guideTool ? 'Cancel price guide' : 'Draw price guide'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={trendTool}
-          disabled={trendLines.length >= 8}
-          onClick={() => {
-            drag.current = null;
-            setGuideTool(false);
-            setTrendStart(null);
-            setTrendMessage('');
-            setTrendTool(!trendTool);
-          }}
-        >
-          {trendTool ? 'Cancel trend line' : 'Draw trend line'}
-        </Button>
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            addGuide(Number(guideInput));
-          }}
-        >
-          <label>
-            Guide {unit}{' '}
-            <input
-              type="number"
-              step="any"
-              min="0"
-              required
-              aria-label={`Price guide ${unit}`}
-              value={guideInput}
-              onChange={(e) => setGuideInput(e.target.value)}
-              style={{ width: 110 }}
-            />
-          </label>
-          <Button
-            type="submit"
-            variant="outline"
-            disabled={
-              guides.length >= 8 ||
-              !Number.isFinite(Number(guideInput)) ||
-              Number(guideInput) <= 0
-            }
+      <details className="candle-chart-tools">
+        <summary>Chart drawing tools</summary>
+        {projectId && (
+          <div
+            className="flex flex-wrap items-center gap-2"
+            aria-label="Drawing storage"
           >
-            Add guide
+            <Button type="button" variant="outline" onClick={saveDrawings}>
+              Save chart drawings
+            </Button>
+            <Button type="button" variant="outline" onClick={restoreDrawings}>
+              Restore chart drawings
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Stored in this browser only. Restore replaces current drawings.
+              Save again after editing; clearing browser data removes saved
+              drawings.
+            </p>
+          </div>
+        )}
+        {drawingStorageMessage && (
+          <output className="block">{drawingStorageMessage}</output>
+        )}
+        <div
+          className="flex flex-wrap items-center gap-2"
+          aria-label="Chart drawings"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            aria-pressed={guideTool}
+            disabled={guides.length >= 8}
+            onClick={() => {
+              drag.current = null;
+              setTrendTool(false);
+              setTrendStart(null);
+              setTrendMessage('');
+              setGuideTool(!guideTool);
+            }}
+          >
+            {guideTool ? 'Cancel price guide' : 'Draw price guide'}
           </Button>
-        </form>
-      </div>
+          <Button
+            type="button"
+            variant="outline"
+            aria-pressed={trendTool}
+            disabled={trendLines.length >= 8}
+            onClick={() => {
+              drag.current = null;
+              setGuideTool(false);
+              setTrendStart(null);
+              setTrendMessage('');
+              setTrendTool(!trendTool);
+            }}
+          >
+            {trendTool ? 'Cancel trend line' : 'Draw trend line'}
+          </Button>
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              addGuide(Number(guideInput));
+            }}
+          >
+            <label>
+              Guide {unit}{' '}
+              <input
+                type="number"
+                step="any"
+                min="0"
+                required
+                aria-label={`Price guide ${unit}`}
+                value={guideInput}
+                onChange={(e) => setGuideInput(e.target.value)}
+                style={{ width: 110 }}
+              />
+            </label>
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={
+                guides.length >= 8 ||
+                !Number.isFinite(Number(guideInput)) ||
+                Number(guideInput) <= 0
+              }
+            >
+              Add guide
+            </Button>
+          </form>
+        </div>
+      </details>
       {averageLevels.some((a) => !a.inRange) && (
         <output>
           Recorded averages outside the current candle price range are not

@@ -196,10 +196,12 @@ export function ImportedTokenProjects({
       <div className="page-title">
         <span className="eyebrow">EXISTING TOKENS</span>
         <h1>{current ? 'Token workspace' : 'Import a token'}</h1>
-        <p>
-          Save an existing token by network and contract address, then inspect
-          its on-chain identity.
-        </p>
+        {!current && (
+          <p>
+            Save an existing token by network and contract address, then inspect
+            its on-chain identity.
+          </p>
+        )}
       </div>
       <details className="token-project-picker" open={!current}>
         <summary>Choose or import a token</summary>
@@ -305,106 +307,114 @@ export function ImportedTokenProjects({
       {current && (
         <section
           aria-label="Imported token details"
-          className="wallet-warmup-panel"
+          className="wallet-warmup-panel imported-token-details"
         >
-          <h2>
-            {current.document.token.name} ({current.document.token.symbol})
-          </h2>
-          <p>
-            {current.document.token.chain} ·{' '}
-            {current.archived ? 'Archived' : 'Active'} · revision{' '}
-            {current.revision}
-          </p>
-          <code className="warmup-address">
-            {current.document.token.address}
-          </code>
-          <details className="token-identity-review">
-            <summary>Token identity and supply</summary>
-            <p>
-              Supply:{' '}
-              {supply(
-                current.document.token.totalSupplyRaw,
-                current.document.token.decimals,
-              )}{' '}
-              · {current.document.token.decimals} decimals
-            </p>
-            <p>
-              Identity observed{' '}
-              {new Date(current.document.token.observedAt).toLocaleString()} ·{' '}
-              {current.document.token.source}
-              {current.document.token.contextSlot !== undefined
-                ? ` · slot ${current.document.token.contextSlot}`
-                : ''}
-              {current.document.token.blockNumber !== undefined
-                ? ` · block ${current.document.token.blockNumber}`
-                : ''}
-            </p>
-            <p>
-              Network and address are fixed for this project. Identity can
-              become stale. Supply is not a price or liquidity measurement.
-            </p>
-            <details>
-              <summary>Exact token units</summary>
-              <p>Raw supply: {current.document.token.totalSupplyRaw}</p>
-              {current.document.token.tokenProgram && (
-                <p>Token program: {current.document.token.tokenProgram}</p>
-              )}
-            </details>
-          </details>
-          <div className="wallet-roster-actions">
-            {!current.archived && (
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => void run('refresh', current)}
-              >
-                Refresh imported identity
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() =>
-                void run(current.archived ? 'restore' : 'archive', current)
-              }
-            >
-              {current.archived
-                ? 'Restore imported project'
-                : 'Archive imported project'}
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => {
-                setSelected('');
-                setSellSelection(null);
-              }}
-            >
-              Close imported details
-            </Button>
-          </div>
-          <Button variant="outline" onClick={openChart}>
-            Open token chart and supply workspace
-          </Button>
-          <div
-            className="imported-workspace-layout-controls"
-            aria-label="Trading workspace layout"
-          >
-            <Button
-              variant="outline"
-              aria-pressed={compactWorkspace}
-              onClick={() => setCompactWorkspace(true)}
-            >
-              Keep chart visible
-            </Button>
-            <Button
-              variant="outline"
-              aria-pressed={!compactWorkspace}
-              onClick={() => setCompactWorkspace(false)}
-            >
-              Full page review
-            </Button>
-          </div>
+          <header className="imported-token-header">
+            <div className="imported-token-heading">
+              <h2>
+                {current.document.token.name} ({current.document.token.symbol})
+              </h2>
+              <p>
+                {current.document.token.chain} ·{' '}
+                {current.archived ? 'Archived' : 'Active'} · revision{' '}
+                {current.revision}
+              </p>
+              <code className="warmup-address">
+                {current.document.token.address}
+              </code>
+              <details className="token-identity-review">
+                <summary>Token identity and supply</summary>
+                <p>
+                  Supply:{' '}
+                  {supply(
+                    current.document.token.totalSupplyRaw,
+                    current.document.token.decimals,
+                  )}{' '}
+                  · {current.document.token.decimals} decimals
+                </p>
+                <p>
+                  Identity observed{' '}
+                  {new Date(current.document.token.observedAt).toLocaleString()}{' '}
+                  · {current.document.token.source}
+                  {current.document.token.contextSlot !== undefined
+                    ? ` · slot ${current.document.token.contextSlot}`
+                    : ''}
+                  {current.document.token.blockNumber !== undefined
+                    ? ` · block ${current.document.token.blockNumber}`
+                    : ''}
+                </p>
+                <p>
+                  Network and address are fixed for this project. Identity can
+                  become stale. Supply is not a price or liquidity measurement.
+                </p>
+                <details>
+                  <summary>Exact token units</summary>
+                  <p>Raw supply: {current.document.token.totalSupplyRaw}</p>
+                  {current.document.token.tokenProgram && (
+                    <p>Token program: {current.document.token.tokenProgram}</p>
+                  )}
+                </details>
+              </details>
+            </div>
+            <div className="imported-token-header-actions">
+              <div className="wallet-roster-actions">
+                {!current.archived && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void run('refresh', current)}
+                  >
+                    Refresh imported identity
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(current.archived ? 'restore' : 'archive', current)
+                  }
+                >
+                  {current.archived
+                    ? 'Restore imported project'
+                    : 'Archive imported project'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setSelected('');
+                    setSellSelection(null);
+                  }}
+                >
+                  Close imported details
+                </Button>
+              </div>
+              <div className="wallet-roster-actions">
+                <Button variant="outline" onClick={openChart}>
+                  Open token chart and supply workspace
+                </Button>
+                <div
+                  className="imported-workspace-layout-controls"
+                  aria-label="Trading workspace layout"
+                >
+                  <Button
+                    variant="outline"
+                    aria-pressed={compactWorkspace}
+                    onClick={() => setCompactWorkspace(true)}
+                  >
+                    Keep chart visible
+                  </Button>
+                  <Button
+                    variant="outline"
+                    aria-pressed={!compactWorkspace}
+                    onClick={() => setCompactWorkspace(false)}
+                  >
+                    Full page review
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </header>
           <div
             className={`imported-live-workspace${compactWorkspace ? ' imported-live-workspace--compact' : ''}`}
           >
