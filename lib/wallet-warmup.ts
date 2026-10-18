@@ -15,6 +15,30 @@ export type WarmupInput = {
   intervalMinutes: number;
   startAt: string;
 };
+export type WarmupPlanField =
+  | 'tokens'
+  | 'amount'
+  | 'feeReserve'
+  | 'cycles'
+  | 'intervalMinutes'
+  | 'startAt';
+export class WarmupPlanInputError extends Error {
+  constructor(
+    readonly field: WarmupPlanField,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'WarmupPlanInputError';
+  }
+}
+function validateField<T>(field: WarmupPlanField, validate: () => T): T {
+  try {
+    return validate();
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    throw new WarmupPlanInputError(field, error.message);
+  }
+}
 export function nativeUnits(chain: string) {
   return chain === 'Solana'
     ? { symbol: 'SOL', decimals: 9 }
@@ -59,13 +83,19 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
     !input.tokens.length ||
     input.tokens.length > 10
   )
-    throw new Error('Enter between 1 and 10 token addresses.');
-  const tokens = input.tokens.map((a) => walletAddress(a, chain));
+    throw new WarmupPlanInputError(
+      'tokens',
+      'Enter between 1 and 10 token addresses.',
+    );
+  const tokens = validateField('tokens', () =>
+    input.tokens.map((a) => walletAddress(a, chain)),
+  );
   if (
     new Set(tokens).size !== tokens.length ||
     tokens.some((t) => addresses.includes(t))
   )
-    throw new Error(
+    throw new WarmupPlanInputError(
+      'tokens',
       'Use distinct token addresses, separate from wallet addresses.',
     );
   if (
@@ -73,18 +103,31 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
     input.cycles < 1 ||
     input.cycles > WARMUP_MAX_CYCLES
   )
-    throw new Error('Choose 1 to 20 buy/sell cycles per wallet.');
+    throw new WarmupPlanInputError(
+      'cycles',
+      'Choose 1 to 20 buy/sell cycles per wallet.',
+    );
   if (
     !Number.isSafeInteger(input.intervalMinutes) ||
     input.intervalMinutes < 15 ||
     input.intervalMinutes > 10080
   )
-    throw new Error('Choose 15 minutes to 7 days between cycles.');
+    throw new WarmupPlanInputError(
+      'intervalMinutes',
+      'Choose 15 minutes to 7 days between cycles.',
+    );
   const start = Date.parse(input.startAt);
   if (!Number.isFinite(start) || start < now || start > now + 30 * 86400000)
-    throw new Error('Choose a start within the next 30 days.');
-  const amount = warmupAtoms(input.amount, unit.decimals),
-    reserve = warmupAtoms(input.feeReserve, unit.decimals);
+    throw new WarmupPlanInputError(
+      'startAt',
+      'Choose a start within the next 30 days.',
+    );
+  const amount = validateField('amount', () =>
+      warmupAtoms(input.amount, unit.decimals),
+    ),
+    reserve = validateField('feeReserve', () =>
+      warmupAtoms(input.feeReserve, unit.decimals),
+    );
   const interval = input.intervalMinutes * 60000;
   const actions = addresses
     .flatMap((address, walletIndex) =>

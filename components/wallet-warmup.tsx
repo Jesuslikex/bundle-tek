@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import {
   buildWarmupPlan,
   nativeUnits,
+  WarmupPlanInputError,
+  type WarmupPlanField,
   type WarmupHistory,
   type WarmupPlan,
 } from '@/lib/wallet-warmup';
@@ -61,13 +63,21 @@ export function WalletWarmup({
   const [freshStart, setFreshStart] = useState(!initialPlan);
   const panel = useRef<HTMLElement>(null);
   const form = useRef<HTMLFormElement>(null);
-  const customTokens = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     panel.current?.focus({ preventScroll: true });
     panel.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
   }, []);
   const [plan, setPlan] = useState<WarmupPlan | null>(null);
   const [error, setError] = useState('');
+  const [invalidField, setInvalidField] = useState<WarmupPlanField | null>(
+    null,
+  );
+  const fieldProps = (field: WarmupPlanField) => ({
+    'data-warmup-field': field,
+    'aria-invalid': invalidField === field || undefined,
+    'aria-describedby':
+      invalidField === field && error ? `${id}-error` : undefined,
+  });
   const [history, setHistory] = useState<HistoryResult[]>([]);
   const [busy, setBusy] = useState(false);
   const abort = useRef<AbortController | null>(null);
@@ -76,6 +86,7 @@ export function WalletWarmup({
     change();
     setPlan(null);
     setError('');
+    setInvalidField(null);
   };
   async function inspect() {
     abort.current?.abort();
@@ -278,10 +289,19 @@ export function WalletWarmup({
               }),
             );
             setError('');
+            setInvalidField(null);
           } catch (e) {
             setPlan(null);
             setError(e instanceof Error ? e.message : 'Invalid warmup plan.');
-            if (customTokens.current) customTokens.current.open = true;
+            setInvalidField(e instanceof WarmupPlanInputError ? e.field : null);
+            if (e instanceof WarmupPlanInputError) {
+              const input = form.current?.querySelector<
+                HTMLInputElement | HTMLTextAreaElement
+              >(`[data-warmup-field="${e.field}"]`);
+              input?.closest('details')?.setAttribute('open', '');
+              input?.focus();
+              input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+            }
           }
         }}
       >
@@ -304,7 +324,6 @@ export function WalletWarmup({
           </div>
         )}
         <details
-          ref={customTokens}
           className={styles.options}
           open={chain !== 'Solana' ? true : undefined}
         >
@@ -312,6 +331,7 @@ export function WalletWarmup({
           <label>
             Token addresses, one per line
             <textarea
+              {...fieldProps('tokens')}
               className="warmup-token-input"
               value={tokens}
               onChange={(e) => edit(() => setTokens(e.target.value))}
@@ -329,6 +349,7 @@ export function WalletWarmup({
             Buy amount per cycle ({unit.symbol})
             <Input
               id={`${id}-amount`}
+              {...fieldProps('amount')}
               value={amount}
               onChange={(e) => edit(() => setAmount(e.target.value))}
               inputMode="decimal"
@@ -347,6 +368,7 @@ export function WalletWarmup({
               Fee reserve per wallet ({unit.symbol})
               <Input
                 id={`${id}-reserve`}
+                {...fieldProps('feeReserve')}
                 value={reserve}
                 onChange={(e) => edit(() => setReserve(e.target.value))}
                 inputMode="decimal"
@@ -357,6 +379,7 @@ export function WalletWarmup({
               Cycles per wallet
               <Input
                 id={`${id}-cycles`}
+                {...fieldProps('cycles')}
                 type="number"
                 min={1}
                 max={20}
@@ -369,6 +392,7 @@ export function WalletWarmup({
               Minutes between cycles
               <Input
                 id={`${id}-interval`}
+                {...fieldProps('intervalMinutes')}
                 type="number"
                 min={15}
                 max={10080}
@@ -381,6 +405,7 @@ export function WalletWarmup({
               Start time
               <Input
                 id={`${id}-start`}
+                {...fieldProps('startAt')}
                 type="datetime-local"
                 value={start}
                 onChange={(e) =>
@@ -435,7 +460,11 @@ export function WalletWarmup({
           <Button type="submit">Review warmup plan</Button>
         </div>
       </form>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p id={`${id}-error`} role="alert">
+          {error}
+        </p>
+      )}
       {plan && <WarmupPlanSummary plan={plan} />}
       <WalletWarmupPlans
         initialPlan={initialPlan}
@@ -458,6 +487,7 @@ export function WalletWarmup({
           );
           setPlan(null);
           setError('');
+          setInvalidField(null);
           form.current?.focus({ preventScroll: true });
           form.current?.scrollIntoView?.({
             block: 'start',

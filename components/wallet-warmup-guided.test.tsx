@@ -108,8 +108,48 @@ it('reveals token entry after review refuses an empty selection, without any mut
   await click('Review warmup plan');
   expect(host.querySelector('form details')!.hasAttribute('open')).toBe(true);
   expect(host.querySelector('[role="alert"]')).toBeTruthy();
+  expect(document.activeElement).toBe(host.querySelector('textarea'));
   expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
 });
+it.each([
+  ['amount', 'amount', false],
+  ['feeReserve', 'feeReserve', true],
+] as const)(
+  'focuses the invalid %s without opening custom tokens',
+  async (property, field, opensOptions) => {
+    fixture.plan.document[property] = 'not-a-number';
+    fixture.plan.document.startAt = new Date(
+      Date.now() + 3600000,
+    ).toISOString();
+    await act(async () =>
+      root.render(
+        <WalletWarmup
+          chain="Solana"
+          addresses={[fixture.wallet]}
+          walletRevisions={[{ address: fixture.wallet, revision: 1 }]}
+          onClose={() => {}}
+          initialPlan={fixture.plan}
+        />,
+      ),
+    );
+    await click('Review warmup plan');
+    const input = host.querySelector<HTMLInputElement>(
+      `[data-warmup-field="${field}"]`,
+    )!;
+    expect(document.activeElement).toBe(input);
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(input.getAttribute('aria-describedby')).toBe(
+      host.querySelector('[role=alert]')!.id,
+    );
+    expect(host.querySelector('form details')!.hasAttribute('open')).toBe(
+      false,
+    );
+    expect(
+      host.querySelectorAll<HTMLDetailsElement>('form details')[1].open,
+    ).toBe(opensOptions);
+    expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
+  },
+);
 
 it('opens a collapsed options section when native input validation needs correction', async () => {
   await mount();
@@ -125,4 +165,35 @@ it('opens a collapsed options section when native input validation needs correct
     ),
   );
   expect(details.open).toBe(true);
+});
+it('routes an expired saved start to timing and recovers without saving automatically', async () => {
+  fixture.plan.document.startAt = new Date(Date.now() - 60000).toISOString();
+  await act(async () =>
+    root.render(
+      <WalletWarmup
+        chain="Solana"
+        addresses={[fixture.wallet]}
+        walletRevisions={[{ address: fixture.wallet, revision: 1 }]}
+        onClose={() => {}}
+        initialPlan={fixture.plan}
+      />,
+    ),
+  );
+  await click('Review warmup plan');
+  const start = host.querySelector<HTMLInputElement>(
+    'input[type="datetime-local"]',
+  )!;
+  expect(start.closest('details')!.open).toBe(true);
+  expect(document.activeElement).toBe(start);
+  expect(host.querySelector('form details')!.hasAttribute('open')).toBe(false);
+  expect(start.getAttribute('aria-invalid')).toBe('true');
+  expect(host.querySelector('[role=alert]')?.textContent).toContain(
+    'next 30 days',
+  );
+  expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
+  await click('Start in 5 minutes');
+  await click('Review warmup plan');
+  expect(host.querySelector('[role=alert]')).toBeNull();
+  expect(start.getAttribute('aria-invalid')).not.toBe('true');
+  expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
 });

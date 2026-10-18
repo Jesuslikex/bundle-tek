@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWarmupPlan } from './wallet-warmup';
+import { buildWarmupPlan, WarmupPlanInputError } from './wallet-warmup';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
 const now = Date.parse('2026-10-10T00:00:00Z');
 const input = {
@@ -16,6 +16,28 @@ const input = {
   startAt: '2026-10-10T01:00:00Z',
 };
 describe('warmup plans', () => {
+  it.each([
+    ['tokens', { tokens: [] }],
+    ['tokens', { tokens: ['invalid'] }],
+    ['tokens', { tokens: [input.addresses[0]] }],
+    ['amount', { amount: '0' }],
+    ['amount', { amount: '1e-3' }],
+    ['feeReserve', { feeReserve: '0.0000000000000000001' }],
+    ['cycles', { cycles: 0 }],
+    ['intervalMinutes', { intervalMinutes: 14 }],
+    ['startAt', { startAt: '2026-10-09T00:00:00Z' }],
+  ])(
+    'identifies the editable %s field without accepting invalid input',
+    (field, patch) => {
+      try {
+        buildWarmupPlan({ ...input, ...patch }, now);
+        expect.unreachable('Invalid plan was accepted');
+      } catch (error) {
+        expect(error).toBeInstanceOf(WarmupPlanInputError);
+        expect((error as WarmupPlanInputError).field).toBe(field);
+      }
+    },
+  );
   it('retains capacity for five maximum-size buy-to-sell passes', () => {
     const addresses = Array.from(
       { length: 20 },
