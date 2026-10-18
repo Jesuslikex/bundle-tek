@@ -41,3 +41,8 @@ The earlier funding audit's REA connection failure is historical. The other Bund
 The completion matrix remains the feature-gap record. Offline tests and layout checks do not establish funded Jito/launch execution, provider reliability, full holder coverage, audited P&L, stock qualification, marketplace fulfillment or complete Proxima parity. Older production release records are not fresh deployment checks.
 
 This reconciliation authorizes no push, deployment, hosted SQL, provider/credential/cron change, real wallet unlock/sign/send or funded transaction. Stock signing and all consent gates remain unchanged.
+
+
+## Combined run terminal at b66b3f8
+
+Read CODEX-PARITY-INTEGRATION-REGRESSION-20261018.md. Session 30484 finished with one account empty-state test failure, 5,107/5,108 Vitest tests and all 35 native tests passing. All 1,805 source hashes and harness hashes matched; HEAD/index were unchanged. The account-area owner has the exact failure for diagnosis. The source freeze is now released. This REA chat next owns the shared standard/holder launch-layer planning entry, preserving account ownership and all execution gates. Draft files in work remain unapplied and unverified. No push or deploy.
