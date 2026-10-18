@@ -1,5 +1,11 @@
 # Bundle collaboration checkpoint, 18 October 2026
 
+## Token layout integration after the planning checkpoints
+
+Local main now includes layer UI `3a2b658` and Claude's original token layout, cherry-picked as `353f762` from preserved branch commit `9f95a1a`. The previously missing actual current-client-shell synthetic browser matrix is complete. See `CODEX-CLAUDE-TOKEN-UI-INTEGRATION-20261018.md` for desktop/phone measurements, unchanged handler/gate evidence, two appended responsive CSS follow-ups and remaining limits. Older sections describing the token UI as unmerged or missing this shell check are historical. A full persistent chart-plus-wallet-table workspace and real-session production acceptance are still unfinished.
+
+The other Bundle chat owns the independent strategy condition-check continuation. Keep its dirty strategy files out of the token CSS/docs checkpoint and coordinate the shared index/build/helper. Local Git integration is not a push, hosted migration or deployment. Funding/signing/execution gates remain unchanged; this handoff grants no new financial authority.
+
 ## Refreshed coordination, 18 October at 06:38 local time
 
 This section supersedes the older source/worktree inventory below. Canonical main was inspected at `cb7dce4`. The other Bundle Codex chat owns strategy/session draft work and migration 0108. This chat owns Front/Back planning persistence and migration 0109. Both are local, unfinished checkpoints; neither adds execution authority. The other chat holds the shared Git index first. Shared journal/schema hunks must be staged separately.
