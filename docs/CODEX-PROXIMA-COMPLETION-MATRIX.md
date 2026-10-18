@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+Imported layer client/API/planner support now binds exact owned imported ID/revision/mint through loading, save acknowledgement and reopening, with scheduled-only plans and no developer role. CODEX-IMPORTED-LAYER-CLIENT-20261018.md records 167 tests in 15 files, scoped lint/TypeScript and responsive synthetic browser proof. The visible production imported picker is still unwired; this does not complete the imported launch flow or enable funding/signing.
+
 StonkFun Block-0 metadata review now has a separate Front-only planning entry with project-bound encrypted mint candidate generation/header restoration and backup download. It refuses a saved Pump context and retains all no-execution gates. CODEX-STONK-FRONT-PLANNING-20261018.md records 133 tests in 10 files, typed lint/TypeScript and synthetic responsive Chrome proof. Stonk creation/signing, imported planning and staged funding/execution remain unfinished.
 
 Standard Pump create-only and holder reviews now share the public-mint-bound Front/Back planner entry. Exact selection changes close/dispose old planning; no holder buy is needed to expose the ordinary entry. CODEX-STANDARD-LAUNCH-LAYER-ENTRY-20261018.md records 142 tests in 12 files, scoped lint/TypeScript and synthetic Chrome checks at desktop/375/320. StonkFun/imported entry points, staged funding and execution remain unfinished.

@@ -215,6 +215,14 @@ export async function readLaunchLayerContext(
     document: loaded.document,
     workspace: loaded.context.workspace,
     target: loaded.context.target,
+    ...(s.target.kind === 'imported'
+      ? {
+          importedTarget: {
+            projectId: s.target.projectId,
+            revision: s.target.revision,
+          },
+        }
+      : {}),
     fundingAllowed: false as const,
     signingAllowed: false as const,
     executionAllowed: false as const,
@@ -412,6 +420,14 @@ async function decode(db: D1Database, owner: string, row: Row) {
     createdAt: row.created_at,
     sha256: row.sha256,
     envelope: snapshot.envelope,
+    ...(snapshot.selection.target.kind === 'imported'
+      ? {
+          importedTarget: {
+            projectId: snapshot.selection.target.projectId,
+            revision: snapshot.selection.target.revision,
+          },
+        }
+      : {}),
     current,
     planningOnly: true as const,
     fundingAllowed: false as const,

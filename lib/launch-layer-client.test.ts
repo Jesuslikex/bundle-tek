@@ -2,6 +2,8 @@ import { expect, it } from 'vitest';
 import { layerUiFixture } from '../test/launch-layer-ui-fixture';
 import {
   initialLayerDraft,
+  layerSelectionRequest,
+  savedLayerMatchesSelection,
   layerAmount,
   layerDisplay,
   layerRequest,
@@ -12,7 +14,10 @@ import {
 } from './launch-layer-client';
 import { quoteCatalog } from './quote-catalog';
 import { layerTestStorage } from '../test/launch-layer-storage';
-import { saveOwnedLaunchLayerPlan } from './launch-layer-service';
+import {
+  saveOwnedLaunchLayerPlan,
+  readLaunchLayerContext,
+} from './launch-layer-service';
 
 it('retains a Front-only editor request through actual storage', async () => {
   const f = layerUiFixture();
@@ -182,4 +187,127 @@ it('refuses saved plans with foreign ownership scope, missing authority flags or
       f.selection.projectId,
     ),
   ).toThrow();
+});
+
+it('binds imported context and saved ceilings to the exact owned ID, revision and mint through real storage', async () => {
+  const f = layerUiFixture();
+  f.document.plan.scheduled = true;
+  const selection = {
+    ...f.selection,
+    target: {
+      kind: 'imported' as const,
+      projectId: 'imported-target',
+      revision: 3,
+      mint: f.address(90),
+    },
+  };
+  const storage = await layerTestStorage(f);
+  try {
+    await storage.db
+      .prepare('INSERT INTO imported_token_projects VALUES(?,?,?,?,?,?,?)')
+      .bind(
+        'alice',
+        'imported-target',
+        'Solana',
+        selection.target.mint,
+        JSON.stringify({
+          token: { chain: 'Solana', address: selection.target.mint },
+        }),
+        3,
+        0,
+      )
+      .run();
+    const request = layerSelectionRequest(selection);
+    expect(request.target).toEqual({
+      kind: 'imported',
+      projectId: 'imported-target',
+      revision: 3,
+    });
+    expect(request.target).not.toHaveProperty('mint');
+    const raw = await readLaunchLayerContext(storage.db, 'alice', request);
+    const context = parseLayerContext(raw, selection);
+    expect(context.importedTarget).toEqual({
+      projectId: 'imported-target',
+      revision: 3,
+    });
+    for (const altered of [
+      { ...raw, importedTarget: undefined },
+      { ...raw, importedTarget: { projectId: 'another-target', revision: 3 } },
+      { ...raw, importedTarget: { projectId: 'imported-target', revision: 4 } },
+      { ...raw, target: { kind: 'new', mint: selection.target.mint } },
+      { ...raw, target: { kind: 'imported', mint: f.address(91) } },
+      { ...raw, signingAllowed: true },
+    ])
+      expect(() => parseLayerContext(altered, selection)).toThrow();
+    const noDeployer = structuredClone(context);
+    delete noDeployer.document.options.wallets!.deployer;
+    expect(
+      initialLayerDraft(noDeployer).rows.some(
+        (row) => row.role === 'developer',
+      ),
+    ).toBe(false);
+    const unscheduled = structuredClone(context);
+    unscheduled.document.plan.scheduled = false;
+    expect(() => initialLayerDraft(unscheduled)).toThrow('scheduled');
+    const draft = {
+      ...f.draft,
+      rows: f.draft.rows.filter((row) => row.role !== 'developer'),
+    };
+    expect(layerRequest(draft, context).roles.developer).toBeUndefined();
+    expect(() => layerRequest(f.draft, context)).toThrow('no developer');
+    const envelope = await reviewLayerDraft(draft, context);
+    const stored = await saveOwnedLaunchLayerPlan(storage.db, 'alice', {
+      ...request,
+      layers: layerRequest(draft, context),
+    });
+    const saved = parseSavedLayer(stored, selection.projectId);
+    expect(saved.importedTarget).toEqual({
+      projectId: 'imported-target',
+      revision: 3,
+    });
+    expect(savedLayerMatchesSelection(saved, selection)).toBe(true);
+    expect(
+      savedLayerMatchesSelection(saved, {
+        ...selection,
+        target: { ...selection.target, projectId: 'another-target' },
+      }),
+    ).toBe(false);
+    expect(
+      savedLayerMatchesSelection(saved, {
+        ...selection,
+        target: { ...selection.target, revision: 4 },
+      }),
+    ).toBe(false);
+    await expect(reopenLayerDraft(envelope, context)).rejects.toThrow(
+      'different',
+    );
+    await expect(
+      reopenLayerDraft(envelope, context, {
+        projectId: 'another-target',
+        revision: 3,
+      }),
+    ).rejects.toThrow('different');
+    const reopened = await reopenLayerDraft(
+      envelope,
+      context,
+      saved.importedTarget,
+    );
+    expect(layerRequest(reopened, context)).toEqual(
+      layerRequest(draft, context),
+    );
+    await storage.db
+      .prepare('UPDATE imported_token_projects SET revision=4')
+      .run();
+    await expect(
+      readLaunchLayerContext(storage.db, 'alice', request),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      saveOwnedLaunchLayerPlan(storage.db, 'alice', {
+        ...request,
+        layers: layerRequest(draft, context),
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+  } finally {
+    storage.client.close();
+  }
 });

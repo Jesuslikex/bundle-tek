@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   initialLayerDraft,
+  layerSelectionRequest,
+  savedLayerMatchesSelection,
   layerDisplay,
   layerAmount,
   layerQuote,
@@ -211,7 +213,9 @@ function Planner({
         fetch(
           endpoint +
             '?context=' +
-            encodeURIComponent(JSON.stringify(selection)),
+            encodeURIComponent(
+              JSON.stringify(layerSelectionRequest(selection)),
+            ),
           { signal, cache: 'no-store' },
         ).then(read),
         fetch(
@@ -238,7 +242,9 @@ function Planner({
           setContext(null);
           setDraft(null);
           failures.push(
-            'Current planning context could not be confirmed. Save the developer, complete holders and exact quote in the launch project, then reload.',
+            selection.target.kind === 'imported'
+              ? 'Current imported token context could not be confirmed. Save a scheduled launch with complete holders and the exact quote, then reload the selected imported record.'
+              : 'Current planning context could not be confirmed. Save the developer, complete holders and exact quote in the launch project, then reload.',
           );
         }
       } else {
@@ -302,13 +308,25 @@ function Planner({
         {frontOnly ? 'Front-wallet planning' : 'Front / Back layer planning'}
       </h3>
       <p>
-        {frontOnly
-          ? 'Plan Front wallets only. Saving does not create a coin or configure execution. Staged funding and execution are not available yet.'
-          : 'Plan distinct buyer and holder stages. Saving here does not configure the ordinary launch below. Staged funding and execution are not available yet.'}
+        {selection.target.kind === 'imported'
+          ? 'Plan buyer and holder stages for this existing token. Saving does not configure token purchases. Staged funding and execution are not available yet.'
+          : frontOnly
+            ? 'Plan Front wallets only. Saving does not create a coin or configure execution. Staged funding and execution are not available yet.'
+            : 'Plan distinct buyer and holder stages. Saving here does not configure the ordinary launch below. Staged funding and execution are not available yet.'}
       </p>
       <p className={styles.address}>
-        Mint candidate: <code>{selection.target.mint}</code>
+        {selection.target.kind === 'imported'
+          ? 'Imported token'
+          : 'Mint candidate'}
+        : <code>{selection.target.mint}</code>
       </p>
+      {selection.target.kind === 'imported' && (
+        <p className={styles.address}>
+          Imported record {selection.target.projectId}, revision{' '}
+          {selection.target.revision}. This is an existing token; no new mint or
+          developer purchase is planned.
+        </p>
+      )}
       <Button variant="outline" disabled={blocked} onClick={load}>
         {context
           ? 'Reload context and saved plan'
@@ -324,8 +342,11 @@ function Planner({
         <p>
           Saved project {context.projectId}, revision time{' '}
           {context.projectUpdatedAt}. Extra role selections use the account
-          roster’s root scope; developer and final holders keep their saved
-          folder references.
+          roster’s root scope;{' '}
+          {context.target.kind === 'new'
+            ? 'developer and final holders'
+            : 'final holders'}{' '}
+          keep their saved folder references.
         </p>
       )}
       {draft && context && quote && (
@@ -333,7 +354,10 @@ function Planner({
           <fieldset disabled={blocked} className={styles.editor}>
             <legend>1. Assign roles and exact ceilings</legend>
             <p>
-              Each address can appear once. Developer and final holders are
+              Each address can appear once.{' '}
+              {context.target.kind === 'new'
+                ? 'Developer and final holders are'
+                : 'Final holders are'}{' '}
               locked to launch settings. Enter every fee, rent and reserve
               ceiling, including 0 when intended. Balances and key control have
               not been checked.
@@ -662,7 +686,7 @@ function Planner({
                         signal,
                         headers: { 'content-type': 'application/json' },
                         body: JSON.stringify({
-                          ...selection,
+                          ...layerSelectionRequest(selection),
                           layers: layerRequest(review.draft, context),
                         }),
                       }).then(read);
@@ -671,8 +695,7 @@ function Planner({
                         selection.projectId,
                       );
                       if (
-                        retained.projectUpdatedAt !==
-                          selection.projectUpdatedAt ||
+                        !savedLayerMatchesSelection(retained, selection) ||
                         JSON.stringify({
                           ...retained.envelope.terms,
                           binding: {
@@ -791,7 +814,7 @@ function Planner({
               blocked ||
               !context ||
               !saved.current ||
-              saved.envelope.terms.binding.target.mint !== selection.target.mint
+              !savedLayerMatchesSelection(saved, selection)
             }
             onClick={() =>
               void run(
@@ -801,6 +824,7 @@ function Planner({
                   const reopened = await reopenLayerDraft(
                     saved.envelope,
                     context,
+                    saved.importedTarget,
                   );
                   if (current()) {
                     edit(reopened);
@@ -816,8 +840,7 @@ function Planner({
           </Button>
           {(!context ||
             !saved.current ||
-            saved.envelope.terms.binding.target.mint !==
-              selection.target.mint) && (
+            !savedLayerMatchesSelection(saved, selection)) && (
             <p>
               Reopening requires matching current source, mint and wallet
               references. Historical snapshots remain readable.

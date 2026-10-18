@@ -651,3 +651,96 @@ it('loads the owned saved Stonk context through the actual route for Front-only 
   ).not.toBeNull();
   expect(calls.every((call) => call.method === 'GET')).toBe(true);
 });
+
+it('loads, reviews, saves and reopens a scheduled imported target without a developer through the real route', async () => {
+  const document = structuredClone(f.document);
+  document.plan.scheduled = true;
+  await storage.db
+    .prepare('UPDATE workspace_projects SET document=? WHERE id=?')
+    .bind(JSON.stringify(document), f.selection.projectId)
+    .run();
+  const target = {
+    kind: 'imported' as const,
+    projectId: 'imported-layer-target',
+    revision: 3,
+    mint: f.address(90),
+  };
+  await storage.db
+    .prepare('INSERT INTO imported_token_projects VALUES(?,?,?,?,?,?,?)')
+    .bind(
+      'alice',
+      target.projectId,
+      'Solana',
+      target.mint,
+      JSON.stringify({ token: { chain: 'Solana', address: target.mint } }),
+      3,
+      0,
+    )
+    .run();
+  const selection = { ...f.selection, target };
+  await act(async () =>
+    root.render(<PumpLayerPlanner selection={selection} />),
+  );
+  await click('Load saved wallets and layer history');
+  await until(() =>
+    expect(host.querySelectorAll('fieldset[aria-label]')).toHaveLength(4),
+  );
+  expect(host.textContent).toContain('Imported token:');
+  expect(
+    [...host.querySelectorAll('fieldset legend')].some(
+      (e) => e.textContent === 'Developer',
+    ),
+  ).toBe(false);
+  const read = calls.find((call) => call.url.includes('?context='))!;
+  expect(
+    JSON.parse(
+      new URL(read.url, 'https://bundle.test').searchParams.get('context')!,
+    ).target,
+  ).toEqual({ kind: 'imported', projectId: target.projectId, revision: 3 });
+  for (const row of host.querySelectorAll('fieldset[aria-label]')) {
+    const role = row.querySelector('legend')!.textContent;
+    const select = row.querySelector('select');
+    if (select) await input(select, f.address(role === 'Funder' ? 1 : 3));
+    const inputs = [...row.querySelectorAll('input')];
+    if (!inputs[0].disabled)
+      await input(inputs[0], role === 'Front buyer' ? '0.000001' : '0');
+    await input(inputs[1], '0.000005');
+    await input(inputs[2], '0.002');
+    await input(inputs[3], '0.0001');
+  }
+  await click('Review layer ceilings');
+  await click('Save reviewed planning snapshot');
+  expect(host.textContent).toContain('Planning snapshot saved');
+  const records = await storage.client.execute(
+    'SELECT document FROM launch_layer_plans',
+  );
+  expect(records.rows).toHaveLength(1);
+  const saved = JSON.parse(records.rows[0].document as string);
+  expect(saved.selection.target).toEqual({
+    kind: 'imported',
+    projectId: target.projectId,
+    revision: 3,
+  });
+  expect(saved.envelope.terms.roles.developer).toBeUndefined();
+  expect(saved.envelope.terms.signingAllowed).toBe(false);
+  await click('Use saved ceilings as a new draft');
+  expect(host.textContent).toContain('Saved ceilings copied into a new draft');
+  await storage.db
+    .prepare('UPDATE imported_token_projects SET revision=4')
+    .run();
+  await act(async () =>
+    root.render(
+      <PumpLayerPlanner
+        selection={{ ...selection, target: { ...target, revision: 4 } }}
+      />,
+    ),
+  );
+  await click('Load saved wallets and layer history');
+  await until(() =>
+    expect(host.textContent).toContain(
+      'Current references could not be confirmed',
+    ),
+  );
+  expect(button('Use saved ceilings as a new draft').disabled).toBe(true);
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+});

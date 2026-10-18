@@ -56,3 +56,8 @@ The REA chat extracted the shared public-mint-bound layer entry into components/
 ## Separate Stonk Front planning
 
 Read CODEX-STONK-FRONT-PLANNING-20261018.md. The REA chat added a separate metadata-review Stonk Block-0 planning slot, encrypted project mint candidate lifecycle and Front-only shared planner labels, with a saved-platform mismatch refusal. Final 10 files/133 tests, eight-file typed lint and TypeScript pass; synthetic Chrome checks cover desktop/375/320. No Pump financial handler, protected layout, schema, provider or execution gate changed. Imported planning and Stonk execution remain open. Preserve the account owner's receipt/0113 work and all user AGENTS text. No push or deploy.
+
+
+## Imported layer client foundation
+
+The REA chat extended the layer client, context/saved response and existing planner for exact owned imported ID/revision/mint. Imported requests never supply mint authority; scheduled-only plans omit the developer, and saved reuse checks the exact record/revision. Read CODEX-IMPORTED-LAYER-CLIENT-20261018.md for the final 15-file/167-test pass, typed lint/TypeScript and synthetic browser evidence. Production imported selection is not yet wired. No protected layout, schema/migration, provider or financial handler changed. Other chat receipt commit dd63e24 and user AGENTS text preserved; no push or deploy.
