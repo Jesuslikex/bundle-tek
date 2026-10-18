@@ -26,6 +26,7 @@ import * as broadcastSimulation from './pump-group-broadcast-simulation';
 import { readFileSync } from 'node:fs';
 import { openOwnedPumpTokenWorkspace } from './pump-launch-token-workspace-service';
 import type { ImportedToken } from './token-import';
+import { readOwnedPumpGroupRecordedCosts } from './pump-group-recorded-costs-service';
 vi.mock('./owned-pump-preflight', async (original) => ({
   ...(await original<typeof import('./owned-pump-preflight')>()),
   preflightOwnedPumpCreate: vi.fn(),
@@ -117,7 +118,9 @@ async function setup() {
         slot: '250',
         transaction: [packet.transaction, 'base64'],
         meta: {
-          err: control.packetErrs ? control.packetErrs[index] : control.groupErr,
+          err: control.packetErrs
+            ? control.packetErrs[index]
+            : control.groupErr,
           fee: '5000',
         },
       };
@@ -229,6 +232,92 @@ async function setup() {
   }
   return { ...f, group, rpc, jito, sends, reads, control, prepare, ready };
 }
+it('projects owner-only saved launch costs through real SQL and receipt parsers without a write or provider read', async () => {
+  const f = await setup();
+  await expect(
+    readOwnedPumpGroupRecordedCosts(f.db, 'alice', f.group.review.id, signal()),
+  ).rejects.toThrow('no closed');
+  await f.ready();
+  f.control.chain = true;
+  await recoverOwnedPumpGroupBroadcast(
+    f.db,
+    'alice',
+    f.group.review.id,
+    signal(),
+    f.rpc,
+    f.jito,
+  );
+  const reads = f.reads.length,
+    sends = f.sends.length;
+  const fetchSpy = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(async () => {
+      throw Error('No provider allowed in saved costs');
+    });
+  const readonlyDb = {
+    prepare(sql: string) {
+      expect(sql.trim()).toMatch(/^SELECT\b/i);
+      return f.db.prepare(sql);
+    },
+  } as unknown as D1Database;
+  const report = await readOwnedPumpGroupRecordedCosts(
+    readonlyDb,
+    'alice',
+    f.group.review.id,
+    signal(),
+  );
+  expect(report).toMatchObject({
+    reviewId: f.group.review.id,
+    mint: f.group.review.input.create.mint,
+    tipLamports: '1000',
+    tipNetworkFeeLamports: '5000',
+    groupNetworkFeeLamports: String(f.group.review.packets.length * 5000),
+    knownTotalLamports: String(f.group.review.packets.length * 5000 + 6000),
+    feeAndTipCoverageComplete: true,
+    signingAllowed: false,
+    executionAllowed: false,
+    reservationsChanged: false,
+    economicSettlementVerified: false,
+  });
+  expect(JSON.stringify(report)).not.toContain('signature');
+  expect(JSON.stringify(report)).not.toContain('transaction');
+  expect(fetchSpy).not.toHaveBeenCalled();
+  expect(f.reads).toHaveLength(reads);
+  expect(f.sends).toHaveLength(sends);
+  await expect(
+    readOwnedPumpGroupRecordedCosts(
+      readonlyDb,
+      'bob',
+      f.group.review.id,
+      signal(),
+    ),
+  ).rejects.toThrow('not found');
+  const aborted = new AbortController();
+  aborted.abort();
+  await expect(
+    readOwnedPumpGroupRecordedCosts(
+      readonlyDb,
+      'alice',
+      f.group.review.id,
+      aborted.signal,
+    ),
+  ).rejects.toThrow();
+  // Deliberately corrupt a disposable fixture after removing its immutability guard.
+  await f.client.execute('DROP TRIGGER pump_group_observation_no_update');
+  await f.client.execute({
+    sql: 'UPDATE pump_group_observations SET context_sha256=? WHERE owner_id=? AND review_id=?',
+    args: ['f'.repeat(64), 'alice', f.group.review.id],
+  });
+  await expect(
+    readOwnedPumpGroupRecordedCosts(
+      readonlyDb,
+      'alice',
+      f.group.review.id,
+      signal(),
+    ),
+  ).rejects.toThrow('exact retained launch observation');
+}, 120000);
+
 it('reviews additional costs, retains the exact tip, sends the fully revalidated vector once and finalizes from exact chain evidence', async () => {
   const f = await setup(),
     { saved, consent } = await f.ready();
@@ -679,6 +768,21 @@ it('closes exact all-finalized failures only when tip and every group fee are re
     )?.recovery?.state,
   ).toBe('failed');
   expect(f.sends).toHaveLength(0);
+  expect(
+    await readOwnedPumpGroupRecordedCosts(
+      f.db,
+      'alice',
+      f.group.review.id,
+      signal(),
+    ),
+  ).toMatchObject({
+    outcome: 'failed',
+    tipLamports: '0',
+    tipNetworkFeeLamports: '5000',
+    feeAndTipCoverageComplete: true,
+    knownTotalLamports: String((f.group.review.packets.length + 1) * 5000),
+    economicSettlementVerified: false,
+  });
 }, 120000);
 it('rejects mismatched closure kind or fee totals in SQL and keeps reservations until a valid retry', async () => {
   const f = await setup();
@@ -780,10 +884,7 @@ async function settledSetup() {
   f.control.chain = true;
   return f;
 }
-const recover = (
-  f: Awaited<ReturnType<typeof setup>>,
-  db: D1Database = f.db,
-) =>
+const recover = (f: Awaited<ReturnType<typeof setup>>, db: D1Database = f.db) =>
   recoverOwnedPumpGroupBroadcast(
     db,
     'alice',
@@ -819,10 +920,7 @@ it('holds a partial landing until expiry, then settles it and releases reservati
     reservationsReleased: true,
     completeLaunch: false,
   });
-  const view = await parsePumpGroupView(
-    result.group,
-    f.group.review.projectId,
-  );
+  const view = await parsePumpGroupView(result.group, f.group.review.projectId);
   expect(
     (await parsePumpGroupBroadcastState(result.broadcast, view))?.recovery
       ?.state,
@@ -846,6 +944,21 @@ it('settles a tip that landed alone after the launch packets expired unobserved'
     networkFeeUnresolved: false,
   });
   expect(result.broadcast?.reservationsReleased).toBe(true);
+  expect(
+    await readOwnedPumpGroupRecordedCosts(
+      f.db,
+      'alice',
+      f.group.review.id,
+      signal(),
+    ),
+  ).toMatchObject({
+    outcome: 'partial',
+    groupNetworkFeeLamports: '0',
+    tipNetworkFeeLamports: '5000',
+    tipLamports: '1000',
+    knownTotalLamports: '6000',
+    feeAndTipCoverageComplete: false,
+  });
 }, 120000);
 it('settles an all-finalized mixed outcome immediately without an expiry read for packets', async () => {
   const f = await settledSetup();

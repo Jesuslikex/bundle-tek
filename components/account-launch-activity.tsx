@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { AccountLaunchCosts } from '@/components/account-launch-costs';
 import styles from './account-launch-activity.module.css';
 import {
   validatedAccountLaunchActivity,
@@ -87,6 +88,7 @@ export function AccountLaunchActivitySummary({
                 >
                   {new Date(item.settledAt ?? item.createdAt).toLocaleString()}
                 </time>
+                <AccountLaunchCosts reviewId={item.id} mint={item.mint} />
               </li>
             ))}
           </ol>
