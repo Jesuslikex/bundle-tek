@@ -136,9 +136,11 @@ function BudgetReview({ envelope }: { envelope: LaunchLayerEnvelope }) {
 function Planner({
   selection,
   disabled = false,
+  frontOnly = false,
 }: {
   selection: LayerSelection;
   disabled?: boolean;
+  frontOnly?: boolean;
 }) {
   const id = useId();
   const [context, setContext] = useState<LayerPlanningContext | null>(null);
@@ -225,6 +227,8 @@ function Planner({
             contextResult.value.context,
             selection,
           );
+          if (frontOnly && loaded.document.plan.launchpad !== 'StonkFun')
+            throw new Error('Save the StonkFun launch settings first.');
           const initial = initialLayerDraft(loaded);
           layerQuote(loaded);
           setContext(loaded);
@@ -290,13 +294,17 @@ function Planner({
   return (
     <section
       className={styles.panel}
-      aria-label="Front and Back layer planning"
+      aria-label={
+        frontOnly ? 'Front-wallet planning' : 'Front and Back layer planning'
+      }
     >
-      <h3>Front / Back layer planning</h3>
+      <h3>
+        {frontOnly ? 'Front-wallet planning' : 'Front / Back layer planning'}
+      </h3>
       <p>
-        Plan distinct buyer and holder stages. Saving here does not configure
-        the ordinary launch below. Staged funding and execution are not
-        available yet.
+        {frontOnly
+          ? 'Plan Front wallets only. Saving does not create a coin or configure execution. Staged funding and execution are not available yet.'
+          : 'Plan distinct buyer and holder stages. Saving here does not configure the ordinary launch below. Staged funding and execution are not available yet.'}
       </p>
       <p className={styles.address}>
         Mint candidate: <code>{selection.target.mint}</code>

@@ -134,3 +134,20 @@ it('aborts both pending planning reads when the entry is closed', async () => {
   expect(signals.every((signal) => signal.aborted)).toBe(true);
   expect(panel()).toBeNull();
 });
+
+it('labels the Stonk planning surface Front-only without changing its authority', async () => {
+  await act(async () => {
+    root.render(<LaunchLayerPlanningEntry selection={selection} frontOnly />);
+  });
+  expect(toggle().textContent).toBe('Plan Front wallets');
+  await open();
+  const front = container.querySelector('[aria-label="Front-wallet planning"]');
+  expect(front?.textContent).toContain('Plan Front wallets only');
+  expect(front?.textContent).toContain(
+    'Saving does not create a coin or configure execution',
+  );
+  expect(
+    container.querySelector('[aria-label="Front and Back layer planning"]'),
+  ).toBeNull();
+  expect(fetcher).not.toHaveBeenCalled();
+});

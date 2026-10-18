@@ -51,3 +51,8 @@ Read CODEX-PARITY-INTEGRATION-REGRESSION-20261018.md. Session 30484 finished wit
 ## Standard launch planner entry
 
 The REA chat extracted the shared public-mint-bound layer entry into components/launch/launch-layer-planning-entry.tsx and mounted it in ordinary create-only and holder reviews. Read CODEX-STANDARD-LAUNCH-LAYER-ENTRY-20261018.md for the final 12-file/142-test pass, scoped checks, synthetic Chrome evidence and explicit remaining StonkFun/imported/funding gaps. The account owner separately committed its integration fixture fix in 32fca77; do not relabel the earlier failed combined run as passing. Preserve the account owner's newer receipt/schema/migration drafts and all user AGENTS text. No push or deploy.
+
+
+## Separate Stonk Front planning
+
+Read CODEX-STONK-FRONT-PLANNING-20261018.md. The REA chat added a separate metadata-review Stonk Block-0 planning slot, encrypted project mint candidate lifecycle and Front-only shared planner labels, with a saved-platform mismatch refusal. Final 10 files/133 tests, eight-file typed lint and TypeScript pass; synthetic Chrome checks cover desktop/375/320. No Pump financial handler, protected layout, schema, provider or execution gate changed. Imported planning and Stonk execution remain open. Preserve the account owner's receipt/0113 work and all user AGENTS text. No push or deploy.

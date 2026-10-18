@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+StonkFun Block-0 metadata review now has a separate Front-only planning entry with project-bound encrypted mint candidate generation/header restoration and backup download. It refuses a saved Pump context and retains all no-execution gates. CODEX-STONK-FRONT-PLANNING-20261018.md records 133 tests in 10 files, typed lint/TypeScript and synthetic responsive Chrome proof. Stonk creation/signing, imported planning and staged funding/execution remain unfinished.
+
 Standard Pump create-only and holder reviews now share the public-mint-bound Front/Back planner entry. Exact selection changes close/dispose old planning; no holder buy is needed to expose the ordinary entry. CODEX-STANDARD-LAUNCH-LAYER-ENTRY-20261018.md records 142 tests in 12 files, scoped lint/TypeScript and synthetic Chrome checks at desktop/375/320. StonkFun/imported entry points, staged funding and execution remain unfinished.
 
 The combined run at b66b3f8 completed with one account-panel test failure: 5,107/5,108 Vitest tests across 580 files passed, plus all 35 native tests in eight files. All 1,805 source hashes and the harness stayed unchanged. The lazy holder-planner readiness case now passes. See CODEX-PARITY-INTEGRATION-REGRESSION-20261018.md for retained failed evidence and the account-owner handoff. This is not a full green release qualification.

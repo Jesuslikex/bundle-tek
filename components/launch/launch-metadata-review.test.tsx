@@ -212,3 +212,26 @@ it('times out even if the response body reader ignores cancellation', async () =
   );
   expect(button().disabled).toBe(false);
 });
+
+it('exposes a separate Front-only StonkFun planner without the Pump financial handler', async () => {
+  render({ plan: { ...plan, launchpad: 'StonkFun', mode: 'Block-0' } });
+  expect(
+    container.querySelector('[aria-label="StonkFun Front-wallet planning"]'),
+  ).not.toBeNull();
+  expect(container.textContent).toContain(
+    'StonkFun has no Back or temporary layer',
+  );
+  expect(
+    container.querySelector('[aria-label="PumpFun launch review"]'),
+  ).toBeNull();
+  expect(fetcher).not.toHaveBeenCalled();
+});
+it('does not expose StonkFun planning without a saved project', () => {
+  render({
+    plan: { ...plan, launchpad: 'StonkFun', mode: 'Block-0' },
+    project: null,
+  });
+  expect(
+    container.querySelector('[aria-label="StonkFun Front-wallet planning"]'),
+  ).toBeNull();
+});

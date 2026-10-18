@@ -620,3 +620,34 @@ it('requires explicit positive Front buys and refuses noninteger delays before a
   expect(host.querySelector('[role=alert]')?.textContent).toContain('positive');
   expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
 });
+
+it('refuses a saved Pump context in the Front-only Stonk entry', async () => {
+  await act(async () =>
+    root.render(<PumpLayerPlanner selection={f.selection} frontOnly />),
+  );
+  await click('Load saved wallets and layer history');
+  await until(() =>
+    expect(host.textContent).toContain(
+      'Current planning context could not be confirmed',
+    ),
+  );
+  expect(host.querySelector('fieldset')).toBeNull();
+  expect(calls.every((call) => call.method === 'GET')).toBe(true);
+});
+it('loads the owned saved Stonk context through the actual route for Front-only planning', async () => {
+  const document = structuredClone(f.context.document);
+  document.plan.launchpad = 'StonkFun';
+  await storage.db
+    .prepare('UPDATE workspace_projects SET document=? WHERE id=?')
+    .bind(JSON.stringify(document), f.selection.projectId)
+    .run();
+  await act(async () =>
+    root.render(<PumpLayerPlanner selection={f.selection} frontOnly />),
+  );
+  await click('Load saved wallets and layer history');
+  await until(() => expect(host.querySelector('fieldset')).not.toBeNull());
+  expect(
+    host.querySelector('[aria-label="Front-wallet planning"]'),
+  ).not.toBeNull();
+  expect(calls.every((call) => call.method === 'GET')).toBe(true);
+});

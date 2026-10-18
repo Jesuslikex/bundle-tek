@@ -9,8 +9,12 @@ const PumpLayerPlanner = dynamic(
     import('./pump-layer-planner').then((loaded) => loaded.PumpLayerPlanner),
   { loading: () => <p>Loading layer planning…</p> },
 );
-type Props = { selection: LayerSelection; disabled?: boolean };
-function Entry({ selection, disabled = false }: Props) {
+type Props = {
+  selection: LayerSelection;
+  disabled?: boolean;
+  frontOnly?: boolean;
+};
+function Entry({ selection, disabled = false, frontOnly = false }: Props) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   return (
@@ -23,11 +27,19 @@ function Entry({ selection, disabled = false }: Props) {
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((value) => !value)}
       >
-        {open ? 'Close layer planning' : 'Plan Front / Back layers'}
+        {open
+          ? 'Close layer planning'
+          : frontOnly
+            ? 'Plan Front wallets'
+            : 'Plan Front / Back layers'}
       </Button>
       {open && (
         <div id={panelId}>
-          <PumpLayerPlanner selection={selection} disabled={disabled} />
+          <PumpLayerPlanner
+            selection={selection}
+            disabled={disabled}
+            frontOnly={frontOnly}
+          />
         </div>
       )}
     </>
