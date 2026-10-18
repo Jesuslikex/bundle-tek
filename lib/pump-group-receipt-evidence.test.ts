@@ -15,6 +15,7 @@ import {
 } from './pump-group-receipt-evidence';
 import {
   readOwnedPumpGroupReceiptEvidence,
+  readOwnedPumpGroupReceiptSource,
   retainOwnedPumpGroupReceiptEvidence,
 } from './pump-group-receipt-evidence-service';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
@@ -101,6 +102,130 @@ async function database() {
   return { client, db: createTursoDatabase(client) };
 }
 const id = () => crypto.randomUUID();
+it('loads an exact private accounting source independently of a poorer latest snapshot, owner scoped', async () => {
+  const { client, db } = await database(),
+    receiptId = id();
+  const first = await retainOwnedPumpGroupReceiptEvidence(
+    db,
+    'alice',
+    f.review.id,
+    receiptId,
+    signal(),
+    f.rpc,
+  );
+  await client.execute(
+    'UPDATE imported_token_project_gates SET next_allowed_at=0',
+  );
+  const latestId = id();
+  await retainOwnedPumpGroupReceiptEvidence(
+    db,
+    'alice',
+    f.review.id,
+    latestId,
+    signal(),
+    async (m, p, s) =>
+      m === 'getTransaction' && p[0] === f.signed.packets[1].signature
+        ? null
+        : f.rpc(m, p, s),
+  );
+  const source = await readOwnedPumpGroupReceiptSource(
+    db,
+    'alice',
+    f.review.id,
+    receiptId,
+    signal(),
+  );
+  expect(source.row.id).toBe(receiptId);
+  expect(source.evidence.sha256).toBe(first.entry!.sha256);
+  expect(
+    source.evidence.report.packets.every((p) => p.outcome === 'success'),
+  ).toBe(true);
+  expect(source.group.signedEvidence).toEqual(f.signed);
+  expect(
+    (
+      await readOwnedPumpGroupReceiptSource(
+        db,
+        'alice',
+        f.review.id,
+        latestId,
+        signal(),
+      )
+    ).evidence.report.packets[1].outcome,
+  ).toBe('not-observed');
+  await expect(
+    readOwnedPumpGroupReceiptSource(
+      db,
+      'bob',
+      f.review.id,
+      receiptId,
+      signal(),
+    ),
+  ).rejects.toThrow('not found');
+  await expect(
+    readOwnedPumpGroupReceiptSource(db, 'alice', f.review.id, id(), signal()),
+  ).rejects.toThrow('not found');
+  await expect(
+    readOwnedPumpGroupReceiptSource(db, 'alice', id(), receiptId, signal()),
+  ).rejects.toThrow('not found');
+  await expect(
+    readOwnedPumpGroupReceiptSource(db, 'alice', f.review.id, 'bad', signal()),
+  ).rejects.toThrow('Select one');
+});
+it.each(['parent', 'cancel'] as const)(
+  'refuses private source publication after %s changes during the final source read',
+  async (mode) => {
+    const { client, db } = await database(),
+      receiptId = id(),
+      controller = new AbortController();
+    await retainOwnedPumpGroupReceiptEvidence(
+      db,
+      'alice',
+      f.review.id,
+      receiptId,
+      signal(),
+      f.rpc,
+    );
+    let reads = 0;
+    const guarded = {
+      prepare(sql: string) {
+        const statement = db.prepare(sql);
+        if (
+          sql !==
+          'SELECT * FROM pump_group_receipt_evidence WHERE owner_id=? AND id=?'
+        )
+          return statement;
+        return {
+          bind(...values: unknown[]) {
+            const bound = statement.bind(...values);
+            return {
+              async first() {
+                const result = await bound.first();
+                if (++reads === 2) {
+                  if (mode === 'parent')
+                    await client.execute(
+                      "UPDATE pump_launch_reviews SET state='different'",
+                    );
+                  else controller.abort();
+                }
+                return result;
+              },
+            };
+          },
+        };
+      },
+    } as D1Database;
+    await expect(
+      readOwnedPumpGroupReceiptSource(
+        guarded,
+        'alice',
+        f.review.id,
+        receiptId,
+        controller.signal,
+      ),
+    ).rejects.toThrow();
+    expect(reads).toBe(2);
+  },
+);
 async function rehash(e: Awaited<ReturnType<typeof collect>>) {
   const { sha256: _sha256, ...body } = e;
   e.sha256 = await pumpHolderDigest(body);

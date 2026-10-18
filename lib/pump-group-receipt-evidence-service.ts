@@ -99,7 +99,7 @@ function summary(
     },
   };
 }
-async function convert(
+async function parsedSource(
   row: Row,
   owner: string,
   id: string,
@@ -120,12 +120,19 @@ async function convert(
   );
   if (row.sha256 !== e.sha256 || row.created_at !== e.report.observedAt)
     return fail('Saved launch receipt row differs.');
-  const value = summary(row.id, e);
-  value.entry!.payments = await projectVerifiedPumpGroupPayments(
-    e,
-    p.group,
-    signal,
-  );
+  const payments = await projectVerifiedPumpGroupPayments(e, p.group, signal);
+  return { evidence: e, payments };
+}
+async function convert(
+  row: Row,
+  owner: string,
+  id: string,
+  p: Awaited<ReturnType<typeof parent>>,
+  signal: AbortSignal,
+) {
+  const source = await parsedSource(row, owner, id, p, signal),
+    value = summary(row.id, source.evidence);
+  value.entry!.payments = source.payments;
   return value;
 }
 async function existing(db: D1Database, owner: string, requestId: string) {
@@ -174,6 +181,42 @@ export async function readOwnedPumpGroupReceiptEvidence(
     ? await convert(row, owner, id, p, signal)
     : { reviewId: id, mint: p.group.review.input.create.mint, entry: null };
   return stable(db, owner, id, p, value, signal);
+}
+/** Private exact-source read for durable accounting. Never serialize this result
+ * into an HTTP response: it contains the retained signed packet evidence.
+ * Unlike the public latest-summary read, a poorer new snapshot cannot select or
+ * replace a previously reviewed source. No provider access or mutation. */
+export async function readOwnedPumpGroupReceiptSource(
+  db: D1Database,
+  owner: string,
+  reviewId: string,
+  receiptId: string,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  if (!launchEvidenceId(receiptId))
+    return fail('Select one retained launch receipt.', 400);
+  await guards(db);
+  const p = await parent(db, owner, reviewId),
+    row = await existing(db, owner, receiptId);
+  if (!row || row.review_id !== reviewId)
+    return fail('The selected launch receipt was not found.', 404);
+  const source = await parsedSource(row, owner, reviewId, p, signal);
+  const after = await existing(db, owner, receiptId);
+  signal.throwIfAborted();
+  if (canonicalPumpHolderJson(row) !== canonicalPumpHolderJson(after))
+    return fail(
+      'The selected launch receipt changed while checking its costs.',
+    );
+  await stable(
+    db,
+    owner,
+    reviewId,
+    p,
+    summary(row.id, source.evidence),
+    signal,
+  );
+  return { row, parent: p.row, group: p.group, ...source };
 }
 /** Explicit evidence capture; the request carries identity only, never caller-authored receipts. */
 export async function retainOwnedPumpGroupReceiptEvidence(
