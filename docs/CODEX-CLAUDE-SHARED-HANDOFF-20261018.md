@@ -103,3 +103,7 @@ Read CODEX-EXCHANGE-ORDER-TRANSPORT-20261018.md. Disabled-by-default fixedorigin
 ## One-quote qualification harness
 
 Read CODEX-EXCHANGE-QUOTE-QUALIFICATION-20261018.md. New boundedGET-onlyharness usesactualquote/review/reload in disposablememorySQL, sanitizedstartup/refusalreceipts andexplicit synthetic/live distinction.6nativecases+100Vitestcases,2mjslint/format/syntaxpass. Actualstartupmissingkey0HTTP; livecheckpendinguserkeyfilepath. Noapp/provider/env/credential/hostedSQL/financialchange. OtherchatpurchaseUI/API/testdraftspreserved.
+
+## Published coordination and fresh holder evidence
+
+User requests all verified progress published to origin/main for Claude; this authorizes a normal GitHub push, not a deployment. Read CODEX-LIVE-HOLDER-ROUTE-RECHECK-20261018.md: fresh real-provider/actual-route check passes for one small mint, 8 RPCs, 2 pages, complete reference supply, local persistence/replay and foreign-owner refusal. No production code or database changes. The other chat owns purchase API/UI drafts and will publish its verified checkpoint separately. Claude should fetch origin/main and branch from that head; preserve existing worktrees and claims. Vercel Git deployment remains disabled; no deployment is performed.
