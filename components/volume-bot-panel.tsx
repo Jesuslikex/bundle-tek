@@ -515,12 +515,25 @@ function VolumeBotWorkspace({
   return (
     <div className={styles.workspace}>
       <p className={styles.note}>
-        Buys and sells this token from your wallets toward a volume target, like
-        Proxima&apos;s Volume Bot. Trades are grouped into batches that fit one
-        ~60 second blockhash window. You approve each batch once, this browser
-        signs it, and each trade is sent at its time. It only runs while this
-        panel is open. Each sell sells exactly what its own buy received.
+        Plan buy/sell round trips toward a volume target. Review each group
+        before approving it. Sending only runs while this panel is open.
       </p>
+      <section aria-label="Volume execution mode" className={styles.mode}>
+        <strong>Mode: Scheduled swaps</strong>
+        <p className={styles.note}>
+          A batch groups approvals. Its trades are sent individually, with no
+          same-block guarantee. Each sell follows its own settled buy and uses
+          only the tokens that buy received.
+        </p>
+        <details>
+          <summary>Bundle mode and tips</summary>
+          <p className={styles.note}>
+            Same-block buy/sell bundles and a total session tip budget are not
+            available here. Wave intensity changes the schedule, not transaction
+            delivery. Network and swap costs are estimated separately below.
+          </p>
+        </details>
+      </section>
       <TransactionDeliveryNotice transport="rpc" />
       {error && (
         <p role="alert" className={styles.error}>
@@ -724,6 +737,8 @@ function VolumeBotWorkspace({
       {!active && plan && (
         <section aria-label="Volume Bot estimate" className={styles.card}>
           <dl>
+            <dt>Execution mode</dt>
+            <dd>Scheduled swaps</dd>
             <dt>Volume</dt>
             <dd>{sol(plan.estimate.volumeLamports)}</dd>
             <dt>Round trips</dt>

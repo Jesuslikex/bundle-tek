@@ -42,6 +42,22 @@
   font-size: 0.85em;
   opacity: 0.8;
 }
+.mode {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.mode p {
+  margin: 8px 0;
+}
+.mode summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+}
 .error {
   color: var(--destructive, #c62828);
 }

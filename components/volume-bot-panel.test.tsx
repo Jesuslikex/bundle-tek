@@ -125,6 +125,13 @@ it('estimates with the chosen settings and saves the session', async () => {
   );
   await act(async () => button('Open Volume Bot').click());
   await settle();
+  const mode = container.querySelector('[aria-label="Volume execution mode"]')!;
+  expect(mode.textContent).toContain('Mode: Scheduled swaps');
+  expect(mode.textContent).toContain('sent individually');
+  expect(mode.textContent).toContain('no same-block guarantee');
+  expect(mode.querySelector('details')!.open).toBe(false);
+  expect(mode.textContent).toContain('total session tip budget are not');
+  expect(calls.every((c) => c.payload === null)).toBe(true);
   await act(async () =>
     (
       container.querySelector('input[type=checkbox]') as HTMLInputElement
@@ -149,6 +156,9 @@ it('estimates with the chosen settings and saves the session', async () => {
     },
   });
   expect(container.textContent).toContain('1 SOL');
+  expect(
+    container.querySelector('[aria-label="Volume Bot estimate"]')?.textContent,
+  ).toContain('Execution modeScheduled swaps');
   expect(container.textContent).toContain('Delivery: configured Solana RPC');
   expect(container.textContent).toContain(
     'does not request dedicated sandwich protection',
