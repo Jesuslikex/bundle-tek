@@ -60,6 +60,11 @@
   border-top: 1px solid var(--border, #30333c);
   padding-block: 12px;
 }
+.review button,
+.review input,
+.review select {
+  min-height: 44px;
+}
 .totals dt {
   font-size: 12px;
   color: var(--muted-foreground, #a1a8b8);
@@ -144,7 +149,7 @@
   .panel button {
     white-space: normal;
     height: auto;
-    min-height: 36px;
+    min-height: 44px;
     max-width: 100%;
   }
 }

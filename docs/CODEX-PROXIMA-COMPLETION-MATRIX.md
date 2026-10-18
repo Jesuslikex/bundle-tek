@@ -2,6 +2,8 @@
 
 ## Current integration status, 18 October 2026
 
+Declared launch budget reviews now filter by role/address and page25wallets while keeping full-plan totals and exact saved terms unchanged. CODEX-LAUNCH-BUDGET-REVIEW-FILTERS-20261018.md records fresh read-only REA setup evidence,67relatedtests,scopedlint/format,isolatedTypeScript and synthetic Chrome375/320/1440. Staged funding/execution and live provider qualification remain open.
+
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
 Current exchange access now has a one-quote GET-only qualification command with actual disposable quote/refund review/reload, sanitized refusal receipts and explicit synthetic/live flags. CODEX-EXCHANGE-QUOTE-QUALIFICATION-20261018.md records6nativecases plus100existingVitestcases. Startup was refused for missing provider key with0HTTP; live qualification remains pending. No provider setting or financial authority changed.

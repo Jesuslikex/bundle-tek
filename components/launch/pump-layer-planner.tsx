@@ -60,8 +60,41 @@ async function read(response: Response) {
   }
   return value;
 }
-function BudgetReview({ envelope }: { envelope: LaunchLayerEnvelope }) {
+export function LayerBudgetReview({
+  envelope,
+}: {
+  envelope: LaunchLayerEnvelope;
+}) {
   const { quote, totals, delays, roles } = envelope.terms;
+  const filterId = useId();
+  const [roleFilter, setRoleFilter] = useState<LayerRole | 'all'>('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const roleOrder = [
+    'funder',
+    'developer',
+    'front',
+    'back',
+    'temporary',
+    'holders',
+  ] as const;
+  const rows = roleOrder.flatMap((role) => {
+    const value = roles[role];
+    const members = Array.isArray(value) ? value : value ? [value] : [];
+    return members.map((member, index) => ({
+      role,
+      member,
+      index,
+      count: members.length,
+    }));
+  });
+  const matching = rows.filter(
+    ({ role, member }) =>
+      (roleFilter === 'all' || roleFilter === role) &&
+      member.wallet.address.includes(search.trim()),
+  );
+  const pages = Math.max(1, Math.ceil(matching.length / 25));
+  const selectedPage = Math.min(page, pages - 1);
   return (
     <section className={styles.review} aria-label="Layer budget review">
       <h4>Declared ceiling review</h4>
@@ -101,23 +134,63 @@ function BudgetReview({ envelope }: { envelope: LaunchLayerEnvelope }) {
         {delays.frontToBackDelayMs} milliseconds. Back to temporary:{' '}
         {delays.backToTemporaryDelayMs} milliseconds.
       </p>
-      <ol className={styles.roleList}>
-        {(
-          [
-            'funder',
-            'developer',
-            'front',
-            'back',
-            'temporary',
-            'holders',
-          ] as const
-        ).flatMap((role) => {
-          const value = roles[role];
-          const entries = Array.isArray(value) ? value : value ? [value] : [];
-          return entries.map((member, index) => (
+      <div className={styles.fields}>
+        <label htmlFor={filterId + '-role'}>
+          Review wallet role
+          <select
+            id={filterId + '-role'}
+            value={roleFilter}
+            onChange={(event) => {
+              setRoleFilter(event.target.value as LayerRole | 'all');
+              setPage(0);
+            }}
+          >
+            <option value="all">All roles ({rows.length})</option>
+            {roleOrder.map((role) => (
+              <option key={role} value={role}>
+                {names[role]} ({rows.filter((row) => row.role === role).length})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label htmlFor={filterId + '-search'}>
+          Find review wallet
+          <Input
+            id={filterId + '-search'}
+            value={search}
+            placeholder="Address or fragment"
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(0);
+            }}
+          />
+        </label>
+      </div>
+      <output>
+        {matching.length} of {rows.length} wallets · page {selectedPage + 1} of{' '}
+        {pages}. Totals above always include the full plan.
+      </output>
+      {matching.length === 0 && <p>No wallets match these filters.</p>}
+      {(search || roleFilter !== 'all') && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setSearch('');
+            setRoleFilter('all');
+            setPage(0);
+          }}
+        >
+          Show all review wallets
+        </Button>
+      )}
+      <ol className={styles.roleList} start={selectedPage * 25 + 1}>
+        {matching
+          .slice(selectedPage * 25, (selectedPage + 1) * 25)
+          .map(({ role, member, index, count }) => (
             <li key={member.wallet.address}>
               <strong>
-                {names[role]} {entries.length > 1 ? index + 1 : ''}
+                {names[role]} {count > 1 ? index + 1 : ''}
               </strong>{' '}
               <code>{member.wallet.address}</code>
               <span>
@@ -129,9 +202,28 @@ function BudgetReview({ envelope }: { envelope: LaunchLayerEnvelope }) {
                 SOL.
               </span>
             </li>
-          ));
-        })}
+          ))}
       </ol>
+      {pages > 1 && (
+        <div className={styles.actions}>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={selectedPage === 0}
+            onClick={() => setPage(selectedPage - 1)}
+          >
+            Previous review wallets
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={selectedPage >= pages - 1}
+            onClick={() => setPage(selectedPage + 1)}
+          >
+            Next review wallets
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
@@ -674,7 +766,10 @@ function Planner({
           </fieldset>
           {review && (
             <>
-              <BudgetReview envelope={review.envelope} />
+              <LayerBudgetReview
+                key={review.envelope.sha256}
+                envelope={review.envelope}
+              />
               <Button
                 disabled={blocked || !historyRead}
                 onClick={() =>
@@ -802,7 +897,10 @@ function Planner({
           <p className={styles.address}>
             Plan ID: <code>{saved.id}</code>
           </p>
-          <BudgetReview envelope={saved.envelope} />
+          <LayerBudgetReview
+            key={saved.envelope.sha256}
+            envelope={saved.envelope}
+          />
           <LaunchLayerNativeCoverage
             key={`${saved.id}:${saved.sha256}:${saved.current}`}
             plan={saved}
