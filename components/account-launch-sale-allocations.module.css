@@ -1,0 +1,91 @@
+.panel {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+.panel summary::before {
+  content: '›';
+}
+.panel[open] > summary::before {
+  transform: rotate(90deg);
+}
+.panel p {
+  margin-block: 0.75rem;
+  line-height: 1.6;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-block: 1rem;
+}
+.panel button {
+  min-height: 44px;
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  text-align: left;
+}
+.sales ul,
+.sale ul {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  margin-block: 0.75rem;
+  list-style: none;
+}
+.sale {
+  margin-block: 1rem;
+  padding: 0.85rem;
+  background: var(--card, #151720);
+  border-radius: 0.75rem;
+  min-width: 0;
+}
+.sale h4 {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+.field {
+  display: grid;
+  gap: 0.35rem;
+  margin-block: 0.75rem;
+  min-width: 0;
+}
+.field input,
+.field select {
+  min-height: 44px;
+  width: 100%;
+  min-width: 0;
+  padding-inline: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+}
+.review {
+  margin-block-start: 1rem;
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-height: 44px;
+  margin-block: 0.75rem;
+}
+.check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  margin-top: 0.15rem;
+}
