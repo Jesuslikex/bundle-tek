@@ -14,7 +14,7 @@ import {
 const fail = (message: string, status = 409): never => {
   throw new ExchangePayoutError(message, status);
 };
-/** Internal composition, trusted authenticated owner and server-owned RPC only. No API or live adapter. */
+/** Owned receipt composition; the payout API supplies authenticated ownership and bounded server-only RPC. No payment or distribution authority. */
 export async function verifyOwnedExchangePayout(
   db: D1Database,
   owner: string,

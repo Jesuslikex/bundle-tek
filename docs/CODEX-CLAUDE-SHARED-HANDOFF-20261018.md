@@ -71,3 +71,7 @@ Read CODEX-IMPORTED-LAYER-PICKER-20261018.md. The REA chat added the explicit ow
 ## Imported picker older-record access
 
 Read CODEX-IMPORTED-PICKER-PAGING-20261018.md. The REA chat removed the newest100 dead end with literal server search and source/search/owned-anchor-bound keyset paging, explicit selection, Enter handling, page announcements and focus. Final11files/141tests, five-file typed lint and whole-project TypeScript passed; actual picker Chrome reached item101 by page and symbol search at desktop/375/320. Imports may change during browsing; no immutable collection or funded proof is claimed. Only six owned target/picker files plus docs changed. Account/payment drafts preserved; no Next/full-suite green claim, schema/provider/push/deploy/signing change.
+
+## Finalized exchange payout API
+
+Read CODEX-EXCHANGE-PAYOUT-API-20261018.md. The REA chat added a strict authenticated owned-review payout verification route and bounded read-only RPC adapter, reusing existing immutable receipt verification/storage and public history projection. Final11files/232tests, six-file format/typed lint and whole-project TypeScript pass. Real route/local SQL fixtures cover concurrency, cancellation, replay and provider429; no live provider, UI wiring, new migration, authority, push or deploy. Journal now ends at0113; recheck before claiming0114. User AGENTS and account/payment ownership preserved.
