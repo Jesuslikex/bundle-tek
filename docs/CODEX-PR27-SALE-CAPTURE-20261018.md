@@ -33,6 +33,8 @@ Capture verification:52 tests across four files pass, including14 new route/tran
 
 Standalone TypeScript for the new capture import closure and scoped typed lint pass. All four new TypeScript files pass formatting. Runtime logs/configs live only in ignored work folders. No environment file is copied into the review clone, and an offline preload blocks unmocked external sockets/fetches during tests.
 
+Follow-up independent checks on the same PR baseline plus capture overlay: full plain `tsc --noEmit --incremental false` passes, and the real whole-file Wrangler command applies all117 migrations to a fresh disposable D1 database with an exact117-entry ledger match. Logs: `work/pr27-review-6ac6231/work/release-qa/pr27-full-typecheck.log` and `pr27-migrations.log`; migration report/state retained at `C:\Users\Julian\AppData\Local\Temp\bundle-wrangler-migrations-YEqiOj`. The Node offline preload also propagates to Wrangler child processes. No application or hosted schema was changed. The earlier committed0008fb8 full regression has also reached terminal success:603 files,5329 tests, zero failures, native script exit0 and unchanged source/harness. That older source does not cover PR27 or the capture additions.
+
 ## Remaining integration
 
 Claude must merge this checkpoint into PR27, finish client admission/selection/approval UI and supply its mount patch. Independently rerun the combined HTTP capture→review→wrong-hash refusal→explicit save→reload regression and render the completed screen. Keep PR27 draft and0116 held. Hosted migration state remains separate; no migrations or deploy are authorized by this task. No profit, real signing or funded proof is claimed.
