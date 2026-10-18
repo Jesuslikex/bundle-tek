@@ -156,7 +156,7 @@ function VolumeBotWorkspace({
     [fixed, setFixed] = useState('0.05'),
     [rangeMin, setRangeMin] = useState('0.02'),
     [rangeMax, setRangeMax] = useState('0.08'),
-    [wave, setWave] = useState<VolumeTerms['wave']>('tight'),
+    [waveIntensity, setWaveIntensity] = useState(0),
     [selected, setSelected] = useState<string[]>([]);
   const [targetUnit, setTargetUnit] = useState<'SOL' | 'USD'>('SOL');
   const [usdQuote, setUsdQuote] = useState<VolumeUsdTarget | null>(null);
@@ -275,7 +275,8 @@ function VolumeBotWorkspace({
                 minLamports: lamports(rangeMin, 'a minimum amount'),
                 maxLamports: lamports(rangeMax, 'a maximum amount'),
               },
-      wave,
+      wave: waveIntensity === 0 ? 'tight' : 'big-waves',
+      ...(waveIntensity === 0 ? {} : { waveIntensityTenths: waveIntensity }),
       wallets: selected,
     });
   };
@@ -654,15 +655,35 @@ function VolumeBotWorkspace({
               />
             </div>
           )}
-          <label htmlFor={`${id}-wave`}>Wave intensity</label>
-          <select
+          <label htmlFor={`${id}-wave`}>
+            Wave intensity: {(waveIntensity / 10).toFixed(1)}
+          </label>
+          <input
             id={`${id}-wave`}
-            value={wave}
-            onChange={(e) => setWave(e.target.value as VolumeTerms['wave'])}
-          >
-            <option value="tight">Tight (buy then sell)</option>
-            <option value="big-waves">Big waves (streaks)</option>
-          </select>
+            aria-label="Wave intensity"
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            value={waveIntensity / 10}
+            className={styles.wave}
+            aria-valuetext={(waveIntensity / 10).toFixed(1)}
+            disabled={busy || locked}
+            onChange={(event) => {
+              const raw = decimalToRaw(event.target.value, 1);
+              if (raw !== undefined && raw >= 0n && raw <= 10n)
+                setWaveIntensity(Number(raw));
+            }}
+          />
+          <div className={styles.waveLabels}>
+            <span>Tight</span>
+            <span>Big waves</span>
+          </div>
+          <p className={styles.note}>
+            Higher intensity makes longer buy and sell streaks, limited to
+            eligible wallets and at most six buys in a row. Each wallet sells
+            only after its own buy settles, with a separate reviewed batch.
+          </p>
           <fieldset className={styles.wallets}>
             <legend>Wallets</legend>
             {wallets.length ? (
@@ -708,6 +729,14 @@ function VolumeBotWorkspace({
             <dt>Round trips</dt>
             <dd>
               {plan.estimate.rounds} ({plan.estimate.trades} trades)
+            </dd>
+            <dt>Wave pattern</dt>
+            <dd>
+              {plan.terms.waveIntensityTenths === undefined
+                ? plan.terms.wave === 'tight'
+                  ? 'Tight'
+                  : 'Legacy big waves'
+                : `${(plan.terms.waveIntensityTenths / 10).toFixed(1)} intensity`}
             </dd>
             <dt>Approvals</dt>
             <dd>{plan.estimate.approvals} batches</dd>

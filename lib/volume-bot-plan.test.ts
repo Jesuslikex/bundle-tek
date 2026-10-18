@@ -211,3 +211,131 @@ it('auto sizing always ends inside the duration, whatever the seed', () => {
     expect(plan.estimate.volumeLamports).toBe('1000000000');
   }
 });
+
+it('preserves exact legacy saved-plan digests across both old modes and all sizing types', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL(
+        '../test/fixtures/volume-legacy-plan-digests.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  ) as {
+    seed: string;
+    cases: {
+      wave: VolumeTerms['wave'];
+      amount: VolumeTerms['amount'];
+      sha256: string;
+    }[];
+  };
+  for (const c of fixture.cases) {
+    const plan = planVolumeSession(
+      terms({ wave: c.wave, amount: c.amount }),
+      rich,
+      fixture.seed,
+    );
+    expect(
+      createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
+    ).toBe(c.sha256);
+  }
+});
+it('interpolates seeded wave intensity without relaxing round, custody or batch bounds', () => {
+  for (const count of [1, 2, 4, 8]) {
+    const selected = Array.from(
+      { length: count },
+      (_, n) => '1111111111111111111111111111111' + String(n + 1),
+    );
+    const balances = selected.map((address) => ({
+      address,
+      lamports: '10000000000',
+    }));
+    for (let intensity = 0; intensity <= 10; intensity++)
+      for (let n = 0; n < 8; n++) {
+        const t = terms({
+          wave: intensity === 0 ? 'tight' : 'big-waves',
+          waveIntensityTenths: intensity,
+          wallets: selected,
+        });
+        const plan = planVolumeSession(
+          t,
+          balances,
+          n.toString(16).padStart(32, '0'),
+        );
+        invariants(plan);
+        let run = 0,
+          max = 0;
+        for (const e of plan.events) {
+          run = e.side === 'Buy' ? run + 1 : 0;
+          max = Math.max(max, run);
+        }
+        expect(max).toBeLessThanOrEqual(Math.min(6, count));
+        if (intensity === 0) expect(max).toBe(1);
+        if (intensity === 10) expect(max).toBe(Math.min(6, count));
+        expect(plan.estimate.volumeLamports).toBe('2000000000');
+        expect(plan.rounds).toHaveLength(10);
+        expect(plan.executionAllowed).toBe(false);
+      }
+  }
+});
+it('keeps intensity deterministic and does not change trade amounts or the delay stream', () => {
+  const t = terms({
+    wave: 'big-waves',
+    waveIntensityTenths: 5,
+    amount: {
+      kind: 'range',
+      minLamports: '50000000',
+      maxLamports: '150000000',
+    },
+  });
+  const first = planVolumeSession(t, rich, seed);
+  expect(planVolumeSession(t, rich, seed)).toEqual(first);
+  const other = planVolumeSession(
+    { ...t, waveIntensityTenths: 10 },
+    rich,
+    seed,
+  );
+  expect(first.rounds.map((r) => r.lamports)).toEqual(
+    other.rounds.map((r) => r.lamports),
+  );
+  expect(first.events.map((e) => e.offsetMs)).toEqual(
+    other.events.map((e) => e.offsetMs),
+  );
+  expect(requireVolumePlan(first, rich)).toEqual(first);
+  expect(first.events.map((e) => e.side)).not.toEqual(
+    other.events.map((e) => e.side),
+  );
+});
+it.each([-1, 11, 0.5, '5', null, undefined])(
+  'rejects malformed supplied intensity %s',
+  (value) => {
+    expect(() =>
+      planVolumeSession(
+        {
+          ...terms({ wave: 'big-waves' }),
+          waveIntensityTenths: value,
+        } as unknown as VolumeTerms,
+        rich,
+        seed,
+      ),
+    ).toThrow(/intensity/);
+  },
+);
+it('requires the legacy mode flag to agree with the explicit intensity', () => {
+  expect(() =>
+    planVolumeSession(
+      terms({ wave: 'tight', waveIntensityTenths: 5 }),
+      rich,
+      seed,
+    ),
+  ).toThrow(/differs/);
+  expect(() =>
+    planVolumeSession(
+      terms({ wave: 'big-waves', waveIntensityTenths: 0 }),
+      rich,
+      seed,
+    ),
+  ).toThrow(/differs/);
+});

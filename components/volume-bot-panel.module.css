@@ -57,3 +57,13 @@
   text-align: left;
   white-space: nowrap;
 }
+
+.wave {
+  width: 100%;
+  min-width: 0;
+}
+.waveLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}

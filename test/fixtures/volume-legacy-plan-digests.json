@@ -1,0 +1,78 @@
+{
+  "sourceCommit": "a087a14",
+  "seed": "0123456789abcdef0123456789abcdef",
+  "wallets": [
+    "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
+    "8phnoC6V8nwYnNUwobNBoWzWAmyP1nj9GyYZaMbU8z4",
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "So11111111111111111111111111111111111111112"
+  ],
+  "balances": [
+    {
+      "address": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
+      "lamports": "10000000000"
+    },
+    {
+      "address": "8phnoC6V8nwYnNUwobNBoWzWAmyP1nj9GyYZaMbU8z4",
+      "lamports": "10000000000"
+    },
+    {
+      "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "lamports": "10000000000"
+    },
+    {
+      "address": "So11111111111111111111111111111111111111112",
+      "lamports": "10000000000"
+    }
+  ],
+  "cases": [
+    {
+      "wave": "tight",
+      "amount": {
+        "kind": "fixed",
+        "lamports": "100000000"
+      },
+      "sha256": "5675da7e1140ab414fa80251cad9dec92e0acdf2ec0d582ac40ec777cd109249"
+    },
+    {
+      "wave": "tight",
+      "amount": {
+        "kind": "range",
+        "minLamports": "50000000",
+        "maxLamports": "150000000"
+      },
+      "sha256": "4f56a904877b14d6763b8fa2bbada4ecbbd6e2b2d6ce8120e8daf6c516aa40dd"
+    },
+    {
+      "wave": "tight",
+      "amount": {
+        "kind": "auto"
+      },
+      "sha256": "e52fa0888332caeb2a22544289c3d822e59fbceac7bed74b63f7dbf19f957760"
+    },
+    {
+      "wave": "big-waves",
+      "amount": {
+        "kind": "fixed",
+        "lamports": "100000000"
+      },
+      "sha256": "19d6a6be0266a7b861e2e2db01d7db352613792a1c6d2c473bf13588f0165d0a"
+    },
+    {
+      "wave": "big-waves",
+      "amount": {
+        "kind": "range",
+        "minLamports": "50000000",
+        "maxLamports": "150000000"
+      },
+      "sha256": "81268fe6aa54805de2c8a8405acc6fa04d4d5c61e9d7ff0b537798835dc01a2c"
+    },
+    {
+      "wave": "big-waves",
+      "amount": {
+        "kind": "auto"
+      },
+      "sha256": "2fbb46d06a4309a2b221374b0fb8e47f0224b3a545aaec929441a21face7f67f"
+    }
+  ]
+}

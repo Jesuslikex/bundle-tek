@@ -25,6 +25,7 @@ export type VolumeTerms = {
   delayMaxMs: number;
   amount: VolumeAmount;
   wave: VolumeWave;
+  waveIntensityTenths?: number;
   wallets: string[];
 };
 export type VolumeWalletBalance = { address: string; lamports: string };
@@ -159,10 +160,21 @@ export function volumeTerms(value: unknown): VolumeTerms {
     );
   if (target < VOLUME_LIMITS.minTradeLamports * 2n)
     fail('Target volume must cover at least one 0.001 SOL round trip.');
+  const hasIntensity = Object.hasOwn(input, 'waveIntensityTenths');
+  const intensity = hasIntensity
+    ? int(input.waveIntensityTenths, 0, 10, 'wave intensity in tenths')
+    : undefined;
+  if (
+    intensity !== undefined &&
+    input.wave !== (intensity === 0 ? 'tight' : 'big-waves')
+  )
+    fail('Wave mode differs from the selected intensity.');
   const keys = Object.keys(input).sort().join(',');
   if (
     keys !==
-    'amount,delayMaxMs,delayMinMs,durationSeconds,targetVolumeLamports,wallets,wave'
+    (hasIntensity
+      ? 'amount,delayMaxMs,delayMinMs,durationSeconds,targetVolumeLamports,wallets,wave,waveIntensityTenths'
+      : 'amount,delayMaxMs,delayMinMs,durationSeconds,targetVolumeLamports,wallets,wave')
   )
     fail('Volume Bot settings contain unknown fields.');
   return {
@@ -172,6 +184,7 @@ export function volumeTerms(value: unknown): VolumeTerms {
     delayMaxMs,
     amount,
     wave: input.wave,
+    ...(intensity !== undefined ? { waveIntensityTenths: intensity } : {}),
     wallets: [...(input.wallets as string[])],
   };
 }
@@ -316,10 +329,26 @@ export function planVolumeSession(
     return undefined;
   };
   while (next < amounts.length) {
-    const streak =
-      terms.wave === 'tight'
-        ? 1
-        : rand.int(2, Math.max(2, Math.min(6, eligible.length)));
+    let streak: number;
+    if (terms.waveIntensityTenths === undefined) {
+      // Preserve legacy random draws and exact serialized plans.
+      streak =
+        terms.wave === 'tight'
+          ? 1
+          : rand.int(2, Math.max(2, Math.min(6, eligible.length)));
+    } else {
+      const cap = Math.max(1, Math.min(6, eligible.length));
+      streak = 1;
+      while (streak < cap && streak < amounts.length - next) {
+        if (terms.waveIntensityTenths === 0) break;
+        if (
+          terms.waveIntensityTenths !== 10 &&
+          rand.int(1, 10) > terms.waveIntensityTenths
+        )
+          break;
+        streak++;
+      }
+    }
     const open: Pending[] = [];
     for (let n = 0; n < streak && next < amounts.length; n++) {
       const wallet = freeWallet();

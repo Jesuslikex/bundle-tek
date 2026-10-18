@@ -525,6 +525,43 @@ async function setSessionTime(hours: string, minutes: string, seconds: string) {
       value,
     );
 }
+
+it('reviews and saves the selected numeric wave, then invalidates review on another wave', async () => {
+  await openSolTiming();
+  const slider = container.querySelector<HTMLInputElement>(
+    '[aria-label="Wave intensity"]',
+  )!;
+  expect(slider.min).toBe('0');
+  expect(slider.max).toBe('1');
+  expect(slider.step).toBe('0.1');
+  await changeControl(slider, '0.7');
+  expect(slider.getAttribute('aria-valuetext')).toBe('0.7');
+  await act(async () => button('Estimate').click());
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('0.7 intensity'),
+  );
+  const estimated = calls.find(
+    (call) => call.payload?.action === 'estimate',
+  )!.payload!;
+  expect(estimated.terms).toMatchObject({
+    wave: 'big-waves',
+    waveIntensityTenths: 7,
+  });
+  await act(async () => button('Save session and reserve wallets').click());
+  await vi.waitFor(() =>
+    expect(calls.some((call) => call.payload?.action === 'create')).toBe(true),
+  );
+  expect(
+    calls.find((call) => call.payload?.action === 'create')!.payload!.terms,
+  ).toEqual(estimated.terms);
+  await changeControl(slider, '0.3');
+  expect(button('Save session and reserve wallets')).toBeUndefined();
+  expect(
+    calls.some((call) =>
+      ['register', 'send'].includes(String(call.payload?.action)),
+    ),
+  ).toBe(false);
+});
 it('sends exact HMS seconds and exact millisecond delays, then invalidates even an equivalent raw edit', async () => {
   await openSolTiming();
   await setSessionTime('1', '2', '3');

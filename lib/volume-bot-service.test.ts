@@ -23,6 +23,7 @@ import {
   cancelVolumeSession,
   createVolumeSession,
   estimateVolumeSession,
+  listVolumeSessions,
   observeVolumeBatch,
   prepareVolumeBatch,
   rawToDecimal,
@@ -229,6 +230,38 @@ const terms = (): VolumeTerms => ({
   wallets,
 });
 type Session = Awaited<ReturnType<typeof createVolumeSession>>;
+it('retains the exact numeric wave in the estimate, saved plan and owned reload', async () => {
+  const { db } = await fixture();
+  const { deps } = chain();
+  const input = {
+    projectId: 'p1',
+    projectRevision: 3,
+    terms: { ...terms(), wave: 'big-waves' as const, waveIntensityTenths: 7 },
+    seed: newVolumeSeed(),
+  };
+  const estimate = await estimateVolumeSession(
+    db,
+    'alice',
+    input,
+    signal(),
+    deps.rpc,
+  );
+  const saved = await createVolumeSession(
+    db,
+    'alice',
+    input,
+    signal(),
+    deps.rpc,
+  );
+  expect(saved.plan).toEqual(estimate.plan);
+  expect(saved.plan.terms.waveIntensityTenths).toBe(7);
+  const reloaded = await listVolumeSessions(db, 'alice', 'p1');
+  expect(reloaded.find((session) => session.id === saved.id)?.plan).toEqual(
+    saved.plan,
+  );
+  expect(await listVolumeSessions(db, 'bob', 'p1')).toEqual([]);
+});
+
 async function runBatch(
   db: D1Database,
   deps: VolumeDeps,
