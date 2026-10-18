@@ -171,4 +171,86 @@ it('marks preflight observations expired without requesting another read or appr
   );
   expect(container.querySelector('button')!.disabled).toBe(false);
   expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(
+    container.querySelector('[role=alert]')?.closest('details'),
+  ).toBeNull();
+});
+it('keeps Hold and balances visible while technical observations require opening details', async () => {
+  const fetcher = vi.fn(async () =>
+    Response.json({
+      id: 'saved-plan',
+      revision: 1,
+      report: {
+        ...preflight(),
+        status: 'Hold',
+        issues: ['Insufficient balance.'],
+        wallets: [
+          {
+            address: '11111111111111111111111111111111',
+            amount: '0',
+            shortfall: '0.013',
+          },
+        ],
+        tokens: [
+          {
+            address: 'technical-token-address',
+            name: 'USD Coin',
+            symbol: 'USDC',
+            decimals: 6,
+            source: 'fixture-provider',
+          },
+        ],
+      },
+    }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () =>
+    root.render(<WalletWarmupPreflight id="saved-plan" revision={1} />),
+  );
+  await act(async () => container.querySelector('button')!.click());
+  const section = container.querySelector('section')!;
+  expect(section.querySelector('h5')?.textContent).toBe('Hold');
+  expect(section.querySelector('dl')?.closest('details')).toBeNull();
+  expect(section.querySelector('dl')?.textContent).toContain('0.013 SOL');
+  const details = section.querySelector('details')!;
+  expect(details.open).toBe(false);
+  expect(details.textContent).toContain('fixture-provider');
+  expect(details.textContent).toContain('technical-token-address');
+  expect(details.textContent).toContain('Saved revision 1');
+  await act(async () => details.querySelector('summary')!.click());
+  expect(details.open).toBe(true);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('keeps raw quote units and provider records inside closed quote details', async () => {
+  const fetcher = vi.fn(async () =>
+    Response.json({
+      id: 'saved-plan',
+      revision: 1,
+      quote: {
+        executionAllowed: false,
+        cycle: 1,
+        router: 'metis',
+        outputMint: 'technical-mint',
+        inAmount: '1000000',
+        outAmount: '103661',
+        minimumOutAmount: '103142',
+        limitations: 'Read-only fixture',
+        expiresAt: new Date(Date.now() + 30000).toISOString(),
+      },
+    }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () =>
+    root.render(<WalletWarmupQuote id="saved-plan" revision={1} cycles={1} />),
+  );
+  await act(async () => container.querySelector('button')!.click());
+  const details = container.querySelector('details')!;
+  expect(details.open).toBe(false);
+  expect(details.textContent).toContain('1000000 lamports');
+  expect(details.textContent).toContain('technical-mint');
+  expect(details.textContent).toContain('metis');
+  expect(container.querySelector('section > p')?.closest('details')).toBeNull();
+  await act(async () => details.querySelector('summary')!.click());
+  expect(details.open).toBe(true);
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });

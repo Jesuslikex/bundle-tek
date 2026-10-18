@@ -163,9 +163,7 @@ export function WalletWarmup({
         <li>3. Review and save</li>
       </ol>
       <p className={styles.help}>
-        An unfunded wallet can use history, drafts and quotes. Saving does not
-        fund the wallet or start trades. Every swap needs separate approval;
-        activity does not prove wallet age or launch eligibility.
+        You can plan with an unfunded wallet. Saving a draft starts no trades.
       </p>
       <h4>1. Check your wallet</h4>
       <Button variant="outline" disabled={busy} onClick={inspect}>
@@ -195,42 +193,56 @@ export function WalletWarmup({
         <div className="warmup-history" aria-live="polite">
           {history.map((r) => (
             <article key={r.address}>
-              <strong className="warmup-address">{r.address}</strong>
               {r.error ? (
-                <output>{r.error}</output>
+                <output>
+                  {r.address.slice(0, 4)}…{r.address.slice(-4)}: {r.error}
+                </output>
               ) : (
                 r.observation && (
                   <>
-                    <p>
-                      {r.observation.nativeBalance} {r.observation.currency} ·{' '}
-                      {r.observation.outgoingTransactions === null
-                        ? `${r.observation.sampleCount} sampled signatures, ${r.observation.successfulSampleCount} successful`
-                        : `${r.observation.outgoingTransactions} account nonce`}
+                    <p className={styles.historyBalance}>
+                      {history.length > 1 && (
+                        <span>
+                          {r.address.slice(0, 4)}…{r.address.slice(-4)} ·{' '}
+                        </span>
+                      )}
+                      {r.observation.nativeBalance} {r.observation.currency}
                     </p>
                     {r.observation.nativeBalance === '0' && (
-                      <p>
-                        No {r.observation.currency} balance was observed. You
-                        can inspect history and save a draft, but a swap needs
-                        enough balance for its amount, fees and any account
-                        rent. Check preflight after saving; no funding or trade
-                        happens automatically.
+                      <p className={styles.help}>
+                        Your wallet is unfunded. You can still save and check a
+                        draft.
                       </p>
                     )}
-                    <p>
-                      Oldest sampled activity:{' '}
-                      {r.observation.oldestObservedAt
-                        ? new Date(
-                            r.observation.oldestObservedAt,
-                          ).toLocaleString()
-                        : 'Unknown'}
-                      . Wallet age: unknown.
-                    </p>
-                    <small>
-                      {r.observation.coverage} Observed{' '}
-                      {new Date(r.observation.observedAt).toLocaleString()} at
-                      block/slot {r.observation.block}. Source:{' '}
-                      {r.observation.source}.
-                    </small>
+                    <details className={styles.technical}>
+                      <summary>Wallet activity details</summary>
+                      <p className="warmup-address">{r.address}</p>
+                      <p>
+                        {r.observation.nativeBalance} {r.observation.currency} ·{' '}
+                        {r.observation.outgoingTransactions === null
+                          ? `${r.observation.sampleCount} sampled signatures, ${r.observation.successfulSampleCount} successful`
+                          : `${r.observation.outgoingTransactions} account nonce`}
+                      </p>
+                      <p>
+                        Oldest sampled activity:{' '}
+                        {r.observation.oldestObservedAt
+                          ? new Date(
+                              r.observation.oldestObservedAt,
+                            ).toLocaleString()
+                          : 'Unknown'}
+                        . Wallet age: unknown.
+                      </p>
+                      <small>
+                        {r.observation.coverage} Observed{' '}
+                        {new Date(r.observation.observedAt).toLocaleString()} at
+                        block/slot {r.observation.block}. Source:{' '}
+                        {r.observation.source}.
+                      </small>
+                      <p>
+                        Activity does not prove wallet age or launch
+                        eligibility. Every swap needs separate approval.
+                      </p>
+                    </details>
                   </>
                 )
               )}
@@ -455,7 +467,8 @@ export function WalletWarmup({
         }}
       />
       {plan && (
-        <section aria-label="Warmup plan review">
+        <details className={styles.technical} aria-label="Warmup plan review">
+          <summary>Full schedule and export</summary>
           <h4>{plan.actions.length} planned actions</h4>
           <p>
             Buys start at fixed staggered offsets within the first quarter of
@@ -488,7 +501,7 @@ export function WalletWarmup({
               ))}
             </ol>
           </details>
-        </section>
+        </details>
       )}
     </section>
   );

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { WarmupPreflight } from '@/lib/wallet-warmup-preflight';
 import { readPanelJson } from './read-panel-json';
+import styles from './wallet-warmup.module.css';
 export function WalletWarmupPreflight({
   id,
   revision,
@@ -100,10 +101,11 @@ export function WalletWarmupPreflight({
       )}
       {error && <p role="alert">{error}</p>}
       {report && (
-        <section aria-label="Warmup preflight observations">
-          <h5>
-            {report.status} · saved revision {revision}
-          </h5>
+        <section
+          className={styles.result}
+          aria-label="Warmup preflight observations"
+        >
+          <h5>{report.status}</h5>
           {expired && (
             <p role="alert">
               Preflight observations expired. Check warmup preflight again
@@ -118,28 +120,53 @@ export function WalletWarmupPreflight({
             <p key={issue}>{issue}</p>
           ))}
           {report.wallets.map((w) => (
-            <p key={w.address} className="warmup-address">
-              {w.address}
-              <br />
-              Balance: {w.amount ?? 'Unknown'} {report.currency}. Budget
-              shortfall: {w.shortfall ?? 'Unknown'} {report.currency}.
-            </p>
+            <div key={w.address}>
+              {report.wallets.length > 1 && (
+                <strong>
+                  {w.address.slice(0, 4)}…{w.address.slice(-4)}
+                </strong>
+              )}
+              <dl className={styles.balanceGrid}>
+                <div>
+                  <dt>Balance</dt>
+                  <dd>
+                    {w.amount ?? 'Unknown'} {report.currency}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Shortfall</dt>
+                  <dd>
+                    {w.shortfall ?? 'Unknown'} {report.currency}
+                  </dd>
+                </div>
+              </dl>
+            </div>
           ))}
-          {report.tokens.map((t) => (
-            <p key={t.address} className="warmup-address">
-              {t.address}
-              <br />
-              {t.error ??
-                `${t.name} (${t.symbol}), ${t.decimals} decimals. Source: ${t.source}.`}
-            </p>
-          ))}
-          <small>
-            Observed {new Date(report.observedAt).toLocaleString()}. Refresh
-            after {new Date(report.expiresAt).toLocaleString()}.{' '}
-            {report.snapshot &&
-              `Balances from ${report.snapshot.source} at block/slot ${report.snapshot.blockNumber}.`}{' '}
-            {report.limitations}
-          </small>
+          <p className={styles.help}>Read-only check. No trades are started.</p>
+          <details className={styles.technical}>
+            <summary>Technical details</summary>
+            <p>Saved revision {revision}</p>
+            {report.wallets.map((w) => (
+              <p key={w.address} className="warmup-address">
+                Wallet: {w.address}
+              </p>
+            ))}
+            {report.tokens.map((t) => (
+              <p key={t.address} className="warmup-address">
+                {t.address}
+                <br />
+                {t.error ??
+                  `${t.name} (${t.symbol}), ${t.decimals} decimals. Source: ${t.source}.`}
+              </p>
+            ))}
+            <small>
+              Observed {new Date(report.observedAt).toLocaleString()}. Refresh
+              after {new Date(report.expiresAt).toLocaleString()}.{' '}
+              {report.snapshot &&
+                `Balances from ${report.snapshot.source} at block/slot ${report.snapshot.blockNumber}.`}{' '}
+              {report.limitations}
+            </small>
+          </details>
         </section>
       )}
     </div>

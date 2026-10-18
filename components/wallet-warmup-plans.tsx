@@ -244,7 +244,7 @@ export function WalletWarmupPlans({
         disabled={busy}
         onChange={(e) => setName(e.target.value)}
       />
-      <div className="wallet-roster-actions">
+      <div className={styles.saveActions}>
         <Button
           disabled={busy || !plan || Boolean(selected?.archived)}
           onClick={() => mutate('save')}
@@ -290,8 +290,8 @@ export function WalletWarmupPlans({
         </div>
       )}
       <small>
-        {selected ? `Editing r${selected.revision}` : 'New saved draft'} ·{' '}
-        {saved.length}/100 saved
+        {selected ? 'Editing draft' : 'New saved draft'} · {saved.length}/100
+        saved
       </small>
       {!plan && (
         <p>
@@ -317,9 +317,9 @@ export function WalletWarmupPlans({
               <strong>{p.document.name}</strong>
               <small>
                 {p.document.addresses.length} wallets · {p.document.cycles}{' '}
-                cycles · r{p.revision} · {p.archived ? 'Archived' : 'Draft'}
+                cycles · {p.archived ? 'Archived' : 'Draft'}
               </small>
-              <div className="wallet-roster-actions">
+              <div className={styles.savedActions}>
                 <Button
                   variant="outline"
                   disabled={busy || p.archived || !matches}
@@ -334,7 +334,7 @@ export function WalletWarmupPlans({
                   }}
                   aria-label={`Open warmup ${p.document.name}`}
                 >
-                  Open
+                  Edit draft
                 </Button>
                 {!p.archived && matches && (
                   <Button
@@ -353,6 +353,10 @@ export function WalletWarmupPlans({
                     Review with fresh start
                   </Button>
                 )}
+              </div>
+              <details className={styles.technical}>
+                <summary>Draft details</summary>
+                <p>Saved revision {p.revision}</p>
                 <Button
                   variant="ghost"
                   disabled={busy}
@@ -361,7 +365,7 @@ export function WalletWarmupPlans({
                 >
                   {p.archived ? 'Restore' : 'Archive'}
                 </Button>
-              </div>
+              </details>
               {matches && !p.archived && (
                 <WalletWarmupPreflight
                   key={p.id + ':' + p.revision}
@@ -370,12 +374,15 @@ export function WalletWarmupPlans({
                 />
               )}
               {matches && !p.archived && chain === 'Solana' && (
-                <WalletWarmupQuote
-                  key={'quote:' + p.id + ':' + p.revision}
-                  id={p.id}
-                  revision={p.revision}
-                  cycles={p.document.cycles}
-                />
+                <details className={styles.technical}>
+                  <summary>Optional market quote</summary>
+                  <WalletWarmupQuote
+                    key={'quote:' + p.id + ':' + p.revision}
+                    id={p.id}
+                    revision={p.revision}
+                    cycles={p.document.cycles}
+                  />
+                </details>
               )}
               <details className={styles.advanced}>
                 <summary>Transactions and recovery</summary>

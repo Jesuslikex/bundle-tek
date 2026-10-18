@@ -161,7 +161,7 @@ it('takes selected wallets through history, plan review, save and reopening with
     'Warmup plan saved. No swaps scheduled.',
   );
   expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(0);
-  await click('Open');
+  await click('Edit draft');
   expect(button('Save warmup changes').disabled).toBe(true);
 });
 it('shows a usable wallet-history error when the entry screen receives HTML', async () => {
@@ -215,13 +215,19 @@ it('explains an unfunded wallet without funding, signing or starting trades', as
       />,
     ),
   );
-  expect(container.textContent).toContain(
-    'Saving does not fund the wallet or start trades',
-  );
+  expect(container.textContent).toContain('Saving a draft starts no trades');
   await click('Check wallet history');
-  expect(container.textContent).toContain('No SOL balance was observed');
+  expect(container.textContent).toContain('Your wallet is unfunded');
   expect(container.textContent).toContain('0 sampled signatures, 0 successful');
-  expect(container.textContent).toContain('Check preflight after saving');
+  expect(container.textContent).toContain(
+    'You can still save and check a draft',
+  );
+  const activity = Array.from(container.querySelectorAll('details')).find(
+    (d) =>
+      d.querySelector('summary')?.textContent === 'Wallet activity details',
+  )!;
+  expect(activity.open).toBe(false);
+  expect(activity.textContent).toContain('Wallet age: unknown');
   expect(button('Save warmup draft').disabled).toBe(true);
   expect(
     fixture.calls.filter((call) =>

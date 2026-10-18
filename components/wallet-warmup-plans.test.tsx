@@ -274,10 +274,10 @@ it('recovers a save that completed after cancellation by reloading its original 
   await click('Cancel plan request');
   await click('Reload warmup plans');
   expect(container.textContent).toContain('Saved draft found');
-  expect(container.textContent).toContain('Editing r1');
+  expect(container.textContent).toContain('Editing draft');
   await act(async () => resolve(Response.json({ ok: true })));
   expect(fetcher).toHaveBeenCalledTimes(3);
-  expect(container.textContent).toContain('Editing r1');
+  expect(container.textContent).toContain('Editing draft');
 });
 
 it('refuses an expired reviewed start locally and provides a review recovery action', async () => {

@@ -62,6 +62,18 @@ it('reviews and saves a USDC draft with a fresh start without manually finding a
       d.querySelector('summary')?.textContent === 'Transactions and recovery',
   )!;
   expect(advanced.open).toBe(false);
+  const quote = Array.from(host.querySelectorAll('details')).find(
+    (d) => d.querySelector('summary')?.textContent === 'Optional market quote',
+  )!;
+  expect(quote.open).toBe(false);
+  const archive = Array.from(host.querySelectorAll('button')).find(
+    (b) => b.textContent === 'Archive',
+  )!;
+  expect(archive.closest('details')?.open).toBe(false);
+  const fullSchedule = host.querySelector<HTMLDetailsElement>(
+    '[aria-label="Warmup plan review"]',
+  )!;
+  expect(fullSchedule.open).toBe(false);
   expect(
     fixture.calls.some(
       (c) =>

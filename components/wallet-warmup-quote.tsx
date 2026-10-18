@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { WarmupSwapQuote } from '@/lib/warmup-swap-quote';
 import { readPanelJson } from './read-panel-json';
+import styles from './wallet-warmup.module.css';
 export function WalletWarmupQuote({
   id,
   revision,
@@ -123,21 +124,25 @@ export function WalletWarmupQuote({
       )}
       {error && <p role="alert">{error}</p>}
       {quote && (
-        <section aria-label="Warmup swap quote">
+        <section className={styles.result} aria-label="Warmup swap quote">
           <p>
             {expired
               ? 'Expired. Refresh before reviewing.'
-              : `Quote via ${quote.router}, 0.5% slippage.`}
+              : 'Market quote received. Wallet readiness is checked separately.'}
           </p>
-          <p className="warmup-address">Token: {quote.outputMint}</p>
-          <p>
-            Input: {quote.inAmount} lamports. Quoted output: {quote.outAmount}{' '}
-            token atomic units. Minimum output: {quote.minimumOutAmount}.
-          </p>
-          <small>
-            {quote.limitations} Expires{' '}
-            {new Date(quote.expiresAt).toLocaleString()}.
-          </small>
+          <details className={styles.technical}>
+            <summary>Quote details</summary>
+            <p>Quote via {quote.router}, 0.5% slippage.</p>
+            <p className="warmup-address">Token: {quote.outputMint}</p>
+            <p>
+              Input: {quote.inAmount} lamports. Quoted output: {quote.outAmount}{' '}
+              token atomic units. Minimum output: {quote.minimumOutAmount}.
+            </p>
+            <small>
+              {quote.limitations} Expires{' '}
+              {new Date(quote.expiresAt).toLocaleString()}.
+            </small>
+          </details>
         </section>
       )}
     </div>
