@@ -12,6 +12,20 @@ import {
 } from './dca-random-allocation';
 import type { DcaSupplySizing, DcaSupplyToken } from './dca-supply-sizing';
 
+/** Convert an explicitly reviewed per-cycle input into the existing total budget. */
+export function dcaPerCycleBudget(
+  amount: string,
+  decimals: number,
+  cycles: number,
+) {
+  if (!Number.isInteger(cycles) || cycles < 2 || cycles > 25)
+    throw new Error('Choose 2 to 25 DCA cycles.');
+  const total = solanaTokenAtoms(amount, decimals) * BigInt(cycles);
+  if (total > (1n << 64n) - 1n)
+    throw new Error('Total DCA input exceeds the supported Solana amount.');
+  return formatNativeBalance(total.toString(), decimals);
+}
+
 export function dcaTradeSessionInput(
   input: {
     projectId: string;

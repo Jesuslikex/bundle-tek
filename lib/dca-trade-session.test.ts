@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { dcaTradeSessionInput } from './dca-trade-session';
+import { dcaTradeSessionInput, dcaPerCycleBudget } from './dca-trade-session';
 import { dcaSupplyInput } from './dca-supply-sizing';
 import {
   decodeTradeSession,
@@ -372,4 +372,56 @@ it('retains an optional canonical deadline strictly after the final cycle and re
       token,
     ),
   ).toThrow();
+});
+
+it('converts fixed per-cycle atoms to an exact existing DCA budget without Number rounding', () => {
+  expect(dcaPerCycleBudget('0.000000003', 9, 3)).toBe('0.000000009');
+  expect(dcaPerCycleBudget('9007199254.740993', 6, 3)).toBe(
+    '27021597764.222979',
+  );
+  const result = dcaTradeSessionInput(
+    { ...input, totalAmount: dcaPerCycleBudget('0.000000003', 9, 3) },
+    token,
+  );
+  expect(result.terms.entries.map((e) => e.unitsRaw)).toEqual(['3', '3', '3']);
+  expect(tradeSessionTerms(result.request, token)).toEqual(result.terms);
+});
+it('maps per-cycle supply targets to the existing conservative total-supply calculation', () => {
+  const captured = {
+    ...token,
+    totalSupplyRaw: '17',
+    observedAt: '2026-10-13T12:00:00.000Z',
+  };
+  const percent = dcaPerCycleBudget('10', 6, 3);
+  expect(percent).toBe('30');
+  const sized = dcaSupplyInput(captured, { totalPercent: percent });
+  expect(sized.totalRaw).toBe('5');
+  const result = dcaTradeSessionInput(
+    {
+      ...input,
+      side: 'Sell',
+      totalAmount: '0.000005',
+      supplySizing: sized.sizing,
+    },
+    captured,
+  );
+  expect(result.terms.entries.map((e) => e.unitsRaw)).toEqual(['2', '2', '1']);
+  expect(() =>
+    dcaSupplyInput(captured, { totalPercent: dcaPerCycleBudget('40', 6, 3) }),
+  ).toThrow('at most 100');
+});
+it('refuses unsafe per-cycle inputs and overflow before constructing a total', () => {
+  for (const cycles of [0, 1, 26, 1.5, NaN, Infinity])
+    expect(() => dcaPerCycleBudget('1', 9, cycles)).toThrow('2 to 25');
+  for (const amount of [
+    '0',
+    '-1',
+    '1e-3',
+    '0.0000000001',
+    '18446744073.709551615',
+  ])
+    expect(() => dcaPerCycleBudget(amount, 9, 2)).toThrow();
+  expect(dcaPerCycleBudget('9223372036.854775807', 9, 2)).toBe(
+    '18446744073.709551614',
+  );
 });
