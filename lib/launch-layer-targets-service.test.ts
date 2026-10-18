@@ -167,6 +167,39 @@ it('reports the exact 100-choice window and does not silently call it complete',
   expect(value.hasMore).toBe(true);
   expect(value.items[0].id).toBe('target-000');
   expect(value.items.at(-1)?.id).toBe('target-099');
+  expect(value.nextCursor?.id).toBe('target-099');
+  const next = await listImportedLayerTargets(storage.db, 'alice', {
+    ...source(),
+    cursor: value.nextCursor!,
+  });
+  expect(next.items.map((item) => item.id)).toEqual(['target-100']);
+  expect(next.hasMore).toBe(false);
+  expect(next.nextCursor).toBeNull();
+  expect(
+    new Set([...value.items, ...next.items].map((item) => item.id)).size,
+  ).toBe(101);
+  const searched = await listImportedLayerTargets(storage.db, 'alice', {
+    ...source(),
+    search: 'Token 100',
+  });
+  expect(searched.items.map((item) => item.id)).toEqual(['target-100']);
+  await expect(
+    listImportedLayerTargets(storage.db, 'alice', {
+      ...source(),
+      search: 'Token',
+      cursor: value.nextCursor!,
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  await storage.db
+    .prepare('UPDATE imported_token_projects SET revision=2 WHERE id=?')
+    .bind(value.nextCursor!.id)
+    .run();
+  await expect(
+    listImportedLayerTargets(storage.db, 'alice', {
+      ...source(),
+      cursor: value.nextCursor!,
+    }),
+  ).rejects.toMatchObject({ status: 409 });
 });
 it('withholds the entire list when a visible imported record is inconsistent', async () => {
   await add();
@@ -211,4 +244,103 @@ it('rejects substituted context, permissions and duplicate target identities in 
     { ...value, hasMore: undefined },
   ])
     expect(() => parseImportedLayerTargets(bad, source())).toThrow();
+});
+
+it('searches owned names, symbols and mint text literally with normalized bounded input', async () => {
+  await add();
+  for (const search of ['saved', 'SAVE', f.address(90).slice(-12)])
+    expect(
+      (
+        await listImportedLayerTargets(storage.db, 'alice', {
+          ...source(),
+          search,
+        })
+      ).items,
+    ).toHaveLength(1);
+  expect(
+    (
+      await listImportedLayerTargets(storage.db, 'alice', {
+        ...source(),
+        search: '  missing  ',
+      })
+    ).search,
+  ).toBe('missing');
+  expect(
+    (
+      await listImportedLayerTargets(storage.db, 'alice', {
+        ...source(),
+        search: '%',
+      })
+    ).items,
+  ).toHaveLength(0);
+  expect(
+    (
+      await listImportedLayerTargets(storage.db, 'alice', {
+        ...source(),
+        search: "' OR 1=1 --",
+      })
+    ).items,
+  ).toHaveLength(0);
+  await expect(
+    listImportedLayerTargets(storage.db, 'alice', {
+      ...source(),
+      search: 'x'.repeat(81),
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+});
+it('rejects foreign, stale and cross-launch cursor anchors without broadening ownership', async () => {
+  await add('foreign-anchor', 'bob');
+  const cursor = {
+    version: 1 as const,
+    ...source(),
+    search: '',
+    id: 'foreign-anchor',
+    revision: 3,
+    updatedAt: f.updatedAt,
+  };
+  await expect(
+    listImportedLayerTargets(storage.db, 'alice', { ...source(), cursor }),
+  ).rejects.toMatchObject({ status: 409 });
+  await expect(
+    listImportedLayerTargets(storage.db, 'alice', {
+      ...source(),
+      cursor: { ...cursor, projectId: 'another-source' },
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  await add('own-anchor');
+  await storage.db
+    .prepare('UPDATE imported_token_projects SET archived=1 WHERE id=?')
+    .bind('own-anchor')
+    .run();
+  await expect(
+    listImportedLayerTargets(storage.db, 'alice', {
+      ...source(),
+      cursor: { ...cursor, id: 'own-anchor' },
+    }),
+  ).rejects.toMatchObject({ status: 409 });
+});
+it('refuses substituted page/search echoes and malformed continuation tails', async () => {
+  await add();
+  const query = { ...source(), search: 'SAVE' };
+  const page = await listImportedLayerTargets(storage.db, 'alice', query);
+  expect(() =>
+    parseImportedLayerTargets({ ...page, search: '' }, query),
+  ).toThrow();
+  const cursor = {
+    version: 1 as const,
+    ...source(),
+    search: 'SAVE',
+    id: 'own-anchor',
+    revision: 1,
+    updatedAt: f.updatedAt,
+  };
+  expect(() =>
+    parseImportedLayerTargets({ ...page, pageCursor: cursor }, query),
+  ).toThrow();
+  expect(() =>
+    parseImportedLayerTargets(
+      { ...page, hasMore: true, nextCursor: cursor },
+      query,
+    ),
+  ).toThrow();
 });

@@ -66,3 +66,8 @@ The REA chat extended the layer client, context/saved response and existing plan
 ## Visible imported target selection
 
 Read CODEX-IMPORTED-LAYER-PICKER-20261018.md. The REA chat added the explicit owned imported picker in the launch metadata component, compact layers targets GET, bounded/cancellable manual loading and exact record/revision selection. Final11files/135tests and typed lint pass. Isolated TypeScript at c77ba2d plus nine overlays passes with unchanged hashes; a concurrent whole-checkout check failed in the account owner's new payment drafts, which were preserved. Chrome synthetic desktop/375/320 and HTML-reload recovery passed. This supersedes the prior unwired-picker gap, while the100record window/search gap and all staged execution/funding gates remain. No protected layout, schema, provider, push or deploy.
+
+
+## Imported picker older-record access
+
+Read CODEX-IMPORTED-PICKER-PAGING-20261018.md. The REA chat removed the newest100 dead end with literal server search and source/search/owned-anchor-bound keyset paging, explicit selection, Enter handling, page announcements and focus. Final11files/141tests, five-file typed lint and whole-project TypeScript passed; actual picker Chrome reached item101 by page and symbol search at desktop/375/320. Imports may change during browsing; no immutable collection or funded proof is claimed. Only six owned target/picker files plus docs changed. Account/payment drafts preserved; no Next/full-suite green claim, schema/provider/push/deploy/signing change.

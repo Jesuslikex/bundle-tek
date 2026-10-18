@@ -1,9 +1,11 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   parseImportedLayerTargets,
   type ImportedLayerTargets,
+  type LayerTargetCursor,
 } from '@/lib/launch-layer-targets';
 import { LaunchLayerPlanningEntry } from './launch-layer-planning-entry';
 import styles from './imported-layer-planning.module.css';
@@ -24,9 +26,18 @@ function Picker({
   const [targets, setTargets] = useState<ImportedLayerTargets | null>(null),
     [selected, setSelected] = useState(''),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [search, setSearch] = useState(''),
+    [page, setPage] = useState(0),
+    [starts, setStarts] = useState<(LayerTargetCursor | undefined)[]>([
+      undefined,
+    ]);
   const request = useRef<AbortController | null>(null),
     alive = useRef(true);
+  const selectionField = useRef<HTMLSelectElement>(null);
+  useEffect(() => {
+    if (targets) selectionField.current?.focus();
+  }, [targets]);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -35,8 +46,13 @@ function Picker({
     };
   }, []);
   const source = { projectId: project.id, projectUpdatedAt: project.updatedAt };
-  async function load() {
+  async function load(cursor?: LayerTargetCursor, pageIndex = 0) {
     if (request.current || disabled || !scheduled) return;
+    const query = {
+      ...source,
+      search: search.trim(),
+      ...(cursor ? { cursor } : {}),
+    };
     const controller = new AbortController();
     request.current = controller;
     setBusy(true);
@@ -55,7 +71,7 @@ function Picker({
         (async () => {
           const response = await fetch(
             '/api/launch/layers?targets=' +
-              encodeURIComponent(JSON.stringify(source)),
+              encodeURIComponent(JSON.stringify(query)),
             { signal: controller.signal, cache: 'no-store' },
           );
           if (!response.ok)
@@ -63,7 +79,9 @@ function Picker({
               response.status === 401
                 ? 'Sign in to choose an imported token.'
                 : response.status === 409
-                  ? 'Save and reload a scheduled launch before choosing its imported token.'
+                  ? cursor
+                    ? 'Imported records changed. Reload the first page before continuing.'
+                    : 'Save and reload a scheduled launch before choosing its imported token.'
                   : 'Imported tokens are unavailable. Reload the list to try again.',
             );
           const text = await response.text();
@@ -79,7 +97,7 @@ function Picker({
             throw new Error('Imported token list was incomplete.');
           return parseImportedLayerTargets(
             (parsed as Record<string, unknown>).targets,
-            source,
+            query,
           );
         })(),
       ]);
@@ -87,8 +105,15 @@ function Picker({
         alive.current &&
         request.current === controller &&
         !controller.signal.aborted
-      )
+      ) {
         setTargets(value);
+        setPage(pageIndex);
+        setStarts((previous) =>
+          pageIndex === 0
+            ? [undefined]
+            : [...previous.slice(0, pageIndex), cursor],
+        );
+      }
     } catch (cause) {
       if (alive.current && request.current === controller)
         setError(
@@ -127,6 +152,30 @@ function Picker({
           token.
         </p>
       )}
+      <label htmlFor={id + '-search'}>Search imported tokens</label>
+      <Input
+        id={id + '-search'}
+        className={styles.search}
+        type="search"
+        maxLength={80}
+        value={search}
+        disabled={disabled || busy || !scheduled}
+        placeholder="Token name, symbol or mint"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            void load();
+          }
+        }}
+        onChange={(event) => {
+          setSearch(event.target.value);
+          setTargets(null);
+          setSelected('');
+          setPage(0);
+          setStarts([undefined]);
+          setError('');
+        }}
+      />
       <Button
         type="button"
         variant="outline"
@@ -137,7 +186,9 @@ function Picker({
           ? 'Loading imported tokens…'
           : targets
             ? 'Reload imported tokens'
-            : 'Load imported tokens'}
+            : search.trim()
+              ? 'Search imported tokens'
+              : 'Load imported tokens'}
       </Button>
       {busy && (
         <Button
@@ -149,22 +200,43 @@ function Picker({
         </Button>
       )}
       <p>
-        Reloading clears the selection and closes its planner so an old record
-        revision cannot be reused.
+        Searching, changing pages or reloading clears the selection and closes
+        its planner. Reload returns to the first page. Imports may change while
+        browsing.
       </p>
       {targets && (
         <>
-          {targets.hasMore && (
-            <p>
-              Showing the 100 most recently updated active Solana imports.
-              Additional records are not included.
-            </p>
-          )}
+          <output aria-live="polite">
+            Page {page + 1} · {targets.items.length} active Solana imports
+            {targets.search ? ' matching “' + targets.search + '”' : ''}. Up to
+            100 per page.
+          </output>
+          <nav className={styles.pages} aria-label="Imported token pages">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={disabled || busy || page === 0}
+              onClick={() => void load(starts[page - 1], page - 1)}
+            >
+              Previous imports
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={disabled || busy || !targets.nextCursor}
+              onClick={() =>
+                void load(targets.nextCursor ?? undefined, page + 1)
+              }
+            >
+              Next imports
+            </Button>
+          </nav>
           {targets.items.length ? (
             <>
               <label htmlFor={id}>Imported token</label>
               <select
                 id={id}
+                ref={selectionField}
                 className={styles.select}
                 value={selected}
                 disabled={disabled || busy}
@@ -181,8 +253,9 @@ function Picker({
             </>
           ) : (
             <p>
-              No active Solana imports were found. Import or restore a token in
-              the workspace, then reload this list.
+              {targets.search
+                ? 'No active Solana imports match this search. Change the name, symbol or mint and search again.'
+                : 'No active Solana imports were found. Import or restore a token in the workspace, then reload this list.'}
             </p>
           )}
           {target && (

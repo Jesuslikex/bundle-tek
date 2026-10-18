@@ -140,6 +140,15 @@ it('shows empty and incomplete-list states honestly', async () => {
       targets: {
         ...value(),
         hasMore: true,
+        nextCursor: {
+          version: 1,
+          projectId: project.id,
+          projectUpdatedAt: project.updatedAt,
+          search: '',
+          id: 'cap-99',
+          revision: 3,
+          updatedAt: project.updatedAt,
+        },
         items: Array.from({ length: 100 }, (_, i) => ({
           ...value().items[0],
           id: 'cap-' + i,
@@ -148,7 +157,7 @@ it('shows empty and incomplete-list states honestly', async () => {
     }),
   );
   await click('Reload imported tokens');
-  expect(host.textContent).toContain('100 most recently updated');
+  expect(host.textContent).toContain('Up to 100 per page');
   expect(host.querySelector('select')?.value).toBe('');
 });
 it('times out even if transport ignores abort and discards its late response', async () => {
@@ -227,4 +236,102 @@ it('explains expired sign-in without exposing a server error body', async () => 
   );
   expect(host.textContent).not.toContain('private server diagnostic');
   expect(host.querySelector('select')).toBeNull();
+});
+
+async function searchText(value: string) {
+  await act(async () => {
+    const field = host.querySelector<HTMLInputElement>('input[type=search]')!;
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+it('clears selected planning when searching and binds the search response to its exact query', async () => {
+  await render();
+  await click('Load imported tokens');
+  await select('import-a');
+  await searchText('  TWO  ');
+  expect(host.querySelector('select')).toBeNull();
+  expect(button('Plan Front / Back layers')).toBeUndefined();
+  fetcher.mockImplementationOnce(async (url: string) => {
+    const query = JSON.parse(
+      new URL(url, 'https://bundle.test').searchParams.get('targets')!,
+    );
+    expect(query.search).toBe('TWO');
+    expect(query.cursor).toBeUndefined();
+    return Response.json({
+      targets: { ...value(), search: 'TWO', items: [value().items[1]] },
+    });
+  });
+  await click('Search imported tokens');
+  expect(host.textContent).toContain('matching “TWO”');
+  expect(host.querySelector('select')?.value).toBe('');
+});
+it('pages forward and back without automatically selecting or retaining a previous planner', async () => {
+  const cursor = {
+    version: 1 as const,
+    projectId: project.id,
+    projectUpdatedAt: project.updatedAt,
+    search: '',
+    id: 'cap-99',
+    revision: 3,
+    updatedAt: project.updatedAt,
+  };
+  const first = {
+    ...value(),
+    items: Array.from({ length: 100 }, (_, i) => ({
+      ...value().items[0],
+      id: 'cap-' + i,
+    })),
+    hasMore: true,
+    nextCursor: cursor,
+  };
+  fetcher.mockResolvedValueOnce(Response.json({ targets: first }));
+  await render();
+  await click('Load imported tokens');
+  await select('cap-0');
+  fetcher.mockImplementationOnce(async (url: string) => {
+    expect(
+      JSON.parse(
+        new URL(url, 'https://bundle.test').searchParams.get('targets')!,
+      ).cursor,
+    ).toEqual(cursor);
+    return Response.json({
+      targets: { ...value(), pageCursor: cursor, items: [value().items[1]] },
+    });
+  });
+  await click('Next imports');
+  expect(host.textContent).toContain('Page 2');
+  expect(host.querySelector('select')?.value).toBe('');
+  expect(button('Plan Front / Back layers')).toBeUndefined();
+  expect(button('Next imports').disabled).toBe(true);
+  fetcher.mockResolvedValueOnce(Response.json({ targets: first }));
+  await click('Previous imports');
+  expect(host.textContent).toContain('Page 1');
+  expect(button('Previous imports').disabled).toBe(true);
+  expect(host.querySelector('select')?.value).toBe('');
+});
+
+it('submits search on Enter without submitting a parent form and focuses the returned choices', async () => {
+  await render();
+  await searchText('ONE');
+  fetcher.mockResolvedValueOnce(
+    Response.json({
+      targets: { ...value(), search: 'ONE', items: [value().items[0]] },
+    }),
+  );
+  const event = new KeyboardEvent('keydown', {
+    key: 'Enter',
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => {
+    host.querySelector('input[type=search]')!.dispatchEvent(event);
+  });
+  expect(event.defaultPrevented).toBe(true);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(document.activeElement).toBe(host.querySelector('select'));
+  expect(host.querySelector('output')?.textContent).toContain('Page 1');
 });

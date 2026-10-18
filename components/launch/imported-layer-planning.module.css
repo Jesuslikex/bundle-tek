@@ -36,3 +36,13 @@
 .address {
   overflow-wrap: anywhere;
 }
+.search {
+  width: 100%;
+  min-width: 0;
+  margin-block: 6px;
+}
+.pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
