@@ -743,6 +743,13 @@
       "when": 1792598400000,
       "tag": "0105_volume_bundle_reservations",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "6",
+      "when": 1792684800000,
+      "tag": "0106_exchange_payout_receipts",
+      "breakpoints": true
     }
   ]
 }

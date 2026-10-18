@@ -97,3 +97,28 @@ export const exchangeOrderObservations = sqliteTable(
     ),
   ],
 );
+export const exchangePayoutReceipts = sqliteTable(
+  'exchange_funding_payout_receipts',
+  {
+    reviewId: text('review_id')
+      .primaryKey()
+      .notNull()
+      .references(() => exchangeOrderAttempts.reviewId),
+    ownerId: text('owner_id').notNull(),
+    observationId: text('observation_id')
+      .notNull()
+      .references(() => exchangeOrderObservations.id),
+    signature: text('signature').notNull(),
+    recipient: text('recipient').notNull(),
+    amountRaw: text('amount_raw').notNull(),
+    document: text('document').notNull(),
+    sha256: text('sha256').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('idx_exchange_payout_once_per_recipient').on(
+      t.signature,
+      t.recipient,
+    ),
+  ],
+);

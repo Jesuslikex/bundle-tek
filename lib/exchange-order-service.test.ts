@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createClient, type Client } from '@libsql/client';
 import { readFile } from 'node:fs/promises';
 import bs58 from 'bs58';
+import { exchangePayoutFixture } from '../test/exchange-payout-fixture';
+import { verifyOwnedExchangePayout } from './exchange-payout-service';
 import { createTursoDatabase } from '../db/turso';
 import { exchangeFundingReviewFixture } from '@/test/exchange-funding-review-fixture';
 import {
@@ -88,6 +90,7 @@ beforeEach(async () => {
   for (const name of [
     '0103_exchange_funding_quotes',
     '0104_exchange_funding_orders',
+    '0106_exchange_payout_receipts',
   ])
     await client.executeMultiple(await readFile(`drizzle/${name}.sql`, 'utf8'));
   await db
@@ -676,4 +679,321 @@ it('refuses foreign-owner and caller-authored provider-reference lookups', async
     ),
   ).rejects.toMatchObject({ status: 400 });
   expect(lookup).not.toHaveBeenCalled();
+});
+
+async function paidOrder() {
+  const review = await approved();
+  await attempt(review);
+  const f = await exchangePayoutFixture();
+  lookup.mockResolvedValue({
+    ...status('finished'),
+    payoutHash: f.expected.signature,
+  });
+  await observeOwnedExchangeOrder(
+    db,
+    'alice',
+    review.terms.id,
+    new AbortController().signal,
+    { lookup },
+    now,
+  );
+  const rpc = vi.fn(
+    async (method: string) =>
+      ({
+        getGenesisHash: f.evidence.genesisBefore,
+        getSignatureStatuses: f.evidence.status,
+        getTransaction: f.evidence.transaction,
+        getSlot: f.evidence.finalizedSlot,
+      })[method],
+  );
+  time = f.now;
+  return {
+    review,
+    f,
+    rpc,
+    verify: () =>
+      verifyOwnedExchangePayout(
+        db,
+        'alice',
+        review.terms.id,
+        new AbortController().signal,
+        rpc,
+        now,
+      ),
+  };
+}
+it('retains an exact finalized payout once, without releasing the order hold or payment authority', async () => {
+  const { review, verify, rpc } = await paidOrder();
+  const receipt = await verify();
+  expect(receipt).toMatchObject({
+    reviewId: review.terms.id,
+    payoutVerified: true,
+    ...exchangeOrderAuthority,
+  });
+  expect(await verify()).toEqual(receipt);
+  expect(rpc).toHaveBeenCalledTimes(5);
+  expect(
+    await readOwnedExchangeOrder(db, 'alice', review.terms.id),
+  ).toMatchObject({
+    state: 'payout-verified',
+    payoutVerified: true,
+    payoutReceipt: receipt,
+    ...exchangeOrderAuthority,
+  });
+  expect(
+    (await readOwnedExchangeOrder(db, 'alice', review.terms.id))
+      .retryCreationAllowed,
+  ).toBe(false);
+  await expect(
+    db.prepare('DELETE FROM exchange_funding_payout_receipts').run(),
+  ).rejects.toThrow(/Retain/);
+  await expect(
+    db
+      .prepare("UPDATE exchange_funding_payout_receipts SET amount_raw='1'")
+      .run(),
+  ).rejects.toThrow(/immutable/);
+});
+it('reconciles a historical payout after draft archive without treating it as current spendable balance', async () => {
+  const { verify } = await paidOrder();
+  await db.prepare('UPDATE funding_plans SET archived=1').run();
+  expect((await verify()).currentSpendabilityVerified).toBe(false);
+});
+it('refuses foreign ownership before any receipt RPC call', async () => {
+  const { review, rpc } = await paidOrder();
+  await expect(
+    verifyOwnedExchangePayout(
+      db,
+      'bob',
+      review.terms.id,
+      new AbortController().signal,
+      rpc,
+      now,
+    ),
+  ).rejects.toMatchObject({ status: 404 });
+  expect(rpc).not.toHaveBeenCalled();
+});
+it('does not mistake provider finished status without a signature for a verified receipt', async () => {
+  const review = await approved();
+  await attempt(review);
+  lookup.mockResolvedValue(status('finished'));
+  await observeOwnedExchangeOrder(
+    db,
+    'alice',
+    review.terms.id,
+    new AbortController().signal,
+    { lookup },
+    now,
+  );
+  const rpc = vi.fn();
+  await expect(
+    verifyOwnedExchangePayout(
+      db,
+      'alice',
+      review.terms.id,
+      new AbortController().signal,
+      rpc,
+      now,
+    ),
+  ).rejects.toThrow(/signature/);
+  expect(rpc).not.toHaveBeenCalled();
+});
+it('keeps a retained finished signature when a later provider response omits it', async () => {
+  const { review, verify } = await paidOrder();
+  time++;
+  lookup.mockResolvedValue(status('finished'));
+  await observeOwnedExchangeOrder(
+    db,
+    'alice',
+    review.terms.id,
+    new AbortController().signal,
+    { lookup },
+    now,
+  );
+  expect((await verify()).payoutVerified).toBe(true);
+});
+it('pins payin, payout and refund signatures even across concurrent same-status observations', async () => {
+  const { review, f } = await paidOrder();
+  lookup.mockResolvedValue({
+    ...status('finished'),
+    payoutHash: bs58.encode(new Uint8Array(64).fill(6)),
+  });
+  await expect(
+    observeOwnedExchangeOrder(
+      db,
+      'alice',
+      review.terms.id,
+      new AbortController().signal,
+      { lookup },
+      now,
+    ),
+  ).rejects.toThrow(/reference changed/);
+  const row = await db
+    .prepare(
+      'SELECT document FROM exchange_funding_order_observations WHERE review_id=?',
+    )
+    .bind(review.terms.id)
+    .first<{ document: string }>();
+  for (const field of ['payinHash', 'refundHash']) {
+    const doc = { ...JSON.parse(row!.document), [field]: f.expected.signature };
+    await db
+      .prepare(
+        'INSERT INTO exchange_funding_order_observations VALUES(?,?,?,?,?)',
+      )
+      .bind(
+        crypto.randomUUID(),
+        review.terms.id,
+        'alice',
+        JSON.stringify(doc),
+        new Date(time).toISOString(),
+      )
+      .run();
+    doc[field] = bs58.encode(new Uint8Array(64).fill(5));
+    await expect(
+      db
+        .prepare(
+          'INSERT INTO exchange_funding_order_observations VALUES(?,?,?,?,?)',
+        )
+        .bind(
+          crypto.randomUUID(),
+          review.terms.id,
+          'alice',
+          JSON.stringify(doc),
+          new Date(time).toISOString(),
+        )
+        .run(),
+    ).rejects.toThrow(/reference changed/);
+  }
+});
+it('does not persist a receipt after RPC refusal or cancellation', async () => {
+  const { review, rpc } = await paidOrder();
+  rpc.mockRejectedValue(new Error('secret'));
+  await expect(
+    verifyOwnedExchangePayout(
+      db,
+      'alice',
+      review.terms.id,
+      new AbortController().signal,
+      rpc,
+      now,
+    ),
+  ).rejects.toMatchObject({ status: 503 });
+  expect(
+    await db.prepare('SELECT * FROM exchange_funding_payout_receipts').first(),
+  ).toBeNull();
+});
+it('database guards reject changed receipt identity, amount, time and authority and prevent duplicate credit', async () => {
+  const { verify } = await paidOrder();
+  await verify();
+  const row = await db
+    .prepare('SELECT * FROM exchange_funding_payout_receipts')
+    .first<Record<string, string>>();
+  const insert = (v: Record<string, string>) =>
+    db
+      .prepare(
+        'INSERT INTO exchange_funding_payout_receipts(review_id,owner_id,observation_id,signature,recipient,amount_raw,document,sha256,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
+      )
+      .bind(
+        ...[
+          'review_id',
+          'owner_id',
+          'observation_id',
+          'signature',
+          'recipient',
+          'amount_raw',
+          'document',
+          'sha256',
+          'created_at',
+        ].map((k) => v[k]),
+      )
+      .run();
+  await expect(insert(row!)).rejects.toThrow();
+  const changes: Record<string, string>[] = [
+    { owner_id: 'bob' },
+    { amount_raw: '1' },
+    { observation_id: crypto.randomUUID() },
+    { sha256: 'invalid' },
+    { created_at: '2020-01-01T00:00:00.000Z' },
+  ];
+  for (const change of changes)
+    await expect(insert({ ...row!, ...change })).rejects.toThrow();
+  for (const change of [
+    { fundingAllowed: true },
+    { currentSpendabilityVerified: true },
+    { payoutVerified: false },
+    { finalizedSlot: 119 },
+    { blockTime: 1 },
+    { signature: bs58.encode(new Uint8Array(64).fill(3)) },
+  ])
+    await expect(
+      insert({
+        ...row!,
+        document: JSON.stringify({ ...JSON.parse(row!.document), ...change }),
+      }),
+    ).rejects.toThrow();
+});
+it('never credits the same transaction and recipient to a second owned order', async () => {
+  const first = await paidOrder();
+  await first.verify();
+  time = Date.parse('2026-10-18T12:00:00.000Z');
+  fixture.plan.id = 'second-funding-plan';
+  fixture.review.planId = fixture.plan.id;
+  fixture.review.id = crypto.randomUUID();
+  await db
+    .prepare('INSERT INTO funding_plans VALUES(?,?,?,?,?,?)')
+    .bind(
+      'alice',
+      fixture.plan.id,
+      JSON.stringify(fixture.plan.document),
+      3,
+      0,
+      fixture.plan.updatedAt,
+    )
+    .run();
+  await db
+    .prepare('INSERT INTO exchange_funding_quotes VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind(
+      fixture.review.id,
+      'alice',
+      fixture.plan.id,
+      3,
+      2,
+      JSON.stringify(fixture.plan.document),
+      JSON.stringify(fixture.review),
+      'second-private-rate',
+      fixture.review.quotedAt,
+      fixture.review.expiresAt,
+    )
+    .run();
+  const review = await approved();
+  await attempt(review);
+  lookup.mockResolvedValue({
+    ...status('finished'),
+    payoutHash: first.f.expected.signature,
+  });
+  await observeOwnedExchangeOrder(
+    db,
+    'alice',
+    review.terms.id,
+    new AbortController().signal,
+    { lookup },
+    now,
+  );
+  time = first.f.now;
+  await expect(
+    verifyOwnedExchangePayout(
+      db,
+      'alice',
+      review.terms.id,
+      new AbortController().signal,
+      first.rpc,
+      now,
+    ),
+  ).rejects.toThrow(/hold remains/);
+  expect(
+    (
+      await db
+        .prepare('SELECT count(*) AS n FROM exchange_funding_payout_receipts')
+        .first<{ n: number }>()
+    )?.n,
+  ).toBe(1);
 });

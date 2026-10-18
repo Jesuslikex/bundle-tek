@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { walletAddress } from './wallet-workspace';
+import { exchangePayoutSignature } from './exchange-payout-signature';
 import {
   decodeExchangeFundingReview,
   exchangeSolLamports,
@@ -105,6 +106,19 @@ const providerAddress = z.string().refine((v) => {
   }
 });
 const noTag = z.union([z.null(), z.literal('')]).optional();
+const optionalSignature = z
+  .union([
+    z.null(),
+    z.literal(''),
+    z.string().refine((v) => {
+      try {
+        return exchangePayoutSignature(v) === v;
+      } catch {
+        return false;
+      }
+    }),
+  ])
+  .optional();
 export const exchangeProviderId = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
 /** Fixed native SOL contract derived from Smoke; no arbitrary program or transaction accepted. */
 export function matchExchangeProviderOrder(
@@ -176,6 +190,9 @@ export function observeExchangeProviderOrder(
         'refunded',
         'verifying',
       ]),
+      payinHash: optionalSignature,
+      payoutHash: optionalSignature,
+      refundHash: optionalSignature,
       payinExtraId: noTag,
       payoutExtraId: noTag,
       refundExtraId: noTag,
@@ -197,6 +214,9 @@ export function observeExchangeProviderOrder(
   return {
     ...order,
     providerStatus: v.status,
+    payinHash: v.payinHash || null,
+    payoutHash: v.payoutHash || null,
+    refundHash: v.refundHash || null,
     payoutVerified: false as const,
     refundVerified: false as const,
     ...exchangeOrderAuthority,

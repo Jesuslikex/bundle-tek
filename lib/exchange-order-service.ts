@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readStoredExchangePayout } from './exchange-payout-storage';
 import { ExchangeFundingError } from './exchange-funding-quote';
 import {
   decodeExchangeFundingReview,
@@ -422,8 +423,8 @@ export async function readOwnedExchangeOrder(
   id: string,
 ) {
   const { row, terms } = await reviewRow(db, owner, id);
-  const [approval, attempt, reference, result, observation] = await Promise.all(
-    [
+  const [approval, attempt, reference, result, observation, payoutReceipt] =
+    await Promise.all([
       db
         .prepare(
           'SELECT created_at FROM exchange_funding_order_approvals WHERE review_id=? AND owner_id=?',
@@ -454,8 +455,8 @@ export async function readOwnedExchangeOrder(
         )
         .bind(id, owner)
         .first<{ document: string }>(),
-    ],
-  );
+      readStoredExchangePayout(db, owner, id),
+    ]);
   const providerStatus = observation
     ? (JSON.parse(observation.document) as { providerStatus: string })
         .providerStatus
@@ -482,6 +483,15 @@ export async function readOwnedExchangeOrder(
       states[providerStatus] ??
       reject('Saved provider status is inconsistent.', 503);
   }
+  if (payoutReceipt) {
+    if (
+      payoutReceipt.orderSha256 !== row.sha256 ||
+      payoutReceipt.recipient !== terms.quote.funder ||
+      payoutReceipt.amountRaw !== terms.quote.expectedPayoutLamports
+    )
+      return reject('Saved payout receipt context differs.', 503);
+    state = 'payout-verified';
+  }
   return {
     terms,
     sha256: row.sha256,
@@ -495,7 +505,8 @@ export async function readOwnedExchangeOrder(
     providerStatus,
     providerReferenceRetained: Boolean(reference),
     retryCreationAllowed: false as const,
-    payoutVerified: false as const,
+    payoutVerified: Boolean(payoutReceipt),
+    payoutReceipt,
     refundVerified: false as const,
     ...exchangeOrderAuthority,
   };
