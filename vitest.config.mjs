@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
@@ -13,6 +13,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Ignored release snapshots contain historical tests, not current source.
+    exclude: [...configDefaults.exclude, 'work/**'],
     environment: 'node',
     setupFiles: [path.join(root, 'test/vercel-compat.ts')],
     // Miniflare-backed route suites start local D1 and run many sequential

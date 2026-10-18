@@ -1,0 +1,7 @@
+# Exclude ignored historical test copies
+
+18 October 2026. Main's Vitest default excluded only node_modules and .git. A focused command matched current Jito tests plus two old copies under ignored work/release-qa/jito-commit-tree and work/release-qa/owned-commit-preview-20261013. Those copies can inflate counts and exercise old source. They are not tracked source: git ls-files work returns no files.
+
+The test configuration now preserves configDefaults.exclude and additionally excludes work/**. This does not skip any tracked test or change test timeouts, worker limits, expectations or application code. Direct discovery using the config, without a command-line exclusion, lists exactly the four requested current UI files and no work snapshots. The previous backend regression started under the old configuration and remains live; its result will be reported by current-root file separately rather than counting historical copies. The shared Next build does not use this test-discovery setting.
+
+Validation: Node24.19.0 confirms Vitest's installed default exclusions; focused Vitest file discovery returns only current files. The current-source focused run is recorded in the MEV transport audit after terminal completion. This fix does not retrospectively validate older full-suite totals. No historical snapshots were deleted, no provider or wallet action occurred, and no build/server/deploy was started here.
