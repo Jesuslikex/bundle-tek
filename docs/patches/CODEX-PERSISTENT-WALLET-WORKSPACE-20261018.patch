@@ -1,0 +1,1485 @@
+diff --git a/components/imported-token-projects.tsx b/components/imported-token-projects.tsx
+index 0cdb730..aa83ce9 100644
+--- a/components/imported-token-projects.tsx
++++ b/components/imported-token-projects.tsx
+@@ -16,6 +16,10 @@ import {
+   ImportedTokenQuote,
+ } from './imported-token-quote';
+ import { ImportedTokenMarket } from './imported-token-market';
++import {
++  ImportedWorkspaceFrame,
++  ImportedWorkspaceViews,
++} from './imported-workspace-frame';
+ import { ImportedSupplyTracker } from './imported-supply-tracker';
+ import { HolderIndexPanel } from './holder-index-panel';
+ import { ImportedEvmWalletBalances } from './imported-evm-wallet-balances';
+@@ -188,6 +192,107 @@ export function ImportedTokenProjects({
+       if (!controller.signal.aborted) setBusy(false);
+     }
+   }
++  const tokenPicker = (
++    <details className="token-project-picker" open={!current}>
++      <summary>Choose or import a token</summary>
++      <p>
++        Importing does not launch a token or establish authenticity. Supported
++        Solana swaps require a fresh preparation, your exact wallet signature
++        and a separate mainnet submission.
++      </p>
++      <form
++        className="imported-project-form"
++        onSubmit={(e) => {
++          e.preventDefault();
++          void run('import');
++        }}
++      >
++        <label>
++          Token network{' '}
++          <select
++            aria-label="Token network"
++            value={chain}
++            disabled={busy}
++            onChange={(e) => setChain(e.target.value)}
++          >
++            {['Solana', ...Object.keys(EVM_NETWORKS)].map((network) => (
++              <option key={network}>{network}</option>
++            ))}
++          </select>
++        </label>
++        <label>
++          Token address{' '}
++          <Input
++            aria-label="Token address"
++            placeholder="Enter a mint or contract address"
++            value={address}
++            disabled={busy}
++            maxLength={44}
++            onChange={(e) => setAddress(e.target.value)}
++            required
++          />
++        </label>
++        <Button type="submit" disabled={busy || !address.trim()}>
++          {busy ? 'Loading…' : 'Import token'}
++        </Button>
++      </form>
++      <div className="wallet-roster-actions">
++        <h2>Imported projects</h2>
++        <Button
++          variant="outline"
++          disabled={busy}
++          onClick={() => void run('reload')}
++        >
++          Reload imported projects
++        </Button>
++        <Button
++          variant="outline"
++          aria-pressed={archived}
++          disabled={busy}
++          onClick={() => {
++            setArchived(!archived);
++            setSelected('');
++            setSellSelection(null);
++          }}
++        >
++          {archived ? 'Show active imports' : 'Show archived imports'}
++        </Button>
++      </div>
++      {!projects.some((p) => p.archived === archived) && !busy && (
++        <p>No {archived ? 'archived' : 'active'} imports.</p>
++      )}
++      <div className="warmup-history">
++        {projects
++          .filter((p) => p.archived === archived)
++          .map((project) => (
++            <article key={project.id}>
++              <strong>
++                {project.document.token.name} ({project.document.token.symbol})
++              </strong>
++              <p>
++                {project.document.token.chain} · r{project.revision} ·{' '}
++                {project.archived ? 'Archived' : 'Active'}
++              </p>
++              <code className="warmup-address">
++                {project.document.token.address}
++              </code>
++              <div>
++                <Button
++                  variant="outline"
++                  disabled={busy}
++                  onClick={() => {
++                    setSelected(project.id);
++                    setSellSelection(null);
++                  }}
++                >
++                  Open import {project.document.token.symbol}
++                </Button>
++              </div>
++            </article>
++          ))}
++      </div>
++    </details>
++  );
+   return (
+     <section
+       className="settings-panel imported-projects"
+@@ -203,106 +308,7 @@ export function ImportedTokenProjects({
+           </p>
+         )}
+       </div>
+-      <details className="token-project-picker" open={!current}>
+-        <summary>Choose or import a token</summary>
+-        <p>
+-          Importing does not launch a token or establish authenticity. Supported
+-          Solana swaps require a fresh preparation, your exact wallet signature
+-          and a separate mainnet submission.
+-        </p>
+-        <form
+-          className="imported-project-form"
+-          onSubmit={(e) => {
+-            e.preventDefault();
+-            void run('import');
+-          }}
+-        >
+-          <label>
+-            Token network{' '}
+-            <select
+-              aria-label="Token network"
+-              value={chain}
+-              disabled={busy}
+-              onChange={(e) => setChain(e.target.value)}
+-            >
+-              {['Solana', ...Object.keys(EVM_NETWORKS)].map((network) => (
+-                <option key={network}>{network}</option>
+-              ))}
+-            </select>
+-          </label>
+-          <label>
+-            Token address{' '}
+-            <Input
+-              aria-label="Token address"
+-              placeholder="Enter a mint or contract address"
+-              value={address}
+-              disabled={busy}
+-              maxLength={44}
+-              onChange={(e) => setAddress(e.target.value)}
+-              required
+-            />
+-          </label>
+-          <Button type="submit" disabled={busy || !address.trim()}>
+-            {busy ? 'Loading…' : 'Import token'}
+-          </Button>
+-        </form>
+-        <div className="wallet-roster-actions">
+-          <h2>Imported projects</h2>
+-          <Button
+-            variant="outline"
+-            disabled={busy}
+-            onClick={() => void run('reload')}
+-          >
+-            Reload imported projects
+-          </Button>
+-          <Button
+-            variant="outline"
+-            aria-pressed={archived}
+-            disabled={busy}
+-            onClick={() => {
+-              setArchived(!archived);
+-              setSelected('');
+-              setSellSelection(null);
+-            }}
+-          >
+-            {archived ? 'Show active imports' : 'Show archived imports'}
+-          </Button>
+-        </div>
+-        {!projects.some((p) => p.archived === archived) && !busy && (
+-          <p>No {archived ? 'archived' : 'active'} imports.</p>
+-        )}
+-        <div className="warmup-history">
+-          {projects
+-            .filter((p) => p.archived === archived)
+-            .map((project) => (
+-              <article key={project.id}>
+-                <strong>
+-                  {project.document.token.name} ({project.document.token.symbol}
+-                  )
+-                </strong>
+-                <p>
+-                  {project.document.token.chain} · r{project.revision} ·{' '}
+-                  {project.archived ? 'Archived' : 'Active'}
+-                </p>
+-                <code className="warmup-address">
+-                  {project.document.token.address}
+-                </code>
+-                <div>
+-                  <Button
+-                    variant="outline"
+-                    disabled={busy}
+-                    onClick={() => {
+-                      setSelected(project.id);
+-                      setSellSelection(null);
+-                    }}
+-                  >
+-                    Open import {project.document.token.symbol}
+-                  </Button>
+-                </div>
+-              </article>
+-            ))}
+-        </div>
+-      </details>
++      {!current && tokenPicker}
+       {error && <p role="alert">{error}</p>}
+       {current && (
+         <section
+@@ -357,38 +363,45 @@ export function ImportedTokenProjects({
+               </details>
+             </div>
+             <div className="imported-token-header-actions">
+-              <div className="wallet-roster-actions">
+-                {!current.archived && (
++              {tokenPicker}
++              <details className="imported-token-actions-menu">
++                <summary>Project actions</summary>
++                <div className="wallet-roster-actions">
++                  {!current.archived && (
++                    <Button
++                      variant="outline"
++                      disabled={busy}
++                      onClick={() => void run('refresh', current)}
++                    >
++                      Refresh imported identity
++                    </Button>
++                  )}
+                   <Button
+                     variant="outline"
+                     disabled={busy}
+-                    onClick={() => void run('refresh', current)}
++                    onClick={() =>
++                      void run(
++                        current.archived ? 'restore' : 'archive',
++                        current,
++                      )
++                    }
+                   >
+-                    Refresh imported identity
++                    {current.archived
++                      ? 'Restore imported project'
++                      : 'Archive imported project'}
+                   </Button>
+-                )}
+-                <Button
+-                  variant="outline"
+-                  disabled={busy}
+-                  onClick={() =>
+-                    void run(current.archived ? 'restore' : 'archive', current)
+-                  }
+-                >
+-                  {current.archived
+-                    ? 'Restore imported project'
+-                    : 'Archive imported project'}
+-                </Button>
+-                <Button
+-                  variant="ghost"
+-                  disabled={busy}
+-                  onClick={() => {
+-                    setSelected('');
+-                    setSellSelection(null);
+-                  }}
+-                >
+-                  Close imported details
+-                </Button>
+-              </div>
++                  <Button
++                    variant="ghost"
++                    disabled={busy}
++                    onClick={() => {
++                      setSelected('');
++                      setSellSelection(null);
++                    }}
++                  >
++                    Close imported details
++                  </Button>
++                </div>
++              </details>
+               <div className="wallet-roster-actions">
+                 <Button variant="outline" onClick={openChart}>
+                   Open token chart and supply workspace
+@@ -415,9 +428,7 @@ export function ImportedTokenProjects({
+               </div>
+             </div>
+           </header>
+-          <div
+-            className={`imported-live-workspace${compactWorkspace ? ' imported-live-workspace--compact' : ''}`}
+-          >
++          <ImportedWorkspaceFrame compact={compactWorkspace}>
+             <section
+               ref={chartReview}
+               id={importedChartWorkspaceId(current.id)}
+@@ -447,49 +458,76 @@ export function ImportedTokenProjects({
+                   >
+                     <ImportedTokenQuote project={current} state={swap} />
+                   </section>
+-                  <section
+-                    className="imported-workspace-wallets"
+-                    aria-label="Token wallet and holder views"
+-                  >
+-                    <ImportedSwapWalletPanel
+-                      project={current}
+-                      state={swap}
+-                      onReviewBuy={reviewBuy}
+-                      onSaved={(saved) => {
+-                        onProjectsChange?.([saved]);
+-                        setProjects((items) =>
+-                          items.map((item) =>
+-                            item.id === saved.id &&
+-                            item.revision < saved.revision
+-                              ? saved
+-                              : item,
+-                          ),
+-                        );
+-                      }}
+-                    />
+-                    <ImportedSupplyTracker
+-                      key={`supply:${current.id}:${current.revision}`}
+-                      project={current}
+-                      onOpenChart={openChart}
+-                    />
+-                    {current.document.token.chain === 'Solana' && (
+-                      <HolderIndexPanel
+-                        key={`holder-index:${current.id}:${current.revision}`}
+-                        project={current}
+-                        onOpenChart={openChart}
+-                      />
+-                    )}
+-                    <TokenOperationHistory
+-                      projectId={current.id}
+-                      revision={current.revision}
+-                      project={current}
+-                      onReviewBuy={reviewBuy}
+-                    />
+-                  </section>
++                  <ImportedWorkspaceViews
++                    tabbed={compactWorkspace}
++                    key={`views:${current.id}:${current.revision}:${selectedHandoff?.sequence ?? 0}`}
++                    views={[
++                      {
++                        id: 'wallets',
++                        title: 'My wallets',
++                        content: (
++                          <ImportedSwapWalletPanel
++                            project={current}
++                            state={swap}
++                            onReviewBuy={reviewBuy}
++                            onSaved={(saved) => {
++                              onProjectsChange?.([saved]);
++                              setProjects((items) =>
++                                items.map((item) =>
++                                  item.id === saved.id &&
++                                  item.revision < saved.revision
++                                    ? saved
++                                    : item,
++                                ),
++                              );
++                            }}
++                          />
++                        ),
++                      },
++                      {
++                        id: 'supply',
++                        title: 'Supply and alerts',
++                        content: (
++                          <ImportedSupplyTracker
++                            key={`supply:${current.id}:${current.revision}`}
++                            project={current}
++                            onOpenChart={openChart}
++                          />
++                        ),
++                      },
++                      ...(current.document.token.chain === 'Solana'
++                        ? [
++                            {
++                              id: 'holders',
++                              title: 'Holders',
++                              content: (
++                                <HolderIndexPanel
++                                  key={`holder-index:${current.id}:${current.revision}`}
++                                  project={current}
++                                  onOpenChart={openChart}
++                                />
++                              ),
++                            },
++                          ]
++                        : []),
++                      {
++                        id: 'activity',
++                        title: 'Activity',
++                        content: (
++                          <TokenOperationHistory
++                            projectId={current.id}
++                            revision={current.revision}
++                            project={current}
++                            onReviewBuy={reviewBuy}
++                          />
++                        ),
++                      },
++                    ]}
++                  />
+                 </>
+               )}
+             </ImportedSwapDesk>
+-          </div>
++          </ImportedWorkspaceFrame>
+           {current.document.token.chain !== 'Solana' && (
+             <ImportedEvmWalletBalances
+               key={`evm-balance:${current.id}:${current.revision}`}
+diff --git a/components/imported-swap-wallet.tsx b/components/imported-swap-wallet.tsx
+index 07ee486..3bce55b 100644
+--- a/components/imported-swap-wallet.tsx
++++ b/components/imported-swap-wallet.tsx
+@@ -3,7 +3,8 @@ import { subscribeImportedWalletReview } from '@/lib/imported-wallet-review-even
+ import { ImportedTradeSessions } from './imported-trade-sessions';
+ import { ImportedPairTradeWalletReview } from './imported-pair-trade-wallet-review';
+ import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
+-import { useEffect, useRef, useState } from 'react';
++import { useCallback, useEffect, useRef, useState } from 'react';
++import { useImportedWorkspaceWalletView } from './imported-workspace-frame';
+ import { Button } from '@/components/ui/button';
+ import type { WorkspaceWallet, WalletFolder } from '@/lib/wallet-workspace';
+ import type { WalletBalance } from '@/lib/wallet-balance-format';
+@@ -45,6 +46,27 @@ export function ImportedSwapWallet({
+   onAmountChange: (amount: string) => void;
+   onWalletTradeReview: (side: 'Buy' | 'Sell', amount?: string) => void;
+ }) {
++  const showWallets = useImportedWorkspaceWalletView();
++  const reviewSection = useRef<HTMLDetailsElement>(null);
++  const openWalletReview = useCallback(() => {
++    showWallets?.();
++    requestAnimationFrame(() => {
++      const review = reviewSection.current;
++      if (!review?.isConnected) return;
++      review.open = true;
++      const pane = review.closest<HTMLElement>('[role="tabpanel"]');
++      const dock = review.closest<HTMLElement>('[data-wallet-dock="docked"]');
++      if (pane && dock) {
++        pane.scrollTop +=
++          review.getBoundingClientRect().top - pane.getBoundingClientRect().top;
++      } else {
++        review.scrollIntoView({ block: 'nearest' });
++      }
++      review
++        .querySelector<HTMLElement>('summary')
++        ?.focus({ preventScroll: true });
++    });
++  }, [showWallets]);
+   const [folders, setFolders] = useState<WalletFolder[]>([]);
+   const [balances, setBalances] = useState<WalletBalance[]>([]);
+   const [wallets, setWallets] = useState<WorkspaceWallet[]>([]),
+@@ -153,6 +175,7 @@ export function ImportedSwapWallet({
+           setReviewedCurrentWallet(true);
+           setError('');
+           onWalletTradeReview(review.side);
++          openWalletReview();
+           return null;
+         },
+       ),
+@@ -165,6 +188,7 @@ export function ImportedSwapWallet({
+       saving,
+       loading,
+       onWalletTradeReview,
++      openWalletReview,
+     ],
+   );
+   const selectedWallet = wallets.find((item) => item.address === selected);
+@@ -229,118 +253,13 @@ export function ImportedSwapWallet({
+   }
+   return (
+     <section aria-label="Imported swap wallet">
+-      <label>
+-        Wallet for balance review{' '}
+-        <select
+-          aria-label="Wallet for balance review"
+-          value={wallet ? selected : ''}
+-          disabled={loading || saving || locked}
+-          onChange={(e) => {
+-            setSelected(e.target.value);
+-            setReviewedCurrentWallet(true);
+-          }}
+-        >
+-          <option value="">Select an active Solana wallet</option>
+-          {wallets.map((item) => (
+-            <option key={item.address} value={item.address}>
+-              {item.label} · {item.address.slice(0, 6)}…{item.address.slice(-4)}
+-            </option>
+-          ))}
+-        </select>
+-      </label>
+-      <Button
+-        variant="outline"
+-        disabled={loading || saving || locked}
+-        onClick={() => void reload()}
+-      >
+-        Reload trade wallets
+-      </Button>
+-      <Button
+-        variant="outline"
+-        disabled={loading || saving || locked || !wallet}
+-        onClick={() => void save()}
+-      >
+-        {saving ? 'Saving settings…' : 'Save trade settings'}
+-      </Button>
+-      {project.document.tradeSettings && (
+-        <p>
+-          Saved trade settings: {project.document.tradeSettings.side}{' '}
+-          {project.document.tradeSettings.amount} · wallet revision{' '}
+-          {project.document.tradeSettings.walletRevision}. Settings only; no
+-          order submitted.
+-        </p>
+-      )}
+-      {!loading && selected && !wallet && (
+-        <p role="alert">
+-          {handoff && !reviewedCurrentWallet
+-            ? 'Receipt wallet is archived, unavailable or has changed revision. Choose a current active wallet explicitly before preparing a sell.'
+-            : 'Saved wallet is unavailable. Select an active wallet.'}
+-        </p>
+-      )}
+-      {wallet &&
+-        project.document.tradeSettings?.wallet === wallet.address &&
+-        project.document.tradeSettings.walletRevision !== wallet.revision && (
+-          <p>
+-            Saved wallet revision has changed. Review this wallet and save
+-            current settings.
+-          </p>
+-        )}
+       <p>
+         Public balance review only. Selecting an address does not connect or
+         unlock its signer.
+       </p>
++      {loading && <output>Loading saved trade wallets…</output>}
+       {error && <p role="alert">{error}</p>}
+-      {wallet && side === 'Sell' && (
+-        <ImportedSellAcquisitions
+-          key={[
+-            project.id,
+-            project.revision,
+-            wallet.address,
+-            wallet.revision,
+-            handoff?.receiptId ?? '',
+-          ].join(':')}
+-          project={project}
+-          wallet={wallet}
+-          amount={amount}
+-          locked={locked || saving}
+-          initialBuyReceiptId={
+-            handoff?.wallet === wallet.address ? handoff.receiptId : undefined
+-          }
+-          onReviewBuy={onReviewBuy}
+-          onAmountChange={onAmountChange}
+-        />
+-      )}
+-      {wallet && side === 'Buy' && (
+-        <ImportedSwapPreparation
+-          key={`prepare:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}:${amount}:${handoff?.receiptId ?? ''}`}
+-          project={project}
+-          wallet={wallet}
+-          side={side}
+-          amount={amount}
+-          locked={locked || saving}
+-          onReviewBuy={onReviewBuy}
+-        />
+-      )}
+-      {wallet && (
+-        <ImportedSwapBalanceCheck
+-          key={`${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}:${amount}`}
+-          project={project}
+-          wallet={wallet}
+-          side={side}
+-          amount={amount}
+-          locked={locked || saving}
+-          onAmountChange={onAmountChange}
+-        />
+-      )}
+-      {wallet && project.document.token.chain === 'Solana' && (
+-        <ImportedPairTradeWalletReview
+-          key={`pair:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}`}
+-          project={project}
+-          wallet={wallet}
+-          side={side}
+-          locked={locked || saving || loading}
+-        />
+-      )}
++
+       <details className="imported-project-wallet-inventory" open>
+         <summary>Project trade wallets</summary>
+         {!loading && (
+@@ -356,7 +275,125 @@ export function ImportedSwapWallet({
+               setSelected(item.address);
+               setReviewedCurrentWallet(true);
+               onWalletTradeReview(direction, reviewedAmount);
++              openWalletReview();
++            }}
++          />
++        )}
++      </details>
++      <details
++        className="imported-selected-wallet-review"
++        ref={reviewSection}
++        open={Boolean(handoff)}
++      >
++        <summary>Selected wallet review</summary>
++
++        <label>
++          Wallet for balance review{' '}
++          <select
++            aria-label="Wallet for balance review"
++            value={wallet ? selected : ''}
++            disabled={loading || saving || locked}
++            onChange={(e) => {
++              setSelected(e.target.value);
++              setReviewedCurrentWallet(true);
+             }}
++          >
++            <option value="">Select an active Solana wallet</option>
++            {wallets.map((item) => (
++              <option key={item.address} value={item.address}>
++                {item.label} · {item.address.slice(0, 6)}…
++                {item.address.slice(-4)}
++              </option>
++            ))}
++          </select>
++        </label>
++        <Button
++          variant="outline"
++          disabled={loading || saving || locked}
++          onClick={() => void reload()}
++        >
++          Reload trade wallets
++        </Button>
++        <Button
++          variant="outline"
++          disabled={loading || saving || locked || !wallet}
++          onClick={() => void save()}
++        >
++          {saving ? 'Saving settings…' : 'Save trade settings'}
++        </Button>
++        {project.document.tradeSettings && (
++          <p>
++            Saved trade settings: {project.document.tradeSettings.side}{' '}
++            {project.document.tradeSettings.amount} · wallet revision{' '}
++            {project.document.tradeSettings.walletRevision}. Settings only; no
++            order submitted.
++          </p>
++        )}
++        {!loading && selected && !wallet && (
++          <p role="alert">
++            {handoff && !reviewedCurrentWallet
++              ? 'Receipt wallet is archived, unavailable or has changed revision. Choose a current active wallet explicitly before preparing a sell.'
++              : 'Saved wallet is unavailable. Select an active wallet.'}
++          </p>
++        )}
++        {wallet &&
++          project.document.tradeSettings?.wallet === wallet.address &&
++          project.document.tradeSettings.walletRevision !== wallet.revision && (
++            <p>
++              Saved wallet revision has changed. Review this wallet and save
++              current settings.
++            </p>
++          )}
++
++        {wallet && side === 'Sell' && (
++          <ImportedSellAcquisitions
++            key={[
++              project.id,
++              project.revision,
++              wallet.address,
++              wallet.revision,
++              handoff?.receiptId ?? '',
++            ].join(':')}
++            project={project}
++            wallet={wallet}
++            amount={amount}
++            locked={locked || saving}
++            initialBuyReceiptId={
++              handoff?.wallet === wallet.address ? handoff.receiptId : undefined
++            }
++            onReviewBuy={onReviewBuy}
++            onAmountChange={onAmountChange}
++          />
++        )}
++        {wallet && side === 'Buy' && (
++          <ImportedSwapPreparation
++            key={`prepare:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}:${amount}:${handoff?.receiptId ?? ''}`}
++            project={project}
++            wallet={wallet}
++            side={side}
++            amount={amount}
++            locked={locked || saving}
++            onReviewBuy={onReviewBuy}
++          />
++        )}
++        {wallet && (
++          <ImportedSwapBalanceCheck
++            key={`${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}:${amount}`}
++            project={project}
++            wallet={wallet}
++            side={side}
++            amount={amount}
++            locked={locked || saving}
++            onAmountChange={onAmountChange}
++          />
++        )}
++        {wallet && project.document.token.chain === 'Solana' && (
++          <ImportedPairTradeWalletReview
++            key={`pair:${project.id}:${project.revision}:${wallet.address}:${wallet.revision}:${side}`}
++            project={project}
++            wallet={wallet}
++            side={side}
++            locked={locked || saving || loading}
+           />
+         )}
+       </details>
+diff --git a/components/imported-trade-wallets.tsx b/components/imported-trade-wallets.tsx
+index 147a71f..7d9f703 100644
+--- a/components/imported-trade-wallets.tsx
++++ b/components/imported-trade-wallets.tsx
+@@ -218,30 +218,9 @@ export function ImportedTradeWallets({
+     >
+       <h4>My trade wallets</h4>
+       <p>
+-        Select a wallet to review a buy or sell. Saved SOL observations may be
+-        old. Preparation checks fresh balances and each transaction requires
+-        signing approval.
++        Saved balances may be stale. Each trade needs a fresh review and signing
++        approval.
+       </p>
+-      {project && (
+-        <>
+-          <Button
+-            variant="outline"
+-            disabled={locked || reading}
+-            onClick={() => void readInventory()}
+-          >
+-            {reading
+-              ? 'Reading project inventory…'
+-              : 'Review saved token inventory'}
+-          </Button>
+-          <p>
+-            Token observations have separate timestamps. Supply share uses the
+-            project supply observed at {project.document.token.observedAt}.
+-            Frozen units are separate; unfrozen units do not prove
+-            transferability. Refresh one wallet at a time, with 15 seconds
+-            between provider reads.
+-          </p>
+-        </>
+-      )}
+       {staleWallets.size > 0 && (
+         <output>
+           Token inventory changed after a finalized trade. Refresh affected
+@@ -250,53 +229,81 @@ export function ImportedTradeWallets({
+         </output>
+       )}
+       {inventoryError && <p role="alert">{inventoryError}</p>}
+-      <div className="imported-trade-wallet-filters">
+-        <label htmlFor={searchId}>
+-          Search trade wallets
+-          <Input
+-            id={searchId}
+-            value={search}
+-            onChange={(e) => {
+-              setSearch(e.target.value);
+-              setPage(0);
+-            }}
+-            placeholder="Label, address, tag or folder"
+-          />
+-        </label>
+-        <label>
+-          Trade wallet folder
+-          <select
+-            value={folder}
+-            onChange={(e) => {
+-              setFolder(e.target.value);
+-              setPage(0);
+-            }}
+-          >
+-            <option value="">All folders</option>
+-            <option value=":unfiled">No active folder</option>
+-            {activeFolders.map((f) => (
+-              <option key={f.id} value={f.id}>
+-                {f.name}
+-              </option>
+-            ))}
+-          </select>
+-        </label>
+-        <label>
+-          Trade wallet role
+-          <select
+-            value={role}
+-            onChange={(e) => {
+-              setRole(e.target.value);
+-              setPage(0);
+-            }}
+-          >
+-            <option value="">All roles</option>
+-            {['Recipient', 'Deployer', 'Funder'].map((r) => (
+-              <option key={r}>{r}</option>
+-            ))}
+-          </select>
+-        </label>
+-      </div>
++      <details className="imported-wallet-inventory-controls">
++        <summary>
++          Wallet filters and inventory
++          {search || folder || role ? ' · filters active' : ''}
++        </summary>
++
++        {project && (
++          <>
++            <Button
++              variant="outline"
++              disabled={locked || reading}
++              onClick={() => void readInventory()}
++            >
++              {reading
++                ? 'Reading project inventory…'
++                : 'Review saved token inventory'}
++            </Button>
++            <p>
++              Token observations have separate timestamps. Supply share uses the
++              project supply observed at {project.document.token.observedAt}.
++              Frozen units are separate; unfrozen units do not prove
++              transferability. Refresh one wallet at a time, with 15 seconds
++              between provider reads.
++            </p>
++          </>
++        )}
++
++        <div className="imported-trade-wallet-filters">
++          <label htmlFor={searchId}>
++            Search trade wallets
++            <Input
++              id={searchId}
++              value={search}
++              onChange={(e) => {
++                setSearch(e.target.value);
++                setPage(0);
++              }}
++              placeholder="Label, address, tag or folder"
++            />
++          </label>
++          <label>
++            Trade wallet folder
++            <select
++              value={folder}
++              onChange={(e) => {
++                setFolder(e.target.value);
++                setPage(0);
++              }}
++            >
++              <option value="">All folders</option>
++              <option value=":unfiled">No active folder</option>
++              {activeFolders.map((f) => (
++                <option key={f.id} value={f.id}>
++                  {f.name}
++                </option>
++              ))}
++            </select>
++          </label>
++          <label>
++            Trade wallet role
++            <select
++              value={role}
++              onChange={(e) => {
++                setRole(e.target.value);
++                setPage(0);
++              }}
++            >
++              <option value="">All roles</option>
++              {['Recipient', 'Deployer', 'Funder'].map((r) => (
++                <option key={r}>{r}</option>
++              ))}
++            </select>
++          </label>
++        </div>
++      </details>
+       <div className="imported-trade-wallet-table">
+         <table>
+           <caption>
+diff --git a/components/imported-workspace-frame.tsx b/components/imported-workspace-frame.tsx
+new file mode 100644
+--- /dev/null
++++ b/components/imported-workspace-frame.tsx
+@@ -0,0 +1,212 @@
++'use client';
++
++import {
++  type CSSProperties,
++  type ReactNode,
++  createContext,
++  useCallback,
++  useContext,
++  useEffect,
++  useId,
++  useRef,
++  useState,
++} from 'react';
++import styles from './imported-workspace-frame.module.css';
++
++type Fit = { height: number; chart: number } | null;
++
++/** Presentation only. Keep the full chart and a usable wallet row, or use flow. */
++export function ImportedWorkspaceFrame({
++  compact,
++  children,
++}: {
++  compact: boolean;
++  children: ReactNode;
++}) {
++  const frame = useRef<HTMLDivElement>(null);
++  const [fit, setFit] = useState<Fit>(null);
++  useEffect(() => {
++    const element = frame.current;
++    if (!element) return;
++    const workspace = element.closest<HTMLElement>('.workspace');
++    const container =
++      element.closest<HTMLElement>('.imported-projects') ?? element;
++    let queued = 0;
++    const measure = () => {
++      queued = 0;
++      const chart = element.querySelector<HTMLElement>(
++        ':scope > [aria-label="Open token chart"]',
++      );
++      const plot = chart?.querySelector<HTMLElement>(
++        '[aria-label="Inspect chart candles"]',
++      );
++      let next: Fit = null;
++      if (compact && workspace && chart && plot) {
++        const bounds = element.getBoundingClientRect();
++        // Use the unscrolled frame position so ordinary page scrolling does
++        // not continually change its height or jump the user's location.
++        const height = Math.floor(
++          workspace.getBoundingClientRect().bottom -
++            (bounds.top + workspace.scrollTop) -
++            12,
++        );
++        const chartHeight = Math.ceil(
++          plot.getBoundingClientRect().bottom -
++            chart.getBoundingClientRect().top +
++            chart.scrollTop +
++            12,
++        );
++        if (
++          window.innerWidth >= 1360 &&
++          window.innerHeight >= 800 &&
++          bounds.width >= 1000 &&
++          chartHeight >= 310 &&
++          height >= chartHeight + 196 + 12
++        ) {
++          next = { height, chart: chartHeight };
++        }
++      }
++      setFit((previous) =>
++        previous?.height === next?.height && previous?.chart === next?.chart
++          ? previous
++          : next,
++      );
++    };
++    const schedule = () => {
++      if (!queued) queued = requestAnimationFrame(measure);
++    };
++    const resize = new ResizeObserver(schedule);
++    resize.observe(element);
++    if (workspace) resize.observe(workspace);
++    resize.observe(container);
++    const mutation = new MutationObserver(schedule);
++    mutation.observe(container, {
++      childList: true,
++      subtree: true,
++      characterData: true,
++      attributes: true,
++      attributeFilter: ['open'],
++    });
++    window.addEventListener('resize', schedule);
++    schedule();
++    return () => {
++      if (queued) cancelAnimationFrame(queued);
++      resize.disconnect();
++      mutation.disconnect();
++      window.removeEventListener('resize', schedule);
++    };
++  }, [compact]);
++  const geometry =
++    compact && fit
++      ? ({
++          '--workspace-fit-height': `${fit.height}px`,
++          '--workspace-chart-height': `${fit.chart}px`,
++        } as CSSProperties)
++      : undefined;
++  return (
++    <div
++      ref={frame}
++      className={`imported-live-workspace${compact ? ' imported-live-workspace--compact' : ''} ${styles.frame}${geometry ? ` ${styles.docked}` : ''}`}
++      style={geometry}
++      data-wallet-dock={geometry ? 'docked' : 'flow'}
++    >
++      {children}
++    </div>
++  );
++}
++
++type WorkspaceView = {
++  id: string;
++  title: string;
++  content: ReactNode;
++};
++
++const WalletView = createContext<(() => void) | null>(null);
++export function useImportedWorkspaceWalletView() {
++  return useContext(WalletView);
++}
++
++/** Mounted panels retain their local review state. No fetch or financial action. */
++export function ImportedWorkspaceViews({
++  views,
++  tabbed,
++}: {
++  views: readonly WorkspaceView[];
++  tabbed: boolean;
++}) {
++  const prefix = useId();
++  const [selected, setSelected] = useState(views[0]?.id ?? '');
++  const current = views.some((view) => view.id === selected)
++    ? selected
++    : (views[0]?.id ?? '');
++  const showWallets = useCallback(() => setSelected('wallets'), []);
++  return (
++    <WalletView.Provider value={showWallets}>
++      <section
++        className={`imported-workspace-wallets ${styles.views}`}
++        aria-label="Token wallet and holder views"
++      >
++        {tabbed && (
++          <div
++            role="tablist"
++            aria-label="Token workspace views"
++            className={styles.navigation}
++            onKeyDown={(event) => {
++              const index = views.findIndex((view) => view.id === current);
++              const next =
++                event.key === 'Home'
++                  ? 0
++                  : event.key === 'End'
++                    ? views.length - 1
++                    : event.key === 'ArrowRight'
++                      ? (index + 1) % views.length
++                      : event.key === 'ArrowLeft'
++                        ? (index + views.length - 1) % views.length
++                        : null;
++              if (next === null || !views[next]) return;
++              event.preventDefault();
++              setSelected(views[next].id);
++              event.currentTarget
++                .querySelectorAll<HTMLButtonElement>('[role="tab"]')
++                [next]?.focus();
++            }}
++          >
++            {views.map((view) => (
++              <button
++                key={view.id}
++                type="button"
++                role="tab"
++                id={`${prefix}-tab-${view.id}`}
++                aria-selected={current === view.id}
++                aria-controls={`${prefix}-panel-${view.id}`}
++                tabIndex={current === view.id ? 0 : -1}
++                onClick={() => setSelected(view.id)}
++              >
++                {view.title}
++              </button>
++            ))}
++          </div>
++        )}
++        {tabbed && (
++          <p className={styles.notice}>
++            Switching views keeps existing reviews and monitors active.
++          </p>
++        )}
++        {views.map((view) => (
++          <div
++            key={view.id}
++            id={`${prefix}-panel-${view.id}`}
++            role={tabbed ? 'tabpanel' : 'region'}
++            aria-label={tabbed ? undefined : view.title}
++            aria-labelledby={tabbed ? `${prefix}-tab-${view.id}` : undefined}
++            tabIndex={tabbed ? 0 : undefined}
++            hidden={tabbed && current !== view.id}
++            className={styles.panel}
++          >
++            {view.content}
++          </div>
++        ))}
++      </section>
++    </WalletView.Provider>
++  );
++}
+diff --git a/components/imported-workspace-frame.module.css b/components/imported-workspace-frame.module.css
+new file mode 100644
+--- /dev/null
++++ b/components/imported-workspace-frame.module.css
+@@ -0,0 +1,129 @@
++.frame {
++  min-width: 0;
++}
++
++.views {
++  min-width: 0;
++}
++
++.frame > .views {
++  display: flex;
++  flex-direction: column;
++  gap: 0;
++  border: 1px solid var(--border);
++  border-radius: 12px;
++}
++
++.navigation {
++  display: flex;
++  flex: 0 0 auto;
++  gap: 4px;
++  padding: 6px;
++  overflow-x: auto;
++  border-bottom: 1px solid var(--border);
++}
++
++.navigation > button {
++  flex: 0 0 auto;
++  min-height: 36px;
++  padding: 7px 12px;
++  border: 1px solid transparent;
++  border-radius: 6px;
++  color: var(--muted-foreground);
++  background: transparent;
++  font: inherit;
++  font-size: 13px;
++  cursor: pointer;
++}
++
++.navigation > button[aria-selected='true'] {
++  color: var(--foreground);
++  border-color: var(--border);
++  background: var(--secondary);
++}
++
++.navigation > button:focus-visible,
++.panel:focus-visible {
++  outline: 2px solid var(--primary);
++  outline-offset: -2px;
++}
++
++.panel {
++  min-width: 0;
++  padding: 12px;
++}
++
++.notice {
++  margin: 0;
++  padding: 3px 12px;
++  color: var(--muted-foreground);
++  font-size: 11px;
++  line-height: 16px;
++}
++
++.panel[hidden] {
++  display: none !important;
++}
++
++.frame.docked {
++  height: var(--workspace-fit-height);
++  grid-template-rows: var(--workspace-chart-height) minmax(196px, 1fr);
++  gap: 12px;
++}
++
++.frame.docked > [aria-label='Open token chart'],
++.frame.docked > :global(.imported-workspace-trading) {
++  min-height: 0;
++  max-height: none;
++  overflow: auto;
++  overscroll-behavior: contain;
++}
++
++.frame.docked > .views {
++  min-height: 0;
++  overflow: hidden;
++}
++
++.docked .panel {
++  min-height: 0;
++  overflow: auto;
++  overscroll-behavior: contain;
++  scrollbar-gutter: stable;
++}
++
++@media (min-width: 1101px) and (min-height: 640px) {
++  :global(.imported-token-details):has(> .frame)
++    :global(.imported-token-header-actions)
++    > :global(.token-project-picker) {
++    margin: 0;
++  }
++
++  :global(.imported-token-details):has(> .frame)
++    :global(.imported-token-header)
++    :global(.token-project-picker)[open],
++  :global(.imported-token-details):has(> .frame)
++    :global(.imported-token-actions-menu)[open] {
++    width: 100%;
++  }
++
++  :global(.imported-token-details):has(> .frame)
++    :global(.imported-token-header-actions) {
++    flex-direction: row;
++    flex-wrap: wrap;
++    justify-content: flex-end;
++    align-items: start;
++    max-width: min(65%, 700px);
++  }
++
++  :global(.imported-token-details):has(> .frame)
++    :global(.imported-token-header-actions)
++    > :global(.wallet-roster-actions) {
++    margin-block: 4px;
++  }
++
++  :global(.imported-token-details):has(> .frame)
++    :global(.imported-token-actions-menu)
++    > :global(.wallet-roster-actions) {
++    margin-block: 8px;
++  }
++}
+diff --git a/components/imported-workspace-frame.test.tsx b/components/imported-workspace-frame.test.tsx
+new file mode 100644
+--- /dev/null
++++ b/components/imported-workspace-frame.test.tsx
+@@ -0,0 +1,226 @@
++// @vitest-environment jsdom
++import React, { act, useEffect, useState } from 'react';
++import { createRoot, type Root } from 'react-dom/client';
++import { afterEach, beforeEach, expect, it, vi } from 'vitest';
++import {
++  ImportedWorkspaceFrame,
++  ImportedWorkspaceViews,
++  useImportedWorkspaceWalletView,
++} from './imported-workspace-frame';
++
++let root: Root;
++let container: HTMLDivElement;
++let frameTop: number;
++let chartScroll: number;
++let width: number;
++const mounted = vi.fn();
++const unmounted = vi.fn();
++const elapsed = vi.fn();
++
++function RetainedReview() {
++  const [checked, setChecked] = useState(false);
++  useEffect(() => {
++    mounted();
++    const timer = setTimeout(elapsed, 5000);
++    return () => {
++      clearTimeout(timer);
++      unmounted();
++    };
++  }, []);
++  return (
++    <label>
++      Existing review selection
++      <input
++        type="checkbox"
++        checked={checked}
++        onChange={(event) => setChecked(event.target.checked)}
++      />
++    </label>
++  );
++}
++function WalletNavigation() {
++  const showWallets = useImportedWorkspaceWalletView();
++  return (
++    <button onClick={() => showWallets?.()}>Review selected wallet</button>
++  );
++}
++function views(tabbed = true) {
++  return (
++    <ImportedWorkspaceViews
++      tabbed={tabbed}
++      views={[
++        { id: 'wallets', title: 'My wallets', content: <RetainedReview /> },
++        { id: 'holders', title: 'Holders', content: <WalletNavigation /> },
++        { id: 'activity', title: 'Activity', content: <p>Saved activity</p> },
++      ]}
++    />
++  );
++}
++async function render(content: React.ReactNode) {
++  await act(async () => root.render(content));
++}
++async function click(element: Element | null) {
++  expect(element).not.toBeNull();
++  await act(async () => (element as HTMLElement).click());
++}
++function tab(name: string) {
++  return (
++    [...container.querySelectorAll('[role="tab"]')].find(
++      (element) => element.textContent === name,
++    ) ?? null
++  );
++}
++async function resize() {
++  vi.stubGlobal('innerWidth', width);
++  await act(async () => {
++    window.dispatchEvent(new Event('resize'));
++    vi.advanceTimersByTime(20);
++  });
++}
++
++beforeEach(() => {
++  vi.useFakeTimers();
++  vi.clearAllMocks();
++  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
++  vi.stubGlobal(
++    'ResizeObserver',
++    class {
++      observe() {}
++      disconnect() {}
++    },
++  );
++  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
++    setTimeout(() => callback(performance.now()), 16),
++  );
++  vi.stubGlobal('cancelAnimationFrame', (id: number) => clearTimeout(id));
++  width = 1920;
++  frameTop = 160;
++  chartScroll = 0;
++  vi.stubGlobal('innerWidth', width);
++  vi.stubGlobal('innerHeight', 945);
++  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
++    function (this: HTMLElement) {
++      const top = this.classList.contains('workspace') ? 70 : frameTop;
++      const bottom = this.classList.contains('workspace')
++        ? 920
++        : this.getAttribute('aria-label') === 'Inspect chart candles'
++          ? frameTop + 480 - chartScroll
++          : top + 480;
++      return {
++        x: 0,
++        y: top,
++        top,
++        bottom,
++        left: 0,
++        right: 1600,
++        width: 1600,
++        height: bottom - top,
++        toJSON() {},
++      };
++    },
++  );
++  container = document.createElement('div');
++  container.className = 'workspace';
++  document.body.append(container);
++  root = createRoot(container);
++});
++afterEach(async () => {
++  await act(async () => root.unmount());
++  container.remove();
++  vi.restoreAllMocks();
++  vi.unstubAllGlobals();
++  vi.useRealTimers();
++});
++
++it('keeps review state and existing timers mounted across tabs and full-page mode', async () => {
++  await render(views());
++  const checkbox = container.querySelector<HTMLInputElement>('input')!;
++  await click(checkbox);
++  await click(tab('Holders'));
++  expect(checkbox.closest('[role="tabpanel"]')?.hasAttribute('hidden')).toBe(
++    true,
++  );
++  await act(async () => vi.advanceTimersByTime(5001));
++  expect(elapsed).toHaveBeenCalledTimes(1);
++  await render(views(false));
++  expect(container.querySelector('[role="tablist"]')).toBeNull();
++  expect(container.querySelector('[hidden]')).toBeNull();
++  expect(container.querySelector('[role="region"][tabindex]')).toBeNull();
++  expect(container.querySelector('input')).toBe(checkbox);
++  expect(checkbox.checked).toBe(true);
++  await render(views());
++  expect(tab('Holders')?.getAttribute('aria-selected')).toBe('true');
++  await click(tab('My wallets'));
++  expect(checkbox.checked).toBe(true);
++  expect(mounted).toHaveBeenCalledTimes(1);
++  expect(unmounted).not.toHaveBeenCalled();
++});
++
++it('supports keyboard tabs with one tab stop and exact labelled panel relationships', async () => {
++  await render(views());
++  await act(async () => {
++    tab('My wallets')?.dispatchEvent(
++      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }),
++    );
++  });
++  expect(document.activeElement).toBe(tab('Activity'));
++  expect(tab('Activity')?.getAttribute('aria-selected')).toBe('true');
++  expect(container.querySelectorAll('[role="tab"][tabindex="0"]')).toHaveLength(
++    1,
++  );
++  const active = tab('Activity')!;
++  const panel = document.getElementById(active.getAttribute('aria-controls')!)!;
++  expect(panel.getAttribute('aria-labelledby')).toBe(active.id);
++  expect(panel.hidden).toBe(false);
++});
++
++it('reveals the retained wallet view for a successful cross-panel review handoff', async () => {
++  await render(views());
++  const checkbox = container.querySelector('input');
++  await click(tab('Holders'));
++  await click(
++    container.querySelector('[role="tabpanel"]:not([hidden]) button'),
++  );
++  expect(tab('My wallets')?.getAttribute('aria-selected')).toBe('true');
++  expect(container.querySelector('input')).toBe(checkbox);
++  expect(unmounted).not.toHaveBeenCalled();
++});
++
++it('fits the full plot without page-scroll feedback and falls back when room is lost', async () => {
++  await render(
++    <ImportedWorkspaceFrame compact>
++      <section aria-label="Open token chart">
++        <div aria-label="Inspect chart candles" />
++      </section>
++      <section className="imported-workspace-trading">Quote</section>
++      {views()}
++    </ImportedWorkspaceFrame>,
++  );
++  await resize();
++  const frame = container.querySelector<HTMLElement>('[data-wallet-dock]')!;
++  expect(frame.dataset.walletDock).toBe('docked');
++  expect(frame.style.getPropertyValue('--workspace-fit-height')).toBe('748px');
++  expect(frame.style.getPropertyValue('--workspace-chart-height')).toBe(
++    '492px',
++  );
++  container.scrollTop = 200;
++  frameTop = -40;
++  const chart = container.querySelector<HTMLElement>(
++    '[aria-label="Open token chart"]',
++  )!;
++  chart.scrollTop = chartScroll = 50;
++  await resize();
++  expect(frame.style.getPropertyValue('--workspace-fit-height')).toBe('748px');
++  expect(frame.style.getPropertyValue('--workspace-chart-height')).toBe(
++    '492px',
++  );
++  width = 1280;
++  await resize();
++  expect(frame.dataset.walletDock).toBe('flow');
++  expect(frame.style.getPropertyValue('--workspace-fit-height')).toBe('');
++  width = 1920;
++  container.scrollTop = 0;
++  frameTop = 300;
++  await resize();
++  expect(frame.dataset.walletDock).toBe('flow');
++});

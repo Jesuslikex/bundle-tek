@@ -13,6 +13,8 @@ The overall Proxima parity goal is still incomplete. Treat the dated sections be
 
 Keep local, remote Git and deployed source separate. Do not infer funded launch/buy/sell/Jito proof, stock-pair signing qualification, complete holder coverage, audited P&L, every launch adapter or marketplace purchase execution from these checkpoints.
 
+Fresh live marketplace UI evidence is recorded in `CODEX-PROXIMA-MARKETPLACE-REA-20261018.md`. Proxima shows a populated preview, multi-select source/tier/timezone filters, folder destination and funding-time spacing controls, sortable/filterable columns and purchase history (empty for this account). Bundle already implements catalog filters, exact totals, freshness and setup/error states; multi-chain inventory, richer provider fields, cross-folder spacing, purchase authorization/delivery and owned purchase history remain incomplete. The purchase button was not activated and no backend provider relationship is proven. Canonical application source remains frozen for the current full offline suite.
+
 ## Latest local UX checkpoint, 18 October 2026
 
 Fresh user-directed REA inspection also confirms a distinct missing launch feature: separate Front MEV and Back MEV funding roles, followed by distribution and launch. The selected SOL draft has one Front MEV and two Back MEV wallets, separately from five holders. Existing Jito/RPC notices and deployer/holder funding do not implement that flow. See CODEX-PROXIMA-FRONT-BACK-MEV-20261018.md. No financial action or backend parity is claimed.
