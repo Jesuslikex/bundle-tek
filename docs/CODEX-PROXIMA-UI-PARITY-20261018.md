@@ -59,3 +59,8 @@ The previously unresolved tracker form is now observed through REA, and Bundle h
 ## DCA per-cycle follow-up
 
 Fresh retained REA inspection verifies fixed/random amount and separate HMS timing/ending controls on the unsaved vendor DCA form. Bundle now supports per-cycle SOL/token/saved-supply targets with explicit total input and exact rounded cycle previews, preserving its existing server limits and approvals. Model checkpoint92c3659 and the subsequent UI checkpoint are described in CODEX-DCA-PER-CYCLE-20261018.md. HMS controls and multi-strategy/strategy-vs-session endings remain open; no automation or funded proof is claimed.
+
+
+## Strategy semantic audit
+
+CODEX-PROXIMA-STRATEGY-COVERAGE-20261018.md links fresh retained DCA Advanced, Limit ladder, Volume Bot and Cleanup form evidence to Bundle source. Critical distinction: Proxima's project Cleanup declares sell-to-buy market redistribution; Bundle's wallet cleanup is token-account/SOL recovery. The names do not establish parity. Also, vendor volume targets are USD while Bundle uses SOL, and vendor strategy/session endings are separate. These are explicit remaining requirements, not completed features. The existing local signing/session regression has now finished68tests successfully; no funded or automation proof is inferred.
