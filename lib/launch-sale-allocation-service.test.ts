@@ -19,9 +19,18 @@ import {
 } from './launch-sale-allocation-service';
 import { LAUNCH_SALE_POLICY } from './launch-sale-allocation';
 import {
+  GET as getRoute,
+  POST as postRoute,
+} from '@/app/api/account-launch-activity/sale-allocations/route';
+import {
   canonicalPumpHolderJson as canonical,
   pumpHolderDigest,
 } from './pump-holder-review';
+const http = vi.hoisted(() => ({ db: null as unknown as D1Database }));
+vi.mock('@/app/chatgpt-auth', () => ({
+  getChatGPTUser: async () => ({ userId: 'alice' }),
+}));
+vi.mock('@/db', () => ({ getD1: () => http.db }));
 vi.mock('./owned-pump-preflight', async (original) => ({
   ...(await original<typeof import('./owned-pump-preflight')>()),
   preflightOwnedPumpCreate: vi.fn(),
@@ -126,6 +135,7 @@ beforeAll(async () => {
     { keepWrapped: true },
     { seed: true, initializer: 16 as const },
     { seed: true, initializer: 1 as const },
+    { fee: 50 },
   ])
     sales.push(
       await importedSaleEvidenceFixture(true, {
@@ -212,6 +222,7 @@ beforeAll(async () => {
       signal(),
       f.rpc,
     );
+  http.db = g.db;
 }, 240000);
 afterAll(() => {
   for (const c of clients) c.close();
@@ -389,6 +400,59 @@ it('recovers a committed insert with a lost response and preserves history after
   ).rejects.toThrow();
   expect(saved).toBe(true);
   expect((await read(g.db, 'alice', id, signal())).plan).toEqual(p);
+}, 120000);
+it('runs signed-in HTTP review, exact approval, save and reload through real services and SQL without RPC', async () => {
+  const id = sales[5].p.receiptId,
+    url = 'https://bundle.example/api/account-launch-activity/sale-allocations',
+    reads = g.reads.length,
+    sends = g.sends.length,
+    post = (body: unknown) =>
+      postRoute(
+        new Request(url, {
+          method: 'POST',
+          headers: {
+            origin: 'https://bundle.example',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }),
+      ),
+    load = async () => {
+      const r = await getRoute(new Request(`${url}?saleReceiptId=${id}`));
+      expect(r.status).toBe(200);
+      return (await r.json()) as { plan: { sha256: string } | null };
+    };
+  expect((await load()).plan).toBeNull();
+  const reviewed = await post({
+    action: 'review',
+    saleReceiptId: id,
+    allocations: selection(),
+  });
+  expect(reviewed.status).toBe(200);
+  const { plan } = (await reviewed.json()) as {
+    plan: { sha256: string; executionAllowed: boolean };
+  };
+  expect(plan.executionAllowed).toBe(false);
+  expect((await load()).plan).toBeNull();
+  const approve = {
+    action: 'record',
+    saleReceiptId: id,
+    allocations: selection(),
+    approved: true,
+    policy: LAUNCH_SALE_POLICY,
+  };
+  const wrong = await post({ ...approve, planSha256: 'f'.repeat(64) });
+  expect(wrong.status).toBe(409);
+  expect((await load()).plan).toBeNull();
+  const saved = await post({ ...approve, planSha256: plan.sha256 });
+  expect(saved.status).toBe(200);
+  expect((await load()).plan?.sha256).toBe(plan.sha256);
+  const again = await post({ ...approve, planSha256: plan.sha256 });
+  expect(
+    ((await again.json()) as typeof plan & { plan: { sha256: string } }).plan
+      .sha256,
+  ).toBe(plan.sha256);
+  expect([g.reads.length, g.sends.length]).toEqual([reads, sends]);
 }, 120000);
 it('refuses missing guards and self-rehashed corrupt saved allocations', async () => {
   const id = sales[0].p.receiptId;
