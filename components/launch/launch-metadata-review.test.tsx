@@ -235,3 +235,12 @@ it('does not expose StonkFun planning without a saved project', () => {
     container.querySelector('[aria-label="StonkFun Front-wallet planning"]'),
   ).toBeNull();
 });
+
+it('offers the explicit existing-token picker separately from new-token preparation', () => {
+  render({ plan: { ...plan, mode: 'Block-0', scheduled: true } });
+  expect(
+    container.querySelector('[aria-label="Existing-token layer planning"]'),
+  ).not.toBeNull();
+  expect(container.querySelector('select')).toBeNull();
+  expect(fetcher).not.toHaveBeenCalled();
+});

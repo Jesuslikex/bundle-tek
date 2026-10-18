@@ -1,3 +1,4 @@
+import { listImportedLayerTargets } from '@/lib/launch-layer-targets-service';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { readOwnedLayerNativeEvidence } from '@/lib/launch-layer-native-service';
@@ -27,6 +28,20 @@ export async function GET(request: Request) {
     return json({ error: 'Sign in to read saved launch layers.' }, 401);
   const p = new URL(request.url).searchParams;
   try {
+    if (p.size === 1 && p.has('targets')) {
+      const text = p.get('targets')!;
+      if (new TextEncoder().encode(text).byteLength > 2048)
+        return json({ error: 'Planning selection is too large.' }, 413);
+      let source: unknown;
+      try {
+        source = JSON.parse(text);
+      } catch {
+        return json({ error: 'Choose an exact saved launch revision.' }, 400);
+      }
+      return json({
+        targets: await listImportedLayerTargets(getD1(), user.userId, source),
+      });
+    }
     if (
       p.size === 3 &&
       p.has('projectId') &&

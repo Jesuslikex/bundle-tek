@@ -61,3 +61,8 @@ Read CODEX-STONK-FRONT-PLANNING-20261018.md. The REA chat added a separate metad
 ## Imported layer client foundation
 
 The REA chat extended the layer client, context/saved response and existing planner for exact owned imported ID/revision/mint. Imported requests never supply mint authority; scheduled-only plans omit the developer, and saved reuse checks the exact record/revision. Read CODEX-IMPORTED-LAYER-CLIENT-20261018.md for the final 15-file/167-test pass, typed lint/TypeScript and synthetic browser evidence. Production imported selection is not yet wired. No protected layout, schema/migration, provider or financial handler changed. Other chat receipt commit dd63e24 and user AGENTS text preserved; no push or deploy.
+
+
+## Visible imported target selection
+
+Read CODEX-IMPORTED-LAYER-PICKER-20261018.md. The REA chat added the explicit owned imported picker in the launch metadata component, compact layers targets GET, bounded/cancellable manual loading and exact record/revision selection. Final11files/135tests and typed lint pass. Isolated TypeScript at c77ba2d plus nine overlays passes with unchanged hashes; a concurrent whole-checkout check failed in the account owner's new payment drafts, which were preserved. Chrome synthetic desktop/375/320 and HTML-reload recovery passed. This supersedes the prior unwired-picker gap, while the100record window/search gap and all staged execution/funding gates remain. No protected layout, schema, provider, push or deploy.

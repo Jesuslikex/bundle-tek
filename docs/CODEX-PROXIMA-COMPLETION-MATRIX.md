@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+The saved Block-0 launch review now exposes an explicit owned imported-token picker for scheduled plans. Its compact authenticated GET excludes foreign/archived/non-Solana records, binds source/revision, and starts with no selected token. Reload/change clears the old planner; timeout/cancel and safe error recovery are implemented. CODEX-IMPORTED-LAYER-PICKER-20261018.md records135tests/11files, typed lint, isolated TypeScript and responsive synthetic Chrome evidence. The newest100record limit is disclosed; older-record search/paging, staged funding and execution remain open. This supersedes the prior unwired-picker status only.
+
 Imported layer client/API/planner support now binds exact owned imported ID/revision/mint through loading, save acknowledgement and reopening, with scheduled-only plans and no developer role. CODEX-IMPORTED-LAYER-CLIENT-20261018.md records 167 tests in 15 files, scoped lint/TypeScript and responsive synthetic browser proof. The visible production imported picker is still unwired; this does not complete the imported launch flow or enable funding/signing.
 
 StonkFun Block-0 metadata review now has a separate Front-only planning entry with project-bound encrypted mint candidate generation/header restoration and backup download. It refuses a saved Pump context and retains all no-execution gates. CODEX-STONK-FRONT-PLANNING-20261018.md records 133 tests in 10 files, typed lint/TypeScript and synthetic responsive Chrome proof. Stonk creation/signing, imported planning and staged funding/execution remain unfinished.

@@ -1,0 +1,38 @@
+.panel {
+  border: 1px solid var(--border, #303142);
+  border-radius: 12px;
+  padding: 16px;
+  margin-block: 16px;
+  min-width: 0;
+}
+.panel h3 {
+  margin-block: 0 10px;
+}
+.panel p {
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.panel button {
+  margin: 4px 8px 4px 0;
+  max-width: 100%;
+  white-space: normal;
+}
+.panel label {
+  display: block;
+  margin-top: 12px;
+}
+.select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--border, #303142);
+  border-radius: 6px;
+  background: var(--background, #101118);
+  color: inherit;
+  padding: 10px;
+  font-size: 13px;
+}
+.address {
+  overflow-wrap: anywhere;
+}

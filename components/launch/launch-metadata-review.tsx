@@ -8,6 +8,7 @@ import type { TokenIdentity, ProjectDocument } from '@/lib/workspace-project';
 import { readPanelJson } from '@/components/read-panel-json';
 import { PumpLaunchReview } from './pump-launch-review';
 import { StonkLayerPlanning } from './stonk-layer-planning';
+import { ImportedLayerPlanning } from './imported-layer-planning';
 
 export type MetadataProject = {
   document?: ProjectDocument;
@@ -273,6 +274,14 @@ function SavedMetadataReview({
           )}
         </div>
       </div>
+      {project && plan.mode === 'Block-0' && (
+        <ImportedLayerPlanning
+          project={project}
+          scheduled={plan.scheduled}
+          frontOnly={plan.launchpad === 'StonkFun'}
+          disabled={busy || saving}
+        />
+      )}
       {project && plan.launchpad === 'StonkFun' && plan.mode === 'Block-0' && (
         <StonkLayerPlanning project={project} disabled={busy || saving} />
       )}
