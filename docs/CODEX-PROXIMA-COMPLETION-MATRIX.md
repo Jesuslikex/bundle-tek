@@ -4,6 +4,8 @@
 
 The overall Proxima parity goal is still incomplete. Treat the dated sections below as historical checkpoints, not a current release inventory.
 
+An internal disabled-by-default ChangeNOW order/status HTTP adapter now passes synthetic transport/service/SQL conformance. No application consumer or environment enablement exists. CODEX-EXCHANGE-ORDER-TRANSPORT-20261018.md records287tests/16files and the official/Smoke contract limits. Live provider access, consented creation API/UI, deposit flow and funded proof remain open.
+
 The exchange quote screen now exposes explicit proven refund-wallet review preparation and unknown-save recovery, with no order consent or creation. CODEX-EXCHANGE-REFUND-REVIEW-UI-20261018.md records266tests/14files and responsive synthetic Chrome proof ofonewrite/lost-response/GETrecovery. This supersedes the unwired refund-review gap; live provider orders/deposits and funded proof remain open.
 
 Fresh REA funding/setup recheck confirms the existing imported/scheduled SOL draft still separates Front/Back/holders and displays distinct funding totals, without revealing their calculation. Bundle saved-observation role/status filters and exact selected-role native ceiling now improve inspection of large role tables, with no funding authority. CODEX-LAYER-OBSERVATION-FILTERS-20261018.md records120tests/10files and responsive synthetic Chrome evidence. Full staged funding/execution and funded proof remain open.

@@ -95,3 +95,7 @@ Read CODEX-EXCHANGE-ORDER-REVIEW-API-20261018.md. New strict ownedquote/refund p
 ## Visible quote and refund review
 
 Read CODEX-EXCHANGE-REFUND-REVIEW-UI-20261018.md. New opt-in refund review selects a separate proven wallet, saves exact quote/refund terms and recovers unknown saves before another attempt. Final14files/266tests,4TSXtypedlint/5fileformat+TypeScript, Chrome375/320/1440lostresponse→GETrecovery withonewrite. No order approval/creation/provider or signing path. UI-pending statement in previous checkpoint is superseded; live orders/deposits remain open. Otherchat0114drafts preserved; no hostedSQL/deploy.
+
+## Internal exchange HTTP transport
+
+Read CODEX-EXCHANGE-ORDER-TRANSPORT-20261018.md. Disabled-by-default fixedorigin SOL adapter now composes with immutable order/service guards in syntheticHTTP/localSQL. Noappcaller,env/provider/credentialchange orlivecall. Final16files/287tests,3filetypedlint/format+TypeScript; no UI/build/fullsuite/funded claim. Missingrefundecho andambiguousresponse remainheld; no retriesorweakenedreceiptchecks. Otherchataccountpurchasedrafts untouched;0114committedseparately ina77decf.
