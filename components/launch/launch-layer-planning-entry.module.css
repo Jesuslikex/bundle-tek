@@ -1,0 +1,15 @@
+.recovery {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-block: 12px;
+  padding: 12px;
+  border: 1px solid var(--border, #30333c);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.recovery button {
+  justify-self: start;
+  min-height: 44px;
+}

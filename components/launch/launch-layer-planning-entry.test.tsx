@@ -133,6 +133,9 @@ it('aborts both pending planning reads when the entry is closed', async () => {
   await act(async () => toggle().click());
   expect(signals.every((signal) => signal.aborted)).toBe(true);
   expect(panel()).toBeNull();
+  expect(container.textContent).not.toContain(
+    'The planning snapshot may already be saved.',
+  );
 });
 
 it('labels the Stonk planning surface Front-only without changing its authority', async () => {

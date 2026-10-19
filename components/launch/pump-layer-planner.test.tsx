@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { layerNativeFixture } from '../../test/launch-layer-native-fixture';
 import { PumpLayerPlanner } from './pump-layer-planner';
 import { LaunchLayerHistory } from './launch-layer-history';
+import { LaunchLayerPlanningEntry } from './launch-layer-planning-entry';
 import { layerUiFixture } from '../../test/launch-layer-ui-fixture';
 import { layerTestStorage } from '../../test/launch-layer-storage';
 import { GET, POST } from '@/app/api/launch/layers/route';
@@ -92,6 +93,16 @@ async function input(
 async function render(selection = f.selection) {
   await act(async () => {
     root.render(<PumpLayerPlanner selection={selection} />);
+    await flush();
+  });
+}
+async function openEntry() {
+  await act(async () =>
+    root.render(<LaunchLayerPlanningEntry selection={f.selection} />),
+  );
+  await act(async () => {
+    button('Plan Front / Back layers').click();
+    await vi.dynamicImportSettled();
     await flush();
   });
 }
@@ -688,6 +699,149 @@ it('cancels a pending save and keeps a late response from changing the screen', 
   );
   expect(host.textContent).not.toContain('Planning snapshot saved');
   expect(host.querySelector('[role=alert]')).toBeNull();
+});
+it('keeps closed-save recovery visible after a real commit, late response and later confirmed save', async () => {
+  await openEntry();
+  await loadAndFill();
+  await click('Review layer ceilings');
+  let release: (() => void) | undefined;
+  let signal: AbortSignal | undefined;
+  intercept = (url, options) => {
+    if (options.method !== 'POST') return;
+    signal = options.signal as AbortSignal;
+    return (async () => {
+      const headers = new Headers(options.headers);
+      headers.set('origin', 'https://bundle.test');
+      const response = await POST(
+        new Request('https://bundle.test' + url, { ...options, headers }),
+      );
+      expect(response.status).toBe(200);
+      return new Promise<Response>((resolve) => {
+        release = () => resolve(response);
+      });
+    })();
+  };
+  await click('Save reviewed planning snapshot', false);
+  await until(() => expect(release).toBeTypeOf('function'));
+  expect(
+    (await storage.client.execute('SELECT id FROM launch_layer_plans')).rows,
+  ).toHaveLength(1);
+  await click('Close layer planning');
+  expect(signal?.aborted).toBe(true);
+  expect(host.querySelector('output span[id]')?.textContent).toContain(
+    'The planning snapshot may already be saved.',
+  );
+  await act(async () => {
+    release!();
+    await flush();
+  });
+  const countBeforeReopen = calls.length;
+  await openEntry();
+  expect(calls).toHaveLength(countBeforeReopen);
+  expect(host.querySelector('output span[id]')?.textContent).toContain(
+    'Load saved history before saving again',
+  );
+  intercept = undefined;
+  await loadAndFill();
+  await click('Review layer ceilings');
+  await click('Save reviewed planning snapshot');
+  expect(host.textContent).toContain('Planning snapshot saved');
+  expect(host.querySelector('output span[id]')?.textContent).toContain(
+    'Layer planning was closed before a save was confirmed.',
+  );
+  await click('Close layer planning');
+  await click('Dismiss save warning');
+  expect(host.querySelector('output span[id]')).toBeNull();
+  expect(document.activeElement).toBe(button('Plan Front / Back layers'));
+  await openEntry();
+  await click('Close layer planning');
+  expect(host.querySelector('output span[id]')).toBeNull();
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(2);
+});
+it('retains recovery when a locally cancelled save is followed by closing the planner', async () => {
+  await openEntry();
+  await loadAndFill();
+  await click('Review layer ceilings');
+  let release!: (response: Response) => void;
+  intercept = (_url, options) =>
+    options.method === 'POST'
+      ? new Promise((resolve) => {
+          release = resolve;
+        })
+      : undefined;
+  await click('Save reviewed planning snapshot', false);
+  await click('Cancel planning request');
+  await click('Close layer planning');
+  expect(host.querySelector('output span[id]')?.textContent).toContain(
+    'The planning snapshot may already be saved.',
+  );
+  await act(async () => {
+    release(Response.json({ plan: null }));
+    await flush();
+  });
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+});
+it('does not let dismissing an old warning hide a newer unconfirmed save', async () => {
+  await openEntry();
+  await loadAndFill();
+  await click('Review layer ceilings');
+  const releases: ((response: Response) => void)[] = [];
+  const signals: AbortSignal[] = [];
+  intercept = (_url, options) => {
+    if (options.method !== 'POST') return;
+    signals.push(options.signal as AbortSignal);
+    return new Promise((resolve) => releases.push(resolve));
+  };
+  await click('Save reviewed planning snapshot', false);
+  await click('Close layer planning');
+  await act(async () => {
+    releases[0](Response.json({ plan: null }));
+    await flush();
+  });
+  await openEntry();
+  await loadAndFill();
+  await click('Review layer ceilings');
+  await click('Save reviewed planning snapshot', false);
+  await click('Dismiss save warning', false);
+  expect(host.querySelector('output span[id]')).toBeNull();
+  await click('Close layer planning');
+  expect(host.querySelector('output span[id]')?.textContent).toContain(
+    'The planning snapshot may already be saved.',
+  );
+  expect(signals.every((signal) => signal.aborted)).toBe(true);
+  await act(async () => {
+    releases[1](Response.json({ plan: null }));
+    await flush();
+  });
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(2);
+});
+it('does not show uncertain-save recovery after a validated save is closed', async () => {
+  await openEntry();
+  await loadAndFill();
+  await click('Review layer ceilings');
+  await click('Save reviewed planning snapshot');
+  await click('Close layer planning');
+  expect(host.querySelector('output span[id]')).toBeNull();
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+});
+it('conservatively retains recovery after an explicitly refused planning save', async () => {
+  await openEntry();
+  await loadAndFill();
+  await click('Review layer ceilings');
+  await storage.client.execute({
+    sql: 'UPDATE workspace_wallets SET revision=3 WHERE address=?',
+    args: [f.address(3)],
+  });
+  await click('Save reviewed planning snapshot');
+  expect(host.querySelector('[role=alert]')?.textContent).toContain('Reselect');
+  expect(
+    (await storage.client.execute('SELECT id FROM launch_layer_plans')).rows,
+  ).toHaveLength(0);
+  await click('Close layer planning');
+  expect(host.querySelector('output span[id]')?.textContent).toContain(
+    'may already be saved',
+  );
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
 });
 it('refuses stale wallet admission without changing ordinary launch settings', async () => {
   await loadAndFill();

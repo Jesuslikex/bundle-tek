@@ -1,0 +1,37 @@
+{
+  "synthetic": true,
+  "actualAuthenticatedApp": false,
+  "externalProviders": false,
+  "measurements": [
+    {
+      "counts": "Fixture GETs: 2; planning saves: 1; provider calls: 0; signing/send: blocked",
+      "descriptionTargetsTextOnly": true,
+      "dismissHeight": 44,
+      "documentWidth": 1440,
+      "viewport": 1440,
+      "warningVisible": true
+    },
+    {
+      "counts": "Fixture GETs: 2; planning saves: 1; provider calls: 0; signing/send: blocked",
+      "descriptionTargetsTextOnly": true,
+      "dismissHeight": 44,
+      "documentWidth": 375,
+      "viewport": 375,
+      "warningVisible": true
+    },
+    {
+      "counts": "Fixture GETs: 2; planning saves: 1; provider calls: 0; signing/send: blocked",
+      "descriptionTargetsTextOnly": true,
+      "dismissHeight": 44,
+      "documentWidth": 320,
+      "viewport": 320,
+      "warningVisible": true
+    }
+  ],
+  "dismissal": {
+    "announcementRegionStillMounted": true,
+    "counts": "Fixture GETs: 2; planning saves: 1; provider calls: 0; signing/send: blocked",
+    "focusedAction": "Plan Front / Back layers",
+    "warningCleared": true
+  }
+}

@@ -231,10 +231,12 @@ function Planner({
   selection,
   disabled = false,
   frontOnly = false,
+  onSaveUnconfirmed,
 }: {
   selection: LayerSelection;
   disabled?: boolean;
   frontOnly?: boolean;
+  onSaveUnconfirmed?: (unconfirmed: boolean) => void;
 }) {
   const id = useId();
   const [context, setContext] = useState<LayerPlanningContext | null>(null);
@@ -791,14 +793,16 @@ function Planner({
                   void run(
                     'Saving planning snapshot…',
                     async (signal, current) => {
+                      const body = JSON.stringify({
+                        ...layerSelectionRequest(selection),
+                        layers: layerRequest(review.draft, context),
+                      });
+                      onSaveUnconfirmed?.(true);
                       const value = await fetch(endpoint, {
                         method: 'POST',
                         signal,
                         headers: { 'content-type': 'application/json' },
-                        body: JSON.stringify({
-                          ...layerSelectionRequest(selection),
-                          layers: layerRequest(review.draft, context),
-                        }),
+                        body,
                       }).then(read);
                       const retained = parseSavedLayer(
                         value.plan,
@@ -825,6 +829,7 @@ function Planner({
                             : 'Planning snapshot saved as history; current references changed. Reload context before reviewing another plan. The saved snapshot is now open.',
                         );
                         setSavedReveal((value) => value + 1);
+                        onSaveUnconfirmed?.(false);
                       }
                     },
                   )
