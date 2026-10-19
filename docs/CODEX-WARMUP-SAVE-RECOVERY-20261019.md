@@ -27,3 +27,7 @@ The shared display fixture now calculates its saved budget with the actual plann
 Browser coverage here is explicitly synthetic component/storage QA, not a signed-in live-provider or funded end-to-end pass. No new wallet/password was created, unlocked, backed up, signed or sent. Existing historical wallet onboarding/provider results retain their original scope. The old signed-in local QA server was not listening during this turn; no unrelated server was restarted.
 
 This local recovery state does not survive a full component unmount or reload. Archive/restore acknowledgement and general list-shape hardening were not redesigned. Staged Front/Back funding, provider qualification, distribution, launch execution and marketplace fulfillment remain separate open work. No deployment, hosted SQL, provider-setting change, cron or funded transaction occurred. Stock signing stays off.
+
+## Shared-main integration
+
+The first normal push was rejected because remote main had advanced through Claude's PR28 (`c42ecf3`, Base Clanker options). Codex fetched and merged normally as `72f5a1a`, without rewriting history. All four Clanker source/test paths remain byte-identical in Git to that remote commit. The combined four-file warmup/Clanker selection passed48tests, and plain TypeScript passed after merge. Claude's Clanker UI tests emit retained React act warnings; they still pass. No new combined-source production build or browser check of Clanker is claimed. The final warmup production build above covers `bcbfff4` plus its three owned overlays.
