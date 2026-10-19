@@ -90,6 +90,7 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { SupplyTracker } from '@/components/supply-tracker';
+import { StatusPrices } from '@/components/status-prices';
 import { DistributionWorkbench } from '@/components/distribution-workbench';
 import { ProjectDashboard } from '@/components/project-dashboard';
 import {
@@ -2347,6 +2348,7 @@ export default function Home() {
         {persistenceState === 'auth' && (
           <Link href="/sign-in">Sign in to save</Link>
         )}
+        <StatusPrices />
         <button
           type="button"
           className="statusbar-link"
