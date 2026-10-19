@@ -1,0 +1,12 @@
+{
+  "code": 0,
+  "actualModels": [
+    "claude-opus-5-5"
+  ],
+  "isError": false,
+  "reviewAvailable": true,
+  "tools": false,
+  "fallback": false,
+  "scope": "Provided source and diff only; review preceded final refinements; no tests or browser by reviewer",
+  "codexDisposition": "Checked server normalization; repaired pending archive warning, preserved newer edits, added archived guidance and regressions"
+}

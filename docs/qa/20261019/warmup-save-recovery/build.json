@@ -1,0 +1,16 @@
+{
+  "base": "bcbfff4",
+  "overlay": [
+    "components/wallet-warmup-plans.tsx",
+    "components/wallet-warmup-plans.test.tsx",
+    "test/warmup-ui-fixture.ts"
+  ],
+  "hashes": {
+    "components/wallet-warmup-plans.tsx": "2b5b072452943302cfd2d9599751cefa6be7c85af00242cee3fc30d4018c2aec",
+    "components/wallet-warmup-plans.test.tsx": "a18812a75486db69236fea8405fbda42057aa45416f50bbe15f62cb1ca43372a",
+    "test/warmup-ui-fixture.ts": "d8974d046d248fd8585f330e11fed55874fccea28b0fab9240d818b6a5db5ae8"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}

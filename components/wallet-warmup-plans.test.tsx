@@ -277,7 +277,7 @@ it('recovers a save that completed after cancellation by reloading its original 
   await click('Reload drafts');
   expect(container.textContent).toContain('Saved draft found');
   expect(container.textContent).toContain('Editing draft');
-  expect(onLoad).toHaveBeenCalledWith(stored.document);
+  expect(onLoad).not.toHaveBeenCalled();
   await act(async () => resolve(Response.json({ ok: true })));
   expect(fetcher).toHaveBeenCalledTimes(3);
   expect(container.textContent).toContain('Editing draft');
@@ -351,3 +351,183 @@ it('keeps the editing draft identity and revision across a normal reload', async
     expectedRevision: stored.revision,
   });
 });
+
+function reviewedSaved(revision: number): SavedWarmup {
+  return {
+    id,
+    revision,
+    archived: false,
+    updatedAt: new Date(now).toISOString(),
+    document: {
+      name: 'Wallet warmup',
+      chain: 'Solana',
+      addresses: plan.addresses,
+      tokens: plan.tokens,
+      amount: plan.buyAmount,
+      feeReserve: plan.feeReserve,
+      cycles: plan.cycles,
+      intervalMinutes: plan.intervalMinutes,
+      startAt: plan.startAt,
+      totalBudget: plan.totalBudget,
+      walletRevisions: [{ address: wallet, revision: 3 }],
+    },
+  };
+}
+it.each(['old', 'missing', 'different', 'archived', 'later', 'exact'] as const)(
+  'reconciles a cancelled update against the %s stored version without another write',
+  async (state) => {
+    const old = reviewedSaved(1);
+    const result = reviewedSaved(
+      state === 'later' ? 3 : state === 'old' ? 1 : 2,
+    );
+    if (state === 'different') result.document.amount = '0.009';
+    if (state === 'archived') result.archived = true;
+    let resolve!: (response: Response) => void;
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ plans: [old] }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((r) => {
+            resolve = r;
+          }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ plans: state === 'missing' ? [] : [result] }),
+      );
+    const onLoad = vi.fn();
+    await mount(fetcher, onLoad);
+    await click('Edit draft');
+    onLoad.mockClear();
+    await click('Save changes');
+    await click('Cancel plan request');
+    await click('Reload drafts');
+    if (state === 'exact') {
+      expect(container.textContent).toContain('Saved draft found');
+      expect(onLoad).not.toHaveBeenCalled();
+      expect(alert()).toBeUndefined();
+    } else {
+      expect(container.textContent).not.toContain('Saved draft found');
+      expect(container.textContent).toContain('Your edits are kept');
+      expect(container.textContent).toContain('The save was not confirmed');
+      expect(onLoad).not.toHaveBeenCalled();
+      if (state === 'archived')
+        expect(alert()).toContain('Restore it under Draft details');
+      const save = Array.from(container.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Save changes',
+      )!;
+      expect(save.disabled).toBe(!['old', 'missing'].includes(state));
+      if (state === 'different') {
+        await click('Edit draft');
+        expect(onLoad).toHaveBeenCalledWith(result.document);
+        expect(container.textContent).not.toContain(
+          'The save was not confirmed',
+        );
+      }
+    }
+    await act(async () => resolve(Response.json({ id, revision: 2 })));
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(
+      fetcher.mock.calls.filter((call) => call[1]?.method === 'POST'),
+    ).toHaveLength(1);
+  },
+);
+async function nameDraft(value: string) {
+  const input = container.querySelector('input')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+it('confirms the server-normalized name without changing the submitted request', async () => {
+  const stored = reviewedSaved(1);
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ plans: [] }))
+    .mockResolvedValueOnce(Response.json({ id, revision: 1 }))
+    .mockResolvedValueOnce(Response.json({ plans: [stored] }));
+  await mount(fetcher);
+  await nameDraft('  Wallet warmup  ');
+  await click('Save draft');
+  expect(JSON.parse(fetcher.mock.calls[1][1].body).document.name).toBe(
+    '  Wallet warmup  ',
+  );
+  expect(container.textContent).toContain('Warmup plan saved.');
+});
+it('keeps newer name edits when reload confirms the cancelled save', async () => {
+  const old = reviewedSaved(1),
+    saved = reviewedSaved(2);
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ plans: [old] }))
+    .mockImplementationOnce(() => new Promise<Response>(() => {}))
+    .mockResolvedValueOnce(Response.json({ plans: [saved] }));
+  const onLoad = vi.fn();
+  await mount(fetcher, onLoad);
+  await click('Edit draft');
+  onLoad.mockClear();
+  await click('Save changes');
+  await click('Cancel plan request');
+  await nameDraft('My newer unsaved edits');
+  await click('Reload drafts');
+  expect(container.textContent).toContain(
+    'Saved draft found. Your current edits are kept',
+  );
+  expect(container.querySelector('input')!.value).toBe(
+    'My newer unsaved edits',
+  );
+  expect(onLoad).not.toHaveBeenCalled();
+});
+it('clears the obsolete pending-save warning after explicitly archiving its plan', async () => {
+  const old = reviewedSaved(1),
+    archived = { ...old, revision: 2, archived: true };
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ plans: [old] }))
+    .mockImplementationOnce(() => new Promise<Response>(() => {}))
+    .mockResolvedValueOnce(Response.json({ id, revision: 2 }))
+    .mockResolvedValueOnce(Response.json({ plans: [archived] }))
+    .mockResolvedValueOnce(Response.json({ plans: [archived] }));
+  await mount(fetcher);
+  await click('Edit draft');
+  await click('Save changes');
+  await click('Cancel plan request');
+  await click('Archive');
+  await click('Reload drafts');
+  expect(alert()).toBeUndefined();
+  expect(container.textContent).not.toContain('The save was not confirmed');
+  expect(container.textContent).toContain('New saved draft');
+  expect(
+    fetcher.mock.calls.filter((call) => call[1]?.method === 'POST'),
+  ).toHaveLength(2);
+});
+it.each(['old', 'missing', 'different', 'exact'] as const)(
+  'confirms a successful save only against its %s reloaded document',
+  async (state) => {
+    const result = reviewedSaved(state === 'old' ? 0 : 1);
+    if (state === 'different') result.document.tokens = ['another-token'];
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ plans: [] }))
+      .mockResolvedValueOnce(Response.json({ id, revision: 1 }))
+      .mockResolvedValueOnce(
+        Response.json({ plans: state === 'missing' ? [] : [result] }),
+      );
+    await mount(fetcher);
+    await click('Save draft');
+    if (state === 'exact') {
+      expect(container.textContent).toContain(
+        'Warmup plan saved. No swaps scheduled.',
+      );
+      expect(alert()).toBeUndefined();
+    } else {
+      expect(container.textContent).not.toContain('Warmup plan saved.');
+      expect(alert()).toContain('does not match this review');
+      expect(container.textContent).toContain('The save was not confirmed');
+    }
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  },
+);

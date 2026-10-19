@@ -1,0 +1,19 @@
+{
+  "combined": {
+    "files": 7,
+    "tests": 123,
+    "failures": 0,
+    "externalProviders": false,
+    "realSigning": false
+  },
+  "finalSavedPlanRerun": {
+    "files": 1,
+    "tests": 30,
+    "failures": 0,
+    "reason": "Archived-guidance assertion moved to correct test branch"
+  },
+  "plainTypeScript": true,
+  "typedLint": true,
+  "format": true,
+  "fullSuiteClaim": false
+}

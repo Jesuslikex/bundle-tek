@@ -1,0 +1,26 @@
+[
+  {
+    "file": "confirmed-1440.jpg",
+    "format": "jpeg",
+    "width": 1425,
+    "height": 1093
+  },
+  {
+    "file": "confirmed-375.jpg",
+    "format": "jpeg",
+    "width": 360,
+    "height": 1237
+  },
+  {
+    "file": "confirmed-320.jpg",
+    "format": "jpeg",
+    "width": 305,
+    "height": 1285
+  },
+  {
+    "file": "unconfirmed-375.jpg",
+    "format": "jpeg",
+    "width": 360,
+    "height": 1381
+  }
+]

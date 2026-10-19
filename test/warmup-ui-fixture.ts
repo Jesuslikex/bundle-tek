@@ -1,5 +1,6 @@
 // Display/workflow fixtures only. Packet/signature markers are not valid transactions.
 import type { SavedWarmup } from '../lib/wallet-warmup-storage';
+import { buildWarmupPlan } from '../lib/wallet-warmup';
 import bs58 from 'bs58';
 import { warmupLotPerformance } from '../lib/warmup-lot-performance';
 import type { SolanaSwapPreparation } from '../lib/warmup-swap-quote';
@@ -290,7 +291,11 @@ export function warmupUiFixture() {
       if (body.action === 'save' && body.id && body.document) {
         Object.assign(plan, {
           id: body.id,
-          document: { ...body.document, totalBudget: '0.011' },
+          revision: saved ? plan.revision + 1 : 1,
+          document: {
+            ...body.document,
+            totalBudget: buildWarmupPlan(body.document).totalBudget,
+          },
         });
         saved = true;
         return Response.json({ plan });

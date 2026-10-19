@@ -29,6 +29,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Warmup saved-update recovery completed, 19 October 2026; its bounded claim is released. Read `docs/CODEX-WARMUP-SAVE-RECOVERY-20261019.md`:123 related tests, final30 saved-plan cases, plain TypeScript, typed lint/format, isolated production build with unchanged hashes and synthetic browser1440/375/320 pass. Recovery verifies exact next revision/document and preserves newer edits. No protected shell/account, API, schema, provider or signing change; no deploy/funded actions.
+
 - Marketplace region preview completed in `cb00f3f`, 19 October 2026; its bounded claim is released. Read `docs/CODEX-MARKETPLACE-REGIONS-20261019.md`:65 tests, typed lint/format, isolated production build and synthetic responsive browser checks pass. No supplier/checkout, provider-setting, schema/migration or protected layout change. Broader marketplace fulfillment remains open.
 
 - Codex, 19 October 2026: full regression freeze at4b4363b is complete and released:613 files/5443 tests plus46 native tests passed with unchanged source/harness hashes. Read `docs/CODEX-UI-RELEASE-UPDATE-20261019.md`. Codex continues Proxima parity and owns launch-layer planner follow-ups, local disposable QA/runtime and related docs. Mobile fix8af171d, planner revealc2a585d and Stonk prerequisite723639a have separate passing checks. Other account-session and Claude-owned UI paths remain protected. No deploy, hosted migrations or funded trades.

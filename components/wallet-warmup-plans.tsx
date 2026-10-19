@@ -15,6 +15,38 @@ import { WarmupSellReceipts } from './warmup-sell-receipts';
 import { WarmupCycleWorkflow } from './warmup-cycle-workflow';
 import { WarmupApprovalHistory } from './warmup-approval-history';
 import { WalletWarmupPlanHistory } from '@/components/wallet-warmup-plan-history';
+type PendingSave = {
+  id: string;
+  revision: number;
+  document: SavedWarmup['document'];
+};
+function matchesPendingSave(saved: SavedWarmup, pending: PendingSave) {
+  const a = saved.document,
+    b = pending.document;
+  return (
+    saved.id === pending.id &&
+    saved.revision === pending.revision &&
+    !saved.archived &&
+    a.name === b.name &&
+    a.chain === b.chain &&
+    a.amount === b.amount &&
+    a.feeReserve === b.feeReserve &&
+    a.cycles === b.cycles &&
+    a.intervalMinutes === b.intervalMinutes &&
+    a.startAt === b.startAt &&
+    a.totalBudget === b.totalBudget &&
+    a.addresses.length === b.addresses.length &&
+    a.addresses.every((address, i) => address === b.addresses[i]) &&
+    a.tokens.length === b.tokens.length &&
+    a.tokens.every((token, i) => token === b.tokens[i]) &&
+    a.walletRevisions.length === b.walletRevisions.length &&
+    a.walletRevisions.every(
+      (wallet, i) =>
+        wallet.address === b.walletRevisions[i].address &&
+        wallet.revision === b.walletRevisions[i].revision,
+    )
+  );
+}
 export function WalletWarmupPlans({
   chain,
   addresses,
@@ -46,7 +78,7 @@ export function WalletWarmupPlans({
   const controller = useRef<AbortController | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftId = useRef<string | null>(null);
-  const pendingSave = useRef<string | null>(null);
+  const pendingSave = useRef<PendingSave | null>(null);
   function beginRequest() {
     controller.current?.abort();
     if (timer.current) clearTimeout(timer.current);
@@ -142,34 +174,42 @@ export function WalletWarmupPlans({
       if (!target && !draftId.current) draftId.current = crypto.randomUUID();
       const id = target?.id ?? draftId.current!,
         expectedRevision = target?.revision ?? 0;
-      if (action === 'save') {
-        pendingSave.current = id;
+      const document =
+        action === 'save' && plan
+          ? {
+              name: name.trim(),
+              chain,
+              addresses: plan.addresses,
+              tokens: plan.tokens,
+              amount: plan.buyAmount,
+              feeReserve: plan.feeReserve,
+              cycles: plan.cycles,
+              intervalMinutes: plan.intervalMinutes,
+              startAt: plan.startAt,
+              walletRevisions,
+              totalBudget: plan.totalBudget,
+            }
+          : undefined;
+      const body = JSON.stringify({
+        id,
+        expectedRevision,
+        action,
+        document: document
+          ? { ...document, name, totalBudget: undefined }
+          : undefined,
+      });
+      const pending = document
+        ? { id, revision: expectedRevision + 1, document }
+        : null;
+      if (pending) {
+        pendingSave.current = pending;
         setSaveUnconfirmed(true);
       }
       const response = await fetch('/api/wallet-workspace/warmup/plans', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         signal: c.signal,
-        body: JSON.stringify({
-          id,
-          expectedRevision,
-          action,
-          document:
-            action === 'save' && plan
-              ? {
-                  name,
-                  chain,
-                  addresses: plan.addresses,
-                  tokens: plan.tokens,
-                  amount: plan.buyAmount,
-                  feeReserve: plan.feeReserve,
-                  cycles: plan.cycles,
-                  intervalMinutes: plan.intervalMinutes,
-                  startAt: plan.startAt,
-                  walletRevisions,
-                }
-              : undefined,
-        }),
+        body,
       });
       const data = (await readPanelJson(response, 'Warmup save failed.')) as {
         error?: string;
@@ -184,12 +224,31 @@ export function WalletWarmupPlans({
       const plans = await read(c.signal);
       if (!c.signal.aborted) {
         if (action === 'save') {
-          setSelected(plans.find((p) => p.id === id) ?? null);
+          const confirmed = plans.find((p) => p.id === id);
+          if (
+            !pending ||
+            !confirmed ||
+            !matchesPendingSave(confirmed, pending)
+          ) {
+            setMustReopen(
+              Boolean(
+                confirmed && pending && confirmed.revision >= pending.revision,
+              ),
+            );
+            throw new Error(
+              'The saved draft does not match this review yet. Your edits are kept. Reload drafts to check the outcome before retrying.',
+            );
+          }
+          setSelected(confirmed);
           pendingSave.current = null;
           setSaveUnconfirmed(false);
         } else if (selected?.id === id) {
           setSelected(null);
           setMustReopen(false);
+        }
+        if (action !== 'save' && pendingSave.current?.id === id) {
+          pendingSave.current = null;
+          setSaveUnconfirmed(false);
         }
         setNotice(
           action === 'save'
@@ -212,19 +271,30 @@ export function WalletWarmupPlans({
     const c = beginRequest();
     setBusy(true);
     setError('');
+    setNotice('');
     try {
       const plans = await read(c.signal);
       if (!c.signal.aborted) {
-        const recovered = plans.find((p) => p.id === pendingSave.current);
-        if (recovered) {
+        const pending = pendingSave.current;
+        const recovered = plans.find((p) => p.id === pending?.id);
+        if (pending && recovered && matchesPendingSave(recovered, pending)) {
           setSelected(recovered);
-          setName(recovered.document.name);
           pendingSave.current = null;
           setSaveUnconfirmed(false);
           setMustReopen(false);
-          onLoad(recovered.document);
           setNotice(
-            'Saved draft found. Review it before making further changes.',
+            'Saved draft found. Your current edits are kept. Use Edit draft to reopen its saved settings.',
+          );
+        } else if (pending) {
+          setMustReopen(
+            Boolean(recovered && recovered.revision >= pending.revision),
+          );
+          setError(
+            recovered && recovered.revision >= pending.revision
+              ? recovered.archived
+                ? 'The saved draft is archived. Your edits are kept. Restore it under Draft details, or choose New draft for a separate copy.'
+                : 'A different saved version was found. Your edits are kept. Reopen the saved draft to review it, or choose New draft for a separate copy.'
+              : 'This reload has not confirmed your save. Your edits are kept. Reload again to check; retrying keeps the same draft identity.',
           );
         } else if (selected) {
           const latest = plans.find((p) => p.id === selected.id);
@@ -278,6 +348,7 @@ export function WalletWarmupPlans({
             setSaveUnconfirmed(false);
             setMustReopen(false);
             setName('Wallet warmup');
+            setError('');
             setNotice('Saving will create a new plan.');
           }}
         >
@@ -314,8 +385,9 @@ export function WalletWarmupPlans({
       {!plan && <p>Review your draft above to enable Save.</p>}
       {error && saveUnconfirmed && !busy && (
         <p>
-          The save was not confirmed. Reload saved plans before retrying.
-          Retrying this draft keeps the same identity.
+          {mustReopen
+            ? 'The save was not confirmed. Review the saved version or choose a separate new draft.'
+            : 'The save was not confirmed. Reload saved plans before retrying. Retrying this draft keeps the same identity.'}
         </p>
       )}
       {notice && <output>{notice}</output>}
@@ -345,6 +417,8 @@ export function WalletWarmupPlans({
                   disabled={busy || p.archived || !matches}
                   onClick={() => {
                     setSelected(p);
+                    pendingSave.current = null;
+                    setSaveUnconfirmed(false);
                     setMustReopen(false);
                     setName(p.document.name);
                     onLoad(p.document);
@@ -363,6 +437,8 @@ export function WalletWarmupPlans({
                     disabled={busy}
                     onClick={() => {
                       setSelected(p);
+                      pendingSave.current = null;
+                      setSaveUnconfirmed(false);
                       setMustReopen(false);
                       setName(p.document.name);
                       onLoad(p.document, true);
