@@ -9,6 +9,7 @@ import { readPanelJson } from '@/components/read-panel-json';
 import { PumpLaunchReview } from './pump-launch-review';
 import { StonkLayerPlanning } from './stonk-layer-planning';
 import { ImportedLayerPlanning } from './imported-layer-planning';
+import { StonkfunLaunchReview } from '@/components/stonkfun-launch-review';
 
 export type MetadataProject = {
   document?: ProjectDocument;
@@ -284,6 +285,13 @@ function SavedMetadataReview({
       )}
       {project && plan.launchpad === 'StonkFun' && plan.mode === 'Block-0' && (
         <StonkLayerPlanning project={project} disabled={busy || saving} />
+      )}
+      {project && plan.launchpad === 'StonkFun' && (
+        <StonkfunLaunchReview
+          project={project}
+          plan={plan}
+          releaseId={uri.split('/').at(-1) ?? ''}
+        />
       )}
       {project && plan.launchpad === 'PumpFun' && (
         <PumpLaunchReview
