@@ -20,6 +20,21 @@ const get = (query = '') =>
   GET(
     new Request(`https://bundle.example.com/api/marketplace/catalog${query}`),
   );
+it('forwards exact region filters canonically and refuses conflicting or duplicate keys', async () => {
+  mocks.read.mockResolvedValue({ purchaseEnabled: false, listings: [] });
+  expect(
+    (await get('?regions=' + encodeURIComponent('["Europe","Asia"]'))).status,
+  ).toBe(200);
+  expect(mocks.read.mock.calls[0][0].regions).toEqual(['Asia', 'Europe']);
+  mocks.read.mockClear();
+  for (const query of [
+    '?region=Europe&region=Asia',
+    '?region=Europe&regions=' + encodeURIComponent('["Europe"]'),
+    '?regions=' + encodeURIComponent('["Europe","Europe"]'),
+  ])
+    expect((await get(query)).status).toBe(400);
+  expect(mocks.read).not.toHaveBeenCalled();
+});
 it('forwards custom count and canonical multiple filters without relaxing duplicate-key rejection', async () => {
   mocks.read.mockResolvedValue({ purchaseEnabled: false, listings: [] });
   const query = new URLSearchParams({

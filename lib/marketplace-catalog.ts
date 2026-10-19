@@ -23,6 +23,13 @@ const label = z
     v.split('').every((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127),
   );
 const tier = z.enum(['funding-only', 'light-history', 'established']);
+const regionLabel = label.refine(
+  (value) =>
+    value.trim().length > 0 &&
+    value === value.trim() &&
+    !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(value) &&
+    value.toLowerCase() !== 'not reported',
+);
 function queryArray(value: unknown) {
   if (typeof value !== 'string' || value.length > 1800) return value;
   try {
@@ -35,6 +42,15 @@ const sources = z.preprocess(
   queryArray,
   z
     .array(label)
+    .min(1)
+    .max(20)
+    .refine((values) => new Set(values).size === values.length)
+    .transform((values) => [...values].sort()),
+);
+const regionChoices = z.preprocess(
+  queryArray,
+  z
+    .array(regionLabel)
     .min(1)
     .max(20)
     .refine((values) => new Set(values).size === values.length)
@@ -54,6 +70,7 @@ export const marketplaceListing = z
     id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/),
     address: wallet,
     source: label,
+    region: regionLabel.optional(),
     tier,
     fundedAt: timestamp,
     balanceLamports: amount,
@@ -98,12 +115,15 @@ export const marketplaceFilters = z
     source: label.optional(),
     tier: tier.optional(),
     sources: sources.optional(),
+    region: regionLabel.optional(),
+    regions: regionChoices.optional(),
     tiers: tiers.optional(),
   })
   .strict()
   .refine(
     (f) =>
       !(f.source && f.sources) &&
+      !(f.region && f.regions) &&
       !(f.tier && f.tiers) &&
       amount.safeParse(f.minimumBalanceLamports).success &&
       (f.maximumBalanceLamports === undefined ||
@@ -128,13 +148,34 @@ export const marketplaceResult = z
     inventoryCount: z.number().int().min(0).max(500),
     matchingCount: z.number().int().min(0).max(500),
     sources: z.array(label).max(500),
+    regions: z.array(regionLabel).min(1).max(500).optional(),
     filters: marketplaceFilters,
     listings: z.array(marketplaceListing).max(200),
     totalBalanceLamports: z.string().regex(/^\d+$/),
     totalPriceLamports: z.string().regex(/^\d+$/),
     netCostLamports: z.string().regex(/^-?\d+$/),
   })
-  .strict();
+  .strict()
+  .refine(
+    (result) =>
+      (!result.regions ||
+        (new Set(result.regions).size === result.regions.length &&
+          result.regions.every(
+            (region, index) =>
+              index === 0 || result.regions![index - 1] < region,
+          ))) &&
+      result.listings.every(
+        (listing) =>
+          (listing.region === undefined ||
+            result.regions?.includes(listing.region)) &&
+          (!result.filters.region ||
+            listing.region === result.filters.region) &&
+          (!result.filters.regions ||
+            (listing.region !== undefined &&
+              result.filters.regions.includes(listing.region))),
+      ),
+    'Reported regions are inconsistent with this inventory snapshot.',
+  );
 export type MarketplaceResult = z.infer<typeof marketplaceResult>;
 
 export function selectMarketplaceInventory(
@@ -178,6 +219,9 @@ export function selectMarketplaceInventory(
         (!f.source || item.source === f.source) &&
         (!f.tier || item.tier === f.tier) &&
         (!f.sources || f.sources.includes(item.source)) &&
+        (!f.region || item.region === f.region) &&
+        (!f.regions ||
+          (item.region !== undefined && f.regions.includes(item.region))) &&
         (!f.tiers || f.tiers.includes(item.tier)),
     )
     .sort((a, b) => {
@@ -205,6 +249,13 @@ export function selectMarketplaceInventory(
     (sum, item) => sum + BigInt(item.purchasePriceLamports),
     0n,
   );
+  const regions = [
+    ...new Set(
+      inventory.listings.flatMap((item) =>
+        item.region === undefined ? [] : [item.region],
+      ),
+    ),
+  ].sort();
   return {
     format: 'bundle-wallet-marketplace-v1',
     purchaseEnabled: false,
@@ -215,6 +266,7 @@ export function selectMarketplaceInventory(
     inventoryCount: inventory.listings.length,
     matchingCount: matches.length,
     sources: [...new Set(inventory.listings.map((item) => item.source))].sort(),
+    ...(regions.length ? { regions } : {}),
     filters: f,
     listings,
     totalBalanceLamports: String(balances),

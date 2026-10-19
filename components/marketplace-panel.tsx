@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   marketplaceResult,
@@ -25,6 +25,7 @@ const displaySortLabels = {
 } as const;
 
 export function MarketplacePanel() {
+  const regionHelpId = useId();
   const [result, setResult] = useState<MarketplaceResult | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -35,6 +36,10 @@ export function MarketplacePanel() {
   const [source, setSource] = useState('');
   const [sourceOptions, setSourceOptions] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [region, setRegion] = useState('');
+  const [regionOptions, setRegionOptions] = useState<string[]>([]);
+  const [regionsLoaded, setRegionsLoaded] = useState(false);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
   const [sort, setSort] = useState<{
     key: MarketplaceSort;
@@ -86,11 +91,16 @@ export function MarketplacePanel() {
       const parsed = marketplaceFilters.safeParse(Object.fromEntries(params));
       if (params.toString().length > 2048)
         throw new Error(
-          'Choose fewer sources or shorter filters before refreshing.',
+          'Choose fewer sources or regions, or shorter filters before refreshing.',
         );
       if (!parsed.success)
         throw new Error(
-          'Check your filter ranges. Maximum values must be at or above their minimums.',
+          parsed.error.issues.some(
+            (issue) =>
+              issue.path[0] === 'region' || issue.path[0] === 'regions',
+          )
+            ? 'Enter a region exactly as reported, or choose from the reported regions.'
+            : 'Check your filter ranges. Maximum values must be at or above their minimums.',
         );
       const response = await fetch(`/api/marketplace/catalog?${params}`, {
         signal: controller.signal,
@@ -129,6 +139,8 @@ export function MarketplacePanel() {
         throw new Error('Inventory snapshot has expired. Refresh to continue.');
       setResult(data);
       setSourceOptions(data.sources);
+      setRegionOptions(data.regions ?? []);
+      setRegionsLoaded(true);
     } catch (reason) {
       if (!controller.signal.aborted)
         setError(
@@ -193,6 +205,8 @@ export function MarketplacePanel() {
           setCount('25');
           setSource('');
           setSelectedSources([]);
+          setRegion('');
+          setSelectedRegions([]);
           setSelectedTiers([]);
           setSort({ key: 'price', descending: false });
         }}
@@ -345,6 +359,74 @@ export function MarketplacePanel() {
               )}
             </fieldset>
             <label>
+              Reported region
+              <input
+                name="region"
+                aria-label="Reported region"
+                aria-describedby={regionHelpId}
+                maxLength={80}
+                placeholder="One exact region or choose below"
+                value={region}
+                onChange={(event) => {
+                  setRegion(event.target.value);
+                  setSelectedRegions([]);
+                }}
+              />
+              <small id={regionHelpId}>
+                Match the reported spelling and capitalization.
+              </small>
+            </label>
+            <fieldset className={styles.choices}>
+              <legend>Reported regions</legend>
+              <small>
+                Choices come from the last loaded snapshot; wallet location is
+                not verified. Selecting a region excludes wallets without that
+                label.
+              </small>
+              {!regionOptions.length && (
+                <small>
+                  {regionsLoaded
+                    ? 'No regions were reported in the last loaded snapshot.'
+                    : 'Refresh inventory to load reported choices, or enter one exact region.'}
+                </small>
+              )}
+              <div className={styles.sourceChoices}>
+                {[...new Set([...regionOptions, ...selectedRegions])]
+                  .sort()
+                  .map((value) => (
+                    <label key={value}>
+                      <input
+                        type="checkbox"
+                        checked={selectedRegions.includes(value)}
+                        disabled={
+                          selectedRegions.length >= 20 &&
+                          !selectedRegions.includes(value)
+                        }
+                        onChange={(event) => {
+                          setRegion('');
+                          setSelectedRegions((current) =>
+                            event.target.checked
+                              ? [...current, value]
+                              : current.filter((item) => item !== value),
+                          );
+                        }}
+                      />
+                      {value}
+                      {!regionOptions.includes(value)
+                        ? ' (not in latest catalog)'
+                        : ''}
+                    </label>
+                  ))}
+              </div>
+              {selectedRegions.length > 0 && (
+                <input
+                  type="hidden"
+                  name="regions"
+                  value={JSON.stringify(selectedRegions)}
+                />
+              )}
+            </fieldset>
+            <label>
               Minimum balance (SOL)
               <input
                 name="minimumBalanceSol"
@@ -458,6 +540,7 @@ export function MarketplacePanel() {
                   {sortHeader('price', 'Price')}
                   {sortHeader('net', 'Price less balance')}
                   <th>Source / tier</th>
+                  <th scope="col">Reported region</th>
                   {sortHeader('funded', 'Funded')}
                   {sortHeader('transactions', 'Transactions')}
                 </tr>
@@ -476,6 +559,7 @@ export function MarketplacePanel() {
                       <br />
                       {tierLabels[item.tier]}
                     </td>
+                    <td>{item.region ?? 'Not reported'}</td>
                     <td>{new Date(item.fundedAt).toLocaleString()}</td>
                     <td>{item.transactionCount}</td>
                   </tr>
@@ -546,6 +630,10 @@ export function MarketplacePanel() {
                       <dd>
                         {item.source} / {tierLabels[item.tier]}
                       </dd>
+                    </div>
+                    <div>
+                      <dt>Reported region</dt>
+                      <dd>{item.region ?? 'Not reported'}</dd>
                     </div>
                     <div>
                       <dt>Funded</dt>

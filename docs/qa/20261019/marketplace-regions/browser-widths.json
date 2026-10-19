@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "actualAuthenticatedApp": false,
+  "externalProviders": false,
+  "measurements": [
+    {
+      "counts": "Catalog GETs: 2; provider requests: 0; purchases: blocked",
+      "documentWidth": 1425,
+      "rows": 2,
+      "unavailable": true,
+      "viewport": 1440,
+      "visiblePhoneCards": 0
+    },
+    {
+      "counts": "Catalog GETs: 2; provider requests: 0; purchases: blocked",
+      "documentWidth": 360,
+      "rows": 2,
+      "unavailable": true,
+      "viewport": 375,
+      "visiblePhoneCards": 2
+    },
+    {
+      "counts": "Catalog GETs: 2; provider requests: 0; purchases: blocked",
+      "documentWidth": 305,
+      "rows": 2,
+      "unavailable": true,
+      "viewport": 320,
+      "visiblePhoneCards": 2
+    }
+  ]
+}

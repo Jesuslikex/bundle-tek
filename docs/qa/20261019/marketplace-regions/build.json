@@ -1,0 +1,22 @@
+{
+  "base": "22049a2",
+  "overlay": [
+    "lib/marketplace-catalog.ts",
+    "lib/marketplace-catalog.test.ts",
+    "lib/marketplace-provider.test.ts",
+    "components/marketplace-panel.tsx",
+    "components/marketplace-panel.test.tsx",
+    "app/api/marketplace/catalog/route.test.ts"
+  ],
+  "hashes": {
+    "lib/marketplace-catalog.ts": "65a412bb89baa852aafee68329986b2842637f8b7c2e74c5e45c4ce5fb79cd9b",
+    "lib/marketplace-catalog.test.ts": "03177f549f8e0fa93506c7262b74e3bff1dc890f89b88a00f52846969d885072",
+    "lib/marketplace-provider.test.ts": "5334c60efc8ff179c8b7f7d0e903a7f2a22d65d4ed6147cce310206c6e8d270b",
+    "components/marketplace-panel.tsx": "16b8eab3fda8312e3fcfaa1d7f70c7ab226e2a509d611065f9bcddc369bb13c1",
+    "components/marketplace-panel.test.tsx": "752e181c1a176d87eff487087df9fc189b50955a0903929e5a8a85f69b642dc8",
+    "app/api/marketplace/catalog/route.test.ts": "991bdf63308dd8d8aebcb44d46706f0fdecf1e96f47b3ef8bb9ec147d539fe67"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}

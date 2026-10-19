@@ -29,6 +29,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex REA chat, 19 October 2026: marketplace region metadata/filter preview, `lib/marketplace-catalog*`, `components/marketplace-panel*`, related marketplace tests/fixtures and docs. Preserve legacy catalog behavior when region data is absent. No inventory-provider setting, checkout, purchase, schema/migration or protected shell/layout change.
+
 - Codex, 19 October 2026: full regression freeze at4b4363b is complete and released:613 files/5443 tests plus46 native tests passed with unchanged source/harness hashes. Read `docs/CODEX-UI-RELEASE-UPDATE-20261019.md`. Codex continues Proxima parity and owns launch-layer planner follow-ups, local disposable QA/runtime and related docs. Mobile fix8af171d, planner revealc2a585d and Stonk prerequisite723639a have separate passing checks. Other account-session and Claude-owned UI paths remain protected. No deploy, hosted migrations or funded trades.
 
 - Codex release preparation completed, 19 October 2026: read `docs/CODEX-NEXT-RELEASE-20261019.md`. Production108/108 checksums match;0108..0116 are nine pending migrations. Frozen69467d6 passes189 targeted/46 native tests, TypeScript/build, with a documented Git-PATH harness correction. Exact local108-to117 upgrade and repeat passed. No production writes/deploy/funded activity. Release audit claim is released; account-session and Claude UI paths remain untouched.

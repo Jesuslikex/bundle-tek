@@ -80,11 +80,11 @@ async function field(name: string, value: string) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
-function catalogTransport() {
+function catalogTransport(inventory?: ReturnType<typeof marketplaceFixture>) {
   const fetcher = vi.fn(async (url: string) =>
     Response.json(
       selectMarketplaceInventory(
-        marketplaceFixture(),
+        inventory ?? marketplaceFixture(),
         marketplaceFilters.parse(
           Object.fromEntries(new URL(url, 'https://bundle.test').searchParams),
         ),
@@ -103,6 +103,93 @@ async function toggle(text: string) {
     label.querySelector<HTMLInputElement>('input')!.click(),
   );
 }
+it('shows missing regions honestly and supports exact single/multiple reported-region selection', async () => {
+  const inventory = marketplaceFixture();
+  inventory.listings[0].region = 'Europe';
+  inventory.listings[1].region = 'Asia';
+  const fetcher = catalogTransport(inventory);
+  await submit();
+  expect(container.textContent).toContain('Not reported');
+  expect(container.textContent).toContain('wallet location is not verified');
+  await toggle('Europe');
+  await toggle('Asia');
+  await submit();
+  const query = new URL(fetcher.mock.calls.at(-1)![0], 'https://bundle.test')
+    .searchParams;
+  expect(JSON.parse(query.get('regions')!).sort()).toEqual(['Asia', 'Europe']);
+  expect(query.has('region')).toBe(false);
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
+  expect(
+    [...container.querySelectorAll('tbody tr')].map(
+      (row) => row.querySelectorAll('td')[5].textContent,
+    ),
+  ).toEqual(['Europe', 'Asia']);
+  await field('region', 'Europe');
+  await submit();
+  const single = new URL(fetcher.mock.calls.at(-1)![0], 'https://bundle.test')
+    .searchParams;
+  expect(single.get('region')).toBe('Europe');
+  expect(single.has('regions')).toBe(false);
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+  expect(container.textContent).toContain('Checkout unavailable');
+  expect(
+    fetcher.mock.calls.every((call) =>
+      String(call[0]).startsWith('/api/marketplace/catalog?'),
+    ),
+  ).toBe(true);
+});
+it('resets region selection without fetching or fabricating a missing label', async () => {
+  const fetcher = catalogTransport();
+  await field('region', 'Europe');
+  await submit();
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(0);
+  expect(container.textContent).not.toContain('Europe (not in latest catalog)');
+  const calls = fetcher.mock.calls.length;
+  await act(async () => container.querySelector('form')!.reset());
+  expect(
+    container.querySelector<HTMLInputElement>('input[name=region]')!.value,
+  ).toBe('');
+  expect(container.querySelector('input[name=regions]')).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(calls);
+  await submit();
+  expect(container.querySelectorAll('tbody tr')).toHaveLength(3);
+  expect(container.textContent).toContain('Not reported');
+});
+it('refuses region metadata that disagrees with a listing rather than exposing parser errors', async () => {
+  const inventory = marketplaceFixture();
+  inventory.listings[0].region = 'Europe';
+  const result = selectMarketplaceInventory(
+    inventory,
+    marketplaceFilters.parse({}),
+    Date.now(),
+  );
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ ...result, regions: ['Asia'] })),
+  );
+  await submit();
+  expect(container.querySelector('table')).toBeNull();
+  expect(container.querySelector('[role=alert]')?.textContent).toBe(
+    'Inventory response was invalid.',
+  );
+});
+it('explains a malformed region without sending a catalog request', async () => {
+  const fetcher = vi.fn();
+  vi.stubGlobal('fetch', fetcher);
+  await field('region', ' Europe');
+  await submit();
+  expect(fetcher).not.toHaveBeenCalled();
+  const input =
+    container.querySelector<HTMLInputElement>('input[name=region]')!;
+  expect(input.getAttribute('aria-label')).toBe('Reported region');
+  expect(
+    document.getElementById(input.getAttribute('aria-describedby')!)
+      ?.textContent,
+  ).toContain('spelling and capitalization');
+  expect(container.querySelector('[role=alert]')?.textContent).toBe(
+    'Enter a region exactly as reported, or choose from the reported regions.',
+  );
+});
 it('keeps reported source choices available while combining filters and supports a custom quantity', async () => {
   const fetcher = catalogTransport();
   await submit();

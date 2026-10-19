@@ -1,0 +1,23 @@
+{
+  "synthetic": true,
+  "resetCounts": "Catalog GETs: 2; provider requests: 0; purchases: blocked",
+  "legacy": {
+    "counts": "Catalog GETs: 3; provider requests: 0; purchases: blocked",
+    "noLabelsReported": true,
+    "regionCheckboxes": 0,
+    "rows": [
+      "Not reported",
+      "Not reported",
+      "Not reported"
+    ]
+  },
+  "localValidation": {
+    "counts": "Catalog GETs: 3; provider requests: 0; purchases: blocked",
+    "error": "Enter a region exactly as reported, or choose from the reported regions."
+  },
+  "inconsistentResponse": {
+    "counts": "Catalog GETs: 5; provider requests: 0; purchases: blocked",
+    "error": "Inventory response was invalid.",
+    "tableRemoved": true
+  }
+}

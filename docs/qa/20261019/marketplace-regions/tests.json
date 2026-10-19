@@ -1,0 +1,19 @@
+{
+  "sourceBase": "22049a2",
+  "physicalTestFiles": 4,
+  "passedTests": 65,
+  "failedTests": 0,
+  "testFiles": [
+    "components/marketplace-panel.test.tsx",
+    "lib/marketplace-catalog.test.ts",
+    "lib/marketplace-provider.test.ts",
+    "app/api/marketplace/catalog/route.test.ts"
+  ],
+  "environmentFilesLoaded": false,
+  "unmockedExternalNodeNetworkBlocked": true,
+  "build": "build.json",
+  "browserMode": "Current real components and model with synthetic transport; no actual account or provider",
+  "checkoutEnabled": false,
+  "deployed": false,
+  "fundedTrades": false
+}

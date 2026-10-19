@@ -1,0 +1,7 @@
+# Marketplace reported regions
+
+Before editing, 19 October: this REA chat claims its existing marketplace model/UI/test/CSS paths, as recorded in the shared handoff. Live Proxima marketplace inspection showed region labels and advanced filters. Bundle's current catalog has no region field; no supplier or geographic verification is established by those observations.
+
+Add optional provider-reported region labels, exact single/multiple region filters, optional catalog choices and desktop/mobile display. Missing labels remain unreported and cannot match a region filter. Legacy inventories without region data keep their existing result shape and behavior. All snapshot age, funding gap, integer amount, duplicate identity, body/query limits and purchase-disabled guards remain intact. No provider configuration or checkout is being added, and no supplier availability is claimed. No protected Claude UI, account-session, migration, deployment or funded action.
+
+The optional rich-region extension retains the v1 format names. Older strict clients may safely refuse region-bearing responses; only region-free legacy response compatibility is promised. Release the matching frontend/server together. Region labels must be nonblank, have no surrounding whitespace or control/formatting characters, and may not use the reserved missing-value wording "Not reported". No normalization or geographic inference is performed. Invalid region data rejects the snapshot; funding-source label validation is unchanged.

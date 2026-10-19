@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   marketplaceFilters,
+  marketplaceResult,
   marketplaceSol,
   marketplaceLamports,
   selectMarketplaceInventory,
@@ -9,6 +10,145 @@ import {
 import { marketplaceFixture } from '../test/marketplace-fixture';
 const now = Date.parse('2026-10-17T12:00:00Z');
 const filters = marketplaceFilters.parse({});
+it.each([
+  '\u0085',
+  '\u200B',
+  '\u202EEurope',
+  '\uFEFFEurope',
+  'Not reported',
+  'NOT REPORTED',
+  ' not reported ',
+  ' Europe',
+  'Europe ',
+  'Europe\u2028Asia',
+])('rejects ambiguous region labels consistently: %j', (region) => {
+  expect(marketplaceFilters.safeParse({ region }).success).toBe(false);
+  expect(marketplaceFilters.safeParse({ regions: [region] }).success).toBe(
+    false,
+  );
+  const inventory = marketplaceFixture(now);
+  expect(() =>
+    selectMarketplaceInventory(
+      { ...inventory, listings: [{ ...inventory.listings[0], region }] },
+      filters,
+      now,
+    ),
+  ).toThrow();
+});
+it('retains readable international labels without changing funding-source rules', () => {
+  expect(
+    marketplaceFilters.parse({ regions: ['日本', 'São Paulo'] }).regions,
+  ).toEqual(['São Paulo', '日本']);
+  expect(marketplaceFilters.parse({ source: 'Not reported' }).source).toBe(
+    'Not reported',
+  );
+  const result = selectMarketplaceInventory(
+    marketplaceFixture(now),
+    filters,
+    now,
+  );
+  expect(marketplaceResult.safeParse({ ...result, regions: [] }).success).toBe(
+    false,
+  );
+});
+it('keeps legacy inventories region-free and never infers missing labels', () => {
+  const inventory = marketplaceFixture(now);
+  const legacy = selectMarketplaceInventory(inventory, filters, now);
+  expect(JSON.stringify(legacy)).not.toContain('"region');
+  expect(marketplaceResult.parse(legacy)).toEqual(legacy);
+  for (const region of ['Europe', 'Unlisted region']) {
+    expect(
+      selectMarketplaceInventory(
+        inventory,
+        marketplaceFilters.parse({ region }),
+        now,
+      ).listings,
+    ).toEqual([]);
+  }
+});
+it('filters exact reported regions before quantity, spacing and integer totals', () => {
+  const inventory = marketplaceFixture(now);
+  inventory.listings[0].region = 'Europe';
+  inventory.listings[1].region = 'Asia';
+  const result = selectMarketplaceInventory(
+    inventory,
+    marketplaceFilters.parse({ regions: '["Europe","Asia"]' }),
+    now,
+  );
+  expect(result.regions).toEqual(['Asia', 'Europe']);
+  expect(result.filters.regions).toEqual(['Asia', 'Europe']);
+  expect(result.listings.map((row) => row.id)).toEqual([
+    'wallet-1',
+    'wallet-2',
+  ]);
+  expect(result.matchingCount).toBe(2);
+  expect(result.totalPriceLamports).toBe('2200000001');
+  expect(result.totalBalanceLamports).toBe('2000000000');
+  expect(result.purchaseEnabled).toBe(false);
+  expect(marketplaceResult.parse(result)).toEqual(result);
+  const single = selectMarketplaceInventory(
+    inventory,
+    marketplaceFilters.parse({ region: 'Europe', count: 1 }),
+    now,
+  );
+  expect(single.listings.map((row) => row.id)).toEqual(['wallet-1']);
+  expect(single.regions).toEqual(['Asia', 'Europe']);
+  expect(
+    selectMarketplaceInventory(
+      inventory,
+      marketplaceFilters.parse({ region: 'europe' }),
+      now,
+    ).listings,
+  ).toEqual([]);
+});
+it('refuses contradictory, duplicate, malformed or excessive region filters', () => {
+  for (const value of [
+    { region: 'Europe', regions: ['Europe'] },
+    { region: ' ' },
+    { regions: [' '] },
+    { regions: [] },
+    { regions: ['Europe', 'Europe'] },
+    { regions: '{}' },
+    { regions: 'bad json' },
+    { regions: Array.from({ length: 21 }, (_, i) => 'r' + i) },
+    { region: 'x'.repeat(81) },
+    { region: 'Europe\nsecret' },
+  ]) {
+    expect(marketplaceFilters.safeParse(value).success).toBe(false);
+  }
+});
+it('refuses untrusted region metadata or result choices that disagree with displayed rows', () => {
+  for (const region of [null, '', ' ', 1, 'x'.repeat(81), 'Europe\nsecret']) {
+    const inventory = marketplaceFixture(now);
+    expect(() =>
+      selectMarketplaceInventory(
+        { ...inventory, listings: [{ ...inventory.listings[0], region }] },
+        filters,
+        now,
+      ),
+    ).toThrow();
+  }
+  const inventory = marketplaceFixture(now);
+  inventory.listings[0].region = 'Europe';
+  const result = selectMarketplaceInventory(inventory, filters, now);
+  for (const regions of [
+    undefined,
+    [],
+    ['Asia'],
+    ['Europe', 'Europe'],
+    ['Europe', 'Asia'],
+  ]) {
+    expect(marketplaceResult.safeParse({ ...result, regions }).success).toBe(
+      false,
+    );
+  }
+  expect(
+    marketplaceResult.safeParse({
+      ...result,
+      filters: { ...result.filters, region: 'Asia' },
+    }).success,
+  ).toBe(false);
+});
 it('admits custom quantities within the existing 200-wallet ceiling and preserves default/legacy filters', () => {
   for (const count of [1, 7, 25, 42, 50, 100, 199, 200])
     expect(marketplaceFilters.parse({ count }).count).toBe(count);
