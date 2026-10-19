@@ -21,6 +21,7 @@ import {
 } from '@/lib/workspace-project';
 import { DEFAULT_VENUE_SETTINGS } from '@/lib/venue-settings';
 import { VenueSettingsForm } from './venue-settings-form';
+import { VenueMark } from './venue-mark';
 
 export function ChainLaunchForm({
   plan,
@@ -108,26 +109,26 @@ export function ChainLaunchForm({
           {CHAINS.map((chain) => (
             <label
               key={chain}
+              htmlFor={`launch-chain-${chain}`}
               className={`selection-card chain-choice ${plan.chain === chain ? 'selected' : ''}`}
               data-chain={chain}
             >
               <RadioGroupItem
+                id={`launch-chain-${chain}`}
                 value={chain}
                 aria-label={chain === 'BNB' ? 'BNB Smart Chain' : chain}
               />
-              <span
-                className={`chain-symbol chain-${chain.toLowerCase()}`}
-                aria-hidden="true"
-              >
-                {chain === 'Solana'
-                  ? '≋'
-                  : chain === 'Ethereum'
-                    ? 'Ξ'
-                    : chain.slice(0, 1)}
-              </span>
-              <span>
-                <strong>{chain === 'BNB' ? 'BNB Smart Chain' : chain}</strong>
-                <small>
+              <span className="chain-card-body">
+                <span className="chain-card-title">
+                  <VenueMark name={chain} size={20} />
+                  <strong>{chain === 'BNB' ? 'BNB Smart Chain' : chain}</strong>
+                </span>
+                <small className="chain-card-meta">
+                  <span className="venue-stack" aria-hidden="true">
+                    {CURRENT_VENUES_BY_CHAIN[chain].slice(0, 3).map((venue) => (
+                      <VenueMark key={venue} name={venue} size={16} />
+                    ))}
+                  </span>
                   {CURRENT_VENUES_BY_CHAIN[chain].length} launchpad
                   {CURRENT_VENUES_BY_CHAIN[chain].length === 1 ? '' : 's'}
                 </small>
@@ -156,9 +157,7 @@ export function ChainLaunchForm({
               key={venue}
             >
               <RadioGroupItem value={venue} aria-label={venue} />
-              <span className="venue-initial" aria-hidden="true">
-                {venue[0].toUpperCase()}
-              </span>
+              <VenueMark name={venue} size={18} />
               <strong>{venue}</strong>
             </label>
           ))}
