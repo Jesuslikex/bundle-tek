@@ -1,5 +1,7 @@
 # Next release preparation, 19 October 2026
 
+Later QA checkpoint: read `CODEX-UI-RELEASE-UPDATE-20261019.md` and `qa/20261019/release/full-suite-summary.json`. The fresh frozen4b4363b full suite passed613 files/5443 tests plus46 native tests. Later mobile/planner UI changes have separate passing checks and builds. Signed-in real-route/disposable-database capture, exact approval, saved recovery and artwork persistence were browser checked. The original frozen-source and production-audit details below remain dated evidence; the new UI commits mean69467d6 is no longer the complete candidate source. No production migration or deployment was performed, and complete Proxima parity is still open.
+
 Status: local candidate prepared and verified within the scope below. Production migration/deployment approval and signed-in release QA remain separate. No production migration, deployment, cron/provider/credential change, real wallet unlock, signing, submission or funded trade is authorized or performed by this preparation.
 
 ## Frozen source

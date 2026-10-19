@@ -1,0 +1,15 @@
+{
+  "sourceCommit": "4b4363bb6ba915d5cf68616d37d74ebbf7fb4af8",
+  "startedAt": "2026-10-19T00:44:42.362Z",
+  "finishedAt": "2026-10-19T01:27:42.340Z",
+  "vitest": {"physicalTestFiles":613,"passedPhysicalFiles":613,"failedPhysicalFiles":0,"passedTests":5443,"failedTests":0,"skippedTests":0,"unhandledErrorsReportedByEndReporter":0,"exitCode":0},
+  "native": {"passedTests":46,"failedTests":0,"exitCode":0},
+  "integrity": {"archivedTrackedSourceFiles":2321,"changedFiles":[],"harnessUnchanged":true},
+  "isolation": {"environmentFilesLoaded":false,"unmockedExternalNodeNetworkBlocked":true},
+  "countClarification": "Vitest numPassedTestSuites is733 and includes nested suites. The physical file count is613, independently confirmed by testResults.length, the CLI and the progress reporter.",
+  "laterUiDelta": {"commits":["8af171d","c2a585d","723639a"],"dashboardTests":4,"launchLayerFiles":11,"launchLayerTests":116,"typedLintPassed":true,"formatPassed":true,"isolatedProductionBuildsPassed":true,"lastTextOnlyGuidanceChangeCoveredByTestsAndTypedLint":true},
+  "limits": ["The full run is on the frozen baseline, not the later UI commits; those have separate delta verification.","Synthetic browser/provider evidence is not funded execution proof.","Actual browser checks of the newly revealed layer snapshot remain pending."],
+  "deployed":false,
+  "hostedSqlWrites":false,
+  "fundedTrades":false
+}
