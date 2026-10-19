@@ -1,8 +1,13 @@
+import { TOKEN_LOGOS } from './token-logos';
+
 // Chain and launchpad marks for the launch picker. Logos are the projects'
 // own published marks (Trust Wallet asset repo); everything else falls back
 // to a coloured monogram until an official logo is added to public/logos.
 const LOGOS: Record<string, string> = {
   Solana: '/logos/solana.png',
+  SOL: '/logos/solana.png',
+  USDC: '/logos/usdc.png',
+  BONK: '/logos/letsbonk.png',
   Ethereum: '/logos/ethereum.png',
   Base: '/logos/base.png',
   BNB: '/logos/bnb.png',
@@ -46,12 +51,17 @@ const COLORS: Record<string, string> = {
 
 export function VenueMark({
   name,
+  address,
   size = 20,
 }: {
   name: string;
+  address?: string;
   size?: number;
 }) {
-  const logo = LOGOS[name];
+  const logo =
+    address && TOKEN_LOGOS.has(address)
+      ? `/logos/tokens/${address}.png`
+      : LOGOS[name];
   if (logo)
     return (
       // Plain img: tiny static marks, no layout shift, no optimizer needed.

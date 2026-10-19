@@ -83,6 +83,8 @@ import { ChainLaunchForm } from '@/components/launch/chain-launch-form';
 import { FundingForm } from '@/components/launch/funding-form';
 import { LiveOperationsForm } from '@/components/launch/live-operations-form';
 import { PlanRail } from '@/components/launch/plan-rail';
+import { SidebarFunder } from '@/components/sidebar-funder';
+import { LaunchSetupDialog } from '@/components/launch/launch-setup-dialog';
 import { TokenDetailsForm } from '@/components/launch/token-details-form';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -962,6 +964,7 @@ export default function Home() {
     holderCount,
   } = launchPlan;
   const holdersUnit = holdersBuyUnit(launchPlan);
+  const [setupOpen, setSetupOpen] = useState(false);
   const developer = launchPlan.developerBuy;
   const holders = launchPlan.holdersBuy;
   const mev = launchPlan.routingEmphasis;
@@ -1726,6 +1729,10 @@ export default function Home() {
           )}
         </nav>
         <div className="sidebar-bottom">
+          <SidebarFunder
+            chain={chain}
+            onOpenWallets={() => changeView('wallets')}
+          />
           <Button
             variant="outline"
             className="sidebar-import"
@@ -1944,7 +1951,11 @@ export default function Home() {
                     <dl className="launch-ws-tiles">
                       <div>
                         <dt>Supply buy</dt>
-                        <dd>{figures.allocation}%</dd>
+                        <dd>
+                          {figures.allocation === null
+                            ? '—'
+                            : `${figures.allocation}%`}
+                        </dd>
                       </div>
                       <div>
                         <dt>Holders</dt>
@@ -2158,11 +2169,22 @@ export default function Home() {
                     </Button>
                     <Button
                       className="create-main"
-                      onClick={() => changeView('funding')}
+                      onClick={() => setSetupOpen(true)}
                     >
                       <Landmark /> Review funding plan
                     </Button>
                   </div>
+                  <LaunchSetupDialog
+                    open={setupOpen}
+                    plan={launchPlan}
+                    modeLabel={`${launchModeLabel(mode)} Mode`}
+                    estimate={figures}
+                    onOpenChange={setSetupOpen}
+                    onContinue={() => {
+                      setSetupOpen(false);
+                      changeView('funding');
+                    }}
+                  />
                 </div>
               ) : (
                 <PulseForm {...pulseProps} />

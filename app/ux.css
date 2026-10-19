@@ -5191,3 +5191,210 @@ body {
 .wallet-workspace .wallet-balance-summary strong {
   font-size: 16px;
 }
+
+/* Proxima-style sidebar funder picker */
+.sidebar-bottom > .sidebar-funder {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 0;
+}
+.sidebar-funder label {
+  font-size: 11px;
+  color: #8f93a8;
+}
+.sidebar-funder select,
+.sidebar-funder .sidebar-funder-empty {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #2c2e3a;
+  border-radius: 8px;
+  background: #1b1c25;
+  color: #e1e3ec;
+  font-size: 12px;
+  text-align: left;
+}
+.sidebar-funder .sidebar-funder-empty {
+  color: #8f93a8;
+  cursor: pointer;
+}
+.sidebar-collapsed .sidebar-bottom > .sidebar-funder {
+  display: none;
+}
+
+/* Proxima-style Launch Setup review */
+.launch-setup-dialog {
+  max-width: 640px;
+  width: calc(100% - 32px);
+}
+.launch-setup-dialog h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+.launch-setup-token {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-block: 1px solid #262833;
+}
+.launch-setup-token small {
+  color: #8f93a8;
+}
+.launch-setup-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #1c3436;
+  border: 1px solid #3fb8a9;
+  color: #6fe0cf;
+  font-size: 12px;
+  font-weight: 700;
+}
+.launch-setup-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.launch-setup-tiles > div {
+  padding: 8px 12px;
+  border: 1px solid #262833;
+  border-radius: 6px;
+  background: #15161d;
+  min-width: 0;
+}
+.launch-setup-tiles dt {
+  font-size: 11px;
+  color: #8f93a8;
+}
+.launch-setup-tiles dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.launch-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.launch-setup-actions > button {
+  width: auto;
+  flex: none;
+  min-height: 40px;
+  margin-top: 0;
+  padding-inline: 18px;
+}
+
+/* Proxima-style quote pair picker */
+.reference-currencies .quote-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.quote-custom {
+  justify-content: center;
+  color: #c9ccd6;
+  background: transparent;
+  cursor: pointer;
+}
+.quote-custom-plus {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #22232d;
+  font-size: 16px;
+}
+.quote-custom-dialog {
+  max-width: 440px;
+  width: calc(100% - 32px);
+}
+.quote-custom-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #2c2e3a;
+  border-radius: 6px;
+  background: #15161d;
+}
+.quote-custom-search svg {
+  width: 14px;
+  height: 14px;
+  color: #8f93a8;
+}
+.quote-custom-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-size: 13px;
+  color: #e9eaf2;
+}
+.quote-custom-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(56vh, 420px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.quote-custom-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 0 18px;
+  border: 1px dashed #2c2e3a;
+  border-radius: 2px;
+  background: #121318;
+  text-align: left;
+  cursor: pointer;
+}
+.quote-custom-card:hover {
+  border-color: #3a3d4c;
+}
+.quote-custom-card strong {
+  display: block;
+  font-size: 14px;
+  color: #f2f3f7;
+}
+.quote-custom-card small {
+  font-size: 11px;
+  color: #8f93a8;
+}
+.quote-custom-card.selected {
+  border: 1px solid transparent;
+  background: #173f33;
+}
+.quote-custom-card.selected::before,
+.quote-custom-card.selected::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: #3ee6a1;
+  border-style: solid;
+}
+.quote-custom-card.selected::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1px 0 0 1px;
+}
+.quote-custom-card.selected::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 1px 1px 0;
+}

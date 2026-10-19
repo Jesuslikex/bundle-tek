@@ -22,6 +22,13 @@ import {
 import { DEFAULT_VENUE_SETTINGS } from '@/lib/venue-settings';
 import { VenueSettingsForm } from './venue-settings-form';
 import { VenueMark } from './venue-mark';
+import { Search } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export function ChainLaunchForm({
   plan,
@@ -42,6 +49,7 @@ export function ChainLaunchForm({
 }) {
   const [quoteSearch, setQuoteSearch] = useState('');
   const [quoteLimit, setQuoteLimit] = useState(40);
+  const [customOpen, setCustomOpen] = useState(false);
   const chooseChain = (chain: LaunchChain) => {
     setQuoteSearch('');
     setQuoteLimit(40);
@@ -82,6 +90,27 @@ export function ChainLaunchForm({
       .toLowerCase()
       .includes(quoteSearch.toLowerCase()),
   );
+  const compact = choices.length > 8;
+  const quick = choices.filter(
+    (asset, index) => index < 2 || asset === selected,
+  );
+  const pickQuote = (value: string) => {
+    const asset = choices.find((a) => (a.address || a.symbol) === value);
+    if (!asset) return;
+    onOptionsChange?.({
+      settings: {
+        ...options.settings,
+        pumpfun: {
+          ...options.settings.pumpfun,
+          creatorFeePercent: undefined,
+        },
+      },
+    });
+    onChange({
+      currency: asset.symbol,
+      quoteAddress: asset.address || undefined,
+    });
+  };
   const shortAddress = (address: string) =>
     address ? address.slice(0, 6) + '…' + address.slice(-4) : 'Symbol only';
   return (
@@ -179,44 +208,15 @@ export function ChainLaunchForm({
             : 'Quote currency'}{' '}
           <span className="section-note">Draft selection</span>
         </h2>
-        {choices.length > 8 && (
-          <Input
-            aria-label="Search quote currencies"
-            placeholder="Search symbol or address…"
-            value={quoteSearch}
-            onChange={(e) => {
-              setQuoteSearch(e.target.value);
-              setQuoteLimit(40);
-            }}
-          />
-        )}
         <RadioGroup
           className="reference-currencies"
           value={selected ? selected.address || selected.symbol : ''}
-          onValueChange={(value) => {
-            const asset = choices.find(
-              (a) => (a.address || a.symbol) === value,
-            );
-            if (!asset) return;
-            onOptionsChange?.({
-              settings: {
-                ...options.settings,
-                pumpfun: {
-                  ...options.settings.pumpfun,
-                  creatorFeePercent: undefined,
-                },
-              },
-            });
-            onChange({
-              currency: asset.symbol,
-              quoteAddress: asset.address || undefined,
-            });
-          }}
+          onValueChange={(value) => pickQuote(value)}
           aria-label="Quote currency"
         >
-          {filtered.slice(0, quoteLimit).map((asset) => (
+          {(compact ? quick : filtered.slice(0, quoteLimit)).map((asset) => (
             <label
-              className={`selection-card ${selected === asset ? 'selected' : ''}`}
+              className={`selection-card quote-choice ${selected === asset ? 'selected' : ''}`}
               key={asset.address || asset.symbol}
               htmlFor={'quote-' + (asset.address || asset.symbol)}
             >
@@ -227,6 +227,11 @@ export function ChainLaunchForm({
                   asset.symbol + (asset.address ? ' ' + asset.address : '')
                 }
               />
+              <VenueMark
+                name={asset.symbol}
+                address={asset.address}
+                size={22}
+              />
               <span>
                 <strong>{asset.symbol}</strong>
                 <small style={{ display: 'block' }}>
@@ -235,13 +240,84 @@ export function ChainLaunchForm({
               </span>
             </label>
           ))}
+          {compact && (
+            <button
+              type="button"
+              className="selection-card quote-choice quote-custom"
+              onClick={() => setCustomOpen(true)}
+            >
+              <span className="quote-custom-plus" aria-hidden="true">
+                +
+              </span>
+              <strong>Custom</strong>
+            </button>
+          )}
         </RadioGroup>
-        {!filtered.length && (
+        <Dialog open={customOpen} onOpenChange={setCustomOpen}>
+          <DialogContent className="quote-custom-dialog">
+            <DialogTitle>Custom</DialogTitle>
+            <DialogDescription className="sr-only">
+              Choose the quote token for this launch.
+            </DialogDescription>
+            <label className="quote-custom-search">
+              <Search aria-hidden="true" />
+              <input
+                aria-label="Search quote currencies"
+                placeholder={`${plan.launchpad === 'PumpFun' ? 'Pump ' : ''}Quote token address`}
+                value={quoteSearch}
+                onChange={(e) => {
+                  setQuoteSearch(e.target.value);
+                  setQuoteLimit(40);
+                }}
+              />
+            </label>
+            <div className="quote-custom-list" aria-label="Quote tokens">
+              {filtered.slice(0, quoteLimit).map((asset) => (
+                <button
+                  type="button"
+                  aria-pressed={selected === asset}
+                  key={asset.address || asset.symbol}
+                  className={`quote-custom-card ${selected === asset ? 'selected' : ''}`}
+                  onClick={() => {
+                    pickQuote(asset.address || asset.symbol);
+                    setCustomOpen(false);
+                  }}
+                >
+                  <VenueMark
+                    name={asset.symbol}
+                    address={asset.address}
+                    size={28}
+                  />
+                  <span>
+                    <strong>{asset.symbol}</strong>
+                    <small>{shortAddress(asset.address)}</small>
+                  </span>
+                </button>
+              ))}
+              {!filtered.length && (
+                <output className="source-note">
+                  No matching tokens. Clear the search to see all choices.
+                </output>
+              )}
+              {filtered.length > quoteLimit && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setQuoteLimit((n) => n + 40)}
+                >
+                  Show more tokens ({filtered.length - quoteLimit} remaining)
+                </Button>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {!compact && !filtered.length && (
           <output className="source-note">
             No matching tokens. Clear the search to see all choices.
           </output>
         )}
-        {filtered.length > quoteLimit && (
+        {!compact && filtered.length > quoteLimit && (
           <Button
             type="button"
             variant="outline"
