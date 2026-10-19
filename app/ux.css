@@ -4946,3 +4946,71 @@ body {
     grid-template-columns: 64px minmax(0, 1fr) 280px;
   }
 }
+
+/* Proxima-style launch picker: logos, teal selection, centred venue tiles. */
+.venue-mark {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.venue-monogram {
+  border: 1px solid;
+  font-weight: 700;
+  line-height: 1;
+}
+.chain-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.chain-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.selection-card small.chain-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0;
+  font: 500 11px var(--font-geist-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.venue-stack {
+  display: inline-flex;
+}
+.venue-stack > .venue-mark + .venue-mark {
+  margin-left: -4px;
+}
+.venue-stack > .venue-mark {
+  box-shadow: 0 0 0 2px #111217;
+}
+.chain-choice {
+  min-height: 78px;
+  align-items: center;
+}
+.selection-card.chain-choice.selected,
+.chain-choice[data-chain='Robinhood'].selected {
+  border-color: #3fb8a9;
+  background: #1c3436;
+  color: #e9fbf7;
+}
+.chain-choice.selected small.chain-card-meta {
+  color: #6fe0cf;
+}
+.chain-choice.selected .venue-stack > .venue-mark {
+  box-shadow: 0 0 0 2px #1c3436;
+}
+.venue-choice {
+  justify-content: center;
+  min-height: 48px;
+}
+.selection-card.venue-choice.selected {
+  border-color: #3fb8a9;
+  background: #1c3436;
+  color: #e9fbf7;
+}
