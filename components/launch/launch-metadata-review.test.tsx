@@ -102,7 +102,7 @@ it('requires uploaded artwork and hides unsupported venue review', () => {
     true,
   );
   expect(container.textContent).toContain('Upload an image');
-  render({ plan: { ...plan, launchpad: 'LetsBonk' } });
+  render({ plan: { ...plan, launchpad: 'Bags' } });
   expect(container.textContent).toBe('');
 });
 it('sends only the reviewed project/version/consent and validates the public link', async () => {

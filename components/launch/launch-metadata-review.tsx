@@ -10,6 +10,11 @@ import { PumpLaunchReview } from './pump-launch-review';
 import { StonkLayerPlanning } from './stonk-layer-planning';
 import { ImportedLayerPlanning } from './imported-layer-planning';
 import { StonkfunLaunchReview } from '@/components/stonkfun-launch-review';
+import { LaunchLabLaunchReview } from '@/components/launchlab-launch-review';
+import {
+  LAUNCHLAB_VENUES,
+  isLaunchLabVenue,
+} from '@/lib/launchlab-platform-launch';
 
 export type MetadataProject = {
   document?: ProjectDocument;
@@ -275,19 +280,29 @@ function SavedMetadataReview({
           )}
         </div>
       </div>
-      {project && plan.mode === 'Block-0' && (
-        <ImportedLayerPlanning
-          project={project}
-          scheduled={plan.scheduled}
-          frontOnly={plan.launchpad === 'StonkFun'}
-          disabled={busy || saving}
-        />
-      )}
+      {project &&
+        plan.mode === 'Block-0' &&
+        !isLaunchLabVenue(plan.launchpad) && (
+          <ImportedLayerPlanning
+            project={project}
+            scheduled={plan.scheduled}
+            frontOnly={plan.launchpad === 'StonkFun'}
+            disabled={busy || saving}
+          />
+        )}
       {project && plan.launchpad === 'StonkFun' && plan.mode === 'Block-0' && (
         <StonkLayerPlanning project={project} disabled={busy || saving} />
       )}
       {project && plan.launchpad === 'StonkFun' && (
         <StonkfunLaunchReview
+          project={project}
+          plan={plan}
+          releaseId={uri.split('/').at(-1) ?? ''}
+        />
+      )}
+      {project && isLaunchLabVenue(plan.launchpad) && (
+        <LaunchLabLaunchReview
+          venue={plan.launchpad}
           project={project}
           plan={plan}
           releaseId={uri.split('/').at(-1) ?? ''}
@@ -308,7 +323,7 @@ function SavedMetadataReview({
 export function LaunchMetadataReview(props: Props) {
   if (
     props.plan.chain !== 'Solana' ||
-    !['PumpFun', 'StonkFun'].includes(props.plan.launchpad)
+    !['PumpFun', 'StonkFun', ...LAUNCHLAB_VENUES].includes(props.plan.launchpad)
   )
     return null;
   // Consent, outstanding responses and links belong only to this exact draft.

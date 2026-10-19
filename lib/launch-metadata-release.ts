@@ -53,10 +53,12 @@ export async function releaseLaunchMetadata(
   const project = validateProjectDocument(JSON.parse(row.document));
   if (
     project.plan.chain !== 'Solana' ||
-    !['PumpFun', 'StonkFun'].includes(project.plan.launchpad)
+    !['PumpFun', 'StonkFun', 'LetsBonk', 'Surge'].includes(
+      project.plan.launchpad,
+    )
   )
     throw new MetadataReleaseError(
-      'Choose a Solana PumpFun or StonkFun launch.',
+      'Choose a Solana PumpFun, StonkFun, LetsBonk or Surge launch.',
       400,
     );
   if (!isUploadedArtwork(project.identity.artworkUrl))
@@ -132,13 +134,15 @@ export async function releaseLaunchMetadata(
   const metadata = JSON.stringify(metadataDocument);
   // The same database statement binds consent to the exact saved project and bytes.
   await db
-    .prepare(`INSERT INTO launch_metadata_releases
+    .prepare(
+      `INSERT INTO launch_metadata_releases
     (id,owner_id,project_id,source_document,metadata,image,mime,created_at)
     SELECT ?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM workspace_projects
       WHERE owner_id=? AND id=? AND archived=0 AND updated_at=? AND document=?)
     AND EXISTS (SELECT 1 FROM project_artwork WHERE owner_id=? AND id=? AND archived=0 AND data=? AND mime=?)
     AND (SELECT COUNT(*) FROM launch_metadata_releases WHERE owner_id=?) < 100
-    ON CONFLICT(id) DO NOTHING`)
+    ON CONFLICT(id) DO NOTHING`,
+    )
     .bind(
       id,
       owner,
