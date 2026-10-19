@@ -539,14 +539,15 @@ export function WalletWorkspace({
           Reload wallets
         </Button>
       </header>
-      <p className="wallet-roster-boundary">
+      <details className="wallet-roster-boundary">
+        <summary>Wallet safety and signing notes</summary>
         Adding an address does not prove ownership or give signing access.
         Imported addresses use your external wallet. Generated keys stay in your
         encrypted browser vault. Solana swaps and asset withdrawals require
         separate review, vault or connected-wallet approval and submission.
         Mainnet token launches, Token-2022 swaps, transfer-hook withdrawals and
         EVM withdrawals remain unavailable.
-      </p>
+      </details>
       <div className="wallet-roster-toolbar">
         <label>
           Wallet network

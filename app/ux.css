@@ -5121,3 +5121,73 @@ body {
     min-width: 0;
   }
 }
+
+/* Proxima-style dense wallet workspace */
+.wallet-workspace > .dashboard-heading {
+  align-items: center;
+  margin-bottom: 4px;
+}
+.wallet-workspace > .dashboard-heading .eyebrow,
+.wallet-workspace > .dashboard-heading p {
+  display: none;
+}
+.wallet-workspace > .dashboard-heading h1 {
+  font-size: 22px;
+}
+.wallet-workspace > .wallet-roster-boundary {
+  margin: 10px 0 14px;
+  padding: 8px 12px;
+}
+.wallet-workspace > .wallet-roster-boundary summary {
+  cursor: pointer;
+  color: #a6abeb;
+  font-size: 12px;
+}
+.wallet-workspace > .wallet-roster-boundary[open] summary {
+  margin-bottom: 6px;
+}
+.wallet-workspace .wallet-roster-actions {
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+.wallet-workspace .wallet-roster-actions button {
+  min-height: 36px;
+  height: 36px;
+  padding-block: 0;
+  padding-inline: 14px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+.wallet-workspace .wallet-roster-actions small,
+.wallet-workspace .wallet-roster-actions p {
+  font-size: 11px;
+}
+.wallet-workspace .wallet-roster-table th {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8f93a8;
+}
+.wallet-workspace .wallet-roster-table td {
+  padding-block: 8px;
+  font-size: 13px;
+}
+.wallet-workspace .wallet-roster-table tbody tr:hover {
+  background: #15161d;
+}
+.wallet-workspace > .wallet-roster-toolbar button,
+.wallet-workspace > .wallet-roster-toolbar select,
+.wallet-workspace > .wallet-roster-toolbar input {
+  min-height: 36px;
+  height: 36px;
+  padding-block: 0;
+  font-size: 13px;
+  border-radius: 6px;
+}
+.wallet-workspace .wallet-balance-summary h2,
+.wallet-workspace .wallet-balance-summary h3,
+.wallet-workspace .wallet-balance-summary strong {
+  font-size: 16px;
+}
