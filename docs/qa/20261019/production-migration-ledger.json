@@ -1,0 +1,708 @@
+{
+  "sourceCommit": "69467d685c7a27e0f10ddf6eb1196370162c5eb5",
+  "checkedAt": "2026-10-19T00:12:43.762Z",
+  "passed": true,
+  "readOnly": true,
+  "applied": 108,
+  "total": 117,
+  "lastApplied": "0107_volume_bundle_recovery",
+  "checksumsMatched": 108,
+  "pending": [
+    {
+      "idx": 108,
+      "tag": "0108_strategy_session_drafts",
+      "sha256": "4e1b9eb552d8cd76f23b91dae22d6ac8be8c1717e4414968feb90daa31edfcc0"
+    },
+    {
+      "idx": 109,
+      "tag": "0109_launch_layer_plans",
+      "sha256": "fea93f24147d201cd5dea4423ac4d5bf5cad7780ac3e3ee0e7f4d2f384e49cbd"
+    },
+    {
+      "idx": 110,
+      "tag": "0110_strategy_review_capacity",
+      "sha256": "c641410167e0cd9da6aa3677a780ddea973c79b610364976aef1068a717a7e7b"
+    },
+    {
+      "idx": 111,
+      "tag": "0111_trade_amount_preferences",
+      "sha256": "edc4d502cea90670359f67e8c5b5ac8328a2a76091b638b18a2891d29bead8e5"
+    },
+    {
+      "idx": 112,
+      "tag": "0112_trade_preset_keyboard",
+      "sha256": "790c13d62a650eef5b3c28f0bd566cd3157d3a4e63b80d202e760c29669f2502"
+    },
+    {
+      "idx": 113,
+      "tag": "0113_pump_group_receipt_evidence",
+      "sha256": "74ffe13738cb05a953716b3d04a2fad1e4a8a7fe894f19478d0750b8900b79f0"
+    },
+    {
+      "idx": 114,
+      "tag": "0114_pump_purchase_cost_sources",
+      "sha256": "57995cf71fa441e118392a881ac341bdfd3a0588c64aacbbbc30069c09883766"
+    },
+    {
+      "idx": 115,
+      "tag": "0115_imported_sale_receipt_evidence",
+      "sha256": "2648463056fa312081f0d7cb0af95d0c358b67ceb7cbb0d9583cd236ad0aacf7"
+    },
+    {
+      "idx": 116,
+      "tag": "0116_launch_sale_allocations",
+      "sha256": "7f5b4a37edec3c9a7f5c3b383b6b4429c2df331a621fbb0b728a982eae858ab1"
+    }
+  ],
+  "ledger": [
+    {
+      "idx": 0,
+      "tag": "0000_daffy_lightspeed",
+      "sha256": "acc6dbc77ede32f1ea53603c2c60a6937acf668ed75190e0c2ac5131d198e29d",
+      "canonicalSha256": "52353f600c6e9f7311146c05fd9edbbfe7a11fa068e37f0a3a455465cc1f0b20"
+    },
+    {
+      "idx": 1,
+      "tag": "0001_nice_blob",
+      "sha256": "2dc10a2eae368783fe57d034fd3145cfb7129c9d3263a33f9a9cf2e9f44e1887",
+      "canonicalSha256": "b67b9b36b66eac95b0b1226a07ec7911573df199053a17d6cd7eee4e345701f3"
+    },
+    {
+      "idx": 2,
+      "tag": "0002_absent_wasp",
+      "sha256": "474b463d6063654070328475f0bf70e2003749aafd0ae34b014faa95704f9361",
+      "canonicalSha256": "fc9d223c140760b572bb06fa63ebee35284d8897126b6e31ad76c1ef2364d147"
+    },
+    {
+      "idx": 3,
+      "tag": "0003_conscious_edwin_jarvis",
+      "sha256": "c48a79693b4c890611875f475721a01f48f426100ffa426e5032d8bf3f6802b7",
+      "canonicalSha256": "322ddac35bc9672af55e2009224ee00b2236ad71e7de7643531e27a8f5414a39"
+    },
+    {
+      "idx": 4,
+      "tag": "0004_sudden_wendigo",
+      "sha256": "4a02eba5dae732bc58ac762a6a039e7b2928c9d8b4331a2a82522117f691d863",
+      "canonicalSha256": "e8ac78f279fc3dbe4c6f5a8cef4ff19829ebd301dfe616b99b04afd29561912a"
+    },
+    {
+      "idx": 5,
+      "tag": "0005_special_marten_broadcloak",
+      "sha256": "374724ce828401f38754dfcc662d249f51e9a71e4bf4d33e847a71d98e2939d9",
+      "canonicalSha256": "e833c84a2b6353933ffbbf83799d9f0424d6aa71b5849265fb3b1e4fa9807e5b"
+    },
+    {
+      "idx": 6,
+      "tag": "0006_worried_cassandra_nova",
+      "sha256": "8f4796db3b34ab1aa343d8fcdc4f5fa8ef1bebca8f3b4ff5fc00027e083cb8a1",
+      "canonicalSha256": "0dffcb88d574f2258dfb1c2da0fdf72e3d2bce7a19199c3b313ac9b54cca0e9d"
+    },
+    {
+      "idx": 7,
+      "tag": "0007_superb_iron_monger",
+      "sha256": "866acdd64a34eb26e5fb1b627134ea48f1359e8dd3d61661d30c6692c6c971db",
+      "canonicalSha256": "6a38064b34809b2455c5b934224a7a68a294064acf18cf72dc6b652502c4adc8"
+    },
+    {
+      "idx": 8,
+      "tag": "0008_slim_wrecker",
+      "sha256": "e9af06217b08d4455d372184b1d70b373c4b82e5f49602abd22f383f3fe362ab",
+      "canonicalSha256": "42892d135a01908d0aa38cc9c05e150fd6d3f43860eb795bd666d7147e0868fd"
+    },
+    {
+      "idx": 9,
+      "tag": "0009_clever_leper_queen",
+      "sha256": "da55ba5878eca44163ecd8b52bee51d60714729eb83836edb485d1913d998e3d",
+      "canonicalSha256": "a5c858e3a3079a0316d8813d103d09ff99a66a1c84d3bc23124a7b1512ae2f65"
+    },
+    {
+      "idx": 10,
+      "tag": "0010_magical_ender_wiggin",
+      "sha256": "9961bcc0d42325283ea9c32530424039d157d5a5d641ef3d4010cc022d702664",
+      "canonicalSha256": "2f285d957770bafbbf5d04093334a50078b4c2d19b6e80f960b4b8d2a9223338"
+    },
+    {
+      "idx": 11,
+      "tag": "0011_huge_donald_blake",
+      "sha256": "0bd7b8652e6327f2c647a4070fbad2cc7edcc5a13779ca58fdd17870fb20c2a7",
+      "canonicalSha256": "3949a6a3e6ae6500008e77bf726a568d987c24b7e6885352357b5dd0b291d4ed"
+    },
+    {
+      "idx": 12,
+      "tag": "0012_messy_zzzax",
+      "sha256": "ef6230c582539b54b450cdf2253725b4f9a074f796cbb02fdd044b0004524bdc",
+      "canonicalSha256": "ec4ff2caa549febe5501cca2366dca9e96c7570dd277f899d956f4e73a25ae3b"
+    },
+    {
+      "idx": 13,
+      "tag": "0013_fresh_sandman",
+      "sha256": "060b7cc1dc236dcf280b50b2988ebb4a99387686436f24a2200c8d72d0a3d1ef",
+      "canonicalSha256": "5718af94c6c322fda16fe92f0bfcad9a43eaaa70651d97ae2e7db5d4dd789822"
+    },
+    {
+      "idx": 14,
+      "tag": "0014_fancy_vertigo",
+      "sha256": "f479640ca2869a41297fa1ec98e686d99cd3920128f11fd7488bb0b59c863355",
+      "canonicalSha256": "f479640ca2869a41297fa1ec98e686d99cd3920128f11fd7488bb0b59c863355"
+    },
+    {
+      "idx": 15,
+      "tag": "0015_smiling_bloodstorm",
+      "sha256": "9805ce5c11d5e5caf19e28f43733b7d93d155cf7440b735950ad655834d76b7b",
+      "canonicalSha256": "8c255853c5d7e2527ef01fddbc7699a21a27e190cf1254e61e380b088c6f28c6"
+    },
+    {
+      "idx": 16,
+      "tag": "0016_short_hedge_knight",
+      "sha256": "240752b8f2a2942e2c55ffdffc39b3488223cabcee6c00fe671954305fb619f1",
+      "canonicalSha256": "240752b8f2a2942e2c55ffdffc39b3488223cabcee6c00fe671954305fb619f1"
+    },
+    {
+      "idx": 17,
+      "tag": "0017_loving_mesmero",
+      "sha256": "df67bef5cdb684e4ae5d8e0237e0477d68640922613c7e659e09efff9fea20ec",
+      "canonicalSha256": "df67bef5cdb684e4ae5d8e0237e0477d68640922613c7e659e09efff9fea20ec"
+    },
+    {
+      "idx": 18,
+      "tag": "0018_real_joshua_kane",
+      "sha256": "16ef9b777762cce2c942f7288c260ad7ac75bf8f5296f43ceaeab5407e23065d",
+      "canonicalSha256": "16ef9b777762cce2c942f7288c260ad7ac75bf8f5296f43ceaeab5407e23065d"
+    },
+    {
+      "idx": 19,
+      "tag": "0019_wallet_folder_memberships",
+      "sha256": "b6bb665f182c299733789e52bfaf9076922be51e75bf178ec5568334945f7e80",
+      "canonicalSha256": "749c917ffc84058cdf8f468aabd7bdee73ec87d6b40c3428fc8082913c91c335"
+    },
+    {
+      "idx": 20,
+      "tag": "0020_wallet_folder_colors",
+      "sha256": "52562bbcfc213465b70f02f730a633dd3bc7ad3a0d7df0ce5f5e7a30e799f7a3",
+      "canonicalSha256": "bee57000eef49595787ca93b35d3d741ae027e694c6583d6ce88af88940c7751"
+    },
+    {
+      "idx": 21,
+      "tag": "0021_wallet_warmup_plans",
+      "sha256": "a970efa1ee8ef23d8d07acca992fec21d9a2c317f92cff19bee1673396ea7cbe",
+      "canonicalSha256": "2aefdda1b7811968f77dde078df5fcddfbc5cb4e33d0bb15f65ee539be96eb92"
+    },
+    {
+      "idx": 22,
+      "tag": "0022_owned_devnet_audit",
+      "sha256": "c3ddfad8657c6116b44856c89670e13ec468609f87535ff8429fe9a49b7524f8",
+      "canonicalSha256": "94f5ea3b2df1b2aa3c74de3fe13c17eff57d4c5351e5c14a1787d0d09e24fdd7"
+    },
+    {
+      "idx": 23,
+      "tag": "0023_wallet_operations",
+      "sha256": "9230477718287bd7a1db46038c77609b6f23bcfaaa70544fc9ab59cd50e65444",
+      "canonicalSha256": "6ffc6cdfb5536127413ba94d6fe464e95647a9617e6de344bbd8b451457f2bf0"
+    },
+    {
+      "idx": 24,
+      "tag": "0024_imported_token_projects",
+      "sha256": "d30cf27e6d3662150111fa223d1bd6b6d9a7e0f3d213710f60121c8835337544",
+      "canonicalSha256": "d4500286a275061a9fa611cf6ae6fcfb8f5cee491cf254de63a1b6662142275e"
+    },
+    {
+      "idx": 25,
+      "tag": "0025_warmup_plan_events",
+      "sha256": "f464e7ddd8f8c50ae846d2c0807bdd468b7913e9b7680c8f894abbac63220668",
+      "canonicalSha256": "fb929a93fb786812c1d2665d3480b449eea204603fdff0814b245c936e23369b"
+    },
+    {
+      "idx": 26,
+      "tag": "0026_tracked_wallet_holdings",
+      "sha256": "09878529131ce00065c6c3eea71f1b4ab2156c0ce2461bcb802dda3ed2581732",
+      "canonicalSha256": "d40c20c6352eb47f9eafefb3b94d2f5114f74c84af0cfb34a94327b7993c209b"
+    },
+    {
+      "idx": 27,
+      "tag": "0027_tracked_wallet_transactions",
+      "sha256": "f17386158c8624c7493858520283e0c7345675edb9903b6de3183788d48a8ca7",
+      "canonicalSha256": "8e73e585a7548f56750b078f035da7f2fa7529992b3e1a8272efb4f547d6ec42"
+    },
+    {
+      "idx": 28,
+      "tag": "0028_warmup_history_runs",
+      "sha256": "366d0c3e6b8669eae9190002a121dd6108b708c4ca986f5d3e217fbfd5f91d1a",
+      "canonicalSha256": "fbc145b86f6f71220d81049411877b9b16e2aef909e6802efc11057884526303"
+    },
+    {
+      "idx": 29,
+      "tag": "0029_warmup_history_run_events",
+      "sha256": "151b6031a8e0414fb6cf882242a6b71eb5515ba8b0f3ccca40ff66d4149c453b",
+      "canonicalSha256": "62637c2766e2704f75fd6a3c47e3a12b9ed4b01d4e0c0dd3033e07115ce063be"
+    },
+    {
+      "idx": 30,
+      "tag": "0030_workspace_wallet_tags",
+      "sha256": "d018bf231860d254b536097387b75f6e885e280f6f9c26a96472ff7072e982f4",
+      "canonicalSha256": "6e41334e4d26e9d09a642afe672aeddaa8ea04ac01b520b324f5efbb8c4dbf8f"
+    },
+    {
+      "idx": 31,
+      "tag": "0031_tracked_signature_snapshots",
+      "sha256": "120db85509e09b09ad73ed206be0f2be07fb01358aa727850f2de90451f56675",
+      "canonicalSha256": "e63c4f6773d9c4e1b4dd016ec615fa771be641b110d734670b36d27f225f9886"
+    },
+    {
+      "idx": 32,
+      "tag": "0032_artwork_archive",
+      "sha256": "d1ac650afd87f1e4075c6410cfac956fa5fa8d6c710a542d193e8f999699048a",
+      "canonicalSha256": "5faf13e400ac4dea431409084e561ecbbcd20f2d57ad92b6a96709543933bf1e"
+    },
+    {
+      "idx": 33,
+      "tag": "0033_imported_market_observations",
+      "sha256": "a9470f8742f62ae40593c6f2a3d994ffd538ea1e34b8190134a5a577fe4aca4f",
+      "canonicalSha256": "5f851053f757f9e6fd1e4693755a17502f592eb96be826f63498c17eecf91574"
+    },
+    {
+      "idx": 34,
+      "tag": "0034_evm_tracker_snapshots",
+      "sha256": "94c2d658a1e175d49d5f0d2071f98ffe3434f0a6a1636ba1ecc53f2413e44488",
+      "canonicalSha256": "697c4f13b89b8abf865a4963e8a79c3fe2afd4166b82b14e2f05702ef944b285"
+    },
+    {
+      "idx": 35,
+      "tag": "0035_tracked_evm_holdings",
+      "sha256": "8a418aefd513ba010d27e2495e704d2fd3f3924dc65d6ec586cd492e21a654e2",
+      "canonicalSha256": "add3aa32f8dd0e543ff5c18a716bd4689742f85dc9aa364900e93edba6928485"
+    },
+    {
+      "idx": 36,
+      "tag": "0036_imported_pool_candles",
+      "sha256": "a23631d7787e7930fa8e064e72ddca2aff07ef7614b94d60b059a5a8d949da62",
+      "canonicalSha256": "2133a358fa86a7f7a83d624674dc8805066ffe30d7ae6cbadf60e0af84517a47"
+    },
+    {
+      "idx": 37,
+      "tag": "0037_imported_pool_trades",
+      "sha256": "73a321abb966ad37d33bf2ce783de6fb48a3ebfc1eaf72c4a4b2a81abb2b2e9f",
+      "canonicalSha256": "29b253274a1eeb8a57d225d628d1dd35bff13fc9a2909ae5b0866e8255f66807"
+    },
+    {
+      "idx": 38,
+      "tag": "0038_imported_evm_balances",
+      "sha256": "3b698d70d83c59b79a0a1a29fa97f85e60183f05e18309f09863dd93c14cb63e",
+      "canonicalSha256": "4d43646b928fd8fb1e82bd856cb06b4e55b88b1a1d50c384875a03a996833e6f"
+    },
+    {
+      "idx": 39,
+      "tag": "0039_tracked_evm_transactions",
+      "sha256": "9a7ab816f6f92c7ee467745a73a216b4fbe83136ea52bc5b6ea9e44bac326dcf",
+      "canonicalSha256": "62ff4dca48d9346981d821a510f1c9612a2c02dccb3881dd7cb7650b7ae4896a"
+    },
+    {
+      "idx": 40,
+      "tag": "0040_tracked_evm_discovery",
+      "sha256": "4f792a8de896117e70d41e4745fb9a1893b5f0c564e5c7ffefae6aa13078fbed",
+      "canonicalSha256": "482302e523cb8221977f907d27110575fde82cea66b96fa105e76a0c9cdeb799"
+    },
+    {
+      "idx": 41,
+      "tag": "0041_imported_swap_preparations",
+      "sha256": "d9d183b0cfb568d604dde6f83fde6fdb70ec6356a5b4ef094cd98a2ebf85a5d5",
+      "canonicalSha256": "7abcc4bee2550caf4f706e7fbfe0b809d1feaa7616e933bf472673afd65a522c"
+    },
+    {
+      "idx": 42,
+      "tag": "0042_warmup_swap_preparations",
+      "sha256": "7f4a2ac43fb7e0b92d5a3c85b1c7013c6a0cfef97aeb89dbae8bac7fd63eef97",
+      "canonicalSha256": "cf1488f04db2f69c11681b7f8f82b01d8d3fd1f45b26bac28ef694fd96757583"
+    },
+    {
+      "idx": 43,
+      "tag": "0043_warmup_buy_receipts",
+      "sha256": "f228a7f40504e68b0e693900ed10dad6cd3c073d4d72629d267c3023e2957ada",
+      "canonicalSha256": "f486e1df6e4baeda5ed79276aa2e75589ecf5782f8019df5a0186bab4b912c84"
+    },
+    {
+      "idx": 44,
+      "tag": "0044_warmup_sell_receipts",
+      "sha256": "6d2145459ce594cff720679a8d8f485359d1301cc2cf57edb171a86e6bdac7fb",
+      "canonicalSha256": "fb3572b62a40d3be4fe99849d2b3e7ec8dda005902a43d0211310b7a615e077c"
+    },
+    {
+      "idx": 45,
+      "tag": "0045_warmup_signing_intents",
+      "sha256": "ce12409c9305b9f0b35136f7bdcc6a26aa7f5930ad7b88c7392c396d1afac101",
+      "canonicalSha256": "1e05c0e55576f0682c4c51e9f4aaced7772c4bb713aec42ea40575877843ea7a"
+    },
+    {
+      "idx": 46,
+      "tag": "0046_warmup_signing_events",
+      "sha256": "37667deefdf83a96ca884725f11719864067595012a99ea852e1d75505f52e54",
+      "canonicalSha256": "f11aa17f466b0a910b316ed9beb283cec9d4490a7d923bd25d68e685b009a049"
+    },
+    {
+      "idx": 47,
+      "tag": "0047_shared_swap_reservations",
+      "sha256": "8413e0d4b83bb7389bd5ba70adc3f205f7665092fb289a43c1c7078a9b0f6832",
+      "canonicalSha256": "f9d281044ffe5f59faa69d244022dd455b9bd4dd2f2d99b19b984c0270313097"
+    },
+    {
+      "idx": 48,
+      "tag": "0048_imported_signing_events",
+      "sha256": "6399edf4b1f0c117fdb70b15dfbae9ae6a2d61bf56279120cd7d80ce457d5ff7",
+      "canonicalSha256": "a50b7e4bad9d3b983ecb700b4acaece9d9d172b1122a85d5a31f4150c360f8a0"
+    },
+    {
+      "idx": 49,
+      "tag": "0049_native_withdrawals",
+      "sha256": "c8ef7eeea7e2ef91610d5e2c88a92506664998cf9d586689de35154c074c2e83",
+      "canonicalSha256": "d40a7133680a9f09c0545934249288b6c76b98582a350ef741598baa7d55378e"
+    },
+    {
+      "idx": 50,
+      "tag": "0050_withdrawal_failure_evidence",
+      "sha256": "8757dd142c6a5a8fb66bddef796739c30948e3ef2b297da805c0efb3c9ef3e4c",
+      "canonicalSha256": "aec13474cb840d782e5ff90ca739b87dbddaa286be1badeb63a1e0cb33637dde"
+    },
+    {
+      "idx": 51,
+      "tag": "0051_imported_swap_failure",
+      "sha256": "c51bc449ab6b0080c8ec0216f006fd9bd6497374f797a221ac55ac3be2639112",
+      "canonicalSha256": "22d1588336b20610dae51a2e3f18c89c6d4e7a9cfd07d1500045a011632fbfdd"
+    },
+    {
+      "idx": 52,
+      "tag": "0052_warmup_swap_failure",
+      "sha256": "ce8e107670b9597784bdbf73f9222a1bd16c291e764a44baa841973d1bc3304b",
+      "canonicalSha256": "3a13655e97695e930dc60dd054786620a3dd350f3d6b66ec924c2198288e360d"
+    },
+    {
+      "idx": 53,
+      "tag": "0053_imported_lot_links",
+      "sha256": "7a44533d45a04e24cd28502e92f81bc7c94f1e4e1d7843538253af14332e1a8c",
+      "canonicalSha256": "64185ba242078d1b6b81d3f66118df4e001cc9bcc45cf06b1610a7fc5a7dfd06"
+    },
+    {
+      "idx": 54,
+      "tag": "0054_imported_approved_acquisition",
+      "sha256": "955e1a34e25320ce626ee58f46354be29d69bec71f02c7e9d63a40548baffe71",
+      "canonicalSha256": "4554f0b2c6382056e1a8f5e6026f2ee298b7583c40b563f803cf1ea8e61e10f1"
+    },
+    {
+      "idx": 55,
+      "tag": "0055_imported_acquisition_baskets",
+      "sha256": "a43882c93596d391249e2ccf772148289b57f7d501ae34bcdf3ed0013607a853",
+      "canonicalSha256": "9c2a3dd14a58c3e4394ef1102c91a3c92fd9941af28624c86aae108b0b02a607"
+    },
+    {
+      "idx": 56,
+      "tag": "0056_conditional_sell_orders",
+      "sha256": "4f2841388a51d8a89757653f1d36032b9448cb2e4c044d7786749e9d66a07cfc",
+      "canonicalSha256": "63c7c0a1c212e7e1bdbd7f5aeda65daf5a2f386c639017a15334c8585b72e8da"
+    },
+    {
+      "idx": 57,
+      "tag": "0057_conditional_level_lifecycle",
+      "sha256": "bae49589def12789cf411442a006851814220805b60df3fe86bcc9a8ff8bb491",
+      "canonicalSha256": "93ac97642f8e8ac293a061edef3a66cc853191e2008f7f2ff5c9bd4c496f1877"
+    },
+    {
+      "idx": 58,
+      "tag": "0058_imported_trade_sessions",
+      "sha256": "cac03387c290e9bec3666e58c4c63af905982849882067eff3bf578dcb151964",
+      "canonicalSha256": "33afd28e0c26408720d5ab649962b641f1a3f56bc03a6f4ddefabb3bb754689f"
+    },
+    {
+      "idx": 59,
+      "tag": "0059_imported_trade_session_events",
+      "sha256": "2303e801f59d53e7c8f7af71eede0defc81157f8ce7ae1171c8edd02e110bac4",
+      "canonicalSha256": "6fcfd5b10e450074a5b28ac0b4355f2eedc644c7ea0bd70f078f8df69681a7f2"
+    },
+    {
+      "idx": 60,
+      "tag": "0060_imported_trade_session_timing",
+      "sha256": "7121a3adb13be15e55b613ccc1796ab8a00a5880d6952ef4030067d79d85db81",
+      "canonicalSha256": "4597b0cbbd4841c7d39d1b6a6216efbdbba17001610dbbdef1ca4ab96c5f66ac"
+    },
+    {
+      "idx": 61,
+      "tag": "0061_imported_trade_session_controls",
+      "sha256": "d258f27c8501cd24317f9055426b1898837f4ca3365f97354e0ac8a7f40dcc8e",
+      "canonicalSha256": "f526c63720a3a40486ad3a0ec127bd81aa4adf08578f0039c823738497f8daa4"
+    },
+    {
+      "idx": 62,
+      "tag": "0062_session_preparation_jobs",
+      "sha256": "027051a4bc607174135a3a957aeb1459edcaea033f907576d7f899d0d6630995",
+      "canonicalSha256": "a3e9626fceec5659af8c0df579909401d2270d6ccf41f82a6b4a177c45033486"
+    },
+    {
+      "idx": 63,
+      "tag": "0063_imported_supply_history",
+      "sha256": "6061e546538edd0cff46bb88246f270959d684db5a435191d143474f0dd4ef78",
+      "canonicalSha256": "4979b04fa797352cb4468463d08a7b42f56254acda15b47e79426ff81a0812b6"
+    },
+    {
+      "idx": 64,
+      "tag": "0064_supply_movement_evidence",
+      "sha256": "1d85b199689c5ced485968e51007a17cc4dd5c8992c84f346e0e2c321a98c18a",
+      "canonicalSha256": "5d0ed765185d71969becfd104cc558350117bc88572c062d12ed4db116c7edcb"
+    },
+    {
+      "idx": 65,
+      "tag": "0065_supply_alert_reviews",
+      "sha256": "8ed2d959b2147ba891d28ed34a40d2e5a6ec1a7c7fbdd63c872ffc6a30a25b45",
+      "canonicalSha256": "2539749cfb3c42007638fd211ae3f6cdd39c1dd057e757a0ec7138ef35edaab9"
+    },
+    {
+      "idx": 66,
+      "tag": "0066_wallet_mint_holdings",
+      "sha256": "8efc9e557898180aef46282c1ea30a05e9bb16700c34e6d872389064a5f82afe",
+      "canonicalSha256": "c54afad5cca86da37340f5b0ad6ccf8ae526c5ee1e8c1d77a5c24f8cdcdd7f3a"
+    },
+    {
+      "idx": 67,
+      "tag": "0067_petite_venus",
+      "sha256": "2eae1c4e72639f5f196cd09c3f1cf948f11b767c9d52fcfe1572d243064e0e13",
+      "canonicalSha256": "d32470c2f0ae06d34684e55b2939d4a077c57161c6cb86ed4faf2b47f30965e5"
+    },
+    {
+      "idx": 68,
+      "tag": "0068_remarkable_frightful_four",
+      "sha256": "df4190957cb33d01590e0f0f4e126caaf6dd6490880fb27e1619a499c453d9cd",
+      "canonicalSha256": "b33173e45d39fdcf0056d34abc09b58dada43d8605a77b1b73f7802f3dcacd80"
+    },
+    {
+      "idx": 69,
+      "tag": "0069_amusing_viper",
+      "sha256": "796ef3ca66aee55105b3b28138960de88ce030f2e7078aae4edad27c86d950b2",
+      "canonicalSha256": "c8478376c5edd340c79981e231f6978b408b7e43dd3669d9630c0235da4c9e4d"
+    },
+    {
+      "idx": 70,
+      "tag": "0070_overjoyed_betty_ross",
+      "sha256": "7c0993a33f2f4631192ed9c7167764799cbd8eb8d391f09ba2975f3e0be78813",
+      "canonicalSha256": "144fc1119e79417c5aecd6f31cfc9095e734c701be3718215304672801a18a34"
+    },
+    {
+      "idx": 71,
+      "tag": "0071_curious_glorian",
+      "sha256": "a842380c9ef0eb294ee8d53f0da6cf021922ab4c2d913b976f089a7af284da9a",
+      "canonicalSha256": "57aa07b97a9b7723a5eb6f89e0d85e6696fb73f01d8a4c64c59d864bed18cdf9"
+    },
+    {
+      "idx": 72,
+      "tag": "0072_conditional_buy_approval",
+      "sha256": "a03964968723be525c05a886763f07c154182a264b651a23584db9537368302b",
+      "canonicalSha256": "ce32a012c075c12c5bcd2a5cfdea1fed6c9ec1ca0ddceb7650fb09a8f2b111bf"
+    },
+    {
+      "idx": 73,
+      "tag": "0073_conditional_monitoring",
+      "sha256": "bf16007fddbf0e5b1f54180628b96df9bb44babebea6d2c0c16c2eaf67e6e962",
+      "canonicalSha256": "8a8b93a0daba267bad96b57dc0049a74677de737aca5a523074411df9f86652f"
+    },
+    {
+      "idx": 74,
+      "tag": "0074_dca_trade_session_timing",
+      "sha256": "a3947d3ae18ab57a2ae3ef21cb7aaaeecf01507a5d21d18d71762d712d2059c0",
+      "canonicalSha256": "74a04a52ca8a84153a2deb37007045e1a59ae4f867f7fca91d1fa2eb19d9528e"
+    },
+    {
+      "idx": 75,
+      "tag": "0075_dca_session_end_time",
+      "sha256": "7375ac853b7fcbd8a72fe4bc0d67226d89a610b73ca2cc9f862e815576ed26bc",
+      "canonicalSha256": "498d2de76da2ddda2e4a1b81a6119cf06bb5d89972a10ebf7126edb3f01557a6"
+    },
+    {
+      "idx": 76,
+      "tag": "0076_flaky_crusher_hogan",
+      "sha256": "948a37a6f4782b8a90db69c50af4d348d7504baa76e679e5f03c3d7ad48a800c",
+      "canonicalSha256": "61f7b75bf0851e52b870fd9e7bea6a4378e343421e5fc79bf39924b6eb369628"
+    },
+    {
+      "idx": 77,
+      "tag": "0077_worried_owl",
+      "sha256": "f17b23f4c08572622a4a07456642c2e2a4c761ed3e839c4e06bd2bfc0e329bae",
+      "canonicalSha256": "44413baef31955fe1ba530773ee328ab7191bb5b603af112ae0a832234477dfd"
+    },
+    {
+      "idx": 78,
+      "tag": "0078_lush_rictor",
+      "sha256": "4da51a7d027233aa21d70450c37e29cc4afb7af1b0c77df9dfe099982471472f",
+      "canonicalSha256": "448e2454c77d3090be4e2a0e9e12a5dc25b8dbfaa1bca53a6855f3710831a532"
+    },
+    {
+      "idx": 79,
+      "tag": "0079_real_justice",
+      "sha256": "7783d887f8b4b50573ffe4cb7e38c1bb25c601ba14ae6b0a7d0582da6ccf828f",
+      "canonicalSha256": "db4562e463d2478c38a8bfdfc3dd133045484cdd108c5d8a417f0d514b0d4d12"
+    },
+    {
+      "idx": 80,
+      "tag": "0080_remarkable_winter_soldier",
+      "sha256": "1d740ea515994ff92aacac07ca318024ebbbc4be5c9995b2e86b08a118c14302",
+      "canonicalSha256": "1d740ea515994ff92aacac07ca318024ebbbc4be5c9995b2e86b08a118c14302"
+    },
+    {
+      "idx": 81,
+      "tag": "0081_pump_holder_reservations",
+      "sha256": "65a38e9c5134d2d7fd553ac06f9eab4d5e793162779ada260221b298866289dd",
+      "canonicalSha256": "65a38e9c5134d2d7fd553ac06f9eab4d5e793162779ada260221b298866289dd"
+    },
+    {
+      "idx": 82,
+      "tag": "0082_pump_group_reviews",
+      "sha256": "47b873c78da763c1d5dc282cdad68ef6b44e9eee79ae905b122ad6f9050c6b96",
+      "canonicalSha256": "741a0a3005e7d4a2eebc0f0b25e0039dc0ee5b2711e48df5efb58545c3bfc724"
+    },
+    {
+      "idx": 83,
+      "tag": "0083_pump_group_approvals",
+      "sha256": "858fe3800f04057bf0006b73d06003b6f5d9d4602a2ab77b04bbd7c7e2e4dab5",
+      "canonicalSha256": "f36fe3bb226fa9b49279ccac433d318d1f26227667c6a9894b7296d3557f96e2"
+    },
+    {
+      "idx": 84,
+      "tag": "0084_pump_group_signatures",
+      "sha256": "5546b11898803b9bda4a6cf06b6fe4037c29f1d36179f07c1e02ca4ac66cf634",
+      "canonicalSha256": "6ebf75ca92946c98723cca55341532957da369f2d92918b021c6b41a8b5e36a3"
+    },
+    {
+      "idx": 85,
+      "tag": "0085_pump_group_observations",
+      "sha256": "4b34a3f905e45a011cf6d203579e4d557444e73eb8cfeec226247189009bda88",
+      "canonicalSha256": "4b34a3f905e45a011cf6d203579e4d557444e73eb8cfeec226247189009bda88"
+    },
+    {
+      "idx": 86,
+      "tag": "0086_pump_group_terminal_recovery",
+      "sha256": "b1901b79c63197ff5fc8cbb70e11363ded76c039f6d497e2fa2efdfd8be995ab",
+      "canonicalSha256": "b1901b79c63197ff5fc8cbb70e11363ded76c039f6d497e2fa2efdfd8be995ab"
+    },
+    {
+      "idx": 87,
+      "tag": "0087_pump_group_runtime_authorization",
+      "sha256": "6515dcbbe598ccf1beb4a590ab059e15c46b3e3d4826d1a51b81d86ef64267dd",
+      "canonicalSha256": "6515dcbbe598ccf1beb4a590ab059e15c46b3e3d4826d1a51b81d86ef64267dd"
+    },
+    {
+      "idx": 88,
+      "tag": "0088_pump_group_broadcast",
+      "sha256": "6dd12f50738224f8da6cef919e86de6f3766b1b1e7b2cc434a701fe718ad4f04",
+      "canonicalSha256": "6dd12f50738224f8da6cef919e86de6f3766b1b1e7b2cc434a701fe718ad4f04"
+    },
+    {
+      "idx": 89,
+      "tag": "0089_pair_order_first_reviews",
+      "sha256": "4170bca9bc6df5d67d119e0786176362652e37d8eb7b646b4392303247060441",
+      "canonicalSha256": "4170bca9bc6df5d67d119e0786176362652e37d8eb7b646b4392303247060441"
+    },
+    {
+      "idx": 90,
+      "tag": "0090_pair_order_first_authorizations",
+      "sha256": "88d24b7c673b88b572e97163060a97eb1d17a5adcceaf181b2e11cbb6350efb9",
+      "canonicalSha256": "88d24b7c673b88b572e97163060a97eb1d17a5adcceaf181b2e11cbb6350efb9"
+    },
+    {
+      "idx": 91,
+      "tag": "0091_pair_order_independent_price_consent",
+      "sha256": "1138bd3d839254727cbcc2f9ad98aac8cfab6e3bf5e23c3482a2f01de11ce530",
+      "canonicalSha256": "1138bd3d839254727cbcc2f9ad98aac8cfab6e3bf5e23c3482a2f01de11ce530"
+    },
+    {
+      "idx": 92,
+      "tag": "0092_pump_group_partial_closure",
+      "sha256": "da0548bb8dee735610b0c356adb2efabf0dbcc6aaa81c10ee62059fe6916446e",
+      "canonicalSha256": "da0548bb8dee735610b0c356adb2efabf0dbcc6aaa81c10ee62059fe6916446e"
+    },
+    {
+      "idx": 93,
+      "tag": "0093_pump_organic_sequences",
+      "sha256": "685738d058b95c1540b18344b550882d5075aeffec4ca1de7e9e2e12fc235b76",
+      "canonicalSha256": "685738d058b95c1540b18344b550882d5075aeffec4ca1de7e9e2e12fc235b76"
+    },
+    {
+      "idx": 94,
+      "tag": "0094_wallet_cleanup",
+      "sha256": "0261ba592cd854e245ba882f6bad10b69453462fd3336c078bbf8ab28c1d05b3",
+      "canonicalSha256": "0261ba592cd854e245ba882f6bad10b69453462fd3336c078bbf8ab28c1d05b3"
+    },
+    {
+      "idx": 95,
+      "tag": "0095_sniper_guards",
+      "sha256": "c0df1275c7c674f0ee378273f1bd20c50184b3523483b2877702d88bfbc38645",
+      "canonicalSha256": "c0df1275c7c674f0ee378273f1bd20c50184b3523483b2877702d88bfbc38645"
+    },
+    {
+      "idx": 96,
+      "tag": "0096_token_supply_actions",
+      "sha256": "99334b0a4deb6664307f22d8147286a7111b3e2dd47d4916fdf4a5ab0bc5fcf5",
+      "canonicalSha256": "99334b0a4deb6664307f22d8147286a7111b3e2dd47d4916fdf4a5ab0bc5fcf5"
+    },
+    {
+      "idx": 97,
+      "tag": "0097_pair_order_executions",
+      "sha256": "a42544f8a64aca5163c0d1e70d4732797824b2d623faa1a8e1c7c8c892262cb1",
+      "canonicalSha256": "a42544f8a64aca5163c0d1e70d4732797824b2d623faa1a8e1c7c8c892262cb1"
+    },
+    {
+      "idx": 98,
+      "tag": "0098_volume_bot_sessions",
+      "sha256": "2530b6be3ef1821cc29df88e3ec3b65585ed6b8d9d696d8896b53b99049b2a0b",
+      "canonicalSha256": "2530b6be3ef1821cc29df88e3ec3b65585ed6b8d9d696d8896b53b99049b2a0b"
+    },
+    {
+      "idx": 99,
+      "tag": "0099_sniper_nuke_sells",
+      "sha256": "8da7cfb1d65506b2fb17492864ad9938fbfe9105ada5ae2a04f2c69beb5a6425",
+      "canonicalSha256": "8da7cfb1d65506b2fb17492864ad9938fbfe9105ada5ae2a04f2c69beb5a6425"
+    },
+    {
+      "idx": 100,
+      "tag": "0100_project_shares",
+      "sha256": "40dadca32349e079cf8ed2a51854ff257963146a8af12f84a5db51fac0c63a92",
+      "canonicalSha256": "40dadca32349e079cf8ed2a51854ff257963146a8af12f84a5db51fac0c63a92"
+    },
+    {
+      "idx": 101,
+      "tag": "0101_referrals",
+      "sha256": "f4835b212e50658018273367e914dd8971a18e9212e78dff4e59fe8629c781cc",
+      "canonicalSha256": "f4835b212e50658018273367e914dd8971a18e9212e78dff4e59fe8629c781cc"
+    },
+    {
+      "idx": 102,
+      "tag": "0102_volume_usd_targets",
+      "sha256": "e896633edae5609194fac2115c767cc0af3a03b4b5d23df0a911fa6ff239a8a0",
+      "canonicalSha256": "e896633edae5609194fac2115c767cc0af3a03b4b5d23df0a911fa6ff239a8a0"
+    },
+    {
+      "idx": 103,
+      "tag": "0103_exchange_funding_quotes",
+      "sha256": "7deb88108f32df1fac0e2961c3c100c1e365592c16849ff35927cc59a3bb9bc1",
+      "canonicalSha256": "7deb88108f32df1fac0e2961c3c100c1e365592c16849ff35927cc59a3bb9bc1"
+    },
+    {
+      "idx": 104,
+      "tag": "0104_exchange_funding_orders",
+      "sha256": "d74d29598a9556a09ef8cd42a1bb7a8f7b95547d12d62fbc0c578cc3f231c9ca",
+      "canonicalSha256": "d74d29598a9556a09ef8cd42a1bb7a8f7b95547d12d62fbc0c578cc3f231c9ca"
+    },
+    {
+      "idx": 105,
+      "tag": "0105_volume_bundle_reservations",
+      "sha256": "5e5ca7e2bcb3655b93e4ed4cb09c1b95a113c6654c2b5b462b4684b427cddb62",
+      "canonicalSha256": "5e5ca7e2bcb3655b93e4ed4cb09c1b95a113c6654c2b5b462b4684b427cddb62"
+    },
+    {
+      "idx": 106,
+      "tag": "0106_exchange_payout_receipts",
+      "sha256": "c6178a6d8c7db77a551fd92db7ac95129db2170be88972207fb5178ff04753ce",
+      "canonicalSha256": "c6178a6d8c7db77a551fd92db7ac95129db2170be88972207fb5178ff04753ce"
+    },
+    {
+      "idx": 107,
+      "tag": "0107_volume_bundle_recovery",
+      "sha256": "a240f25c57ec4a9c156980d8429eaa4f2fb52c95a20a914404a20b776c7232e8",
+      "canonicalSha256": "a240f25c57ec4a9c156980d8429eaa4f2fb52c95a20a914404a20b776c7232e8"
+    }
+  ],
+  "schemaObjectCount": 603
+}

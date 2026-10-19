@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-10-19T00:16:03.824Z",
+  "origin": "https://bundle-tek.vercel.app",
+  "signedIn": false,
+  "results": [
+    {
+      "path": "/",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "path": "/sign-in",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "path": "/launch",
+      "status": 404,
+      "location": null,
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "path": "/api/launch/pump/groups",
+      "status": 401,
+      "location": null,
+      "contentType": "application/json"
+    }
+  ]
+}

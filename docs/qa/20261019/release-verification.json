@@ -1,0 +1,37 @@
+{
+  "sourceCommit": "69467d685c7a27e0f10ddf6eb1196370162c5eb5",
+  "sourceArchiveSha256": "45db9e67c27327097d60605acaca1d894648ea11f21dc6f361562d591d7861e5",
+  "sourceFileCount": 2316,
+  "sourceManifestSha256": "366ba0c14744ca7fbcd0eb029fdc71f8a25ffde465ab2f66fab2178d99b87a61",
+  "trackedSourceUnchanged": true,
+  "initialRun": {
+    "passedTests": 186,
+    "failedTests": 3,
+    "failedFile": "scripts/migration-checksums.test.ts",
+    "failure": "Three Git subprocess ENOENT errors; isolated PATH omitted Git"
+  },
+  "correctedChecksumRun": {
+    "passedTests": 9,
+    "failedTests": 0,
+    "correction": "Add the pinned Git executable to isolated PATH and pin snapshot Git HEAD to its source commit. No tracked source changes."
+  },
+  "uniqueTargetedFiles": 15,
+  "uniqueTargetedTests": 189,
+  "nativeTests": 46,
+  "typecheck": true,
+  "productionBuild": true,
+  "environmentFilesCopied": false,
+  "productionCredentialsLoadedForQA": false,
+  "fullSuiteRerun": false,
+  "productionLedgerUnchangedDuringVerification": true,
+  "productionApplied": 108,
+  "productionChecksumsMatched": 108,
+  "productionPending": 9,
+  "productionFinalCheckedAt": "2026-10-19T00:22:49.499Z",
+  "deployPerformed": false,
+  "productionMigrationsApplied": false,
+  "fundedActivity": false,
+  "scope": "All changed test files since the previous full-suite baseline plus acquisition/evidence integration and migration checksums; not a new full-suite run.",
+  "finishedAt": "2026-10-19T00:22:50.917Z",
+  "passed": true
+}

@@ -1,0 +1,20 @@
+{
+  "target": "disposable-local-file-only",
+  "baselineMigrations": 108,
+  "finalMigrations": 117,
+  "newlyApplied": 9,
+  "repeatNewlyApplied": 0,
+  "matchingChecksums": 117,
+  "productionSchemaObjectNamesMatchBaseline": true,
+  "productionSchemaObjects": 603,
+  "baselineLedgerUnchanged": true,
+  "syntheticMarkerPreserved": true,
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeyViolations": 0,
+  "productionDataCopied": false,
+  "passed": true
+}
