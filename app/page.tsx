@@ -28,7 +28,14 @@ import {
 
 import { venueLimits, validateVenuePlan } from '@/lib/venue-limits';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import Link from 'next/link';
 import {
   Activity,
@@ -44,12 +51,14 @@ import {
   Leaf,
   Menu,
   PanelLeftClose,
+  PanelLeftOpen,
+  Download,
+  ShoppingCart,
   Settings,
   Shield,
   Search,
   LayoutDashboard,
   Archive,
-  Plus,
   BarChart3,
   Bot,
   CircleDollarSign,
@@ -139,6 +148,44 @@ type View =
   | 'tracker';
 // Workspace pages are not part of the launch draft, so the topbar and status bar
 // drop draft-editing chrome there and show the page location instead.
+const SIDEBAR_COLLAPSED_KEY = 'bundle:sidebar-collapsed';
+const sidebarListeners = new Set<() => void>();
+// Used when browser storage is unavailable, so the toggle still works.
+let sidebarCollapsedFallback = false;
+
+function readSidebarCollapsed() {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+  } catch {
+    return sidebarCollapsedFallback;
+  }
+}
+
+function writeSidebarCollapsed(collapsed: boolean) {
+  sidebarCollapsedFallback = collapsed;
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+  } catch {
+    // Storage can be unavailable; the fallback keeps this visit's choice.
+  }
+  sidebarListeners.forEach((listener) => listener());
+}
+
+function subscribeSidebarCollapsed(listener: () => void) {
+  sidebarListeners.add(listener);
+  window.addEventListener('storage', listener);
+  return () => {
+    sidebarListeners.delete(listener);
+    window.removeEventListener('storage', listener);
+  };
+}
+const PLAN_TOOL_VIEWS: readonly View[] = [
+  'funding',
+  'distribution',
+  'live',
+  'pulse',
+];
+
 const WORKSPACE_TITLES: Partial<Record<View, string>> = {
   dashboard: 'Dashboard',
   archived: 'Archived',
@@ -850,6 +897,13 @@ export default function Home() {
   );
   const [advanced, setAdvanced] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeSidebarCollapsed,
+    readSidebarCollapsed,
+    () => false,
+  );
+  const [planToolsOpen, setPlanToolsOpen] = useState(false);
+  const [rpcLatency, setRpcLatency] = useState<number | null>(null);
   const [strategy, setStrategy] = useState<Strategy>('Balanced');
   const [agents, setAgents] = useState(6);
   const [budget, setBudget] = useState(4);
@@ -964,13 +1018,19 @@ export default function Home() {
   );
 
   useEffect(() => {
+    const timedStatusRequest = async () => {
+      const requestStarted = performance.now();
+      const response = await fetch('/api/pulse/status', { cache: 'no-store' });
+      setRpcLatency(Math.round(performance.now() - requestStarted));
+      return response;
+    };
     const load = async () => {
       const started = revision.current.capture();
       try {
         const [planResponse, statusResponse, projectsResponse] =
           await Promise.all([
             fetch('/api/launch/plans', { cache: 'no-store' }),
-            fetch('/api/pulse/status', { cache: 'no-store' }),
+            timedStatusRequest(),
             fetch('/api/projects', { cache: 'no-store' }),
           ]);
         if (statusResponse.ok) {
@@ -1169,6 +1229,8 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  const toggleSidebar = () => writeSidebarCollapsed(!sidebarCollapsed);
+
   const changeView = (nextView: View) => {
     setExploringRobinhood(false);
     setView(nextView);
@@ -1323,7 +1385,9 @@ export default function Home() {
   };
 
   return (
-    <div className={`app-shell ${isLibrary ? 'library-shell' : ''}`}>
+    <div
+      className={`app-shell ${isLibrary ? 'library-shell' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+    >
       <AlertDialog
         open={Boolean(pendingNavigation)}
         onOpenChange={(open) => {
@@ -1372,7 +1436,19 @@ export default function Home() {
             <i />
           </div>
           <strong>Bundle Tek</strong>
-          <PanelLeftClose className="ml-auto size-4 text-[#717789]" />
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={toggleSidebar}
+            aria-label={
+              sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+            }
+            aria-pressed={sidebarCollapsed}
+            aria-controls="project-navigation"
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          </button>
         </div>
         {workspaceTitle ? (
           <nav className="steps workspace-crumb" aria-label="Location">
@@ -1533,15 +1609,8 @@ export default function Home() {
             </p>
           )}
         </div>
-        <nav className="sidebar-section" aria-label="Workspace tools">
-          <p>Workspace</p>
-          <button
-            aria-current={view === 'dashboard' ? 'page' : undefined}
-            onClick={() => changeView('dashboard')}
-            className={view === 'dashboard' ? 'feature-active' : ''}
-          >
-            <LayoutDashboard /> Dashboard
-          </button>
+        <nav className="sidebar-section" aria-label="Features">
+          <p>Features</p>
           <button
             onClick={() => {
               setActivityWarmupId('');
@@ -1550,37 +1619,60 @@ export default function Home() {
             }}
             className={view === 'wallets' ? 'feature-active' : ''}
             aria-current={view === 'wallets' ? 'page' : undefined}
+            title="My wallets"
           >
-            <WalletCards /> My wallets
+            <WalletCards /> <span className="nav-label">My wallets</span>
           </button>
           <button
             disabled={saveBusy}
             onClick={() =>
               guardDraft(() => window.location.assign('/marketplace'))
             }
+            title="Marketplace"
           >
-            <WalletCards /> Wallet marketplace <b>PREVIEW</b>
+            <ShoppingCart /> <span className="nav-label">Marketplace</span>
+            <b>PREVIEW</b>
           </button>
           <button
             onClick={() => changeView('tracker')}
             className={view === 'tracker' ? 'feature-active' : ''}
             aria-current={view === 'tracker' ? 'page' : undefined}
+            title="Supply tracker"
           >
-            <Crosshair /> Supply tracker
+            <Crosshair /> <span className="nav-label">Supply tracker</span>
           </button>
           <button
             onClick={() => changeView('watchlist')}
             className={view === 'watchlist' ? 'feature-active' : ''}
             aria-current={view === 'watchlist' ? 'page' : undefined}
+            title="Wallet tracker"
           >
-            <Users /> Wallet tracker <b>NEW</b>
+            <Users /> <span className="nav-label">Wallet tracker</span>
+            <b>NEW</b>
+          </button>
+          <button
+            onClick={() => changeView('archived')}
+            className={view === 'archived' ? 'feature-active' : ''}
+            aria-current={view === 'archived' ? 'page' : undefined}
+            title="Archived"
+          >
+            <Archive /> <span className="nav-label">Archived</span>
+          </button>
+          <button
+            aria-current={view === 'dashboard' ? 'page' : undefined}
+            onClick={() => changeView('dashboard')}
+            className={view === 'dashboard' ? 'feature-active' : ''}
+            title="Dashboard"
+          >
+            <LayoutDashboard /> <span className="nav-label">Dashboard</span>
           </button>
           <button
             onClick={() => changeView('activity')}
             className={view === 'activity' ? 'feature-active' : ''}
             aria-current={view === 'activity' ? 'page' : undefined}
+            title="Activity"
           >
-            <Activity /> Activity
+            <Activity /> <span className="nav-label">Activity</span>
           </button>
           <button
             onClick={() => {
@@ -1588,59 +1680,71 @@ export default function Home() {
               setExploringRobinhood(true);
             }}
             className={exploringRobinhood ? 'feature-active' : ''}
+            title="Robinhood research"
           >
-            <Search /> Robinhood research
-          </button>
-          <button
-            onClick={() => changeView('archived')}
-            className={view === 'archived' ? 'feature-active' : ''}
-            aria-current={view === 'archived' ? 'page' : undefined}
-          >
-            <Archive /> Archived
+            <Search /> <span className="nav-label">Robinhood research</span>
           </button>
         </nav>
         <nav
           className="sidebar-section planning-navigation"
           aria-label="Plan tools"
         >
-          <p>Plan tools</p>
-          {(
-            [
-              ['funding', Landmark, 'Funding review'],
-              ['distribution', Boxes, 'Devnet distribution'],
-              ['live', Activity, 'Operations preview'],
-              ['pulse', Bot, 'Pulse simulation'],
-            ] as const
-          ).map(([target, Icon, label]) => (
-            <button
-              key={target}
-              className={view === target ? 'feature-active' : ''}
-              onClick={() => changeView(target)}
-            >
-              <Icon />
-              {label}
-            </button>
-          ))}
+          <button
+            type="button"
+            className="sidebar-group-toggle"
+            aria-expanded={planToolsOpen || PLAN_TOOL_VIEWS.includes(view)}
+            aria-controls="plan-tools-list"
+            onClick={() => setPlanToolsOpen((open) => !open)}
+            title="Plan tools"
+          >
+            <span className="nav-label">Plan tools</span>
+            <ChevronDown />
+          </button>
+          {(planToolsOpen || PLAN_TOOL_VIEWS.includes(view)) && (
+            <div id="plan-tools-list" className="sidebar-group-list">
+              {(
+                [
+                  ['funding', Landmark, 'Funding review'],
+                  ['distribution', Boxes, 'Devnet distribution'],
+                  ['live', Activity, 'Operations preview'],
+                  ['pulse', Bot, 'Pulse simulation'],
+                ] as const
+              ).map(([target, Icon, label]) => (
+                <button
+                  key={target}
+                  className={view === target ? 'feature-active' : ''}
+                  aria-current={view === target ? 'page' : undefined}
+                  onClick={() => changeView(target)}
+                  title={label}
+                >
+                  <Icon />
+                  <span className="nav-label">{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </nav>
         <div className="sidebar-bottom">
-          <div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setActivityImportId('');
-                changeView('imports');
-              }}
-              disabled={saveBusy}
-            >
-              <Plus /> Import token
-            </Button>
-          </div>
-          <div>
-            <Button onClick={startProject} disabled={saveBusy}>
-              <Plus /> Create launch
-            </Button>
-          </div>
-          <p className="sidebar-footnote">Bundle Tek · Planning &amp; devnet</p>
+          <Button
+            variant="outline"
+            className="sidebar-import"
+            onClick={() => {
+              setActivityImportId('');
+              changeView('imports');
+            }}
+            disabled={saveBusy}
+            title="Import token"
+          >
+            <Download /> <span className="nav-label">Import</span>
+          </Button>
+          <Button
+            className="sidebar-create"
+            onClick={startProject}
+            disabled={saveBusy}
+            title="Create launch"
+          >
+            <Rocket /> <span className="nav-label">Create launch</span>
+          </Button>
         </div>
       </aside>
 
@@ -2221,6 +2325,14 @@ export default function Home() {
             : chain === 'Solana'
               ? `Solana · ${runtimeStatus}`
               : `${chain} · Planning only · Execution locked`}
+          {rpcLatency !== null && (
+            <span className="latency">
+              {' · RPC '}
+              {rpcLatency < 1000
+                ? `${rpcLatency}ms`
+                : `${(rpcLatency / 1000).toFixed(1)}s`}
+            </span>
+          )}
         </span>
         {workspaceTitle ? (
           <span className="plan-save-state" />
@@ -2235,6 +2347,13 @@ export default function Home() {
         {persistenceState === 'auth' && (
           <Link href="/sign-in">Sign in to save</Link>
         )}
+        <button
+          type="button"
+          className="statusbar-link"
+          onClick={() => changeView('activity')}
+        >
+          <Activity /> Activity
+        </button>
         <span className="network-boundary">
           DEVNET TOOLS · SWAP APPROVAL REQUIRED
         </span>
