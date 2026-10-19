@@ -1930,15 +1930,38 @@ export default function Home() {
                   onOpenSimulation={() => setView('pulse')}
                 />
               ) : view === 'launch' ? (
-                <div className="settings-scroll">
-                  <div className="page-title">
-                    <h1>Launch Settings</h1>
-                    <p>
-                      Model allocations and compare scenarios. Nothing here
-                      submits a launch or schedules a trade.
-                    </p>
-                  </div>
-                  <div className="form-body">
+                <div className="settings-scroll launch-ws">
+                  <header className="launch-ws-head">
+                    <div className="launch-ws-token">
+                      <span className="token-avatar">
+                        {ticker.slice(0, 2) || 'PF'}
+                      </span>
+                      <span>
+                        <strong>${ticker || 'TOKEN'}</strong>
+                        <small>{tokenName || 'Untitled'}</small>
+                      </span>
+                    </div>
+                    <dl className="launch-ws-tiles">
+                      <div>
+                        <dt>Supply buy</dt>
+                        <dd>{figures.allocation}%</dd>
+                      </div>
+                      <div>
+                        <dt>Holders</dt>
+                        <dd>{holderCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Est. funding ({currency})</dt>
+                        <dd>{figures.scenarioTotal}</dd>
+                      </div>
+                    </dl>
+                  </header>
+                  <h1 className="sr-only">Launch Settings</h1>
+                  <p className="launch-ws-note">
+                    Model allocations and compare scenarios. Nothing here
+                    submits a launch or schedules a trade.
+                  </p>
+                  <div className="form-body launch-ws-body">
                     <div className="mode-tabs">
                       {methodProfile.methods.map((name) => {
                         const Icon =
@@ -2124,6 +2147,15 @@ export default function Home() {
                         }
                       />
                     </div>
+                  </div>
+                  <div className="launch-action-bar">
+                    <Button
+                      variant="outline"
+                      disabled={saveBusy}
+                      onClick={() => void saveLaunchPlan()}
+                    >
+                      Save plan
+                    </Button>
                     <Button
                       className="create-main"
                       onClick={() => changeView('funding')}
