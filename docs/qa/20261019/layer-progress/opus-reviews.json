@@ -1,0 +1,23 @@
+{
+  "historyDesignReview": {
+    "code": 0,
+    "actualModels": [
+      "claude-opus-5-5"
+    ],
+    "isError": false,
+    "reviewAvailable": true
+  },
+  "closeRecoveryReview": {
+    "code": 0,
+    "actualModels": [
+      "claude-opus-5-5"
+    ],
+    "isError": false,
+    "reviewAvailable": true
+  },
+  "toolsEnabled": false,
+  "fallbackEnabled": false,
+  "reviewScope": "Provided owned source excerpts and diffs only; no tests or live browsing by Claude",
+  "codexFinalPolish": "After the close review: prepare body before marker, persistent native output and text-only description, open-state guidance, focus restoration and explicit-refusal coverage",
+  "latestVerifiedCommit": "b3f6223"
+}
