@@ -634,7 +634,7 @@ it('refuses a saved Pump context in the Front-only Stonk entry', async () => {
   await click('Load saved wallets and layer history');
   await until(() =>
     expect(host.textContent).toContain(
-      'Current planning context could not be confirmed',
+      'Save the StonkFun launch settings first, then reload this Front-wallet plan.',
     ),
   );
   expect(host.querySelector('fieldset')).toBeNull();

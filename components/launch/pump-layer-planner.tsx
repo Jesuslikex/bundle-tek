@@ -328,13 +328,16 @@ function Planner({
       if (!current()) return;
       const failures: string[] = [];
       if (contextResult.status === 'fulfilled') {
+        let requiresStonkFun = false;
         try {
           const loaded = parseLayerContext(
             contextResult.value.context,
             selection,
           );
-          if (frontOnly && loaded.document.plan.launchpad !== 'StonkFun')
+          if (frontOnly && loaded.document.plan.launchpad !== 'StonkFun') {
+            requiresStonkFun = true;
             throw new Error('Save the StonkFun launch settings first.');
+          }
           const initial = initialLayerDraft(loaded);
           layerQuote(loaded);
           setContext(loaded);
@@ -344,9 +347,11 @@ function Planner({
           setContext(null);
           setDraft(null);
           failures.push(
-            selection.target.kind === 'imported'
-              ? 'Current imported token context could not be confirmed. Save a scheduled launch with complete holders and the exact quote, then reload the selected imported record.'
-              : 'Current planning context could not be confirmed. Save the developer, complete holders and exact quote in the launch project, then reload.',
+            requiresStonkFun
+              ? 'Save the StonkFun launch settings first, then reload this Front-wallet plan.'
+              : selection.target.kind === 'imported'
+                ? 'Current imported token context could not be confirmed. Save a scheduled launch with complete holders and the exact quote, then reload the selected imported record.'
+                : 'Current planning context could not be confirmed. Save the developer, complete holders and exact quote in the launch project, then reload.',
           );
         }
       } else {
