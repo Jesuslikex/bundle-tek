@@ -2240,6 +2240,39 @@ body {
   min-width: 0;
   font-size: 13px;
 }
+.artwork-upload[data-dragging] {
+  border-color: var(--foreground);
+  background: var(--muted);
+}
+.artwork-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.artwork-paste {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.artwork-paste:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.artwork-upload .artwork-square {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.artwork-upload .artwork-square input {
+  width: auto;
+}
 /* External wallet roster, independent of the public tracker. */
 .wallet-workspace {
   min-width: 0;

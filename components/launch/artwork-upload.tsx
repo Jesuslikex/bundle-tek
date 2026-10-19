@@ -1,6 +1,17 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { inspectArtwork, MAX_ARTWORK_BYTES } from '@/lib/artwork';
+import { imageFromTransfer, prepareArtwork } from '@/lib/artwork-prepare';
+
+/** Text fields keep normal paste behaviour unless only an image was copied. */
+function pastingText(event: ClipboardEvent) {
+  const target = event.target as HTMLElement | null;
+  const editable =
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target?.isContentEditable;
+  return Boolean(editable && event.clipboardData?.getData('text/plain'));
+}
 
 export function ArtworkUpload({
   onUploaded,
@@ -10,9 +21,43 @@ export function ArtworkUpload({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [square, setSquare] = useState(true);
+  const [dragging, setDragging] = useState(false);
   const pending = useRef<AbortController | null>(null);
+  const latest = useRef<(file: Blob) => void>(() => {});
   useEffect(() => () => pending.current?.abort(), []);
-  async function upload(file: File) {
+  // Ctrl/Cmd+V an image anywhere on the token form, like Proxima.
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      if (pastingText(event)) return;
+      const file = imageFromTransfer(event.clipboardData);
+      if (!file) return;
+      event.preventDefault();
+      latest.current(file);
+    }
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, []);
+  async function pasteFromClipboard() {
+    setError('');
+    try {
+      if (!navigator.clipboard?.read)
+        throw new Error('Press Ctrl+V (Cmd+V on Mac) to paste the image.');
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith('image/'));
+        if (type) return void upload(await item.getType(type));
+      }
+      throw new Error('No image on the clipboard. Copy an image first.');
+    } catch (error) {
+      setError(
+        error instanceof Error && error.name !== 'NotAllowedError'
+          ? error.message
+          : 'Clipboard access was blocked. Press Ctrl+V (Cmd+V on Mac) instead.',
+      );
+    }
+  }
+  latest.current = (file) => void upload(file);
+  async function upload(source: Blob) {
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
@@ -20,6 +65,8 @@ export function ArtworkUpload({
     setNotice('');
     setUploading(true);
     try {
+      const file = await prepareArtwork(source, square);
+      if (controller.signal.aborted) return;
       if (file.size > MAX_ARTWORK_BYTES)
         throw new Error('Choose an image up to 512 KB.');
       const buffer = await file.arrayBuffer();
@@ -64,12 +111,33 @@ export function ArtworkUpload({
     }
   }
   return (
-    <section className="artwork-upload" aria-label="Upload token artwork">
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Drop zone convenience; the file input and Paste button are the keyboard paths.
+    <section
+      className="artwork-upload"
+      aria-label="Upload token artwork"
+      data-dragging={dragging || undefined}
+      onDragOver={(event) => {
+        if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setDragging(false);
+      }}
+      onDrop={(event) => {
+        setDragging(false);
+        const file = imageFromTransfer(event.dataTransfer);
+        if (!file) return;
+        event.preventDefault();
+        void upload(file);
+      }}
+    >
       <label htmlFor="token-artwork-file">Upload artwork</label>
       <input
         id="token-artwork-file"
         type="file"
-        accept="image/png,image/jpeg"
+        accept="image/png,image/jpeg,image/gif,image/webp"
         disabled={uploading}
         onChange={(event) => {
           const file = event.target.files?.[0];
@@ -77,9 +145,29 @@ export function ArtworkUpload({
           event.target.value = '';
         }}
       />
+      <div className="artwork-upload-actions">
+        <button
+          type="button"
+          className="artwork-paste"
+          disabled={uploading}
+          onClick={() => void pasteFromClipboard()}
+        >
+          Paste image
+        </button>
+        <label className="artwork-square">
+          <input
+            type="checkbox"
+            checked={square}
+            onChange={(event) => setSquare(event.target.checked)}
+          />
+          Crop to square (1:1)
+        </label>
+      </div>
       <p className="source-note">
-        PNG or JPEG, up to 512 KB and 4096 pixels. Uploaded artwork is private
-        to your account.
+        Choose a file, drop it here, or copy an image and press Ctrl+V (Cmd+V on
+        Mac). PNG, JPEG, GIF or WebP up to 20 MB; it is cropped to 1:1 and
+        resized to fit 512 KB. GIFs keep their first frame. Uploaded artwork is
+        private to your account.
       </p>
       <div aria-live="polite">
         {uploading && <p>Uploading artwork…</p>}
