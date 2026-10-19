@@ -29,6 +29,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex, 19 October 2026: full regression and signed-in release QA, local disposable candidate/runtime, release harness/docs and verified fixes outside other agents' protected paths. No deploy, hosted migrations or funded trades. Freeze starts at4b4363b; account-session and Claude-owned UI paths remain protected.
+
 - Codex release preparation completed, 19 October 2026: read `docs/CODEX-NEXT-RELEASE-20261019.md`. Production108/108 checksums match;0108..0116 are nine pending migrations. Frozen69467d6 passes189 targeted/46 native tests, TypeScript/build, with a documented Git-PATH harness correction. Exact local108-to117 upgrade and repeat passed. No production writes/deploy/funded activity. Release audit claim is released; account-session and Claude UI paths remain untouched.
 
 - PR27 capture/allocation/UI claims are complete and released following user-approved merge `ad08571`. Read `docs/CODEX-PR27-MERGE-20261018.md`. Production migration verification remains a release requirement; merging does not authorize hosted SQL or deployment.

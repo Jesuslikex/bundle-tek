@@ -1,0 +1,214 @@
+{
+  "capturedAt": "2026-10-19T01:21:07.030Z",
+  "evidenceId": "ev_672c7f483f4ccda4d171158b18305ce962f025147ebbad478b59c0c03f551992",
+  "operation": "inspect_web_page",
+  "targetOrigin": "https://app.proxima.tools",
+  "page": "/account",
+  "controls": [
+    {
+      "role": "link",
+      "label": "Activity"
+    },
+    {
+      "role": "button",
+      "label": "Settings"
+    },
+    {
+      "role": "region",
+      "label": "Launch statistics"
+    },
+    {
+      "role": "region",
+      "label": "Launches"
+    },
+    {
+      "role": "StaticText",
+      "label": "Activity"
+    },
+    {
+      "role": "StaticText",
+      "label": "Settings"
+    },
+    {
+      "role": "link",
+      "label": "Create launch"
+    },
+    {
+      "role": "button",
+      "label": "P&L Calendar"
+    },
+    {
+      "role": "tablist",
+      "label": "Launch ranking"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "Activity"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "Settings"
+    },
+    {
+      "role": "button",
+      "label": "Create launch"
+    },
+    {
+      "role": "button",
+      "label": "24H"
+    },
+    {
+      "role": "button",
+      "label": "7D"
+    },
+    {
+      "role": "button",
+      "label": "30D"
+    },
+    {
+      "role": "button",
+      "label": "1Y"
+    },
+    {
+      "role": "button",
+      "label": "All time"
+    },
+    {
+      "role": "StaticText",
+      "label": "P&L Calendar"
+    },
+    {
+      "role": "tab",
+      "label": "Recent launches"
+    },
+    {
+      "role": "tab",
+      "label": "Best P&L"
+    },
+    {
+      "role": "StaticText",
+      "label": "Create launch"
+    },
+    {
+      "role": "StaticText",
+      "label": "24H"
+    },
+    {
+      "role": "StaticText",
+      "label": "7D"
+    },
+    {
+      "role": "StaticText",
+      "label": "30D"
+    },
+    {
+      "role": "StaticText",
+      "label": "1Y"
+    },
+    {
+      "role": "StaticText",
+      "label": "All time"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "P&L Calendar"
+    },
+    {
+      "role": "button",
+      "label": "Cumulative P&L"
+    },
+    {
+      "role": "button",
+      "label": "Daily P&L"
+    },
+    {
+      "role": "StaticText",
+      "label": "Recent launches"
+    },
+    {
+      "role": "StaticText",
+      "label": "Best P&L"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "Create launch"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "24H"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "7D"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "30D"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "1Y"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "All time"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "Recent launches"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "Best P&L"
+    },
+    {
+      "role": "columnheader",
+      "label": "LAUNCHPAD"
+    },
+    {
+      "role": "columnheader",
+      "label": "NET P&L"
+    },
+    {
+      "role": "columnheader",
+      "label": "LAUNCHED"
+    },
+    {
+      "role": "StaticText",
+      "label": "LAUNCHPAD"
+    },
+    {
+      "role": "StaticText",
+      "label": "NET P&L"
+    },
+    {
+      "role": "StaticText",
+      "label": "LAUNCHED"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "LAUNCHPAD"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "NET P&L"
+    },
+    {
+      "role": "InlineTextBox",
+      "label": "LAUNCHED"
+    }
+  ],
+  "network": {
+    "requests": 0,
+    "priorActivityAvailable": false
+  },
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "Observation starts when REA attaches; prior network and console activity is unavailable.",
+    "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+    "Source maps are reported only as declarative URLs and are not fetched.",
+    "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+    "Browser host platform and architecture were not observed."
+  ],
+  "privateAccountValuesOmitted": true
+}
