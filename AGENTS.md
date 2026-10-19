@@ -53,4 +53,4 @@ Codex (ChatGPT) owns the following areas it is actively extending. The original 
 
 Claude: no active PR27 claim after merge. Add a new claim before further implementation.
 
-- Claude, 19 October 2026: Base launch options (Bankr mode, dev buy, vault) on branch `claude/proxima-parity-next-910jwg`: `lib/clanker/**`, `components/clanker-launch-panel*`. No migration, env var or `components/launch/**` edit; the one-line Bankr mount in `components/launch/live-operations-form.tsx` is left to Codex/julian.
+- Claude, 19 October 2026: Base launch options (Bankr mode, dev buy, vault) completed in PR #28; claim released. Open follow-up for Codex/julian: mount `ClankerLaunchPanel venue="Bankr"` for `Base / Bankr` plans in `components/launch/live-operations-form.tsx` (exact line in the PR).
