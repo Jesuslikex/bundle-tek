@@ -1,5 +1,11 @@
 # Proxima reconstruction completion matrix
 
+## Latest UI checkpoint, 19 October 2026
+
+`cb00f3f` adds provider-reported marketplace regions, single/multiple exact filters, missing-label disclosure and phone/table presentation, with65 related tests, typed lint/format, a production build and synthetic1440/375/320 browser checks. Actual Opus5.5 reviewed the model/UI contract. Legacy region-free responses keep their original shape; rich extensions have an explicit old-client/ingester compatibility limit. No supplier/checkout/delivery is connected. Read `CODEX-MARKETPLACE-REGIONS-20261019.md`.
+
+Launch-layer history refresh and close recovery are committed in `d1a157d`/`b3f6223`; final126 scoped tests and build pass, with synthetic component browser verification and explicit local-only warning limits. Read `CODEX-LAYER-CLOSE-RECOVERY-20261019.md`. The earlier frozen full regression passed613 files/5443 tests plus46 native tests, separately from these deltas. These checkpoints improve UI parity only; funded proof, provider qualification, full marketplace fulfillment, protected-layout comparison and overall Proxima parity remain incomplete. No deployment or hosted migration was performed.
+
 ## Current integration status, 18 October 2026
 
 Declared launch budget reviews now filter by role/address and page25wallets while keeping full-plan totals and exact saved terms unchanged. CODEX-LAUNCH-BUDGET-REVIEW-FILTERS-20261018.md records fresh read-only REA setup evidence,67relatedtests,scopedlint/format,isolatedTypeScript and synthetic Chrome375/320/1440. Staged funding/execution and live provider qualification remain open.

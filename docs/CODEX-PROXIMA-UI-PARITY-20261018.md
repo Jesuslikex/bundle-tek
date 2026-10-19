@@ -1,5 +1,7 @@
 # Proxima UI evidence and Bundle gaps, 18 October
 
+19October follow-up: marketplace region labels/filter preview are now implemented in `cb00f3f`, with65 tests, build and synthetic responsive browser proof. Live ordinary Chrome rechecked US East/Europe/Asia controls, and actual Opus5.5 reviewed the extension. This supersedes only the older missing-region-display/filter gap below. Supplier access, reservations, purchase, encrypted delivery and order recovery remain unimplemented; no geographic verification or live fulfillment is claimed. See `CODEX-MARKETPLACE-REGIONS-20261019.md`. Launch-layer progress/recovery updates are separately linked from `CODEX-UI-RELEASE-UPDATE-20261019.md`.
+
 The full Proxima-parity goal remains incomplete. This is a bounded UI evidence ledger, not proof of vendor backend architecture, signing, automation or successful transactions. It separates observed controls, Bundle source/test coverage and unverified delivery. No Proxima wallet addresses, holdings, account balances, activity rows or private project names are reproduced here.
 
 ## Evidence
