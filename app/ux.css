@@ -4673,3 +4673,8 @@ body {
     max-height: none;
   }
 }
+
+/* Keep hidden table headers inside their horizontal scroll container. */
+.project-table-wrap {
+  position: relative;
+}

@@ -1,0 +1,12 @@
+{
+  "scope": "Authenticated synthetic account on the isolated local Next production build, base 4b4363b plus app/ux.css only",
+  "before375": {"viewport":375,"documentWidth":558,"bodyWidth":360},
+  "after": [
+    {"viewport":320,"documentWidth":305,"bodyWidth":305},
+    {"viewport":375,"documentWidth":360,"bodyWidth":360},
+    {"viewport":1440,"documentWidth":1440,"bodyWidth":1440}
+  ],
+  "verification": {"dashboardTestsPassed":4,"productionBuildExit":0,"sourceHashesUnchangedDuringVerification":true},
+  "cause": "Absolutely positioned hidden Actions header escaped its horizontal scroll container; positioning the wrapper contains it.",
+  "productionChanged": false
+}

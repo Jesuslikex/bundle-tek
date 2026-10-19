@@ -1,0 +1,5 @@
+# Release QA mobile table containment
+
+19 October 2026. Before the UI edit: Codex claims one appended rule in `app/ux.css` during user-authorized release QA/fixes. `CLAUDE-UI-SPLIT-AND-LAUNCH-FIXES-20261015.md` explicitly allows either agent to append rules in that file; no existing rule will be rewritten or reordered. Claude-owned components, app/page.tsx, token layout and the other chat's account-session files are not being edited.
+
+Chrome at375px on the authenticated candidate reports document.scrollWidth558 while body width is360. The launch-drafts table's absolutely positioned `.sr-only` Actions label has right558; its containing block is outside the horizontally scrollable table wrapper. Other wide table content is correctly inside scrollports. Proposed bounded fix: append `position: relative` to `.project-table-wrap`, keeping those hidden labels within their scrollport. This changes neither table column sizing nor consent/signing behavior. Verify at375 and320 plus desktop against the built candidate, retain before/after measurements and run the existing dashboard tests. No production change or deployment.
