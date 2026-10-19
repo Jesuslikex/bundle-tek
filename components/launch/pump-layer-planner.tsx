@@ -242,6 +242,16 @@ function Planner({
   const [review, setReview] = useState<Review | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
   const snapshotReview = useRef<HTMLDetailsElement>(null);
+  const [savedReveal, setSavedReveal] = useState(0);
+  useEffect(() => {
+    const detail = snapshotReview.current;
+    if (!savedReveal || !detail?.isConnected) return;
+    detail.open = true;
+    detail.scrollIntoView({ block: 'nearest' });
+    detail
+      .querySelector<HTMLElement>('summary')
+      ?.focus({ preventScroll: true });
+  }, [savedReveal]);
   const [historyRead, setHistoryRead] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -806,9 +816,10 @@ function Planner({
                         setSaved(retained);
                         setNotice(
                           retained.current
-                            ? 'Planning snapshot saved. Nothing was funded and ordinary launch settings were not changed.'
-                            : 'Planning snapshot saved as history; current references changed. Reload context before reviewing another plan.',
+                            ? 'Planning snapshot saved. Nothing was funded and ordinary launch settings were not changed. The saved snapshot is open below.'
+                            : 'Planning snapshot saved as history; current references changed. Reload context before reviewing another plan. The saved snapshot is open below.',
                         );
+                        setSavedReveal((value) => value + 1);
                       }
                     },
                   )

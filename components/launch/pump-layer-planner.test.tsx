@@ -434,6 +434,12 @@ it('reviews and saves through the real authenticated route, service and SQL guar
   await click('Save reviewed planning snapshot');
   expect(insertError).toBeUndefined();
   expect(host.textContent).toContain('Planning snapshot saved');
+  const savedSummary = [...host.querySelectorAll('summary')].find((summary) =>
+    summary.textContent?.includes('Saved planning snapshot'),
+  );
+  expect(savedSummary).toBeDefined();
+  expect(savedSummary!.closest('details')!.open).toBe(true);
+  expect(document.activeElement).toBe(savedSummary);
   expect(calls.filter((c) => c.method === 'POST')).toHaveLength(1);
   const result = await storage.client.execute(
     'SELECT document FROM launch_layer_plans',
