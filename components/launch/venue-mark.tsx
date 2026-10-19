@@ -13,6 +13,18 @@ const LOGOS: Record<string, string> = {
   'Uniswap V2': '/logos/uniswap.png',
   'Uniswap V3': '/logos/uniswap.png',
   'Uniswap V4': '/logos/uniswap.png',
+  Robinhood: '/logos/robinhood.png',
+  Arc: '/logos/arc.png',
+  LetsBonk: '/logos/letsbonk.png',
+  Bags: '/logos/bags.png',
+  Anoncoin: '/logos/anoncoin.png',
+  'Meteora DBC': '/logos/meteora.svg',
+  Stoxes: '/logos/stoxes.png',
+  Lesgo: '/logos/lesgo.png',
+  'meme.fun': '/logos/memefun.png',
+  Clanker: '/logos/clanker.png',
+  Bankr: '/logos/bankr.png',
+  Raydium: '/logos/raydium.png',
 };
 
 const COLORS: Record<string, string> = {
