@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "actualAuthenticatedApp": false,
+  "externalProviders": false,
+  "measurements": [
+    {
+      "bodyWidth": 1425,
+      "counts": "Fixture GETs: 4; planning saves: 1; provider calls: 0; signing/send: blocked",
+      "documentWidth": 1425,
+      "focusedSummary": true,
+      "openSnapshot": true,
+      "viewport": 1440
+    },
+    {
+      "bodyWidth": 360,
+      "counts": "Fixture GETs: 4; planning saves: 1; provider calls: 0; signing/send: blocked",
+      "documentWidth": 360,
+      "focusedSummary": true,
+      "openSnapshot": true,
+      "viewport": 375
+    },
+    {
+      "bodyWidth": 305,
+      "counts": "Fixture GETs: 4; planning saves: 1; provider calls: 0; signing/send: blocked",
+      "documentWidth": 305,
+      "focusedSummary": true,
+      "openSnapshot": true,
+      "viewport": 320
+    }
+  ]
+}

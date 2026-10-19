@@ -821,8 +821,8 @@ function Planner({
                         setSaved(retained);
                         setNotice(
                           retained.current
-                            ? 'Planning snapshot saved. Nothing was funded and ordinary launch settings were not changed. The saved snapshot is open below.'
-                            : 'Planning snapshot saved as history; current references changed. Reload context before reviewing another plan. The saved snapshot is open below.',
+                            ? 'Planning snapshot saved. Nothing was funded and ordinary launch settings were not changed. The saved snapshot is now open.'
+                            : 'Planning snapshot saved as history; current references changed. Reload context before reviewing another plan. The saved snapshot is now open.',
                         );
                         setSavedReveal((value) => value + 1);
                       }
@@ -844,6 +844,7 @@ function Planner({
         projectId={selection.projectId}
         mint={selection.target.mint}
         disabled={blocked}
+        refreshVersion={savedReveal}
         onOpen={(entry) =>
           void run(
             'Opening saved planning snapshot…',

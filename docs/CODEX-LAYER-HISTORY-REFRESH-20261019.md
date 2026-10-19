@@ -1,0 +1,13 @@
+# Saved launch-layer progress
+
+The planner now invalidates its history index only after a validated, current save. An open index refreshes once; a closed index makes no request until opened. Old pending reads are aborted and invalidated by generation, including transports that ignore cancellation. A refresh deferred by a disabled parent waits until re-enabled without consuming its version. A failed refresh leaves the saved snapshot readable, hides raw upstream HTML, and requires an explicit retry. It makes no additional POST or provider read and changes no snapshot-opening equality, authority or signing guard.
+
+The post-save refresh runs in a cancellable microtask after the React commit. A superseded effect cannot consume the version or start a request; this also avoids a synchronous cascading state update flagged by the React compiler. The success notice now says the snapshot is "now open", correcting its misleading "below" wording.
+
+Verification:11 test files/121 tests pass through the existing real authenticated route/service/disposable SQL setup. This includes open/closed history, an ignored-abort stale response, a failed refresh with explicit retry, deferred disabled refresh and unchanged one-POST behavior. Typed lint, formatting and plain `tsc --noEmit --incremental false` pass. The preceding full frozen baseline remains separately documented; it does not cover this new delta.
+
+The current real components were rebuilt in a local browser fixture with synthetic responses and no account, actual database, external provider or financial authority. Browser save opens/focuses the snapshot, updates open history0→1 and records exactly one planning save plus one additional history GET. Document widths fit1440/375/320, with keyboard focus retained. Screenshots and measurements: `docs/qa/20261019/layer-progress/`. This rendered check complements the real-route tests; it is not actual signed-in app or live-provider qualification.
+
+Actual Claude CLI review returned only `claude-opus-5-5` in model metadata, with tools disabled and no fallback. Opus found no confirmed race/authority defect in the first refresh design and suggested the disabled-refresh test, now passing. Codex subsequently made the React-compiler scheduling correction and verified it independently. Opus did not run tests or browse Proxima. Its separate confirmed close-during-save recovery gap remains the next bounded step.
+
+No protected Claude UI, account-session file, API, library or migration changed. No deployment, hosted SQL, real wallet unlock/sign/send or funded trade.

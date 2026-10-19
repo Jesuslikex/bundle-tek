@@ -7,6 +7,7 @@ import { webcrypto } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { layerNativeFixture } from '../../test/launch-layer-native-fixture';
 import { PumpLayerPlanner } from './pump-layer-planner';
+import { LaunchLayerHistory } from './launch-layer-history';
 import { layerUiFixture } from '../../test/launch-layer-ui-fixture';
 import { layerTestStorage } from '../../test/launch-layer-storage';
 import { GET, POST } from '@/app/api/launch/layers/route';
@@ -461,6 +462,147 @@ it('invalidates review on edits and preserves the exact saved developer/holder o
   await input(firstFee, '0.000006');
   expect(host.textContent).not.toContain('Save reviewed planning snapshot');
   expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
+});
+it('refreshes an open history index once after saving the exact reviewed snapshot', async () => {
+  await loadAndFill();
+  await click('Browse saved planning history');
+  await until(() =>
+    expect(host.textContent).toContain('No saved planning snapshots yet.'),
+  );
+  await click('Review layer ceilings');
+  await click('Save reviewed planning snapshot');
+  await until(() => expect(host.textContent).toContain('1 retained snapshot.'));
+  expect(host.textContent).not.toContain('No saved planning snapshots yet.');
+  expect(
+    host.querySelectorAll('button[aria-label^="Open snapshot"]'),
+  ).toHaveLength(1);
+  expect(calls.filter((call) => call.url.includes('?history='))).toHaveLength(
+    2,
+  );
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+});
+it('defers a new history version while disabled and loads it only once after re-enabling', async () => {
+  const opened = vi.fn();
+  const renderHistory = async (disabled: boolean, refreshVersion: number) => {
+    await act(async () =>
+      root.render(
+        <LaunchLayerHistory
+          projectId={f.selection.projectId}
+          mint={f.selection.target.mint}
+          disabled={disabled}
+          refreshVersion={refreshVersion}
+          onOpen={opened}
+        />,
+      ),
+    );
+  };
+  await renderHistory(false, 0);
+  await click('Browse saved planning history');
+  await until(() =>
+    expect(host.textContent).toContain('No saved planning snapshots yet.'),
+  );
+  await saveOwnedLaunchLayerPlan(storage.db, 'alice', f.input, f.now);
+  await renderHistory(true, 1);
+  expect(calls.filter((call) => call.url.includes('?history='))).toHaveLength(
+    1,
+  );
+  expect(button('Reload planning history').disabled).toBe(true);
+  await renderHistory(false, 1);
+  await until(() => expect(host.textContent).toContain('1 retained snapshot.'));
+  await renderHistory(false, 1);
+  expect(calls.filter((call) => call.url.includes('?history='))).toHaveLength(
+    2,
+  );
+  expect(calls.every((call) => call.method === 'GET')).toBe(true);
+  expect(opened).not.toHaveBeenCalled();
+});
+it('defers closed history reads until it is opened after a save', async () => {
+  await loadAndFill();
+  await click('Review layer ceilings');
+  await click('Save reviewed planning snapshot');
+  expect(calls.filter((call) => call.url.includes('?history='))).toHaveLength(
+    0,
+  );
+  expect(
+    button('Browse saved planning history').getAttribute('aria-expanded'),
+  ).toBe('false');
+  await click('Browse saved planning history');
+  await until(() => expect(host.textContent).toContain('1 retained snapshot.'));
+  expect(calls.filter((call) => call.url.includes('?history='))).toHaveLength(
+    1,
+  );
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+});
+it('keeps a saved snapshot readable when its one history refresh fails and retries only on request', async () => {
+  await loadAndFill();
+  await click('Browse saved planning history');
+  await until(() =>
+    expect(host.textContent).toContain('No saved planning snapshots yet.'),
+  );
+  intercept = (url) =>
+    url.includes('?history=')
+      ? Promise.resolve(
+          new Response('<html>private upstream error</html>', {
+            status: 503,
+            headers: { 'content-type': 'text/html' },
+          }),
+        )
+      : undefined;
+  await click('Review layer ceilings');
+  await click('Save reviewed planning snapshot');
+  await until(() =>
+    expect(host.querySelector('[role=alert]')?.textContent).toContain(
+      'Saved planning history is unavailable.',
+    ),
+  );
+  expect(host.textContent).toContain('Planning snapshot saved');
+  expect(host.textContent).not.toContain('private upstream error');
+  expect(host.textContent).not.toContain('No saved planning snapshots yet.');
+  expect(calls.filter((call) => call.url.includes('?history='))).toHaveLength(
+    2,
+  );
+  expect(button('Reload planning history').disabled).toBe(false);
+  intercept = undefined;
+  await click('Reload planning history');
+  await until(() => expect(host.textContent).toContain('1 retained snapshot.'));
+  expect(calls.filter((call) => call.url.includes('?history='))).toHaveLength(
+    3,
+  );
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+});
+it('discards an older pending history response when a saved snapshot refreshes the index', async () => {
+  await loadAndFill();
+  const previous = await listOwnedLaunchLayerPlans(
+    storage.db,
+    'alice',
+    f.selection.projectId,
+  );
+  let release!: (response: Response) => void;
+  let historyReads = 0;
+  let oldSignal: AbortSignal | undefined;
+  intercept = (url, options) => {
+    if (!url.includes('?history=') || ++historyReads !== 1) return;
+    oldSignal = options.signal as AbortSignal;
+    return new Promise((resolve) => {
+      release = resolve;
+    });
+  };
+  await click('Browse saved planning history');
+  expect(host.textContent).toContain('Loading planning history…');
+  await click('Review layer ceilings');
+  await click('Save reviewed planning snapshot');
+  await until(() => expect(host.textContent).toContain('1 retained snapshot.'));
+  expect(oldSignal?.aborted).toBe(true);
+  await act(async () => {
+    release(Response.json({ history: previous }));
+    await flush();
+  });
+  expect(host.textContent).toContain('1 retained snapshot.');
+  expect(host.textContent).not.toContain('No saved planning snapshots yet.');
+  expect(calls.filter((call) => call.url.includes('?history='))).toHaveLength(
+    2,
+  );
+  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
 });
 it('reopens current saved ceilings but requires another review before saving', async () => {
   await loadAndFill();

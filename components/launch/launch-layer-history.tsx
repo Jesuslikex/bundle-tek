@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { readPanelJson } from '@/components/read-panel-json';
 import {
@@ -12,11 +12,13 @@ export function LaunchLayerHistory({
   projectId,
   mint,
   disabled,
+  refreshVersion = 0,
   onOpen,
 }: {
   projectId: string;
   mint: string;
   disabled: boolean;
+  refreshVersion?: number;
   onOpen: (entry: LaunchLayerHistoryItem) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -28,6 +30,7 @@ export function LaunchLayerHistory({
     timer: ReturnType<typeof setTimeout>;
   } | null>(null);
   const generation = useRef(0);
+  const lastRefresh = useRef(refreshVersion);
   useEffect(
     () => () => {
       generation.current++;
@@ -36,14 +39,14 @@ export function LaunchLayerHistory({
     },
     [],
   );
-  const cancel = () => {
+  const cancel = useCallback(() => {
     generation.current++;
     active.current?.controller.abort();
     if (active.current) clearTimeout(active.current.timer);
     active.current = null;
     setLoading(false);
-  };
-  const load = async () => {
+  }, []);
+  const load = useCallback(async () => {
     if (active.current || disabled) return;
     const mine = ++generation.current,
       controller = new AbortController();
@@ -85,7 +88,24 @@ export function LaunchLayerHistory({
         setLoading(false);
       }
     }
-  };
+  }, [cancel, disabled, projectId]);
+  useEffect(() => {
+    if (lastRefresh.current === refreshVersion || disabled) return;
+    let superseded = false;
+    // Start the post-save read after this commit; superseded effects must not
+    // consume the refresh version or start a request for an older UI context.
+    void Promise.resolve().then(() => {
+      if (superseded) return;
+      lastRefresh.current = refreshVersion;
+      cancel();
+      setItems(null);
+      setError('');
+      if (open) void load();
+    });
+    return () => {
+      superseded = true;
+    };
+  }, [cancel, disabled, load, open, refreshVersion]);
   return (
     <section className={styles.history} aria-label="Saved planning history">
       <Button
