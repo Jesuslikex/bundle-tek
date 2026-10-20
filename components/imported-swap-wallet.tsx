@@ -1,6 +1,7 @@
 'use client';
 import { subscribeImportedWalletReview } from '@/lib/imported-wallet-review-events';
 import { ImportedTradeSessions } from './imported-trade-sessions';
+import { AutoSell } from './auto-sell-modal';
 import { ImportedPairTradeWalletReview } from './imported-pair-trade-wallet-review';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -409,6 +410,14 @@ export function ImportedSwapWallet({
           />
         )}
       </details>
+      {!loading && project.document.token.chain === 'Solana' && (
+        <AutoSell
+          key={`auto-sell:${project.id}:${project.revision}`}
+          project={project}
+          wallets={wallets}
+          locked={locked || saving}
+        />
+      )}
       <details className="imported-bundle-session-tools">
         <summary>Wallet groups and bundle sessions</summary>
         {!loading && (
