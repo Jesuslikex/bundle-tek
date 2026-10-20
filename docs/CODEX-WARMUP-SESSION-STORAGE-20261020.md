@@ -21,6 +21,10 @@ The shared progress loader now uses stable receipt ordering and explicit plan fi
 
 Local evidence: `work/release-qa/warmup-session-storage-build-20261020/result.json`, `work/release-qa/warmup-session-upgrade-20261020/report.json`, and the disposable Wrangler report at `C:\Users\Julian\AppData\Local\Temp\bundle-wrangler-migrations-mLAPTq\report.json`. These generated artifacts are ignored, not application sources.
 
+## Committed-source verification
+
+Source checkpoint `cc24a0c` was then tested as one combined cohort: all 12 files and 170 tests passed, including all nine checksum tests. Git-HEAD SQL and working-copy checksums match for every historical file and new migration 0117. The earlier uncommitted-HEAD limitation is resolved. The final JSON report is `work/release-qa/layer-save-tests.json`. The expected negative-path preparation/approval log messages remain in the successful run; they are not live provider requests or funded actions. This is a focused regression run, not a full repository suite or signed-in production qualification.
+
 ## Still open
 
 The retaining service is not yet connected to a write API or a Save/Recover panel. Execution consent, a scheduler, fresh per-transaction authorization, cancellation and session-level recovery remain separate follow-ups. Stored reviews always have `executionAllowed`, `signingAllowed` and `automaticExecutionAllowed` false. This is not full Proxima execution parity or funded proof.
