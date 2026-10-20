@@ -23,11 +23,13 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 - Codex (ChatGPT) works in `C:\Users\Julian\Desktop\Bundle` on local `main`, committing verified work locally as described above. Pushing `main` stays julian's decision.
 - Claude works only on new branches cut from `origin/main` (never from local `main`, never on `main` itself) and delivers through pull requests. Claude does not commit into this checkout's `main`.
 - Nobody force-pushes `main`, rewrites its published history, or deletes another agent's branch or worktree.
-- Migrations: take the next number after the highest entry in `drizzle/meta/_journal.json` **on local main**, not on `origin/main`. Local main currently goes up to `0121_marketplace_reservation_history`, so the next free number is `0122`. Recheck the journal before claiming it. Claim the number in "Current claims" before writing the file. A Claude branch off `origin/main` must still use a number above local main's highest, and must be renumbered if local main moves past it before merge.
+- Migrations: take the next number after the highest entry in `drizzle/meta/_journal.json` **on local main**, not on `origin/main`. Local main currently goes up to `0122_wallet_warmup_session_consents`, so the next free number is `0123`. Recheck the journal before claiming it. Claim the number in "Current claims" before writing the file. A Claude branch off `origin/main` must still use a number above local main's highest, and must be renumbered if local main moves past it before merge.
 - Never rename, renumber or edit an already-committed migration.
 - Shell and layout protection from the handoff doc still applies (`app/page.tsx` and the protected layout files need an approved exact patch).
 
 ### Current claims
+
+- Codex, 21 October 2026: immutable warmup session-consent storage foundation complete; bounded claim released. Read `docs/CODEX-WARMUP-SESSION-CONSENT-20261021.md`:241 tests/13files (24 new), plain TypeScript, typed lint/format, all123 local checksum-runner/whole-file Wrangler migrations pass. Exact separate consent binds retained plan/actions/budget/deadline; fresh insertion and immutable same-owner history, all execution/signing flags false. Source-only0122 claim released; next0123 subject to recheck. No API/UI caller, per-action budget state, wallet reservation or scheduler; crash recovery/execution integration remains open. No application/hosted SQL, provider, signer, protected layout, deploy or real wallet action changed. Claude review requested against the committed checkpoint.
 
 - Codex, 21 October 2026: Opus442b593 review and test-only follow-up complete; bounded claim released. `docs/CODEX-WARMUP-SESSION-SETTLEMENT-20261021.md` records exact reviewer limits,217 local tests/12files including38 adapter cases, whole-project plain TypeScript and scoped lint/format. Explicit equal-revision historical refusal and canonical link-order success close a reviewer coverage overstatement. Application remains442b593; no new authority, schema/provider/wallet/deploy changes. Durable session consent, atomic action/budget storage and crash recovery remain next, with implementation requirements recorded, not claimed complete.
 
@@ -98,7 +100,7 @@ Codex (ChatGPT) owns the following areas it is actively extending. The original 
 - Codex (Review current progress), 18 October 2026: account session management audit and implementation, `components/bundle-account.tsx`, new `components/account-sessions*`, `lib/account-sessions*`, `app/api/account-sessions/**` and their tests. Source implementation waits for the current full-suite freeze to end; no provider, credential, password-policy or schema change is claimed.
 - Imported token chart and wallet workspace: `app/api/imported-projects/**`, `components/wallet-workspace*`, marketplace catalog/inventory (`lib/marketplace-catalog*`).
 - DCA timing and budgets (`lib/dca-trade*`, `lib/duration-parts*`), public wallet tags/watchlist imports (`lib/wallet-public*`, `lib/tracker-bulk*`), sign-in/password rules (`app/sign-in/**`).
-- All of `drizzle/**` and `db/**`; the committed journal currently ends at `0121`.
+- All of `drizzle/**` and `db/**`; the committed journal currently ends at `0122`.
 
 
 Claude: no active PR27 claim after merge. Add a new claim before further implementation.
