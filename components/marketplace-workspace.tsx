@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { MarketplacePanel } from './marketplace-panel';
+import { MarketplaceBundleCatalog } from './marketplace-bundle-catalog';
 import { MarketplaceOwnedWallets } from './marketplace-owned-wallets';
 import { MarketplaceOperatorConsole } from './marketplace-operator-console';
 import styles from './marketplace-owned-wallets.module.css';
@@ -31,7 +31,7 @@ export function MarketplaceWorkspace() {
         </button>
       </nav>
       {section === 'catalog' ? (
-        <MarketplacePanel />
+        <MarketplaceBundleCatalog />
       ) : section === 'owned' ? (
         <MarketplaceOwnedWallets />
       ) : (

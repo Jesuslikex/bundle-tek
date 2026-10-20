@@ -110,7 +110,7 @@ it('starts unchecked, saves only the exact acknowledged draft and prevents a dup
   const input = JSON.parse(fetcher.mock.calls[0][1]!.body as string);
   expect(input).toEqual(operatorDraftRequest(input.id, review, true));
   expect(sessionStorage.getItem(key)).toBe(JSON.stringify(input));
-  expect(host.textContent).toContain('Retained draft · not published');
+  expect(host.textContent).toContain('Saved draft snapshot');
   expect(host.textContent).toContain('0.05 SOL');
   expect(button('Save unpublished draft').disabled).toBe(true);
   expect(host.querySelector('input[type="password"]')).toBeNull();
@@ -151,7 +151,7 @@ it('keeps an unknown save across remount, sends no automatic request and recover
   await click('Recover saved draft');
   expect(fetcher).toHaveBeenCalledTimes(2);
   expect(fetcher.mock.calls[1][0]).toContain(retained!.id);
-  expect(host.textContent).toContain('Retained draft · not published');
+  expect(host.textContent).toContain('Saved draft snapshot');
   expect(host.textContent).toContain('evidence is historical');
   expect(
     fetcher.mock.calls.filter((c) => c[1]?.method === 'POST'),
@@ -173,7 +173,7 @@ it('aborts waiting without forgetting the save ID and ignores a late save respon
   expect(init.signal!.aborted).toBe(true);
   expect(sessionStorage.getItem(key)).not.toBeNull();
   await act(async () => finish(Response.json({ draft: record(input) })));
-  expect(host.textContent).not.toContain('Retained draft · not published');
+  expect(host.textContent).not.toContain('Saved draft snapshot');
   expect(host.textContent).toContain('may have saved');
 });
 it('aborts a save on review change but retains the original recovery identity', async () => {
@@ -213,7 +213,7 @@ it.each(['id', 'price', 'authority', 'html'] as const)(
     await mount();
     await check();
     await click('Save unpublished draft');
-    expect(host.textContent).not.toContain('Retained draft · not published');
+    expect(host.textContent).not.toContain('Saved draft snapshot');
     expect(host.querySelector('[role="alert"]')).not.toBeNull();
     expect(sessionStorage.getItem(key)).not.toBeNull();
     expect(button('Clear recovery reminder').disabled).toBe(true);

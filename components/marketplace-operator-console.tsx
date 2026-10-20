@@ -196,10 +196,11 @@ export function MarketplaceOperatorConsole() {
         Customer accounts cannot become sellers through this screen.
       </p>
       <div className={styles.notice}>
-        <strong>Draft review only</strong>
+        <strong>Draft first, publication separate</strong>
         <p>
-          Review an asking price and the wallet’s recorded evidence. Publishing,
-          payment, signing and key delivery remain unavailable.
+          Review the asking price and recorded evidence, then save the draft.
+          Catalog publication requires a separate review and approval below.
+          Payment, signing and key delivery remain unavailable.
         </p>
       </div>
       <div className={styles.controls}>
@@ -322,7 +323,8 @@ export function MarketplaceOperatorConsole() {
             <code>{review.evidenceSha256}</code>
           </details>
           <p>
-            No listing was published. There is no purchase or signing approval.
+            This review does not publish a listing or authorize a purchase or
+            signature.
           </p>
         </div>
       )}

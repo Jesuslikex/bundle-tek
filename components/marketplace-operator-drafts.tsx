@@ -14,6 +14,7 @@ import { marketplaceSol } from '@/lib/marketplace-catalog';
 import { readPanelJson } from './read-panel-json';
 import styles from './marketplace-owned-wallets.module.css';
 import draftStyles from './marketplace-operator-drafts.module.css';
+import { MarketplacePublication } from './marketplace-publication';
 const reminderKey = 'bundle:operator-draft-recovery:v1';
 function draftFromResponse(value: unknown) {
   if (
@@ -195,7 +196,7 @@ export function MarketplaceOperatorDrafts({
       setRecord(saved);
       setResolvedId(input.id);
       setMessage(
-        'Unpublished draft saved. No listing, payment or key delivery was authorized.',
+        'Draft saved. Saving does not publish a listing or authorize payment or key delivery.',
       );
     } catch {
       if (live(controller))
@@ -254,7 +255,7 @@ export function MarketplaceOperatorDrafts({
       setRecord(saved);
       setResolvedId(captured);
       setMessage(
-        'Saved unpublished draft recovered. Its evidence is historical; recovery does not refresh or publish it.',
+        'Saved draft recovered. Its evidence is historical; recovery does not refresh or publish it.',
       );
     } catch {
       if (live(controller))
@@ -357,8 +358,8 @@ export function MarketplaceOperatorDrafts({
       {error && <p role="alert">{error}</p>}
       {message && <output>{message}</output>}
       {record && (
-        <div aria-label="Retained unpublished listing draft">
-          <h3>Retained draft · not published</h3>
+        <div aria-label="Saved listing draft snapshot">
+          <h3>Saved draft snapshot</h3>
           <dl>
             <div>
               <dt>Draft ID</dt>
@@ -389,14 +390,15 @@ export function MarketplaceOperatorDrafts({
           </dl>
           <p>{record.review.disclosure}</p>
           <p>
-            These are historical details. A fresh review and separate
-            publication flow will be required before any listing; payment,
-            delivery and signing remain unavailable.
+            These are historical details. The separate publication review below
+            is required before a catalog listing. Payment, delivery and signing
+            remain unavailable.
           </p>
           <details>
             <summary>Saved review hash</summary>
             <code>{record.reviewSha256}</code>
           </details>
+          <MarketplacePublication key={record.id} draft={record} />
         </div>
       )}
     </section>

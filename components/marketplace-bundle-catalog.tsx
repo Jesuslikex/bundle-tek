@@ -1,0 +1,282 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import {
+  admitBundleCatalog,
+  type BundleCatalog,
+} from '@/lib/marketplace-publication';
+import { marketplaceLamports, marketplaceSol } from '@/lib/marketplace-catalog';
+import { readPanelJson } from './read-panel-json';
+import styles from './marketplace-owned-wallets.module.css';
+function filtered(
+  catalog: BundleCatalog | null,
+  age: string,
+  price: string,
+  sort: string,
+) {
+  if (!catalog) return { listings: [], valid: true };
+  if (!/^(0|[1-9]\d{0,4})$/.test(age) || Number(age) > 36500)
+    return { listings: [], valid: false };
+  let cap: bigint | null = null;
+  try {
+    if (price) cap = BigInt(marketplaceLamports(price));
+  } catch {
+    return { listings: [], valid: false };
+  }
+  const at = Date.parse(catalog.observedAt),
+    days = Number(age);
+  const listings = catalog.listings.filter(
+    (e) =>
+      (days === 0 ||
+        (e.listing.oldestRecordedActivityAt !== null &&
+          at - Date.parse(e.listing.oldestRecordedActivityAt) >=
+            days * 86400000)) &&
+      (cap === null || BigInt(e.listing.priceLamports) <= cap),
+  );
+  listings.sort((a, b) => {
+    if (sort === 'activity') {
+      const av = a.listing.oldestRecordedActivityAt,
+        bv = b.listing.oldestRecordedActivityAt;
+      return av === bv
+        ? a.id.localeCompare(b.id)
+        : av === null
+          ? 1
+          : bv === null
+            ? -1
+            : av.localeCompare(bv);
+    }
+    const av = BigInt(a.listing.priceLamports),
+      bv = BigInt(b.listing.priceLamports);
+    return av === bv ? a.id.localeCompare(b.id) : av < bv ? -1 : 1;
+  });
+  return { listings, valid: true };
+}
+export function MarketplaceBundleCatalog() {
+  const pending = useRef<AbortController | null>(null);
+  const [catalog, setCatalog] = useState<BundleCatalog | null>(null),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [expired, setExpired] = useState(false),
+    [signIn, setSignIn] = useState(false),
+    [age, setAge] = useState('0'),
+    [price, setPrice] = useState(''),
+    [sort, setSort] = useState('price'),
+    [page, setPage] = useState(0);
+  useEffect(
+    () => () => {
+      pending.current?.abort();
+      pending.current = null;
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!catalog) return;
+    const timer = setTimeout(
+      () => {
+        setCatalog(null);
+        setExpired(true);
+      },
+      Math.max(0, Date.parse(catalog.expiresAt) - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [catalog]);
+  function stop() {
+    pending.current?.abort();
+    pending.current = null;
+    setBusy(false);
+    setError('Catalog read cancelled. No purchase was sent.');
+  }
+  async function load() {
+    if (pending.current) return;
+    const c = new AbortController();
+    pending.current = c;
+    setBusy(true);
+    setError('');
+    setCatalog(null);
+    setExpired(false);
+    setSignIn(false);
+    setPage(0);
+    try {
+      const response = await fetch('/api/marketplace/bundle-catalog', {
+        cache: 'no-store',
+        signal: AbortSignal.any([c.signal, AbortSignal.timeout(10000)]),
+      });
+      const body = await readPanelJson(response, 'Bundle catalog unavailable.');
+      if (pending.current !== c || c.signal.aborted) return;
+      if (!response.ok) {
+        setSignIn(response.status === 401);
+        setError(
+          response.status === 401
+            ? 'Sign in to browse Bundle inventory.'
+            : 'Bundle inventory is unavailable. No purchase was authorized.',
+        );
+        return;
+      }
+      const checked = admitBundleCatalog(body);
+      if (pending.current === c && !c.signal.aborted) setCatalog(checked);
+    } catch {
+      if (pending.current === c && !c.signal.aborted)
+        setError(
+          'Bundle inventory response could not be verified. No purchase was authorized.',
+        );
+    } finally {
+      if (pending.current === c) {
+        pending.current = null;
+        setBusy(false);
+      }
+    }
+  }
+  const selected = filtered(catalog, age, price, sort),
+    start = page * 20,
+    visible = selected.listings.slice(start, start + 20);
+  return (
+    <section
+      className={styles.panel}
+      aria-label="Bundle wallet catalog"
+      aria-busy={busy}
+    >
+      <p className={styles.eyebrow}>BUNDLE-OPERATED INVENTORY</p>
+      <h1>Wallet marketplace</h1>
+      <p>
+        Browse listings published by Bundle. Customer accounts cannot sell
+        wallets here. Checkout unavailable.
+      </p>
+      <div className={styles.notice}>
+        <strong>Recorded history, with its limits</strong>
+        <p>
+          Recorded activity age is not wallet creation or funding age.
+          Historical balances are not current balances or an approved purchase
+          entitlement. Checkout, payment and secure delivery are not connected.
+        </p>
+      </div>
+      <div className={styles.controls}>
+        <button disabled={busy} onClick={() => void load()}>
+          Refresh Bundle inventory
+        </button>
+        {busy && <button onClick={stop}>Cancel catalog read</button>}
+      </div>
+      {error && <p role="alert">{error}</p>}
+      {signIn && <Link href="/sign-in">Sign in</Link>}
+      {expired && <p>Catalog view expired. Refresh for a new snapshot.</p>}
+      {catalog && (
+        <>
+          <div className={styles.filters}>
+            <label>
+              Minimum recorded activity age (days)
+              <input
+                inputMode="numeric"
+                value={age}
+                onChange={(e) => {
+                  setAge(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </label>
+            <label>
+              Maximum asking price (SOL)
+              <input
+                inputMode="decimal"
+                value={price}
+                onChange={(e) => {
+                  setPrice(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </label>
+            <label>
+              Sort listings
+              <select
+                value={sort}
+                onChange={(e) => {
+                  setSort(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <option value="price">Asking price</option>
+                <option value="activity">Oldest recorded activity</option>
+              </select>
+            </label>
+          </div>
+          {!selected.valid ? (
+            <p role="alert">
+              Choose a whole activity age from 0 to 36500 days and a valid SOL
+              price.
+            </p>
+          ) : (
+            <>
+              <p>
+                {selected.listings.length === 0
+                  ? 'No published Bundle wallets match these filters.'
+                  : `${start + 1} to ${Math.min(start + 20, selected.listings.length)} of ${selected.listings.length} published listings.`}
+              </p>
+              <ul className={styles.wallets}>
+                {visible.map((e) => (
+                  <li key={e.id}>
+                    <h2>Bundle wallet</h2>
+                    <code>{e.listing.address}</code>
+                    <dl>
+                      <div>
+                        <dt>Asking price</dt>
+                        <dd>{marketplaceSol(e.listing.priceLamports)} SOL</dd>
+                      </div>
+                      <div>
+                        <dt>Oldest recorded activity</dt>
+                        <dd>
+                          {e.listing.oldestRecordedActivityAt
+                            ? new Date(
+                                e.listing.oldestRecordedActivityAt,
+                              ).toLocaleString()
+                            : 'Not established'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Historical balance</dt>
+                        <dd>
+                          {e.listing.historicalBalance
+                            ? `${marketplaceSol(e.listing.historicalBalance.balanceLamports)} SOL, observed ${new Date(e.listing.historicalBalance.observedAt).toLocaleString()}`
+                            : 'Not recorded'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Listing published</dt>
+                        <dd>{new Date(e.publishedAt).toLocaleString()}</dd>
+                      </div>
+                    </dl>
+                    <p>Purchase unavailable</p>
+                    <details>
+                      <summary>Evidence and custody disclosure</summary>
+                      <p>{e.listing.disclosure}</p>
+                      <p>
+                        {e.listing.savedHistoryChecks} saved history checks;{' '}
+                        {e.listing.warmupUniqueSignatures} unique recorded
+                        warmup signatures. This is not complete chain coverage
+                        or a fresh receipt replay.
+                      </p>
+                    </details>
+                  </li>
+                ))}
+              </ul>
+              <div className={styles.controls}>
+                {page > 0 && (
+                  <button onClick={() => setPage(page - 1)}>
+                    Previous catalog page
+                  </button>
+                )}
+                {start + 20 < selected.listings.length && (
+                  <button onClick={() => setPage(page + 1)}>
+                    Next catalog page
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+          <p>
+            Snapshot: {new Date(catalog.observedAt).toLocaleString()}. Withdrawn
+            listings are excluded from subsequent refreshes. No wallet is
+            reserved by browsing.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
