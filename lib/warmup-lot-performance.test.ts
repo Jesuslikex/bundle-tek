@@ -63,6 +63,13 @@ describe('linked warmup performance', () => {
       networkFeeLamports: '2',
       rentChangeLamports: '10',
     });
+    expect(
+      warmupLotPerformance([buy('2')], [sell()], ['lot']).lots[0],
+    ).toMatchObject({
+      buyVolumeLamports: '100',
+      sellVolumeLamports: '50',
+      sellCount: 1,
+    });
   });
   it('fully allocates rounding residue and permits net losses from sell fees', () => {
     const s = sell('2', 3);
@@ -76,6 +83,13 @@ describe('linked warmup performance', () => {
       realizedResultLamports: '-62',
       networkFeeLamports: '62',
       rentChangeLamports: '0',
+    });
+    expect(
+      warmupLotPerformance([buy('0')], [s, sell()], ['lot']).lots[0],
+    ).toMatchObject({
+      buyVolumeLamports: '100',
+      sellVolumeLamports: '100',
+      sellCount: 2,
     });
   });
   it('preserves uint64 units and exact costs above safe integer precision', () => {

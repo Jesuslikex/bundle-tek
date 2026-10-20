@@ -152,6 +152,13 @@ it('isolates owners, validates revision and includes archived historical lots on
       realizedResultLamports: '16',
       openCostLamports: '68',
       rentChangeLamports: '10',
+      lots: [
+        expect.objectContaining({
+          buyVolumeLamports: '100',
+          sellVolumeLamports: '50',
+          sellCount: 1,
+        }),
+      ],
     },
   });
 });

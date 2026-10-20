@@ -254,8 +254,46 @@ it('walks buy through separate signing/send approvals, receipt, matched sell and
   await click('Open cycle progress');
   expect(container.textContent).toContain('1/1 wallet cycles');
   expect(container.textContent).toContain('Recorded lots sold');
+  const summary = container.querySelector(
+    '[aria-label="Recorded activity by wallet"]',
+  );
+  expect(summary?.textContent).toContain('Recorded loops complete');
+  expect(summary?.textContent).toContain('2 (1 buy, 1 sell)');
+  expect(summary?.textContent).toContain('0.0019 SOL');
   expect(mocks.sign).toHaveBeenCalledTimes(2);
   expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(2);
+});
+
+it('withholds malformed wallet activity instead of inferring progress and makes no signing request', async () => {
+  const ordinary = fixture.fetcher;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (...args: Parameters<typeof fetch>) => {
+      const response = await ordinary(...args);
+      const url = args[0] instanceof Request ? args[0].url : args[0].toString();
+      if (url.includes('/cycle-progress')) {
+        const data = (await response.json()) as {
+          steps: Array<{ state: string }>;
+        };
+        data.steps[0].state = 'Recorded lots sold';
+        return Response.json(data);
+      }
+      return response;
+    }),
+  );
+  await mount();
+  await click('Open cycle progress');
+  expect(
+    container.querySelector('[aria-label="Recorded activity by wallet"]'),
+  ).toBeNull();
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    'scope differs',
+  );
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.unlock).not.toHaveBeenCalled();
+  expect(fixture.calls.filter((call) => call.action === 'submit')).toHaveLength(
+    0,
+  );
 });
 it('clears send consent on page invalidation and retains receipt recovery after expiry', async () => {
   await mount();

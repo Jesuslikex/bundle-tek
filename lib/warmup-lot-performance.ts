@@ -75,6 +75,8 @@ export function warmupLotPerformance(
         acquired: bigint;
         sold: bigint;
         proceeds: bigint;
+        buyVolume: bigint;
+        sellVolume: bigint;
         fees: bigint;
         rent: bigint;
         sellCount: number;
@@ -105,6 +107,8 @@ export function warmupLotPerformance(
       acquired,
       sold: 0n,
       proceeds: 0n,
+      buyVolume: -e.settlement,
+      sellVolume: 0n,
       fees: e.fee,
       rent: e.rent,
       sellCount: 0,
@@ -134,6 +138,7 @@ export function warmupLotPerformance(
     sellIds.add(sell.id);
     lot.sold += units;
     lot.proceeds += e.settlement - e.fee;
+    lot.sellVolume += e.settlement;
     lot.fees += e.fee;
     lot.rent += e.rent;
     lot.sellCount++;
@@ -160,6 +165,8 @@ export function warmupLotPerformance(
       soldRaw: lot.sold.toString(),
       remainingRaw: lot.remaining.toString(),
       buyCostLamports: lot.cost.toString(),
+      buyVolumeLamports: lot.buyVolume.toString(),
+      sellVolumeLamports: lot.sellVolume.toString(),
       realizedCostLamports: allocated.toString(),
       openCostLamports: (lot.cost - allocated).toString(),
       netSellProceedsLamports: lot.proceeds.toString(),

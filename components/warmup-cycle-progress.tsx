@@ -8,6 +8,11 @@ import { WarmupPerformance } from './warmup-performance';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { WARMUP_RECEIPT_SAVED } from '@/lib/warmup-receipt-events';
 import { readPanelJson } from './read-panel-json';
+import {
+  walletWarmupActivity,
+  type WalletWarmupActivity,
+} from '@/lib/wallet-warmup-activity';
+import { WalletWarmupActivitySummary } from './wallet-warmup-activity-summary';
 type Progress = WarmupCycleProgress & { performance: WarmupLotPerformance };
 export function WarmupCycleProgress({
   plan,
@@ -24,7 +29,9 @@ export function WarmupCycleProgress({
     pending = useRef<AbortController | null>(null);
   const [open, setOpen] = useState(false),
     [earlier, setEarlier] = useState(false),
-    [result, setResult] = useState<Progress | null>(null),
+    [result, setResult] = useState<
+      (Progress & { activity: WalletWarmupActivity }) | null
+    >(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [page, setPage] = useState(0);
@@ -86,7 +93,8 @@ export function WarmupCycleProgress({
           plan.document.cycles * plan.document.addresses.length
       )
         throw new Error(data.error || 'Recorded cycle progress unavailable.');
-      if (!controller.signal.aborted) setResult(data);
+      const activity = walletWarmupActivity(plan, data, data.performance);
+      if (!controller.signal.aborted) setResult({ ...data, activity });
     } catch (err) {
       if (!controller.signal.aborted)
         setError(
@@ -97,14 +105,7 @@ export function WarmupCycleProgress({
     } finally {
       if (!controller.signal.aborted) setBusy(false);
     }
-  }, [
-    plan.id,
-    plan.revision,
-    plan.archived,
-    plan.document.cycles,
-    plan.document.addresses.length,
-    earlier,
-  ]);
+  }, [plan, earlier]);
   useEffect(() => {
     if (!open) return;
     let disposed = false;
@@ -166,6 +167,7 @@ export function WarmupCycleProgress({
                 all included recorded lots sold. {result.activeApprovals} active
                 approvals need recovery before further transactions.
               </p>
+              <WalletWarmupActivitySummary rows={result.activity} />
               <WarmupPerformance performance={result.performance} />
               {result.excludedBuys > 0 && (
                 <p>
