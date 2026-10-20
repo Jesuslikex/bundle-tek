@@ -53,12 +53,12 @@ export async function releaseLaunchMetadata(
   const project = validateProjectDocument(JSON.parse(row.document));
   if (
     project.plan.chain !== 'Solana' ||
-    !['PumpFun', 'StonkFun', 'LetsBonk', 'Surge'].includes(
+    !['PumpFun', 'StonkFun', 'LetsBonk', 'Surge', 'Meteora DBC'].includes(
       project.plan.launchpad,
     )
   )
     throw new MetadataReleaseError(
-      'Choose a Solana PumpFun, StonkFun, LetsBonk or Surge launch.',
+      'Choose a Solana PumpFun, StonkFun, LetsBonk, Surge or Meteora DBC launch.',
       400,
     );
   if (!isUploadedArtwork(project.identity.artworkUrl))

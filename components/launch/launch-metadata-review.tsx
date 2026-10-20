@@ -11,6 +11,7 @@ import { StonkLayerPlanning } from './stonk-layer-planning';
 import { ImportedLayerPlanning } from './imported-layer-planning';
 import { StonkfunLaunchReview } from '@/components/stonkfun-launch-review';
 import { LaunchLabLaunchReview } from '@/components/launchlab-launch-review';
+import { MeteoraDbcLaunchReview } from '@/components/meteora-dbc-launch-review';
 import {
   LAUNCHLAB_VENUES,
   isLaunchLabVenue,
@@ -282,7 +283,8 @@ function SavedMetadataReview({
       </div>
       {project &&
         plan.mode === 'Block-0' &&
-        !isLaunchLabVenue(plan.launchpad) && (
+        !isLaunchLabVenue(plan.launchpad) &&
+        plan.launchpad !== 'Meteora DBC' && (
           <ImportedLayerPlanning
             project={project}
             scheduled={plan.scheduled}
@@ -308,6 +310,13 @@ function SavedMetadataReview({
           releaseId={uri.split('/').at(-1) ?? ''}
         />
       )}
+      {project && plan.launchpad === 'Meteora DBC' && (
+        <MeteoraDbcLaunchReview
+          project={project}
+          plan={plan}
+          releaseId={uri.split('/').at(-1) ?? ''}
+        />
+      )}
       {project && plan.launchpad === 'PumpFun' && (
         <PumpLaunchReview
           project={project}
@@ -323,7 +332,9 @@ function SavedMetadataReview({
 export function LaunchMetadataReview(props: Props) {
   if (
     props.plan.chain !== 'Solana' ||
-    !['PumpFun', 'StonkFun', ...LAUNCHLAB_VENUES].includes(props.plan.launchpad)
+    !['PumpFun', 'StonkFun', 'Meteora DBC', ...LAUNCHLAB_VENUES].includes(
+      props.plan.launchpad,
+    )
   )
     return null;
   // Consent, outstanding responses and links belong only to this exact draft.
