@@ -12,7 +12,7 @@
   max-width: 1180px;
   margin: 0 auto;
   padding: 48px 28px;
-  color: #e9edf5;
+  color: #fcfcfc;
 }
 .panel h1 {
   font-size: clamp(28px, 4vw, 42px);
@@ -20,7 +20,7 @@
   margin: 12px 0;
 }
 .panel p {
-  color: #aeb9cc;
+  color: #b9b9c8;
   line-height: 1.6;
 }
 .eyebrow {
@@ -70,17 +70,18 @@
 .filters button {
   min-width: 0;
   width: 100%;
-  border: 1px solid #34415b;
+  border: 1px solid #22242d;
   border-radius: 8px;
-  padding: 12px;
-  background: #131b29;
+  padding: 0 8px;
+  min-height: 30px;
+  background: #18181f;
   color: inherit;
   font: inherit;
 }
 .filters button {
   align-self: end;
   cursor: pointer;
-  background: #405bc8;
+  background: #22242d;
 }
 .filters button:disabled {
   opacity: 0.6;

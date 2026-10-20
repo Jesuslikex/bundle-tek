@@ -5552,3 +5552,32 @@ body {
 .app-shell .launch-ws .form-body {
   gap: 24px;
 }
+
+/* Proxima My Wallets / Funding / token page measurements (REA 2026-10-20). */
+.wallet-roster-table {
+  border-color: #22242d;
+  border-radius: 8px;
+}
+.wallet-workspace .wallet-roster-table th {
+  height: 40px;
+  padding: 9px 12px;
+}
+.wallet-workspace h2,
+.wallet-workspace h3 {
+  font-size: 14px;
+  font-weight: 500;
+}
+.wallet-workspace button,
+.funding-workspace button {
+  border-radius: 8px;
+}
+.wallet-roster-toolbar button {
+  min-height: 30px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+.app-shell input[type='search'] {
+  border-radius: 6px;
+  border: 1px solid #22242d;
+  background: rgba(24, 24, 31, 0.2);
+}
