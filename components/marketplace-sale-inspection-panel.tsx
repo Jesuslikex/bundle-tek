@@ -230,10 +230,10 @@ export function MarketplaceSaleInspectionPanel({
             </p>
           </details>
           <p>
-            Sale qualification is incomplete. Token holdings, provenance and
-            current key control have not been checked. Balances are snapshots,
-            not guaranteed funds included in a sale. Payment and key delivery
-            remain unavailable.
+            Sale qualification is incomplete. This SOL-only check does not cover
+            token holdings, provenance or current key control. Balances are
+            snapshots, not guaranteed funds included in a sale. Payment and key
+            delivery remain unavailable.
           </p>
         </div>
       )}

@@ -1,0 +1,35 @@
+.rows {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+  gap: 10px;
+}
+.account {
+  border: 1px solid #38455d;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 0;
+}
+.account > summary {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: #e1c17c;
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 12px;
+}
+.summary > div {
+  border: 1px solid #38455d;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 0;
+}

@@ -1,0 +1,62 @@
+{
+  "base": "78f8ab0",
+  "tests": {
+    "passed": 516,
+    "failed": 0,
+    "files": 33,
+    "success": true,
+    "scope": "All marketplace test files; synthetic providers and disposable libSQL/Turso adapter fixtures"
+  },
+  "typecheck": "Plain tsc --noEmit --incremental false: exit0",
+  "lint": "Scoped type-aware oxlint and oxfmt: pass",
+  "browser": {
+    "kind": "Actual console/panels, public synthetic data and production styles",
+    "desktop": {
+      "viewport": 1440,
+      "documentClient": 1440,
+      "documentScroll": 1440,
+      "panelClient": 1122,
+      "panelScroll": 1122,
+      "actionHeight": 46
+    },
+    "phone": {
+      "viewport": 375,
+      "documentClient": 360,
+      "documentScroll": 360,
+      "panelClient": 326,
+      "panelScroll": 326,
+      "verticalScrollbar": 15,
+      "actionHeight": 46,
+      "pageTwoRows": 5,
+      "focused": "Accounts21-25of25, after render",
+      "headingTop": 438.375
+    },
+    "cases": [
+      "25 accounts locally paged20+5 and back",
+      "Frozen zero-raw-unit account with delegate and external close authority",
+      "No request on paging",
+      "Zero-account response remains unqualified",
+      "Inventory expiry removes both panels without automatic request",
+      "New manual review after expiry",
+      "Price edit clears both panels"
+    ],
+    "requests": 9,
+    "cycles": "Phone mixed+empty6; fresh desktop3",
+    "financialWrites": 0,
+    "signatures": 0,
+    "cleanup": "Temporary tab closed; viewport reset; owned fixture server stopped"
+  },
+  "claude": {
+    "model": "Opus5.5, visibly selected",
+    "scope": "Committed785a254 foundation at78f8ab0, read-only",
+    "reported": "No high/medium; low capacity clarification and bounded scanning-cost nit",
+    "action": "Capacity wording clarified and real100x16KiB oversized-response regression added",
+    "limits": "No test-body/fixture/SDK-internal review or tests/build; new API/UI not reviewed by Claude"
+  },
+  "limits": [
+    "No full repository suite",
+    "No live provider or production sign-in qualification",
+    "No application or hosted SQL",
+    "No actual listing/hold/payment/wallet action or deployment"
+  ]
+}

@@ -8,6 +8,7 @@ import { marketplaceOwnedFixture } from '../test/marketplace-owned-fixture';
 import { buildMarketplaceOwnedInventory } from '@/lib/marketplace-owned-inventory';
 import { reviewOperatorListing } from '@/lib/marketplace-operator-review';
 import { marketplaceSaleInspectionFixture } from '../test/marketplace-sale-inspection-fixture';
+import { marketplaceTokenViewFixture } from '../test/marketplace-token-inspection-view-fixture';
 let root: Root, host: HTMLDivElement;
 const now = Date.parse('2026-10-20T12:00:00Z');
 function inventory() {
@@ -223,4 +224,37 @@ it('mounts the manual account check only for a reviewed draft and aborts it when
   );
   expect(host.textContent).not.toContain('Ordinary SOL account observed');
   expect(host.textContent).not.toContain('Unpublished listing review');
+});
+it('mounts both checks with distinct identities and aborts a token read when the exact reviewed price changes', async () => {
+  const data = inventory(),
+    f = await marketplaceTokenViewFixture(now);
+  let resolve!: (r: Response) => void;
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/token-inspection'))
+      return new Promise<Response>((r) => {
+        resolve = r;
+      });
+    return init?.method === 'POST'
+      ? Response.json(
+          await reviewOperatorListing(data, JSON.parse(init.body as string)),
+        )
+      : Response.json(data);
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Open seller inventory');
+  await price('0.05');
+  await click('Review listing draft');
+  expect(button('Inspect current account')).toBeDefined();
+  expect(button('Inspect owned token accounts')).toBeDefined();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  await click('Inspect owned token accounts');
+  const init = fetcher.mock.calls[2][1]!;
+  expect(JSON.parse(init.body as string)).toEqual(f.selection);
+  await price('0.06');
+  expect(init.signal?.aborted).toBe(true);
+  expect(button('Inspect current account')).toBeUndefined();
+  expect(button('Inspect owned token accounts')).toBeUndefined();
+  await act(async () => resolve(Response.json({ inspection: f.inspection })));
+  expect(host.textContent).not.toContain('2 owned token accounts returned');
 });

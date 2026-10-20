@@ -1,0 +1,32 @@
+{
+  "base": "78f8ab0",
+  "overlay": [
+    "app/api/marketplace/operator/token-inspection/route.ts",
+    "app/api/marketplace/operator/token-inspection/route.test.ts",
+    "lib/marketplace-token-inspection-view.ts",
+    "lib/marketplace-token-inspection.test.ts",
+    "components/marketplace-token-inspection-panel.tsx",
+    "components/marketplace-token-inspection-panel.test.tsx",
+    "components/marketplace-token-inspection-panel.module.css",
+    "components/marketplace-operator-console.tsx",
+    "components/marketplace-operator-console.test.tsx",
+    "components/marketplace-sale-inspection-panel.tsx",
+    "test/marketplace-token-inspection-view-fixture.ts"
+  ],
+  "hashes": {
+    "app/api/marketplace/operator/token-inspection/route.ts": "64013539406701fcc694ac8a6fd12d00b0570149e0ba0e4d6840b123efea610a",
+    "app/api/marketplace/operator/token-inspection/route.test.ts": "c9048f542a72252f90902804f968015c870d4100bb669403f0e638db9871fcfc",
+    "lib/marketplace-token-inspection-view.ts": "0e21dd8ed7aea2eef65fee5a0bae5e992db8c9fbb80d96a8a0b354c6df07959d",
+    "lib/marketplace-token-inspection.test.ts": "d60543514b9db50cf4daa808de80b4bd28da0a5787e9f88cdc0668600889e692",
+    "components/marketplace-token-inspection-panel.tsx": "6b3e7196e14548ca2ab7f79611b96235d9e3d0d4533b8f41bc266270e80f0813",
+    "components/marketplace-token-inspection-panel.test.tsx": "4ace4065412fb8fde9b471a5dd584feb6f26f9c9ad39a2da586872617e77975b",
+    "components/marketplace-token-inspection-panel.module.css": "9f33b0f11871e18a80829eadccce1e69aa23d7dff297bf57f8eb5c8c6953282c",
+    "components/marketplace-operator-console.tsx": "8ef58975310725a7f63551cf4dcd9021a6fa70fd7b1b16ad9aaa018b108b23ad",
+    "components/marketplace-operator-console.test.tsx": "edf9049dd7f842eb79bab88434a28c2a50ad8f574dd5f949a9fdae91d6476a4f",
+    "components/marketplace-sale-inspection-panel.tsx": "7f69431185db1a17a83d8cc890612dc86a75a776aa11d42b0059283613a4f7e3",
+    "test/marketplace-token-inspection-view-fixture.ts": "fed80cb32649255b9787671b651af031cb36a39301c598f62ea233ef936d7b64"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}

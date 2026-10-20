@@ -384,6 +384,25 @@ it('supports exactly 200 accounts without truncation and admits every row', asyn
     ),
   ).toEqual(result);
 });
+it('refuses a 2 MiB enumeration response even below the 200-account cap, without a partial result', async () => {
+  const t = setup();
+  t.responses[0] = [];
+  t.responses[1] = Array.from({ length: 100 }, (_, i) => {
+    const a = t.f.account({
+      id: i + 3,
+      program: programs[1],
+      extensions: [{ __kind: 'ImmutableOwner' }],
+    });
+    const bytes = new Uint8Array(16384);
+    bytes.set(a.bytes);
+    a.raw.account.space = String(bytes.length);
+    a.raw.account.data[0] = btoa(String.fromCharCode(...bytes));
+    return a.raw;
+  });
+  await expect(t.run()).rejects.toThrow('response too large');
+  expect(t.read).toHaveBeenCalledTimes(1);
+  expect(t.fetcher).toHaveBeenCalledTimes(4);
+});
 it('accepts reserved zero padding but refuses a noncanonical known extension boolean', async () => {
   const t = setup(),
     padded = t.f.account({

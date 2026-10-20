@@ -13,6 +13,13 @@ export const MARKETPLACE_TOKEN_PROGRAMS = [
   'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
 ] as const;
 export const MARKETPLACE_TOKEN_ACCOUNT_LIMIT = 200;
+export class MarketplaceTokenInspectionClockError extends Error {
+  constructor() {
+    super(
+      'Token inspection is stale or ahead of this device clock. Check automatic date and time, then request a fresh review and inspection.',
+    );
+  }
+}
 export const MARKETPLACE_ACCOUNT_EXTENSIONS = [
   'TransferFeeAmount',
   'ConfidentialTransferAccount',
@@ -25,7 +32,7 @@ export const MARKETPLACE_ACCOUNT_EXTENSIONS = [
   'PausableAccount',
 ] as const;
 export const MARKETPLACE_TOKEN_COVERAGE =
-  'Provider-returned accounts owned by this wallet under the original Token Program and Token-2022 only. Raw base amounts are not token prices or transferable balances. Mint authorities, permanent delegates, confidential amounts, stake, compressed assets and other programs are not covered. No empty-wallet or sale qualification guarantee.';
+  'Provider-returned accounts owned by this wallet under the original Token Program and Token-2022 only. Limits are 200 accounts combined, 2 MiB per enumeration response and 16 KiB per account; exceeding any limit refuses the whole inspection. Large Token-2022 accounts can reach the response limit before 200 accounts. Raw base amounts are not token prices or transferable balances. Mint authorities, permanent delegates, confidential amounts, stake, compressed assets and other programs are not covered. No empty-wallet or sale qualification guarantee.';
 const key = z
   .string()
   .min(32)
@@ -157,6 +164,8 @@ export async function admitMarketplaceTokenInspection(
   const start = Date.parse(inspection.startedAt),
     observed = Date.parse(inspection.observedAt),
     expiry = Date.parse(inspection.expiresAt);
+  if (Number.isSafeInteger(now) && (observed > now || now >= expiry))
+    throw new MarketplaceTokenInspectionClockError();
   if (
     !Number.isSafeInteger(now) ||
     [inspection.startedAt, inspection.observedAt, inspection.expiresAt].some(
