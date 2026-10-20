@@ -1,6 +1,7 @@
 import {
   applyAutoSellTrade,
   checkAutoSellEnd,
+  endCapRaw,
   initialAutoSellState,
   marketCapInRange,
   rawToDecimal,
@@ -14,6 +15,11 @@ import {
   autoSellSessionCap,
   type AutoSellSessionRules,
 } from './auto-sell-session';
+import {
+  reviewedAutoSellConfiguration,
+  type AutoSellConfiguration,
+  type AutoSellEditReview,
+} from './auto-sell-edit';
 
 export type AutoSellLogEntry = {
   at: number;
@@ -27,6 +33,8 @@ export type AutoSellSnapshot = {
   running: boolean;
   paused: boolean;
   settling: boolean;
+  configurationRevision: number;
+  accountedRaw: bigint;
   marketCapUsd: number | null;
   states: Record<string, AutoSellStrategyState & { inRange: boolean }>;
   log: AutoSellLogEntry[];
@@ -104,6 +112,11 @@ export class AutoSellRunner {
   private activeAt = 0;
   private endTimer: unknown = null;
   private sessionCap: bigint | null = null;
+  private configurationRevision = 1;
+  private retiredAccountedRaw = 0n;
+  private retiredIds = new Set<string>();
+  private pendingEdit: { review: AutoSellEditReview; evidence: string } | null =
+    null;
 
   constructor(deps: AutoSellRunnerDeps) {
     this.deps = {
@@ -116,6 +129,8 @@ export class AutoSellRunner {
       setTimer: (fn, ms) => setTimeout(fn, ms),
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
       ...deps,
+      strategies: structuredClone(deps.strategies),
+      ownWallets: new Set(deps.ownWallets),
       session: deps.session ? { ...deps.session } : undefined,
     };
     if (this.deps.session)
@@ -148,6 +163,7 @@ export class AutoSellRunner {
   stop(reason = 'Stopped') {
     if (!this.running) return;
     this.running = false;
+    this.pendingEdit = null;
     this.paused = false;
     this.controller.abort();
     if (this.timer !== null) this.deps.clearTimer(this.timer);
@@ -184,6 +200,7 @@ export class AutoSellRunner {
       return false;
     this.checkEnds();
     if (!this.running) return false;
+    this.pendingEdit = null;
     if (this.timer !== null) this.deps.clearTimer(this.timer);
     this.timer = null;
     this.controller = new AbortController();
@@ -227,6 +244,204 @@ export class AutoSellRunner {
     return this.running;
   }
 
+  configuration(): AutoSellConfiguration {
+    return structuredClone({
+      strategies: this.deps.strategies,
+      session: this.deps.session ?? {
+        startDelaySeconds: 0,
+        endDurationSeconds: 0,
+        endMaxSupplyPercent: '',
+      },
+    });
+  }
+
+  reviewEdit(configuration: AutoSellConfiguration): AutoSellEditReview {
+    this.requireEditable();
+    this.pendingEdit = null;
+    this.checkEnds();
+    this.requireEditable();
+    const after = reviewedAutoSellConfiguration(configuration);
+    const before = this.configuration();
+    if (JSON.stringify(before) === JSON.stringify(after))
+      throw new Error('No settings have changed.');
+    if (after.session.startDelaySeconds !== before.session.startDelaySeconds)
+      throw new Error(
+        'The original start delay cannot be restarted by editing.',
+      );
+    const cap = autoSellSessionCap(after.session, this.deps.totalSupplyRaw);
+    for (const strategy of after.strategies) {
+      if (this.retiredIds.has(strategy.id))
+        throw new Error(
+          'A removed strategy cannot be rearmed. Add a new strategy instead.',
+        );
+      const old = before.strategies.find((item) => item.id === strategy.id);
+      const state = this.states.get(strategy.id);
+      if (
+        old &&
+        state &&
+        state.bufferedRaw > 0n &&
+        (old.mode !== strategy.mode ||
+          (old.mode === 'limit' &&
+            JSON.stringify(old.limitOrders) !==
+              JSON.stringify(strategy.limitOrders)))
+      )
+        throw new Error(
+          `${old.name} has queued trades. Resume to settle them, or remove the strategy to cancel its unsent queue before changing its mode or limit rows.`,
+        );
+    }
+    const kept = new Set(after.strategies.map((strategy) => strategy.id));
+    const evidence = this.editEvidence();
+    const review: AutoSellEditReview = {
+      revision: this.configurationRevision,
+      reviewKey: JSON.stringify([evidence, after]),
+      before,
+      after,
+      accountedRaw: this.sessionUsed(false).toString(),
+      queuedRaw: [...this.states.values()]
+        .reduce((sum, state) => sum + state.bufferedRaw, 0n)
+        .toString(),
+      cancelledQueuedRaw: [...this.states]
+        .reduce(
+          (sum, [id, state]) => sum + (kept.has(id) ? 0n : state.bufferedRaw),
+          0n,
+        )
+        .toString(),
+      reactivatedStrategies: after.strategies
+        .filter((strategy) => {
+          const old = before.strategies.find((item) => item.id === strategy.id);
+          const state = this.states.get(strategy.id);
+          return (
+            old &&
+            state?.status === 'ended' &&
+            JSON.stringify(old) !== JSON.stringify(strategy) &&
+            checkAutoSellEnd(
+              strategy,
+              { ...state, status: 'running', endedReason: null },
+              this.deps.now(),
+              this.deps.totalSupplyRaw,
+            ).status === 'running'
+          );
+        })
+        .map((strategy) => strategy.name),
+      endsSession:
+        (cap !== null && this.sessionUsed(false) >= cap) ||
+        (after.session.endDurationSeconds > 0 &&
+          this.deps.now() >=
+            this.activeAt + after.session.endDurationSeconds * 1000),
+    };
+    this.pendingEdit = { review: structuredClone(review), evidence };
+    return structuredClone(review);
+  }
+
+  cancelEdit() {
+    this.pendingEdit = null;
+  }
+
+  applyEdit(reviewKey: string, approved: boolean) {
+    this.requireEditable();
+    this.checkEnds();
+    this.requireEditable();
+    const pending = this.pendingEdit;
+    if (
+      approved !== true ||
+      !pending ||
+      reviewKey !== pending.review.reviewKey ||
+      pending.evidence !== this.editEvidence()
+    )
+      throw new Error(
+        'The reviewed settings or session state changed. Review and approve the exact changes again.',
+      );
+    const configuration = structuredClone(pending.review.after);
+    const previous = this.configuration();
+    const kept = new Set(
+      configuration.strategies.map((strategy) => strategy.id),
+    );
+    const now = this.deps.now();
+    for (const [id, state] of this.states) {
+      if (!kept.has(id)) {
+        this.retiredAccountedRaw += state.soldRaw + state.inFlightRaw;
+        this.retiredIds.add(id);
+        this.states.delete(id);
+      }
+    }
+    for (const strategy of configuration.strategies) {
+      let state = this.states.get(strategy.id);
+      const old = previous.strategies.find((item) => item.id === strategy.id);
+      if (
+        state?.status === 'ended' &&
+        old &&
+        JSON.stringify(old) !== JSON.stringify(strategy)
+      ) {
+        state = checkAutoSellEnd(
+          strategy,
+          { ...state, status: 'running', endedReason: null },
+          now,
+          this.deps.totalSupplyRaw,
+        );
+        this.states.set(strategy.id, state);
+      }
+      if (!state)
+        this.states.set(
+          strategy.id,
+          initialAutoSellState(Math.max(now, this.activeAt)),
+        );
+      else if (strategy.mode === 'dca' && state.status === 'running')
+        this.states.set(strategy.id, {
+          ...state,
+          nextDcaAt: Math.max(
+            state.nextDcaAt,
+            now + strategy.dcaIntervalSeconds * 1000,
+          ),
+        });
+    }
+    this.deps.strategies = configuration.strategies;
+    this.deps.session = configuration.session;
+    this.sessionCap = autoSellSessionCap(
+      configuration.session,
+      this.deps.totalSupplyRaw,
+    );
+    this.configurationRevision += 1;
+    this.pendingEdit = null;
+    if (this.endTimer !== null) this.deps.clearTimer(this.endTimer);
+    this.endTimer = null;
+    this.note(
+      null,
+      'info',
+      'Applied explicitly approved settings. Session progress and original clocks are retained; the session remains paused.',
+    );
+    this.checkEnds();
+    if (this.running && configuration.session.endDurationSeconds)
+      this.endTimer = this.deps.setTimer(
+        () => this.stop('Session duration reached.'),
+        Math.max(
+          0,
+          this.activeAt + configuration.session.endDurationSeconds * 1000 - now,
+        ),
+      );
+  }
+
+  private requireEditable() {
+    if (!this.running || !this.paused || this.polling || this.selling)
+      throw new Error(
+        'Pause and wait for every pending operation to settle before editing this session.',
+      );
+  }
+
+  private editEvidence() {
+    return JSON.stringify(
+      [
+        this.configurationRevision,
+        this.activeAt,
+        this.configuration(),
+        this.retiredAccountedRaw.toString(),
+        [...this.retiredIds],
+        [...this.states],
+      ],
+      (_key, value: unknown) =>
+        typeof value === 'bigint' ? value.toString() : value,
+    );
+  }
+
   snapshot(): AutoSellSnapshot {
     const states: AutoSellSnapshot['states'] = {};
     for (const s of this.deps.strategies) {
@@ -241,6 +456,8 @@ export class AutoSellRunner {
       running: this.running,
       paused: this.paused,
       settling: this.polling || this.selling,
+      configurationRevision: this.configurationRevision,
+      accountedRaw: this.sessionUsed(false),
       marketCapUsd: this.marketCapUsd,
       states,
       log: this.log.slice(-50),
@@ -425,6 +642,7 @@ export class AutoSellRunner {
     }
     if ([...this.states.values()].every((st) => st.status !== 'running')) {
       this.running = false;
+      this.pendingEdit = null;
       this.paused = false;
       if (this.timer !== null) this.deps.clearTimer(this.timer);
       this.timer = null;
@@ -448,6 +666,15 @@ export class AutoSellRunner {
       const state = this.states.get(s.id)!;
       if (!marketCapInRange(s, this.marketCapUsd)) continue;
       let amount = readyToSellRaw(s, state, this.deps.totalSupplyRaw);
+      const strategyCap = endCapRaw(s, this.deps.totalSupplyRaw);
+      if (strategyCap !== null) {
+        const remaining = strategyCap - state.soldRaw - state.inFlightRaw;
+        if (remaining <= 0n) {
+          this.checkEnds();
+          continue;
+        }
+        if (amount > remaining) amount = remaining;
+      }
       if (this.sessionCap !== null) {
         const remaining = this.sessionCap - this.sessionUsed();
         if (remaining <= 0n) {
@@ -556,7 +783,7 @@ export class AutoSellRunner {
     return [...this.states.values()].reduce(
       (sum, state) =>
         sum + state.soldRaw + (includeFlight ? state.inFlightRaw : 0n),
-      0n,
+      this.retiredAccountedRaw,
     );
   }
 }
