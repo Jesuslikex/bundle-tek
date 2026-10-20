@@ -5508,3 +5508,21 @@ body {
 .launch-wallet-pending {
   color: var(--muted-foreground);
 }
+
+/* Proxima type scale from the 2026-10-20 REA capture: 11px table headers
+   with +0.44px tracking, 13px cells, 12px buttons, slight negative tracking. */
+.app-shell {
+  letter-spacing: -0.012em;
+}
+.app-shell table th {
+  font-size: 11px;
+  letter-spacing: 0.44px;
+  color: #787a8d;
+  font-weight: 500;
+}
+.app-shell table td {
+  font-size: 13px;
+}
+.app-shell button {
+  letter-spacing: -0.012em;
+}
