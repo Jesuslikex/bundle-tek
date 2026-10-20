@@ -19,6 +19,7 @@ import {
 import { MarketplaceReservationBuyer } from './marketplace-reservation-buyer';
 import { MarketplaceReservationContext } from './marketplace-reservation-context';
 import { MarketplaceBundleCatalog } from './marketplace-bundle-catalog';
+import type { ReservationHistoryPage } from '@/lib/marketplace-reservation-history';
 let root: Root,
   host: HTMLDivElement,
   review: CartReview,
@@ -320,3 +321,132 @@ it.each([false, true])(
     expect(fetcher).toHaveBeenCalledTimes(3);
   },
 );
+function historyPage(records: ReservationRecord[]): ReservationHistoryPage {
+  return {
+    format: 'bundle-reservation-history-v1',
+    chain: 'Solana',
+    seller: 'Bundle',
+    observedAt: new Date().toISOString(),
+    entries: records.map((record) => ({
+      id: record.id,
+      createdAt: record.createdAt,
+      expiresAt: record.expiresAt,
+      releasedAt: null,
+      state: 'held',
+      count: record.review.count,
+      askingPriceLamports: record.review.askingPriceLamports,
+      contextSha256: record.contextSha256,
+    })),
+    nextCursor: null,
+    reserveAllowed: false,
+    releaseAllowed: false,
+    purchaseEnabled: false,
+    paymentEnabled: false,
+    deliveryEnabled: false,
+    signingAllowed: false,
+  };
+}
+it('discovers a saved hold without a local ID, then recovers its full receipt before showing release consent', async () => {
+  saved = await makeReservation(
+    { id: crypto.randomUUID(), review, acknowledgement: RESERVATION_ACK },
+    now,
+  );
+  const page = historyPage([saved]),
+    fetcher = vi.fn(async (url: string, _init?: RequestInit) =>
+      url.includes('history=1') ? Response.json({ history: page }) : response(),
+    );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Recover wallet hold');
+  expect(fetcher).not.toHaveBeenCalled();
+  await click('Find my saved holds');
+  expect(document.body.textContent).toContain('Saved wallet holds');
+  expect(document.body.textContent).not.toContain(
+    review.items[0].listing.address,
+  );
+  expect(button('Release this hold')).toBeUndefined();
+  expect(sessionStorage.getItem(key)).toBeNull();
+  await click('Open hold');
+  expect(
+    document.querySelector('section[aria-label="Saved wallet holds"]'),
+  ).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher.mock.calls.every((call) => call[1]?.method !== 'POST')).toBe(
+    true,
+  );
+  expect(button('Release this hold').disabled).toBe(true);
+  expect(sessionStorage.getItem(key)).toBe(saved.id);
+});
+it.each(['authority', 'html'] as const)(
+  'refuses malformed %s history without saving an ID or granting an action',
+  async (kind) => {
+    const page = historyPage([]);
+    Object.assign(page, { releaseAllowed: true });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        kind === 'html'
+          ? new Response('<html>private detail</html>', { status: 502 })
+          : Response.json({ history: page }),
+      ),
+    );
+    await mount();
+    await click('Recover wallet hold');
+    await click('Find my saved holds');
+    expect(document.querySelector('[role="alert"]')).not.toBeNull();
+    expect(document.body.textContent).not.toContain('private detail');
+    expect(button('Open hold')).toBeUndefined();
+    expect(sessionStorage.getItem(key)).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  },
+);
+it('pages saved summaries manually without automatically recovering or writing a hold', async () => {
+  const one = await makeReservation(
+      { id: crypto.randomUUID(), review, acknowledgement: RESERVATION_ACK },
+      now,
+    ),
+    first = historyPage([one]);
+  first.entries = Array.from({ length: 20 }, (_, i) => ({
+    ...first.entries[0],
+    id: crypto.randomUUID(),
+    createdAt: new Date(now - i * 1000).toISOString(),
+    expiresAt: new Date(now - i * 1000 + 300000).toISOString(),
+  }));
+  const last = first.entries[19];
+  first.nextCursor = { id: last.id, createdAt: last.createdAt };
+  const second = {
+    ...first,
+    entries: [
+      {
+        ...first.entries[0],
+        id: crypto.randomUUID(),
+        createdAt: new Date(now - 21000).toISOString(),
+        expiresAt: new Date(now - 21000 + 300000).toISOString(),
+      },
+    ],
+    nextCursor: null,
+  };
+  const fetcher = vi.fn(async (url: string, _init?: RequestInit) =>
+    Response.json({ history: url.includes('beforeId=') ? second : first }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Recover wallet hold');
+  await click('Find my saved holds');
+  expect(
+    document.querySelectorAll('button[aria-label^="Open saved hold"]'),
+  ).toHaveLength(20);
+  await click('Older saved holds');
+  expect(
+    document.querySelectorAll('button[aria-label^="Open saved hold"]'),
+  ).toHaveLength(1);
+  expect(fetcher.mock.calls[1][0]).toContain(
+    encodeURIComponent(last.createdAt),
+  );
+  await click('Latest saved holds');
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  expect(fetcher.mock.calls.every((call) => call[1]?.method !== 'POST')).toBe(
+    true,
+  );
+  expect(sessionStorage.getItem(key)).toBeNull();
+});

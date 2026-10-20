@@ -15,7 +15,9 @@ import {
   readMarketplaceReservation,
   reserveMarketplaceCart,
   releaseMarketplaceReservation,
+  readMarketplaceReservationHistory,
 } from '@/lib/marketplace-reservation-storage';
+import { reservationHistoryCursor } from '@/lib/marketplace-reservation-history';
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200, retry = false) =>
   Response.json(body, {
@@ -59,6 +61,36 @@ export async function GET(request: Request) {
       return json({ error: 'Sign in to recover your reservation.' }, 401);
     const params = new URL(request.url).searchParams,
       id = params.get('id');
+    if (params.get('history') === '1') {
+      const keys = [...params.keys()],
+        createdAt = params.get('beforeCreatedAt'),
+        beforeId = params.get('beforeId');
+      if (
+        keys.some(
+          (k) => !['history', 'beforeCreatedAt', 'beforeId'].includes(k),
+        ) ||
+        new Set(keys).size !== keys.length ||
+        !(
+          (keys.length === 1 && createdAt === null && beforeId === null) ||
+          (keys.length === 3 && createdAt !== null && beforeId !== null)
+        )
+      )
+        return json({ error: 'Choose one saved-hold history page.' }, 400);
+      const parsed =
+        createdAt === null
+          ? null
+          : reservationHistoryCursor.safeParse({ createdAt, id: beforeId });
+      if (parsed && !parsed.success)
+        return json({ error: 'Choose a valid saved-hold cursor.' }, 400);
+      return json({
+        history: await readMarketplaceReservationHistory(
+          getD1(),
+          user.userId,
+          parsed?.success ? parsed.data : null,
+          request.signal,
+        ),
+      });
+    }
     if (
       [...params.keys()].length !== 1 ||
       !operatorDraftId.safeParse(id).success

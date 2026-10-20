@@ -23,11 +23,13 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 - Codex (ChatGPT) works in `C:\Users\Julian\Desktop\Bundle` on local `main`, committing verified work locally as described above. Pushing `main` stays julian's decision.
 - Claude works only on new branches cut from `origin/main` (never from local `main`, never on `main` itself) and delivers through pull requests. Claude does not commit into this checkout's `main`.
 - Nobody force-pushes `main`, rewrites its published history, or deletes another agent's branch or worktree.
-- Migrations: take the next number after the highest entry in `drizzle/meta/_journal.json` **on local main**, not on `origin/main`. Local main currently goes up to `0120_marketplace_reservations`, so the next free number is `0121`. Recheck the journal before claiming it. Claim the number in "Current claims" before writing the file. A Claude branch off `origin/main` must still use a number above local main's highest, and must be renumbered if local main moves past it before merge.
+- Migrations: take the next number after the highest entry in `drizzle/meta/_journal.json` **on local main**, not on `origin/main`. Local main currently goes up to `0121_marketplace_reservation_history`, so the next free number is `0122`. Recheck the journal before claiming it. Claim the number in "Current claims" before writing the file. A Claude branch off `origin/main` must still use a number above local main's highest, and must be renumbered if local main moves past it before merge.
 - Never rename, renumber or edit an already-committed migration.
 - Shell and layout protection from the handoff doc still applies (`app/page.tsx` and the protected layout files need an approved exact patch).
 
 ### Current claims
+
+- Codex, 20 October 2026: saved-hold discovery is complete; bounded claim released. Read `docs/CODEX-MARKETPLACE-HOLD-HISTORY-20261020.md`: 348 marketplace tests/26 files, final16 buyer cases, plain TypeScript, typed lint/format, unchanged-source isolated build and synthetic desktop/375 Chrome pass. Source-only `0121_marketplace_reservation_history`, owner-scoped indexed history/API/model and buyer-dialog list/pagination recover full receipts before release. All122 whole-file local migrations and checksum-checked0120-to0121 upgrade/repeat pass. No protected layout, application/hosted SQL, actual holds, payment/delivery/signing or deployment. Sale qualification and checkout/fulfillment remain open; next migration is0122 subject to recheck.
 
 - Codex, 20 October 2026: buyer reservation UI is complete; bounded claim released. Read `docs/CODEX-MARKETPLACE-RESERVATION-BUYER-20261020.md`: 327 marketplace tests/25 files, plain TypeScript, typed lint/format, final unchanged-source isolated build and synthetic desktop/375 Chrome pass. Paths: owned buyer dialog/model/context/tests/CSS and cart/catalog/workspace wiring. Separate unchecked hold/release consent, same-ID manual recovery, local expiry, no automatic write/retry, and background availability invalidation after known/unknown writes. No protected shell/layout, migration, application/hosted SQL, real hold, payment/delivery/signing or deployment. Saved-hold discovery, sale qualification and checkout/fulfillment remain open; next migration stays 0121 subject to recheck.
 
@@ -72,7 +74,7 @@ Codex (ChatGPT) owns the following areas it is actively extending. The original 
 - Codex (Review current progress), 18 October 2026: account session management audit and implementation, `components/bundle-account.tsx`, new `components/account-sessions*`, `lib/account-sessions*`, `app/api/account-sessions/**` and their tests. Source implementation waits for the current full-suite freeze to end; no provider, credential, password-policy or schema change is claimed.
 - Imported token chart and wallet workspace: `app/api/imported-projects/**`, `components/wallet-workspace*`, marketplace catalog/inventory (`lib/marketplace-catalog*`).
 - DCA timing and budgets (`lib/dca-trade*`, `lib/duration-parts*`), public wallet tags/watchlist imports (`lib/wallet-public*`, `lib/tracker-bulk*`), sign-in/password rules (`app/sign-in/**`).
-- All of `drizzle/**` and `db/**`; the committed journal currently ends at `0117`.
+- All of `drizzle/**` and `db/**`; the committed journal currently ends at `0121`.
 
 
 Claude: no active PR27 claim after merge. Add a new claim before further implementation.

@@ -6,6 +6,12 @@ import {
 } from './marketplace-operator-draft-view';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
 import {
+  admitReservationHistory,
+  reservationHistoryCursor,
+  HOLD_HISTORY_PAGE_SIZE,
+  type ReservationHistoryCursor,
+} from './marketplace-reservation-history';
+import {
   reservationRequest,
   reservationCancel,
   makeReservation,
@@ -38,28 +44,38 @@ async function installed(db: D1Database) {
       503,
     );
 }
+const selectReservation =
+  'SELECT r.*,c.released_at,c.context_sha256 AS release_sha,c.acknowledgement AS release_ack FROM marketplace_reservations r';
+const joinRelease =
+  ' LEFT JOIN marketplace_reservation_releases c ON c.buyer_id=r.buyer_id AND c.reservation_id=r.id';
+type ReservationRow = {
+  id: string;
+  document: string;
+  context_sha256: string;
+  request_sha256: string;
+  created_at: string;
+  expires_at: string;
+  released_at: string | null;
+  release_sha: string | null;
+  release_ack: string | null;
+};
 async function read(db: D1Database, owner: string, id: string) {
   const row = await db
-    .prepare(
-      'SELECT r.*,c.released_at,c.context_sha256 AS release_sha,c.acknowledgement AS release_ack FROM marketplace_reservations r LEFT JOIN marketplace_reservation_releases c ON c.buyer_id=r.buyer_id AND c.reservation_id=r.id WHERE r.buyer_id=? AND r.id=?',
-    )
+    .prepare(selectReservation + joinRelease + ' WHERE r.buyer_id=? AND r.id=?')
     .bind(owner, id)
-    .first<{
-      id: string;
-      document: string;
-      context_sha256: string;
-      request_sha256: string;
-      created_at: string;
-      expires_at: string;
-      released_at: string | null;
-      release_sha: string | null;
-      release_ack: string | null;
-    }>();
+    .first<ReservationRow>();
   if (!row) return null;
+  return decodeReservation(row);
+}
+async function decodeReservation(row: ReservationRow, now = Date.now()) {
   try {
     if (new TextEncoder().encode(row.document).byteLength > 524288)
       throw Error('Capacity');
-    const record = await admitReservation(JSON.parse(row.document));
+    const record = await admitReservation(
+      JSON.parse(row.document),
+      undefined,
+      now,
+    );
     if (
       record.id !== row.id ||
       record.contextSha256 !== row.context_sha256 ||
@@ -70,7 +86,7 @@ async function read(db: D1Database, owner: string, id: string) {
       throw Error('Binding');
     if (row.released_at !== null)
       reservationCancel.parse({
-        id,
+        id: row.id,
         contextSha256: row.release_sha,
         acknowledgement: row.release_ack,
       });
@@ -79,7 +95,7 @@ async function read(db: D1Database, owner: string, id: string) {
     return {
       record,
       releasedAt: row.released_at,
-      state: reservationState(record, row.released_at),
+      state: reservationState(record, row.released_at, now),
     };
   } catch {
     throw new MarketplaceReservationError(
@@ -87,6 +103,85 @@ async function read(db: D1Database, owner: string, id: string) {
       503,
     );
   }
+}
+export async function readMarketplaceReservationHistory(
+  db: D1Database,
+  owner: string,
+  cursor: ReservationHistoryCursor | null,
+  signal: AbortSignal,
+) {
+  ownerId(owner);
+  if (cursor) reservationHistoryCursor.parse(cursor);
+  signal.throwIfAborted();
+  await installed(db);
+  const found = await db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name='marketplace_reservations_buyer_history'",
+    )
+    .first();
+  if (!found)
+    throw new MarketplaceReservationError(
+      'Reservation history storage is not installed.',
+      503,
+    );
+  const query =
+    selectReservation +
+    ' INDEXED BY marketplace_reservations_buyer_history' +
+    joinRelease +
+    ' WHERE r.buyer_id=?' +
+    (cursor ? ' AND (r.created_at,r.id)<(?,?)' : '') +
+    ' ORDER BY r.created_at DESC,r.id DESC LIMIT ?';
+  const args: unknown[] = [
+    owner,
+    ...(cursor ? [cursor.createdAt, cursor.id] : []),
+    HOLD_HISTORY_PAGE_SIZE + 1,
+  ];
+  const rows = (
+      await db
+        .prepare(query)
+        .bind(...args)
+        .all<ReservationRow>()
+    ).results,
+    now = Date.now(),
+    entries = [];
+  for (const row of rows.slice(0, HOLD_HISTORY_PAGE_SIZE)) {
+    signal.throwIfAborted();
+    const { record, releasedAt, state } = await decodeReservation(row, now);
+    entries.push({
+      id: record.id,
+      createdAt: record.createdAt,
+      expiresAt: record.expiresAt,
+      releasedAt,
+      state,
+      count: record.review.count,
+      askingPriceLamports: record.review.askingPriceLamports,
+      contextSha256: record.contextSha256,
+    });
+  }
+  signal.throwIfAborted();
+  const last = entries.at(-1);
+  return admitReservationHistory(
+    {
+      history: {
+        format: 'bundle-reservation-history-v1',
+        chain: 'Solana',
+        seller: 'Bundle',
+        observedAt: new Date(now).toISOString(),
+        entries,
+        nextCursor:
+          rows.length > HOLD_HISTORY_PAGE_SIZE && last
+            ? { createdAt: last.createdAt, id: last.id }
+            : null,
+        reserveAllowed: false,
+        releaseAllowed: false,
+        purchaseEnabled: false,
+        paymentEnabled: false,
+        deliveryEnabled: false,
+        signingAllowed: false,
+      },
+    },
+    cursor,
+  );
 }
 export async function readMarketplaceReservation(
   db: D1Database,

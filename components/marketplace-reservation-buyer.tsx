@@ -24,6 +24,12 @@ import {
   type BuyerReservation,
 } from '@/lib/marketplace-reservation-view';
 import styles from './marketplace-reservation-buyer.module.css';
+import { MarketplaceReservationHistoryPanel } from './marketplace-reservation-history-panel';
+import {
+  admitReservationHistory,
+  type ReservationHistoryPage,
+  type ReservationHistoryCursor,
+} from '@/lib/marketplace-reservation-history';
 import { MarketplaceReservationContext } from './marketplace-reservation-context';
 const recoveryKey = 'bundle.marketplace.reservation-id.v1';
 function retainedId() {
@@ -53,10 +59,12 @@ export function MarketplaceReservationBuyer({
     [signIn, setSignIn] = useState(false),
     [clock, setClock] = useState(0),
     [retentionFailed, setRetentionFailed] = useState(false),
-    [version, setVersion] = useState(0);
+    [version, setVersion] = useState(0),
+    [history, setHistory] = useState<ReservationHistoryPage | null>(null);
   const pending = useRef<AbortController | null>(null),
     expected = useRef<ReservationRequest | undefined>(undefined),
-    recoveryButton = useRef<HTMLButtonElement | null>(null);
+    recoveryButton = useRef<HTMLButtonElement | null>(null),
+    dialogPanel = useRef<HTMLDivElement | null>(null);
   useEffect(
     () => () => {
       pending.current?.abort();
@@ -104,6 +112,7 @@ export function MarketplaceReservationBuyer({
     setMissing(false);
     setSignIn(false);
     setClock(Date.now());
+    setHistory(null);
     if (expected.current?.id !== saved) expected.current = undefined;
     setOpen(true);
   }
@@ -122,10 +131,15 @@ export function MarketplaceReservationBuyer({
     setAck(false);
     setReleaseAck(false);
     setMessage(
-      'Stopped waiting. Recover this same ID before another write. Closing does not release a hold.',
+      id
+        ? 'Stopped waiting. Recover this same ID before another write. Closing does not release a hold.'
+        : 'Stopped waiting. No hold was created, renewed or released.',
     );
   }
-  async function run(action: 'reserve' | 'recover' | 'release') {
+  async function run(
+    action: 'reserve' | 'recover' | 'release',
+    selectedId?: string,
+  ) {
     if (pending.current) return;
     if (
       action === 'reserve' &&
@@ -171,7 +185,15 @@ export function MarketplaceReservationBuyer({
         setReleaseAck(false);
         setReceipt(null);
       } else {
-        activeId = operatorDraftId.parse(id || lookup.trim());
+        activeId = operatorDraftId.parse(selectedId || id || lookup.trim());
+        if (selectedId) {
+          setHistory(null);
+          dialogPanel.current?.focus();
+        }
+        setReceipt(null);
+        setCandidate(null);
+        setAck(false);
+        setReleaseAck(false);
         if (expected.current?.id !== activeId) expected.current = undefined;
         setId(activeId);
         remember(activeId);
@@ -249,6 +271,57 @@ export function MarketplaceReservationBuyer({
       }
     }
   }
+  async function findHistory(cursor: ReservationHistoryCursor | null = null) {
+    if (pending.current) return;
+    const c = new AbortController();
+    pending.current = c;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    setSignIn(false);
+    setHistory(null);
+    setCandidate(null);
+    setReceipt(null);
+    setAck(false);
+    setReleaseAck(false);
+    try {
+      const params = new URLSearchParams({ history: '1' });
+      if (cursor) {
+        params.set('beforeCreatedAt', cursor.createdAt);
+        params.set('beforeId', cursor.id);
+      }
+      const response = await fetch('/api/marketplace/reservations?' + params, {
+        cache: 'no-store',
+        signal: AbortSignal.any([c.signal, AbortSignal.timeout(10000)]),
+      });
+      const body = await readPanelJson(
+        response,
+        'Saved wallet holds unavailable.',
+      );
+      if (!live(c)) return;
+      if (!response.ok) {
+        setSignIn(response.status === 401);
+        setError(
+          response.status === 401
+            ? 'Sign in to find your saved holds.'
+            : 'Saved holds unavailable. You can still recover a hold by its ID.',
+        );
+        return;
+      }
+      const checked = admitReservationHistory(body, cursor);
+      if (live(c)) setHistory(checked);
+    } catch {
+      if (live(c))
+        setError(
+          'Saved holds could not be verified. No hold was created, renewed or released.',
+        );
+    } finally {
+      if (pending.current === c) {
+        pending.current = null;
+        setBusy(false);
+      }
+    }
+  }
   const state = receipt
     ? reservationState(
         receipt.record,
@@ -285,19 +358,40 @@ export function MarketplaceReservationBuyer({
           if (!value) close();
         }}
       >
-        <DialogContent className={styles.popup} finalFocus={recoveryButton}>
+        <DialogContent
+          ref={dialogPanel}
+          className={styles.popup}
+          finalFocus={recoveryButton}
+        >
           <DialogTitle>
             {receipt
               ? 'Wallet hold status'
-              : id
-                ? 'Recover wallet hold'
-                : 'Review wallet hold'}
+              : candidate && !id
+                ? 'Review wallet hold'
+                : 'Recover wallet hold'}
           </DialogTitle>
           <DialogDescription>
             A hold lasts five minutes. Payment, purchase and secure key delivery
             are not yet available. Closing this window does not release an
             existing hold.
           </DialogDescription>
+          <div className={styles.controls}>
+            <button disabled={busy} onClick={() => void findHistory()}>
+              Find my saved holds
+            </button>
+          </div>
+          {history && (
+            <MarketplaceReservationHistoryPanel
+              history={history}
+              busy={busy}
+              onOpen={(selected) => void run('recover', selected)}
+              onPage={(cursor) => void findHistory(cursor)}
+              onById={() => {
+                setHistory(null);
+                dialogPanel.current?.focus();
+              }}
+            />
+          )}
           {candidate && !id && (
             <>
               <dl className={styles.facts}>
@@ -356,7 +450,7 @@ export function MarketplaceReservationBuyer({
               </div>
             </>
           )}
-          {(id || !candidate) && (
+          {!history && (id || !candidate) && (
             <>
               <label className={styles.lookup}>
                 Reservation ID

@@ -27,6 +27,11 @@ import {
   reservationRecord,
 } from '@/lib/marketplace-reservation';
 import { walletWarmupSessionDigest as digest } from '@/lib/wallet-warmup-session-digest';
+import {
+  reserveMarketplaceCart,
+  releaseMarketplaceReservation,
+} from '@/lib/marketplace-reservation-storage';
+import { admitReservationHistory } from '@/lib/marketplace-reservation-history';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'buyer' } as { userId: string } | null,
   db: null as unknown as D1Database,
@@ -70,6 +75,7 @@ beforeEach(async () => {
     '0118_marketplace_operator_drafts',
     '0119_marketplace_publications',
     '0120_marketplace_reservations',
+    '0121_marketplace_reservation_history',
   ])
     for (const sql of readFileSync('drizzle/' + file + '.sql', 'utf8')
       .split('--> statement-breakpoint')
@@ -359,5 +365,122 @@ it('refuses stale cart content and missing reservation guards with safe errors',
   expect(text).not.toMatch(/sqlite|SELECT |trigger|stack/i);
   await expect(readBundleCatalog(db, signal())).rejects.toThrow(
     /not installed/,
+  );
+});
+it('finds only owned holds with stable indexed pages and no writes or financial authority', async () => {
+  const { action: _action, ...template } = await input();
+  async function seed(owner: string) {
+    const result = await reserveMarketplaceCart(
+      db,
+      owner,
+      { ...template, id: crypto.randomUUID() },
+      signal(),
+    );
+    await releaseMarketplaceReservation(
+      db,
+      owner,
+      {
+        id: result.record.id,
+        contextSha256: result.record.contextSha256,
+        acknowledgement: RESERVATION_CANCEL_ACK,
+      },
+      signal(),
+    );
+    return result.record.id;
+  }
+  const other = await seed('other'),
+    ids = [];
+  for (let i = 0; i < 25; i++) ids.push(await seed('buyer'));
+  queries = [];
+  const firstResponse = await get('history=1'),
+    first = admitReservationHistory(await firstResponse.json());
+  expect(firstResponse.status).toBe(200);
+  expect(firstResponse.headers.get('cache-control')).toBe('no-store');
+  expect(first.entries).toHaveLength(20);
+  expect(first.nextCursor).not.toBeNull();
+  const query = new URLSearchParams({
+    history: '1',
+    beforeCreatedAt: first.nextCursor!.createdAt,
+    beforeId: first.nextCursor!.id,
+  });
+  const second = admitReservationHistory(
+    await (await get(query.toString())).json(),
+    first.nextCursor,
+  );
+  expect(second.entries).toHaveLength(5);
+  expect(second.nextCursor).toBeNull();
+  expect(
+    new Set([...first.entries, ...second.entries].map((e) => e.id)),
+  ).toEqual(new Set(ids));
+  expect(first.entries.some((e) => e.id === other)).toBe(false);
+  expect(first).toMatchObject({
+    reserveAllowed: false,
+    releaseAllowed: false,
+    purchaseEnabled: false,
+    paymentEnabled: false,
+    deliveryEnabled: false,
+    signingAllowed: false,
+  });
+  expect(Object.hasOwn(first.entries[0], 'record')).toBe(false);
+  expect(queries.every((q) => /^SELECT\b/i.test(q.trim()))).toBe(true);
+  expect(
+    queries.some((q) =>
+      q.includes('INDEXED BY marketplace_reservations_buyer_history'),
+    ),
+  ).toBe(true);
+  expect(fetch).not.toHaveBeenCalled();
+});
+it('validates history selectors and auth before SQL, including missing cursor halves and duplicates', async () => {
+  queries = [];
+  mocks.user = null;
+  expect((await get('history=1')).status).toBe(401);
+  mocks.user = { userId: 'buyer' };
+  for (const query of [
+    'history=1&id=' + crypto.randomUUID(),
+    'history=1&history=1',
+    'history=1&buyerId=other',
+    'history=1&beforeId=' + crypto.randomUUID(),
+    'history=1&beforeCreatedAt=bad&beforeId=' + crypto.randomUUID(),
+  ])
+    expect((await get(query)).status).toBe(400);
+  expect(queries).toEqual([]);
+  const c = new AbortController();
+  c.abort();
+  expect(
+    (
+      await GET(
+        new Request('http://localhost/api/marketplace/reservations?history=1', {
+          signal: c.signal,
+        }),
+      )
+    ).status,
+  ).toBe(408);
+  expect(queries).toEqual([]);
+});
+it('returns empty history and fails closed on missing index or corrupt owned receipts', async () => {
+  expect(
+    admitReservationHistory(await (await get('history=1')).json()).entries,
+  ).toEqual([]);
+  const selected = await input(),
+    saved = await reservationBody(await post(selected));
+  await db.prepare('DROP INDEX marketplace_reservations_buyer_history').run();
+  expect((await get('history=1')).status).toBe(503);
+  expect((await get('id=' + selected.id)).status).toBe(200);
+  await db
+    .prepare(
+      readFileSync('drizzle/0121_marketplace_reservation_history.sql', 'utf8'),
+    )
+    .run();
+  await db.prepare('DROP TRIGGER marketplace_reservations_no_update').run();
+  await db
+    .prepare(
+      "UPDATE marketplace_reservations SET document=json_set(document,'$.review.askingPriceLamports','1') WHERE id=?",
+    )
+    .bind(saved.reservation.record.id)
+    .run();
+  const result = await get('history=1');
+  expect(result.status).toBe(503);
+  expect(await result.text()).not.toMatch(
+    /sqlite|SELECT |stack|askingPriceLamports/,
   );
 });

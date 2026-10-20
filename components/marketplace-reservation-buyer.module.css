@@ -88,6 +88,35 @@
 .facts dd {
   margin: 4px 0 0;
 }
+.historyRows {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 12px;
+  max-height: min(42dvh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.historyRows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #38455d;
+  border-radius: 8px;
+}
+.historyRows button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #38455d;
+  border-radius: 8px;
+}
+.historyRows button:focus-visible {
+  outline: 2px solid #a6b1ff;
+  outline-offset: 3px;
+}
 .popup code {
   display: block;
   overflow-wrap: anywhere;
