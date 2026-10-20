@@ -126,4 +126,43 @@ describe('AutoSellRunner', () => {
     expect(t.runner.snapshot().states.a.status).toBe('stopped');
     expect(t.runner.isRunning()).toBe(false);
   });
+
+  it('stops the whole run after repeated failed sells', async () => {
+    const sell = vi.fn().mockRejectedValue(new Error('balance'));
+    const t = setup({}, sell);
+    t.runner.start();
+    await flush();
+    t.push(buy('1000'));
+    for (let i = 0; i < 8; i++) {
+      await t.runner.tick();
+      await flush();
+      t.advance(20_000);
+    }
+    expect(sell).toHaveBeenCalledTimes(5);
+    expect(t.runner.isRunning()).toBe(false);
+    expect(t.runner.snapshot().states.a.status).toBe('stopped');
+  });
+
+  it('treats a stale market cap as unknown and holds ranged sells', async () => {
+    const t = setup({ marketCapMinUsd: '1', minSupplyPercentPerSell: '50' });
+    let failing = false;
+    const runner = t.runner as unknown as {
+      deps: { readTrades: (s: AbortSignal) => Promise<unknown> };
+    };
+    const read = runner.deps.readTrades;
+    runner.deps.readTrades = async (signal) => {
+      if (failing) throw new Error('feed down');
+      return read(signal);
+    };
+    t.runner.start();
+    await flush();
+    t.push(buy('1000'));
+    await t.runner.tick();
+    expect(t.runner.snapshot().marketCapUsd).not.toBeNull();
+    failing = true;
+    t.advance(61_000);
+    await t.runner.tick();
+    expect(t.runner.snapshot().marketCapUsd).toBeNull();
+    expect(t.runner.snapshot().states.a.inRange).toBe(false);
+  });
 });
