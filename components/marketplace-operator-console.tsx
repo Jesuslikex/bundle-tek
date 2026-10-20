@@ -15,6 +15,7 @@ import styles from './marketplace-owned-wallets.module.css';
 import { MarketplaceOperatorDrafts } from './marketplace-operator-drafts';
 import { MarketplaceSaleInspectionPanel } from './marketplace-sale-inspection-panel';
 import { MarketplaceTokenInspectionPanel } from './marketplace-token-inspection-panel';
+import { MarketplaceControlEvidencePanel } from './marketplace-control-evidence-panel';
 export function MarketplaceOperatorConsole() {
   const [inventory, setInventory] = useState<MarketplaceOwnedInventory | null>(
       null,
@@ -332,6 +333,13 @@ export function MarketplaceOperatorConsole() {
             signature.
           </p>
         </div>
+      )}
+      {review && inventory && (
+        <MarketplaceControlEvidencePanel
+          key={`control:${review.requestSha256}`}
+          inventory={inventory}
+          selection={review.selection}
+        />
       )}
       {review && inventory && (
         <MarketplaceSaleInspectionPanel

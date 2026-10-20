@@ -92,6 +92,13 @@ const joined = z
 const fail = (): never => {
   throw Error('Saved control evidence is unavailable or inconsistent.');
 };
+export class MarketplaceControlClockError extends Error {
+  constructor() {
+    super(
+      'The control record snapshot expired or is ahead of this device clock. Check the device time, reload seller inventory and check the record again.',
+    );
+  }
+}
 function stateFor(
   value: MarketplaceControlEvidence['record'],
   site: string,
@@ -240,6 +247,8 @@ export async function admitMarketplaceControlEvidence(
   );
   const at = Date.parse(evidence.observedAt),
     expires = Date.parse(evidence.expiresAt);
+  if (Number.isSafeInteger(now) && (at > now || now >= expires))
+    throw new MarketplaceControlClockError();
   if (
     !wallet ||
     operatorDraftCanonical(evidence.selection) !==

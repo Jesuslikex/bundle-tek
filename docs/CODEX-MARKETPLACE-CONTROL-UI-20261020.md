@@ -1,0 +1,31 @@
+# Manual seller control-record review
+
+20 October 2026. Integration after05cce28. Source implementation only, not a live release or sale qualification.
+
+## API and display
+
+POST `/api/marketplace/operator/control-evidence` authenticates the verified configured Bundle operator before storage, accepts no query parameters and requires exact same-origin JSON under2048bytes. Only the strict address/revision/positive-price selection is accepted. It calls the one-SELECT owned record reader, then rechecks the same session identity, operator configuration and cancellation before returning a no-store envelope. Changed wallet409, revoked access403, cancellation408 and unavailable/corrupted storage503 use fixed sanitized messages. There is no provider request, pacing-table write or other persistence; unlike provider inspections, this DB-only lookup does not consume a provider cooldown.
+
+The new Codex-owned panel appears only under a current unpublished listing review. It has a distinct `control:` key beside the unchanged `native:` and `tokens:` panel identities. Changing the exact price, reloading inventory, review expiry or cancelling the parent removes it and aborts pending work. No mount/disclosure request, retry or polling occurs. A manual request has a fifteen-second HTTP timeout, synchronous pending lock, explicit Cancel and ignored late replies. Strict async response admission is followed by another expiry check before display. Local expiry clears the result without renewing the original proof.
+
+The result separates recent same-site records, expired challenges, missing originals, other origins and no saved verification. Original challenge identity, recorded verification time, origin and message issue/expiry are displayed. Adjacent visible copy states that no signature is stored/replayed, the record does not approve price/revision or prove current/exclusive key control, and sale/payment/delivery are unavailable. The original five-minute window remains unchanged.
+
+An expandable guide explains how to use the existing My wallets verification flow, return, reload inventory and review again. Its root workspace link is real; no unsupported wallet deep-link or second ownership signer was invented. The panel cannot unlock a vault, ask for a signature, change proofs or authorize anything.
+
+## Claude Opus5.5 coordination
+
+Codex requested a read-only foundation review against pushed05cce28 in the existing Bundle Claude project, with Opus5.5 visibly selected. Claude confirmed a separate cloud checkout and no PC edits. It reported no high/medium issues, a clock-guidance concern, the possible misreading of address-only proof as price/revision consent and a redundant wallet-time check nit.
+
+Codex independently assessed them. Typed device-clock/stale guidance is now presented without changing freshness tolerances. Visible adjacent text explicitly denies price/revision/current/exclusive custody implications. The wallet-time relation is already implied by exact inventory equality plus validated wallet.updatedAt<=inventory.observedAt<=evidence.observedAt; no predicate change was needed. Claude read both foundation files, both test bodies, the fixture/message and relevant ownership-route SQL. It did not read AGENTS/the handoff or all imported helper bodies and ran no tests. Its review is not claimed to cover this new API/UI; Codex owns their verification.
+
+## Verification and limits
+
+Integrated marketplace run passes **579 tests/36files**. A test-only lint correction captured the existing prepare spy instead of passing an unbound method; all11 affected server/API cases were rerun afterwards and pass. Application source did not change during the integrated run. Plain TypeScript, seven-file typed lint and formatting pass. The initial panel tests exposed real WebCrypto scheduling outside React act while using fake timers; the UI fixtures now use a deterministic Node SHA256 implementation, matching the existing token-panel test convention. Real WebCrypto remains used by model/server tests and browser QA. No product predicate changed for this test correction.
+
+The11 server tests include the actual existing ownership HTTP route with synthetic signatures and disposable in-memory libSQL, plus API auth/policy, strict input, SELECT-only no-store output, mid-read session/policy revocation, source change, cancellation and sanitized storage failure. The19 panel tests cover manual exact selection, all record states, fixed status/HTML guidance, altered price/origin/capability/timing refusal, expiry, cancellation/late replies/unmount. The parent test verifies all three distinct panels and exact-price invalidation.
+
+Chrome renders the actual console/panel and production styles with public in-memory metadata, never a real provider/account/operator setting. Desktop1440 has document/client width1440 and panel1124; phone375 has document/client width360 (scrollbar), panel328 and46px action height. Recent, missing-original and expired states render correctly. The expanded existing-flow instructions remain readable; price edits remove all reviewed panels with no new request. Desktop3 fixture reads and phone5 fixture reads, zero financial writes or signatures. Screenshots are in `docs/qa/20261020/marketplace-control/`; phone capture is full-page. These are synthetic browser checks, not signed-in production or current wallet control proof.
+
+Final isolated Next production build exits0 on05cce28 plus seven exact overlays, with both canonical and snapshot hashes unchanged. Evidence: `CODEX-MARKETPLACE-CONTROL-UI-BUILD-20261020.json`. Environment was sanitized with no application secrets, local font fixtures and dependency junction. No full-repository suite, real-provider qualification, payment, delivery or funded proof is claimed.
+
+No protected Claude shell/token layout, existing signer/ownership route, migration, application/hosted SQL, provider/credential/cron or real operator configuration changed. No deployment or real wallet action. Further current-control and asset/provenance qualification, checkout, finalized payment reconciliation, secure delivery/import and purchase recovery remain open; broader Proxima parity remains unproven. Next migration stays0122, subject to recheck.

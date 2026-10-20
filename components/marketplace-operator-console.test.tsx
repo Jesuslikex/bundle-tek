@@ -258,3 +258,42 @@ it('mounts both checks with distinct identities and aborts a token read when the
   await act(async () => resolve(Response.json({ inspection: f.inspection })));
   expect(host.textContent).not.toContain('2 owned token accounts returned');
 });
+it('mounts the saved control check only after review and aborts it on price changes without disturbing other panel identities', async () => {
+  const data = inventory();
+  let resolve!: (r: Response) => void;
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/control-evidence'))
+      return new Promise<Response>((r) => {
+        resolve = r;
+      });
+    return init?.method === 'POST'
+      ? Response.json(
+          await reviewOperatorListing(data, JSON.parse(init.body as string)),
+        )
+      : Response.json(data);
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  expect(button('Check saved control record')).toBeUndefined();
+  await click('Open seller inventory');
+  await price('0.05');
+  await click('Review listing draft');
+  expect(button('Check saved control record')).toBeDefined();
+  expect(button('Inspect current account')).toBeDefined();
+  expect(button('Inspect owned token accounts')).toBeDefined();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  await click('Check saved control record');
+  const init = fetcher.mock.calls[2][1]!;
+  expect(JSON.parse(init.body as string)).toEqual({
+    address: data.wallets[0].address,
+    walletRevision: data.wallets[0].revision,
+    priceLamports: '50000000',
+  });
+  await price('0.06');
+  expect(init.signal?.aborted).toBe(true);
+  expect(button('Check saved control record')).toBeUndefined();
+  expect(button('Inspect current account')).toBeUndefined();
+  expect(button('Inspect owned token accounts')).toBeUndefined();
+  await act(async () => resolve(Response.json({ evidence: {} })));
+  expect(host.querySelector('[aria-label="Control record result"]')).toBeNull();
+});

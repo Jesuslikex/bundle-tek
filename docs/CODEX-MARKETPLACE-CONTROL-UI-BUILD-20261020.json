@@ -1,0 +1,24 @@
+{
+  "base": "05cce28",
+  "overlay": [
+    "app/api/marketplace/operator/control-evidence/route.ts",
+    "lib/marketplace-control-evidence.ts",
+    "lib/marketplace-control-evidence-server.test.ts",
+    "components/marketplace-control-evidence-panel.tsx",
+    "components/marketplace-control-evidence-panel.test.tsx",
+    "components/marketplace-operator-console.tsx",
+    "components/marketplace-operator-console.test.tsx"
+  ],
+  "hashes": {
+    "app/api/marketplace/operator/control-evidence/route.ts": "72d0ca684527295f68806b4ee0d38f7e8fc381d78d2c658fe62480fdb17b8e2e",
+    "lib/marketplace-control-evidence.ts": "14c7cd1d1f43ae93208c8bc6ecde75d1c84cedf26a510068ecfa2435d2d7928c",
+    "lib/marketplace-control-evidence-server.test.ts": "e2cc53cc0f28355b0c3b77e2b19a56141e5466543d28585c3205fbacd4f9f9db",
+    "components/marketplace-control-evidence-panel.tsx": "522373e000673eeea2bf529cfef7093a6da9651cc255293785acd8e5dfc30a6b",
+    "components/marketplace-control-evidence-panel.test.tsx": "703c269a20ca4f64fa1e66466502bb31c4f980a59ca1acb43572fbd81a05d323",
+    "components/marketplace-operator-console.tsx": "e0af01ad96cd545e4ac00fdc5a9896921ef22b8973b371e67cc55abffbb7d8ac",
+    "components/marketplace-operator-console.test.tsx": "65424b630694fc2dc8c0d44265adbf93900b8623d057953c6e0db9d02acd8d34"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}
