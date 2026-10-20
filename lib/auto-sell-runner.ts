@@ -10,6 +10,10 @@ import {
   type AutoSellStrategy,
   type AutoSellStrategyState,
 } from './auto-sell';
+import {
+  autoSellSessionCap,
+  type AutoSellSessionRules,
+} from './auto-sell-session';
 
 export type AutoSellLogEntry = {
   at: number;
@@ -40,6 +44,7 @@ export type AutoSellRunnerDeps = {
     signal: AbortSignal,
   ) => Promise<{ soldRaw: bigint; signature: string; wallet: string }>;
   onUpdate: (snapshot: AutoSellSnapshot) => void;
+  session?: AutoSellSessionRules;
   now?: () => number;
   random?: () => number;
   pollMs?: number;
@@ -93,6 +98,9 @@ export class AutoSellRunner {
   private timer: unknown = null;
   private controller = new AbortController();
   private polling = false;
+  private activeAt = 0;
+  private endTimer: unknown = null;
+  private sessionCap: bigint | null = null;
 
   constructor(deps: AutoSellRunnerDeps) {
     this.deps = {
@@ -105,15 +113,27 @@ export class AutoSellRunner {
       setTimer: (fn, ms) => setTimeout(fn, ms),
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
       ...deps,
+      session: deps.session ? { ...deps.session } : undefined,
     };
+    if (this.deps.session)
+      this.sessionCap = autoSellSessionCap(
+        this.deps.session,
+        deps.totalSupplyRaw,
+      );
   }
 
   start() {
     if (this.running) return;
     this.running = true;
     const now = this.deps.now();
+    this.activeAt = now + (this.deps.session?.startDelaySeconds ?? 0) * 1000;
     for (const s of this.deps.strategies)
-      this.states.set(s.id, initialAutoSellState(now));
+      this.states.set(s.id, initialAutoSellState(this.activeAt));
+    if (this.deps.session?.endDurationSeconds)
+      this.endTimer = this.deps.setTimer(
+        () => this.stop('Session duration reached.'),
+        this.activeAt - now + this.deps.session.endDurationSeconds * 1000,
+      );
     this.note(
       null,
       'info',
@@ -128,6 +148,8 @@ export class AutoSellRunner {
     this.controller.abort();
     if (this.timer !== null) this.deps.clearTimer(this.timer);
     this.timer = null;
+    if (this.endTimer !== null) this.deps.clearTimer(this.endTimer);
+    this.endTimer = null;
     for (const [id, state] of this.states)
       if (state.status === 'running')
         this.states.set(id, {
@@ -222,6 +244,12 @@ export class AutoSellRunner {
     // The first read only marks history; Auto Sell reacts to buys after Run.
     const fresh = trades.filter((t) => !this.seen.has(t.id)).reverse();
     for (const t of trades) this.seen.add(t.id);
+    if (this.deps.now() < this.activeAt) {
+      // Do not accumulate pre-start buys for a later counter sell.
+      this.seeded = false;
+      this.emit();
+      return;
+    }
     if (this.seen.size > 5000) this.seen = new Set(trades.map((t) => t.id));
     if (!this.seeded) {
       this.seeded = true;
@@ -258,7 +286,7 @@ export class AutoSellRunner {
 
   /** Queues due DCA and Limit Order sells. */
   private schedule() {
-    if (!this.running) return;
+    if (!this.running || this.deps.now() < this.activeAt) return;
     const now = this.deps.now();
     for (const s of this.deps.strategies) {
       if (s.mode === 'counter') continue;
@@ -295,6 +323,20 @@ export class AutoSellRunner {
 
   private checkEnds() {
     const now = this.deps.now();
+    if (
+      this.deps.session?.endDurationSeconds &&
+      now >= this.activeAt + this.deps.session.endDurationSeconds * 1000
+    ) {
+      this.stop('Session duration reached.');
+      return;
+    }
+    if (
+      this.sessionCap !== null &&
+      this.sessionUsed(false) >= this.sessionCap
+    ) {
+      this.stop('Session maximum amount reached.');
+      return;
+    }
     for (const s of this.deps.strategies) {
       const before = this.states.get(s.id)!;
       const after = checkAutoSellEnd(s, before, now, this.deps.totalSupplyRaw);
@@ -311,6 +353,8 @@ export class AutoSellRunner {
       this.running = false;
       if (this.timer !== null) this.deps.clearTimer(this.timer);
       this.timer = null;
+      if (this.endTimer !== null) this.deps.clearTimer(this.endTimer);
+      this.endTimer = null;
       this.note(null, 'info', 'All strategies ended.');
     }
   }
@@ -318,6 +362,7 @@ export class AutoSellRunner {
   private maybeSell() {
     if (
       !this.running ||
+      this.deps.now() < this.activeAt ||
       this.selling ||
       this.deps.now() < this.sellBlockedUntil
     )
@@ -326,7 +371,15 @@ export class AutoSellRunner {
     for (const s of this.deps.strategies) {
       const state = this.states.get(s.id)!;
       if (!marketCapInRange(s, this.marketCapUsd)) continue;
-      const amount = readyToSellRaw(s, state, this.deps.totalSupplyRaw);
+      let amount = readyToSellRaw(s, state, this.deps.totalSupplyRaw);
+      if (this.sessionCap !== null) {
+        const remaining = this.sessionCap - this.sessionUsed();
+        if (remaining <= 0n) {
+          this.stop('Session maximum amount reached.');
+          return;
+        }
+        if (amount > remaining) amount = remaining;
+      }
       if (amount <= 0n) continue;
       this.states.set(s.id, {
         ...state,
@@ -421,6 +474,14 @@ export class AutoSellRunner {
         });
       return;
     }
+  }
+
+  private sessionUsed(includeFlight = true) {
+    return [...this.states.values()].reduce(
+      (sum, state) =>
+        sum + state.soldRaw + (includeFlight ? state.inFlightRaw : 0n),
+      0n,
+    );
   }
 }
 
