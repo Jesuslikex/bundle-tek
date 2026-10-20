@@ -20,7 +20,16 @@ import {
 } from '@/lib/auto-sell';
 import { AutoSellRunner, type AutoSellSnapshot } from '@/lib/auto-sell-runner';
 import { autoSellSessionCap } from '@/lib/auto-sell-session';
-import { parseDurationParts, type DurationParts } from '@/lib/duration-parts';
+import {
+  parseDurationParts,
+  splitDurationSeconds,
+  type DurationParts,
+} from '@/lib/duration-parts';
+import type {
+  AutoSellConfiguration,
+  AutoSellEditReview,
+} from '@/lib/auto-sell-edit';
+import { autoSellEditChanges } from '@/lib/auto-sell-edit-changes';
 import { createAutoSellExecutor } from '@/lib/auto-sell-execute';
 import { createAutoSellFeed } from '@/lib/auto-sell-feed';
 import {
@@ -174,9 +183,104 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   }
   const running = !!snapshot?.running;
   const paused = running && !!snapshot?.paused;
+  const [editing, setEditing] = useState(false);
+  const [generation, setGeneration] = useState(0);
+  const [editReview, setEditReview] = useState<AutoSellEditReview | null>(null);
+  const [reviewedDraft, setReviewedDraft] = useState('');
+  const [approvedEdit, setApprovedEdit] = useState('');
+  const originalConfiguration = useRef<AutoSellConfiguration | null>(null);
+  const draftKey = JSON.stringify({ strategies, session: sessionRules });
+  const currentReview =
+    editing && paused && !snapshot?.settling && reviewedDraft === draftKey
+      ? editReview
+      : null;
   const ids = useId();
 
+  function loadConfiguration(configuration: AutoSellConfiguration) {
+    setStrategies(structuredClone(configuration.strategies));
+    setSessionDelay(
+      splitDurationSeconds(configuration.session.startDelaySeconds),
+    );
+    setSessionDuration(
+      splitDurationSeconds(configuration.session.endDurationSeconds),
+    );
+    setSessionMaximum(configuration.session.endMaxSupplyPercent);
+    setGeneration((value) => value + 1);
+  }
+
+  function cancelChanges() {
+    runner.current?.cancelEdit();
+    if (originalConfiguration.current)
+      loadConfiguration(originalConfiguration.current);
+    originalConfiguration.current = null;
+    setEditing(false);
+    setEditReview(null);
+    setApprovedEdit('');
+    setReviewedDraft('');
+    setError('');
+  }
+
+  function beginEdit() {
+    if (!paused || snapshot?.settling || !runner.current) return;
+    runner.current.cancelEdit();
+    originalConfiguration.current = runner.current.configuration();
+    loadConfiguration(originalConfiguration.current);
+    setEditReview(null);
+    setApprovedEdit('');
+    setEditing(true);
+    setError('');
+  }
+
+  function reviewChanges() {
+    setEditReview(null);
+    setApprovedEdit('');
+    setError('');
+    try {
+      if (sessionError || errors.some(Boolean))
+        throw new Error(sessionError || errors.find(Boolean)!);
+      if (!runner.current) return;
+      const review = runner.current.reviewEdit({
+        strategies,
+        session: sessionRules,
+      });
+      if (!autoSellEditChanges(review.before, review.after).length)
+        throw new Error('No active settings have changed.');
+      setEditReview(review);
+      setReviewedDraft(draftKey);
+    } catch (cause) {
+      runner.current?.cancelEdit();
+      setError(
+        cause instanceof Error ? cause.message : 'Could not review changes.',
+      );
+    }
+  }
+
+  function applyChanges() {
+    if (
+      !currentReview ||
+      approvedEdit !== currentReview.reviewKey ||
+      !runner.current
+    )
+      return;
+    try {
+      runner.current.applyEdit(currentReview.reviewKey, true);
+      originalConfiguration.current = null;
+      loadConfiguration(runner.current.configuration());
+      setEditing(false);
+      setEditReview(null);
+      setApprovedEdit('');
+      setError('');
+    } catch (cause) {
+      setEditReview(null);
+      setApprovedEdit('');
+      setError(
+        cause instanceof Error ? cause.message : 'Review the changes again.',
+      );
+    }
+  }
+
   function stop(reason = 'Stopped by you.') {
+    if (originalConfiguration.current) cancelChanges();
     runEpoch.current += 1;
     setBusy(false);
     setPassword('');
@@ -191,11 +295,13 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   }
 
   function closeDialog() {
+    if (originalConfiguration.current) cancelChanges();
     if (busy) stop('Vault unlock cancelled.');
     setOpen(false);
   }
 
   function togglePause() {
+    if (editing) return;
     setError('');
     if (!runner.current) return;
     if (paused) {
@@ -265,6 +371,11 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   const marketCap = running ? (snapshot?.marketCapUsd ?? null) : previewCap;
 
   function update(id: string, patch: Partial<AutoSellStrategy>) {
+    if (editing) {
+      runner.current?.cancelEdit();
+      setEditReview(null);
+      setApprovedEdit('');
+    }
     setStrategies((list) =>
       list.map((s) => (s.id === id ? { ...s, ...patch } : s)),
     );
@@ -353,6 +464,14 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
           if (!mounted.current || runner.current !== instance) return;
           setSnapshot(next);
           if (!next.running && !next.selling) {
+            if (originalConfiguration.current) {
+              loadConfiguration(instance.configuration());
+              originalConfiguration.current = null;
+              setEditing(false);
+              setEditReview(null);
+              setApprovedEdit('');
+              setError('The session ended. Unapplied edits were discarded.');
+            }
             if (vault.current) vault.current.payload.wallets = [];
             vault.current = null;
             releaseLock.current?.();
@@ -419,35 +538,56 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
               ×
             </button>
           </header>
-          <div className={styles.body}>
+          <div
+            className={styles.body}
+            onChangeCapture={(event) => {
+              if (
+                editing &&
+                !(
+                  event.target instanceof HTMLElement &&
+                  event.target.closest('[data-edit-approval]')
+                )
+              ) {
+                runner.current?.cancelEdit();
+                setEditReview(null);
+                setApprovedEdit('');
+              }
+            }}
+          >
             {strategies.map((s, i) => (
               <StrategyCard
-                key={s.id}
+                key={`${s.id}:${generation}`}
                 strategy={s}
                 error={errors[i]}
-                disabled={running || busy}
+                disabled={(running && !editing) || busy}
                 inRange={marketCapInRange(s, marketCap)}
                 state={snapshot?.states[s.id]}
                 pct={pct}
                 decimals={token.decimals}
                 canDelete={strategies.length > 1}
                 onChange={(patch) => update(s.id, patch)}
-                onDelete={() =>
-                  setStrategies((list) => list.filter((x) => x.id !== s.id))
-                }
+                onDelete={() => {
+                  runner.current?.cancelEdit();
+                  setEditReview(null);
+                  setApprovedEdit('');
+                  setStrategies((list) => list.filter((x) => x.id !== s.id));
+                }}
               />
             ))}
-            {!running && (
+            {(!running || editing) && (
               <button
                 type="button"
                 className={styles.add}
                 disabled={busy || strategies.length >= 5}
-                onClick={() =>
+                onClick={() => {
+                  runner.current?.cancelEdit();
+                  setEditReview(null);
+                  setApprovedEdit('');
                   setStrategies((list) => [
                     ...list,
                     newAutoSellStrategy(list.length),
-                  ])
-                }
+                  ]);
+                }}
               >
                 + Add Strategy
               </button>
@@ -457,10 +597,11 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
               open={!sellWallets.length || undefined}
             >
               <summary>Advanced Options</summary>
-              <fieldset disabled={running || busy}>
+              <fieldset disabled={(running && !editing) || busy}>
                 <legend>Session settings</legend>
                 <SessionTime
                   label="Start delay"
+                  disabled={editing}
                   value={sessionDelay}
                   onChange={setSessionDelay}
                 />
@@ -555,6 +696,85 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                 {error}
               </p>
             )}
+            {editing && (
+              <section
+                className={styles.review}
+                aria-label="Review Auto Sell changes"
+              >
+                <h3>Edit paused session</h3>
+                <p>
+                  Sold amounts, completed orders and elapsed time are retained.
+                  Wallet selection and the original start delay stay fixed.
+                  Applying changes does not resume selling.
+                </p>
+                {currentReview ? (
+                  <>
+                    <dl>
+                      {autoSellEditChanges(
+                        currentReview.before,
+                        currentReview.after,
+                      ).map((change) => (
+                        <div key={change.label}>
+                          <dt>{change.label}</dt>
+                          <dd>
+                            <span>Before: {change.before}</span>
+                            <span>After: {change.after}</span>
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <p>
+                      Accounted sales:{' '}
+                      {rawToDecimal(
+                        toRaw(currentReview.accountedRaw),
+                        token.decimals,
+                      )}{' '}
+                      tokens. Queued:{' '}
+                      {rawToDecimal(
+                        toRaw(currentReview.queuedRaw),
+                        token.decimals,
+                      )}{' '}
+                      tokens. Removed unsent queue:{' '}
+                      {rawToDecimal(
+                        toRaw(currentReview.cancelledQueuedRaw),
+                        token.decimals,
+                      )}{' '}
+                      tokens.
+                    </p>
+                    {currentReview.reactivatedStrategies.length > 0 && (
+                      <p>
+                        Strategies enabled again under the new limits:{' '}
+                        {currentReview.reactivatedStrategies.join(', ')}.
+                        Completed orders stay completed.
+                      </p>
+                    )}
+                    {currentReview.endsSession && (
+                      <output>
+                        These limits have already been reached. Applying will
+                        end this session.
+                      </output>
+                    )}
+                    <label className={styles.check} data-edit-approval>
+                      <input
+                        type="checkbox"
+                        checked={approvedEdit === currentReview.reviewKey}
+                        onChange={(event) =>
+                          setApprovedEdit(
+                            event.target.checked ? currentReview.reviewKey : '',
+                          )
+                        }
+                      />
+                      I approve these exact Auto Sell changes.
+                    </label>
+                  </>
+                ) : (
+                  <p>
+                    Change settings above, then review the differences. Every
+                    new review needs a fresh approval.
+                  </p>
+                )}
+              </section>
+            )}
             {running && (
               <output
                 aria-label="Auto Sell session status"
@@ -600,7 +820,43 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
             <Button variant="outline" onClick={closeDialog}>
               Close
             </Button>
-            {running && (
+            {paused && !editing && (
+              <Button
+                variant="outline"
+                disabled={!!snapshot?.settling}
+                onClick={beginEdit}
+              >
+                Edit
+              </Button>
+            )}
+            {editing && (
+              <>
+                <Button variant="outline" onClick={cancelChanges}>
+                  Cancel edits
+                </Button>
+                {currentReview ? (
+                  <Button
+                    disabled={approvedEdit !== currentReview.reviewKey}
+                    onClick={applyChanges}
+                  >
+                    Apply approved changes
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={
+                      !paused ||
+                      !!snapshot?.settling ||
+                      !!sessionError ||
+                      errors.some(Boolean)
+                    }
+                    onClick={reviewChanges}
+                  >
+                    Review changes
+                  </Button>
+                )}
+              </>
+            )}
+            {running && !editing && (
               <Button
                 variant="outline"
                 disabled={paused && !!snapshot?.settling}
@@ -641,10 +897,12 @@ function SessionTime({
   label,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: DurationParts;
   onChange: (parts: DurationParts) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className={styles.field}>
@@ -655,6 +913,7 @@ function SessionTime({
         {(['hours', 'minutes', 'seconds'] as const).map((unit) => (
           <Input
             key={unit}
+            disabled={disabled}
             aria-label={`${label} ${unit}`}
             inputMode="numeric"
             placeholder={
@@ -697,11 +956,19 @@ function StrategyCard({
   const [expanded, setExpanded] = useState(true);
   const id = useId();
   const [section, setSection] = useState<Section>(null);
-  const [hours, setHours] = useState('');
-  const [minutes, setMinutes] = useState('');
-  const [seconds, setSeconds] = useState('');
+  const initialDuration = s.endDurationSeconds
+    ? splitDurationSeconds(s.endDurationSeconds)
+    : emptyDuration();
+  const [hours, setHours] = useState(initialDuration.hours);
+  const [minutes, setMinutes] = useState(initialDuration.minutes);
+  const [seconds, setSeconds] = useState(initialDuration.seconds);
   const [whitelistText, setWhitelistText] = useState(s.whitelist.join('\n'));
-  const [dcaInterval, setDcaIntervalParts] = useState({ h: '', m: '', s: '' });
+  const [dcaInterval, setDcaIntervalParts] = useState(() => {
+    const parts = s.dcaIntervalSeconds
+      ? splitDurationSeconds(s.dcaIntervalSeconds)
+      : emptyDuration();
+    return { h: parts.hours, m: parts.minutes, s: parts.seconds };
+  });
   const setDuration = (h: string, m: string, sec: string) => {
     setHours(h);
     setMinutes(m);

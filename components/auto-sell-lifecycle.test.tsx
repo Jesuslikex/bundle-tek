@@ -290,3 +290,95 @@ it('invalidates a paused session when its owned wallet context changes', async (
   expect(host.querySelector('dialog')).toBeNull();
   expect(host.textContent).not.toContain('Auto Sell · paused');
 });
+
+async function startEditable() {
+  vi.mocked(unlockVault).mockResolvedValueOnce({
+    payload: { wallets: [{ family: 'solana', address }] },
+  } as VaultSession);
+  const start = vi.spyOn(AutoSellRunner.prototype, 'start');
+  await startUnlock();
+  await click('Pause');
+  await click('Edit');
+  return start.mock.instances[0] as AutoSellRunner;
+}
+function replicationSelector() {
+  const label = [...host.querySelectorAll('label')].find((item) =>
+    item.textContent?.includes('Replication Factor'),
+  )!;
+  return `input[id="${label.htmlFor}"]`;
+}
+it('requires exact unchecked edit approval and stays paused without another unlock', async () => {
+  const instance = await startEditable();
+  await editSession(replicationSelector(), '20');
+  await click('Review changes');
+  const approval = host.querySelector<HTMLInputElement>(
+    '[data-edit-approval] input',
+  )!;
+  expect(approval.checked).toBe(false);
+  await click('Apply approved changes');
+  expect(instance.configuration().strategies[0].replicationPercent).toBe('10');
+  await act(async () => approval.click());
+  await click('Apply approved changes');
+  expect(instance.configuration().strategies[0].replicationPercent).toBe('20');
+  expect(instance.snapshot().paused).toBe(true);
+  expect(instance.snapshot().configurationRevision).toBe(2);
+  expect(unlockVault).toHaveBeenCalledTimes(1);
+  expect(host.textContent).not.toContain('I approve these exact');
+  await click('Stop');
+});
+it('invalidates approval on every draft edit including changing back to the reviewed value', async () => {
+  const instance = await startEditable();
+  await editSession(replicationSelector(), '20');
+  await click('Review changes');
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('[data-edit-approval] input')!.click(),
+  );
+  await editSession(replicationSelector(), '21');
+  await editSession(replicationSelector(), '20');
+  expect(host.querySelector('[data-edit-approval]')).toBeNull();
+  expect(instance.configuration().strategies[0].replicationPercent).toBe('10');
+  await click('Review changes');
+  expect(
+    host.querySelector<HTMLInputElement>('[data-edit-approval] input')!.checked,
+  ).toBe(false);
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('[data-edit-approval] input')!.click(),
+  );
+  await click('◷ DCA');
+  await click('↺ Counter Trading');
+  expect(host.querySelector('[data-edit-approval]')).toBeNull();
+  expect(instance.configuration().strategies[0].replicationPercent).toBe('10');
+  await click('Stop');
+});
+it.each(['Cancel edits', 'Close'])(
+  'discards unapplied edits on %s and preserves the original paused configuration',
+  async (action) => {
+    const instance = await startEditable();
+    expect(
+      host.querySelector<HTMLInputElement>(
+        '[aria-label="Start delay seconds"]',
+      )!.disabled,
+    ).toBe(true);
+    await editSession(replicationSelector(), '20');
+    await editSession('[aria-label="Session duration seconds"]', '45');
+    await click('Review changes');
+    await click(action);
+    if (action === 'Close') await click('Auto Sell · paused');
+    expect(
+      host.querySelector<HTMLInputElement>(replicationSelector())!.value,
+    ).toBe('10');
+    expect(
+      host.querySelector<HTMLInputElement>(
+        '[aria-label="Session duration seconds"]',
+      )!.value,
+    ).toBe('0');
+    expect(instance.configuration().strategies[0].replicationPercent).toBe(
+      '10',
+    );
+    expect(instance.snapshot().paused).toBe(true);
+    await click('Resume');
+    expect(instance.snapshot().paused).toBe(false);
+    expect(unlockVault).toHaveBeenCalledTimes(1);
+    await click('Stop');
+  },
+);
