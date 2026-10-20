@@ -62,8 +62,9 @@ export function WarmupNextReview({
             </Button>
           ) : (
             <p>
-              Select this saved plan’s active wallets to open transaction
-              review.
+              {progress.archived
+                ? 'Restore this archived plan before opening a new transaction review. Approval recovery remains available.'
+                : 'New transaction review requires an active Solana plan and its selected wallets.'}
             </p>
           )}
         </>

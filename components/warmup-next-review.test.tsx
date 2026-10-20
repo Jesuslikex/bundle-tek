@@ -100,7 +100,20 @@ it('does not offer a replacement trade when an active approval lacks a selected 
 it('keeps read-only progress informative without creating a review action', async () => {
   await mount(progress());
   expect(host.querySelector('button')).toBeNull();
-  expect(host.textContent).toContain('Select this saved plan’s active wallets');
+  expect(host.textContent).toContain('requires an active Solana plan');
+});
+it('explains archival without asking the user to fix wallet selection and retains recovery', async () => {
+  const p = progress();
+  p.archived = true;
+  await mount(p);
+  expect(host.textContent).toContain('Restore this archived plan');
+  expect(host.querySelector('button')).toBeNull();
+  p.activeApprovals = 1;
+  Object.assign(p.steps[0], { state: 'Recovery required', recoveryCount: 1 });
+  const onRecover = vi.fn();
+  await mount(p, { onRecover });
+  await act(async () => host.querySelector('button')!.click());
+  expect(onRecover).toHaveBeenCalledExactlyOnceWith(p.steps[0].wallet);
 });
 it('shows completion only when no included step remains and retains the receipt-only scope', async () => {
   const p = progress();

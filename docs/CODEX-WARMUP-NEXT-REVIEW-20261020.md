@@ -19,3 +19,13 @@ Final isolated Next production build exits0 onf6ada0a plus five exact source/tes
 The retained Proxima Generate Activity/session controls remain reference evidence rather than new live REA coverage; the last approved9223 refresh was unreachable. Claude Opus5.5 review is requested against the committed checkpoint and is not implied by this verification.
 
 Only Codex-owned workflow navigation/UI/tests/notes changed. No protected shell/token layout, manual signing/submission implementation, migration, application/hosted SQL, provider/credential/cron or deployment. Automatic warmup Start, durable execution authorization, scheduler and alternative routing remain unfinished. Broader Proxima parity remains incomplete.
+
+## Accepted Opus5.5 wording review
+
+Claude reviewed pushed3dd7940 read-only in the existing Bundle project on Opus5.5. It reported no correctness/safety issue and one valid low-severity wording issue: the no-onReview message asked for selected wallets even when the parent had disabled review for an archived or non-Solana plan. Codex confirmed it against the existing parent guard rather than treating the suggestion as authority.
+
+The card now uses the already-admitted progress.archived value for explicit restore guidance, retaining approval recovery; other read-only contexts state the active Solana plan/selected-wallet prerequisites. No callback, admission, approval or execution predicate changed. The new archived regression verifies no trade action plus continued recovery. Final23 card/workflow tests pass (7+16), typed lint/format pass. The earlier151-test related run remains the broader checkpoint evidence; overlapping counts are not added as separate tests.
+
+Actual Chrome375 archived workflow shows restore guidance, zero shortcut buttons and equal client/document widths375. The parent still shows its original restore/recovery message. Screenshot `phone-archived.jpg` is added beside the earlier screenshots. Final isolated production build exits0 on3dd7940 plus the two exact source/test overlays, with canonical/snapshot hashes unchanged: `CODEX-WARMUP-NEXT-REVIEW-FINAL-BUILD-20261020.json`. This supersedes the original build only for the accepted wording/test follow-up.
+
+Claude checked the card priority/vector forwarding, parent review guards/focus/refresh, recorded-scope copy and unchanged financial/storage file boundary. It ran no tests/typecheck/lint/build and did not inspect QA pixels or build evidence. Codex owns those verifications; no broader live/backend or funded proof is claimed. Claude also acknowledged the source-only/no-release boundary. No protected file, provider/configuration, hosted SQL, real wallet action or deployment changed.
