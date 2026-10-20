@@ -14,9 +14,24 @@ function readStored(chain: LaunchChain) {
   }
 }
 
+const CHANGE_EVENT = 'bundle:funder-change';
+
 function subscribe(onChange: () => void) {
   window.addEventListener('storage', onChange);
-  return () => window.removeEventListener('storage', onChange);
+  window.addEventListener(CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener('storage', onChange);
+    window.removeEventListener(CHANGE_EVENT, onChange);
+  };
+}
+
+/** The saved wallet the user picked as funder for this chain, or ''. */
+export function useFunderAddress(chain: LaunchChain) {
+  return useSyncExternalStore(
+    subscribe,
+    () => readStored(chain),
+    () => '',
+  );
 }
 
 function short(address: string) {
@@ -41,12 +56,7 @@ export function SidebarFunder({
   onOpenWallets: () => void;
 }) {
   const [state, setState] = useState<State>({ status: 'loading' });
-  const [, setVersion] = useState(0);
-  const picked = useSyncExternalStore(
-    subscribe,
-    () => readStored(chain),
-    () => '',
-  );
+  const picked = useFunderAddress(chain);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -81,7 +91,7 @@ export function SidebarFunder({
     } catch {
       // Storage can be blocked; nothing else depends on this choice yet.
     }
-    setVersion((v) => v + 1);
+    window.dispatchEvent(new Event(CHANGE_EVENT));
   }
 
   return (
