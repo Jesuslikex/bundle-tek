@@ -1,5 +1,13 @@
 # Proxima reconstruction completion matrix
 
+## Current source checkpoints, 20 October2026
+
+Read the dated feature reports before relying on older missing-feature entries below. At8de8fa3, marketplace now includes first-party publication/drafts, cart review, five-minute reservations/history recovery and informational owned SOL/token/control-record inspection. Actual sale qualification, checkout, finalized payment and secure delivery remain unfinished; no purchase execution or exclusive-key guarantee is established.
+
+Auto Sell source now supports Counter/DCA/Limit modes, shared session limits, paused edits with exact separate consent and Pause/Resume lifecycle. `CODEX-AUTOSELL-READINESS-20261020.md` records the latest local start-guidance fix with118 tests, TypeScript/build and synthetic desktop/phone evidence. These source and fixture results are not deployment, provider reliability or funded proof. Generate Activity still has separate session/scheduler/alternative-routing gaps documented in AGENTS and its focused reports. The full goal remains incomplete.
+
+The20October REA9223 refresh failed because the debugging endpoint was unreachable. Earlier retained Proxima captures remain historical evidence; this does not establish fresh UI parity or private backend semantics. Claude Opus5.5 reviewed the saved-control foundation read-only, with its limitations recorded in `CODEX-MARKETPLACE-CONTROL-UI-20261020.md`. No new deployment, hosted SQL, provider change or real wallet action is implied.
+
 ## Latest UI checkpoint, 19 October 2026
 
 `54b14cb` repairs warmup draft save confirmation/recovery: exact next revision and normalized terms, preserved newer edits, explicit reopen guidance and no recovery write. Seven related files/123 tests plus a final30-test assertion rerun, plain TypeScript, typed lint/format and unchanged-source isolated production build pass. Synthetic component Chrome1440/375/320 coverage is distinct from historical signed-in/provider checks. Read `CODEX-WARMUP-SAVE-RECOVERY-20261019.md`. Staged funding and launch execution remain unfinished; no deploy or funded actions.

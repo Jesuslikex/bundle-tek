@@ -1,0 +1,21 @@
+# Auto Sell start guidance
+
+20 October2026. Source follow-up to8de8fa3. Codex uses the transferred Auto Sell ownership recorded in AGENTS; Claude is the read-only Opus5.5 reviewer.
+
+The existing Run action could look available with a valid strategy and nonempty password before selecting a sell wallet, then refuse inside its handler. Advanced Options already opens initially with no wallet selection, but users can collapse it. A collapsed strategy can also hide its specific input error. This change keeps the first reason beside Run and connects it with aria-describedby, instead of requiring a failed start or expansion of every card to find it.
+
+The footer shows selected-wallet and strategy counts, then the first local blocker: workspace lock, archived project, unsupported chain, pending sell, named invalid strategy, invalid session settings, missing Solana wallets, empty sell selection or missing password. With valid local inputs it explicitly retains the existing vault/server checks. This is not a provider/balance/route/execution-readiness claim. Run is additionally disabled for the same missing-wallet/archived/chain conditions already refused by its unchanged handler. No acceptance condition is relaxed.
+
+Choose sell wallets opens the existing disclosure and focuses its first checkbox. It does not check the box, unlock a vault, call a provider or start a strategy. It disappears after selection. Existing Run approval text, handler, unlock lifecycle, browser lock, scope validation, runner, feed, session/edit consent, signing, submission and recovery remain unchanged. Protected shell/token layout files are untouched.
+
+## Evidence and verification
+
+REA list_browser_targets against the previously approved loopback9223 returned endpoint_unreachable. No fresh REA behavior or backend coverage is claimed, and no browser launch workaround was attempted. Retained18October strategy records remain historical reference: `CODEX-PROXIMA-STRATEGY-COVERAGE-20261018.md`. The concrete change follows direct inspection of Bundle's current source and actual rendered components, not an inference about Proxima's private execution.
+
+Final13 Auto Sell files pass together, **118 tests**. Four new component cases cover named errors, absent wallets, explicit disclosure/focus navigation without selection/request, zero-to-one selection/password readiness, deselection, archived project and unsupported chain. Existing19 lifecycle cases plus runner/mode/pause/edit/session/quote/feed/execution tests pass. Plain TypeScript, typed lint and three-file formatting pass. A final text-only wording clarification was followed by the final118-test run; all behavioral predicates stay unchanged.
+
+Chrome renders the actual AutoSell and production styles with synthetic public props. The fixture denies provider access and real vault unlock/signing. Desktop1440 has equal client/document widths1440 and modal620. On phone375x812, client/document widths375, modal337 wide, footer top650/bottom795, both footer actions44px high with bottom781. Missing-wallet guidance remains visible alongside disabled Run; Choose sell wallets opens the manually collapsed disclosure and focuses an unchecked input. Selecting the synthetic wallet produces the password guidance and count1. Run was not clicked. The checkbox action's locator timed out after the selection caused the disclosure to collapse; authoritative subsequent DOM showed count1 and password guidance, so the action was not repeated. Screenshots are in `docs/qa/20261020/auto-sell-readiness/`.
+
+The final isolated production build exits0 on8de8fa3 plus the exact three owned source/test/CSS overlays, all canonical/snapshot hashes unchanged. Evidence: `CODEX-AUTOSELL-READINESS-BUILD-20261020.json`. Sanitized environment, no application secret files, local font fixture/dependency junction. No full-repository suite, production sign-in or real provider/funded proof is claimed. No schema, application/hosted SQL, provider/credential/cron change or deployment.
+
+The full Proxima goal stays incomplete. Activity scheduling/alternative routing, provider/funded qualification, full holder coverage, launch adapters, audited performance and marketplace purchase/secure delivery remain separate open work. Completed source UX is not proof of those capabilities.

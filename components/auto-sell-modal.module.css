@@ -53,6 +53,27 @@
 .footer button {
   min-height: 44px;
 }
+.readiness {
+  flex-basis: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.readiness strong {
+  font-weight: 600;
+}
+.readiness p {
+  margin: 0;
+  color: #a0a2b1;
+}
+.readiness button {
+  justify-self: start;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
 .review {
   display: grid;
   gap: 10px;

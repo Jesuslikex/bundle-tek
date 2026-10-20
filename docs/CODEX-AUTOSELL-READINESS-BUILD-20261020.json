@@ -1,0 +1,16 @@
+{
+  "base": "8de8fa3",
+  "overlay": [
+    "components/auto-sell-modal.tsx",
+    "components/auto-sell-modal.test.tsx",
+    "components/auto-sell-modal.module.css"
+  ],
+  "hashes": {
+    "components/auto-sell-modal.tsx": "5f991c203a6e98e611962e638ad06c53d0fd4de5b7ea0f3fbdf2659c04c0aa0e",
+    "components/auto-sell-modal.test.tsx": "2e4bf8c0ce2f34259aa2603c998bef985d68409345e554c792f9b385140da8ba",
+    "components/auto-sell-modal.module.css": "8f06a7958ddc822dd8a984a03d453e3ff0266fa6cd64f5cfe0e98637155b7255"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}

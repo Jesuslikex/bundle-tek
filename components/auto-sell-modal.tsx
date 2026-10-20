@@ -128,6 +128,8 @@ export function AutoSell(props: AutoSellProps) {
 function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   const [open, setOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
+  const advanced = useRef<HTMLDetailsElement>(null);
+  const walletOptions = useRef<HTMLFieldSetElement>(null);
   useEffect(() => {
     if (!open) return;
     const element = dialog.current;
@@ -373,6 +375,26 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   ]);
 
   const errors = strategies.map(autoSellStrategyError);
+  const firstStrategyError = errors.findIndex(Boolean);
+  const startBlockReason = locked
+    ? 'Wait for the current workspace operation to finish.'
+    : project.archived
+      ? 'This project is archived. Restore it before starting Auto Sell.'
+      : token.chain !== 'Solana'
+        ? 'Auto Sell supports Solana tokens.'
+        : snapshot?.selling
+          ? 'Wait for the pending sell to finish before starting another session.'
+          : firstStrategyError >= 0
+            ? `${strategies[firstStrategyError].name}: ${errors[firstStrategyError]}`
+            : sessionError
+              ? `Session settings: ${sessionError}`
+              : !solanaWallets.length
+                ? 'Add a Solana wallet in My wallets before starting Auto Sell.'
+                : !sellWallets.length
+                  ? 'Choose at least one sell wallet in Advanced Options.'
+                  : !password
+                    ? 'Enter your vault password before starting these strategies.'
+                    : '';
   const marketCap = running ? (snapshot?.marketCapUsd ?? null) : previewCap;
 
   function update(id: string, patch: Partial<AutoSellStrategy>) {
@@ -598,6 +620,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
               </button>
             )}
             <details
+              ref={advanced}
               className={styles.advanced}
               open={!sellWallets.length || undefined}
             >
@@ -644,7 +667,11 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                 </p>
                 {sessionError && <p role="alert">{sessionError}</p>}
               </fieldset>
-              <fieldset disabled={running || busy}>
+              <fieldset
+                ref={walletOptions}
+                tabIndex={-1}
+                disabled={running || busy}
+              >
                 <legend>Sell from wallets</legend>
                 {solanaWallets.length === 0 && (
                   <p>No Solana wallets in this workspace.</p>
@@ -822,6 +849,35 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
             )}
           </div>
           <footer className={styles.footer}>
+            {!running && !busy && (
+              <div className={styles.readiness} id={`${ids}-start-hint`}>
+                <strong>
+                  {sellWallets.length} sell{' '}
+                  {sellWallets.length === 1 ? 'wallet' : 'wallets'} selected ·{' '}
+                  {strategies.length}{' '}
+                  {strategies.length === 1 ? 'strategy' : 'strategies'}
+                </strong>
+                <p>
+                  {startBlockReason ||
+                    'Local settings are complete. Starting still requires the existing vault and server checks.'}
+                </p>
+                {solanaWallets.length > 0 && !sellWallets.length && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (advanced.current) advanced.current.open = true;
+                      walletOptions.current
+                        ?.querySelector<HTMLInputElement>(
+                          'input[type="checkbox"]',
+                        )
+                        ?.focus();
+                    }}
+                  >
+                    Choose sell wallets
+                  </button>
+                )}
+              </div>
+            )}
             <Button variant="outline" onClick={closeDialog}>
               Close
             </Button>
@@ -876,13 +932,15 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
               </Button>
             ) : (
               <Button
+                aria-describedby={`${ids}-start-hint`}
                 disabled={
                   busy ||
                   locked ||
                   !!snapshot?.selling ||
                   errors.some(Boolean) ||
                   !!sessionError ||
-                  !password
+                  !password ||
+                  Boolean(startBlockReason)
                 }
                 onClick={() => void run()}
               >
