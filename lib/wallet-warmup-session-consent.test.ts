@@ -2,6 +2,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createClient, type Client } from '@libsql/client';
 import { readFileSync } from 'node:fs';
 import { createTursoDatabase } from '@/db/turso';
+import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
 import { warmupSessionReviewFixture } from '@/test/warmup-session-review-fixture';
 import { loadWalletWarmupProgress } from './wallet-warmup-progress-server';
 import { reviewWalletWarmupSession } from './wallet-warmup-session-review';
@@ -494,3 +495,66 @@ it('requires the new deadline database guard before saving consent', async () =>
     'not installed',
   );
 });
+it.each(['over-cap', 'noncanonical'] as const)(
+  'holds a pre-0123 %s consent on recovery without rewriting or renewing it',
+  async (kind) => {
+    const prepared = await review(db, 'owner', selected(), signal());
+    const oldTerms = {
+      ...prepared.terms,
+      sessionExpiresAt:
+        kind === 'over-cap'
+          ? '9999-12-31T23:59:59.999Z'
+          : prepared.terms.sessionExpiresAt.replace(/\.\d{3}Z$/, 'Z'),
+    };
+    const document = canonical(oldTerms),
+      oldHash = await digest(document);
+    await db
+      .prepare('DROP TRIGGER wallet_warmup_session_consents_bounds')
+      .run();
+    await db
+      .prepare('INSERT INTO wallet_warmup_session_consents VALUES(?,?,?,?,?,?)')
+      .bind(
+        'owner',
+        input.id,
+        input.reviewId,
+        oldHash,
+        document,
+        new Date().toISOString(),
+      )
+      .run();
+    await db
+      .prepare(
+        readFileSync(
+          'drizzle/0123_wallet_warmup_session_consent_bounds.sql',
+          'utf8',
+        ),
+      )
+      .run();
+    await expect(read(db, 'owner', input.id, signal())).rejects.toThrow(
+      'unavailable or differs',
+    );
+    if (kind === 'over-cap')
+      await expect(
+        retain(
+          db,
+          'owner',
+          {
+            ...input,
+            sessionExpiresAt: oldTerms.sessionExpiresAt,
+            termsSha256: oldHash,
+          },
+          true,
+          signal(),
+        ),
+      ).rejects.toThrow('unavailable or differs');
+    const unchanged = await db
+      .prepare(
+        'SELECT document,terms_sha256 FROM wallet_warmup_session_consents WHERE owner_id=? AND id=?',
+      )
+      .bind('owner', input.id)
+      .first<{ document: string; terms_sha256: string }>();
+    expect(unchanged).toEqual({ document, terms_sha256: oldHash });
+    expect(await total()).toBe(1);
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);
