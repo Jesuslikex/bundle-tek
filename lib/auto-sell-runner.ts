@@ -3,7 +3,9 @@ import {
   checkAutoSellEnd,
   initialAutoSellState,
   marketCapInRange,
+  rawToDecimal,
   readyToSellRaw,
+  scheduleAutoSell,
   type AutoSellObservedTrade,
   type AutoSellStrategy,
   type AutoSellStrategyState,
@@ -58,9 +60,10 @@ export function cryptoRandom() {
 }
 
 /**
- * Browser-side Auto Sell loop. It polls the trade feed, applies each new
- * outside buy to every running strategy, and sells buffered amounts one at a
- * time through the injected `sell`. Strategies end independently.
+ * Browser-side Auto Sell loop. It polls the trade feed (for outside buys and
+ * the market cap), applies each new outside buy to every running Counter
+ * strategy, queues due DCA and Limit Order sells, and sells buffered amounts
+ * one at a time through the injected `sell`. Strategies end independently.
  */
 export class AutoSellRunner {
   private readonly deps: Required<
@@ -200,6 +203,7 @@ export class AutoSellRunner {
     if (!this.running) return;
     this.expireMarketCap();
     this.checkEnds();
+    this.schedule();
     this.maybeSell();
     this.timer = this.deps.setTimer(() => void this.tick(), this.deps.pollMs);
   }
@@ -250,6 +254,32 @@ export class AutoSellRunner {
       }
     }
     this.emit();
+  }
+
+  /** Queues due DCA and Limit Order sells. */
+  private schedule() {
+    if (!this.running) return;
+    const now = this.deps.now();
+    for (const s of this.deps.strategies) {
+      if (s.mode === 'counter') continue;
+      const result = scheduleAutoSell(s, this.states.get(s.id)!, {
+        now,
+        decimals: this.deps.decimals,
+        totalSupplyRaw: this.deps.totalSupplyRaw,
+        marketCapUsd: this.marketCapUsd,
+        random: this.deps.random,
+      });
+      if (result.state === this.states.get(s.id)) continue;
+      this.states.set(s.id, result.state);
+      const amount = rawToDecimal(result.addedRaw, this.deps.decimals);
+      this.note(
+        s.id,
+        'info',
+        s.mode === 'dca'
+          ? `${s.name}: DCA sell ${result.state.responses} queued, ${amount} tokens.`
+          : `${s.name}: market cap reached ${result.filled.length === 1 ? 'a limit order' : `${result.filled.length} limit orders`}, queued ${amount} tokens.`,
+      );
+    }
   }
 
   /** A failing feed must not leave an old market cap gating sells. */

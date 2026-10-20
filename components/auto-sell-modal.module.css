@@ -136,6 +136,35 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
+.tiles2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.orders {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.orders li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+}
+.orders li > button {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: #d4d5dd;
+  cursor: pointer;
+}
+.orders li[data-hit] input {
+  opacity: 0.6;
+}
 .tile,
 .tileActive {
   display: grid;
@@ -328,5 +357,11 @@
   .tiles3,
   .row {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .orders li {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+  .orders li > div:nth-child(2) {
+    grid-row: 2;
   }
 }
