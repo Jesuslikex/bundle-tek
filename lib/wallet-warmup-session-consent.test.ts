@@ -11,6 +11,7 @@ import {
   reviewWalletWarmupSessionConsent as review,
   retainWalletWarmupSessionConsent as retain,
   readWalletWarmupSessionConsent as read,
+  WARMUP_SESSION_DEADLINE_GRACE_MS,
 } from './wallet-warmup-session-consent';
 let client: Client,
   db: D1Database,
@@ -48,6 +49,7 @@ beforeEach(async () => {
   for (const name of [
     '0117_wallet_warmup_session_reviews',
     '0122_wallet_warmup_session_consents',
+    '0123_wallet_warmup_session_consent_bounds',
   ])
     for (const sql of readFileSync(`drizzle/${name}.sql`, 'utf8')
       .split('--> statement-breakpoint')
@@ -413,5 +415,82 @@ it('detects a corrupted consent digest even after an out-of-band update guard by
   await db.prepare(trigger!.sql).run();
   await expect(read(db, 'owner', input.id, signal())).rejects.toThrow(
     'unavailable or differs',
+  );
+});
+it('accepts the exact maximum recorded deadline and refuses one millisecond beyond it', async () => {
+  const original = await review(db, 'owner', selected(), signal());
+  const doc = JSON.parse(original.terms.reviewDocument) as {
+    actions: { scheduledAt: string }[];
+  };
+  const maximum =
+    Math.max(...doc.actions.map((a) => Date.parse(a.scheduledAt))) +
+    WARMUP_SESSION_DEADLINE_GRACE_MS;
+  const exact = {
+    ...selected(),
+    sessionExpiresAt: new Date(maximum).toISOString(),
+  };
+  const prepared = await review(db, 'owner', exact, signal());
+  const saved = await retain(
+    db,
+    'owner',
+    { ...exact, id: input.id, termsSha256: prepared.termsSha256 },
+    true,
+    signal(),
+  );
+  expect(saved.terms.sessionExpiresAt).toBe(exact.sessionExpiresAt);
+  await expect(
+    review(
+      db,
+      'owner',
+      { ...exact, sessionExpiresAt: new Date(maximum + 1).toISOString() },
+      signal(),
+    ),
+  ).rejects.toThrow('five minutes');
+});
+it.each([
+  'one-ms-over',
+  'year-9999',
+  'created-format',
+  'deadline-format',
+] as const)('rejects direct SQL deadline bypass: %s', async (kind) => {
+  const prepared = await review(db, 'owner', selected(), signal());
+  const doc = JSON.parse(prepared.terms.reviewDocument) as {
+    actions: { scheduledAt: string }[];
+  };
+  const maximum =
+    Math.max(...doc.actions.map((a) => Date.parse(a.scheduledAt))) +
+    WARMUP_SESSION_DEADLINE_GRACE_MS;
+  const terms = { ...prepared.terms };
+  let createdAt = new Date(Date.now() + 1000).toISOString();
+  if (kind === 'one-ms-over')
+    terms.sessionExpiresAt = new Date(maximum + 1).toISOString();
+  if (kind === 'year-9999') terms.sessionExpiresAt = '9999-12-31T23:59:59.999Z';
+  if (kind === 'created-format')
+    createdAt = createdAt.replace(/\.\d{3}Z$/, 'Z');
+  if (kind === 'deadline-format')
+    terms.sessionExpiresAt = new Date(
+      Math.floor(Date.parse(terms.sessionExpiresAt) / 1000) * 1000,
+    )
+      .toISOString()
+      .replace('.000Z', 'Z');
+  await expect(
+    db
+      .prepare('INSERT INTO wallet_warmup_session_consents VALUES(?,?,?,?,?,?)')
+      .bind(
+        'owner',
+        input.id,
+        input.reviewId,
+        input.termsSha256,
+        JSON.stringify(terms),
+        createdAt,
+      )
+      .run(),
+  ).rejects.toThrow('deadline');
+  expect(await total()).toBe(0);
+});
+it('requires the new deadline database guard before saving consent', async () => {
+  await db.prepare('DROP TRIGGER wallet_warmup_session_consents_bounds').run();
+  await expect(retain(db, 'owner', input, true, signal())).rejects.toThrow(
+    'not installed',
   );
 });

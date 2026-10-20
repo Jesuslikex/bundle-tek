@@ -862,6 +862,13 @@
       "when": 1794067200000,
       "tag": "0122_wallet_warmup_session_consents",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "6",
+      "when": 1794153600000,
+      "tag": "0123_wallet_warmup_session_consent_bounds",
+      "breakpoints": true
     }
   ]
 }

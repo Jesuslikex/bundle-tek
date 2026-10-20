@@ -5,6 +5,8 @@ import { readWalletWarmupSessionReview } from './wallet-warmup-session-storage';
 
 const uuid = z.uuid().refine((v) => v === v.toLowerCase());
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
+/** Recorded consent ends at most five minutes after the last captured action. */
+export const WARMUP_SESSION_DEADLINE_GRACE_MS = 5 * 60 * 1000;
 const iso = z.iso.datetime().refine((v) => new Date(v).toISOString() === v);
 const selection = z
   .object({
@@ -49,10 +51,10 @@ function ownerId(value: string) {
 async function installed(db: D1Database) {
   const row = await db
     .prepare(
-      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_consents_insert','wallet_warmup_session_consents_no_update','wallet_warmup_session_consents_no_delete')",
+      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_consents_insert','wallet_warmup_session_consents_no_update','wallet_warmup_session_consents_no_delete','wallet_warmup_session_consents_bounds')",
     )
     .first<{ n: number }>();
-  if (row?.n !== 3)
+  if (row?.n !== 4)
     fail('Warmup session consent storage is not installed.', 503);
 }
 async function build(
@@ -83,6 +85,9 @@ async function build(
   if (!retained.document.actions.length)
     fail('This review has no remaining actions to approve.');
   const expiry = Date.parse(input.sessionExpiresAt);
+  const lastActionAt = Math.max(
+    ...retained.document.actions.map((a) => Date.parse(a.scheduledAt)),
+  );
   if (
     retained.document.actions.some(
       (a) => Date.parse(a.scheduledAt) >= expiry,
@@ -90,6 +95,10 @@ async function build(
     expiry <= Date.parse(retained.reviewedAt)
   )
     fail('The selected session deadline must follow every reviewed action.');
+  if (expiry > lastActionAt + WARMUP_SESSION_DEADLINE_GRACE_MS)
+    fail(
+      'The session deadline cannot exceed five minutes after the last reviewed action.',
+    );
   const after = await rawRead();
   signal.throwIfAborted();
   if (canonical(row) !== canonical(after))
