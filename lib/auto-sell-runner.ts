@@ -20,6 +20,10 @@ import {
   type AutoSellConfiguration,
   type AutoSellEditReview,
 } from './auto-sell-edit';
+import {
+  autoSellMarketObservation,
+  AUTO_SELL_MARKET_MAX_AGE_MS,
+} from './auto-sell-market-observation';
 
 export type AutoSellLogEntry = {
   at: number;
@@ -125,7 +129,7 @@ export class AutoSellRunner {
       pollMs: 4000,
       retryMs: 15000,
       maxConsecutiveFailures: 5,
-      marketCapMaxAgeMs: 60000,
+      marketCapMaxAgeMs: AUTO_SELL_MARKET_MAX_AGE_MS,
       setTimer: (fn, ms) => setTimeout(fn, ms),
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
       ...deps,
@@ -519,15 +523,18 @@ export class AutoSellRunner {
   }
 
   private observe(trades: AutoSellObservedTrade[]) {
-    if (trades[0]) {
-      const ctxPrice = trades.find((t) => Number(t.priceUsd) > 0)?.priceUsd;
-      if (ctxPrice) {
-        const supply =
-          Number(this.deps.totalSupplyRaw) / 10 ** this.deps.decimals;
-        const cap = Number(ctxPrice) * supply;
-        this.marketCapUsd = Number.isFinite(cap) ? cap : null;
-        this.marketCapAt = this.deps.now();
-      }
+    this.expireMarketCap();
+    const observation = autoSellMarketObservation(
+      trades,
+      this.deps.now(),
+      this.deps.marketCapMaxAgeMs,
+    );
+    if (observation && observation.at >= this.marketCapAt) {
+      const supply =
+        Number(this.deps.totalSupplyRaw) / 10 ** this.deps.decimals;
+      const cap = Number(observation.priceUsd) * supply;
+      this.marketCapUsd = Number.isFinite(cap) ? cap : null;
+      this.marketCapAt = observation.at;
     }
     // The first read only marks history; Auto Sell reacts to buys after Run.
     const fresh = trades.filter((t) => !this.seen.has(t.id)).reverse();
@@ -611,7 +618,8 @@ export class AutoSellRunner {
   private expireMarketCap() {
     if (
       this.marketCapUsd !== null &&
-      this.deps.now() - this.marketCapAt > this.deps.marketCapMaxAgeMs
+      (this.deps.now() < this.marketCapAt ||
+        this.deps.now() - this.marketCapAt > this.deps.marketCapMaxAgeMs)
     ) {
       this.marketCapUsd = null;
       this.emit();

@@ -213,6 +213,7 @@ describe('AutoSellRunner with DCA and limit orders', () => {
     tokenAmount: '1',
     quoteAmount: '1',
     priceUsd,
+    timestamp: new Date(0).toISOString(),
   });
   const flush = () => new Promise((r) => setTimeout(r, 0));
 

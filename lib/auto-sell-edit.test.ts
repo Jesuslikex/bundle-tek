@@ -16,6 +16,7 @@ const buy = (id: string): AutoSellObservedTrade => ({
   tokenAmount: '100',
   quoteAmount: '1',
   priceUsd: '1',
+  timestamp: new Date(0).toISOString(),
 });
 const flush = async () => {
   for (let i = 0; i < 20; i++) await Promise.resolve();

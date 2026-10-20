@@ -52,6 +52,7 @@ export function createAutoSellFeed(
       quoteAmount: t.quoteAmount,
       quoteMint: observed.quote,
       priceUsd: t.priceUsd,
+      timestamp: t.timestamp,
     }));
   };
 }

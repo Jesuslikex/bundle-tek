@@ -7,12 +7,16 @@ import { AutoSellRunner } from '@/lib/auto-sell-runner';
 import { unlockVault, type VaultSession } from '@/lib/browser-wallet-vault';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
+import type { AutoSellObservedTrade } from '@/lib/auto-sell';
+const feed = vi.hoisted(() => ({
+  read: vi.fn(async () => [] as AutoSellObservedTrade[]),
+}));
 vi.mock('@/lib/browser-wallet-vault', () => ({
   VAULT_STORAGE_KEY: 'synthetic-auto-sell-vault',
   unlockVault: vi.fn(),
 }));
 vi.mock('@/lib/auto-sell-feed', () => ({
-  createAutoSellFeed: () => async () => [],
+  createAutoSellFeed: () => feed.read,
 }));
 const address = '11111111111111111111111111111111';
 const project = {
@@ -40,6 +44,7 @@ const wallets = [
 let host: HTMLDivElement, root: Root | null;
 beforeEach(() => {
   vi.mocked(unlockVault).mockReset();
+  feed.read.mockReset().mockResolvedValue([]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   localStorage.setItem('synthetic-auto-sell-vault', 'FIXTURE ONLY');
   host = document.createElement('div');
@@ -52,7 +57,43 @@ afterEach(async () => {
   localStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
+
+it.each(['stale', 'failed'] as const)(
+  'clears the ranged preview after a %s feed read without unlocking',
+  async (kind) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-20T00:00:00.000Z'));
+    feed.read.mockResolvedValue([
+      {
+        id: 'fixture',
+        sender: 'OUTSIDE',
+        side: 'Sell',
+        tokenAmount: '1',
+        quoteAmount: '1',
+        priceUsd: '1',
+        timestamp: new Date(Date.now()).toISOString(),
+      },
+    ]);
+    await act(async () =>
+      root!.render(
+        <AutoSell project={project} wallets={wallets} locked={false} />,
+      ),
+    );
+    await click('Auto Sell');
+    await click('Market Cap Range0->∞');
+    await editSession('input[id$="-mcmin"]', '1');
+    expect(host.textContent).not.toContain('Out-of-Range');
+    if (kind === 'failed')
+      feed.read.mockRejectedValueOnce(Error('synthetic provider failure'));
+    await act(async () =>
+      vi.advanceTimersByTimeAsync(kind === 'stale' ? 75000 : 15000),
+    );
+    expect(host.textContent).toContain('Out-of-Range');
+    expect(unlockVault).not.toHaveBeenCalled();
+  },
+);
 async function click(text: string) {
   const button = [...host.querySelectorAll('button')].find(
     (b) => b.textContent?.trim() === text,

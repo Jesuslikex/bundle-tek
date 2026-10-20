@@ -63,6 +63,8 @@ export type AutoSellObservedTrade = {
   /** Verified pool quote mint. Missing units cannot authorize a Min. SOL response. */
   quoteMint?: string;
   priceUsd: string;
+  /** Original trade timestamp, not the time this HTTP response arrived. */
+  timestamp?: string;
 };
 
 export type AutoSellStrategyState = {

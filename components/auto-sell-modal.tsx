@@ -30,6 +30,7 @@ import type {
   AutoSellEditReview,
 } from '@/lib/auto-sell-edit';
 import { autoSellEditChanges } from '@/lib/auto-sell-edit-changes';
+import { autoSellMarketObservation } from '@/lib/auto-sell-market-observation';
 import { createAutoSellExecutor } from '@/lib/auto-sell-execute';
 import { createAutoSellFeed } from '@/lib/auto-sell-feed';
 import {
@@ -345,13 +346,17 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
     const load = () =>
       read(controller.signal)
         .then((trades) => {
-          const price = trades.find((t) => Number(t.priceUsd) > 0)?.priceUsd;
+          if (controller.signal.aborted) return;
+          const price = autoSellMarketObservation(trades, Date.now())?.priceUsd;
           if (price)
             setPreviewCap(
               marketCapFromPrice(price, token.totalSupplyRaw, token.decimals),
             );
+          else setPreviewCap(null);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (!controller.signal.aborted) setPreviewCap(null);
+        });
     void load();
     const timer = setInterval(load, 15000);
     return () => {

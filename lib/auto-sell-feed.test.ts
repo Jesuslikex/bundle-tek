@@ -57,6 +57,7 @@ it.each([AUTO_SELL_SOL_QUOTE, 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'])(
       quoteAmount: '0.5',
       tokenAmount: '10',
       side: 'Buy',
+      timestamp: new Date(time * 1000).toISOString(),
     });
     expect(fetcher).toHaveBeenCalledTimes(3);
   },

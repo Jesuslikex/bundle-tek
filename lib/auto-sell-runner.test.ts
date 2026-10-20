@@ -17,6 +17,7 @@ const buy = (
   tokenAmount,
   quoteAmount: '1',
   priceUsd,
+  timestamp: new Date(0).toISOString(),
 });
 
 function setup(
