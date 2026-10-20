@@ -1,0 +1,33 @@
+{
+  "target": "disposable-local-file-only",
+  "baseline": {
+    "mode": "--local",
+    "migrations": 120,
+    "newlyApplied": 120,
+    "schemaObjects": 679,
+    "passed": true
+  },
+  "upgrade": {
+    "mode": "--remote",
+    "migrations": 121,
+    "newlyApplied": 1,
+    "schemaObjects": 689,
+    "passed": true
+  },
+  "repeat": {
+    "mode": "--remote",
+    "migrations": 121,
+    "newlyApplied": 0,
+    "schemaObjects": 689,
+    "passed": true
+  },
+  "matchingChecksums": 121,
+  "baselineAndDataPreserved": true,
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeyViolations": 0,
+  "passed": true
+}

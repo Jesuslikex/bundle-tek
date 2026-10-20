@@ -841,6 +841,13 @@
       "when": 1793808000000,
       "tag": "0119_marketplace_publications",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "6",
+      "when": 1793894400000,
+      "tag": "0120_marketplace_reservations",
+      "breakpoints": true
     }
   ]
 }
