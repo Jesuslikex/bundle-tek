@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { MarketplaceBundleCatalog } from './marketplace-bundle-catalog';
 import { MarketplaceOwnedWallets } from './marketplace-owned-wallets';
 import { MarketplaceOperatorConsole } from './marketplace-operator-console';
+import { MarketplaceReservationBuyer } from './marketplace-reservation-buyer';
 import styles from './marketplace-owned-wallets.module.css';
 export function MarketplaceWorkspace() {
   const [section, setSection] = useState<'catalog' | 'owned' | 'operator'>(
@@ -31,7 +32,9 @@ export function MarketplaceWorkspace() {
         </button>
       </nav>
       {section === 'catalog' ? (
-        <MarketplaceBundleCatalog />
+        <MarketplaceReservationBuyer>
+          <MarketplaceBundleCatalog />
+        </MarketplaceReservationBuyer>
       ) : section === 'owned' ? (
         <MarketplaceOwnedWallets />
       ) : (

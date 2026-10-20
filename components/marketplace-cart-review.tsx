@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { MarketplaceReservationContext } from './marketplace-reservation-context';
 import Link from 'next/link';
 import type { BundleCatalog } from '@/lib/marketplace-publication';
 import {
@@ -45,6 +46,7 @@ function CartReviewPanel({
   onClear,
   stale = false,
 }: CartProps) {
+  const onReserve = useContext(MarketplaceReservationContext)?.open;
   const pending = useRef<AbortController | null>(null);
   const [review, setReview] = useState<CartReview | null>(null),
     [busy, setBusy] = useState(false),
@@ -248,6 +250,13 @@ function CartReviewPanel({
             are not reserved and may be withdrawn. Checkout, payment, signing
             and secure delivery remain unavailable.
           </p>
+          {onReserve && (
+            <div className={styles.controls}>
+              <button onClick={() => onReserve(review)}>
+                Review wallet hold
+              </button>
+            </div>
+          )}
           <details>
             <summary>Exact cart review</summary>
             <code>{review.contextSha256}</code>

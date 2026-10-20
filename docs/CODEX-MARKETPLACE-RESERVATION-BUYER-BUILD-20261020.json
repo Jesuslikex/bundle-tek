@@ -1,0 +1,26 @@
+{
+  "base": "15c04f6",
+  "overlay": [
+    "lib/marketplace-reservation-view.ts",
+    "components/marketplace-reservation-buyer.tsx",
+    "components/marketplace-reservation-buyer.module.css",
+    "components/marketplace-reservation-buyer.test.tsx",
+    "components/marketplace-reservation-context.ts",
+    "components/marketplace-cart-review.tsx",
+    "components/marketplace-workspace.tsx",
+    "components/marketplace-bundle-catalog.tsx"
+  ],
+  "hashes": {
+    "lib/marketplace-reservation-view.ts": "93c411b880c8d397607dd87786d59aacd494d1d6efb59971001af784e43c8dba",
+    "components/marketplace-reservation-buyer.tsx": "562860ef3b7b6f322354c904506143d5e5cf1da22be45ca9198c60008f055083",
+    "components/marketplace-reservation-buyer.module.css": "2f95fa5fa2349870f7314f7f1873d7604683cffcef980e6dcd575428b6328473",
+    "components/marketplace-reservation-buyer.test.tsx": "a8e136c3a7a8e805da84df6afb4125b9462b6b3e4377d50edc1fd494e9e3c5d8",
+    "components/marketplace-reservation-context.ts": "27478a553ee05df532522f935d7a7a4ffb5097a927d084754ac10d17f96e82ee",
+    "components/marketplace-cart-review.tsx": "28b2e3c9baf11bf5237f0b6892d83187253cfe4dd36df01fc4d51608ab93fe04",
+    "components/marketplace-workspace.tsx": "5261d089461ae85da67b92893704bc18567e5c4068423dad3841a736466e578a",
+    "components/marketplace-bundle-catalog.tsx": "eccf4bef7a6b853e4ee50a749137559e311a4a512e1f93de7a6f0db37ae4412a"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}

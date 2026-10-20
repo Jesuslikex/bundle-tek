@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { MarketplaceReservationContext } from './marketplace-reservation-context';
 import Link from 'next/link';
 import {
   admitBundleCatalog,
@@ -55,6 +56,7 @@ function filtered(
   return { listings, valid: true };
 }
 export function MarketplaceBundleCatalog() {
+  const version = useContext(MarketplaceReservationContext)?.version ?? 0;
   const pending = useRef<AbortController | null>(null);
   const [catalog, setCatalog] = useState<BundleCatalog | null>(null),
     [busy, setBusy] = useState(false),
@@ -67,7 +69,9 @@ export function MarketplaceBundleCatalog() {
     [page, setPage] = useState(0),
     [ids, setIds] = useState<string[]>([]),
     [requestedCount, setRequestedCount] = useState('25'),
-    [selectionMessage, setSelectionMessage] = useState('');
+    [selectionMessage, setSelectionMessage] = useState(''),
+    [catalogVersion, setCatalogVersion] = useState(version);
+  const unavailable = expired || catalogVersion !== version;
   useEffect(
     () => () => {
       pending.current?.abort();
@@ -130,6 +134,7 @@ export function MarketplaceBundleCatalog() {
             : '',
         );
         setCatalog(checked);
+        setCatalogVersion(version);
       }
     } catch {
       if (pending.current === c && !c.signal.aborted)
@@ -151,7 +156,7 @@ export function MarketplaceBundleCatalog() {
     Number(requestedCount) <= CART_MAX_WALLETS;
   const matchingIds = new Set(selected.listings.map((e) => e.id));
   function chooseMatching() {
-    if (!countValid || !selected.valid || expired) return;
+    if (!countValid || !selected.valid || unavailable) return;
     const chosen = selected.listings
       .slice(0, Number(requestedCount))
       .map((e) => e.id);
@@ -163,7 +168,7 @@ export function MarketplaceBundleCatalog() {
     );
   }
   function toggle(id: string) {
-    if (expired) return;
+    if (unavailable) return;
     setSelectionMessage('');
     setIds((previous) =>
       previous.includes(id)
@@ -205,6 +210,12 @@ export function MarketplaceBundleCatalog() {
         <p>
           Catalog view expired. Refresh for a new snapshot. Selected wallets are
           retained as an unverified draft.
+        </p>
+      )}
+      {catalog && catalogVersion !== version && (
+        <p>
+          A wallet hold may have changed availability. Refresh inventory before
+          selecting or reviewing again.
         </p>
       )}
       {catalog && (
@@ -267,7 +278,7 @@ export function MarketplaceBundleCatalog() {
                 !countValid ||
                 !selected.valid ||
                 selected.listings.length === 0 ||
-                expired
+                unavailable
               }
               onClick={chooseMatching}
             >
@@ -297,7 +308,7 @@ export function MarketplaceBundleCatalog() {
                 setIds([]);
                 setSelectionMessage('');
               }}
-              stale={expired}
+              stale={unavailable}
             />
           )}
           {!selected.valid ? (
@@ -321,7 +332,7 @@ export function MarketplaceBundleCatalog() {
                         aria-label={`Select ${e.listing.address}`}
                         checked={ids.includes(e.id)}
                         disabled={
-                          expired ||
+                          unavailable ||
                           (ids.length >= CART_MAX_WALLETS &&
                             !ids.includes(e.id))
                         }

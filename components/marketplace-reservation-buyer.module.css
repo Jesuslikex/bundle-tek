@@ -1,0 +1,112 @@
+.toolbar {
+  max-width: 1180px;
+  margin: 12px auto;
+  padding-inline: 28px;
+}
+.popup {
+  width: min(640px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  color: #fcfcfc;
+  background: #121722;
+  border: 1px solid #38455d;
+  gap: 12px;
+}
+.popup p {
+  color: #b9b9c8;
+  line-height: 1.6;
+  margin: 0;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-block: 8px;
+}
+.controls button,
+.toolbar button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #38455d;
+  border-radius: 8px;
+  background: #151922;
+  color: inherit;
+}
+.controls button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.controls button:focus-visible,
+.toolbar button:focus-visible,
+.ack input:focus-visible {
+  outline: 2px solid #a6b1ff;
+  outline-offset: 3px;
+}
+.ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  line-height: 1.6;
+  margin-block: 8px;
+}
+.ack input {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 3px;
+}
+.lookup {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-block: 8px;
+}
+.lookup input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid #38455d;
+  border-radius: 8px;
+  padding: 10px;
+  background: #10131c;
+  color: inherit;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.facts dt {
+  font-size: 12px;
+  color: #b9b9c8;
+}
+.facts dd {
+  margin: 4px 0 0;
+}
+.popup code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.popup summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+}
+.popup [data-slot='dialog-close'] {
+  min-width: 44px;
+  min-height: 44px;
+}
+@media (max-width: 480px) {
+  .facts {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    padding-inline: 16px;
+  }
+}
