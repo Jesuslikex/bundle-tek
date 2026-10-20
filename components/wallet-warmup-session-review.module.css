@@ -69,3 +69,37 @@
   gap: 5px;
   min-width: 0;
 }
+.retention,
+.retained,
+.recoveryInput {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.retention {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.retention h6 {
+  margin: 0;
+  font-size: 14px;
+}
+.retention button {
+  min-height: 44px;
+}
+.retained {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.recoveryInput input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  padding: 8px;
+  font: inherit;
+  font-size: 12px;
+}

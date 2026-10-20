@@ -13,6 +13,7 @@ import {
 import { Button } from './ui/button';
 import { readPanelJson } from './read-panel-json';
 import styles from './wallet-warmup-session-review.module.css';
+import { WalletWarmupSessionRetention } from './wallet-warmup-session-retention';
 
 export function WalletWarmupSessionReview({ plan }: { plan: SavedWarmup }) {
   // Any saved context change discards the old response before another click can use it.
@@ -22,6 +23,7 @@ function SessionReview({ plan }: { plan: SavedWarmup }) {
   const pending = useRef<AbortController | null>(null);
   const [view, setView] = useState<WalletWarmupSessionView | null>(null),
     [busy, setBusy] = useState(false),
+    [retentionBusy, setRetentionBusy] = useState(false),
     [message, setMessage] = useState(''),
     [error, setError] = useState(''),
     [page, setPage] = useState(0);
@@ -144,7 +146,7 @@ function SessionReview({ plan }: { plan: SavedWarmup }) {
       <div className={styles.controls}>
         <Button
           variant="outline"
-          disabled={!enabled || busy}
+          disabled={!enabled || busy || retentionBusy}
           onClick={() => void read()}
         >
           Review automatic session
@@ -157,6 +159,7 @@ function SessionReview({ plan }: { plan: SavedWarmup }) {
         {view && (
           <Button
             variant="ghost"
+            disabled={retentionBusy}
             onClick={() => {
               setView(null);
               setMessage('Session review dismissed. No session was started.');
@@ -329,6 +332,11 @@ function SessionReview({ plan }: { plan: SavedWarmup }) {
           </p>
         </>
       )}
+      <WalletWarmupSessionRetention
+        plan={plan}
+        view={view}
+        onBusyChange={setRetentionBusy}
+      />
     </section>
   );
 }
