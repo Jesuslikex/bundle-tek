@@ -5447,3 +5447,64 @@ body {
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+
+.launch-wallet-table {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  margin: 10px 0 72px;
+  min-width: 0;
+}
+.launch-wallet-table > header,
+.launch-wallet-table > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.launch-wallet-table > footer {
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+.launch-wallet-table h2 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+.launch-wallet-table header button {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: transparent;
+  color: inherit;
+}
+.launch-wallet-scroll {
+  max-height: 280px;
+  overflow: auto;
+}
+.launch-wallet-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.launch-wallet-table th,
+.launch-wallet-table td {
+  text-align: left;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+}
+.launch-wallet-table th {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+  background: var(--card);
+}
+.launch-wallet-pending {
+  color: var(--muted-foreground);
+}

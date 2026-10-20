@@ -83,6 +83,7 @@ import { ChainLaunchForm } from '@/components/launch/chain-launch-form';
 import { FundingForm } from '@/components/launch/funding-form';
 import { LiveOperationsForm } from '@/components/launch/live-operations-form';
 import { PlanRail } from '@/components/launch/plan-rail';
+import { LaunchWalletTable } from '@/components/launch/launch-wallet-table';
 import { LaunchWorkspacePanels } from '@/components/launch/launch-workspace-panels';
 import { SidebarFunder } from '@/components/sidebar-funder';
 import { VenueMark } from '@/components/launch/venue-mark';
@@ -2183,6 +2184,10 @@ export default function Home() {
                       <Landmark /> Review funding plan
                     </Button>
                   </div>
+                  <LaunchWalletTable
+                    plan={launchPlan}
+                    onOpenWallets={() => changeView('wallets')}
+                  />
                   <LaunchSetupDialog
                     open={setupOpen}
                     plan={launchPlan}
