@@ -78,15 +78,32 @@ function acquireRunLock(name: string): Promise<(() => void) | null> {
  * matching sells are prepared, signed with the unlocked browser vault and
  * submitted without further clicks, while this tab stays open.
  */
-export function AutoSell({
-  project,
-  wallets,
-  locked,
-}: {
+type AutoSellProps = {
   project: ImportedTokenProject;
   wallets: WorkspaceWallet[];
   locked: boolean;
-}) {
+};
+
+export function AutoSell(props: AutoSellProps) {
+  // A review/run belongs to one exact project and wallet roster. Changing that
+  // context must stop the old instance, including an unfinished vault unlock.
+  const context = JSON.stringify([
+    props.project.id,
+    props.project.revision,
+    props.project.archived,
+    props.project.document.token,
+    props.locked,
+    props.wallets.map((wallet) => [
+      wallet.address,
+      wallet.chain,
+      wallet.revision,
+      wallet.archived,
+    ]),
+  ]);
+  return <AutoSellContext key={context} {...props} />;
+}
+
+function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   const [open, setOpen] = useState(false);
   const [strategies, setStrategies] = useState<AutoSellStrategy[]>(() => [
     newAutoSellStrategy(0),
@@ -95,6 +112,8 @@ export function AutoSell({
   const runner = useRef<AutoSellRunner | null>(null);
   const vault = useRef<VaultSession | null>(null);
   const releaseLock = useRef<(() => void) | null>(null);
+  const runEpoch = useRef(0);
+  const mounted = useRef(false);
   const token = project.document.token;
   const solanaWallets = useMemo(
     () => wallets.filter((w) => w.chain === 'Solana' && !w.archived),
@@ -109,6 +128,9 @@ export function AutoSell({
   const ids = useId();
 
   function stop(reason = 'Stopped by you.') {
+    runEpoch.current += 1;
+    setBusy(false);
+    setPassword('');
     runner.current?.stop(reason);
     if (vault.current) vault.current.payload.wallets = [];
     vault.current = null;
@@ -120,16 +142,23 @@ export function AutoSell({
   }
 
   useEffect(() => {
+    mounted.current = true;
     const halt = (reason: string) => {
+      runEpoch.current += 1;
       runner.current?.stop(reason);
       if (vault.current) vault.current.payload.wallets = [];
       vault.current = null;
       releaseLock.current?.();
       releaseLock.current = null;
     };
-    const onHide = () => halt('Tab closed.');
+    const onHide = () => {
+      halt('Tab closed.');
+      setBusy(false);
+      setPassword('');
+    };
     window.addEventListener('pagehide', onHide);
     return () => {
+      mounted.current = false;
       window.removeEventListener('pagehide', onHide);
       halt('Auto Sell closed.');
     };
@@ -175,7 +204,15 @@ export function AutoSell({
   }
 
   async function run() {
-    if (busy || running || snapshot?.selling || errors.some(Boolean)) return;
+    if (
+      locked ||
+      project.archived ||
+      busy ||
+      running ||
+      snapshot?.selling ||
+      errors.some(Boolean)
+    )
+      return;
     setError('');
     if (token.chain !== 'Solana')
       return setError('Auto Sell supports Solana tokens.');
@@ -189,16 +226,22 @@ export function AutoSell({
         'Create or import your wallets in the browser vault first.',
       );
     setBusy(true);
+    const epoch = ++runEpoch.current;
+    const current = () => mounted.current && runEpoch.current === epoch;
     let release: (() => void) | null = null;
+    let unlocked: VaultSession | null = null;
     try {
       release = await acquireRunLock(
         `bundle-auto-sell:${project.id}:${token.address}`,
       );
+      if (!current()) return;
       if (!release)
         throw new Error(
           'Auto Sell is already running for this token in another tab.',
         );
       const session = await unlockVault(encrypted, password);
+      unlocked = session;
+      if (!current()) return;
       setPassword('');
       const missing = sellWallets.filter(
         (a) =>
@@ -238,7 +281,7 @@ export function AutoSell({
         }),
         onUpdate: (next) => {
           // A previous run finishing its last sell must not touch this one.
-          if (runner.current !== instance) return;
+          if (!mounted.current || runner.current !== instance) return;
           setSnapshot(next);
           if (!next.running && !next.selling) {
             if (vault.current) vault.current.payload.wallets = [];
@@ -253,10 +296,16 @@ export function AutoSell({
       release = null;
       instance.start();
     } catch (e) {
-      release?.();
-      setError(e instanceof Error ? e.message : 'Could not unlock the vault.');
+      if (unlocked) unlocked.payload.wallets = [];
+      if (vault.current === unlocked) vault.current = null;
+      if (current())
+        setError(
+          e instanceof Error ? e.message : 'Could not unlock the vault.',
+        );
     } finally {
-      setBusy(false);
+      release?.();
+      if (!current() && unlocked) unlocked.payload.wallets = [];
+      if (current()) setBusy(false);
     }
   }
 
@@ -420,9 +469,9 @@ export function AutoSell({
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Close
               </Button>
-              {running ? (
+              {running || busy ? (
                 <Button variant="destructive" onClick={() => stop()}>
-                  Stop
+                  {busy ? 'Cancel unlock' : 'Stop'}
                 </Button>
               ) : (
                 <Button

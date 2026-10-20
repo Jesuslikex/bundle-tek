@@ -515,10 +515,11 @@ export function WalletWarmup({
           </span>
           <span>
             {range ? 'Required (max)' : 'Required'}:{' '}
-            {estimate ? estimate.required : '0'} {unit.symbol}
+            {estimate ? `${estimate.required} ${unit.symbol}` : 'Unavailable'}
           </span>
           <span>
-            Estimated: {estimate ? formatWarmupDelay(estimate.seconds) : '0s'}
+            Estimated:{' '}
+            {estimate ? formatWarmupDelay(estimate.seconds) : 'Unavailable'}
           </span>
         </p>
         <details className={styles.options}>

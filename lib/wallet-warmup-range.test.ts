@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildWarmupPlan,
+  estimateWarmupTotals,
   drawWarmupAmounts,
   formatWarmupDelay,
   warmupBuyAmount,
@@ -32,6 +33,25 @@ const field = (patch: object) => {
   throw new Error('accepted');
 };
 describe('warmup range amounts and second delays', () => {
+  it('does not display a budget or duration for an invalid plan', () => {
+    expect(estimateWarmupTotals(2, 2, '0.01', '0.005', 30, 9)).toEqual({
+      required: '0.05',
+      seconds: 49,
+    });
+    for (const [walletCount, cycles, delay] of [
+      [0, 2, 30],
+      [1.5, 2, 30],
+      [2, 21, 30],
+      [2, 2, 9],
+      [2, 2, 30.5],
+      [2, 2, 604801],
+    ]) {
+      expect(
+        estimateWarmupTotals(walletCount, cycles, '0.01', '0.005', delay, 9),
+      ).toBeNull();
+    }
+    expect(estimateWarmupTotals(2, 2, '0', '0.005', 30, 9)).toBeNull();
+  });
   it('binds exact saved per-wallet, per-cycle range amounts and budgets', () => {
     const amounts = [
       ['0.01', '0.02'],

@@ -273,9 +273,21 @@ export function estimateWarmupTotals(
   decimals: number,
 ) {
   try {
-    if (!wallets || !Number.isSafeInteger(cycles) || cycles < 1) return null;
+    if (
+      !Number.isSafeInteger(wallets) ||
+      wallets < 1 ||
+      wallets > WARMUP_MAX_WALLETS ||
+      !Number.isSafeInteger(cycles) ||
+      cycles < 1 ||
+      cycles > WARMUP_MAX_CYCLES ||
+      !Number.isSafeInteger(delaySeconds) ||
+      delaySeconds < WARMUP_MIN_DELAY_SECONDS ||
+      delaySeconds > 604800
+    )
+      return null;
     const per = warmupAtoms(amount, decimals),
       fee = warmupAtoms(reserve, decimals);
+    if (per <= 0n) return null;
     const ms = delaySeconds * 1000;
     const window =
       (cycles - 1) * ms +
