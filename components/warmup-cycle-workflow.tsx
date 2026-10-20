@@ -5,6 +5,7 @@ import type { WarmupCycleProgress as Progress } from '@/lib/warmup-cycle-progres
 import { WarmupCycleProgress } from './warmup-cycle-progress';
 import { WalletWarmupPreparation } from './wallet-warmup-preparation';
 import { WarmupApprovalHistory } from './warmup-approval-history';
+import { WalletWarmupSessionReview } from './wallet-warmup-session-review';
 
 export function WarmupCycleWorkflow({
   plan,
@@ -68,6 +69,7 @@ export function WarmupCycleWorkflow({
             }));
         }}
       />
+      {enabled && <WalletWarmupSessionReview key={refreshToken} plan={plan} />}
       {!enabled && (
         <p>
           {plan.archived
