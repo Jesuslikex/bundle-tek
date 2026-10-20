@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   admitMarketplaceOwnedInventory,
+  MarketplaceInventoryClockError,
   type MarketplaceOwnedInventory,
 } from '@/lib/marketplace-owned-inventory';
 import { marketplaceLamports, marketplaceSol } from '@/lib/marketplace-catalog';
@@ -122,10 +123,12 @@ export function MarketplaceOperatorConsole() {
         setInventory(result);
         setWallet(result.wallets[0]?.address ?? '');
       }
-    } catch {
+    } catch (error) {
       if (live(controller))
         setError(
-          'Seller inventory response could not be verified. No access or listing was granted.',
+          error instanceof MarketplaceInventoryClockError
+            ? error.message
+            : 'Seller inventory response could not be verified. No access or listing was granted.',
         );
     } finally {
       if (pending.current === controller) {

@@ -3,8 +3,24 @@ import { marketplaceOwnedFixture } from '../test/marketplace-owned-fixture';
 import {
   buildMarketplaceOwnedInventory,
   admitMarketplaceOwnedInventory,
+  MarketplaceInventoryClockError,
 } from './marketplace-owned-inventory';
 const now = Date.parse('2026-10-20T12:00:00Z');
+it('keeps the exact inventory freshness boundaries and identifies stale or ahead-of-device time', () => {
+  const inventory = buildMarketplaceOwnedInventory(
+    marketplaceOwnedFixture(now).sources,
+    now,
+  );
+  expect(() => admitMarketplaceOwnedInventory(inventory, now - 1)).toThrow(
+    MarketplaceInventoryClockError,
+  );
+  expect(admitMarketplaceOwnedInventory(inventory, now + 60000)).toEqual(
+    inventory,
+  );
+  expect(() => admitMarketplaceOwnedInventory(inventory, now + 60001)).toThrow(
+    MarketplaceInventoryClockError,
+  );
+});
 it('separates observed activity, historical control proof, raw warmup receipts and unknown funding age', () => {
   const f = marketplaceOwnedFixture(now),
     result = buildMarketplaceOwnedInventory(f.sources, now);

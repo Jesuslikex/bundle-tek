@@ -1,0 +1,26 @@
+{
+  "base": "785a254",
+  "overlay": [
+    "lib/marketplace-owned-inventory.ts",
+    "lib/marketplace-owned-inventory.test.ts",
+    "lib/marketplace-sale-inspection-view.ts",
+    "lib/marketplace-sale-inspection-view.test.ts",
+    "components/marketplace-operator-console.tsx",
+    "components/marketplace-operator-console.test.tsx",
+    "components/marketplace-sale-inspection-panel.tsx",
+    "components/marketplace-sale-inspection-panel.test.tsx"
+  ],
+  "hashes": {
+    "lib/marketplace-owned-inventory.ts": "71d673c9760615dd22d960926ff97fd86427d68b563b305e9aaf228954e2d725",
+    "lib/marketplace-owned-inventory.test.ts": "698fb0f110f0000d2e35aa3705a506740b8ece1a859141dec7563e5895e4fa8f",
+    "lib/marketplace-sale-inspection-view.ts": "a967a02f6bf0c6b40c1f84215aefd30d6ad219bcc6568d9cae8d62f1cea808c2",
+    "lib/marketplace-sale-inspection-view.test.ts": "d8ece3715253af93d1a9752de6af1b32a6420ce9988a12c7a502cb0f1ada10ce",
+    "components/marketplace-operator-console.tsx": "a6fbe18158e0303d0655a3d6749c2b62dac4348fca2907e095a787b16fe60704",
+    "components/marketplace-operator-console.test.tsx": "a5bd050ed494ce8a565002935408e84bfa5a8d4350a00e470c9c2d416b010fc1",
+    "components/marketplace-sale-inspection-panel.tsx": "519f6ddcb075365d67e006495b1547f8684ccfc31602811f52ce47eec799ca96",
+    "components/marketplace-sale-inspection-panel.test.tsx": "8e1f3fd196b3c3f56bb349e4b5682df964fbf4c12ff866003c5eae40018aa01a"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}

@@ -1,7 +1,37 @@
 import { expect, it } from 'vitest';
 import { marketplaceSaleInspectionFixture } from '../test/marketplace-sale-inspection-fixture';
-import { admitSaleInspection } from './marketplace-sale-inspection-view';
+import {
+  admitSaleInspection,
+  MarketplaceInspectionClockError,
+} from './marketplace-sale-inspection-view';
 const now = Date.parse('2026-10-20T12:00:00.000Z');
+it('identifies clock mismatch without accepting any future or expired inspection', () => {
+  const f = marketplaceSaleInspectionFixture(now);
+  expect(() =>
+    admitSaleInspection(
+      { inspection: f.inspection },
+      f.inventory,
+      f.selection,
+      now - 1,
+    ),
+  ).toThrow(MarketplaceInspectionClockError);
+  expect(() =>
+    admitSaleInspection(
+      { inspection: f.inspection },
+      f.inventory,
+      f.selection,
+      now + 60000,
+    ),
+  ).toThrow(MarketplaceInspectionClockError);
+  expect(
+    admitSaleInspection(
+      { inspection: f.inspection },
+      f.inventory,
+      f.selection,
+      now + 59999,
+    ),
+  ).toEqual(f.inspection);
+});
 it('admits the exact informational snapshot and its signed integer difference', () => {
   const f = marketplaceSaleInspectionFixture(now);
   expect(

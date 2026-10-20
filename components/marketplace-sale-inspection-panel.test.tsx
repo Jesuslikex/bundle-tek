@@ -149,3 +149,70 @@ it('aborts a pending read when the owning review unmounts', async () => {
   await act(async () => root.render(null));
   expect(signal.aborted).toBe(true);
 });
+it.each([400, 408, 413, 415])(
+  'explains rejected request %s with fixed local text rather than outage or raw provider text',
+  async (status) => {
+    const fetcher = vi.fn(async () =>
+      Response.json({ error: 'private backend detail' }, { status }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    await mount();
+    await click('Inspect current account');
+    expect(host.textContent).not.toContain('inspection unavailable');
+    expect(host.textContent).not.toContain('private backend detail');
+    expect(host.querySelector('output')).not.toBeNull();
+  },
+);
+it('keeps the visible 15-second cooldown after cancellation with no automatic request', async () => {
+  const fetcher = vi.fn(
+    async (_url: string, _init?: RequestInit) =>
+      new Promise<Response>(() => {}),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Inspect current account');
+  await click('Cancel account inspection');
+  expect(button('Inspect current account').disabled).toBe(true);
+  expect(host.textContent).toContain('15 seconds');
+  await act(async () => vi.advanceTimersByTime(14999));
+  expect(button('Inspect current account').disabled).toBe(true);
+  await act(async () => vi.advanceTimersByTime(1));
+  expect(button('Inspect current account').disabled).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('starts a fresh visible cooldown on a delayed provider 429 response', async () => {
+  let resolve!: (r: Response) => void;
+  const fetcher = vi.fn(
+    async () =>
+      new Promise<Response>((r) => {
+        resolve = r;
+      }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Inspect current account');
+  await act(async () => vi.advanceTimersByTime(20000));
+  await act(async () =>
+    resolve(Response.json({ error: 'provider limited' }, { status: 429 })),
+  );
+  expect(button('Inspect current account').disabled).toBe(true);
+  await act(async () => vi.advanceTimersByTime(14999));
+  expect(button('Inspect current account').disabled).toBe(true);
+  await act(async () => vi.advanceTimersByTime(1));
+  expect(button('Inspect current account').disabled).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('identifies a future device-clock mismatch without relaxing admission or displaying the result', async () => {
+  const f = marketplaceSaleInspectionFixture(now);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ inspection: f.inspection })),
+  );
+  await mount();
+  vi.setSystemTime(now - 120000);
+  await click('Inspect current account');
+  expect(host.textContent).toContain('automatic date and time');
+  expect(
+    host.querySelector('[aria-label="Account inspection result"]'),
+  ).toBeNull();
+});

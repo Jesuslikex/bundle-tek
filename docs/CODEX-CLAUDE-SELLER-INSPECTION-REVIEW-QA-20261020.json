@@ -1,0 +1,51 @@
+{
+  "base": "785a254",
+  "tests": {
+    "passed": 482,
+    "failed": 0,
+    "files": 31,
+    "success": true,
+    "scope": "All marketplace test files; includes56 token foundation cases and10 review fix regressions"
+  },
+  "typecheck": "Plain tsc --noEmit --incremental false: exit0",
+  "lint": "Scoped type-aware oxlint and oxfmt: pass",
+  "review": {
+    "model": "Opus 5.5 (visibly selected in existing Bundle Claude project)",
+    "source": "0f60969 and825e730",
+    "readOnly": true,
+    "retracted": "Inventory-key/reload finding",
+    "accepted": [
+      "Device-clock recovery guidance",
+      "Fixed local4xx messages",
+      "Visible request cooldown"
+    ],
+    "limits": "Claude ran no tests/typecheck/build and did not review the token foundation"
+  },
+  "browser": {
+    "kind": "Actual seller console and panel; public synthetic fixtures",
+    "viewportDesktop": 1440,
+    "viewportPhone": 375,
+    "phoneDocumentClient": 360,
+    "phoneDocumentScroll": 360,
+    "phonePanelClient": 326,
+    "phonePanelScroll": 326,
+    "buttonHeight": 46,
+    "requests": 5,
+    "financialWrites": 0,
+    "signatures": 0,
+    "checks": [
+      "Inventory-clock guidance with no form",
+      "Inspection-clock result refused",
+      "Visible15-second cooldown",
+      "Manual action re-enabled with unchanged counter",
+      "Explicit valid manual retry"
+    ],
+    "cleanup": "Temporary tab closed; viewport reset"
+  },
+  "limits": [
+    "No full repository suite",
+    "No real provider or production sign-in proof",
+    "No application or hosted SQL",
+    "No payment, delivery, signing or deployment"
+  ]
+}

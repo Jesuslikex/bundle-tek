@@ -10,6 +10,13 @@ const uint = z
   .refine((v) => BigInt(v) <= (1n << 64n) - 1n);
 const slot = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const system = '11111111111111111111111111111111';
+export class MarketplaceInspectionClockError extends Error {
+  constructor() {
+    super(
+      'Account inspection is stale or ahead of this device clock. Check automatic date and time, then request a fresh review and inspection.',
+    );
+  }
+}
 const account = z
   .object({
     kind: z.enum(['absent', 'system-wallet', 'unsupported-account']),
@@ -66,10 +73,6 @@ export function admitSaleInspection(
     .parse(value);
   const result = envelope.inspection,
     expected = operatorListingSelection.parse(selection);
-  const captured = admitMarketplaceOwnedInventory(inventory, now).wallets.find(
-    (w) =>
-      w.address === expected.address && w.revision === expected.walletRevision,
-  );
   const start = Date.parse(result.startedAt),
     observed = Date.parse(result.observedAt),
     expiry = Date.parse(result.expiresAt);
@@ -84,6 +87,12 @@ export function admitSaleInspection(
       'Account inspection differs or expired. Reload seller inventory and inspect again.',
     );
   };
+  if (Number.isSafeInteger(now) && (observed > now || now >= expiry))
+    throw new MarketplaceInspectionClockError();
+  const captured = admitMarketplaceOwnedInventory(inventory, now).wallets.find(
+    (w) =>
+      w.address === expected.address && w.revision === expected.walletRevision,
+  );
   if (
     !captured ||
     JSON.stringify(result.selection) !== JSON.stringify(expected) ||

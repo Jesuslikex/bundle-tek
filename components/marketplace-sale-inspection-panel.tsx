@@ -1,9 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { MarketplaceOwnedInventory } from '@/lib/marketplace-owned-inventory';
+import { MarketplaceInventoryClockError } from '@/lib/marketplace-owned-inventory';
 import type { OperatorListingReview } from '@/lib/marketplace-operator-review';
 import {
   admitSaleInspection,
+  MarketplaceInspectionClockError,
   type SaleInspection,
 } from '@/lib/marketplace-sale-inspection-view';
 import { marketplaceSol } from '@/lib/marketplace-catalog';
@@ -24,7 +26,9 @@ export function MarketplaceSaleInspectionPanel({
 }) {
   const [result, setResult] = useState<SaleInspection | null>(null),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    [cooldown, setCooldown] = useState(false),
+    [cooldownKey, setCooldownKey] = useState(0);
   const pending = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -33,6 +37,11 @@ export function MarketplaceSaleInspectionPanel({
     },
     [],
   );
+  useEffect(() => {
+    if (cooldownKey === 0) return;
+    const timer = setTimeout(() => setCooldown(false), 15000);
+    return () => clearTimeout(timer);
+  }, [cooldownKey]);
   useEffect(() => {
     if (!result) return;
     const timer = setTimeout(
@@ -51,15 +60,19 @@ export function MarketplaceSaleInspectionPanel({
     pending.current = null;
     setBusy(false);
     setResult(null);
-    setMessage('Account inspection cancelled. Nothing was published or paid.');
+    setMessage(
+      'Account inspection cancelled. Nothing was published or paid. Wait 15 seconds from the request before another inspection.',
+    );
   }
   async function inspect() {
-    if (pending.current) return;
+    if (pending.current || cooldown) return;
     const controller = new AbortController();
     pending.current = controller;
     const live = () =>
       pending.current === controller && !controller.signal.aborted;
     setBusy(true);
+    setCooldown(true);
+    setCooldownKey((key) => key + 1);
     setResult(null);
     setMessage('');
     try {
@@ -82,25 +95,40 @@ export function MarketplaceSaleInspectionPanel({
       );
       if (!live()) return;
       if (!response.ok) {
+        if (response.status === 429) {
+          setCooldown(true);
+          setCooldownKey((key) => key + 1);
+        }
         setMessage(
           response.status === 401
             ? 'Sign in before inspecting a seller wallet.'
             : response.status === 403
               ? 'Seller access changed. Sign in again.'
               : response.status === 409
-                ? 'Seller evidence changed. Reload seller inventory and review again.'
+                ? 'Seller evidence changed. Reload seller inventory and review again; wait 15 seconds from the last request before inspecting.'
                 : response.status === 429
                   ? 'Rate limited. Wait at least 15 seconds, then inspect manually.'
-                  : 'Account inspection unavailable. No sale or payment was authorized.',
+                  : response.status === 400
+                    ? 'The selected wallet or asking price was rejected. Reload seller inventory and review the selection again.'
+                    : response.status === 408
+                      ? 'Account inspection stopped. Wait 15 seconds from the request before inspecting again.'
+                      : response.status === 413
+                        ? 'The inspection request was too large. Reload seller inventory and choose one wallet.'
+                        : response.status === 415
+                          ? 'The inspection request format was rejected. Reload the page before trying again.'
+                          : 'Account inspection unavailable. No sale or payment was authorized.',
         );
         return;
       }
       const admitted = admitSaleInspection(data, inventory, selection);
       if (live()) setResult(admitted);
-    } catch {
+    } catch (error) {
       if (live())
         setMessage(
-          'Account inspection could not be verified. Reload seller inventory and inspect again.',
+          error instanceof MarketplaceInspectionClockError ||
+            error instanceof MarketplaceInventoryClockError
+            ? error.message
+            : 'Account inspection could not be verified. Reload seller inventory and inspect again after the cooldown.',
         );
     } finally {
       if (pending.current === controller) {
@@ -125,7 +153,7 @@ export function MarketplaceSaleInspectionPanel({
       </p>
       <code>{selection.address}</code>
       <div className={styles.controls}>
-        <button disabled={busy} onClick={() => void inspect()}>
+        <button disabled={busy || cooldown} onClick={() => void inspect()}>
           {busy
             ? 'Inspecting account…'
             : result
@@ -134,6 +162,12 @@ export function MarketplaceSaleInspectionPanel({
         </button>
         {busy && <button onClick={cancel}>Cancel account inspection</button>}
       </div>
+      {cooldown && (
+        <p>
+          New inspections are available 15 seconds after this request. There is
+          no automatic retry.
+        </p>
+      )}
       {message && <output>{message}</output>}
       {result && (
         <div aria-label="Account inspection result" aria-live="polite">

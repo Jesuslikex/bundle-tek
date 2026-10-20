@@ -129,6 +129,13 @@ const fail = (): never => {
     'Saved wallet inventory evidence is unavailable or inconsistent.',
   );
 };
+export class MarketplaceInventoryClockError extends Error {
+  constructor() {
+    super(
+      'Seller inventory is stale or ahead of this device clock. Check automatic date and time, then reload seller inventory.',
+    );
+  }
+}
 const time = (value: string, now: number) => {
   const result = Date.parse(value);
   if (
@@ -302,9 +309,15 @@ export function admitMarketplaceOwnedInventory(
 ): MarketplaceOwnedInventory {
   if (!Number.isSafeInteger(now)) return fail();
   const result = marketplaceOwnedInventoryResult.parse(value),
-    observed = time(result.observedAt, now);
+    observed = Date.parse(result.observedAt);
   if (
-    now - observed > 60000 ||
+    !Number.isSafeInteger(observed) ||
+    new Date(observed).toISOString() !== result.observedAt
+  )
+    return fail();
+  if (observed > now || now - observed > 60000)
+    throw new MarketplaceInventoryClockError();
+  if (
     new Set(result.wallets.map((w) => w.address)).size !== result.wallets.length
   )
     return fail();

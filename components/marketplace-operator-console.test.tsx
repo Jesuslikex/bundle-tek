@@ -58,6 +58,16 @@ async function price(value: string) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+it('explains an ahead-of-device inventory timestamp without retrying or granting seller forms', async () => {
+  const fetcher = vi.fn(async () => Response.json(inventory()));
+  vi.stubGlobal('fetch', fetcher);
+  vi.setSystemTime(now - 120000);
+  await mount();
+  await click('Open seller inventory');
+  expect(host.textContent).toContain('automatic date and time');
+  expect(host.querySelector('select')).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
 it.each([401, 403])(
   'requires explicit access and explains denial %s without exposing forms',
   async (status) => {
