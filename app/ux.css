@@ -5581,3 +5581,35 @@ body {
   border: 1px solid #22242d;
   background: rgba(24, 24, 31, 0.2);
 }
+
+/* Proxima Funding and token page measurements (REA 2026-10-20): Funding
+   panels are 4px-radius frames on the stroke colour; token toolbars use
+   30px boxed selects. */
+.funding-planner,
+.funding-editor,
+.funding-summary,
+.funding-saved,
+.funding-fee-table,
+.funding-unsigned-review {
+  border-color: #22242d;
+  border-radius: 4px;
+}
+.funding-planner h2,
+.funding-planner h3,
+.funding-editor h2,
+.funding-editor h3 {
+  font-size: 14px;
+  font-weight: 500;
+}
+.funding-planner button,
+.funding-editor button {
+  border-radius: 8px;
+  font-size: 12px;
+}
+.imported-market-toolbar select {
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid #22242d;
+  background: rgba(24, 24, 31, 0.6);
+  font-size: 12px;
+}

@@ -25,21 +25,22 @@
 
 .navigation > button {
   flex: 0 0 auto;
-  min-height: 36px;
-  padding: 7px 12px;
+  min-height: 30px;
+  padding: 8px 10px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--muted-foreground);
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
 }
 
 .navigation > button[aria-selected='true'] {
   color: var(--foreground);
-  border-color: var(--border);
-  background: var(--secondary);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: inset 0 -2px 0 var(--primary);
 }
 
 .navigation > button:focus-visible,
