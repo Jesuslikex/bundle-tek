@@ -476,3 +476,156 @@ it('stops on provider throttling without retry or partial output', async () => {
   ).rejects.toThrow();
   expect(limited).toHaveBeenCalledTimes(1);
 });
+async function historicalInput() {
+  const selected = input('Sell');
+  selected.planRevision = 2;
+  const a = selected.candidate.action;
+  if (a.side !== 'Sell') throw Error('Sell fixture required');
+  a.walletRevision = 2;
+  a.id += `:${f.buy.receiptId}`;
+  a.source = {
+    kind: 'saved-buy',
+    buyReceiptId: f.buy.receiptId,
+    remainingRaw: '101',
+    decimals: 6,
+  };
+  const link = f.sell.preparation.document.buyReceipt!;
+  link.historicalBuy = { planRevision: 1, walletRevision: 1 };
+  f.sell.approval.buyReceipt = structuredClone(link);
+  await db.prepare('UPDATE wallet_warmup_plans SET revision=2').run();
+  await db
+    .prepare(
+      'UPDATE warmup_swap_preparations SET plan_revision=2,wallet_revision=2,document=? WHERE id=?',
+    )
+    .bind(JSON.stringify(f.sell.preparation.document), f.sell.preparation.id)
+    .run();
+  await db
+    .prepare(
+      'UPDATE warmup_signing_intents SET document=? WHERE preparation_id=?',
+    )
+    .bind(JSON.stringify(f.sell.approval), f.sell.preparation.id)
+    .run();
+  return selected;
+}
+it('recovers a finalized saved-buy sell using the exact lower revisions retained in both preparation and approval', async () => {
+  const selected = await historicalInput();
+  const replayed = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    selected,
+    signal(),
+    fetcher,
+  );
+  expect(replayed.settlement).toMatchObject({
+    side: 'Sell',
+    planRevision: 2,
+    walletRevision: 2,
+    buyReceiptId: f.buy.receiptId,
+    consumedRaw: '101',
+  });
+  expect(replayed.signingAllowed).toBe(false);
+  expect(methods).toHaveLength(4);
+});
+it.each([
+  'future-plan',
+  'future-wallet',
+  'wrong-plan',
+  'wrong-wallet',
+  'missing',
+  'session-buy',
+] as const)(
+  'refuses historical %s without broadening the current-session capture',
+  async (kind) => {
+    const selected = await historicalInput(),
+      a = selected.candidate.action;
+    if (a.side !== 'Sell') throw Error('Sell fixture required');
+    const link = f.sell.preparation.document.buyReceipt!;
+    if (kind === 'future-plan') link.historicalBuy!.planRevision = 3;
+    if (kind === 'future-wallet') link.historicalBuy!.walletRevision = 3;
+    if (kind === 'wrong-plan') link.historicalBuy!.planRevision = 2;
+    if (kind === 'wrong-wallet') link.historicalBuy!.walletRevision = 2;
+    if (kind === 'missing') delete link.historicalBuy;
+    if (kind === 'session-buy') {
+      a.id = `Sell:1:${f.wallet}`;
+      a.source = { kind: 'session-buy', actionId: `Buy:1:${f.wallet}` };
+    }
+    f.sell.approval.buyReceipt = structuredClone(link);
+    await db
+      .prepare('UPDATE warmup_swap_preparations SET document=? WHERE id=?')
+      .bind(JSON.stringify(f.sell.preparation.document), f.sell.preparation.id)
+      .run();
+    await db
+      .prepare(
+        'UPDATE warmup_signing_intents SET document=? WHERE preparation_id=?',
+      )
+      .bind(JSON.stringify(f.sell.approval), f.sell.preparation.id)
+      .run();
+    await expect(
+      replayWarmupSessionSettlement(db, 'owner', selected, signal(), fetcher),
+    ).rejects.toThrow();
+    expect(methods).toHaveLength(0);
+  },
+);
+it.each([
+  'column-units',
+  'column-buy',
+  'source-decimals',
+  'stored-sell-units',
+  'link-units',
+] as const)('refuses sell-specific %s drift', async (kind) => {
+  const selected = input('Sell');
+  if (kind === 'column-units')
+    await db
+      .prepare("UPDATE warmup_sell_receipts SET consumed_raw='100'")
+      .run();
+  if (kind === 'column-buy')
+    await db
+      .prepare('UPDATE warmup_sell_receipts SET buy_receipt_id=?')
+      .bind('00000000-0000-4000-8000-000000000099')
+      .run();
+  if (kind === 'source-decimals') selected.candidate.sellSource!.decimals = 5;
+  if (kind === 'stored-sell-units')
+    await db
+      .prepare('UPDATE warmup_sell_receipts SET document=?')
+      .bind(JSON.stringify({ ...f.sellDocument, consumedRaw: '100' }))
+      .run();
+  if (kind === 'link-units') {
+    f.sell.preparation.document.buyReceipt!.remainingRaw = '100';
+    f.sell.approval.buyReceipt = structuredClone(
+      f.sell.preparation.document.buyReceipt,
+    );
+    await db
+      .prepare('UPDATE warmup_swap_preparations SET document=? WHERE id=?')
+      .bind(JSON.stringify(f.sell.preparation.document), f.sell.preparation.id)
+      .run();
+    await db
+      .prepare(
+        'UPDATE warmup_signing_intents SET document=? WHERE preparation_id=?',
+      )
+      .bind(JSON.stringify(f.sell.approval), f.sell.preparation.id)
+      .run();
+  }
+  await expect(
+    replayWarmupSessionSettlement(db, 'owner', selected, signal(), fetcher),
+  ).rejects.toThrow();
+});
+it('refuses a buy-lot link that differs from the retained exact signing approval before any provider work', async () => {
+  f.sell.approval.buyReceipt!.receiptId =
+    '00000000-0000-4000-8000-000000000099';
+  await db
+    .prepare(
+      'UPDATE warmup_signing_intents SET document=? WHERE preparation_id=?',
+    )
+    .bind(JSON.stringify(f.sell.approval), f.sell.preparation.id)
+    .run();
+  await expect(
+    replayWarmupSessionSettlement(
+      db,
+      'owner',
+      input('Sell'),
+      signal(),
+      fetcher,
+    ),
+  ).rejects.toThrow();
+  expect(methods).toHaveLength(0);
+});

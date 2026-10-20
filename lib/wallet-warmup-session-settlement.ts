@@ -201,6 +201,8 @@ function decode(
     approval.outputMint !== p.outputMint ||
     approval.inputRaw !== p.inAmountRaw ||
     approval.minimumOutputRaw !== p.minimumOutRaw ||
+    canonical(approval.buyReceipt ?? null) !==
+      canonical(p.buyReceipt ?? null) ||
     approval.lastValidBlockHeight !== p.transaction.lastValidBlockHeight
   )
     return fail();
@@ -337,7 +339,36 @@ export async function replayWarmupSessionSettlement(
       'Buy',
     );
     signal.throwIfAborted();
-    const bound = decode(linked, selected, 'Buy');
+    let buySelection = selected;
+    const historical = preparation.document.buyReceipt.historicalBuy;
+    if (historical !== undefined) {
+      const exact = z
+        .object({
+          planRevision: z.number().int().min(1).max(1e9),
+          walletRevision: z.number().int().min(1).max(1e9),
+        })
+        .strict()
+        .parse(historical);
+      if (
+        a.source.kind !== 'saved-buy' ||
+        exact.planRevision > selected.planRevision ||
+        exact.walletRevision > a.walletRevision ||
+        (exact.planRevision === selected.planRevision &&
+          exact.walletRevision === a.walletRevision)
+      )
+        return fail();
+      // Only the linked historical buy uses its exact original revisions. The
+      // root sell remains bound to the captured current action throughout.
+      buySelection = {
+        ...selected,
+        planRevision: exact.planRevision,
+        candidate: {
+          ...selected.candidate,
+          action: { ...a, walletRevision: exact.walletRevision },
+        },
+      };
+    }
+    const bound = decode(linked, buySelection, 'Buy');
     await checkPacket(bound.preparation, bound.approval);
     signal.throwIfAborted();
     const document = await observeWarmupBuyReceipt(

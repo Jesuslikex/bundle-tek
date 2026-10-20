@@ -132,6 +132,9 @@ export async function warmupSessionSettlementFixture() {
       mint,
       cycle: 1,
     });
+    sell.approval.buyReceipt = structuredClone(
+      sell.preparation.document.buyReceipt,
+    );
     const { acquiredRaw: consumedRaw, ...core } = await decodeWarmupReceipt(
       sell.raw,
       sell.preparation,
