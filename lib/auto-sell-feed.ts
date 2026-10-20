@@ -50,6 +50,7 @@ export function createAutoSellFeed(
       side: t.side,
       tokenAmount: t.tokenAmount,
       quoteAmount: t.quoteAmount,
+      quoteMint: observed.quote,
       priceUsd: t.priceUsd,
     }));
   };

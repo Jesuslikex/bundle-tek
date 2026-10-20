@@ -2,6 +2,10 @@
 // evaluation.
 // Everything here is deterministic apart from the injected random draw, so
 // the browser runner and its tests share the same arithmetic.
+import {
+  AUTO_SELL_SOL_QUOTE,
+  autoSellQuoteAtLeast,
+} from './auto-sell-quote-trigger';
 
 export type AutoSellTrigger =
   | { kind: 'rate'; percent: string }
@@ -56,6 +60,8 @@ export type AutoSellObservedTrade = {
   tokenAmount: string;
   /** Decimal quote amount (SOL for SOL pools). */
   quoteAmount: string;
+  /** Verified pool quote mint. Missing units cannot authorize a Min. SOL response. */
+  quoteMint?: string;
   priceUsd: string;
 };
 
@@ -408,6 +414,7 @@ export type AutoSellOutcome =
   | 'whitelisted'
   | 'out-of-range'
   | 'below-trigger'
+  | 'quote-unit-mismatch'
   | 'rate-skipped'
   | 'not-counter'
   | 'buffered';
@@ -441,8 +448,12 @@ export function applyAutoSellTrade(
     return none('below-trigger');
   }
   const t = s.trigger;
-  if (t.kind === 'min-sol' && Number(trade.quoteAmount) < Number(t.amount))
-    return none('below-trigger');
+  if (t.kind === 'min-sol') {
+    if (trade.quoteMint !== AUTO_SELL_SOL_QUOTE)
+      return none('quote-unit-mismatch');
+    if (!autoSellQuoteAtLeast(trade.quoteAmount, t.amount))
+      return none('below-trigger');
+  }
   if (t.kind === 'min-token' && tokenRaw < decimalToRaw(t.amount, ctx.decimals))
     return none('below-trigger');
   if (t.kind === 'rate') {

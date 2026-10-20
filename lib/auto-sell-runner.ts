@@ -563,6 +563,12 @@ export class AutoSellRunner {
             'info',
             `${s.name}: buy by ${short(trade.sender)} of ${trade.tokenAmount}, queued ${result.addedRaw} raw to sell.`,
           );
+        else if (result.outcome === 'quote-unit-mismatch')
+          this.note(
+            s.id,
+            'info',
+            `${s.name}: Min. SOL trigger skipped because this pool is not quoted in verified SOL. Use Rate or Min. Token for other quote assets.`,
+          );
         else if (result.outcome === 'out-of-range')
           this.note(
             s.id,

@@ -34,6 +34,7 @@ const buy = (tokenAmount: string, sender = BUYER, quoteAmount = '1') => ({
   side: 'Buy' as const,
   tokenAmount,
   quoteAmount,
+  quoteMint: 'So11111111111111111111111111111111111111112',
   priceUsd: '0.00005',
 });
 
