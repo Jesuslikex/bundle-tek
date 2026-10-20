@@ -21,3 +21,11 @@ No production module imports the class; scoped source search finds only its defi
 ## Remaining requirements
 
 Durable exact session approval and per-action identities/budget state, fresh ownership/source/lifetime/custody/balance/simulation/code authorization, real retained-receipt adapter, crash/unknown-outcome recovery and carefully integrated browser scheduler remain unfinished. Signing and automatic Start stay off. Alternate routing, provider/funded qualification and broad Proxima parity remain open. No UI/protected layout, existing signer, API, migration, application/hosted SQL, provider/credential/cron, deployment or real wallet action changed.
+
+## Opus5.5 review of20fd9fc
+
+The existing Bundle Claude project reviewed pushed20fd9fc read-only on visibly selected Opus5.5. It reported no concrete transition, budget, lifetime or identity bug within the internal/unconnected scope. Codex checked that the assessment preserves the event-label trust boundary, original short preview lifetime and false authority flags; it is not approval for runtime integration or real sending.
+
+Claude read the entire sequence model, this document and the view helper, plus the action/budget portion of the review builder. Despite the requested broader scope, it only listed test names, did not read all29 test bodies or AGENTS, and ran no tests because its cloud checkout lacks Vitest. No claim of full independent verification is made. Codex's178-test/TypeScript/typed-lint result is independent. Paused-after-expiry display priority and abandoned-review recovery were noted as intentional conservative behavior, not authorization changes. No application change or repeated unchanged test run followed this source-level no-findings review.
+
+Local review screenshot is retained only under ignored `work/release-qa/opus-sequence-review-20261021/`, not published as repository evidence. This note is documentation-only. The full goal and durable approval/execution integration remain open.
