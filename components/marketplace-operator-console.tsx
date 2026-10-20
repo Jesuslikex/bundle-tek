@@ -11,6 +11,7 @@ import {
 } from '@/lib/marketplace-operator-review';
 import { readPanelJson } from './read-panel-json';
 import styles from './marketplace-owned-wallets.module.css';
+import { MarketplaceOperatorDrafts } from './marketplace-operator-drafts';
 export function MarketplaceOperatorConsole() {
   const [inventory, setInventory] = useState<MarketplaceOwnedInventory | null>(
       null,
@@ -325,6 +326,7 @@ export function MarketplaceOperatorConsole() {
           </p>
         </div>
       )}
+      <MarketplaceOperatorDrafts review={review} />
     </section>
   );
 }

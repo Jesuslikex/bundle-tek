@@ -49,7 +49,14 @@ export async function reviewOperatorListing(
   inventory: MarketplaceOwnedInventory,
   input: unknown,
   now = Date.now(),
+  reviewedAt = now,
 ): Promise<OperatorListingReview> {
+  if (
+    !Number.isSafeInteger(reviewedAt) ||
+    reviewedAt > now ||
+    now - reviewedAt >= 60000
+  )
+    throw Error('Listing review expired. Request a fresh review.');
   const current = admitMarketplaceOwnedInventory(inventory, now),
     selection = operatorListingSelection.parse(input),
     captured = current.wallets.find(
@@ -65,7 +72,7 @@ export async function reviewOperatorListing(
       captured.oldestRecordedActivityAt === null
         ? null
         : Math.floor(
-            (now - Date.parse(captured.oldestRecordedActivityAt)) / 1000,
+            (reviewedAt - Date.parse(captured.oldestRecordedActivityAt)) / 1000,
           ),
   };
   const requestSha256 = await digest(canonical(selection)),
@@ -73,8 +80,8 @@ export async function reviewOperatorListing(
   return operatorListingReview.parse({
     format: 'bundle-operator-listing-review-v1',
     sellerModel: 'bundle-operated',
-    reviewedAt: new Date(now).toISOString(),
-    reviewExpiresAt: new Date(now + 60000).toISOString(),
+    reviewedAt: new Date(reviewedAt).toISOString(),
+    reviewExpiresAt: new Date(reviewedAt + 60000).toISOString(),
     requestSha256,
     evidenceSha256,
     selection,

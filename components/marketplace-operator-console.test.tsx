@@ -68,7 +68,9 @@ it.each([401, 403])(
     expect(fetcher).not.toHaveBeenCalled();
     await click('Open seller inventory');
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(host.querySelector('input')).toBeNull();
+    expect(host.querySelector('select')).toBeNull();
+    expect(host.textContent).not.toContain('Asking price (SOL)');
+    expect(host.querySelector('input[type="checkbox"]')).toBeNull();
     expect(host.textContent).toContain(
       status === 401 ? 'Sign in before' : 'cannot assign roles',
     );
@@ -172,6 +174,7 @@ it('expires inventory without refreshing automatically', async () => {
   await click('Open seller inventory');
   await act(async () => vi.advanceTimersByTime(60000));
   expect(host.textContent).toContain('Seller inventory expired');
-  expect(host.querySelector('input')).toBeNull();
+  expect(host.querySelector('select')).toBeNull();
+  expect(host.textContent).not.toContain('Asking price (SOL)');
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
