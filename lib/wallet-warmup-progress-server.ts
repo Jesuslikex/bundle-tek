@@ -33,12 +33,12 @@ export async function loadWalletWarmupProgress(
       .bind(owner, id),
     db
       .prepare(
-        `SELECT document,id,plan_revision AS planRevision,wallet_revision AS walletRevision,cycle,wallet_address AS wallet,json_extract(document,'$.mint') AS mint,json_extract(document,'$.acquiredRaw') AS acquiredRaw,COALESCE(remaining_raw,json_extract(document,'$.acquiredRaw')) AS remainingRaw,json_extract(document,'$.decimals') AS decimals,CASE WHEN json_extract(document,'$.signatureVerified')=1 AND json_extract(document,'$.wallet')=wallet_address AND json_extract(document,'$.signature')=signature THEN 1 ELSE 0 END AS verified,json_extract(document,'$.commitment') AS commitment,json_extract(document,'$.network') AS network FROM warmup_buy_receipts WHERE owner_id=? AND plan_id=? LIMIT ?`,
+        `SELECT document,id,plan_revision AS planRevision,wallet_revision AS walletRevision,cycle,wallet_address AS wallet,json_extract(document,'$.mint') AS mint,json_extract(document,'$.acquiredRaw') AS acquiredRaw,COALESCE(remaining_raw,json_extract(document,'$.acquiredRaw')) AS remainingRaw,json_extract(document,'$.decimals') AS decimals,CASE WHEN json_extract(document,'$.signatureVerified')=1 AND json_extract(document,'$.wallet')=wallet_address AND json_extract(document,'$.signature')=signature THEN 1 ELSE 0 END AS verified,json_extract(document,'$.commitment') AS commitment,json_extract(document,'$.network') AS network FROM warmup_buy_receipts WHERE owner_id=? AND plan_id=? ORDER BY id LIMIT ?`,
       )
       .bind(owner, id, WARMUP_HISTORY_LIMIT + 1),
     db
       .prepare(
-        `SELECT document,id,buy_receipt_id AS buyId,consumed_raw AS consumedRaw,CASE WHEN json_extract(document,'$.signatureVerified')=1 AND json_extract(document,'$.signature')=signature AND json_extract(document,'$.consumedRaw')=consumed_raw AND json_extract(document,'$.buyReceiptId')=buy_receipt_id THEN 1 ELSE 0 END AS verified,json_extract(document,'$.commitment') AS commitment,json_extract(document,'$.network') AS network FROM warmup_sell_receipts WHERE owner_id=? AND plan_id=? LIMIT ?`,
+        `SELECT document,id,buy_receipt_id AS buyId,consumed_raw AS consumedRaw,CASE WHEN json_extract(document,'$.signatureVerified')=1 AND json_extract(document,'$.signature')=signature AND json_extract(document,'$.consumedRaw')=consumed_raw AND json_extract(document,'$.buyReceiptId')=buy_receipt_id THEN 1 ELSE 0 END AS verified,json_extract(document,'$.commitment') AS commitment,json_extract(document,'$.network') AS network FROM warmup_sell_receipts WHERE owner_id=? AND plan_id=? ORDER BY id LIMIT ?`,
       )
       .bind(owner, id, WARMUP_HISTORY_LIMIT + 1),
     db
@@ -72,8 +72,9 @@ export async function loadWalletWarmupProgress(
     );
   const plan: SavedWarmup = {
     id,
-    ...row,
+    revision: row.revision,
     archived: Boolean(row.archived),
+    updatedAt: row.updatedAt,
     document: JSON.parse(row.document),
   };
   const currentWallets = results[4]?.results[0] as
@@ -119,5 +120,12 @@ export async function loadWalletWarmupProgress(
     progress.steps.flatMap((step) => step.buyIds),
   );
 
-  return { plan, progress, performance };
+  const source = {
+    format: 'wallet-warmup-session-source-v1' as const,
+    planDocument: row.document,
+    planUpdatedAt: row.updatedAt,
+    buys: results[1].results,
+    sells: results[2].results,
+  };
+  return { plan, progress, performance, source };
 }

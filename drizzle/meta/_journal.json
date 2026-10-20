@@ -820,6 +820,13 @@
       "when": 1793548800000,
       "tag": "0116_launch_sale_allocations",
       "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "6",
+      "when": 1793635200000,
+      "tag": "0117_wallet_warmup_session_reviews",
+      "breakpoints": true
     }
   ]
 }
