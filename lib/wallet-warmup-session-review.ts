@@ -4,6 +4,8 @@ import type { WarmupCycleProgress } from './warmup-cycle-progress';
 import type { WarmupLotPerformance } from './warmup-lot-performance';
 import { walletWarmupActivity } from './wallet-warmup-activity';
 
+export class WalletWarmupSessionReviewError extends Error {}
+
 type ActionContext = {
   id: string;
   wallet: string;
@@ -17,7 +19,9 @@ function recordedLamports(value: string, signed = false) {
     typeof value !== 'string' ||
     !(signed ? /^(0|-?[1-9]\d{0,24})$/ : /^(0|[1-9]\d{0,24})$/).test(value)
   )
-    throw new Error('Recorded session costs are unavailable.');
+    throw new WalletWarmupSessionReviewError(
+      'Recorded session costs are unavailable.',
+    );
   return BigInt(value);
 }
 export type WarmupSessionAction = ActionContext &
@@ -53,21 +57,23 @@ export function reviewWalletWarmupSession(
     plan.archived ||
     plan.document.chain !== 'Solana'
   )
-    throw new Error('Choose an active saved Solana plan.');
+    throw new WalletWarmupSessionReviewError(
+      'Choose an active saved Solana plan.',
+    );
   if (progress.includeEarlier !== false)
-    throw new Error(
+    throw new WalletWarmupSessionReviewError(
       'Automatic session review requires the current saved plan and wallet revisions.',
     );
   const activity = walletWarmupActivity(plan, progress, performance);
   if (progress.excludedBuys !== 0)
-    throw new Error(
+    throw new WalletWarmupSessionReviewError(
       'Review excluded receipt history manually before planning an automatic session.',
     );
   if (
     progress.activeApprovals !== 0 ||
     activity.some((wallet) => wallet.recoveryCount !== 0)
   )
-    throw new Error(
+    throw new WalletWarmupSessionReviewError(
       'Recover every active approval before reviewing an automatic session.',
     );
   const revisions = plan.document.walletRevisions;
@@ -83,10 +89,14 @@ export function reviewWalletWarmupSession(
         wallet.revision < 1,
     )
   )
-    throw new Error('The saved wallet revision capture differs.');
+    throw new WalletWarmupSessionReviewError(
+      'The saved wallet revision capture differs.',
+    );
   const originalStart = Date.parse(plan.document.startAt);
   if (!Number.isFinite(originalStart))
-    throw new Error('The saved start time is invalid.');
+    throw new WalletWarmupSessionReviewError(
+      'The saved start time is invalid.',
+    );
   // Old scheduled times are never backfilled. The rebased schedule itself is part of this review.
   const effectiveStart = Math.max(now, originalStart);
   const rebuilt = buildWarmupPlan(
@@ -94,7 +104,7 @@ export function reviewWalletWarmupSession(
     now,
   );
   if (rebuilt.totalBudget !== plan.document.totalBudget)
-    throw new Error(
+    throw new WalletWarmupSessionReviewError(
       'The saved plan budget differs. Review and save the plan again.',
     );
   const actions: WarmupSessionAction[] = [];
@@ -145,7 +155,7 @@ export function reviewWalletWarmupSession(
           lot.decimals < 0 ||
           lot.decimals > 18
         )
-          throw new Error(
+          throw new WalletWarmupSessionReviewError(
             'Saved buy units are unavailable for session review.',
           );
         actions.push({
@@ -189,16 +199,16 @@ export function reviewWalletWarmupSession(
       0n,
     );
     if (recordedBuySpend + buys > originalBuyBudget)
-      throw new Error(
+      throw new WalletWarmupSessionReviewError(
         'Recorded and remaining buys exceed the saved wallet budget. Review the receipt history and plan.',
       );
     if (priorCosts > reserve)
-      throw new Error(
+      throw new WalletWarmupSessionReviewError(
         'Recorded fees and rent exceed the saved fee reserve. Review the plan before another session.',
       );
     const remainingReserve = reserve - priorCosts;
     if (active && remainingReserve === 0n)
-      throw new Error(
+      throw new WalletWarmupSessionReviewError(
         'The saved fee reserve is exhausted. Review the plan before another session.',
       );
     return {
