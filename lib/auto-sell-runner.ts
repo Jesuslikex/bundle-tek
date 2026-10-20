@@ -25,6 +25,8 @@ export type AutoSellLogEntry = {
 
 export type AutoSellSnapshot = {
   running: boolean;
+  paused: boolean;
+  settling: boolean;
   marketCapUsd: number | null;
   states: Record<string, AutoSellStrategyState & { inRange: boolean }>;
   log: AutoSellLogEntry[];
@@ -89,6 +91,7 @@ export class AutoSellRunner {
   private seen = new Set<string>();
   private seeded = false;
   private running = false;
+  private paused = false;
   private selling = false;
   private sellBlockedUntil = 0;
   private marketCapUsd: number | null = null;
@@ -145,6 +148,7 @@ export class AutoSellRunner {
   stop(reason = 'Stopped') {
     if (!this.running) return;
     this.running = false;
+    this.paused = false;
     this.controller.abort();
     if (this.timer !== null) this.deps.clearTimer(this.timer);
     this.timer = null;
@@ -158,6 +162,65 @@ export class AutoSellRunner {
           endedReason: reason,
         });
     this.note(null, 'info', reason);
+  }
+
+  pause() {
+    if (!this.running || this.paused) return false;
+    this.paused = true;
+    this.controller.abort();
+    if (this.timer !== null) this.deps.clearTimer(this.timer);
+    this.timer = null;
+    this.note(
+      null,
+      'info',
+      'Paused. Existing transaction outcomes are retained; session time limits continue.',
+    );
+    this.schedulePausedCheck();
+    return true;
+  }
+
+  resume() {
+    if (!this.running || !this.paused || this.polling || this.selling)
+      return false;
+    this.checkEnds();
+    if (!this.running) return false;
+    if (this.timer !== null) this.deps.clearTimer(this.timer);
+    this.timer = null;
+    this.controller = new AbortController();
+    this.paused = false;
+    this.seeded = false;
+    this.seen.clear();
+    this.marketCapUsd = null;
+    this.marketCapAt = 0;
+    const now = this.deps.now();
+    for (const strategy of this.deps.strategies) {
+      const state = this.states.get(strategy.id)!;
+      if (strategy.mode === 'dca' && state.status === 'running')
+        this.states.set(strategy.id, {
+          ...state,
+          nextDcaAt: Math.max(
+            state.nextDcaAt,
+            now + strategy.dcaIntervalSeconds * 1000,
+          ),
+        });
+    }
+    this.note(
+      null,
+      'info',
+      'Resumed. Paused market activity is not replayed; queued amounts and existing limits are retained.',
+    );
+    void this.tick();
+    return true;
+  }
+
+  private schedulePausedCheck() {
+    if (!this.running || !this.paused) return;
+    this.timer = this.deps.setTimer(() => {
+      this.timer = null;
+      if (!this.running || !this.paused) return;
+      this.checkEnds();
+      this.schedulePausedCheck();
+    }, this.deps.pollMs);
   }
 
   isRunning() {
@@ -176,6 +239,8 @@ export class AutoSellRunner {
     }
     return {
       running: this.running,
+      paused: this.paused,
+      settling: this.polling || this.selling,
       marketCapUsd: this.marketCapUsd,
       states,
       log: this.log.slice(-50),
@@ -206,14 +271,18 @@ export class AutoSellRunner {
 
   /** One poll: exposed for tests. */
   async tick() {
-    if (!this.running || this.polling) return;
+    if (!this.running || this.paused || this.polling) return;
+    if (this.timer !== null) this.deps.clearTimer(this.timer);
+    this.timer = null;
     this.polling = true;
+    const controller = this.controller;
     try {
-      const trades = await this.deps.readTrades(this.controller.signal);
-      if (!this.running) return;
+      const trades = await this.deps.readTrades(controller.signal);
+      if (!this.running || this.paused || this.controller !== controller)
+        return;
       this.observe(trades);
     } catch (error) {
-      if (this.running && !this.controller.signal.aborted)
+      if (this.running && !controller.signal.aborted)
         this.note(
           null,
           'error',
@@ -221,13 +290,15 @@ export class AutoSellRunner {
         );
     } finally {
       this.polling = false;
+      if (this.paused) this.emit();
     }
-    if (!this.running) return;
+    if (!this.running || this.paused || this.controller !== controller) return;
     this.expireMarketCap();
     this.checkEnds();
     this.schedule();
     this.maybeSell();
-    this.timer = this.deps.setTimer(() => void this.tick(), this.deps.pollMs);
+    if (this.running && !this.paused)
+      this.timer = this.deps.setTimer(() => void this.tick(), this.deps.pollMs);
   }
 
   private observe(trades: AutoSellObservedTrade[]) {
@@ -259,6 +330,7 @@ export class AutoSellRunner {
     }
     for (const trade of fresh) {
       for (const s of this.deps.strategies) {
+        if (!this.running || this.paused) return;
         const state = this.states.get(s.id)!;
         const result = applyAutoSellTrade(s, state, trade, {
           decimals: this.deps.decimals,
@@ -287,9 +359,10 @@ export class AutoSellRunner {
 
   /** Queues due DCA and Limit Order sells. */
   private schedule() {
-    if (!this.running || this.deps.now() < this.activeAt) return;
+    if (!this.running || this.paused || this.deps.now() < this.activeAt) return;
     const now = this.deps.now();
     for (const s of this.deps.strategies) {
+      if (!this.running || this.paused) return;
       if (s.mode === 'counter') continue;
       const result = scheduleAutoSell(s, this.states.get(s.id)!, {
         now,
@@ -352,6 +425,7 @@ export class AutoSellRunner {
     }
     if ([...this.states.values()].every((st) => st.status !== 'running')) {
       this.running = false;
+      this.paused = false;
       if (this.timer !== null) this.deps.clearTimer(this.timer);
       this.timer = null;
       if (this.endTimer !== null) this.deps.clearTimer(this.endTimer);
@@ -363,6 +437,7 @@ export class AutoSellRunner {
   private maybeSell() {
     if (
       !this.running ||
+      this.paused ||
       this.deps.now() < this.activeAt ||
       this.selling ||
       this.deps.now() < this.sellBlockedUntil
