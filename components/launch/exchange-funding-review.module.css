@@ -6,7 +6,7 @@
   border: 1px solid var(--border, #343846);
   border-radius: 12px;
   background: var(--card, #151720);
-  color: var(--foreground, #f3f4f7);
+  color: var(--foreground, #fcfcfc);
 }
 .panel header {
   display: flex;

@@ -115,7 +115,7 @@ function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={`min-h-9 whitespace-nowrap rounded px-3 text-sm ${
             value === o.value
-              ? 'bg-[#7775ef] text-[#101222]'
+              ? 'bg-[#7892ff] text-[#101222]'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -624,7 +624,7 @@ export function PerformanceCalendar({
               }
               className={`flex min-h-14 flex-col items-start rounded-md border p-1.5 text-left text-xs disabled:opacity-60 ${
                 selected?.key === cell.key
-                  ? 'border-[#7775ef]'
+                  ? 'border-[#7892ff]'
                   : 'border-[#343846]'
               } ${
                 cell.resultLamports > 0n

@@ -317,7 +317,7 @@
   }
 }
 :root {
-  --background: #0f1014;
+  --background: #101114;
   --foreground: #f0f1f6;
   --card: #14151b;
   --primary: #8587ff;
@@ -578,7 +578,7 @@ body {
   min-height: 0;
   overflow: hidden;
   grid-template-columns: minmax(0, 780px);
-  background: #0f1014;
+  background: #101114;
   border-right: 1px solid var(--border);
 }
 .settings-scroll,
@@ -843,11 +843,11 @@ body {
 .app-shell .create-main,
 .app-shell .create-side {
   margin-top: 24px;
-  background: #7f82ed;
-  color: #101120;
-  border: 1px solid #9496ff;
-  font-weight: 600;
-  border-radius: 5px;
+  background: #7892ff;
+  color: #101114;
+  border: 0;
+  font-weight: 500;
+  border-radius: 8px;
   min-height: 44px;
 }
 .app-shell .text-link {
@@ -4320,7 +4320,7 @@ body {
   display: none;
 }
 .activity-coverage summary:focus-visible {
-  outline: 2px solid #7775ef;
+  outline: 2px solid #7892ff;
   outline-offset: 4px;
   border-radius: 4px;
 }
@@ -5359,7 +5359,7 @@ body {
   padding: 0 18px;
   border: 1px dashed #2c2e3a;
   border-radius: 2px;
-  background: #121318;
+  background: #18181f;
   text-align: left;
   cursor: pointer;
 }
@@ -5414,7 +5414,7 @@ body {
   padding-inline: 16px;
   background: #1c1d24;
   font-weight: 600;
-  color: #f3f4f7;
+  color: #fcfcfc;
 }
 
 .launch-ws-panels {
