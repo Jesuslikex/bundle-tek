@@ -1,4 +1,4 @@
-import type { WarmupPlan } from '@/lib/wallet-warmup';
+import { formatWarmupDelay, type WarmupPlan } from '@/lib/wallet-warmup';
 import styles from './warmup-plan-summary.module.css';
 export function WarmupPlanSummary({ plan }: { plan: WarmupPlan }) {
   const first = plan.actions[0].scheduledAt;
@@ -36,7 +36,9 @@ export function WarmupPlanSummary({ plan }: { plan: WarmupPlan }) {
           <dd>{plan.actions.length}</dd>
         </div>
         <div>
-          <dt>Required per wallet</dt>
+          <dt>
+            {plan.buyAmountMax ? 'Largest wallet need' : 'Required per wallet'}
+          </dt>
           <dd>
             {plan.requiredPerWallet} {plan.currency}
           </dd>
@@ -57,9 +59,12 @@ export function WarmupPlanSummary({ plan }: { plan: WarmupPlan }) {
         </div>
       </dl>
       <p>
-        Each buy: {plan.buyAmount} {plan.currency}. User-chosen fee reserve:{' '}
-        {plan.feeReserve} {plan.currency} per wallet. Sell proceeds are not
-        reused in this budget.
+        {plan.buyAmountMax
+          ? `Each buy: drawn between ${plan.buyAmount} and ${plan.buyAmountMax} ${plan.currency}; exact amounts are in the full schedule.`
+          : `Each buy: ${plan.buyAmount} ${plan.currency}.`}{' '}
+        Delay between loops: {formatWarmupDelay(plan.intervalSeconds)}.
+        User-chosen fee reserve: {plan.feeReserve} {plan.currency} per wallet.
+        Sell proceeds are not reused in this budget.
       </p>
       <p className={styles.schedule}>
         First buy:{' '}

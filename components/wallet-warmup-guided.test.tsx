@@ -154,7 +154,7 @@ it.each([
 it('opens a collapsed options section when native input validation needs correction', async () => {
   await mount();
   const label = Array.from(host.querySelectorAll('label')).find((l) =>
-    l.textContent?.includes('Cycles per wallet'),
+    l.textContent?.includes('Fee reserve per wallet'),
   )!;
   const input = label.querySelector('input')!;
   const details = input.closest('details')!;
@@ -196,4 +196,46 @@ it('routes an expired saved start to timing and recovers without saving automati
   expect(host.querySelector('[role=alert]')).toBeNull();
   expect(start.getAttribute('aria-invalid')).not.toBe('true');
   expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
+});
+function type(input: HTMLInputElement, value: string) {
+  Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    'value',
+  )!.set!.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+it('reviews and saves Proxima-style range amounts with a seconds delay', async () => {
+  await mount();
+  await click('Use USDC');
+  await click('Range');
+  const max = host.querySelector<HTMLInputElement>(
+    'input[aria-label="Maximum amount"]',
+  )!;
+  const minutes = host.querySelector<HTMLInputElement>(
+    'input[aria-label="Delay minutes"]',
+  )!;
+  const seconds = host.querySelector<HTMLInputElement>(
+    'input[aria-label="Delay seconds"]',
+  )!;
+  await act(async () => {
+    type(max, '0.002');
+    type(minutes, '0');
+    type(seconds, '45');
+  });
+  // 3 loops x 0.002 upper bound + 0.01 reserve for one wallet.
+  expect(host.textContent).toContain('Required (max): 0.016 SOL');
+  expect(host.textContent).toContain('Estimated: 1m 53s');
+  await click('Review warmup plan');
+  expect(host.textContent).toContain('drawn between 0.001 and 0.002 SOL');
+  await click('Save draft');
+  const doc = fixture.plan.document;
+  expect(doc.amountMax).toBe('0.002');
+  expect(doc.intervalSeconds).toBe(45);
+  expect(doc.intervalMinutes).toBeUndefined();
+  expect(doc.amounts).toHaveLength(1);
+  expect(doc.amounts![0]).toHaveLength(3);
+  for (const a of doc.amounts![0]) {
+    expect(Number(a)).toBeGreaterThanOrEqual(0.001);
+    expect(Number(a)).toBeLessThanOrEqual(0.002);
+  }
 });

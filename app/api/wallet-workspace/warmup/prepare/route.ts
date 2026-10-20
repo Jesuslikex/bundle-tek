@@ -1,7 +1,7 @@
 import { env } from '@/lib/server-env';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
-import { buildWarmupPlan } from '@/lib/wallet-warmup';
+import { buildWarmupPlan, warmupBuyAmount } from '@/lib/wallet-warmup';
 import { WARMUP_HISTORY_LIMIT } from '@/lib/warmup-history-capacity';
 import { walletAddress } from '@/lib/wallet-workspace';
 import { prepareSolanaSwap } from '@/lib/warmup-swap-quote';
@@ -250,7 +250,10 @@ export async function POST(request: Request) {
       {
         tokenMint: mint,
         side,
-        amount: side === 'Sell' ? input.amount! : plan.buyAmount,
+        amount:
+          side === 'Sell'
+            ? input.amount!
+            : warmupBuyAmount(document, input.wallet, input.cycle),
         decimals: inventory?.decimals ?? 9,
         wallet: input.wallet,
       },

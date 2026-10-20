@@ -1,4 +1,5 @@
 'use client';
+import { formatWarmupDelay, warmupDelaySeconds } from '@/lib/wallet-warmup';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { WarmupPlanEvent } from '@/lib/wallet-warmup-storage';
@@ -147,13 +148,17 @@ export function WalletWarmupPlanHistory({
                     {event.document.cycles} cycles.
                   </p>
                   <p>
-                    Buy amount: {event.document.amount}. Fee reserve per wallet:{' '}
-                    {event.document.feeReserve}. Total budget:{' '}
-                    {event.document.totalBudget}.
+                    Buy amount: {event.document.amount}
+                    {event.document.amountMax
+                      ? ` to ${event.document.amountMax} (range)`
+                      : ''}
+                    . Fee reserve per wallet: {event.document.feeReserve}. Total
+                    budget: {event.document.totalBudget}.
                   </p>
                   <p>
                     Start: {new Date(event.document.startAt).toLocaleString()}.
-                    Interval: {event.document.intervalMinutes} minutes.
+                    Delay:{' '}
+                    {formatWarmupDelay(warmupDelaySeconds(event.document))}.
                   </p>
                   <p className="warmup-address">
                     Tokens: {event.document.tokens.join(', ')}

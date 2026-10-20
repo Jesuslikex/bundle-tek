@@ -110,7 +110,11 @@ const request = (
     }),
   );
 const list = async () =>
-  (await (await GET(new Request('http://localhost:3000/api/wallet-workspace/warmup/plans'))).json()) as { plans: SavedWarmup[] };
+  (await (
+    await GET(
+      new Request('http://localhost:3000/api/wallet-workspace/warmup/plans'),
+    )
+  ).json()) as { plans: SavedWarmup[] };
 const eventList = (cursor?: string) =>
   history(
     new Request(
@@ -786,6 +790,41 @@ it('persists only server-rebuilt public settings and isolates owners', async () 
   ).toBe(409);
   expect((await request()).status).toBe(409);
 });
+it('persists server-validated range amounts and second delays', async () => {
+  const { intervalMinutes: _legacy, ...base } = document();
+  const ranged = {
+    ...base,
+    intervalSeconds: 45,
+    amountMax: '0.002',
+    amounts: [['0.001', '0.0015', '0.002']],
+  };
+  expect(
+    (
+      await request({
+        id: 'qa',
+        expectedRevision: 0,
+        action: 'save',
+        document: { ...ranged, amounts: [['0.001', '0.0015', '0.0021']] },
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await request({
+        id: 'qa',
+        expectedRevision: 0,
+        action: 'save',
+        document: ranged,
+      })
+    ).status,
+  ).toBe(200);
+  const p = (await list()).plans[0];
+  expect(p.document.amountMax).toBe('0.002');
+  expect(p.document.amounts).toEqual([['0.001', '0.0015', '0.002']]);
+  expect(p.document.intervalSeconds).toBe(45);
+  expect(p.document).not.toHaveProperty('intervalMinutes');
+  expect(p.document.totalBudget).toBe('0.0145');
+});
 it('allows exactly one concurrent edit and guards archive/restore revisions', async () => {
   await request();
   const edit = {
@@ -825,7 +864,13 @@ it('rejects stale, archived and cross-chain wallet snapshots at save time', asyn
 });
 it('requires auth/origin and bounds names, input and per-owner storage', async () => {
   mocks.user = null;
-  expect((await GET(new Request('http://localhost:3000/api/wallet-workspace/warmup/plans'))).status).toBe(401);
+  expect(
+    (
+      await GET(
+        new Request('http://localhost:3000/api/wallet-workspace/warmup/plans'),
+      )
+    ).status,
+  ).toBe(401);
   expect((await request()).status).toBe(401);
   mocks.user = { userId: 'one' };
   expect(

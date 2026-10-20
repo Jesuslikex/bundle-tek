@@ -30,9 +30,12 @@ function matchesPendingSave(saved: SavedWarmup, pending: PendingSave) {
     a.name === b.name &&
     a.chain === b.chain &&
     a.amount === b.amount &&
+    a.amountMax === b.amountMax &&
+    JSON.stringify(a.amounts) === JSON.stringify(b.amounts) &&
     a.feeReserve === b.feeReserve &&
     a.cycles === b.cycles &&
     a.intervalMinutes === b.intervalMinutes &&
+    a.intervalSeconds === b.intervalSeconds &&
     a.startAt === b.startAt &&
     a.totalBudget === b.totalBudget &&
     a.addresses.length === b.addresses.length &&
@@ -182,9 +185,14 @@ export function WalletWarmupPlans({
               addresses: plan.addresses,
               tokens: plan.tokens,
               amount: plan.buyAmount,
+              ...(plan.buyAmountMax
+                ? { amountMax: plan.buyAmountMax, amounts: plan.buyAmounts }
+                : {}),
               feeReserve: plan.feeReserve,
               cycles: plan.cycles,
-              intervalMinutes: plan.intervalMinutes,
+              ...(plan.intervalMinutes === undefined
+                ? { intervalSeconds: plan.intervalSeconds }
+                : { intervalMinutes: plan.intervalMinutes }),
               startAt: plan.startAt,
               walletRevisions,
               totalBudget: plan.totalBudget,

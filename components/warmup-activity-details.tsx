@@ -116,9 +116,12 @@ export function WarmupActivityDetails({
               {current.plan.revision} · {current.plan.document.cycles} cycles.
             </p>
             <p>
-              Buy amount: {current.plan.document.amount}. Total budget:{' '}
-              {current.plan.document.totalBudget}. Fee reserve per wallet:{' '}
-              {current.plan.document.feeReserve}.
+              Buy amount: {current.plan.document.amount}
+              {current.plan.document.amountMax
+                ? ` to ${current.plan.document.amountMax} (range)`
+                : ''}
+              . Total budget: {current.plan.document.totalBudget}. Fee reserve
+              per wallet: {current.plan.document.feeReserve}.
             </p>
             <p className="warmup-address">
               Tokens: {current.plan.document.tokens.join(', ')}

@@ -1,4 +1,4 @@
-import { buildWarmupPlan, warmupAtoms } from './wallet-warmup';
+import { buildWarmupPlan, warmupAtoms, warmupBuyAmount } from './wallet-warmup';
 import type { SavedWarmup } from './wallet-warmup-storage';
 import { validateTokenSource } from './token-source';
 import { solanaTokenAtoms } from './solana-token-amount';
@@ -50,7 +50,11 @@ export async function quoteWarmupBuy(
     throw new WarmupQuoteError(
       'Choose a token other than wrapped SOL for a SOL swap.',
     );
-  const amount = warmupAtoms(plan.buyAmount, 9);
+  // Range plans preview the first wallet's reviewed amount for this cycle.
+  const amount = warmupAtoms(
+    warmupBuyAmount(document, plan.addresses[0], cycle),
+    9,
+  );
   if (amount > (1n << 64n) - 1n)
     throw new WarmupQuoteError('Swap amount exceeds Solana limits.');
   // Match the executable warmup path instead of receiving an RFQ quote with

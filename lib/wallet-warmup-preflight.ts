@@ -79,10 +79,15 @@ export async function inspectWarmupPreflight(
   for (const address of plan.tokens)
     if (!tokens.some((t) => t.address === address))
       tokens.push({ address, error: 'Token lookup timed out.' });
-  const required =
-    warmupAtoms(plan.buyAmount, unit.decimals) * BigInt(plan.cycles) +
-    warmupAtoms(plan.feeReserve, unit.decimals);
+  const budgets = new Map(
+    plan.walletBudgets.map((w) => [
+      w.address,
+      warmupAtoms(w.required, unit.decimals),
+    ]),
+  );
+  const required = [...budgets.values()].reduce((a, b) => (b > a ? b : a), 0n);
   const wallets = plan.addresses.map((address) => {
+    const required = budgets.get(address)!;
     const balance = snapshot?.items.find((b) => b.address === address);
     if (!balance)
       return { address, amount: null, shortfall: null, covered: null };

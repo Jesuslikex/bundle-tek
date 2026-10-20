@@ -9,7 +9,7 @@ import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import type { SolanaSwapPreparation } from '@/lib/warmup-swap-quote';
 import type { ImportedSwapSimulation } from '@/lib/imported-swap-simulation';
 import type { SavedWarmupPreparation } from '@/lib/warmup-preparation-history';
-import { warmupAtoms } from '@/lib/wallet-warmup';
+import { warmupAtoms, warmupBuyAmount } from '@/lib/wallet-warmup';
 import { WalletWarmupSell } from '@/components/wallet-warmup-sell';
 import { SwapInstructionReview } from './swap-instruction-review';
 import { readPanelJson } from './read-panel-json';
@@ -175,7 +175,11 @@ function WarmupPreparationRequest({
         order.side !== 'Buy' ||
         order.inputMint !== 'So11111111111111111111111111111111111111112' ||
         order.outputMint !== mint ||
-        order.inAmount !== warmupAtoms(plan.document.amount, 9).toString() ||
+        order.inAmount !==
+          warmupAtoms(
+            warmupBuyAmount(plan.document, wallet, cycle),
+            9,
+          ).toString() ||
         order.executionAllowed !== false ||
         order.preparation.wallet !== wallet ||
         order.preparation.executionAllowed !== false ||
@@ -223,7 +227,8 @@ function WarmupPreparationRequest({
     <div>
       {!result && <WarmupTransactionProgress stage="prepare" />}
       <p className="warmup-address">
-        Cycle {cycle}: Spend {plan.document.amount} SOL to buy {mint}.
+        Cycle {cycle}: Spend {warmupBuyAmount(plan.document, wallet, cycle)} SOL
+        to buy {mint}.
       </p>
       <Button variant="outline" disabled={busy} onClick={() => void prepare()}>
         {busy ? 'Preparing warmup buy…' : 'Prepare unsigned warmup buy'}
