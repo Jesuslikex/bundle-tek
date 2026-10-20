@@ -47,6 +47,7 @@ beforeEach(async () => {
   for (const file of [
     '0118_marketplace_operator_drafts',
     '0119_marketplace_publications',
+    '0120_marketplace_reservations',
   ])
     for (const sql of readFileSync('drizzle/' + file + '.sql', 'utf8')
       .split('--> statement-breakpoint')

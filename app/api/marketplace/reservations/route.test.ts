@@ -1,0 +1,363 @@
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+import { createClient, type Client } from '@libsql/client';
+import { readFileSync } from 'node:fs';
+import { createTursoDatabase } from '@/db/turso';
+import { marketplaceOwnedFixture } from '@/test/marketplace-owned-fixture';
+import { readMarketplaceOwnedInventory } from '@/lib/marketplace-owned-inventory-server';
+import { reviewOperatorListing } from '@/lib/marketplace-operator-review';
+import { operatorDraftRequest } from '@/lib/marketplace-operator-draft-view';
+import { saveOperatorDraft } from '@/lib/marketplace-operator-draft-storage';
+import {
+  previewPublication,
+  publishListing,
+  readBundleCatalog,
+} from '@/lib/marketplace-publication-storage';
+import {
+  PUBLICATION_ACK,
+  type PublicationRecord,
+} from '@/lib/marketplace-publication';
+import {
+  buildCartRequest,
+  reviewMarketplaceCart,
+} from '@/lib/marketplace-cart';
+import {
+  makeReservationRequest,
+  RESERVATION_CANCEL_ACK,
+  reservationRecord,
+} from '@/lib/marketplace-reservation';
+import { walletWarmupSessionDigest as digest } from '@/lib/wallet-warmup-session-digest';
+const mocks = vi.hoisted(() => ({
+  user: { userId: 'buyer' } as { userId: string } | null,
+  db: null as unknown as D1Database,
+}));
+vi.mock('@/app/chatgpt-auth', () => ({
+  getChatGPTUser: async () => mocks.user,
+}));
+vi.mock('@/db', () => ({ getD1: () => mocks.db }));
+import { GET, POST } from './route';
+let client: Client,
+  db: D1Database,
+  publications: PublicationRecord[],
+  queries: string[];
+const signal = () => new AbortController().signal;
+async function reservationBody(response: Response) {
+  return z
+    .object({
+      reservation: z
+        .object({
+          record: reservationRecord,
+          releasedAt: z.iso.datetime().nullable(),
+          state: z.enum(['held', 'released', 'expired']),
+        })
+        .strict(),
+    })
+    .strict()
+    .parse(await response.json());
+}
+beforeEach(async () => {
+  client = createClient({ url: 'file::memory:', intMode: 'number' });
+  db = createTursoDatabase(client);
+  for (const sql of [
+    'CREATE TABLE workspace_wallets(owner_id TEXT,chain TEXT,address TEXT,label TEXT,revision INTEGER,updated_at TEXT,archived INTEGER)',
+    'CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT,verified_at TEXT)',
+    'CREATE TABLE warmup_history_runs(owner_id TEXT,id TEXT,revision INTEGER,created_at TEXT,updated_at TEXT,document TEXT)',
+    'CREATE TABLE warmup_buy_receipts(owner_id TEXT,wallet_address TEXT,signature TEXT)',
+    'CREATE TABLE warmup_sell_receipts(owner_id TEXT,signature TEXT,document TEXT)',
+  ])
+    await db.prepare(sql).run();
+  for (const file of [
+    '0118_marketplace_operator_drafts',
+    '0119_marketplace_publications',
+    '0120_marketplace_reservations',
+  ])
+    for (const sql of readFileSync('drizzle/' + file + '.sql', 'utf8')
+      .split('--> statement-breakpoint')
+      .map((x) => x.trim())
+      .filter(Boolean))
+      await db.prepare(sql).run();
+  const sources = marketplaceOwnedFixture();
+  for (const value of sources.sources.wallets) {
+    const w = value as {
+      address: string;
+      label: string;
+      revision: number;
+      updatedAt: string;
+    };
+    await db
+      .prepare('INSERT INTO workspace_wallets VALUES(?,?,?,?,?,?,?)')
+      .bind(
+        'operator',
+        'Solana',
+        w.address,
+        w.label,
+        w.revision,
+        w.updatedAt,
+        0,
+      )
+      .run();
+    await db
+      .prepare('INSERT INTO wallet_ownership_proofs VALUES(?,?,?,?)')
+      .bind(
+        'operator',
+        'Solana',
+        w.address,
+        new Date(Date.now() - 60000).toISOString(),
+      )
+      .run();
+  }
+  publications = [];
+  for (let i = 0; i < 2; i++) {
+    const inventory = await readMarketplaceOwnedInventory(
+        db,
+        'operator',
+        signal(),
+      ),
+      w = inventory.wallets[i],
+      review = await reviewOperatorListing(inventory, {
+        address: w.address,
+        walletRevision: w.revision,
+        priceLamports: i === 0 ? '50000000' : '25000001',
+      }),
+      draft = await saveOperatorDraft(
+        db,
+        'operator',
+        operatorDraftRequest(crypto.randomUUID(), review, true),
+        signal(),
+      ),
+      publicationReview = await previewPublication(
+        db,
+        'operator',
+        draft.id,
+        signal(),
+      );
+    publications.push(
+      await publishListing(
+        db,
+        'operator',
+        {
+          id: crypto.randomUUID(),
+          draftId: draft.id,
+          reviewedAt: publicationReview.preview.reviewedAt,
+          contextSha256: publicationReview.preview.contextSha256,
+          acknowledgement: PUBLICATION_ACK,
+        },
+        signal(),
+      ),
+    );
+  }
+  vi.stubEnv('MARKETPLACE_OPERATOR_USER_IDS', '["operator"]');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => {
+      throw Error('No provider calls');
+    }),
+  );
+  await db
+    .prepare(
+      'CREATE TABLE market_read_gates(owner_id TEXT PRIMARY KEY,next_allowed_at INTEGER NOT NULL)',
+    )
+    .run();
+  mocks.user = { userId: 'buyer' };
+  queries = [];
+  mocks.db = new Proxy(db, {
+    get(target, key) {
+      if (key === 'prepare')
+        return (sql: string) => {
+          queries.push(sql);
+          return target.prepare(sql);
+        };
+      const value = Reflect.get(target, key);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+});
+afterEach(() => {
+  client?.close();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+async function input(ids = publications.map((p) => p.id)) {
+  const catalog = await readBundleCatalog(db, signal());
+  return {
+    action: 'reserve',
+    ...makeReservationRequest(
+      crypto.randomUUID(),
+      await reviewMarketplaceCart(
+        await buildCartRequest(catalog, ids),
+        catalog,
+      ),
+      true,
+    ),
+  };
+}
+const post = (
+  value: unknown,
+  headers: Record<string, string> = {
+    origin: 'http://localhost',
+    'content-type': 'application/json',
+  },
+  abort?: AbortSignal,
+) =>
+  POST(
+    new Request('http://localhost/api/marketplace/reservations', {
+      method: 'POST',
+      headers,
+      body: typeof value === 'string' ? value : JSON.stringify(value),
+      signal: abort,
+    }),
+  );
+const get = (query: string) =>
+  GET(new Request('http://localhost/api/marketplace/reservations?' + query));
+it('authenticates both methods before database access and refuses caller-supplied identities', async () => {
+  mocks.user = null;
+  expect((await get('id=' + crypto.randomUUID())).status).toBe(401);
+  expect((await post({})).status).toBe(401);
+  expect(queries).toEqual([]);
+  mocks.user = { userId: 'buyer' };
+  const selected = await input();
+  queries = [];
+  expect((await post({ ...selected, buyerId: 'operator' })).status).toBe(400);
+  expect(queries).toEqual([]);
+});
+it('reserves once, hides held wallets from every catalog, recovers and releases without payment authority', async () => {
+  const selected = await input(),
+    response = await post(selected),
+    body = await reservationBody(response);
+  expect(response.status).toBe(200);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(body.reservation).toMatchObject({
+    state: 'held',
+    record: {
+      paymentEnabled: false,
+      signingAllowed: false,
+      purchaseEnabled: false,
+      deliveryEnabled: false,
+    },
+  });
+  expect((await readBundleCatalog(db, signal())).listings).toHaveLength(0);
+  expect((await get('id=' + selected.id)).status).toBe(200);
+  expect((await post(selected)).status).toBe(200);
+  const released = await post({
+    action: 'release',
+    id: selected.id,
+    contextSha256: body.reservation.record.contextSha256,
+    acknowledgement: RESERVATION_CANCEL_ACK,
+  });
+  expect(released.status).toBe(200);
+  expect((await reservationBody(released)).reservation.state).toBe('released');
+  expect((await readBundleCatalog(db, signal())).listings).toHaveLength(2);
+  expect(
+    (
+      await db
+        .prepare('SELECT count(*) AS n FROM marketplace_reservations')
+        .first<{ n: number }>()
+    )?.n,
+  ).toBe(1);
+  expect(fetch).not.toHaveBeenCalled();
+});
+it('isolates buyer recovery and release and requires one exact GET selector', async () => {
+  const selected = await input(),
+    saved = await reservationBody(await post(selected));
+  mocks.user = { userId: 'other' };
+  expect((await get('id=' + selected.id)).status).toBe(404);
+  expect(
+    (
+      await post({
+        action: 'release',
+        id: selected.id,
+        contextSha256: saved.reservation.record.contextSha256,
+        acknowledgement: RESERVATION_CANCEL_ACK,
+      })
+    ).status,
+  ).toBe(404);
+  for (const query of [
+    '',
+    'id=nope',
+    'id=' + selected.id + '&id=' + selected.id,
+    'id=' + selected.id + '&buyerId=buyer',
+  ])
+    expect((await get(query)).status).toBe(400);
+});
+it('rejects wrong origin, encoding, oversized streaming body, incomplete consent and cancellation before SQL', async () => {
+  const selected = await input();
+  queries = [];
+  expect(
+    (
+      await post(selected, {
+        origin: 'https://other',
+        'content-type': 'application/json',
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await post(selected, {
+        origin: 'http://localhost',
+        'content-type': 'text/plain',
+      })
+    ).status,
+  ).toBe(415);
+  expect((await post({ ...selected, acknowledgement: '' })).status).toBe(400);
+  expect((await post(' '.repeat(524289))).status).toBe(413);
+  const c = new AbortController();
+  c.abort();
+  expect((await post(selected, undefined, c.signal)).status).toBe(408);
+  expect(queries).toEqual([]);
+});
+it('paces only new holds, preserves unrelated reads, and leaves recovery and release available', async () => {
+  const selected = await input([publications[0].id]),
+    other = await input([publications[1].id]);
+  await db
+    .prepare('INSERT INTO market_read_gates VALUES(?,?)')
+    .bind('buyer', Date.now() + 60000)
+    .run();
+  const saved = await reservationBody(await post(selected));
+  expect(saved.reservation.state).toBe('held');
+  expect((await post(other)).status).toBe(409);
+  expect((await get('id=' + selected.id)).status).toBe(200);
+  expect(
+    (
+      await post({
+        action: 'release',
+        id: selected.id,
+        contextSha256: saved.reservation.record.contextSha256,
+        acknowledgement: RESERVATION_CANCEL_ACK,
+      })
+    ).status,
+  ).toBe(200);
+  const paced = await post(other);
+  expect(paced.status).toBe(429);
+  expect(paced.headers.get('retry-after')).toBe('15');
+  const key = 'marketplace-reservation:' + (await digest('buyer'));
+  await db
+    .prepare('UPDATE market_read_gates SET next_allowed_at=0 WHERE owner_id=?')
+    .bind(key)
+    .run();
+  expect((await post(other)).status).toBe(200);
+  expect(
+    (await db
+      .prepare('SELECT next_allowed_at FROM market_read_gates WHERE owner_id=?')
+      .bind('buyer')
+      .first<{ next_allowed_at: number }>())!.next_allowed_at,
+  ).toBeGreaterThan(Date.now());
+});
+it('refuses stale cart content and missing reservation guards with safe errors', async () => {
+  const selected = await input();
+  expect(
+    (
+      await post({
+        ...selected,
+        review: { ...selected.review, askingPriceLamports: '1' },
+      })
+    ).status,
+  ).toBe(409);
+  await db.prepare('DROP TRIGGER marketplace_reservations_insert').run();
+  const response = await get('id=' + selected.id);
+  expect(response.status).toBe(503);
+  const text = await response.text();
+  expect(text).not.toMatch(/sqlite|SELECT |trigger|stack/i);
+  await expect(readBundleCatalog(db, signal())).rejects.toThrow(
+    /not installed/,
+  );
+});

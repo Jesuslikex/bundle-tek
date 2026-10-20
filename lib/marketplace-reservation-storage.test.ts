@@ -230,11 +230,12 @@ it('atomically allows only one of two racing buyers and never leaves a partial c
   ).toBe(1);
 });
 it('refuses an overlapping cart without retaining its otherwise available wallet', async () => {
+  const other = await request();
   const input = await request([publications[0].id]);
   await reserveMarketplaceCart(db, 'buyer', input, signal());
   await expect(
-    reserveMarketplaceCart(db, 'other', await request(), signal()),
-  ).rejects.toThrow(/already held|changed/);
+    reserveMarketplaceCart(db, 'other', other, signal()),
+  ).rejects.toThrow(/already held|changed|unavailable/);
   expect(
     (
       await db
@@ -415,6 +416,9 @@ it('database independently refuses changed source, enabled payment and mutable r
   await expect(rawInsert(input)).rejects.toThrow(/source changed/);
   await db.prepare('UPDATE workspace_wallets SET archived=0').run();
   await reserveMarketplaceCart(db, 'buyer', input, signal());
+  await expect(
+    rawInsert({ ...input, id: crypto.randomUUID() }),
+  ).rejects.toThrow(/already reserved/);
   await expect(
     db
       .prepare('UPDATE marketplace_reservations SET expires_at=?')

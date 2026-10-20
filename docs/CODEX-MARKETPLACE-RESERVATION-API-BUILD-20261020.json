@@ -1,0 +1,24 @@
+{
+  "base": "9a69c80",
+  "overlay": [
+    "lib/marketplace-reservation-availability.ts",
+    "lib/marketplace-publication-storage.ts",
+    "lib/marketplace-reservation-storage.test.ts",
+    "app/api/marketplace/reservations/route.ts",
+    "app/api/marketplace/reservations/route.test.ts",
+    "app/api/marketplace/cart-review/route.test.ts",
+    "app/api/marketplace/operator/publications/route.test.ts"
+  ],
+  "hashes": {
+    "lib/marketplace-reservation-availability.ts": "13539451d5b68f0747a0c8c62862954e88babaa993dcadf6154f2a5d79e6f8b7",
+    "lib/marketplace-publication-storage.ts": "a9ef4408aebc1ffc20658816a2e3107eb217b2fc34e657f8c138b146f4e923a0",
+    "lib/marketplace-reservation-storage.test.ts": "cc7eaf45d7bd9d3e9b47a7c1256ce4af197d0db58a4923e0557beabf385fa8e2",
+    "app/api/marketplace/reservations/route.ts": "c300135b937e913f781701b6bf5b826edbc3398897b21b96a67a33813f1e07bd",
+    "app/api/marketplace/reservations/route.test.ts": "df569e2e324b6c3b29c90b75cbe314482a1a34a89f4c576f02e83c3cbfe337d5",
+    "app/api/marketplace/cart-review/route.test.ts": "f80b138ce86b2754400826cde904af838d3c65b1902961044022430e8e5d8385",
+    "app/api/marketplace/operator/publications/route.test.ts": "fcef2dfc542d39a6b3a9c057d18ed13034f33f7f05e2f1174627068eb4a2deec"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}
