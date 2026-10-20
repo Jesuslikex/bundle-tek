@@ -8,6 +8,9 @@ import {
 import { marketplaceLamports, marketplaceSol } from '@/lib/marketplace-catalog';
 import { readPanelJson } from './read-panel-json';
 import styles from './marketplace-owned-wallets.module.css';
+import cartStyles from './marketplace-cart.module.css';
+import { MarketplaceCartReview } from './marketplace-cart-review';
+import { CART_MAX_WALLETS } from '@/lib/marketplace-cart';
 function filtered(
   catalog: BundleCatalog | null,
   age: string,
@@ -61,7 +64,10 @@ export function MarketplaceBundleCatalog() {
     [age, setAge] = useState('0'),
     [price, setPrice] = useState(''),
     [sort, setSort] = useState('price'),
-    [page, setPage] = useState(0);
+    [page, setPage] = useState(0),
+    [ids, setIds] = useState<string[]>([]),
+    [requestedCount, setRequestedCount] = useState('25'),
+    [selectionMessage, setSelectionMessage] = useState('');
   useEffect(
     () => () => {
       pending.current?.abort();
@@ -73,13 +79,13 @@ export function MarketplaceBundleCatalog() {
     if (!catalog) return;
     const timer = setTimeout(
       () => {
-        setCatalog(null);
+        if (ids.length === 0) setCatalog(null);
         setExpired(true);
       },
       Math.max(0, Date.parse(catalog.expiresAt) - Date.now()),
     );
     return () => clearTimeout(timer);
-  }, [catalog]);
+  }, [catalog, ids.length]);
   function stop() {
     pending.current?.abort();
     pending.current = null;
@@ -113,7 +119,18 @@ export function MarketplaceBundleCatalog() {
         return;
       }
       const checked = admitBundleCatalog(body);
-      if (pending.current === c && !c.signal.aborted) setCatalog(checked);
+      if (pending.current === c && !c.signal.aborted) {
+        const retained = ids.filter((id) =>
+          checked.listings.some((e) => e.id === id),
+        );
+        setIds(retained);
+        setSelectionMessage(
+          ids.length > retained.length
+            ? `${ids.length - retained.length} previously selected ${ids.length - retained.length === 1 ? 'wallet is no longer available and was' : 'wallets are no longer available and were'} removed.`
+            : '',
+        );
+        setCatalog(checked);
+      }
     } catch {
       if (pending.current === c && !c.signal.aborted)
         setError(
@@ -129,6 +146,33 @@ export function MarketplaceBundleCatalog() {
   const selected = filtered(catalog, age, price, sort),
     start = page * 20,
     visible = selected.listings.slice(start, start + 20);
+  const countValid =
+    /^[1-9]\d{0,2}$/.test(requestedCount) &&
+    Number(requestedCount) <= CART_MAX_WALLETS;
+  const matchingIds = new Set(selected.listings.map((e) => e.id));
+  function chooseMatching() {
+    if (!countValid || !selected.valid || expired) return;
+    const chosen = selected.listings
+      .slice(0, Number(requestedCount))
+      .map((e) => e.id);
+    setIds(chosen);
+    setSelectionMessage(
+      chosen.length < Number(requestedCount)
+        ? `Only ${chosen.length} ${chosen.length === 1 ? 'wallet matches' : 'wallets match'}; selected ${chosen.length} of the requested ${requestedCount}.`
+        : `Selected ${chosen.length} matching wallets. Previous selection was replaced.`,
+    );
+  }
+  function toggle(id: string) {
+    if (expired) return;
+    setSelectionMessage('');
+    setIds((previous) =>
+      previous.includes(id)
+        ? previous.filter((x) => x !== id)
+        : previous.length < CART_MAX_WALLETS
+          ? [...previous, id]
+          : previous,
+    );
+  }
   return (
     <section
       className={styles.panel}
@@ -157,7 +201,12 @@ export function MarketplaceBundleCatalog() {
       </div>
       {error && <p role="alert">{error}</p>}
       {signIn && <Link href="/sign-in">Sign in</Link>}
-      {expired && <p>Catalog view expired. Refresh for a new snapshot.</p>}
+      {expired && (
+        <p>
+          Catalog view expired. Refresh for a new snapshot. Selected wallets are
+          retained as an unverified draft.
+        </p>
+      )}
       {catalog && (
         <>
           <div className={styles.filters}>
@@ -197,6 +246,60 @@ export function MarketplaceBundleCatalog() {
               </select>
             </label>
           </div>
+          <div className={styles.filters}>
+            <label>
+              Wallet count
+              <input
+                inputMode="numeric"
+                maxLength={3}
+                value={requestedCount}
+                onChange={(e) => setRequestedCount(e.target.value)}
+              />
+            </label>
+          </div>
+          <p>
+            Select up to this many matching wallets in the displayed sort order.
+            This replaces the current selection.
+          </p>
+          <div className={styles.controls}>
+            <button
+              disabled={
+                !countValid ||
+                !selected.valid ||
+                selected.listings.length === 0 ||
+                expired
+              }
+              onClick={chooseMatching}
+            >
+              Select matching wallets
+            </button>
+          </div>
+          {!countValid && (
+            <p role="alert">Choose a wallet count from 1 to 200.</p>
+          )}
+          {selectionMessage && <output>{selectionMessage}</output>}
+          {ids.length === CART_MAX_WALLETS && (
+            <p>
+              Maximum 200 wallets selected. Remove a wallet before selecting
+              another.
+            </p>
+          )}
+          {ids.length > 0 && (
+            <MarketplaceCartReview
+              catalog={catalog}
+              ids={ids}
+              hiddenCount={ids.filter((id) => !matchingIds.has(id)).length}
+              onRemove={(id) => {
+                setIds((previous) => previous.filter((x) => x !== id));
+                setSelectionMessage('');
+              }}
+              onClear={() => {
+                setIds([]);
+                setSelectionMessage('');
+              }}
+              stale={expired}
+            />
+          )}
           {!selected.valid ? (
             <p role="alert">
               Choose a whole activity age from 0 to 36500 days and a valid SOL
@@ -212,6 +315,20 @@ export function MarketplaceBundleCatalog() {
               <ul className={styles.wallets}>
                 {visible.map((e) => (
                   <li key={e.id}>
+                    <label className={cartStyles.choice}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${e.listing.address}`}
+                        checked={ids.includes(e.id)}
+                        disabled={
+                          expired ||
+                          (ids.length >= CART_MAX_WALLETS &&
+                            !ids.includes(e.id))
+                        }
+                        onChange={() => toggle(e.id)}
+                      />
+                      <span>Select wallet</span>
+                    </label>
                     <h2>Bundle wallet</h2>
                     <code>{e.listing.address}</code>
                     <dl>
