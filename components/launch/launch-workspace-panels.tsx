@@ -46,8 +46,8 @@ export function LaunchWorkspacePanels({
       <section aria-labelledby="ws-autosell-title">
         <h2 id="ws-autosell-title">Auto Sell</h2>
         <p className="launch-ws-empty">
-          Set up after launch from the token workspace. Every sell still needs
-          your approval.
+          After launch, open the token workspace and press Auto Sell. Run
+          Strategy sells a set % of every outside buy while that tab is open.
         </p>
       </section>
       <section aria-labelledby="ws-sniper-title">
