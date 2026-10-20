@@ -3,7 +3,7 @@ import type { SolanaSwapPreparation } from './warmup-swap-quote';
 import type { ImportedSwapSimulation } from './imported-swap-simulation';
 import type { WarmupSellInventory } from './warmup-sell-inventory';
 import type { SavedWarmup } from './wallet-warmup-storage';
-import { warmupAtoms } from './wallet-warmup';
+import { warmupAtoms, warmupBuyAmount } from './wallet-warmup';
 import type { WarmupBuyLink } from './warmup-buy-link';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
 export function warmupPreparationSummary(
@@ -83,7 +83,11 @@ export async function saveWarmupPreparation(
   const plan = JSON.parse(capturedDocument) as SavedWarmup['document'];
   if (
     document.side === 'Buy' &&
-    document.inAmountRaw !== warmupAtoms(plan.amount, 9).toString()
+    document.inAmountRaw !==
+      warmupAtoms(
+        warmupBuyAmount(plan, document.wallet, context.cycle),
+        9,
+      ).toString()
   )
     throw new Error('Warmup input does not match the saved budget.');
   if (
@@ -105,12 +109,14 @@ export async function saveWarmupPreparation(
   )
     throw new Error('Invalid preparation history.');
   const result = await db
-    .prepare(`INSERT INTO warmup_swap_preparations
+    .prepare(
+      `INSERT INTO warmup_swap_preparations
     (id,owner_id,plan_id,plan_revision,cycle,wallet_address,wallet_revision,document,created_at)
     SELECT ?,?,?,?,?,?,?,?,? WHERE
     EXISTS(SELECT 1 FROM wallet_warmup_plans p WHERE p.owner_id=? AND p.id=? AND p.revision=? AND p.archived=0 AND p.document=?
       AND (SELECT COUNT(*) FROM json_each(json_extract(p.document,'$.walletRevisions')) j JOIN workspace_wallets w ON w.address=json_extract(j.value,'$.address') AND w.revision=json_extract(j.value,'$.revision') WHERE w.owner_id=p.owner_id AND w.chain=json_extract(p.document,'$.chain') AND w.archived=0)=json_array_length(json_extract(p.document,'$.addresses')))
-    AND (SELECT COUNT(*) FROM warmup_swap_preparations WHERE owner_id=? AND plan_id=?)<? AND ?>?`)
+    AND (SELECT COUNT(*) FROM warmup_swap_preparations WHERE owner_id=? AND plan_id=?)<? AND ?>?`,
+    )
     .bind(
       id,
       owner,

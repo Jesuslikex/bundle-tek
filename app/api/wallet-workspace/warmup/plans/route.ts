@@ -127,9 +127,14 @@ export async function POST(request: Request) {
         addresses: plan.addresses,
         tokens: plan.tokens,
         amount: plan.buyAmount,
+        ...(plan.buyAmountMax
+          ? { amountMax: plan.buyAmountMax, amounts: plan.buyAmounts }
+          : {}),
         feeReserve: plan.feeReserve,
         cycles: plan.cycles,
-        intervalMinutes: plan.intervalMinutes,
+        ...(plan.intervalMinutes === undefined
+          ? { intervalSeconds: plan.intervalSeconds }
+          : { intervalMinutes: plan.intervalMinutes }),
         startAt: plan.startAt,
         walletRevisions: revisions.map((r) => ({
           address: r.address,
