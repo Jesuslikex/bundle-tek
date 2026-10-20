@@ -1,6 +1,56 @@
 .panel {
   min-width: 0;
-  scroll-margin-top: 90px;
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 22px;
+  overflow-y: auto;
+  border: 1px solid #30303c;
+  border-radius: 12px;
+  background: #101114;
+  color: #fcfcfc;
+}
+.panel::backdrop {
+  background: rgb(0 0 0 / 0.65);
+  backdrop-filter: blur(4px);
+}
+.panel h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.reviewActions {
+  position: sticky;
+  bottom: -22px;
+  z-index: 1;
+  padding: 12px 0;
+  background: #101114;
+}
+.reviewActions > button {
+  width: 100%;
+  min-height: 40px;
+}
+.panel .setup .help {
+  margin: 0;
+}
+.panel > .help {
+  margin: 14px 0;
+}
+.routingNote {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #30303c;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.routingNote span {
+  color: #a7a7b8;
 }
 .steps {
   display: flex;
@@ -18,8 +68,8 @@
 }
 .setup {
   display: grid;
-  gap: 16px;
-  padding: 20px 0;
+  gap: 12px;
+  padding: 12px 0;
   scroll-margin-top: 90px;
   min-width: 0;
 }
@@ -251,5 +301,5 @@
 .amount {
   display: grid;
   gap: 8px;
-  width: min(100%, 420px);
+  width: 100%;
 }

@@ -42,10 +42,40 @@ async function click(text: string) {
   expect(b, text).toBeTruthy();
   await act(async () => b.click());
 }
+it('opens a compact activity dialog with secondary history and saved controls', async () => {
+  const close = vi.fn();
+  await act(async () =>
+    root.render(
+      <WalletWarmup
+        chain="Solana"
+        addresses={[fixture.wallet]}
+        walletRevisions={[{ address: fixture.wallet, revision: 1 }]}
+        onClose={close}
+      />,
+    ),
+  );
+  const dialog = host.querySelector('dialog')!;
+  expect(dialog.open).toBe(true);
+  expect(host.querySelector('h3')?.textContent).toBe('Generate Activity');
+  const secondary = [...host.querySelectorAll('details')].filter((detail) =>
+    ['Wallet history · read only', 'Saved plans and recovery'].includes(
+      detail.querySelector('summary')?.textContent ?? '',
+    ),
+  );
+  expect(secondary).toHaveLength(2);
+  expect(secondary.every((detail) => !detail.open)).toBe(true);
+  expect(fixture.calls.every((call) => call.method === 'GET')).toBe(true);
+  await act(async () => {
+    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+  });
+  expect(close).toHaveBeenCalledOnce();
+});
 it('reviews and saves a USDC draft with a fresh start without manually finding a mint or date', async () => {
   await mount();
   expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
-  expect(host.querySelector('form details')!.hasAttribute('open')).toBe(false);
+  expect(
+    host.querySelector('textarea')!.closest('details')!.hasAttribute('open'),
+  ).toBe(false);
   await click('Use USDC');
   await click('Review warmup plan');
   expect(host.textContent).toContain('0.013 SOL');
@@ -106,7 +136,9 @@ it('refreshes an expired saved draft explicitly and requires review before any n
 it('reveals token entry after review refuses an empty selection, without any mutation', async () => {
   await mount();
   await click('Review warmup plan');
-  expect(host.querySelector('form details')!.hasAttribute('open')).toBe(true);
+  expect(
+    host.querySelector('textarea')!.closest('details')!.hasAttribute('open'),
+  ).toBe(true);
   expect(host.querySelector('[role="alert"]')).toBeTruthy();
   expect(document.activeElement).toBe(host.querySelector('textarea'));
   expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
@@ -141,11 +173,12 @@ it.each([
     expect(input.getAttribute('aria-describedby')).toBe(
       host.querySelector('[role=alert]')!.id,
     );
-    expect(host.querySelector('form details')!.hasAttribute('open')).toBe(
-      false,
-    );
     expect(
-      host.querySelectorAll<HTMLDetailsElement>('form details')[1].open,
+      host.querySelector('textarea')!.closest('details')!.hasAttribute('open'),
+    ).toBe(false);
+    expect(
+      host.querySelector('[data-warmup-field=feeReserve]')!.closest('details')!
+        .open,
     ).toBe(opensOptions);
     expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
   },
@@ -185,7 +218,9 @@ it('routes an expired saved start to timing and recovers without saving automati
   )!;
   expect(start.closest('details')!.open).toBe(true);
   expect(document.activeElement).toBe(start);
-  expect(host.querySelector('form details')!.hasAttribute('open')).toBe(false);
+  expect(
+    host.querySelector('textarea')!.closest('details')!.hasAttribute('open'),
+  ).toBe(false);
   expect(start.getAttribute('aria-invalid')).toBe('true');
   expect(host.querySelector('[role=alert]')?.textContent).toContain(
     'next 30 days',
