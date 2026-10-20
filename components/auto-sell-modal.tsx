@@ -173,6 +173,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
     }
   }
   const running = !!snapshot?.running;
+  const paused = running && !!snapshot?.paused;
   const ids = useId();
 
   function stop(reason = 'Stopped by you.') {
@@ -192,6 +193,19 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   function closeDialog() {
     if (busy) stop('Vault unlock cancelled.');
     setOpen(false);
+  }
+
+  function togglePause() {
+    setError('');
+    if (!runner.current) return;
+    if (paused) {
+      if (!runner.current.resume())
+        setError(
+          runner.current.isRunning()
+            ? 'Wait for the pending operation to settle before resuming.'
+            : 'This session has ended. Review the settings before starting a new run.',
+        );
+    } else runner.current.pause();
   }
 
   useEffect(() => {
@@ -377,7 +391,11 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
         disabled={locked && !running}
         onClick={() => setOpen(true)}
       >
-        {running ? 'Auto Sell · running' : 'Auto Sell'}
+        {paused
+          ? 'Auto Sell · paused'
+          : running
+            ? 'Auto Sell · running'
+            : 'Auto Sell'}
       </Button>
       {open && (
         <dialog
@@ -537,6 +555,20 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                 {error}
               </p>
             )}
+            {running && (
+              <output
+                aria-label="Auto Sell session status"
+                className={styles.hint}
+              >
+                {paused
+                  ? snapshot?.settling
+                    ? 'Paused. Waiting for the pending operation to settle. A submitted transaction can still finalize.'
+                    : 'Paused. Resume continues queued amounts within the same approved limits. Paused market activity is discarded and DCA does not catch up missed intervals.'
+                  : 'Running while this tab is open.'}{' '}
+                Session time limits continue while paused. Stop or close the tab
+                to lock the browser vault.
+              </output>
+            )}
             {snapshot && snapshot.log.length > 0 && (
               <section aria-label="Auto Sell activity" className={styles.log}>
                 <h3>Activity</h3>
@@ -568,6 +600,15 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
             <Button variant="outline" onClick={closeDialog}>
               Close
             </Button>
+            {running && (
+              <Button
+                variant="outline"
+                disabled={paused && !!snapshot?.settling}
+                onClick={togglePause}
+              >
+                {paused ? 'Resume' : 'Pause'}
+              </Button>
+            )}
             {running || busy ? (
               <Button variant="destructive" onClick={() => stop()}>
                 {busy ? 'Cancel unlock' : 'Stop'}

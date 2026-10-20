@@ -29,7 +29,7 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
-- Codex, 20 October 2026: Julian transferred ownership while Claude is out of credits, then requested Generate Activity and Auto Sell parity one by one. Active claim: `lib/auto-sell*`, `components/auto-sell*`, `lib/wallet-warmup*`, `components/wallet-warmup*` and focused verification notes. Lifecycle checkpoint `67f0763` and Generate Activity dialog `53a26a6` are committed. Session-wide Auto Sell controls follow separately. No deployment, funded actions or new signing authority.
+- Codex, 20 October 2026: Julian transferred ownership while Claude is out of credits, then requested Generate Activity and Auto Sell parity one by one. Active claim: `lib/auto-sell*`, `components/auto-sell*`, `lib/wallet-warmup*`, `components/wallet-warmup*` and focused verification notes. Lifecycle `67f0763`, Generate Activity dialog `53a26a6`, shared session controls `7dc9f43` and Pause/Resume engine `033045b` are committed. Pause/Resume UI verification is recorded in `docs/CODEX-AUTOSELL-PAUSE-UI-20261020.md`. Exact review of session edits is next; broader parity remains open. No deployment, funded actions or new signing authority.
 
 - Warmup saved-update recovery completed, 19 October 2026; its bounded claim is released. Read `docs/CODEX-WARMUP-SAVE-RECOVERY-20261019.md`:123 related tests, final30 saved-plan cases, plain TypeScript, typed lint/format, isolated production build with unchanged hashes and synthetic browser1440/375/320 pass. Recovery verifies exact next revision/document and preserves newer edits. No protected shell/account, API, schema, provider or signing change; no deploy/funded actions.
 

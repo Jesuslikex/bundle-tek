@@ -243,3 +243,50 @@ it('refuses an invalid shared cap before attempting vault unlock', async () => {
     'greater than 0',
   );
 });
+
+it('pauses and resumes the same approved browser session without another unlock', async () => {
+  const session = {
+    payload: { wallets: [{ family: 'solana', address }] },
+  } as VaultSession;
+  vi.mocked(unlockVault).mockResolvedValueOnce(session);
+  await startUnlock();
+  await click('Pause');
+  expect(host.textContent).toContain('Auto Sell · paused');
+  expect(
+    host.querySelector('output[aria-label="Auto Sell session status"]')
+      ?.textContent,
+  ).toContain('Session time limits continue while paused');
+  expect(session.payload.wallets).toHaveLength(1);
+  await click('Resume');
+  expect(host.textContent).toContain('Auto Sell · running');
+  expect(unlockVault).toHaveBeenCalledTimes(1);
+  await click('Pause');
+  await click('Stop');
+  expect(session.payload.wallets).toEqual([]);
+  expect(
+    [...host.querySelectorAll('button')].some(
+      (button) => button.textContent?.trim() === 'Resume',
+    ),
+  ).toBe(false);
+});
+
+it('invalidates a paused session when its owned wallet context changes', async () => {
+  const session = {
+    payload: { wallets: [{ family: 'solana', address }] },
+  } as VaultSession;
+  vi.mocked(unlockVault).mockResolvedValueOnce(session);
+  await startUnlock();
+  await click('Pause');
+  await act(async () =>
+    root!.render(
+      <AutoSell
+        project={project}
+        wallets={wallets.map((wallet) => ({ ...wallet, revision: 2 }))}
+        locked={false}
+      />,
+    ),
+  );
+  expect(session.payload.wallets).toEqual([]);
+  expect(host.querySelector('dialog')).toBeNull();
+  expect(host.textContent).not.toContain('Auto Sell · paused');
+});
