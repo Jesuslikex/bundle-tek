@@ -11,7 +11,11 @@ import {
   marketCapInRange,
   marketCapLabel,
   newAutoSellStrategy,
+  newLimitOrder,
   rawToDecimal,
+  withAutoSellMode,
+  type AutoSellLimitOrder,
+  type AutoSellMode,
   type AutoSellStrategy,
 } from '@/lib/auto-sell';
 import { AutoSellRunner, type AutoSellSnapshot } from '@/lib/auto-sell-runner';
@@ -27,6 +31,26 @@ import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import styles from './auto-sell-modal.module.css';
 
 type Section = 'range' | 'end' | 'whitelist' | null;
+
+const MODES: { mode: AutoSellMode; label: string; hint: string }[] = [
+  {
+    mode: 'counter',
+    label: '↺ Counter Trading',
+    hint: 'Counter Trade will sell tokens every time someone buys the token.',
+  },
+  {
+    mode: 'dca',
+    label: '◷ DCA',
+    hint: 'DCA spreads your sells over time by selling at a fixed interval rather than all at once.',
+  },
+  {
+    mode: 'limit',
+    label: '⇡ Limit Orders',
+    hint: 'Limit Orders sell each amount once when the market cap reaches its target. Each target must be higher than the one above.',
+  },
+];
+
+const cleanNumber = (value: string) => value.replace(/[,\s$]/g, '');
 
 /**
  * Holds a browser-wide lock for one token's Auto Sell so a second tab cannot
@@ -334,6 +358,8 @@ export function AutoSell({
                   ))}
                   <p className={styles.hint}>
                     Your own workspace wallets never trigger a counter sell.
+                    Each sell comes from one wallet, rotating through the ones
+                    you pick.
                   </p>
                 </fieldset>
               </details>
@@ -350,10 +376,11 @@ export function AutoSell({
                   />
                   <small className={styles.hint}>
                     Run Strategy unlocks your browser vault for this tab and
-                    approves every sell these strategies make, until they end or
-                    you press Stop. Keep this tab open. Each sell still goes
-                    through the server&apos;s balance, simulation and 15-second
-                    read checks, so sells land about every 30 seconds at most.
+                    approves every sell these strategies make (counter, DCA and
+                    limit order sells), until they end or you press Stop. Keep
+                    this tab open. Each sell still goes through the
+                    server&apos;s balance, simulation and 15-second read checks,
+                    so sells land about every 30 seconds at most.
                   </small>
                 </div>
               )}
@@ -451,12 +478,32 @@ function StrategyCard({
   const [minutes, setMinutes] = useState('');
   const [seconds, setSeconds] = useState('');
   const [whitelistText, setWhitelistText] = useState(s.whitelist.join('\n'));
+  const [dcaInterval, setDcaIntervalParts] = useState({ h: '', m: '', s: '' });
   const setDuration = (h: string, m: string, sec: string) => {
     setHours(h);
     setMinutes(m);
     setSeconds(sec);
     onChange({ endDurationSeconds: durationSeconds(h, m, sec) });
   };
+  const setDcaInterval = (next: typeof dcaInterval) => {
+    setDcaIntervalParts(next);
+    onChange({ dcaIntervalSeconds: durationSeconds(next.h, next.m, next.s) });
+  };
+  const unit = s.amountUnit === 'supply' ? '% Supply' : 'Tokens';
+  const updateRow = (rowId: string, patch: Partial<AutoSellLimitOrder>) =>
+    onChange({
+      limitOrders: s.limitOrders.map((row) =>
+        row.id === rowId ? { ...row, ...patch } : row,
+      ),
+    });
+  const modeInfo = MODES.find((m) => m.mode === s.mode)!;
+  const stats = !state
+    ? ''
+    : s.mode === 'dca'
+      ? `${state.responses} DCA sell${state.responses === 1 ? '' : 's'}`
+      : s.mode === 'limit'
+        ? `${state.filledLimitIds.length}/${s.limitOrders.length} limit orders hit`
+        : `${state.responses} buys countered`;
   const t = s.trigger;
   const triggerValue = t.kind === 'rate' ? t.percent : t.amount;
   const endLabel =
@@ -516,116 +563,325 @@ function StrategyCard({
           Sold {rawToDecimal(state.soldRaw, decimals)} ({pct(state.soldRaw)}{' '}
           supply) · queued{' '}
           {rawToDecimal(state.bufferedRaw + state.inFlightRaw, decimals)} ·{' '}
-          {state.responses} buys countered
+          {stats}
         </p>
       )}
       {expanded && (
         <fieldset disabled={disabled} className={styles.cardBody}>
           <legend className={styles.label}>Mode</legend>
           <div className={styles.tiles3} aria-label="Mode">
-            <button
-              type="button"
-              aria-pressed="true"
-              className={styles.tileActive}
-            >
-              ↺ Counter Trading
-            </button>
-            <button
-              type="button"
-              aria-pressed="false"
-              className={styles.tile}
-              disabled
-              title="Coming next"
-            >
-              DCA
-            </button>
-            <button
-              type="button"
-              aria-pressed="false"
-              className={styles.tile}
-              disabled
-              title="Coming next"
-            >
-              Limit Orders
-            </button>
-          </div>
-          <p className={styles.hint}>
-            Counter Trade will sell tokens every time someone buys the token.
-          </p>
-          <div className={styles.field}>
-            <label htmlFor={`${id}-rep`}>
-              Replication Factor<em>*</em>
-            </label>
-            <div className={styles.suffixed}>
-              <Input
-                id={`${id}-rep`}
-                inputMode="decimal"
-                placeholder="50"
-                value={s.replicationPercent}
-                onChange={(e) =>
-                  onChange({ replicationPercent: e.target.value.trim() })
-                }
-              />
-              <span>%</span>
-            </div>
-          </div>
-          <div className={styles.field}>
-            <span>
-              Trigger Condition<em>*</em>
-            </span>
-            <div className={styles.row}>
-              <select
-                aria-label="Trigger type"
-                value={t.kind}
-                onChange={(e) => {
-                  const kind = e.target
-                    .value as AutoSellStrategy['trigger']['kind'];
-                  onChange({
-                    trigger:
-                      kind === 'rate'
-                        ? { kind, percent: '100' }
-                        : { kind, amount: '' },
-                  });
+            {MODES.map((m) => (
+              <button
+                key={m.mode}
+                type="button"
+                aria-pressed={s.mode === m.mode}
+                className={s.mode === m.mode ? styles.tileActive : styles.tile}
+                onClick={() => {
+                  if (s.mode === m.mode) return;
+                  if (section === 'whitelist') setSection(null);
+                  onChange(withAutoSellMode(s, m.mode));
                 }}
               >
-                <option value="rate">Rate (%)</option>
-                <option value="min-sol">Min. SOL</option>
-                <option value="min-token">Min. Token</option>
-              </select>
-              <Input
-                aria-label="Trigger value"
-                inputMode="decimal"
-                value={triggerValue}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  onChange({
-                    trigger:
-                      t.kind === 'rate'
-                        ? { kind: 'rate', percent: v }
-                        : { kind: t.kind, amount: v },
-                  });
-                }}
-              />
-            </div>
+                {m.label}
+              </button>
+            ))}
           </div>
-          <div className={styles.field}>
-            <label htmlFor={`${id}-min`}>
-              Min. % Supply per Sell <small>(optional)</small>
-            </label>
-            <div className={styles.suffixed}>
-              <Input
-                id={`${id}-min`}
-                inputMode="decimal"
-                placeholder="0.1"
-                value={s.minSupplyPercentPerSell}
-                onChange={(e) =>
-                  onChange({ minSupplyPercentPerSell: e.target.value.trim() })
-                }
-              />
-              <span>% Supply</span>
+          <p className={styles.hint}>{modeInfo.hint}</p>
+          {s.mode === 'counter' && (
+            <>
+              <div className={styles.field}>
+                <label htmlFor={`${id}-rep`}>
+                  Replication Factor<em>*</em>
+                </label>
+                <div className={styles.suffixed}>
+                  <Input
+                    id={`${id}-rep`}
+                    inputMode="decimal"
+                    placeholder="50"
+                    value={s.replicationPercent}
+                    onChange={(e) =>
+                      onChange({ replicationPercent: e.target.value.trim() })
+                    }
+                  />
+                  <span>%</span>
+                </div>
+              </div>
+              <div className={styles.field}>
+                <span>
+                  Trigger Condition<em>*</em>
+                </span>
+                <div className={styles.row}>
+                  <select
+                    aria-label="Trigger type"
+                    value={t.kind}
+                    onChange={(e) => {
+                      const kind = e.target
+                        .value as AutoSellStrategy['trigger']['kind'];
+                      onChange({
+                        trigger:
+                          kind === 'rate'
+                            ? { kind, percent: '100' }
+                            : { kind, amount: '' },
+                      });
+                    }}
+                  >
+                    <option value="rate">Rate (%)</option>
+                    <option value="min-sol">Min. SOL</option>
+                    <option value="min-token">Min. Token</option>
+                  </select>
+                  <Input
+                    aria-label="Trigger value"
+                    inputMode="decimal"
+                    value={triggerValue}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      onChange({
+                        trigger:
+                          t.kind === 'rate'
+                            ? { kind: 'rate', percent: v }
+                            : { kind: t.kind, amount: v },
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+              <div className={styles.field}>
+                <label htmlFor={`${id}-min`}>
+                  Min. % Supply per Sell <small>(optional)</small>
+                </label>
+                <div className={styles.suffixed}>
+                  <Input
+                    id={`${id}-min`}
+                    inputMode="decimal"
+                    placeholder="0.1"
+                    value={s.minSupplyPercentPerSell}
+                    onChange={(e) =>
+                      onChange({
+                        minSupplyPercentPerSell: e.target.value.trim(),
+                      })
+                    }
+                  />
+                  <span>% Supply</span>
+                </div>
+              </div>
+            </>
+          )}
+          {s.mode !== 'counter' && (
+            <div className={styles.field}>
+              <span>Amount unit</span>
+              <div className={styles.tiles2} aria-label="Amount unit">
+                {(['supply', 'tokens'] as const).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    aria-pressed={s.amountUnit === u}
+                    className={
+                      s.amountUnit === u ? styles.tileActive : styles.tile
+                    }
+                    onClick={() => onChange({ amountUnit: u })}
+                  >
+                    {u === 'supply' ? '% Supply' : 'Token amount'}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className={styles.tiles3}>
+          )}
+          {s.mode === 'dca' && (
+            <>
+              <div className={styles.tiles2} aria-label="Amount type">
+                {[false, true].map((random) => (
+                  <button
+                    key={String(random)}
+                    type="button"
+                    aria-pressed={s.dcaRandomized === random}
+                    className={
+                      s.dcaRandomized === random
+                        ? styles.tileActive
+                        : styles.tile
+                    }
+                    onClick={() => onChange({ dcaRandomized: random })}
+                  >
+                    {random ? 'Randomized' : 'Fixed Amount'}
+                  </button>
+                ))}
+              </div>
+              {s.dcaRandomized ? (
+                <div className={styles.row}>
+                  <div className={styles.field}>
+                    <label htmlFor={`${id}-dcamin`}>
+                      Min Amount<em>*</em>
+                    </label>
+                    <div className={styles.suffixed}>
+                      <Input
+                        id={`${id}-dcamin`}
+                        inputMode="decimal"
+                        value={s.dcaMinAmount}
+                        onChange={(e) =>
+                          onChange({
+                            dcaMinAmount: cleanNumber(e.target.value),
+                          })
+                        }
+                      />
+                      <span>{unit}</span>
+                    </div>
+                  </div>
+                  <div className={styles.field}>
+                    <label htmlFor={`${id}-dcamax`}>
+                      Max Amount<em>*</em>
+                    </label>
+                    <div className={styles.suffixed}>
+                      <Input
+                        id={`${id}-dcamax`}
+                        inputMode="decimal"
+                        value={s.dcaMaxAmount}
+                        onChange={(e) =>
+                          onChange({
+                            dcaMaxAmount: cleanNumber(e.target.value),
+                          })
+                        }
+                      />
+                      <span>{unit}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.field}>
+                  <label htmlFor={`${id}-dcaamt`}>
+                    Amount<em>*</em>
+                  </label>
+                  <div className={styles.suffixed}>
+                    <Input
+                      id={`${id}-dcaamt`}
+                      inputMode="decimal"
+                      placeholder={s.amountUnit === 'supply' ? '0.1' : '1000'}
+                      value={s.dcaAmount}
+                      onChange={(e) =>
+                        onChange({ dcaAmount: cleanNumber(e.target.value) })
+                      }
+                    />
+                    <span>{unit}</span>
+                  </div>
+                </div>
+              )}
+              <div className={styles.field}>
+                <span>
+                  Interval<em>*</em> <small>(up to 24 hours)</small>
+                </span>
+                <div className={styles.duration}>
+                  <Input
+                    aria-label="Interval hours"
+                    inputMode="numeric"
+                    placeholder="HOURS"
+                    value={dcaInterval.h}
+                    onChange={(e) =>
+                      setDcaInterval({ ...dcaInterval, h: e.target.value })
+                    }
+                  />
+                  <span>:</span>
+                  <Input
+                    aria-label="Interval minutes"
+                    inputMode="numeric"
+                    placeholder="MIN"
+                    value={dcaInterval.m}
+                    onChange={(e) =>
+                      setDcaInterval({ ...dcaInterval, m: e.target.value })
+                    }
+                  />
+                  <span>:</span>
+                  <Input
+                    aria-label="Interval seconds"
+                    inputMode="numeric"
+                    placeholder="SEC"
+                    value={dcaInterval.s}
+                    onChange={(e) =>
+                      setDcaInterval({ ...dcaInterval, s: e.target.value })
+                    }
+                  />
+                </div>
+                <small className={styles.hint}>
+                  The first sell goes out when you press Run. Sells take about
+                  30 seconds each, so short intervals run back to back.
+                </small>
+              </div>
+            </>
+          )}
+          {s.mode === 'limit' && (
+            <div className={styles.field}>
+              <span>
+                Orders<em>*</em>
+              </span>
+              <ol className={styles.orders}>
+                {s.limitOrders.map((row, i) => {
+                  const hit = state?.filledLimitIds.includes(row.id);
+                  return (
+                    <li key={row.id} data-hit={hit || undefined}>
+                      <div className={styles.suffixed}>
+                        <Input
+                          aria-label={`Order ${i + 1} amount`}
+                          inputMode="decimal"
+                          placeholder="Amount"
+                          value={row.amount}
+                          onChange={(e) =>
+                            updateRow(row.id, {
+                              amount: cleanNumber(e.target.value),
+                            })
+                          }
+                        />
+                        <span>{unit}</span>
+                      </div>
+                      <div className={styles.suffixed}>
+                        <span>$</span>
+                        <Input
+                          aria-label={`Order ${i + 1} market cap`}
+                          inputMode="decimal"
+                          placeholder="Market Cap (USD)"
+                          value={row.marketCapUsd}
+                          onChange={(e) =>
+                            updateRow(row.id, {
+                              marketCapUsd: cleanNumber(e.target.value),
+                            })
+                          }
+                        />
+                      </div>
+                      {hit ? (
+                        <span className={styles.inRange}>Hit</span>
+                      ) : (
+                        s.limitOrders.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label={`Remove order ${i + 1}`}
+                            onClick={() =>
+                              onChange({
+                                limitOrders: s.limitOrders.filter(
+                                  (x) => x.id !== row.id,
+                                ),
+                              })
+                            }
+                          >
+                            ×
+                          </button>
+                        )
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+              {s.limitOrders.length < 10 && (
+                <button
+                  type="button"
+                  className={styles.add}
+                  onClick={() =>
+                    onChange({
+                      limitOrders: [...s.limitOrders, newLimitOrder()],
+                    })
+                  }
+                >
+                  + Add Order
+                </button>
+              )}
+            </div>
+          )}
+          <div className={s.mode === 'counter' ? styles.tiles3 : styles.tiles2}>
             <button
               type="button"
               aria-expanded={section === 'range'}
@@ -646,21 +902,24 @@ function StrategyCard({
               End Conditions
               <small>{endLabel}</small>
             </button>
-            <button
-              type="button"
-              aria-expanded={section === 'whitelist'}
-              className={
-                section === 'whitelist' ? styles.tileActive : styles.tile
-              }
-              onClick={() =>
-                setSection(section === 'whitelist' ? null : 'whitelist')
-              }
-            >
-              Whitelist
-              <small>
-                {s.whitelist.length} Wallet{s.whitelist.length === 1 ? '' : 's'}
-              </small>
-            </button>
+            {s.mode === 'counter' && (
+              <button
+                type="button"
+                aria-expanded={section === 'whitelist'}
+                className={
+                  section === 'whitelist' ? styles.tileActive : styles.tile
+                }
+                onClick={() =>
+                  setSection(section === 'whitelist' ? null : 'whitelist')
+                }
+              >
+                Whitelist
+                <small>
+                  {s.whitelist.length} Wallet
+                  {s.whitelist.length === 1 ? '' : 's'}
+                </small>
+              </button>
+            )}
           </div>
           {section === 'range' && (
             <div className={styles.panel}>
@@ -670,7 +929,7 @@ function StrategyCard({
                 <span className={styles.hint}>
                   Sell only while the token&apos;s market cap is between these
                   values. Outside the range, buys are skipped and queued sells
-                  wait.
+                  wait; DCA pauses without stacking missed sells.
                 </span>
               </p>
               <div className={styles.row}>
@@ -785,7 +1044,7 @@ function StrategyCard({
               </div>
             </div>
           )}
-          {section === 'whitelist' && (
+          {section === 'whitelist' && s.mode === 'counter' && (
             <div className={styles.panel}>
               <p>
                 <strong>Whitelist</strong>
