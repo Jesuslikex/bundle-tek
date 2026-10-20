@@ -5398,3 +5398,21 @@ body {
   right: -1px;
   border-width: 0 1px 1px 0;
 }
+
+/* Proxima-style sidebar project rows and funder pill */
+.sidebar-projects > button .venue-mark {
+  flex: none;
+  margin-left: 6px;
+}
+.sidebar-projects > button em {
+  margin-left: auto;
+}
+.sidebar-funder select,
+.sidebar-funder .sidebar-funder-empty {
+  height: 40px;
+  border-radius: 999px;
+  padding-inline: 16px;
+  background: #1c1d24;
+  font-weight: 600;
+  color: #f3f4f7;
+}

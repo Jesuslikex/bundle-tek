@@ -84,6 +84,7 @@ import { FundingForm } from '@/components/launch/funding-form';
 import { LiveOperationsForm } from '@/components/launch/live-operations-form';
 import { PlanRail } from '@/components/launch/plan-rail';
 import { SidebarFunder } from '@/components/sidebar-funder';
+import { VenueMark } from '@/components/launch/venue-mark';
 import { LaunchSetupDialog } from '@/components/launch/launch-setup-dialog';
 import { TokenDetailsForm } from '@/components/launch/token-details-form';
 import { Button } from '@/components/ui/button';
@@ -1576,6 +1577,7 @@ export default function Home() {
                 <small>{project.plan.tokenName}</small>
               </span>
               <em>Draft</em>
+              <VenueMark name={project.plan.launchpad} size={16} />
             </button>
           ))}
           {visibleImports.map((project) => (
@@ -1598,6 +1600,7 @@ export default function Home() {
                 <small>{project.document.token.name}</small>
               </span>
               <em>Import</em>
+              <VenueMark name={project.document.token.chain} size={16} />
             </button>
           ))}
           {importedProjects.error && (
