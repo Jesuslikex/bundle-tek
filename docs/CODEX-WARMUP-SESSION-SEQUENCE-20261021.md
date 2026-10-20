@@ -1,0 +1,23 @@
+# Unsigned warmup review sequencing
+
+21 October2026. Internal foundation after3cde0fd. This is not an automatic Start implementation or an execution authorization.
+
+`WalletWarmupSessionSequence` first replays the exact public session review with the existing view/plan admission and owns its nested values. Only the earliest queued action can reserve a review slot, once its captured schedule and the conservative fifteen-second post-settlement review gap are due. One reviewing/submitted/unknown action blocks further slots. This floor is additional bookkeeping, not a replacement for actual provider pacing or fresh per-signature checks. Nothing starts a timer or invokes an external callback.
+
+Future-buy sells wait for that buy's recorded finalized event and inherit its exact receipt ID, acquired units and decimals. Saved-buy sells retain their exact original receipt and remaining units. Settlement input binds action, plan/revision, wallet/revision, mint and side; canonical receipt IDs cannot be reused for another action or collide with initial saved-buy sources. The same parsed finalized event is idempotent; changed replays refuse. Buy spending must equal the reviewed action amount and stay within the original per-wallet planned budget. Fees plus positive net rent consume the original remaining reserve; rent refunds never increase it. Malformed/mismatched/over-budget events cannot advance progress or consume a replacement identity.
+
+**Trust boundary:** the event's `verified:true`, mainnet and finalized literals are consistency labels, not on-chain proof. A future internal adapter must independently replay the actual retained finalized receipt with the existing real verifier before recording it here, and retain conflicting/out-of-bounds outcomes for manual recovery in the authoritative receipt store. This class has no HTTP/API/UI caller, database, signing or network capability. It must never be used as a verifier or sole authority for spending.
+
+Pause stops new review slots without changing schedules or expanding allowances. Stop is terminal. Submission observations and valid finalized receipts from an already pending operation remain recordable after Pause/Stop/preview expiry, because a late response cannot undo an actual outcome. Unknown outcomes block further actions until the exact finalized event is admitted; there is no retry/reroll/replacement transition. This does not prove that any real adapter sends once. It prevents duplicate bookkeeping transitions only.
+
+The original short preview deadline remains enforced before opening another review slot. Expiry requires a fresh source review. This deliberately cannot turn a saved non-authorizing preview into a long-running session grant. Snapshots report the source freshness, detached pending context, exact recorded spending/reserve, counts and false execution/signing/automatic-execution flags. Local time must be safe, representable and nondecreasing; chain Clock rules are untouched.
+
+## Verification
+
+Final **178 tests across11related files pass**, including29 deterministic sequencer cases. Related tests cover the real owner-scoped session-review and immutable retained-review routes/storage in disposable local SQLite, existing view/context/lot accounting and UI regressions. New cases cover initial replay/authority refusal, detached objects, one pending slot, duplicate submission refusal, submitted-before-finalized dependency, a complete two-cycle synthetic sequence, overdue spacing, exact future/saved buy lots, unknown recovery, paused/stopped late outcomes, source expiry, schedule preservation, altered fields, idempotent/conflicting/duplicate events, reserve refusal/refunds, invalid clocks and expired/altered initial reviews. No real provider, key, signature or send is involved. Plain TypeScript plus two-file typed lint/format pass.
+
+No production module imports the class; scoped source search finds only its definition/test. No new build/browser/live behavior is claimed for this internal-only checkpoint. Existing application/manual flow is unchanged. Opus5.5 review will target the committed foundation, with limits recorded separately.
+
+## Remaining requirements
+
+Durable exact session approval and per-action identities/budget state, fresh ownership/source/lifetime/custody/balance/simulation/code authorization, real retained-receipt adapter, crash/unknown-outcome recovery and carefully integrated browser scheduler remain unfinished. Signing and automatic Start stay off. Alternate routing, provider/funded qualification and broad Proxima parity remain open. No UI/protected layout, existing signer, API, migration, application/hosted SQL, provider/credential/cron, deployment or real wallet action changed.
