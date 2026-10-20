@@ -83,6 +83,7 @@ import { ChainLaunchForm } from '@/components/launch/chain-launch-form';
 import { FundingForm } from '@/components/launch/funding-form';
 import { LiveOperationsForm } from '@/components/launch/live-operations-form';
 import { PlanRail } from '@/components/launch/plan-rail';
+import { LaunchWorkspacePanels } from '@/components/launch/launch-workspace-panels';
 import { SidebarFunder } from '@/components/sidebar-funder';
 import { VenueMark } from '@/components/launch/venue-mark';
 import { LaunchSetupDialog } from '@/components/launch/launch-setup-dialog';
@@ -1970,6 +1971,11 @@ export default function Home() {
                       </div>
                     </dl>
                   </header>
+                  <LaunchWorkspacePanels
+                    chain={chain}
+                    onFund={() => changeView('funding')}
+                    onOpenWallets={() => changeView('wallets')}
+                  />
                   <h1 className="sr-only">Launch Settings</h1>
                   <p className="launch-ws-note">
                     Model allocations and compare scenarios. Nothing here
