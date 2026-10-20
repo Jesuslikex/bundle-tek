@@ -190,7 +190,7 @@ export function AutoSell({
     }
   }
 
-  const supply = BigInt(token.totalSupplyRaw);
+  const supply = toRaw(token.totalSupplyRaw);
   const pct = (raw: bigint) =>
     supply > 0n
       ? `${(Number((raw * 1_000_000n) / supply) / 10_000).toFixed(4)}%`
@@ -470,7 +470,7 @@ function StrategyCard({
       {expanded && (
         <fieldset disabled={disabled} className={styles.cardBody}>
           <legend className={styles.label}>Mode</legend>
-          <div className={styles.tiles3} role="group" aria-label="Mode">
+          <div className={styles.tiles3} aria-label="Mode">
             <button
               type="button"
               aria-pressed="true"
@@ -766,4 +766,8 @@ function StrategyCard({
       )}
     </article>
   );
+}
+
+function toRaw(value: string) {
+  return BigInt(value);
 }
