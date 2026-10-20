@@ -20,6 +20,11 @@ import {
   type ImportedLotLink,
 } from '@/lib/imported-lot-links';
 import { importedTradeReceipt } from '@/lib/imported-trade-ledger';
+import {
+  launchSaleCosts,
+  type LaunchCostSourceRecord,
+  type LaunchSaleAllocationRecord,
+} from '@/lib/launch-sale-performance';
 import type {
   PerformanceBuy,
   PerformanceSell,
@@ -61,29 +66,26 @@ export async function GET(request: Request) {
       `SELECT l.id,l.project_id AS projectId,l.buy_receipt_id AS buyReceiptId,l.sell_receipt_id AS sellReceiptId,l.units_raw AS unitsRaw,l.buy_signature AS buySignature,l.sell_signature AS sellSignature,l.buy_preparation_sha256 AS buyPreparationSha256,l.sell_preparation_sha256 AS sellPreparationSha256,l.created_at AS createdAt FROM imported_trade_lot_links l WHERE l.owner_id=? LIMIT ?`,
       `SELECT r.id,r.plan_id AS planId,r.signature,r.document,r.plan_revision AS planRevision,r.wallet_revision AS walletRevision,r.cycle,r.wallet_address AS wallet,json_extract(r.document,'$.mint') AS mint,json_extract(r.document,'$.acquiredRaw') AS acquiredRaw,COALESCE(r.remaining_raw,json_extract(r.document,'$.acquiredRaw')) AS remainingRaw,json_extract(r.document,'$.decimals') AS decimals,CASE WHEN json_extract(r.document,'$.signatureVerified')=1 AND json_extract(r.document,'$.wallet')=r.wallet_address AND json_extract(r.document,'$.signature')=r.signature THEN 1 ELSE 0 END AS verified,json_extract(r.document,'$.commitment') AS commitment,json_extract(r.document,'$.network') AS network,p.id AS scopeId,p.document AS scopeDocument,p.archived AS scopeArchived FROM warmup_buy_receipts r LEFT JOIN wallet_warmup_plans p ON p.owner_id=r.owner_id AND p.id=r.plan_id WHERE r.owner_id=? LIMIT ?`,
       `SELECT r.id,r.plan_id AS planId,r.signature,r.document,r.buy_receipt_id AS buyId,r.consumed_raw AS consumedRaw,CASE WHEN json_extract(r.document,'$.signatureVerified')=1 AND json_extract(r.document,'$.signature')=r.signature AND json_extract(r.document,'$.consumedRaw')=r.consumed_raw AND json_extract(r.document,'$.buyReceiptId')=r.buy_receipt_id THEN 1 ELSE 0 END AS verified,json_extract(r.document,'$.commitment') AS commitment,json_extract(r.document,'$.network') AS network,p.id AS scopeId,p.document AS scopeDocument,p.archived AS scopeArchived FROM warmup_sell_receipts r LEFT JOIN wallet_warmup_plans p ON p.owner_id=r.owner_id AND p.id=r.plan_id WHERE r.owner_id=? LIMIT ?`,
+      `SELECT a.sale_receipt_id AS saleReceiptId,a.sale_signature AS saleSignature,a.wallet,a.mint,a.sha256,a.document FROM launch_sale_allocations a WHERE a.owner_id=? LIMIT ?`,
+      `SELECT s.origin_id AS originId,s.wallet,s.mint,s.sha256,s.source FROM pump_purchase_cost_sources s WHERE s.owner_id=? AND EXISTS(SELECT 1 FROM launch_sale_allocations a,json_each(a.document,'$.allocations') x WHERE a.owner_id=s.owner_id AND json_extract(x.value,'$.originId')=s.origin_id) LIMIT ?`,
       `SELECT b.id,b.state,b.document,f.document AS finalizationDocument,(SELECT json_group_array(json_object('packet',p.packet,'signature',p.signature)) FROM jito_bundle_packets p WHERE p.owner_id=b.owner_id AND p.bundle_id=b.id AND p.signature IS NOT NULL) AS packets FROM jito_bundles b LEFT JOIN jito_bundle_finalizations f ON f.owner_id=b.owner_id AND f.bundle_id=b.id WHERE b.owner_id=? LIMIT ?`,
     ];
+    // Launch sales may use up to eight buy sources each.
+    const limits = [
+      ACCOUNT_PERFORMANCE_LIMIT,
+      IMPORTED_LOT_LINK_LIMIT,
+      ACCOUNT_PERFORMANCE_LIMIT,
+      ACCOUNT_PERFORMANCE_LIMIT,
+      ACCOUNT_PERFORMANCE_LIMIT,
+      ACCOUNT_PERFORMANCE_LIMIT * 8,
+      ACCOUNT_PERFORMANCE_LIMIT,
+    ].filter((_, i) => expenseStorage || i !== 6);
     const results = await db.batch(
       queries
-        .filter((_, i) => expenseStorage || i !== 4)
-        .map((q, i) =>
-          db
-            .prepare(q)
-            .bind(
-              user.userId,
-              (i === 1 ? IMPORTED_LOT_LINK_LIMIT : ACCOUNT_PERFORMANCE_LIMIT) +
-                1,
-            ),
-        ),
+        .filter((_, i) => expenseStorage || i !== 6)
+        .map((q, i) => db.prepare(q).bind(user.userId, limits[i] + 1)),
     );
-    if (
-      results.some(
-        (r, i) =>
-          !r.success ||
-          r.results.length >
-            (i === 1 ? IMPORTED_LOT_LINK_LIMIT : ACCOUNT_PERFORMANCE_LIMIT),
-      )
-    )
+    if (results.some((r, i) => !r.success || r.results.length > limits[i]))
       throw new Error('Incomplete snapshot.');
     const imports = new Map<string, ImportedPerformanceSource>(),
       warmups = new Map<string, WarmupPerformanceSource>();
@@ -136,9 +138,20 @@ export async function GET(request: Request) {
         warmups.set(row.scopeId, source);
       }
     }
+    const launch = launchSaleCosts(
+      results[4].results as LaunchSaleAllocationRecord[],
+      results[5].results as LaunchCostSourceRecord[],
+    );
+    for (const [saleId, cost] of launch.costs) {
+      const source = [...imports.values()].find((s) =>
+        s.receipts.some((r) => r.id === saleId),
+      );
+      if (!source) throw new Error('Launch sale receipt missing.');
+      source.launchCosts = { ...source.launchCosts, [saleId]: cost };
+    }
     const expenses = expenseStorage
       ? await jitoPerformanceCosts(
-          results[4].results as JitoPerformanceRow[],
+          results[6].results as JitoPerformanceRow[],
           [...imports.values()].flatMap((s) => s.receipts),
         )
       : new Map();

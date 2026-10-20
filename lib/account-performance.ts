@@ -1,6 +1,7 @@
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 import { type ImportedLotLink } from './imported-lot-links';
 import { type ImportedTradeReceipt } from './imported-trade-ledger';
+import { type LaunchSaleCost } from './launch-sale-performance';
 import {
   type PerformanceBuy,
   type PerformanceSell,
@@ -38,6 +39,8 @@ export type ImportedPerformanceSource = {
   archived: boolean;
   receipts: ImportedTradeReceipt[];
   links: ImportedLotLink[];
+  /** Sales assigned to recorded launch buys, keyed by sale receipt id. */
+  launchCosts?: Record<string, LaunchSaleCost>;
 };
 export type WarmupPerformanceSource = {
   id: string;

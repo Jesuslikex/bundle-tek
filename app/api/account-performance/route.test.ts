@@ -39,6 +39,8 @@ const tables = [
   'jito_bundles(owner_id TEXT,id TEXT,document TEXT,state TEXT)',
   'jito_bundle_packets(owner_id TEXT,bundle_id TEXT,packet INTEGER,signature TEXT)',
   'jito_bundle_finalizations(owner_id TEXT,bundle_id TEXT,document TEXT)',
+  'launch_sale_allocations(owner_id TEXT,sale_receipt_id TEXT,sale_signature TEXT,wallet TEXT,mint TEXT,document TEXT,sha256 TEXT,created_at TEXT)',
+  'pump_purchase_cost_sources(owner_id TEXT,origin_id TEXT,receipt_id TEXT,review_id TEXT,mint TEXT,wallet TEXT,source TEXT,sha256 TEXT)',
 ];
 let mf: Miniflare;
 beforeAll(async () => {
@@ -189,9 +191,16 @@ async function warmupFixture() {
 }
 it('authenticates and returns an explicit empty summary without invented gains', async () => {
   mocks.user = null;
-  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(401);
+  expect(
+    (await GET(new Request('http://localhost:3000/api/account-performance')))
+      .status,
+  ).toBe(401);
   mocks.user = { userId: 'empty' };
-  expect(await (await GET(new Request('http://localhost:3000/api/account-performance'))).json()).toMatchObject({
+  expect(
+    await (
+      await GET(new Request('http://localhost:3000/api/account-performance'))
+    ).json(),
+  ).toMatchObject({
     receiptCount: 0,
     recordedRealizedLamports: null,
     scopes: [],
@@ -280,7 +289,9 @@ it('reads owner-bound bundle expenses in the real D1 snapshot and reconciles par
         .bind(owner, row.id, p.packet, p.signature)
         .run();
   }
-  const response = await GET(new Request('http://localhost:3000/api/account-performance'));
+  const response = await GET(
+    new Request('http://localhost:3000/api/account-performance'),
+  );
   expect(response.status).toBe(200);
   const summary = (await response.json()) as AccountPerformance;
   const expense = (BigInt(f.manifest.tip.amountRaw) + 2n) / 2n;
@@ -315,7 +326,9 @@ it('reads owner-bound bundle expenses in the real D1 snapshot and reconciles par
     .prepare('DELETE FROM jito_bundle_finalizations WHERE owner_id=?')
     .bind('one')
     .run();
-  const missing = (await (await GET(new Request('http://localhost:3000/api/account-performance'))).json()) as AccountPerformance;
+  const missing = (await (
+    await GET(new Request('http://localhost:3000/api/account-performance'))
+  ).json()) as AccountPerformance;
   expect(missing).toMatchObject({
     missingBundleCostCount: 1,
     recordedRealizedLamports: null,
@@ -324,7 +337,9 @@ it('reads owner-bound bundle expenses in the real D1 snapshot and reconciles par
   expect(missing.bundleTipLamports).toBe('0');
   await mocks.db.prepare('DROP TABLE jito_bundle_packets').run();
   try {
-    const legacyResponse = await GET(new Request('http://localhost:3000/api/account-performance'));
+    const legacyResponse = await GET(
+      new Request('http://localhost:3000/api/account-performance'),
+    );
     expect(legacyResponse.status).toBe(200);
     const legacy = (await legacyResponse.json()) as AccountPerformance;
     expect(legacy).toMatchObject({
@@ -346,7 +361,9 @@ it('aggregates two-source sales and partial warmup exits exactly across archived
   await importedFixture();
   await importedFixture('other');
   await warmupFixture();
-  const response = await GET(new Request('http://localhost:3000/api/account-performance'));
+  const response = await GET(
+    new Request('http://localhost:3000/api/account-performance'),
+  );
   expect(response.status).toBe(200);
   expect(response.headers.get('cache-control')).toBe('no-store');
   const value = (await response.json()) as AccountPerformance;
@@ -388,7 +405,11 @@ it('withholds complete results for unlinked inventory sales rather than treating
       JSON.stringify(r.document),
     )
     .run();
-  expect(await (await GET(new Request('http://localhost:3000/api/account-performance'))).json()).toMatchObject({
+  expect(
+    await (
+      await GET(new Request('http://localhost:3000/api/account-performance'))
+    ).json(),
+  ).toMatchObject({
     recordedRealizedLamports: null,
     linkedResultLamports: '-153',
     unlinkedSaleCount: 1,
@@ -401,10 +422,16 @@ it('refuses incomplete splits, orphan projects and cross-plan warmup sales witho
     .prepare('DELETE FROM imported_trade_lot_links WHERE owner_id=? AND id=?')
     .bind('one', id(501))
     .run();
-  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(503);
+  expect(
+    (await GET(new Request('http://localhost:3000/api/account-performance')))
+      .status,
+  ).toBe(503);
   await mocks.db.prepare('DELETE FROM imported_trade_lot_links').run();
   await mocks.db.prepare('DELETE FROM imported_token_projects').run();
-  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(503);
+  expect(
+    (await GET(new Request('http://localhost:3000/api/account-performance')))
+      .status,
+  ).toBe(503);
   await mocks.db.prepare('DELETE FROM imported_swap_receipts').run();
   await mocks.db
     .prepare('INSERT INTO wallet_warmup_plans VALUES(?,?,?,0)')
@@ -414,7 +441,10 @@ it('refuses incomplete splits, orphan projects and cross-plan warmup sales witho
     .prepare('UPDATE warmup_sell_receipts SET plan_id=?')
     .bind(id(11))
     .run();
-  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(503);
+  expect(
+    (await GET(new Request('http://localhost:3000/api/account-performance')))
+      .status,
+  ).toBe(503);
 });
 it('reads all receipts beyond one UI page and rejects duplicate cross-workflow signatures', async () => {
   await importedFixture();
@@ -437,7 +467,11 @@ it('reads all receipts beyond one UI page and rejects duplicate cross-workflow s
         );
     }),
   );
-  expect(await (await GET(new Request('http://localhost:3000/api/account-performance'))).json()).toMatchObject({
+  expect(
+    await (
+      await GET(new Request('http://localhost:3000/api/account-performance'))
+    ).json(),
+  ).toMatchObject({
     receiptCount: 56,
     unallocatedCostLamports: '5656',
     recordedRealizedLamports: null,
@@ -448,7 +482,10 @@ it('reads all receipts beyond one UI page and rejects duplicate cross-workflow s
     .prepare('UPDATE imported_swap_receipts SET document=? WHERE id=?')
     .bind(JSON.stringify(buy.document), id(20))
     .run();
-  expect((await GET(new Request('http://localhost:3000/api/account-performance'))).status).toBe(503);
+  expect(
+    (await GET(new Request('http://localhost:3000/api/account-performance')))
+      .status,
+  ).toBe(503);
 });
 it('rejects an over-capacity account snapshot before displaying any subset', async () => {
   await importedFixture();
@@ -459,7 +496,9 @@ it('rejects an over-capacity account snapshot before displaying any subset', asy
     )
     .bind(id(2))
     .run();
-  const response = await GET(new Request('http://localhost:3000/api/account-performance'));
+  const response = await GET(
+    new Request('http://localhost:3000/api/account-performance'),
+  );
   expect(response.status).toBe(503);
   expect(await response.json()).toEqual({
     error:
@@ -611,4 +650,136 @@ it('exports a fresh complete owned snapshot as a downloadable CSV and rejects un
   expect(damaged.status).toBe(503);
   expect(damaged.headers.get('content-type')).toContain('application/json');
   expect(damaged.headers.get('content-disposition')).toBeNull();
+});
+async function launchSaleFixture(
+  nativeCost: string | null,
+  saleSignature?: string,
+) {
+  const sale = acquisitionReceipt(5, 'Sell', '1');
+  await mocks.db
+    .prepare('INSERT INTO imported_swap_receipts VALUES(?,?,?,?,?,?,?,?)')
+    .bind(
+      'one',
+      sale.projectId,
+      sale.id,
+      sale.preparationId,
+      sale.projectRevision,
+      sale.walletRevision,
+      sale.createdAt,
+      JSON.stringify(sale.document),
+    )
+    .run();
+  const origin = 'c'.repeat(64),
+    sourceHash = 'd'.repeat(64),
+    planHash = 'e'.repeat(64);
+  const source = {
+    originId: origin,
+    reviewId: id(900),
+    wallet,
+    mint,
+    acquiredRaw: '4',
+    purchaseQuoteRaw: '90',
+    nativeTradeCostExcludingSetupLamports: nativeCost,
+    policy: 'reviewed-buy-shares-v1',
+    acquisitionBasisVerified: false,
+    executionAllowed: false,
+    sha256: sourceHash,
+  };
+  const plan = {
+    format: 'launch-sale-allocation-v1',
+    policy: 'recorded-launch-units-v1',
+    saleReceiptId: sale.id,
+    saleEvidenceSha256: 'f'.repeat(64),
+    saleSignature: saleSignature ?? sale.document.signature,
+    wallet,
+    mint,
+    decimals: 6,
+    saleSlot: '5',
+    soldRaw: '1',
+    allocations: [
+      {
+        originId: origin,
+        sourceSha256: sourceHash,
+        receiptSha256: 'b'.repeat(64),
+        buySlot: '1',
+        beforeRaw: '1',
+        unitsRaw: '1',
+        afterRaw: '2',
+      },
+    ],
+    executionAllowed: false,
+    signingAllowed: false,
+    profitCalculated: false,
+    acquisitionBasisVerified: false,
+    sha256: planHash,
+  };
+  await mocks.db
+    .prepare('INSERT INTO pump_purchase_cost_sources VALUES(?,?,?,?,?,?,?,?)')
+    .bind(
+      'one',
+      origin,
+      id(901),
+      id(900),
+      mint,
+      wallet,
+      JSON.stringify(source),
+      sourceHash,
+    )
+    .run();
+  await mocks.db
+    .prepare('INSERT INTO launch_sale_allocations VALUES(?,?,?,?,?,?,?,?)')
+    .bind(
+      'one',
+      sale.id,
+      plan.saleSignature,
+      wallet,
+      mint,
+      JSON.stringify(plan),
+      planHash,
+      date,
+    )
+    .run();
+}
+it('counts sales assigned to recorded launch buys as linked, with their exact saved SOL cost share', async () => {
+  await importedFixture();
+  // Buy cost 100 for 4 units; the sale takes units [1,2): 100*2/4 - 100*1/4 = 25.
+  await launchSaleFixture('100');
+  const summary = (await (await GET(timelineRequest())).json()) as {
+    summary: AccountPerformance;
+    timeline: PerformanceTimelineData;
+  };
+  const timeline = validatedTimelineData(summary.timeline, summary.summary);
+  expect(summary.summary).toMatchObject({
+    unlinkedSaleCount: 0,
+    linkedSaleCount: 2,
+    allocatedCostLamports: '227',
+    linkedNetProceedsLamports: '98',
+    linkedResultLamports: '-129',
+    recordedRealizedLamports: '-129',
+  });
+  expect(timeline.sales.find((s) => s.saleId === id(5))).toMatchObject({
+    costLamports: '25',
+    netProceedsLamports: '49',
+    resultLamports: '24',
+  });
+});
+it('keeps launch sales bought with a token quote outside realized SOL totals', async () => {
+  await importedFixture();
+  await launchSaleFixture(null);
+  expect(
+    await (
+      await GET(new Request('http://localhost/api/account-performance'))
+    ).json(),
+  ).toMatchObject({
+    recordedRealizedLamports: null,
+    linkedResultLamports: '-153',
+    unlinkedSaleCount: 1,
+  });
+});
+it('refuses a launch assignment whose sale signature differs from the retained receipt', async () => {
+  await importedFixture();
+  await launchSaleFixture('100', signature(99));
+  expect(
+    (await GET(new Request('http://localhost/api/account-performance'))).status,
+  ).toBe(503);
 });

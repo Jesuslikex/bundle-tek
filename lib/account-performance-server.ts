@@ -50,7 +50,12 @@ export function summarizeAccountPerformance(
           source.links,
           source.executionCosts,
         ),
-        ledger = summarizeImportedTrades(source.receipts);
+        ledger = summarizeImportedTrades(source.receipts),
+        launch = launchSales(source),
+        launchSum = (field: 'costLamports' | 'netProceedsLamports') =>
+          launch.reduce((n, s) => n + BigInt(s[field]), 0n);
+      const launchCost = launchSum('costLamports'),
+        launchNet = launchSum('netProceedsLamports');
       return {
         kind: 'Imported trades' as const,
         id: source.id,
@@ -63,12 +68,20 @@ export function summarizeAccountPerformance(
           source.bundleCostStorageUnavailable ?? false,
         buyCount: ledger.buyCount,
         sellCount: ledger.sellCount,
-        linkedSaleCount: p.linkedSaleCount,
-        unlinkedSaleCount: p.unlinkedSaleCount,
-        allocatedCostLamports: p.assignedCostLamports,
+        linkedSaleCount: p.linkedSaleCount + launch.length,
+        unlinkedSaleCount: p.unlinkedSaleCount - launch.length,
+        allocatedCostLamports: (
+          BigInt(p.assignedCostLamports) + launchCost
+        ).toString(),
         unallocatedCostLamports: p.unassignedCostLamports,
-        linkedNetProceedsLamports: p.netAssignedProceedsLamports,
-        linkedResultLamports: p.assignedResultLamports,
+        linkedNetProceedsLamports: (
+          BigInt(p.netAssignedProceedsLamports) + launchNet
+        ).toString(),
+        linkedResultLamports: (
+          BigInt(p.assignedResultLamports) +
+          launchNet -
+          launchCost
+        ).toString(),
         successfulFeeLamports: ledger.networkFeeLamports,
         rentChangeLamports: ledger.rentChangeRaw,
       };
@@ -198,6 +211,44 @@ function importedSales(source: ImportedPerformanceSource): RealizedSale[] {
     };
   });
 }
+/** Sales whose units were assigned to recorded launch buys. Their cost comes
+ * from saved launch cost shares; proceeds use the same net rule as swap lots. */
+function launchSales(source: ImportedPerformanceSource): RealizedSale[] {
+  const byId = new Map(source.receipts.map((r) => [r.id, r]));
+  const swapLinked = new Set(source.links.map((l) => l.sellReceiptId));
+  return Object.entries(source.launchCosts ?? {}).map(([saleId, launch]) => {
+    const sale = byId.get(saleId);
+    if (
+      !sale ||
+      sale.document.side !== 'Sell' ||
+      swapLinked.has(saleId) ||
+      sale.document.signature !== launch.saleSignature ||
+      sale.document.wallet !== launch.wallet ||
+      sale.document.mint !== launch.mint ||
+      sale.document.tokenUnitsRaw !== launch.soldRaw ||
+      !/^(0|[1-9]\d{0,24})$/.test(launch.costLamports)
+    )
+      throw new Error('Launch sale assignment differs.');
+    const cost = BigInt(launch.costLamports),
+      net =
+        BigInt(sale.document.nativeSettlementRaw) -
+        BigInt(sale.document.networkFeeLamports) -
+        BigInt(source.executionCosts?.[saleId] ?? '0');
+    return {
+      kind: 'Imported trades',
+      scopeId: source.id,
+      scopeName: source.name,
+      saleId,
+      signature: sale.document.signature,
+      wallet: sale.document.wallet,
+      slot: sale.document.slot,
+      blockTime: blockTime(sale.document),
+      costLamports: cost.toString(),
+      netProceedsLamports: net.toString(),
+      resultLamports: (net - cost).toString(),
+    };
+  });
+}
 function warmupSales(source: WarmupPerformanceSource): RealizedSale[] {
   const buys = new Map(source.buys.map((b) => [b.id, b]));
   const partsByBuy = new Map<
@@ -257,6 +308,7 @@ export function summarizeAccountTimeline(
   const summary = summarizeAccountPerformance(imports, warmups, observedAt);
   const sales = [
     ...imports.flatMap(importedSales),
+    ...imports.flatMap(launchSales),
     ...warmups.flatMap(warmupSales),
   ];
   const total = sales.reduce((n, s) => n + BigInt(s.resultLamports), 0n);
