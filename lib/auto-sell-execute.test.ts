@@ -113,4 +113,31 @@ describe('auto sell executor', () => {
     ).rejects.toBeInstanceOf(AutoSellUncertainError);
     expect(s.calls.filter((c) => c.url.endsWith('/prepare'))).toHaveLength(1);
   });
+
+  it('never sends when Stop lands while registering', async () => {
+    const s = server();
+    const controller = new AbortController();
+    const fetcher = vi.fn(
+      async (url: string, init: RequestInit): Promise<Response> => {
+        const body = JSON.parse(init.body as string);
+        if (body.action === 'register') controller.abort();
+        return s.fetcher(url, init);
+      },
+    );
+    const sell = createAutoSellExecutor({
+      projectId: 'p',
+      projectRevision: 3,
+      mint: MINT,
+      decimals: 6,
+      wallets: [{ address: W1, revision: 1 }],
+      session: () => session,
+      fetcher: fetcher as unknown as typeof fetch,
+      sleep: async () => {},
+      sign: vi.fn(async () => ({ signature: 'SIG', transaction: 'signed' })),
+    });
+    const error = await sell(1_500_000n, controller.signal).catch((e) => e);
+    expect(error).not.toBeInstanceOf(AutoSellUncertainError);
+    expect(error.message).toMatch(/before sending/);
+    expect(s.calls.some((c) => c.body.action === 'submit')).toBe(false);
+  });
 });

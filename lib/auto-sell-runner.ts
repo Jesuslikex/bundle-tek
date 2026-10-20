@@ -43,6 +43,10 @@ export type AutoSellRunnerDeps = {
   pollMs?: number;
   /** Wait after a failed sell before trying again. */
   retryMs?: number;
+  /** Failed sells in a row before the whole run stops. */
+  maxConsecutiveFailures?: number;
+  /** A market cap older than this is unknown, so ranged strategies hold. */
+  marketCapMaxAgeMs?: number;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
 };
@@ -62,7 +66,14 @@ export class AutoSellRunner {
   private readonly deps: Required<
     Pick<
       AutoSellRunnerDeps,
-      'now' | 'random' | 'pollMs' | 'retryMs' | 'setTimer' | 'clearTimer'
+      | 'now'
+      | 'random'
+      | 'pollMs'
+      | 'retryMs'
+      | 'maxConsecutiveFailures'
+      | 'marketCapMaxAgeMs'
+      | 'setTimer'
+      | 'clearTimer'
     >
   > &
     AutoSellRunnerDeps;
@@ -73,6 +84,8 @@ export class AutoSellRunner {
   private selling = false;
   private sellBlockedUntil = 0;
   private marketCapUsd: number | null = null;
+  private marketCapAt = 0;
+  private failures = 0;
   private log: AutoSellLogEntry[] = [];
   private timer: unknown = null;
   private controller = new AbortController();
@@ -84,6 +97,8 @@ export class AutoSellRunner {
       random: cryptoRandom,
       pollMs: 4000,
       retryMs: 15000,
+      maxConsecutiveFailures: 5,
+      marketCapMaxAgeMs: 60000,
       setTimer: (fn, ms) => setTimeout(fn, ms),
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
       ...deps,
@@ -183,6 +198,7 @@ export class AutoSellRunner {
       this.polling = false;
     }
     if (!this.running) return;
+    this.expireMarketCap();
     this.checkEnds();
     this.maybeSell();
     this.timer = this.deps.setTimer(() => void this.tick(), this.deps.pollMs);
@@ -196,6 +212,7 @@ export class AutoSellRunner {
           Number(this.deps.totalSupplyRaw) / 10 ** this.deps.decimals;
         const cap = Number(ctxPrice) * supply;
         this.marketCapUsd = Number.isFinite(cap) ? cap : null;
+        this.marketCapAt = this.deps.now();
       }
     }
     // The first read only marks history; Auto Sell reacts to buys after Run.
@@ -235,6 +252,17 @@ export class AutoSellRunner {
     this.emit();
   }
 
+  /** A failing feed must not leave an old market cap gating sells. */
+  private expireMarketCap() {
+    if (
+      this.marketCapUsd !== null &&
+      this.deps.now() - this.marketCapAt > this.deps.marketCapMaxAgeMs
+    ) {
+      this.marketCapUsd = null;
+      this.emit();
+    }
+  }
+
   private checkEnds() {
     const now = this.deps.now();
     for (const s of this.deps.strategies) {
@@ -264,6 +292,7 @@ export class AutoSellRunner {
       this.deps.now() < this.sellBlockedUntil
     )
       return;
+    this.expireMarketCap();
     for (const s of this.deps.strategies) {
       const state = this.states.get(s.id)!;
       if (!marketCapInRange(s, this.marketCapUsd)) continue;
@@ -279,6 +308,7 @@ export class AutoSellRunner {
       void this.deps
         .sell(amount, this.controller.signal)
         .then(({ soldRaw, signature, wallet }) => {
+          this.failures = 0;
           const current = this.states.get(s.id)!;
           const sold = soldRaw < amount ? soldRaw : amount;
           this.states.set(s.id, {
@@ -313,6 +343,13 @@ export class AutoSellRunner {
               'error',
               `${s.name}: ${error instanceof Error ? error.message : 'submission unknown'}`,
             );
+            if (
+              !this.controller.signal.aborted &&
+              ++this.failures >= this.deps.maxConsecutiveFailures
+            )
+              this.stop(
+                `Stopped after ${this.failures} failed sells in a row. Check the wallets and try again.`,
+              );
             return;
           }
           this.states.set(s.id, {
@@ -324,12 +361,25 @@ export class AutoSellRunner {
                 : current.bufferedRaw,
           });
           this.sellBlockedUntil = this.deps.now() + this.deps.retryMs;
-          if (!this.controller.signal.aborted)
+          if (this.controller.signal.aborted) return;
+          this.failures++;
+          const detail = error instanceof Error ? error.message : '';
+          if (this.failures >= this.deps.maxConsecutiveFailures) {
             this.note(
               s.id,
               'error',
-              `${s.name}: sell failed, retrying shortly. ${error instanceof Error ? error.message : ''}`.trim(),
+              `${s.name}: sell failed. ${detail}`.trim(),
             );
+            this.stop(
+              `Stopped after ${this.failures} failed sells in a row. Check the wallets and try again.`,
+            );
+            return;
+          }
+          this.note(
+            s.id,
+            'error',
+            `${s.name}: sell failed, retrying shortly. ${detail}`.trim(),
+          );
         })
         .finally(() => {
           this.selling = false;

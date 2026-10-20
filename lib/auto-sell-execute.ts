@@ -54,6 +54,13 @@ export class AutoSellUncertainError extends Error {
   }
 }
 
+/** Stopped after registration but before the send started. */
+class AutoSellNotSentError extends Error {
+  constructor() {
+    super('Auto Sell stopped before sending.');
+  }
+}
+
 class RetryLater extends Error {
   constructor(
     message: string,
@@ -224,8 +231,11 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
       );
       if (registered.signature !== packet.signature)
         throw new Error('Registered signature mismatch.');
-      // Once registered, submission is not tied to Stop: a signed packet should
-      // not be left half-way. The server sends it once and never resends.
+      // Stop pressed while registering: never start the send. The registered
+      // packet is left unsent and expires with its blockhash.
+      if (signal.aborted) throw new AutoSellNotSentError();
+      // Once the send has started it is not aborted: the server sends it once
+      // and never resends, so the outcome must be awaited and recorded.
       const submitted = await postJson(
         fetcher,
         '/api/imported-projects/signing',
@@ -235,6 +245,7 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
       if (submitted.signature !== packet.signature)
         throw new Error('Submitted signature mismatch.');
     } catch (error) {
+      if (error instanceof AutoSellNotSentError) throw error;
       // A signed packet may already be on chain. Never resell this amount.
       throw new AutoSellUncertainError(
         `${error instanceof Error ? error.message : 'Submission unknown'}. Check signature ${packet.signature} in preparation history.`,
