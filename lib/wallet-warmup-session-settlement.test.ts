@@ -529,6 +529,7 @@ it('recovers a finalized saved-buy sell using the exact lower revisions retained
 it.each([
   'future-plan',
   'future-wallet',
+  'equal',
   'wrong-plan',
   'wrong-wallet',
   'missing',
@@ -542,6 +543,10 @@ it.each([
     const link = f.sell.preparation.document.buyReceipt!;
     if (kind === 'future-plan') link.historicalBuy!.planRevision = 3;
     if (kind === 'future-wallet') link.historicalBuy!.walletRevision = 3;
+    if (kind === 'equal') {
+      link.historicalBuy!.planRevision = 2;
+      link.historicalBuy!.walletRevision = 2;
+    }
     if (kind === 'wrong-plan') link.historicalBuy!.planRevision = 2;
     if (kind === 'wrong-wallet') link.historicalBuy!.walletRevision = 2;
     if (kind === 'missing') delete link.historicalBuy;
@@ -608,6 +613,31 @@ it.each([
   await expect(
     replayWarmupSessionSettlement(db, 'owner', selected, signal(), fetcher),
   ).rejects.toThrow();
+});
+it('admits the identical retained buy link with reordered object keys', async () => {
+  f.sell.approval.buyReceipt = Object.fromEntries(
+    Object.entries(f.sell.approval.buyReceipt!).reverse(),
+  ) as typeof f.sell.approval.buyReceipt;
+  await db
+    .prepare(
+      'UPDATE warmup_signing_intents SET document=? WHERE preparation_id=?',
+    )
+    .bind(JSON.stringify(f.sell.approval), f.sell.preparation.id)
+    .run();
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    input('Sell'),
+    signal(),
+    fetcher,
+  );
+  expect(result.settlement).toMatchObject({
+    side: 'Sell',
+    buyReceiptId: f.buy.receiptId,
+    consumedRaw: '101',
+  });
+  expect(result.signingAllowed).toBe(false);
+  expect(methods).toHaveLength(4);
 });
 it('refuses a buy-lot link that differs from the retained exact signing approval before any provider work', async () => {
   f.sell.approval.buyReceipt!.receiptId =
