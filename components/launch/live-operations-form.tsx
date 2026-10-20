@@ -15,7 +15,7 @@ export function LiveOperationsForm({ plan, onOpenSimulation }: { plan: LaunchPla
       <div className="chart-placeholder"><BarChart3 /><span><strong>No market feed connected</strong><small>Price, trades, wallet attribution, and bonding-curve data are unavailable in this build.</small></span></div>
       <div className="boundary-card danger"><LockKeyhole /><span><strong>Mainnet market execution is locked</strong><small>Devnet wallet verification and SPL distribution are separate tools; no trade or launch order submitter exists.</small></span></div>
       {plan.chain === 'Robinhood' && plan.launchpad === 'pons.family' && <PonsLaunchPanel name={plan.tokenName} symbol={plan.ticker} />}
-      {plan.chain === 'Base' && plan.launchpad === 'Clanker' && <ClankerLaunchPanel name={plan.tokenName} symbol={plan.ticker} />}
+      {plan.chain === 'Base' && (plan.launchpad === 'Clanker' || plan.launchpad === 'Bankr') && <ClankerLaunchPanel key={plan.launchpad} name={plan.tokenName} symbol={plan.ticker} venue={plan.launchpad} />}
       {(plan.chain === 'Ethereum' || plan.chain === 'Robinhood') && plan.launchpad === 'Uniswap V2' && <LiquidityPoolPanel chain={plan.chain} />}
       <Button className="flow-next secondary" onClick={onOpenSimulation}>Open simulation engine <Bot /></Button>
     </div>
