@@ -15,6 +15,7 @@ const uint = z.string().regex(/^(0|[1-9]\d*)$/);
 const slot = uint.refine((v) => BigInt(v) <= BigInt(Number.MAX_SAFE_INTEGER));
 const lamports = uint.refine((v) => BigInt(v) <= (1n << 64n) - 1n);
 const systemProgram = '11111111111111111111111111111111';
+export class MarketplaceSaleInspectionChangedError extends Error {}
 const accountResult = z.object({
   context: z.object({ slot }),
   value: z
@@ -50,7 +51,10 @@ export async function inspectMarketplaceSaleWallet(
       w.address === selection.address &&
       w.revision === selection.walletRevision,
   );
-  if (!wallet) throw Error('Seller wallet changed. Reload inventory.');
+  if (!wallet)
+    throw new MarketplaceSaleInspectionChangedError(
+      'Seller wallet changed. Reload inventory.',
+    );
   signal.throwIfAborted();
   const endpoint = getSolanaRpcEndpoint('mainnet');
   const rpc = async (method: string, params: unknown[]) => {
@@ -102,7 +106,7 @@ export async function inspectMarketplaceSaleWallet(
   const binding = (value: MarketplaceOwnedWallet | undefined) =>
     value && { ...value, observedActivityAgeSeconds: null };
   if (JSON.stringify(binding(current)) !== JSON.stringify(binding(wallet)))
-    throw Error(
+    throw new MarketplaceSaleInspectionChangedError(
       'Seller wallet evidence changed during inspection. Reload inventory.',
     );
   const completedAt = now();

@@ -1,0 +1,52 @@
+{
+  "base": "825e730",
+  "tests": {
+    "passed": 416,
+    "failed": 0,
+    "files": 30,
+    "success": true,
+    "scope": "All marketplace test files; synthetic provider responses and disposable in-memory databases"
+  },
+  "typecheck": "tsc --noEmit --incremental false: exit0",
+  "lint": "Scoped type-aware oxlint and oxfmt: pass",
+  "browser": {
+    "kind": "Actual components and production styles; public synthetic fixtures",
+    "desktop": {
+      "viewportWidth": 1440,
+      "documentClientWidth": 1440,
+      "documentScrollWidth": 1440,
+      "panelClientWidth": 1122,
+      "panelScrollWidth": 1122,
+      "buttonHeight": 46
+    },
+    "phone": {
+      "viewportWidth": 375,
+      "documentClientWidth": 360,
+      "documentScrollWidth": 360,
+      "panelClientWidth": 326,
+      "panelScrollWidth": 326,
+      "buttonHeight": 46,
+      "verticalScrollbarWidth": 15
+    },
+    "fixtureRequests": 7,
+    "financialWrites": 0,
+    "signatures": 0,
+    "cases": [
+      "manual load/review",
+      "ordinary",
+      "unsupported",
+      "absent",
+      "rate limited",
+      "invalid authority refused",
+      "price edit clears panel"
+    ],
+    "cleanup": "Tab closed and viewport reset"
+  },
+  "limits": [
+    "No real provider qualification",
+    "No production sign-in test",
+    "No full repository suite",
+    "No application or hosted SQL",
+    "No payment, delivery, signing or deployment"
+  ]
+}

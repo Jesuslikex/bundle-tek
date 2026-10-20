@@ -7,6 +7,7 @@ import { MarketplaceOperatorConsole } from './marketplace-operator-console';
 import { marketplaceOwnedFixture } from '../test/marketplace-owned-fixture';
 import { buildMarketplaceOwnedInventory } from '@/lib/marketplace-owned-inventory';
 import { reviewOperatorListing } from '@/lib/marketplace-operator-review';
+import { marketplaceSaleInspectionFixture } from '../test/marketplace-sale-inspection-fixture';
 let root: Root, host: HTMLDivElement;
 const now = Date.parse('2026-10-20T12:00:00Z');
 function inventory() {
@@ -177,4 +178,39 @@ it('expires inventory without refreshing automatically', async () => {
   expect(host.querySelector('select')).toBeNull();
   expect(host.textContent).not.toContain('Asking price (SOL)');
   expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('mounts the manual account check only for a reviewed draft and aborts it when its price changes', async () => {
+  const data = inventory(),
+    fixture = marketplaceSaleInspectionFixture(now);
+  let resolve!: (r: Response) => void;
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/account-inspection'))
+      return new Promise<Response>((r) => {
+        resolve = r;
+      });
+    return init?.method === 'POST'
+      ? Response.json(
+          await reviewOperatorListing(data, JSON.parse(init.body as string)),
+        )
+      : Response.json(data);
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  expect(button('Inspect current account')).toBeUndefined();
+  await click('Open seller inventory');
+  await price('0.05');
+  await click('Review listing draft');
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(button('Inspect current account')).toBeDefined();
+  await click('Inspect current account');
+  const init = fetcher.mock.calls[2][1]!;
+  expect(JSON.parse(init.body as string)).toEqual(fixture.selection);
+  await price('0.06');
+  expect(init.signal?.aborted).toBe(true);
+  expect(button('Inspect current account')).toBeUndefined();
+  await act(async () =>
+    resolve(Response.json({ inspection: fixture.inspection })),
+  );
+  expect(host.textContent).not.toContain('Ordinary SOL account observed');
+  expect(host.textContent).not.toContain('Unpublished listing review');
 });

@@ -1,0 +1,30 @@
+{
+  "base": "825e730",
+  "overlay": [
+    "lib/marketplace-sale-inspection.ts",
+    "lib/marketplace-sale-inspection-view.ts",
+    "lib/marketplace-sale-inspection-view.test.ts",
+    "app/api/marketplace/operator/account-inspection/route.ts",
+    "app/api/marketplace/operator/account-inspection/route.test.ts",
+    "components/marketplace-sale-inspection-panel.tsx",
+    "components/marketplace-sale-inspection-panel.test.tsx",
+    "components/marketplace-operator-console.tsx",
+    "components/marketplace-operator-console.test.tsx",
+    "test/marketplace-sale-inspection-fixture.ts"
+  ],
+  "hashes": {
+    "lib/marketplace-sale-inspection.ts": "c64dab5d7f5aad92636ed6dc361220c2230fde18a5a35617ad2e70df4beb6f2d",
+    "lib/marketplace-sale-inspection-view.ts": "c75ddb1ccb1aa84dcfa48f0bd2206b5c37e3e7a0b36e4719d1fcb88f589cf7a4",
+    "lib/marketplace-sale-inspection-view.test.ts": "47c261279ad270b1f12407602453895a35373a84f8a48107754b3f70aa86fff0",
+    "app/api/marketplace/operator/account-inspection/route.ts": "608eae55f1b1f82db0109e7e7da78f7ab6e693970c6452c35435c32e0d3242f3",
+    "app/api/marketplace/operator/account-inspection/route.test.ts": "ee1fef3f580855d102eda03d363c3799fbeb33817b551d70a66bc736ea0b1f22",
+    "components/marketplace-sale-inspection-panel.tsx": "4fa7d88aac7f6ce587a3fde10607d0a52aae23b82e6bdd779c84429cbe4169c2",
+    "components/marketplace-sale-inspection-panel.test.tsx": "1b14621f0cec39c2eaae930608b0e16a533c551480e0a59f00441a80970fe1ee",
+    "components/marketplace-operator-console.tsx": "190466a637e047da4c9b07fc7b7d031e4a6466dd293555f15d462f6d98936b80",
+    "components/marketplace-operator-console.test.tsx": "ba446d97ff181c50af2d224a6e467c6ac4db4cdbe304cf2e428a8d7eccec13ad",
+    "test/marketplace-sale-inspection-fixture.ts": "8d69776d4ad57c7e98148d4018f6384c547b02ea9c5da9e9fe003447cc3af3be"
+  },
+  "code": 0,
+  "unchanged": true,
+  "passed": true
+}
