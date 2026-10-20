@@ -20,7 +20,7 @@ Planning, exact range draws, saved-document admission, recovery, approval and si
 - Final two-file typed lint/format and plain TypeScript pass.
 - Isolated production webpack build at `67f0763` plus these three UI/test files passed, with unchanged source hashes. Result: ignored `work/release-qa/activity-dialog-build-20261020/result.json`.
 - Existing Chrome rendered the actual components against synthetic fixtures. Desktop modal, token selection/collapse and retained review action verified. Screenshot: ignored `work/activity-autosell-browser-20261020/activity-desktop.jpg`.
-- A requested 375px viewport override did not affect the observed page (it remained 1920px); therefore mobile rendered QA is not claimed. The override was reset.
+- The first 375px override affected the active Proxima tab rather than the background QA tab. Follow-up reused that active tab temporarily for the local harness: measured viewport/page width375, dialog client/scroll width320/320, and Range controls fit without sideways scrolling. Saved `activity-phone.jpg`, reset the viewport and restored Proxima's original live-token URL. No Proxima form was submitted.
 
 ## Next steps and limits
 

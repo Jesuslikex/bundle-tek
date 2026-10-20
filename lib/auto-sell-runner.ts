@@ -246,6 +246,7 @@ export class AutoSellRunner {
     for (const t of trades) this.seen.add(t.id);
     if (this.deps.now() < this.activeAt) {
       // Do not accumulate pre-start buys for a later counter sell.
+      this.seen.clear();
       this.seeded = false;
       this.emit();
       return;

@@ -19,6 +19,8 @@ import {
   type AutoSellStrategy,
 } from '@/lib/auto-sell';
 import { AutoSellRunner, type AutoSellSnapshot } from '@/lib/auto-sell-runner';
+import { autoSellSessionCap } from '@/lib/auto-sell-session';
+import { parseDurationParts, type DurationParts } from '@/lib/duration-parts';
 import { createAutoSellExecutor } from '@/lib/auto-sell-execute';
 import { createAutoSellFeed } from '@/lib/auto-sell-feed';
 import {
@@ -51,6 +53,16 @@ const MODES: { mode: AutoSellMode; label: string; hint: string }[] = [
 ];
 
 const cleanNumber = (value: string) => value.replace(/[,\s$]/g, '');
+const emptyDuration = (): DurationParts => ({
+  hours: '',
+  minutes: '',
+  seconds: '',
+});
+function optionalDuration(parts: DurationParts) {
+  return Object.values(parts).every((value) => value === '' || value === '0')
+    ? { seconds: 0, error: '' }
+    : parseDurationParts(parts, 86400);
+}
 
 /**
  * Holds a browser-wide lock for one token's Auto Sell so a second tab cannot
@@ -105,6 +117,21 @@ export function AutoSell(props: AutoSellProps) {
 
 function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   const [open, setOpen] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const element = dialog.current;
+    const previous = document.activeElement;
+    if (element && !element.open) {
+      if (typeof element.showModal === 'function') element.showModal();
+      else element.setAttribute('open', '');
+    }
+    return () => {
+      element?.close?.();
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus();
+    };
+  }, [open]);
   const [strategies, setStrategies] = useState<AutoSellStrategy[]>(() => [
     newAutoSellStrategy(0),
   ]);
@@ -124,6 +151,27 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [previewCap, setPreviewCap] = useState<number | null>(null);
+  const [sessionDelay, setSessionDelay] =
+    useState<DurationParts>(emptyDuration);
+  const [sessionDuration, setSessionDuration] =
+    useState<DurationParts>(emptyDuration);
+  const [sessionMaximum, setSessionMaximum] = useState('');
+  const delay = optionalDuration(sessionDelay);
+  const duration = optionalDuration(sessionDuration);
+  const sessionRules = {
+    startDelaySeconds: delay.seconds ?? 0,
+    endDurationSeconds: duration.seconds ?? 0,
+    endMaxSupplyPercent: sessionMaximum,
+  };
+  let sessionError = delay.error || duration.error;
+  if (!sessionError) {
+    try {
+      autoSellSessionCap(sessionRules, toRaw(token.totalSupplyRaw));
+    } catch (cause) {
+      sessionError =
+        cause instanceof Error ? cause.message : 'Invalid session settings.';
+    }
+  }
   const running = !!snapshot?.running;
   const ids = useId();
 
@@ -139,6 +187,11 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
       releaseLock.current?.();
       releaseLock.current = null;
     }
+  }
+
+  function closeDialog() {
+    if (busy) stop('Vault unlock cancelled.');
+    setOpen(false);
   }
 
   useEffect(() => {
@@ -210,7 +263,8 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
       busy ||
       running ||
       snapshot?.selling ||
-      errors.some(Boolean)
+      errors.some(Boolean) ||
+      sessionError
     )
       return;
     setError('');
@@ -261,6 +315,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
       );
       const instance: AutoSellRunner = new AutoSellRunner({
         strategies,
+        session: sessionRules,
         decimals: token.decimals,
         totalSupplyRaw: BigInt(token.totalSupplyRaw),
         // Archived wallets are still the user's own: never counter them.
@@ -325,175 +380,253 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
         {running ? 'Auto Sell · running' : 'Auto Sell'}
       </Button>
       {open && (
-        <div className={styles.overlay}>
-          <dialog
-            open
-            aria-modal="true"
-            aria-labelledby="auto-sell-title"
-            className={styles.modal}
-          >
-            <header className={styles.header}>
-              <h2 id="auto-sell-title">Auto Sell</h2>
+        <dialog
+          ref={dialog}
+          aria-modal="true"
+          aria-labelledby={`${ids}-title`}
+          className={styles.modal}
+          onCancel={(event) => {
+            event.preventDefault();
+            closeDialog();
+          }}
+        >
+          <header className={styles.header}>
+            <h2 id={`${ids}-title`}>Auto Sell</h2>
+            <button
+              type="button"
+              aria-label="Close"
+              className={styles.x}
+              onClick={closeDialog}
+            >
+              ×
+            </button>
+          </header>
+          <div className={styles.body}>
+            {strategies.map((s, i) => (
+              <StrategyCard
+                key={s.id}
+                strategy={s}
+                error={errors[i]}
+                disabled={running || busy}
+                inRange={marketCapInRange(s, marketCap)}
+                state={snapshot?.states[s.id]}
+                pct={pct}
+                decimals={token.decimals}
+                canDelete={strategies.length > 1}
+                onChange={(patch) => update(s.id, patch)}
+                onDelete={() =>
+                  setStrategies((list) => list.filter((x) => x.id !== s.id))
+                }
+              />
+            ))}
+            {!running && (
               <button
                 type="button"
-                aria-label="Close"
-                className={styles.x}
-                onClick={() => setOpen(false)}
+                className={styles.add}
+                disabled={busy || strategies.length >= 5}
+                onClick={() =>
+                  setStrategies((list) => [
+                    ...list,
+                    newAutoSellStrategy(list.length),
+                  ])
+                }
               >
-                ×
+                + Add Strategy
               </button>
-            </header>
-            <div className={styles.body}>
-              {strategies.map((s, i) => (
-                <StrategyCard
-                  key={s.id}
-                  strategy={s}
-                  error={errors[i]}
-                  disabled={running || busy}
-                  inRange={marketCapInRange(s, marketCap)}
-                  state={snapshot?.states[s.id]}
-                  pct={pct}
-                  decimals={token.decimals}
-                  canDelete={strategies.length > 1}
-                  onChange={(patch) => update(s.id, patch)}
-                  onDelete={() =>
-                    setStrategies((list) => list.filter((x) => x.id !== s.id))
+            )}
+            <details
+              className={styles.advanced}
+              open={!sellWallets.length || undefined}
+            >
+              <summary>Advanced Options</summary>
+              <fieldset disabled={running || busy}>
+                <legend>Session settings</legend>
+                <SessionTime
+                  label="Start delay"
+                  value={sessionDelay}
+                  onChange={setSessionDelay}
+                />
+                <p className={styles.hint}>
+                  No sells are queued during this delay. Counter Trading begins
+                  with a fresh history baseline afterwards.
+                </p>
+                <label htmlFor={`${ids}-session-max`}>
+                  Session maximum (% supply)
+                </label>
+                <Input
+                  id={`${ids}-session-max`}
+                  inputMode="decimal"
+                  placeholder="No shared limit"
+                  value={sessionMaximum}
+                  onChange={(event) =>
+                    setSessionMaximum(event.target.value.trim())
                   }
                 />
-              ))}
-              {!running && (
-                <button
-                  type="button"
-                  className={styles.add}
-                  disabled={busy || strategies.length >= 5}
-                  onClick={() =>
-                    setStrategies((list) => [
-                      ...list,
-                      newAutoSellStrategy(list.length),
-                    ])
-                  }
-                >
-                  + Add Strategy
-                </button>
-              )}
-              <details
-                className={styles.advanced}
-                open={!sellWallets.length || undefined}
-              >
-                <summary>Advanced Options</summary>
-                <fieldset disabled={running || busy}>
-                  <legend>Sell from wallets</legend>
-                  {solanaWallets.length === 0 && (
-                    <p>No Solana wallets in this workspace.</p>
-                  )}
-                  {solanaWallets.map((w) => (
-                    <label key={w.address} className={styles.check}>
-                      <input
-                        type="checkbox"
-                        checked={sellWallets.includes(w.address)}
-                        onChange={(e) =>
-                          setSellWallets((list) =>
-                            e.target.checked
-                              ? [...list, w.address]
-                              : list.filter((a) => a !== w.address),
-                          )
-                        }
-                      />
-                      <span>{w.label || 'Wallet'}</span>
-                      <code>
-                        {w.address.slice(0, 6)}…{w.address.slice(-4)}
-                      </code>
-                    </label>
-                  ))}
-                  <p className={styles.hint}>
-                    Your own workspace wallets never trigger a counter sell.
-                    Each sell comes from one wallet, rotating through the ones
-                    you pick.
-                  </p>
-                </fieldset>
-              </details>
-              {!running && (
-                <div className={styles.field}>
-                  <label htmlFor={`${ids}-password`}>Vault password</label>
-                  <Input
-                    id={`${ids}-password`}
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    disabled={busy}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <small className={styles.hint}>
-                    Run Strategy unlocks your browser vault for this tab and
-                    approves every sell these strategies make (counter, DCA and
-                    limit order sells), until they end or you press Stop. Keep
-                    this tab open. Each sell still goes through the
-                    server&apos;s balance, simulation and 15-second read checks,
-                    so sells land about every 30 seconds at most.
-                  </small>
-                </div>
-              )}
-              {error && (
-                <p role="alert" className={styles.alert}>
-                  {error}
+                <SessionTime
+                  label="Session duration"
+                  value={sessionDuration}
+                  onChange={setSessionDuration}
+                />
+                <p className={styles.hint}>
+                  These limits stop all strategies when either is reached.
+                  Duration begins after the start delay. Amount includes
+                  uncertain submissions so they cannot be sold again. Blank
+                  limits are optional; maximum duration and delay are 24 hours
+                  each.
                 </p>
-              )}
-              {snapshot && snapshot.log.length > 0 && (
-                <section aria-label="Auto Sell activity" className={styles.log}>
-                  <h3>Activity</h3>
-                  <ol>
-                    {[...snapshot.log]
-                      .reverse()
-                      .slice(0, 20)
-                      .map((entry, n) => (
-                        <li key={`${entry.at}-${n}`} data-kind={entry.kind}>
-                          <time>{new Date(entry.at).toLocaleTimeString()}</time>{' '}
-                          {entry.text}
-                          {entry.signature && (
-                            <a
-                              href={`https://solscan.io/tx/${entry.signature}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {' '}
-                              tx
-                            </a>
-                          )}
-                        </li>
-                      ))}
-                  </ol>
-                </section>
-              )}
-            </div>
-            <footer className={styles.footer}>
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Close
+                <p className={styles.hint}>
+                  Slippage uses the existing reviewed quote and protected
+                  minimum. Custom session slippage is not connected.
+                </p>
+                {sessionError && <p role="alert">{sessionError}</p>}
+              </fieldset>
+              <fieldset disabled={running || busy}>
+                <legend>Sell from wallets</legend>
+                {solanaWallets.length === 0 && (
+                  <p>No Solana wallets in this workspace.</p>
+                )}
+                {solanaWallets.map((w) => (
+                  <label key={w.address} className={styles.check}>
+                    <input
+                      type="checkbox"
+                      checked={sellWallets.includes(w.address)}
+                      onChange={(e) =>
+                        setSellWallets((list) =>
+                          e.target.checked
+                            ? [...list, w.address]
+                            : list.filter((a) => a !== w.address),
+                        )
+                      }
+                    />
+                    <span>{w.label || 'Wallet'}</span>
+                    <code>
+                      {w.address.slice(0, 6)}…{w.address.slice(-4)}
+                    </code>
+                  </label>
+                ))}
+                <p className={styles.hint}>
+                  Your own workspace wallets never trigger a counter sell. Each
+                  sell comes from one wallet, rotating through the ones you
+                  pick.
+                </p>
+              </fieldset>
+            </details>
+            {!running && (
+              <div className={styles.field}>
+                <label htmlFor={`${ids}-password`}>Vault password</label>
+                <Input
+                  id={`${ids}-password`}
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  disabled={busy}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <small className={styles.hint}>
+                  Run Strategy unlocks your browser vault for this tab and
+                  approves every sell these strategies make (counter, DCA and
+                  limit order sells), until they end or you press Stop. Keep
+                  this tab open. Each sell still goes through the server&apos;s
+                  balance, simulation and 15-second read checks, so sells land
+                  about every 30 seconds at most.
+                </small>
+              </div>
+            )}
+            {error && (
+              <p role="alert" className={styles.alert}>
+                {error}
+              </p>
+            )}
+            {snapshot && snapshot.log.length > 0 && (
+              <section aria-label="Auto Sell activity" className={styles.log}>
+                <h3>Activity</h3>
+                <ol>
+                  {[...snapshot.log]
+                    .reverse()
+                    .slice(0, 20)
+                    .map((entry, n) => (
+                      <li key={`${entry.at}-${n}`} data-kind={entry.kind}>
+                        <time>{new Date(entry.at).toLocaleTimeString()}</time>{' '}
+                        {entry.text}
+                        {entry.signature && (
+                          <a
+                            href={`https://solscan.io/tx/${entry.signature}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {' '}
+                            tx
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                </ol>
+              </section>
+            )}
+          </div>
+          <footer className={styles.footer}>
+            <Button variant="outline" onClick={closeDialog}>
+              Close
+            </Button>
+            {running || busy ? (
+              <Button variant="destructive" onClick={() => stop()}>
+                {busy ? 'Cancel unlock' : 'Stop'}
               </Button>
-              {running || busy ? (
-                <Button variant="destructive" onClick={() => stop()}>
-                  {busy ? 'Cancel unlock' : 'Stop'}
-                </Button>
-              ) : (
-                <Button
-                  disabled={
-                    busy ||
-                    locked ||
-                    !!snapshot?.selling ||
-                    errors.some(Boolean) ||
-                    !password
-                  }
-                  onClick={() => void run()}
-                >
-                  {busy
-                    ? 'Unlocking…'
-                    : `Run ${strategies.length} Strateg${strategies.length === 1 ? 'y' : 'ies'}`}
-                </Button>
-              )}
-            </footer>
-          </dialog>
-        </div>
+            ) : (
+              <Button
+                disabled={
+                  busy ||
+                  locked ||
+                  !!snapshot?.selling ||
+                  errors.some(Boolean) ||
+                  !!sessionError ||
+                  !password
+                }
+                onClick={() => void run()}
+              >
+                {busy
+                  ? 'Unlocking…'
+                  : `Run ${strategies.length} Strateg${strategies.length === 1 ? 'y' : 'ies'}`}
+              </Button>
+            )}
+          </footer>
+        </dialog>
       )}
     </>
+  );
+}
+
+function SessionTime({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: DurationParts;
+  onChange: (parts: DurationParts) => void;
+}) {
+  return (
+    <div className={styles.field}>
+      <span>
+        {label} <small>(optional)</small>
+      </span>
+      <div className={styles.duration}>
+        {(['hours', 'minutes', 'seconds'] as const).map((unit) => (
+          <Input
+            key={unit}
+            aria-label={`${label} ${unit}`}
+            inputMode="numeric"
+            placeholder={
+              unit === 'hours' ? 'HOURS' : unit === 'minutes' ? 'MIN' : 'SEC'
+            }
+            value={value[unit]}
+            onChange={(event) =>
+              onChange({ ...value, [unit]: event.target.value })
+            }
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

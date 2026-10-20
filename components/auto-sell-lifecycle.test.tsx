@@ -60,7 +60,7 @@ async function click(text: string) {
   expect(button).toBeTruthy();
   await act(async () => button.click());
 }
-async function startUnlock() {
+async function startUnlock(configure?: () => Promise<void>) {
   await act(async () =>
     root!.render(
       <AutoSell project={project} wallets={wallets} locked={false} />,
@@ -96,6 +96,7 @@ async function startUnlock() {
     )!.set!.call(password, 'SYNTHETIC PASSWORD');
     password.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  await configure?.();
   await click('Run 1 Strategy');
 }
 it('never starts a run when vault unlock completes after the component unmounts', async () => {
@@ -121,7 +122,15 @@ it('never starts a run when vault unlock completes after the component unmounts'
   expect(session.payload.wallets).toEqual([]);
 });
 
-it.each(['pagehide', 'cancel', 'project', 'wallet', 'locked'] as const)(
+it.each([
+  'pagehide',
+  'cancel',
+  'close',
+  'escape',
+  'project',
+  'wallet',
+  'locked',
+] as const)(
   'discards a pending unlock after %s invalidates the review',
   async (change) => {
     let resolve!: (value: VaultSession) => void;
@@ -140,6 +149,18 @@ it.each(['pagehide', 'cancel', 'project', 'wallet', 'locked'] as const)(
       await act(async () => window.dispatchEvent(new Event('pagehide')));
     } else if (change === 'cancel') {
       await click('Cancel unlock');
+    } else if (change === 'close') {
+      await act(async () =>
+        host
+          .querySelector<HTMLButtonElement>('button[aria-label="Close"]')!
+          .click(),
+      );
+    } else if (change === 'escape') {
+      await act(async () => {
+        host
+          .querySelector('dialog')!
+          .dispatchEvent(new Event('cancel', { cancelable: true }));
+      });
     } else {
       await act(async () =>
         root!.render(
@@ -177,4 +198,48 @@ it('starts only the currently approved run and erases the session on Stop', asyn
   await click('Stop');
   expect(host.textContent).toContain('Stopped by you.');
   expect(session.payload.wallets).toEqual([]);
+});
+
+async function editSession(selector: string, value: string) {
+  const input = host.querySelector<HTMLInputElement>(selector)!;
+  expect(input).toBeTruthy();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+it('binds the selected session delay to the running strategy clock', async () => {
+  const session = {
+    payload: { wallets: [{ family: 'solana', address }] },
+  } as VaultSession;
+  vi.mocked(unlockVault).mockResolvedValueOnce(session);
+  const start = vi.spyOn(AutoSellRunner.prototype, 'start');
+  const before = Date.now();
+  await startUnlock(async () => {
+    await editSession('[aria-label="Start delay seconds"]', '15');
+    await editSession('[aria-label="Session duration seconds"]', '30');
+    await editSession('input[placeholder="No shared limit"]', '5');
+  });
+  expect(start).toHaveBeenCalledOnce();
+  const instance = start.mock.instances[0] as AutoSellRunner;
+  const states = Object.values(instance.snapshot().states);
+  expect(states).toHaveLength(1);
+  expect(states[0].startedAt).toBeGreaterThanOrEqual(before + 15000);
+  expect(states[0].startedAt).toBeLessThanOrEqual(Date.now() + 15000);
+  await click('Stop');
+  expect(session.payload.wallets).toEqual([]);
+});
+
+it('refuses an invalid shared cap before attempting vault unlock', async () => {
+  await startUnlock(async () =>
+    editSession('input[placeholder="No shared limit"]', '0'),
+  );
+  expect(unlockVault).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'greater than 0',
+  );
 });

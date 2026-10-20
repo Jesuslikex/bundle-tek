@@ -61,6 +61,64 @@ const flush = async () => {
   for (let n = 0; n < 12; n++) await Promise.resolve();
 };
 
+it('does not replay buys from the delay or its boundary baseline', async () => {
+  let now = 0;
+  let trades: Array<{
+    id: string;
+    side: 'Buy';
+    sender: string;
+    tokenAmount: string;
+    quoteAmount: string;
+    priceUsd: string;
+  }> = [];
+  const buy = (id: string) => ({
+    id,
+    side: 'Buy' as const,
+    sender: 'OUTSIDE',
+    tokenAmount: '100',
+    quoteAmount: '1',
+    priceUsd: '1',
+  });
+  const sell = vi.fn(async (amount: bigint) => ({
+    soldRaw: amount,
+    signature: 'FIXTURE',
+    wallet: 'FIXTURE',
+  }));
+  const runner = new AutoSellRunner({
+    strategies: [{ ...newAutoSellStrategy(0), replicationPercent: '100' }],
+    decimals: 0,
+    totalSupplyRaw: 1000n,
+    ownWallets: new Set(),
+    session: { ...defaults, startDelaySeconds: 10 },
+    readTrades: async () => trades,
+    sell,
+    onUpdate: () => {},
+    now: () => now,
+    random: () => 0,
+    setTimer: () => null,
+    clearTimer: () => {},
+  });
+  runner.start();
+  await flush();
+  now = 5000;
+  trades = [buy('during')];
+  await runner.tick();
+  await flush();
+  expect(sell).not.toHaveBeenCalled();
+  now = 10000;
+  trades = [buy('boundary'), ...trades];
+  await runner.tick();
+  await flush();
+  expect(sell).not.toHaveBeenCalled();
+  now = 11000;
+  trades = [buy('after'), ...trades];
+  await runner.tick();
+  await flush();
+  expect(sell).toHaveBeenCalledTimes(1);
+  expect(sell).toHaveBeenCalledWith(100n, expect.any(AbortSignal));
+  runner.stop();
+});
+
 it('validates optional session bounds without coercing invalid edits', () => {
   expect(autoSellSessionError(defaults)).toBe('');
   for (const rules of [

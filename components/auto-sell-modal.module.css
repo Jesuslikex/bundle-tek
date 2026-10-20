@@ -1,18 +1,15 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
+.modal::backdrop {
   background: rgb(0 0 0 / 0.6);
 }
 .modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
   display: flex;
   flex-direction: column;
-  width: min(620px, 100%);
-  max-height: calc(100vh - 32px);
+  width: min(620px, calc(100vw - 32px));
+  height: fit-content;
+  max-height: calc(100dvh - 32px);
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #101114;
