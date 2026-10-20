@@ -118,7 +118,7 @@ it('opens recovery from a blocked cycle and refreshes progress after cancellatio
       (b) => b.textContent === 'Review buy',
     ),
   ).toBe(false);
-  await click('Open approval recovery');
+  await click('Recover wallet approval');
   expect(
     fixture.calls.filter(
       (c) => c.path.includes('/signing') && c.method === 'GET',
@@ -127,6 +127,27 @@ it('opens recovery from a blocked cycle and refreshes progress after cancellatio
   await click('Cancel this unsigned approval');
   expect(container.textContent).toContain('0 active approvals');
   expect(button('Review buy')).toBeTruthy();
+  expect(button('Review next buy')).toBeTruthy();
+});
+it('opens the suggested buy in the existing review destination without unlocking, preparing or signing', async () => {
+  await mount();
+  await click('Open cycle progress');
+  const preparationCount = fixture.calls.filter(
+    (c) => c.method === 'POST',
+  ).length;
+  await click('Review next buy');
+  const destination = container.querySelector(
+    '[aria-label="Selected warmup transaction review"]',
+  );
+  expect(document.activeElement).toBe(destination);
+  expect(destination?.textContent).toContain(
+    `Review buy for cycle 1, wallet ${fixture.wallet}`,
+  );
+  expect(fixture.calls.filter((c) => c.method === 'POST')).toHaveLength(
+    preparationCount,
+  );
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.unlock).not.toHaveBeenCalled();
 });
 it('takes selected wallets through history, plan review, save and reopening without scheduling', async () => {
   await act(async () =>

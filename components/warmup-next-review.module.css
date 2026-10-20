@@ -1,0 +1,25 @@
+.summary {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card, #15161b);
+  overflow-wrap: anywhere;
+}
+.summary h5,
+.summary p {
+  margin: 0;
+}
+.summary small {
+  color: var(--muted-foreground, #a0a2b1);
+}
+.summary code {
+  overflow-wrap: anywhere;
+}
+.summary button {
+  justify-self: start;
+  min-height: 44px;
+  max-width: 100%;
+}

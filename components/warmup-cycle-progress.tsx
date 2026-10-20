@@ -13,6 +13,7 @@ import {
   type WalletWarmupActivity,
 } from '@/lib/wallet-warmup-activity';
 import { WalletWarmupActivitySummary } from './wallet-warmup-activity-summary';
+import { WarmupNextReview } from './warmup-next-review';
 type Progress = WarmupCycleProgress & { performance: WarmupLotPerformance };
 export function WarmupCycleProgress({
   plan,
@@ -167,6 +168,11 @@ export function WarmupCycleProgress({
                 all included recorded lots sold. {result.activeApprovals} active
                 approvals need recovery before further transactions.
               </p>
+              <WarmupNextReview
+                progress={result}
+                onReview={onReview}
+                onRecover={onRecover}
+              />
               <WalletWarmupActivitySummary rows={result.activity} />
               <WarmupPerformance performance={result.performance} />
               {result.excludedBuys > 0 && (
