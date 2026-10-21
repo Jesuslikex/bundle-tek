@@ -75,6 +75,22 @@ async function counts(db: D1Database) {
     ),
   );
 }
+async function fillHistory(
+  f: Awaited<ReturnType<typeof fixture>>,
+  target = WARMUP_HISTORY_LIMIT,
+) {
+  await f.db
+    .prepare(
+      "WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<?) INSERT INTO warmup_swap_preparations(id,owner_id,plan_id,plan_revision,cycle,wallet_address,wallet_revision,document,created_at) SELECT 'capacity-'||x,'owner',?,1,1,?,1,'{}',? FROM n",
+    )
+    .bind(
+      target - 2,
+      f.plan.id,
+      f.packets.wallet,
+      new Date(f.clock()).toISOString(),
+    )
+    .run();
+}
 function intercept(
   db: D1Database,
   onRun: (run: () => Promise<unknown>) => Promise<unknown>,
@@ -170,6 +186,7 @@ it('never adopts a preparation that already exists', async () => {
     ),
   ).rejects.toThrow();
   expect(await counts(f.db)).toEqual([0, 0, 2]);
+  expect(quote).not.toHaveBeenCalled();
 });
 
 it.each(['before', 'write-boundary'])(
@@ -247,22 +264,73 @@ it('rolls back the preparation itself when its subsequent binding refuses a fail
   expect(await counts(f.db)).toEqual([0, 0, 2]);
 });
 it('preserves the original preparation capacity with no wrapper or binding left on a zero-row INSERT', async () => {
-  const f = await fixture();
-  await f.db
-    .prepare(
-      "WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<?) INSERT INTO warmup_swap_preparations(id,owner_id,plan_id,plan_revision,cycle,wallet_address,wallet_revision,document,created_at) SELECT 'capacity-'||x,'owner',?,1,1,?,1,'{}',? FROM n",
-    )
-    .bind(
-      WARMUP_HISTORY_LIMIT - 2,
-      f.plan.id,
-      f.packets.wallet,
-      new Date(f.clock()).toISOString(),
-    )
-    .run();
+  const f = await fixture(),
+    quote = callback(f);
+  const db = intercept(f.db, async (run) => {
+    await fillHistory(f);
+    return run();
+  });
   await expect(
-    prepare(f.db, 'owner', input(f), signal(), callback(f), f.clock),
+    prepare(db, 'owner', input(f), signal(), quote, f.clock),
   ).rejects.toThrow();
   expect(await counts(f.db)).toEqual([0, 0, WARMUP_HISTORY_LIMIT]);
+  expect(quote).toHaveBeenCalledTimes(1);
+});
+it.each([WARMUP_HISTORY_LIMIT - 1, WARMUP_HISTORY_LIMIT])(
+  'preflights history at %i records without wasting a provider request',
+  async (target) => {
+    const f = await fixture(),
+      quote = callback(f);
+    await fillHistory(f, target);
+    if (target === WARMUP_HISTORY_LIMIT) {
+      await expect(
+        prepare(f.db, 'owner', input(f), signal(), quote, f.clock),
+      ).rejects.toThrow('history is full');
+      expect(quote).not.toHaveBeenCalled();
+      expect(await counts(f.db)).toEqual([0, 0, target]);
+    } else {
+      await prepare(f.db, 'owner', input(f), signal(), quote, f.clock);
+      expect(quote).toHaveBeenCalledTimes(1);
+      expect(await counts(f.db)).toEqual([1, 1, WARMUP_HISTORY_LIMIT]);
+    }
+  },
+);
+it.each(['archived', 'revision'])(
+  'refuses a stale %s wallet before calling a provider',
+  async (kind) => {
+    const f = await fixture(),
+      quote = callback(f);
+    await f.db
+      .prepare(
+        kind === 'archived'
+          ? 'UPDATE workspace_wallets SET archived=1'
+          : 'UPDATE workspace_wallets SET revision=2',
+      )
+      .run();
+    await expect(
+      prepare(f.db, 'owner', input(f), signal(), quote, f.clock),
+    ).rejects.toThrow('plan or wallets changed');
+    expect(quote).not.toHaveBeenCalled();
+    expect(await counts(f.db)).toEqual([0, 0, 2]);
+  },
+);
+it('gives unconfirmed-write guidance when there is no retained result or conflict to recover', async () => {
+  const f = await fixture(),
+    quote = callback(f);
+  let writes = 0;
+  const db = intercept(f.db, async () => {
+    writes++;
+    throw Error('write unavailable');
+  });
+  await expect(
+    prepare(db, 'owner', input(f), signal(), quote, f.clock),
+  ).rejects.toMatchObject({
+    message: expect.stringContaining('No saved preparation could be confirmed'),
+    recoveryId: undefined,
+  });
+  expect(writes).toBe(1);
+  expect(quote).toHaveBeenCalledTimes(1);
+  expect(await counts(f.db)).toEqual([0, 0, 2]);
 });
 it('recovers a lost write response using the original ID with one callback and one INSERT', async () => {
   const f = await fixture(),
@@ -277,6 +345,54 @@ it('recovers a lost write response using the original ID with one callback and o
   expect(saved.executionAllowed).toBe(false);
   expect(writes).toBe(1);
   expect(quote).toHaveBeenCalledTimes(1);
+});
+it('recovers a same-ID winner that commits between the initial lookup and the occupied-ID precheck', async () => {
+  const f = await fixture(),
+    request = input(f),
+    outerQuote = callback(f),
+    winnerQuote = callback(f);
+  let winner: Awaited<ReturnType<typeof prepare>> | undefined;
+  const db = {
+    batch: f.db.batch.bind(f.db),
+    prepare(sql: string) {
+      const original = f.db.prepare(sql);
+      if (
+        sql !==
+        'SELECT id FROM warmup_swap_preparations WHERE owner_id=? AND id=?'
+      )
+        return original;
+      return {
+        bind(...args: unknown[]) {
+          const bound = original.bind(...args);
+          return {
+            first: async () => {
+              winner = await prepare(
+                f.db,
+                'owner',
+                request,
+                signal(),
+                winnerQuote,
+                f.clock,
+              );
+              return bound.first();
+            },
+          };
+        },
+      };
+    },
+  } as D1Database;
+  const saved = await prepare(
+    db,
+    'owner',
+    request,
+    signal(),
+    outerQuote,
+    f.clock,
+  );
+  expect(saved).toEqual(winner);
+  expect(outerQuote).not.toHaveBeenCalled();
+  expect(winnerQuote).toHaveBeenCalledTimes(1);
+  expect(await counts(f.db)).toEqual([1, 1, 3]);
 });
 it('keeps a committed result recoverable after response cancellation', async () => {
   const f = await fixture(),
@@ -311,28 +427,44 @@ it('does not persist a callback result after cancellation', async () => {
   ).rejects.toThrow();
   expect(await counts(f.db)).toEqual([0, 0, 2]);
 });
-it('returns the same result for concurrent identical requests with different clocks', async () => {
-  const f = await fixture(),
-    request = input(f),
-    quote = callback(f);
-  let reached = 0,
-    release!: () => void;
-  const barrier = new Promise<void>((r) => {
-    release = r;
-  });
-  const db = intercept(f.db, async (run) => {
-    if (++reached === 2) release();
-    await barrier;
-    return run();
-  });
-  const results = await Promise.all([
-    prepare(db, 'owner', request, signal(), quote, () => f.clock() + 1),
-    prepare(db, 'owner', request, signal(), quote, () => f.clock() + 2),
-  ]);
-  expect(results[0]).toEqual(results[1]);
-  expect(await counts(f.db)).toEqual([1, 1, 3]);
-  expect(quote).toHaveBeenCalledTimes(2);
-});
+it.each(['identical', 'changed-quote'])(
+  'returns the first retained result for concurrent same-ID requests with %s callbacks',
+  async (kind) => {
+    const f = await fixture(),
+      request = input(f),
+      quote = callback(f);
+    if (kind === 'changed-quote') {
+      let calls = 0;
+      quote.mockImplementation(async () => {
+        const p = structuredClone(f.packets.buy.preparation.document);
+        p.transaction.sha256 = (calls++ === 0 ? 'a' : 'b').repeat(64);
+        p.expiresAt = new Date(f.clock() + 30000 + calls * 1000).toISOString();
+        return p;
+      });
+    }
+    let reached = 0,
+      release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    const db = intercept(f.db, async (run) => {
+      if (++reached === 2) release();
+      await barrier;
+      return run();
+    });
+    const results = await Promise.all([
+      prepare(db, 'owner', request, signal(), quote, () => f.clock() + 1),
+      prepare(db, 'owner', request, signal(), quote, () => f.clock() + 2),
+    ]);
+    expect(results[0]).toEqual(results[1]);
+    expect(await counts(f.db)).toEqual([1, 1, 3]);
+    expect(quote).toHaveBeenCalledTimes(2);
+    expect(
+      await prepare(db, 'owner', request, signal(), quote, f.clock),
+    ).toEqual(results[0]);
+    expect(quote).toHaveBeenCalledTimes(2);
+  },
+);
 it('admits one of two distinct IDs racing for an action and returns the winner ID for recovery', async () => {
   const f = await fixture(),
     quote = callback(f);

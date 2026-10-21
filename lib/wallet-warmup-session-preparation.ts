@@ -9,6 +9,7 @@ import {
   type WarmupPreparationSummary,
 } from './warmup-preparation-history';
 import type { WarmupSessionAction } from './wallet-warmup-session-review';
+import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
 
 const uuid = z.uuid().refine((v) => v === v.toLowerCase()),
   hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -163,6 +164,11 @@ async function refuseExistingBinding(
   binding: Awaited<ReturnType<typeof readWalletWarmupSessionActionBinding>>,
   signal: AbortSignal,
 ): Promise<never> {
+  if (!binding)
+    return fail(
+      'No saved preparation could be confirmed. Check this request ID and the current journal before trying again; do not create a replacement automatically.',
+      409,
+    );
   const retained = binding
     ? await readWalletWarmupSessionPreparation(
         db,
@@ -181,6 +187,29 @@ async function refuseExistingBinding(
     409,
     retained?.preparation.id,
   );
+}
+async function recoverBeforeRefusal(
+  db: D1Database,
+  owner: string,
+  input: z.infer<typeof inputSchema>,
+  signal: AbortSignal,
+  message?: string,
+  status = 409,
+) {
+  const saved = await readWalletWarmupSessionPreparation(
+    db,
+    owner,
+    input.id,
+    signal,
+  );
+  if (!saved) return fail(message, status);
+  if (
+    saved.identity.journal_id !== input.journalId ||
+    saved.identity.review_version !== input.version ||
+    saved.identity.review_sha256 !== input.headSha256
+  )
+    fail();
+  return saved;
 }
 /**
  * A trusted server callback prepares the exact derived action without persisting
@@ -217,6 +246,22 @@ export async function prepareWalletWarmupSessionAction(
       fail();
     return prior;
   }
+  const occupiedId = await db
+    .prepare(
+      'SELECT id FROM warmup_swap_preparations WHERE owner_id=? AND id=?',
+    )
+    .bind(owner, input.id)
+    .first();
+  signal.throwIfAborted();
+  if (occupiedId)
+    return recoverBeforeRefusal(
+      db,
+      owner,
+      input,
+      signal,
+      'This request ID already belongs to another preparation. No new preparation was saved.',
+      409,
+    );
   const at = clock();
   if (!Number.isSafeInteger(at) || at < 0) fail();
   const journal = await readWalletWarmupSessionJournal(
@@ -236,7 +281,7 @@ export async function prepareWalletWarmupSessionAction(
     journal.snapshot.stopped ||
     !journal.snapshot.sourceReviewFresh
   )
-    fail();
+    return recoverBeforeRefusal(db, owner, input, signal);
   const existing = await readWalletWarmupSessionActionBinding(
     db,
     owner,
@@ -244,10 +289,19 @@ export async function prepareWalletWarmupSessionAction(
     pending.action.id,
     signal,
   );
-  if (existing) return refuseExistingBinding(db, owner, existing, signal);
+  if (existing) {
+    const raced = await readWalletWarmupSessionPreparation(
+      db,
+      owner,
+      input.id,
+      signal,
+    );
+    if (raced) return recoverBeforeRefusal(db, owner, input, signal);
+    return refuseExistingBinding(db, owner, existing, signal);
+  }
   const plan = await db
     .prepare(
-      'SELECT document FROM wallet_warmup_plans WHERE owner_id=? AND id=? AND revision=? AND archived=0',
+      "SELECT document FROM wallet_warmup_plans p WHERE owner_id=? AND id=? AND revision=? AND archived=0 AND (SELECT COUNT(*) FROM json_each(json_extract(p.document,'$.walletRevisions')) j JOIN workspace_wallets w ON w.address=json_extract(j.value,'$.address') AND w.revision=json_extract(j.value,'$.revision') WHERE w.owner_id=p.owner_id AND w.chain=json_extract(p.document,'$.chain') AND w.archived=0)=json_array_length(json_extract(p.document,'$.addresses'))",
     )
     .bind(owner, journal.plan.id, journal.plan.revision)
     .first<{ document: string }>();
@@ -255,7 +309,39 @@ export async function prepareWalletWarmupSessionAction(
     !plan ||
     canonical(JSON.parse(plan.document)) !== canonical(journal.plan.document)
   )
-    fail();
+    return recoverBeforeRefusal(
+      db,
+      owner,
+      input,
+      signal,
+      'Saved plan or wallets changed. Refresh the original session review.',
+      409,
+    );
+  const capacity = await db
+    .prepare(
+      'SELECT COUNT(*) AS n FROM warmup_swap_preparations WHERE owner_id=? AND plan_id=?',
+    )
+    .bind(owner, journal.plan.id)
+    .first<{ n: number }>();
+  signal.throwIfAborted();
+  if (!capacity || !Number.isSafeInteger(capacity.n) || capacity.n < 0)
+    return recoverBeforeRefusal(
+      db,
+      owner,
+      input,
+      signal,
+      'Preparation history is unavailable.',
+      503,
+    );
+  if (capacity.n >= WARMUP_HISTORY_LIMIT)
+    return recoverBeforeRefusal(
+      db,
+      owner,
+      input,
+      signal,
+      'Preparation history is full. No new preparation was saved.',
+      409,
+    );
   const action = structuredClone(pending.action);
   let sellSource: Candidate['sellSource'] = null;
   if (action.side === 'Sell') {
@@ -381,18 +467,15 @@ export async function prepareWalletWarmupSessionAction(
     );
     return refuseExistingBinding(db, owner, conflict, signal);
   }
-  const {
-    created_at: _savedAt,
-    binding_sha256: _savedBinding,
-    record_sha256: _savedHash,
-    ...savedIdentity
-  } = saved.identity;
-  const {
-    created_at: _attemptAt,
-    binding_sha256: _attemptBinding,
-    record_sha256: _attemptHash,
-    ...attemptIdentity
-  } = row;
-  if (canonical(savedIdentity) !== canonical(attemptIdentity)) fail();
+  // As on the initial same-ID read, return the fully validated first result
+  // for this request. A second provider quote is not a competing approval;
+  // callers must review the retained packet before any future consent/signing.
+  if (
+    saved.identity.journal_id !== input.journalId ||
+    saved.identity.review_version !== input.version ||
+    saved.identity.review_sha256 !== input.headSha256 ||
+    saved.identity.action_id !== action.id
+  )
+    fail();
   return saved;
 }
