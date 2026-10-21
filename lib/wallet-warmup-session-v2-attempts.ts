@@ -15,6 +15,18 @@ import {
 } from './wallet-warmup-session-packet';
 import type { WarmupSessionPreparationCandidate } from './wallet-warmup-session-preparation';
 import { createWalletWarmupV2Provider } from './wallet-warmup-session-v2-provider';
+import { createWalletWarmupV2RuntimeProvider } from './wallet-warmup-session-v2-runtime-provider';
+import {
+  warmupRuntimeInstalled,
+  warmupPurposeInsert,
+  readWarmupPurpose,
+  warmupRuntimeDocument,
+  warmupRuntimeInsert,
+  readWarmupRuntimeObservation,
+  WarmupRuntimeReadRace,
+  type WarmupAttemptMode,
+  type WarmupRuntimeMaterial,
+} from './wallet-warmup-session-v2-runtime-storage';
 import { WalletWarmupSessionProviderError } from './wallet-warmup-session-provider';
 import type { WarmupSessionProviderFeeEvidence } from './wallet-warmup-session-provider-core';
 import { WalletRpcError } from './wallet-balances';
@@ -597,6 +609,7 @@ async function readSame(
   db: D1Database,
   owner: string,
   input: z.infer<typeof inputSchema>,
+  mode: WarmupAttemptMode,
 ) {
   const saved = await readWalletWarmupV2Attempt(
     db,
@@ -606,6 +619,7 @@ async function readSame(
   );
   if (saved && !binding(saved.lease, input))
     fail('This request ID belongs to a different saved head.');
+  if (saved) await readWarmupPurpose(db, saved.lease, mode);
   return saved;
 }
 export async function prepareWalletWarmupV2Attempt(
@@ -617,13 +631,77 @@ export async function prepareWalletWarmupV2Attempt(
   apiKey: string | undefined,
   providerFactory: typeof createWalletWarmupV2Provider = createWalletWarmupV2Provider,
 ) {
+  return prepareAttempt(
+    db,
+    owner,
+    value,
+    approved,
+    signal,
+    apiKey,
+    'preview',
+    providerFactory,
+  );
+}
+type Material = Awaited<
+  ReturnType<ReturnType<typeof createWalletWarmupV2Provider>>
+> & { runtimeEvidence?: WarmupRuntimeMaterial };
+type ProviderFactory = (
+  db: D1Database,
+  owner: string,
+  key: string | undefined,
+  lease: WarmupV2AttemptRow,
+) => (
+  candidate: WarmupSessionPreparationCandidate,
+  signal: AbortSignal,
+) => Promise<Material>;
+export async function prepareWalletWarmupV2RuntimeAttempt(
+  db: D1Database,
+  owner: string,
+  value: unknown,
+  approved: boolean,
+  signal: AbortSignal,
+  apiKey: string | undefined,
+  providerFactory: ProviderFactory = createWalletWarmupV2RuntimeProvider,
+) {
+  const saved = await prepareAttempt(
+    db,
+    owner,
+    value,
+    approved,
+    signal,
+    apiKey,
+    'runtime',
+    providerFactory,
+  );
+  const recovered = await readWalletWarmupV2RuntimeAttempt(
+    db,
+    owner,
+    saved.lease.id,
+    signal,
+  );
+  return recovered?.attempt ?? fail(undefined, 503);
+}
+async function prepareAttempt(
+  db: D1Database,
+  owner: string,
+  value: unknown,
+  approved: boolean,
+  signal: AbortSignal,
+  apiKey: string | undefined,
+  mode: WarmupAttemptMode,
+  providerFactory: ProviderFactory,
+) {
   ownerId(owner);
   const input = inputSchema.parse(value);
   if (approved !== true)
     fail('Request this exact unsigned preview separately.', 400);
   signal.throwIfAborted();
   await installed(db);
-  const prior = await readSame(db, owner, input);
+  const purposesInstalled = await warmupRuntimeInstalled(
+    db,
+    mode === 'runtime',
+  );
+  const prior = await readSame(db, owner, input, mode);
   if (prior) return prior;
   if (!apiKey || apiKey.length > 1000 || /\s/.test(apiKey))
     fail('Unsigned provider is not configured.', 503);
@@ -642,7 +720,7 @@ export async function prepareWalletWarmupV2Attempt(
     .first<{ id: string }>();
   signal.throwIfAborted();
   if (pending?.id === input.id) {
-    const raced = await readSame(db, owner, input);
+    const raced = await readSame(db, owner, input, mode);
     if (raced) return raced;
     fail(
       'The original request is still being recovered. Keep its ID.',
@@ -659,7 +737,7 @@ export async function prepareWalletWarmupV2Attempt(
   let claimed = false;
   try {
     signal.throwIfAborted();
-    const result = await db
+    const claimStatement = db
       .prepare(`INSERT INTO wallet_warmup_session_v2_attempts
  (owner_id,id,journal_id,action_id,sequence,attempt_no,previous_id,review_version,review_sha256,terms_sha256,created_at,expires_at)
  SELECT c.owner_id,?,c.journal_id,c.action_id,(SELECT count(*)+1 FROM wallet_warmup_session_v2_attempts a WHERE a.owner_id=c.owner_id AND a.journal_id=c.journal_id),
@@ -667,13 +745,26 @@ export async function prepareWalletWarmupV2Attempt(
  (SELECT id FROM wallet_warmup_session_v2_attempts a WHERE a.owner_id=c.owner_id AND a.journal_id=c.journal_id ORDER BY sequence DESC LIMIT 1),c.version,c.head_sha256,c.terms_sha256,
  strftime('%Y-%m-%dT%H:%M:%fZ','now'),min(strftime('%Y-%m-%dT%H:%M:%fZ','now','+60 seconds'),c.finish_at)
  FROM wallet_warmup_session_v2_attempt_context c WHERE c.owner_id=? AND c.journal_id=? AND c.version=? AND c.head_sha256=?`)
-      .bind(input.id, owner, input.journalId, input.version, input.headSha256)
-      .run();
+      .bind(input.id, owner, input.journalId, input.version, input.headSha256);
+    const result = purposesInstalled
+      ? (
+          await db.batch([
+            await warmupPurposeInsert(
+              db,
+              owner,
+              input,
+              journal.termsSha256,
+              mode,
+            ),
+            claimStatement,
+          ])
+        )[1]
+      : await claimStatement.run();
     claimed = result.meta.changes > 0;
   } catch {
     /* An uncertain write never authorizes another provider call. */
   }
-  const retained = await readSame(db, owner, input);
+  const retained = await readSame(db, owner, input, mode);
   if (!retained) {
     const other = await db
       .prepare(
@@ -724,6 +815,8 @@ export async function prepareWalletWarmupV2Attempt(
         : null,
   };
   let facts: Omit<WarmupV2OutcomeRow, 'record_sha256'>;
+  let runtimeDocument: string | null = null;
+  const purpose = await readWarmupPurpose(db, lease, mode);
   try {
     signal.throwIfAborted();
     const material = await providerFactory(
@@ -734,6 +827,23 @@ export async function prepareWalletWarmupV2Attempt(
     )(candidate, signal);
     signal.throwIfAborted();
     const admitted = await admitMaterial(retained.journal, material);
+    if (mode === 'runtime') {
+      if (!purpose || !material.runtimeEvidence)
+        fail('Complete original runtime observations are required.');
+      if (
+        material.runtimeEvidence.result.order.preparation.transaction !==
+        material.transaction
+      )
+        fail('Runtime packet differs from the original outcome.');
+      runtimeDocument = await warmupRuntimeDocument(
+        material.runtimeEvidence,
+        lease,
+        purpose,
+        admitted.summary,
+        wallet.remainingFeeReserveLamports,
+      );
+    } else if (material.runtimeEvidence)
+      fail('Runtime reads require their separate original purpose.');
     signal.throwIfAborted();
     facts = {
       owner_id: owner,
@@ -775,7 +885,7 @@ export async function prepareWalletWarmupV2Attempt(
       record_sha256: await evidenceHash(lease, facts),
     });
     signal.throwIfAborted();
-    await db
+    const outcomeStatement = db
       .prepare(
         'INSERT INTO wallet_warmup_session_v2_attempt_outcomes VALUES(?,?,?,?,?,?,?,?,?,?,?)',
       )
@@ -791,16 +901,99 @@ export async function prepareWalletWarmupV2Attempt(
         row.created_at,
         row.expires_at,
         row.record_sha256,
-      )
-      .run();
+      );
+    if (mode === 'runtime' && row.kind === 'prepared') {
+      if (!purpose || !runtimeDocument) fail();
+      await db.batch([
+        await warmupRuntimeInsert(db, lease, purpose, row, runtimeDocument),
+        outcomeStatement,
+      ]);
+    } else await outcomeStatement.run();
   } catch {
     /* Outcome and exact packet are one immutable row; recover, never rerun. */
   }
-  const saved = await readSame(db, owner, input);
+  const saved = await readSame(db, owner, input, mode);
   if (!saved)
     fail(
       'Keep the original request ID. Its retained result is unavailable.',
       503,
     );
   return saved;
+}
+export async function readWalletWarmupV2RuntimeAttempt(
+  db: D1Database,
+  owner: string,
+  id: string,
+  signal: AbortSignal,
+) {
+  for (let pass = 0; pass < 2; pass++) {
+    try {
+      return await readRuntimeAttemptSnapshot(db, owner, id, signal);
+    } catch (error) {
+      if (!(error instanceof WarmupRuntimeReadRace) || pass !== 0) throw error;
+      signal.throwIfAborted();
+    }
+  }
+  return fail(undefined, 503);
+}
+async function readRuntimeAttemptSnapshot(
+  db: D1Database,
+  owner: string,
+  id: string,
+  signal: AbortSignal,
+) {
+  const attempt = await readWalletWarmupV2Attempt(db, owner, id, signal);
+  if (!attempt) return null;
+  const runtime = await readWarmupRuntimeObservation(
+    db,
+    attempt.lease,
+    attempt.outcome,
+    attempt.summary,
+    attempt.journal.manifest.wallets.find(
+      (w) => w.wallet === attempt.journal.manifest.actions[0].wallet,
+    )?.remainingFeeReserveLamports ?? fail(),
+  );
+  signal.throwIfAborted();
+  return { attempt, runtime };
+}
+export function publicWalletWarmupV2RuntimeAttempt(
+  saved: NonNullable<
+    Awaited<ReturnType<typeof readWalletWarmupV2RuntimeAttempt>>
+  >,
+) {
+  const { purpose, observation } = saved.runtime;
+  return {
+    attempt: publicWalletWarmupV2Attempt(saved.attempt),
+    runtime: {
+      mode: 'runtime-observation-v1' as const,
+      purposeSha256: purpose.request_sha256,
+      effectiveExpiresAt: observation
+        ? new Date(
+            Math.min(
+              Date.parse(observation.runtimeExpiresAt),
+              Date.parse(saved.attempt.outcome!.expires_at),
+            ),
+          ).toISOString()
+        : null,
+      observation: observation
+        ? {
+            packetSha256: observation.packetSha256,
+            observedAt: observation.observedAt,
+            expiresAt: observation.runtimeExpiresAt,
+            minimumSlot: observation.minimumSlot,
+            maximumSlot: observation.maximumSlot,
+            programCount: observation.codeScans[0].length,
+            codeScans: 2 as const,
+            referenceMinimum: observation.referenceMinimum,
+            codeClockPolicy: observation.codeClockPolicy,
+          }
+        : null,
+      programCodeAttested: false,
+      independentPriceProtectionEstablished: false,
+      trustedProgramPolicyEstablished: false,
+      ...flags,
+      limitations:
+        'Saved raw-account and code identity observations only. The minimum is the order’s own bound, with no independent price check. Code chunks use context-slot floors, not per-chunk Clock reads. No trusted code policy, funds reservation, signing or execution permission.',
+    },
+  };
 }

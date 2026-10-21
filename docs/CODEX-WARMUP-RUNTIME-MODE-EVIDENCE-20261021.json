@@ -1,0 +1,195 @@
+{
+  "sourceBaseCommit": "70074cf3b88097fcb14ce9314ec9ad5a67d873b6",
+  "checkpoint": "connected manual unsigned warmup runtime API and retention; UI integration remains open",
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "automaticExecutionAllowed": false,
+  "programCodeAttested": false,
+  "independentPriceProtectionEstablished": false,
+  "relatedSerialTests": {
+    "files": 93,
+    "passed": 1809,
+    "failed": 0,
+    "total": 1810,
+    "success": true,
+    "pendingAssertions": 0,
+    "skippedAssertions": 1
+  },
+  "separateRealSqlClockTest": {
+    "files": 1,
+    "passed": 1,
+    "failed": 0,
+    "total": 22,
+    "success": true,
+    "pendingAssertions": 0,
+    "skippedAssertions": 21
+  },
+  "distinctRelatedTestsPassed": 1810,
+  "earlierTwoWorkerRun": {
+    "passed": false,
+    "reason": "worker exited; 26 journal-storage assertions remained pending despite suite being labelled passed; not counted as a pass"
+  },
+  "plainTypeScript": {
+    "command": "tsc --noEmit --incremental false",
+    "passed": true
+  },
+  "typedLint": {
+    "ownedFiles": 9,
+    "passed": true
+  },
+  "format": {
+    "ownedFiles": 10,
+    "passed": true
+  },
+  "sourceFreeze": {
+    "files": 2782,
+    "digest": "e91def7a0d1ba884e62ce1208f271d8b02f97081ab3bb67f457771cfe760b853",
+    "unchanged": true
+  },
+  "build": {
+    "passed": true,
+    "exitCode": 0,
+    "overlaySourceUnchanged": true,
+    "base": "70074cf",
+    "overlay": [
+      "db/schema.ts",
+      "drizzle/meta/_journal.json",
+      "lib/wallet-warmup-runtime-order.ts",
+      "lib/wallet-warmup-session-v2-attempts.ts",
+      "app/api/wallet-workspace/warmup/session-v2-runtime-attempts/route.test.ts",
+      "app/api/wallet-workspace/warmup/session-v2-runtime-attempts/route.ts",
+      "drizzle/0135_wallet_warmup_session_v2_runtime_observations.sql",
+      "lib/wallet-warmup-session-v2-runtime-provider.ts",
+      "lib/wallet-warmup-session-v2-runtime-storage.ts",
+      "lib/wallet-warmup-session-v2-runtime.test.ts",
+      "test/warmup-session-v2-runtime-fixture.ts"
+    ]
+  },
+  "schemaProof": {
+    "base": "70074cf3b88097fcb14ce9314ec9ad5a67d873b6",
+    "previousMigrations": 135,
+    "totalMigrations": 136,
+    "oldPhysicalFilesUnchanged": 135,
+    "oldJournalPrefixUnchanged": true,
+    "oldSchemaBodies": 778,
+    "oldSchemaBodiesUnchanged": true,
+    "newObjects": [
+      {
+        "type": "table",
+        "name": "wallet_warmup_session_v2_attempt_purposes"
+      },
+      {
+        "type": "table",
+        "name": "wallet_warmup_session_v2_runtime_observations"
+      },
+      {
+        "type": "trigger",
+        "name": "warmup_v2_attempt_requires_purpose"
+      },
+      {
+        "type": "index",
+        "name": "warmup_v2_purpose_identity"
+      },
+      {
+        "type": "trigger",
+        "name": "warmup_v2_purpose_insert"
+      },
+      {
+        "type": "trigger",
+        "name": "warmup_v2_purpose_no_delete"
+      },
+      {
+        "type": "trigger",
+        "name": "warmup_v2_purpose_no_update"
+      },
+      {
+        "type": "trigger",
+        "name": "warmup_v2_runtime_insert"
+      },
+      {
+        "type": "trigger",
+        "name": "warmup_v2_runtime_no_delete"
+      },
+      {
+        "type": "trigger",
+        "name": "warmup_v2_runtime_no_update"
+      },
+      {
+        "type": "trigger",
+        "name": "warmup_v2_runtime_outcome"
+      },
+      {
+        "type": "index",
+        "name": "warmup_v2_runtime_packet"
+      }
+    ],
+    "integrity": "ok",
+    "foreignKeyViolations": 0
+  },
+  "localLedger": {
+    "localOnly": true,
+    "migrations": 136,
+    "allChecksumsMatch": true,
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "foreignKeyViolations": 0
+  },
+  "wholeFileWrangler": {
+    "version": "4.127.1",
+    "migrationCount": 136,
+    "appliedCount": 136,
+    "applyExit": 0,
+    "ledgerExit": 0,
+    "passed": true
+  },
+  "localD1ForeignKeyRead": {
+    "method": "real Wrangler d1 execute --local PRAGMA foreign_keys",
+    "result": {
+      "foreign_keys": 1
+    }
+  },
+  "reviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "readOnlyTools": ["Glob", "Grep", "Read"],
+      "exitCode": 0,
+      "terminal": "success",
+      "isError": false,
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "sourceFiles": 2736
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "readOnlyTools": ["Glob", "Grep", "Read"],
+      "exitCode": 0,
+      "terminal": "success",
+      "isError": false,
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "sourceFiles": 2736
+    }
+  ],
+  "noProtectedUiChanges": true,
+  "noApplicationOrHostedSql": true,
+  "noProviderCredentialCronChanges": true,
+  "noRealWalletAction": true,
+  "noFundedTest": true,
+  "noDeployment": true,
+  "remaining": [
+    "mode-aware runtime UI and initially unchecked approval",
+    "legacy discovery mode distinction and effective expiry admission",
+    "native saved-buy Sell runtime composition coverage",
+    "trusted program policy and independent price protection",
+    "financial reservations and short browser authorization",
+    "finalized settlement, action/budget advancement and durable orchestration",
+    "live read-only qualification and separately authorized funded evidence"
+  ]
+}

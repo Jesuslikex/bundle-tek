@@ -1570,4 +1570,41 @@ export const walletWarmupSessionV2AttemptOutcomes = sqliteTable(
     uniqueIndex('warmup_v2_attempt_packet').on(t.ownerId, t.packetSha256),
   ],
 );
+// 0135 owns the deferred foreign keys and admission triggers in SQL.
+export const walletWarmupSessionV2AttemptPurposes = sqliteTable(
+  'wallet_warmup_session_v2_attempt_purposes',
+  {
+    ownerId: text('owner_id').notNull(),
+    attemptId: text('attempt_id').notNull(),
+    journalId: text('journal_id').notNull(),
+    reviewVersion: integer('review_version').notNull(),
+    reviewSha256: text('review_sha256').notNull(),
+    termsSha256: text('terms_sha256').notNull(),
+    mode: text('mode').notNull(),
+    requestSha256: text('request_sha256').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ownerId, t.attemptId] }),
+    uniqueIndex('warmup_v2_purpose_identity').on(t.attemptId),
+  ],
+);
+export const walletWarmupSessionV2RuntimeObservations = sqliteTable(
+  'wallet_warmup_session_v2_runtime_observations',
+  {
+    ownerId: text('owner_id').notNull(),
+    attemptId: text('attempt_id').notNull(),
+    purposeSha256: text('purpose_sha256').notNull(),
+    packetSha256: text('packet_sha256').notNull(),
+    document: text('document').notNull(),
+    documentSha256: text('document_sha256').notNull(),
+    outcomeSha256: text('outcome_sha256').notNull(),
+    createdAt: text('created_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ownerId, t.attemptId] }),
+    uniqueIndex('warmup_v2_runtime_packet').on(t.ownerId, t.packetSha256),
+  ],
+);
 export * from './auth-schema';

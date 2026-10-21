@@ -506,10 +506,8 @@ export async function collectWalletWarmupRuntimeOrder(
       tokenChanges: changes,
       inputAmountMatches: request.side === 'Sell' ? true : null,
       minimumOutputCovered: request.side === 'Buy' ? true : null,
-      routeAssessment: { status: 'Matched fields' },
-      // Summary vocabulary for the full collector's custody checks, not a
-      // claim that the legacy bindings reader or signing policy ran.
-      accountBindings: { status: 'Matched bindings' },
+      // Legacy route/binding assessments did not run. Their optional summary
+      // fields stay unavailable; actual raw checks live in runtime evidence.
     };
     return {
       order,
