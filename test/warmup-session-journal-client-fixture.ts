@@ -92,11 +92,18 @@ export async function warmupJournalClientFixture(at = Date.now()) {
     if (command.control === 'pause') j.snapshot.paused = true;
     if (command.control === 'resume') j.snapshot.paused = false;
     if (command.control === 'stop') j.snapshot.stopped = true;
-    j.snapshot.phase = j.snapshot.stopped
-      ? 'stopped'
-      : j.snapshot.paused
-        ? 'paused'
-        : 'review-required';
+    j.snapshot.phase =
+      j.snapshot.pending?.state === 'unknown'
+        ? 'recovery-required'
+        : j.snapshot.stopped
+          ? 'stopped'
+          : j.snapshot.pending
+            ? 'in-flight'
+            : j.snapshot.completedActions === j.snapshot.totalActions
+              ? 'complete'
+              : j.snapshot.paused
+                ? 'paused'
+                : 'review-required';
     j.commandReceipt = {
       id: command.id,
       operation: command.control,

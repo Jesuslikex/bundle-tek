@@ -349,6 +349,41 @@ it('allows cancelling Stop without a write and clears confirmation after a statu
   expect(button('Confirm stop plan')).toBeUndefined();
   expect(writes()).toHaveLength(1);
 });
+it('keeps an unknown outcome after a confirmed Stop through exact control-receipt admission', async () => {
+  saved = f.root();
+  saved.version = 3;
+  saved.recoveryRequired = true;
+  saved.snapshot.phase = 'recovery-required';
+  const a = f.context.actions[0];
+  saved.snapshot.pending = {
+    state: 'unknown',
+    action: {
+      id: a.id,
+      side: a.side,
+      cycle: a.cycle,
+      wallet: a.wallet,
+      walletRevision: a.walletRevision,
+      mint: a.mint,
+      scheduledAt: a.scheduledAt,
+    },
+  };
+  await render();
+  await done(() => expect(host.textContent).toContain('Recovery required'));
+  await click('Stop plan');
+  expect(writes()).toHaveLength(0);
+  await click('Confirm stop plan');
+  await done(() =>
+    expect(host.textContent).toContain('Plan stopped. No signing'),
+  );
+  expect(host.textContent).toContain('Recovery required');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'A trade may already have been sent',
+  );
+  expect(button('Stop plan')).toBeUndefined();
+  expect(writes()).toHaveLength(1);
+  expect(saved?.snapshot.stopped).toBe(true);
+  expect(sessionStorage.getItem(key())).toBeNull();
+});
 it('withholds a POST when the recovery reminder cannot be read back', async () => {
   await ready();
   vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
