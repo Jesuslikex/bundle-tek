@@ -1,12 +1,19 @@
 import { WalletWarmupV2AttemptError } from './wallet-warmup-session-v2-attempt-types';
 /** Read-only advisory checks over the original owned context alias c.
  * These do not reserve funds or close an authorization/broadcast race.
+ * The context view already excludes shared swap/execution reservations. These
+ * active-intent fallbacks also refuse legacy/inconsistent records without a hold;
+ * an old timestamp is not evidence that a signed transaction is resolved.
  * Keep normal preview/legacy queries independent of these runtime parents.
  */
 export const WARMUP_RUNTIME_WALLET_BUSY_SQL = `CASE WHEN EXISTS (
  SELECT 1 FROM json_each(c.review_document,'$.wallets') selected
  WHERE EXISTS(SELECT 1 FROM pair_order_executions e WHERE e.owner_id=c.owner_id
   AND e.wallet=json_extract(selected.value,'$.wallet') AND e.state IN ('reserved','signed','submitting','submitted'))
+ OR EXISTS(SELECT 1 FROM imported_swap_signing_intents i WHERE i.owner_id=c.owner_id
+  AND i.wallet_address=json_extract(selected.value,'$.wallet') AND i.state IN ('awaiting_signature','signed','submitted'))
+ OR EXISTS(SELECT 1 FROM warmup_signing_intents i WHERE i.owner_id=c.owner_id
+  AND i.wallet_address=json_extract(selected.value,'$.wallet') AND i.state IN ('awaiting_signature','signed','submitted'))
  OR EXISTS(SELECT 1 FROM pump_launch_reviews r WHERE r.owner_id=c.owner_id
   AND r.state NOT IN ('cancelled','failed','finalized') AND (r.payer=json_extract(selected.value,'$.wallet')
    OR EXISTS(SELECT 1 FROM json_each(r.review,'$.input.holders') h

@@ -4,6 +4,8 @@ export async function installWarmupRuntimeWalletParents(db: D1Database) {
     await db.prepare(sql).run();
 }
 export const WARMUP_RUNTIME_PARENT_FIXTURE_SQL = [
+  'CREATE TABLE IF NOT EXISTS imported_swap_signing_intents(owner_id TEXT,wallet_address TEXT,state TEXT)',
+  'CREATE TABLE IF NOT EXISTS warmup_signing_intents(owner_id TEXT,wallet_address TEXT,state TEXT)',
   'CREATE TABLE IF NOT EXISTS pair_order_executions(owner_id TEXT,wallet TEXT,state TEXT)',
   'CREATE TABLE IF NOT EXISTS pump_launch_reviews(owner_id TEXT,payer TEXT,state TEXT,review TEXT)',
   'CREATE TABLE IF NOT EXISTS volume_bot_sessions(owner_id TEXT,state TEXT,plan TEXT,id TEXT)',

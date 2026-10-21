@@ -1,0 +1,101 @@
+{
+  "baseCommit": "3d51220b1d2d32976d4328cf796980ce07269456",
+  "scope": "Read-only stock-independent warmup runtime orphan signing-intent advisory; normal shared reservations already protected by unchanged context view",
+  "runtimeSigningEnabled": false,
+  "executionEnabled": false,
+  "deployed": false,
+  "fundedTests": false,
+  "providerOrCredentialsChanged": false,
+  "applicationOrHostedSqlRun": false,
+  "immutableMigrationsChanged": false,
+  "protectedClaudeFilesChanged": false,
+  "tests": {
+    "files": 14,
+    "total": 276,
+    "passed": 273,
+    "failed": 0,
+    "skipped": 3,
+    "skips": "Three opt-in BUNDLE_WARMUP_DB_CLOCK_QA real-clock cases; not run in this checkpoint",
+    "fullRepositorySuite": false,
+    "report": "work/release-qa/warmup-swap-busy-final-20261021.json"
+  },
+  "checks": {
+    "plainTypeScript": true,
+    "typedLintFiles": 3,
+    "formatFiles": 3,
+    "nativeDisposableMigrationsApplied": 136,
+    "positiveOrphanFixture": "Actual migrated tables; target intent write triggers removed only in disposable :memory: database, seeded rows unchanged by reads; not write-path or financial reservation proof"
+  },
+  "build": {
+    "base": "3d51220b1d2d32976d4328cf796980ce07269456",
+    "overlays": [
+      "lib/wallet-warmup-runtime-wallet-busy.ts",
+      "lib/wallet-warmup-runtime-swap-busy.test.ts",
+      "test/warmup-runtime-wallet-busy-fixture.ts"
+    ],
+    "hashes": {
+      "lib/wallet-warmup-runtime-wallet-busy.ts": "bce07d592f1a9128c99e38453e5431156b4464026778b7c61bff6208da6466bf",
+      "lib/wallet-warmup-runtime-swap-busy.test.ts": "99286eda76cd291db744d55e013d979d415ab9287a32af86c506ccddec431eee",
+      "test/warmup-runtime-wallet-busy-fixture.ts": "fb46a1a6a9e7183dbf1288bb630a2f3acc40b7c277eb329088956df585e4bbd5"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "review": {
+    "model": "claude-opus-5-5",
+    "modelsUsed": ["claude-opus-5-5"],
+    "copiedFiles": 3437,
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "tools": ["Glob", "Grep", "Read"],
+    "criticalOrHighRuntimeFindings": 0,
+    "mediumFinding": "Incorrect new missing-warmup-table ordinary-preview test; independently reproduced and corrected without changing production logic",
+    "lowFindings": "Actual-schema positive test added; minimal fixture limits documented; imported owner/wallet indexing remains an unmeasured performance consideration",
+    "finalOverlayDifferencesAfterReview": [
+      "lib/wallet-warmup-runtime-swap-busy.test.ts"
+    ],
+    "independentFinalVerification": true,
+    "reviewRunsTests": false,
+    "artifact": "work/release-qa/opus-warmup-swap-busy-3d51220-20261021"
+  },
+  "sourceFreeze": {
+    "selectedFiles": 2348,
+    "sha256": "0b2f50e7bd123109b58d8720222352f163e035de574b24f2de7652b0c9499042",
+    "scope": "Tracked TS/TSX/MJS/CSS/SQL/JSON plus new test captured before final checks; excludes environment, runtime artifacts, Markdown bookkeeping and this new evidence document",
+    "changed": []
+  },
+  "retainedEarlierReports": [
+    {
+      "name": "warmup-swap-busy-baseline-20261021.json",
+      "meaning": "Unpatched expression versus initial tests; includes incorrect reservation assertions, not 24 separate product bugs"
+    },
+    {
+      "name": "warmup-swap-busy-first-fix-20261021.json",
+      "meaning": "Superseded redundant reservation clause; two incorrect expectations"
+    },
+    {
+      "name": "warmup-swap-busy-corrected-20261021.json",
+      "meaning": "103/103 before last four regressions"
+    },
+    {
+      "name": "warmup-swap-busy-cohort-20261021.json",
+      "meaning": "272 passed, one incorrect new preview test failed, three skipped; retained and corrected"
+    }
+  ],
+  "browser": {
+    "inventoryTimedOutAfterUserConfirmedConnection": true,
+    "restartedOrSwitched": false,
+    "runningWarmupTouched": false,
+    "renderedQaPassed": false
+  },
+  "openPrerequisites": [
+    "Rendered signed-in verification",
+    "Live provider qualification and program policy",
+    "Exclusive financial reservation and short signing authorization",
+    "Finalized/unknown receipt-driven advancement and durable session orchestration",
+    "Qualified alternative routing"
+  ]
+}
