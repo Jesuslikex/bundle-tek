@@ -1,6 +1,6 @@
 import { unsignedPreparationSummary } from './imported-swap-preparation-history';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
-import type { ImportedSwapSimulation } from './imported-swap-simulation';
+import type { UnsignedSwapSummarySimulation } from './unsigned-swap-summary-simulation';
 import type { WarmupSellInventory } from './warmup-sell-inventory';
 import type { SavedWarmup } from './wallet-warmup-storage';
 import { warmupAtoms, warmupBuyAmount } from './wallet-warmup';
@@ -8,7 +8,7 @@ import type { WarmupBuyLink } from './warmup-buy-link';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
 export function warmupPreparationSummary(
   order: SolanaSwapPreparation,
-  simulation: ImportedSwapSimulation,
+  simulation: UnsignedSwapSummarySimulation,
   mint: string,
   inventory?: WarmupSellInventory,
   buyReceipt?: WarmupBuyLink,

@@ -5,6 +5,7 @@ import {
 import type { TradeSessionCapture } from './imported-trade-session';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
 import type { ImportedSwapSimulation } from './imported-swap-simulation';
+import type { UnsignedSwapSummarySimulation } from './unsigned-swap-summary-simulation';
 import type { ImportedSwapBalance } from './imported-swap-balance';
 import type { ImportedAcquisitionSelection } from './imported-acquisition';
 import {
@@ -57,7 +58,7 @@ export function swapPreparationSummary(
 }
 export function unsignedPreparationSummary(
   order: SolanaSwapPreparation,
-  simulation: ImportedSwapSimulation,
+  simulation: UnsignedSwapSummarySimulation,
 ) {
   if (
     order.executionAllowed !== false ||

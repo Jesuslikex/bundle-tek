@@ -1,6 +1,7 @@
 import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
 import { prepareSolanaSwap, WRAPPED_SOL } from './warmup-swap-quote';
 import { simulateImportedSwap } from './imported-swap-simulation';
+import type { WarmupSessionSimulationObservation } from './unsigned-swap-summary-simulation';
 import { inspectWarmupSellInventory } from './warmup-sell-inventory';
 import { warmupBuyLink } from './warmup-buy-link';
 import type { SavedWarmupBuyReceipt } from './warmup-buy-receipt';
@@ -49,7 +50,9 @@ const signed = (value: string) => {
 };
 export type WarmupSessionProviderDependencies = {
   quote?: typeof prepareSolanaSwap;
-  simulate?: typeof simulateImportedSwap;
+  simulate?: (
+    ...args: Parameters<typeof simulateImportedSwap>
+  ) => Promise<WarmupSessionSimulationObservation>;
   inventory?: typeof inspectWarmupSellInventory;
   now?: () => number;
 };

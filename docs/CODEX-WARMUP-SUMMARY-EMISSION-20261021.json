@@ -1,0 +1,29 @@
+{
+  "format": "unsigned-summary-emission-proof-v1",
+  "sourceBaseCommit": "8db1d49e09744bde124201821ba821691409166d",
+  "typescriptVersion": "5.9.3",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext"
+  },
+  "emission": [
+    {
+      "path": "lib/imported-swap-preparation-history.ts",
+      "before": "bf021b97a7a27f96ddc3ddec4582265dbbe5a605ddd9c94a724b3ed91e0d30fb",
+      "after": "bf021b97a7a27f96ddc3ddec4582265dbbe5a605ddd9c94a724b3ed91e0d30fb",
+      "identical": true
+    },
+    {
+      "path": "lib/warmup-preparation-history.ts",
+      "before": "778128d1a52b23bb5b71714870df941fac81c3e6f68305596d2f48d04b6c552e",
+      "after": "778128d1a52b23bb5b71714870df941fac81c3e6f68305596d2f48d04b6c552e",
+      "identical": true
+    },
+    {
+      "path": "lib/wallet-warmup-session-provider-core.ts",
+      "before": "186c7b380d1c4ae35b75e3555a5208cd7aeb5068e4e4a9c96c99c1d4945da3c7",
+      "after": "186c7b380d1c4ae35b75e3555a5208cd7aeb5068e4e4a9c96c99c1d4945da3c7",
+      "identical": true
+    }
+  ]
+}
