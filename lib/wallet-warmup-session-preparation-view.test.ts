@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { createWalletWarmupSessionProvider } from './wallet-warmup-session-provider';
 import { prepareSolanaSwap } from './warmup-swap-quote';
 import { warmupJournalClientFixture } from '@/test/warmup-session-journal-client-fixture';
@@ -53,7 +53,7 @@ async function fixture() {
     planRevision: f.context.planRevision,
     cycle: a.cycle,
     walletRevision: a.walletRevision,
-    createdAt: new Date(at + 1000).toISOString(),
+    createdAt: new Date(at + 40000).toISOString(),
     side: 'Buy',
     wallet: a.wallet,
     mint: a.mint,
@@ -62,7 +62,7 @@ async function fixture() {
     inAmountRaw: String(a.inputLamports),
     quotedOutRaw: '101',
     minimumOutRaw: '100',
-    expiresAt: new Date(at + 120000).toISOString(),
+    expiresAt: new Date(at + 70000).toISOString(),
     packetAvailability: 'retained',
     packetSha256: 'b'.repeat(64),
     estimatedFeesLamports: '5000',
@@ -83,6 +83,7 @@ async function fixture() {
   };
   const read = (value: unknown = { preparation: p }) =>
     admit(value, identity, journal, f.context);
+  await warmupJournalView({ journal }, f.context);
   return { ...f, journal, identity, p, read };
 }
 it('admits an exact unsigned review and caps display freshness at the original source deadline', async () => {
@@ -95,11 +96,18 @@ it('admits an exact unsigned review and caps display freshness at the original s
 });
 it('keeps historical recovery readable without extending either expiry', async () => {
   const f = await fixture();
-  f.journal.snapshot.sourceReviewFresh = false;
-  f.journal.snapshot.stopped = true;
-  expect(f.read().effectiveReviewExpiresAt).toBe(
-    f.context.sourceReviewExpiresAt,
-  );
+  const original = structuredClone(f.journal);
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Date.parse(f.context.sessionExpiresAt) + 60000);
+  try {
+    expect(f.read().effectiveReviewExpiresAt).toBe(
+      f.context.sourceReviewExpiresAt,
+    );
+    expect(f.journal).toEqual(original);
+  } finally {
+    clock.mockRestore();
+  }
 });
 for (const [field, value] of Object.entries({
   id: '00000000-0000-4000-8000-000000000009',
@@ -119,6 +127,8 @@ for (const [field, value] of Object.entries({
   inAmountRaw: '1000001',
   minimumOutRaw: '102',
   estimatedFeesLamports: '10000001',
+  quotedOutRaw: '1000000',
+  nativeChangeRaw: null,
   createdAt: '2026-10-21T05:01:00.000Z',
   expiresAt: '2026-10-21T05:00:00.000Z',
   packetSha256: null,
@@ -182,7 +192,7 @@ it('never exposes raw parser errors or admits unexpected wrapper data', async ()
       'Saved unsigned preparation is unavailable',
     );
 });
-it('admits a Sell with wrapped-SOL output while refusing a changed saved-buy upper bound', async () => {
+it('admits a Sell with wrapped-SOL output while requiring the exact saved-buy amount', async () => {
   const f = await fixture();
   const a = f.context.actions.find((item) => item.side === 'Sell')!;
   f.journal.snapshot.pending!.action = {
@@ -201,6 +211,7 @@ it('admits a Sell with wrapped-SOL output while refusing a changed saved-buy upp
     outputMint: 'So11111111111111111111111111111111111111112',
     inAmountRaw: '100',
     createdAt: a.scheduledAt,
+    expiresAt: new Date(Date.parse(a.scheduledAt) + 30000).toISOString(),
     simulation: {
       ...f.p.simulation,
       inputAmountMatches: true,
@@ -217,12 +228,32 @@ it('admits a Sell with wrapped-SOL output while refusing a changed saved-buy upp
   expect(f.read().inAmountRaw).toBe('100');
   f.p.inAmountRaw = '101';
   expect(() => f.read()).toThrow();
+  f.p.inAmountRaw = '99';
+  expect(() => f.read()).toThrow('Recover the original request');
   f.p.inAmountRaw = '100';
   f.p.simulation.inputAmountMatches = null;
   expect(() => f.read()).toThrow();
 });
+it('refuses Buy overspend, impossible original paused heads and long quote lifetimes', async () => {
+  const f = await fixture();
+  f.journal.snapshot.wallets[0].recordedFurtherBuySpendLamports =
+    f.context.wallets[0].buySpendLamports;
+  expect(() => f.read()).toThrow('Recover the original request');
+  f.journal.snapshot.wallets[0].recordedFurtherBuySpendLamports = '0';
+  f.journal.snapshot.paused = true;
+  expect(() => f.read()).toThrow('Recover the original request');
+  f.journal.snapshot.paused = false;
+  f.p.expiresAt = new Date(Date.parse(f.p.createdAt) + 30001).toISOString();
+  expect(() => f.read()).toThrow('Recover the original request');
+});
+it('uses an earlier quote expiry without renewing the source deadline', async () => {
+  const f = await fixture();
+  f.p.expiresAt = new Date(Date.parse(f.p.createdAt) + 1000).toISOString();
+  expect(f.read().effectiveReviewExpiresAt).toBe(f.p.expiresAt);
+});
 it('admits the actual SQL-retained preparation and server projections through the real consent and journal clients', async () => {
   const f = await warmupSessionProviderFixture();
+  const clock = vi.spyOn(Date, 'now').mockImplementation(f.clock);
   try {
     const signal = new AbortController().signal;
     const saved = await readWalletWarmupSessionConsent(
@@ -282,6 +313,7 @@ it('admits the actual SQL-retained preparation and server projections through th
     expect(result.signingAllowed).toBe(false);
     expect(result.actionId).toBe(journal.snapshot.pending?.action.id);
   } finally {
+    clock.mockRestore();
     f.client.close();
   }
 });

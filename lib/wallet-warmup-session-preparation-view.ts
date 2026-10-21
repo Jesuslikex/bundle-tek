@@ -51,7 +51,7 @@ const schema = z
     ]),
     packetSha256: hash.nullable(),
     estimatedFeesLamports: units,
-    nativeChangeRaw: nativeChange.nullable(),
+    nativeChangeRaw: nativeChange,
     limitations: z.literal(limitations),
     simulation: z
       .object({
@@ -99,6 +99,7 @@ export function warmupPreparationView(
     const a = pending?.action;
     const original = context.actions.find((item) => item.id === a?.id);
     const budget = journal.snapshot.wallets.find((w) => w.wallet === a?.wallet);
+    const approvedBudget = context.wallets.find((w) => w.wallet === a?.wallet);
     const expectedDeadline = Math.min(
       Date.parse(context.sourceReviewExpiresAt),
       Date.parse(context.sessionExpiresAt),
@@ -107,7 +108,10 @@ export function warmupPreparationView(
       !a ||
       !original ||
       !budget ||
+      !approvedBudget ||
       pending?.state !== 'reviewing' ||
+      journal.snapshot.paused ||
+      journal.snapshot.stopped ||
       journal.consentId !== context.consentId ||
       journal.termsSha256 !== context.termsSha256 ||
       journal.snapshot.planId !== context.planId ||
@@ -135,8 +139,10 @@ export function warmupPreparationView(
       Date.parse(p.createdAt) < Date.parse(journal.createdAt) ||
       Date.parse(p.createdAt) < Date.parse(a.scheduledAt) ||
       Date.parse(p.expiresAt) <= Date.parse(p.createdAt) ||
+      Date.parse(p.expiresAt) - Date.parse(p.createdAt) > 30000 ||
       Date.parse(p.createdAt) >= expectedDeadline ||
       BigInt(p.minimumOutRaw) > BigInt(p.quotedOutRaw) ||
+      BigInt(p.minimumOutRaw) < (BigInt(p.quotedOutRaw) * 9950n) / 10000n ||
       BigInt(p.estimatedFeesLamports) >
         BigInt(budget.remainingReserveLamports) ||
       BigInt(p.simulation.networkFeeLamports) >
@@ -144,22 +150,27 @@ export function warmupPreparationView(
       (p.packetAvailability === 'retained') !== (p.packetSha256 !== null) ||
       (a.side === 'Buy'
         ? p.inAmountRaw !== original.inputLamports ||
+          BigInt(budget.recordedFurtherBuySpendLamports) +
+            BigInt(p.inAmountRaw) >
+            BigInt(approvedBudget.buySpendLamports) ||
           p.simulation.minimumOutputCovered !== true ||
           p.simulation.inputAmountMatches === false
         : p.simulation.inputAmountMatches !== true ||
           p.simulation.minimumOutputCovered === false)
     )
       fail();
-    // A saved-buy action has an immutable upper bound. A session-buy lot is checked server-side.
+    // A saved-buy action has an exact immutable amount. Session-buy lots are checked server-side.
     if (a.side === 'Sell') {
       const source = z
-        .object({ kind: z.string(), remainingRaw: positive.optional() })
+        .object({
+          kind: z.enum(['saved-buy', 'session-buy']),
+          remainingRaw: positive.optional(),
+        })
         .loose()
         .parse(original.source);
       if (
         source.kind === 'saved-buy' &&
-        (!source.remainingRaw ||
-          BigInt(p.inAmountRaw) > BigInt(source.remainingRaw))
+        (!source.remainingRaw || p.inAmountRaw !== source.remainingRaw)
       )
         fail();
     }
