@@ -32,3 +32,12 @@ Source commit `54dd2178bc99456d7a4f7db459efeece291c767f` fixes the owned funding
 462tests/40files, plain TypeScript, seven-file typed lint/format, unchanged-overlay isolated production build and2374-file source freeze pass. Actual Opus5.5 completed two read-only reviews with unchanged copies and zero denials; final layout-cleanup/recovery-message/metadata-confirmation/assertion delta independently tested, not rereviewed. The shared reader is mechanically equivalent to the old layer reader except names/internal fixed error, and the complete layer driver/receipt suffix is unchanged. See CODEX-MAINNET-FUNDING-SOURCE-20261021.md and its evidence.
 
 No protected Claude file, SQL/schema/migration, provider/credential/cron, real wallet/funded action or deploy. Browser comparison remains blocked by the desktop URL-policy stop; no bypass or new signed-in/rendered/live-provider proof. The broader product goal stays open. Fetch origin/main before branching;0136 unchanged, next0137 subject to recheck.
+
+
+## Proxy funding route-step history, 22 October 2026
+
+Source commit `bfaa0825047c0e49fef731bacf03d38cc511f907` corrects the owned history API, strict DTO and history panel: latest attempts are separated by exact recipient/leg, all400possible steps fit with401overflow refusal, and proxy-leg receipts are not final-allocation proof.25-row local paging preserves full totals. A failed progress summary retains valid captured transitions with records:null/unavailable:true and no fabricated zero counts.
+
+499tests/42files plus2selected existing financial-policy tests (21unselected), plain TypeScript, seven-file typed lint/format, unchanged-overlay isolated build and2376-file source freeze pass. Actual Opus5.5 completed two read-only reviews with unchanged copies/zero denials; production runtime matches follow-up exactly, optional later test diagnostics independently verified. See CODEX-PROXY-FUNDING-PROGRESS-20261021.md and companion evidence.
+
+No protected Claude file, financial/signing/recovery backend, migration, application/hosted SQL, provider/credential/cron, real wallet/funded action or deployment changed. Browser/signed-in/live-provider verification remains open after the URL-policy stop. Combined source-bound launch approval and full parity remain unfinished.0136 unchanged; next0137 subject to recheck.
