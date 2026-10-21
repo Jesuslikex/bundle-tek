@@ -29,6 +29,21 @@ export class WalletWarmupSessionPacketError extends Error {
   }
 }
 const unavailable = () => new WalletWarmupSessionPacketError();
+async function integrityGuardsInstalled(db: D1Database) {
+  const row = await db
+    .prepare(
+      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_packets_insert','wallet_warmup_session_packets_no_update','wallet_warmup_session_packets_no_delete','wallet_warmup_session_packets_fresh')",
+    )
+    .first<{ n: number }>();
+  return row?.n === 4;
+}
+/** Call before provider work, and repeat immediately before building the write. */
+export async function walletWarmupSessionPacketWriteReady(db: D1Database) {
+  return (
+    (await integrityGuardsInstalled(db)) &&
+    (await walletWarmupSessionFinishGuardInstalled(db, 'packet'))
+  );
+}
 
 /** Envelope identity only. Route, custody, lifetime and signing are NOT authorized. */
 export async function validateWalletWarmupSessionPacket(
@@ -61,14 +76,7 @@ export async function prepareWalletWarmupSessionPacketWrite(
   transaction: string,
   summary: WarmupPreparationSummary,
 ) {
-  const installed = await db
-    .prepare(
-      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_packets_insert','wallet_warmup_session_packets_no_update','wallet_warmup_session_packets_no_delete','wallet_warmup_session_packets_fresh')",
-    )
-    .first<{ n: number }>();
-  if (installed?.n !== 4) throw unavailable();
-  if (!(await walletWarmupSessionFinishGuardInstalled(db, 'packet')))
-    throw unavailable();
+  if (!(await walletWarmupSessionPacketWriteReady(db))) throw unavailable();
   const packet = await validateWalletWarmupSessionPacket(transaction, summary);
   const facts = {
     owner_id: owner,
@@ -113,12 +121,7 @@ export async function readWalletWarmupSessionPacket(
     .first();
   if (!installed)
     return { packet: null, packetAvailability: 'storage-unavailable' as const };
-  const guards = await db
-    .prepare(
-      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_packets_insert','wallet_warmup_session_packets_no_update','wallet_warmup_session_packets_no_delete','wallet_warmup_session_packets_fresh')",
-    )
-    .first<{ n: number }>();
-  if (guards?.n !== 4) throw unavailable();
+  if (!(await integrityGuardsInstalled(db))) throw unavailable();
   const stored = await db
     .prepare(
       'SELECT * FROM wallet_warmup_session_packets WHERE owner_id=? AND preparation_id=?',

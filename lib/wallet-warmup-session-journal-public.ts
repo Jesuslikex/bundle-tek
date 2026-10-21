@@ -14,6 +14,10 @@ export function publicWalletWarmupSessionJournal(
     : undefined;
   const document = event ? JSON.parse(event.document) : null;
   const pending = snapshot.pending;
+  const reviewWindowUnavailable =
+    snapshot.nextReviewAt !== null &&
+    Date.parse(snapshot.nextReviewAt) >=
+      Date.parse(journal.effectiveReviewExpiresAt);
   return {
     id: journal.id,
     consentId: journal.consentId,
@@ -25,14 +29,19 @@ export function publicWalletWarmupSessionJournal(
     headSha256: journal.headSha256,
     recoveryRequired: journal.recoveryRequired,
     snapshot: {
-      phase: snapshot.phase,
+      phase:
+        reviewWindowUnavailable &&
+        ['waiting', 'review-required'].includes(snapshot.phase)
+          ? ('refresh-required' as const)
+          : snapshot.phase,
       planId: snapshot.planId,
       planRevision: snapshot.planRevision,
       sourceReviewFresh: snapshot.sourceReviewFresh,
       sourceReviewExpiresAt: snapshot.sourceReviewExpiresAt,
       completedActions: snapshot.completedActions,
       totalActions: snapshot.totalActions,
-      nextReviewAt: snapshot.nextReviewAt,
+      nextReviewAt: reviewWindowUnavailable ? null : snapshot.nextReviewAt,
+      reviewWindowUnavailable,
       paused: snapshot.paused,
       stopped: snapshot.stopped,
       pending: pending

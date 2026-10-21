@@ -4,6 +4,8 @@ import { warmupSessionConsentFixture } from '@/test/warmup-session-consent-fixtu
 import { retainWalletWarmupSessionConsent } from '@/lib/wallet-warmup-session-consent';
 import { installWarmupSessionFinishGuards } from '@/test/warmup-session-finish-guard-fixture';
 import type { publicWalletWarmupSessionJournal } from '@/lib/wallet-warmup-session-journal-public';
+import { publicWalletWarmupSessionJournal as projectJournal } from '@/lib/wallet-warmup-session-journal-public';
+import { readWalletWarmupSessionJournal } from '@/lib/wallet-warmup-session-journal-storage';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'owner' } as { userId: string } | null,
   db: null as unknown as D1Database,
@@ -313,6 +315,37 @@ it('does not write redundant pause/stop controls or report unrelated receipts on
   );
   expect(await eventCount()).toBe(2);
 });
+it.each([-1, 0, 1])(
+  'projects a queued review %i ms from the effective deadline without promising an impossible review time',
+  async (offset) => {
+    await create();
+    const source = await readWalletWarmupSessionJournal(
+      f.db,
+      'owner',
+      record.id,
+      new AbortController().signal,
+    );
+    expect(source).not.toBeNull();
+    if (!source) throw Error('Missing fixture journal');
+    const scheduled = new Date(
+      Date.parse(source.effectiveReviewExpiresAt) + offset,
+    ).toISOString();
+    const dto = projectJournal({
+      ...source,
+      snapshot: {
+        ...source.snapshot,
+        phase: 'waiting',
+        nextReviewAt: scheduled,
+      },
+    });
+    expect(dto.snapshot.nextReviewAt).toBe(offset < 0 ? scheduled : null);
+    expect(dto.snapshot.reviewWindowUnavailable).toBe(offset >= 0);
+    expect(dto.snapshot.phase).toBe(
+      offset < 0 ? 'waiting' : 'refresh-required',
+    );
+    expect(dto.signingAllowed).toBe(false);
+  },
+);
 it('isolates owners and does not create missing journals during reads or controls', async () => {
   const j = await create();
   mocks.user = { userId: 'other' };

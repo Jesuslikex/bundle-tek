@@ -14,6 +14,7 @@ import { walletWarmupSessionFinishGuardInstalled } from './wallet-warmup-session
 import {
   readWalletWarmupSessionPacket,
   prepareWalletWarmupSessionPacketWrite,
+  walletWarmupSessionPacketWriteReady,
   type WarmupSessionPacketMaterial,
 } from './wallet-warmup-session-packet';
 
@@ -384,6 +385,11 @@ export async function prepareWalletWarmupSessionAction(
   signal.throwIfAborted();
   if (!(await walletWarmupSessionFinishGuardInstalled(db, 'binding')))
     fail('Warmup session finish guard is unavailable.', 503);
+  if (!(await walletWarmupSessionPacketWriteReady(db)))
+    fail(
+      'The retained unsigned session packet is unavailable. No signing is enabled.',
+      503,
+    );
   const material = await prepare(
     structuredClone({ action, sellSource }),
     signal,

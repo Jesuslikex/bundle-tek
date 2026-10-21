@@ -41,6 +41,7 @@ async function install(db: D1Database) {
       .map((s) => s.trim())
       .filter(Boolean))
       await db.prepare(sql).run();
+  await installWarmupSessionFinishGuards(db);
 }
 it('retains exact unsigned bytes atomically and recovers after expiry without another quote', async () => {
   const f = await fixture(),
@@ -157,7 +158,6 @@ async function fixture(options: { finishAfterLastMs?: number } = {}) {
   });
   clients.push(f.client);
   await install(f.db);
-  await installWarmupSessionFinishGuards(f.db);
   mocks.db = f.db;
   mocks.user = { userId: 'owner' };
   return f;
@@ -211,6 +211,22 @@ it('the binding SQL guard rejects a new identity timestamp at the consent finish
   ).rejects.toThrow('Approved warmup session has finished');
   expect(await counts(f.db)).toEqual([0, 0, 2]);
 });
+it.each([
+  'wallet_warmup_session_packet_finish',
+  'wallet_warmup_session_packets_no_update',
+])(
+  'checks missing packet guard %s before any provider callback',
+  async (name) => {
+    const f = await fixture(),
+      quote = callback(f);
+    await f.db.prepare(`DROP TRIGGER ${name}`).run();
+    await expect(
+      prepare(f.db, 'owner', input(f), signal(), quote, f.clock),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(quote).not.toHaveBeenCalled();
+    expect(await counts(f.db)).toEqual([0, 0, 2]);
+  },
+);
 function input(f: Awaited<ReturnType<typeof fixture>>) {
   return {
     id: crypto.randomUUID(),

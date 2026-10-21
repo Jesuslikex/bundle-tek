@@ -40,4 +40,16 @@ The final24-file related run passes **619 tests**, including47 API,35 journal,56
 
 Plain TypeScript,13-file typed lint and14-file formatting pass. All132 migrations apply to a fresh disposable checksum-runner database (736 schema objects) and the real whole-file Wrangler CLI; the ledger matches and exit0. Final Wrangler report: `C:\Users\Julian\AppData\Local\Temp\bundle-wrangler-migrations-2eN20O\report.json`. The application and hosted databases were not touched.
 
-Final source freeze: `work/release-qa/warmup-journal-finish-verified-freeze-20261021.json`,2699files, digest `85f8d815f786974874ee312c90a88b4fb78088d39fa0b19227210d853b568feb`. Verify unchanged before committing. Earlier frozen checkpoints are retained as historical evidence, not the final candidate. No UI, automatic execution, short signing authorization or full-product parity is claimed.
+Reviewed663d086 source freeze: `work/release-qa/warmup-journal-finish-verified-freeze-20261021.json`,2699files, digest `85f8d815f786974874ee312c90a88b4fb78088d39fa0b19227210d853b568feb`. It was verified unchanged before that commit. Earlier frozen checkpoints are retained as historical evidence, not the final candidate. No UI, automatic execution, short signing authorization or full-product parity is claimed.
+
+## Completed finish re-review and final follow-up
+
+Actual `claude-opus-5-5` reviewed committed663d086 and explicitly confirmed **M1 closed**, with no critical/high/medium finding. Read/Glob/Grep only, no delegation/tests/edits, zero permission denials, final success and unchanged2139file snapshot. Status/logs: ignored `work/release-qa/opus-journal-finish-review-663d086-20261021/`.
+
+The follow-up read the diff,0131/helper and current journal decode/append, API/projection, binding/preparation/packet modules and0122/0123 fully; selected0124/sequence sections and grep hits for0125/0126/0128. It did not reread the complete replay, consent, settlement TypeScript,0126/0130 trigger bodies or full tests. Its verdict is static; all test execution is Codex's.
+
+Two accepted low notes are independently Codex-verified after that review, not rereviewed: all packet integrity/finish guards are checked before any preparation callback and repeated before writing, and the public progress projection returns no next-review time beyond the effective deadline. Such a queued review reports `reviewWindowUnavailable:true` and a review-needed state; it does not invent a future run. Existing in-flight, paused, stopped and complete states retain their meaning.
+
+The final24-file run passes **624 tests** including50 API,35 journal and58 preparation cases. Final plain TypeScript,13-file typed lint and14-file format checks pass. The132 migration sources are unchanged from the passing disposable checksum-runner/whole-file Wrangler reports above; no extra database run is claimed for these TypeScript-only low fixes.
+
+Final source freeze: `work/release-qa/warmup-journal-api-opus-followup-freeze-20261021.json`,2699files, digest `f766d7755312133bc37846e5eb2901e74ba27e6d2d1280325338e39a8b11f84d`. Verify unchanged before the final commit. Signing/automatic execution remain off. No UI, real provider quote, application/hosted SQL, deployment or funded action occurred. The next UI connection point is the verified saved-approval panel in Codex-owned `components/wallet-warmup-session-consent.tsx`; it is not changed in this checkpoint, and raw API state must not be labelled as a running trading session.
