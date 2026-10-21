@@ -86,3 +86,16 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+.recoveryInput {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-block: 8px;
+  background: transparent;
+  font: inherit;
+  box-sizing: border-box;
+}

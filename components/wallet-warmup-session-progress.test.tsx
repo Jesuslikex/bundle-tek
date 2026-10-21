@@ -178,7 +178,9 @@ it('opens the next action review explicitly, then requests a preparation only af
   expect(button('Review next action').disabled).toBe(false);
   await click('Review next action');
   await done(() =>
-    expect(host.querySelector('input[type=checkbox]')).toBeTruthy(),
+    expect(
+      host.querySelector<HTMLInputElement>('input[type=checkbox]'),
+    ).toBeTruthy(),
   );
   expect(writes()).toHaveLength(2);
   expect(
@@ -212,8 +214,14 @@ it('locks parent history controls while a child preparation is pending', async (
   });
   await create();
   await click('Review next action');
-  await done(() => expect(host.querySelector('input')).toBeTruthy());
-  await act(async () => host.querySelector<HTMLInputElement>('input')!.click());
+  await done(() =>
+    expect(
+      host.querySelector<HTMLInputElement>('input[type=checkbox]'),
+    ).toBeTruthy(),
+  );
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(),
+  );
   await click('Prepare unsigned action');
   await done(() => expect(button('Cancel preparation request')).toBeTruthy());
   for (const name of [
@@ -225,6 +233,37 @@ it('locks parent history controls while a child preparation is pending', async (
     expect(button(name).disabled).toBe(true);
   await act(async () => resolve(Response.json(p.preparation(id, saved!))));
   await done(() => expect(button('Pause plan').disabled).toBe(false));
+});
+it('updates the parent to verified current history after read-only recovery from another browser', async () => {
+  const p = await warmupPreparationClientFixture(at),
+    originalFetch = fetch,
+    id = '00000000-0000-4000-8000-000000000007';
+  vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+    if (!input.includes('/session-preparations/recovery?'))
+      return originalFetch(input, init);
+    requests.push({ url: input, body: null });
+    const review = { ...p.journal, id: saved!.id };
+    return Promise.resolve(Response.json(p.recovery(id, review, review)));
+  });
+  await create();
+  await act(async () => {
+    const input = host.querySelector<HTMLInputElement>(
+      'input:not([type=checkbox])',
+    )!;
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, id);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('Read saved preparation context');
+  await done(() =>
+    expect(host.textContent).toContain('Original unsigned review recovered'),
+  );
+  expect(host.textContent).toContain('Action ready for unsigned review');
+  expect(writes()).toHaveLength(1);
+  expect(button('Start automatic activity').disabled).toBe(true);
+  expect(host.querySelector('input[type=checkbox]')).toBeNull();
 });
 it('saves history once, then explicitly pauses/resumes/stops without any wallet or provider endpoint', async () => {
   await create();

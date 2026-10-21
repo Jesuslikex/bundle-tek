@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useId } from 'react';
 import { z } from 'zod';
 import {
   readWarmupJournalResponse,
@@ -13,6 +13,7 @@ import {
   type WarmupPreparationRequest,
 } from '@/lib/wallet-warmup-session-preparation-request';
 import { warmupPreparationView } from '@/lib/wallet-warmup-session-preparation-view';
+import { warmupPreparationRecoveryView } from '@/lib/wallet-warmup-session-preparation-recovery-view';
 import { WARMUP_RECEIPT_SAVED } from '@/lib/warmup-receipt-events';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { Button } from './ui/button';
@@ -24,6 +25,7 @@ type Props = {
   context: WarmupJournalContext;
   disabled: boolean;
   onBusyChange: (busy: boolean) => void;
+  onRecovered?: (journal: WarmupJournalView) => void;
 };
 type Prepared = ReturnType<typeof warmupPreparationView>;
 const collision = z
@@ -35,7 +37,9 @@ export function WalletWarmupSessionPreparation({
   context,
   disabled,
   onBusyChange,
+  onRecovered,
 }: Props) {
+  const recoveryInputId = useId();
   const key = 'bundle:warmup-preparation-request:' + context.consentId;
   const pending = useRef<AbortController | null>(null),
     mounted = useRef(false),
@@ -53,6 +57,7 @@ export function WalletWarmupSessionPreparation({
     [message, setMessage] = useState(''),
     [recoveryId, setRecoveryId] = useState<string | null>(null),
     [unreadableId, setUnreadableId] = useState<string | null>(null),
+    [recoveryInput, setRecoveryInput] = useState(''),
     [now, setNow] = useState(Date.now);
   const live = useCallback(
     (c: AbortController) =>
@@ -133,9 +138,11 @@ export function WalletWarmupSessionPreparation({
         if (!live(c)) return;
         if (!response.ok) {
           if (!write && response.status === 404) {
-            setRetryReady(true);
+            setRetryReady(!original.recovered);
             setMessage(
-              'No saved result is confirmed for this ID yet. You may recover again. A retry, if still fresh, keeps this exact request and review head.',
+              original.recovered
+                ? 'The confirmed saved review is currently unavailable. Keep its original ID and recover again. It cannot be retried as a new preparation.'
+                : 'No saved result is confirmed for this ID yet. You may recover again. A retry, if still fresh, keeps this exact request and review head.',
             );
             return;
           }
@@ -192,6 +199,117 @@ export function WalletWarmupSessionPreparation({
       }
     },
     [context, changeBusy, live, persist],
+  );
+  const recoverContext = useCallback(
+    async (value: string | null) => {
+      if (disabled || pending.current || starting.current) return;
+      const selected =
+        value === null
+          ? null
+          : z
+              .uuid()
+              .refine((v) => v === v.toLowerCase())
+              .safeParse(value.trim());
+      if (selected && !selected.success) {
+        setError('Enter the original lower-case preparation ID.');
+        return;
+      }
+      const requestedId = selected?.success ? selected.data : null;
+      const c = new AbortController();
+      pending.current = c;
+      changeBusy(true);
+      setApproved(false);
+      setRetryReady(false);
+      setError('');
+      setMessage('');
+      const timer = setTimeout(() => c.abort(), 30000);
+      try {
+        const response = await fetch(
+          endpoint +
+            '/recovery?' +
+            (requestedId
+              ? 'id=' + encodeURIComponent(requestedId)
+              : 'journalId=' + encodeURIComponent(journal.id)),
+          { credentials: 'same-origin', cache: 'no-store', signal: c.signal },
+        );
+        if (response.status === 401 || response.status === 429) {
+          void response.body?.cancel().catch(() => {});
+          throw Error(
+            response.status === 401
+              ? 'Sign in again, then recover the saved preparation context.'
+              : 'Saved-context recovery is rate limited. Wait and recover again; no new quote was requested.',
+          );
+        }
+        const body = await readWarmupJournalResponse(response, c.signal);
+        if (!live(c)) return;
+        if (response.status === 404 && !requestedId) {
+          setMessage(
+            'No saved preparation is confirmed for this action. Keep any existing ID and recover again; no new quote was created.',
+          );
+          return;
+        }
+        if (!response.ok) throw Error();
+        const oldId = marker?.id ?? unreadableId ?? undefined;
+        const recovered = await warmupPreparationRecoveryView(
+          body,
+          {
+            ...(requestedId
+              ? { id: requestedId }
+              : { discover: true as const }),
+            journal,
+            ...(oldId && oldId !== requestedId
+              ? { priorRequestId: oldId }
+              : {}),
+          },
+          context,
+        );
+        if (!live(c)) return;
+        setResult(recovered.preparation);
+        setRecoveryId(null);
+        setRecoveryInput('');
+        try {
+          persist(recovered.request);
+          setLoaded(true);
+          setUnreadableId(null);
+        } catch {
+          setError(
+            'Saved review verified, but its browser reminder could not be retained. Keep the recovered ID; no retry or new preparation is allowed here.',
+          );
+        }
+        onRecovered?.(recovered.current);
+        setMessage(
+          'Original unsigned review recovered from saved history. Its expiry is unchanged. No new quote, signature or transaction was requested.',
+        );
+      } catch (cause) {
+        if (mounted.current && pending.current === c)
+          setError(
+            cause instanceof Error &&
+              [
+                'Sign in again, then recover the saved preparation context.',
+                'Saved-context recovery is rate limited. Wait and recover again; no new quote was requested.',
+              ].includes(cause.message)
+              ? cause.message
+              : 'Saved recovery context could not be confirmed for this plan approval. Keep the ID and recover again; nothing was renewed or sent.',
+          );
+      } finally {
+        clearTimeout(timer);
+        if (pending.current === c) {
+          pending.current = null;
+          if (mounted.current) changeBusy(false);
+        }
+      }
+    },
+    [
+      disabled,
+      changeBusy,
+      live,
+      marker,
+      unreadableId,
+      journal,
+      context,
+      persist,
+      onRecovered,
+    ],
   );
   useEffect(() => {
     mounted.current = true;
@@ -305,7 +423,8 @@ export function WalletWarmupSessionPreparation({
       !sameHead ||
       result ||
       recoveryId ||
-      (marker && !retryReady)
+      (marker && !retryReady) ||
+      marker?.recovered
     )
       return;
     starting.current = true;
@@ -355,7 +474,8 @@ export function WalletWarmupSessionPreparation({
       !retryReady ||
       sameHead ||
       result ||
-      recoveryId
+      recoveryId ||
+      marker.recovered
     )
       return;
     try {
@@ -374,19 +494,28 @@ export function WalletWarmupSessionPreparation({
       );
     }
   }
-  if (!action && !marker && !error) return null;
   return (
     <section
       className={styles.panel}
       aria-label="Unsigned warmup preparation"
       aria-busy={busy}
     >
-      <div>
-        <h6>Review this action</h6>
-        <p>
-          Quote and simulation only. Signing and automatic activity remain off.
-        </p>
-      </div>
+      {(displayAction || marker || error) && (
+        <div>
+          <h6>
+            {displayAction
+              ? marker?.recovered
+                ? 'Recovered unsigned action'
+                : 'Review this action'
+              : 'Saved preparation recovery'}
+          </h6>
+          <p>
+            {marker?.recovered || !displayAction
+              ? 'Saved-only recovery. No new quote, signing or sending.'
+              : 'Quote and simulation only. Signing and automatic activity remain off.'}
+          </p>
+        </div>
+      )}
       {displayAction && (
         <p>
           {displayAction.side} · Cycle {displayAction.cycle} · Wallet{' '}
@@ -406,7 +535,7 @@ export function WalletWarmupSessionPreparation({
           earlier review; recovery does not start a new action.
         </p>
       )}
-      {!result && fresh && sameHead && !recoveryId && (
+      {!result && fresh && sameHead && !recoveryId && !marker?.recovered && (
         <label className={styles.consent}>
           <input
             type="checkbox"
@@ -418,7 +547,7 @@ export function WalletWarmupSessionPreparation({
           not approve signing or spending.
         </label>
       )}
-      {!result && !fresh && (
+      {!result && !fresh && (action || marker) && (
         <p>
           A fresh, unpaused action review is needed for a new preparation. Saved
           preparations can still be recovered.
@@ -501,7 +630,7 @@ export function WalletWarmupSessionPreparation({
         </fieldset>
       )}
       <div className={styles.controls}>
-        {!result && (
+        {!result && (action || marker) && (
           <Button
             disabled={
               disabled ||
@@ -511,15 +640,18 @@ export function WalletWarmupSessionPreparation({
               !fresh ||
               !sameHead ||
               !!recoveryId ||
+              !!marker?.recovered ||
               (!!marker && !retryReady)
             }
             onClick={() => {
               void prepare();
             }}
           >
-            {marker
-              ? 'Retry this preparation request'
-              : 'Prepare unsigned action'}
+            {marker?.recovered
+              ? 'Recovered preparation · read only'
+              : marker
+                ? 'Retry this preparation request'
+                : 'Prepare unsigned action'}
           </Button>
         )}
         {marker && (
@@ -551,22 +683,79 @@ export function WalletWarmupSessionPreparation({
           created here.
         </p>
       )}
-      {marker && retryReady && !sameHead && !result && !recoveryId && (
-        <div>
-          <p>
-            The original GET found no saved preparation and the session head has
-            changed. Keep request ID <code>{marker.id}</code> before retiring
-            its local reminder. Retiring does not cancel server work.
-          </p>
-          <Button
-            variant="outline"
-            disabled={disabled || busy}
-            onClick={retireAbsent}
-          >
-            Retire absent request
-          </Button>
-        </div>
+      {recoveryId && !result && (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || disabled}
+          onClick={() => void recoverContext(recoveryId)}
+        >
+          Recover earlier preparation
+        </Button>
       )}
+      {marker &&
+        !marker.recovered &&
+        retryReady &&
+        !sameHead &&
+        !result &&
+        !recoveryId && (
+          <div>
+            <p>
+              The original GET found no saved preparation and the session head
+              has changed. Keep request ID <code>{marker.id}</code> before
+              retiring its local reminder. Retiring does not cancel server work.
+            </p>
+            <Button
+              variant="outline"
+              disabled={disabled || busy}
+              onClick={retireAbsent}
+            >
+              Retire absent request
+            </Button>
+          </div>
+        )}
+      {!result && (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || disabled}
+          onClick={() => void recoverContext(null)}
+        >
+          Find saved preparation
+        </Button>
+      )}
+      <details>
+        <summary>Recover by saved preparation ID</summary>
+        <label htmlFor={recoveryInputId}>Preparation ID</label>
+        <input
+          id={recoveryInputId}
+          className={styles.recoveryInput}
+          value={recoveryInput}
+          maxLength={64}
+          autoComplete="off"
+          disabled={busy || disabled}
+          aria-describedby={recoveryInputId + '-hint'}
+          onChange={(e) => setRecoveryInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void recoverContext(recoveryInput);
+            }
+          }}
+        />
+        <p id={recoveryInputId + '-hint'}>
+          Read an existing unsigned review from this plan approval. This never
+          creates a quote or renews approval.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || disabled || !recoveryInput.trim()}
+          onClick={() => void recoverContext(recoveryInput)}
+        >
+          Read saved preparation context
+        </Button>
+      </details>
       {(marker || unreadableId) && (
         <details>
           <summary>Preparation recovery details</summary>
@@ -577,6 +766,13 @@ export function WalletWarmupSessionPreparation({
           {recoveryId && (
             <p>
               Earlier preparation: <code>{recoveryId}</code>
+            </p>
+          )}
+          {marker?.priorRequestId && (
+            <p>
+              Previous local request (not confirmed):{' '}
+              <code>{marker.priorRequestId}</code>. Recovering this saved review
+              does not cancel another request.
             </p>
           )}
           <p>

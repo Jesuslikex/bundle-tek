@@ -55,6 +55,12 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
     preparationPending.current = value;
     setPreparationBusy(value);
   }, []);
+  const preparationRecovered = useCallback((value: WarmupJournalView) => {
+    previous.current = value;
+    setJournal(value);
+    setChecked(true);
+    setExpired(Date.now() >= Date.parse(value.effectiveReviewExpiresAt));
+  }, []);
   const busy = statusBusy || preparationBusy;
   useEffect(() => {
     onBusyChange(busy);
@@ -566,6 +572,7 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
           context={context}
           disabled={busy || !checked || !!marker || invalidReminder}
           onBusyChange={preparationBusyChanged}
+          onRecovered={preparationRecovered}
         />
       )}
       {statusBusy && (

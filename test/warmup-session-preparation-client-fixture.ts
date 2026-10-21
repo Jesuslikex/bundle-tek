@@ -56,5 +56,15 @@ export async function warmupPreparationClientFixture(at = Date.now()) {
       },
     };
   }
-  return { ...f, root, journal, command, preparation };
+  function recovery(id: string, original = journal, current = journal) {
+    return {
+      recovery: {
+        readOnly: true,
+        preparation: preparation(id, original).preparation,
+        originalJournal: { ...original, commandReceipt: null },
+        currentJournal: { ...current, commandReceipt: null },
+      },
+    };
+  }
+  return { ...f, root, journal, command, preparation, recovery };
 }

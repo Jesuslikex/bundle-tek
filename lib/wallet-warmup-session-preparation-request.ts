@@ -10,12 +10,15 @@ const schema = z
     format: z.enum([
       'warmup-preparation-request-v1',
       'warmup-preparation-request-v2',
+      'warmup-preparation-request-v3',
     ]),
     id: z.uuid().refine((v) => v === v.toLowerCase()),
     consentId: z.uuid(),
     termsSha256: z.string().regex(/^[a-f0-9]{64}$/),
     journal: z.unknown(),
     recoveryId: z.uuid().optional(),
+    recovered: z.literal(true).optional(),
+    priorRequestId: z.uuid().optional(),
   })
   .strict();
 export type WarmupPreparationRequest = Omit<
@@ -31,6 +34,13 @@ export async function warmupPreparationRequest(
     if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 81920)
       throw Error();
     const m = schema.parse(value);
+    if (
+      (m.format === 'warmup-preparation-request-v3') !==
+        (m.recovered === true) ||
+      (m.priorRequestId !== undefined &&
+        (m.recovered !== true || m.priorRequestId === m.id))
+    )
+      throw Error();
     if (
       m.format === 'warmup-preparation-request-v1' &&
       m.recoveryId !== undefined
@@ -66,5 +76,9 @@ export function warmupPreparationIdentity(m: WarmupPreparationRequest) {
   };
 }
 export function warmupPreparationRequestBody(m: WarmupPreparationRequest) {
+  if (m.recovered)
+    throw Error(
+      'Recovered preparations are read-only. No new request is allowed.',
+    );
   return { ...warmupPreparationIdentity(m), prepareRequested: true };
 }

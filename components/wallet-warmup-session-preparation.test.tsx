@@ -7,7 +7,8 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { WalletWarmupSessionPreparation } from './wallet-warmup-session-preparation';
 import { warmupPreparationClientFixture } from '@/test/warmup-session-preparation-client-fixture';
 const at = Date.parse('2026-10-21T12:00:00.000Z'),
-  onBusy = vi.fn();
+  onBusy = vi.fn(),
+  onRecovered = vi.fn();
 let host: HTMLDivElement,
   root: Root,
   f: Awaited<ReturnType<typeof warmupPreparationClientFixture>>,
@@ -23,6 +24,7 @@ beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   sessionStorage.clear();
   onBusy.mockClear();
+  onRecovered.mockClear();
   f = await warmupPreparationClientFixture(at);
   saved = null;
   currentReview = f.journal;
@@ -79,6 +81,7 @@ async function render(journal = f.journal, disabled = false) {
         context={f.context}
         disabled={disabled}
         onBusyChange={onBusy}
+        onRecovered={onRecovered}
       />,
     ),
   );
@@ -103,18 +106,38 @@ async function click(label: string) {
 }
 async function approve() {
   await act(async () => {
-    const checkbox = host.querySelector('input')!;
+    const checkbox = host.querySelector<HTMLInputElement>(
+      'input[type=checkbox]',
+    )!;
     checkbox.click();
+  });
+}
+async function typeRecovery(id: string) {
+  await act(async () => {
+    const input = host.querySelector<HTMLInputElement>(
+      'input:not([type=checkbox])',
+    )!;
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, id);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
 async function ready() {
   await render();
-  await settle(() => expect(host.querySelector('input')?.disabled).toBe(false));
+  await settle(() =>
+    expect(
+      host.querySelector<HTMLInputElement>('input[type=checkbox]')?.disabled,
+    ).toBe(false),
+  );
 }
 it('has a separate unchecked approval, no mount request and no signing control', async () => {
   await ready();
   expect(calls).toHaveLength(0);
-  expect(host.querySelector('input')?.checked).toBe(false);
+  expect(
+    host.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked,
+  ).toBe(false);
   expect(button('Prepare unsigned action').disabled).toBe(true);
   expect(host.textContent).toContain(
     'Signing and automatic activity remain off',
@@ -332,7 +355,9 @@ it('ignores an in-flight response after the current head changes', async () => {
   expect(host.textContent).not.toMatch(
     /Unsigned preparation (saved|recovered)/,
   );
-  expect(host.querySelector('input')).toBeNull();
+  expect(
+    host.querySelector<HTMLInputElement>('input[type=checkbox]'),
+  ).toBeNull();
   expect(
     JSON.parse(sessionStorage.getItem(storageKey())!).journal.headSha256,
   ).toBe(f.journal.headSha256);
@@ -573,3 +598,231 @@ it('rearms the display expiry if the local clock moves backwards', async () => {
   });
   expect(host.textContent).toContain('· expired');
 });
+it('recovers by ID from a different browser with GET only, no reminder and no new quote', async () => {
+  const id = '00000000-0000-4000-8000-000000000007';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string, init?: RequestInit) => {
+      expect(init?.method ?? 'GET').toBe('GET');
+      expect(input).toContain('/recovery?id=' + id);
+      calls.push({ method: 'GET', id });
+      return Response.json(f.recovery(id));
+    }),
+  );
+  await render(f.root);
+  await typeRecovery(id);
+  await click('Read saved preparation context');
+  await settle(() =>
+    expect(host.textContent).toContain('Original unsigned review recovered'),
+  );
+  const marker = JSON.parse(sessionStorage.getItem(storageKey())!);
+  expect(marker.id).toBe(id);
+  expect(marker.recovered).toBe(true);
+  expect(marker.journal.headSha256).toBe(f.journal.headSha256);
+  expect(calls).toEqual([{ method: 'GET', id }]);
+  expect(onRecovered).toHaveBeenCalledWith(
+    expect.objectContaining({ version: 1 }),
+  );
+  expect(
+    host.querySelector<HTMLInputElement>('input[type=checkbox]'),
+  ).toBeNull();
+});
+it('finds a saved action without any browser reminder or known preparation ID', async () => {
+  const id = '00000000-0000-4000-8000-000000000007';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string, init?: RequestInit) => {
+      expect(input).toContain('/recovery?journalId=' + f.journal.id);
+      expect(init?.method ?? 'GET').toBe('GET');
+      return Response.json(f.recovery(id));
+    }),
+  );
+  await render(f.root);
+  await click('Find saved preparation');
+  await settle(() =>
+    expect(host.textContent).toContain('Original unsigned review recovered'),
+  );
+  expect(JSON.parse(sessionStorage.getItem(storageKey())!).id).toBe(id);
+  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('input[type=checkbox]')).toBeNull();
+});
+it('keeps an absent discovery read-only without creating a reminder or approving a retry', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ error: 'Absent' }, { status: 404 })),
+  );
+  await ready();
+  await click('Find saved preparation');
+  await settle(() =>
+    expect(host.textContent).toContain(
+      'No saved preparation is confirmed for this action',
+    ),
+  );
+  expect(sessionStorage.getItem(storageKey())).toBeNull();
+  expect(button('Prepare unsigned action').disabled).toBe(true);
+  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+});
+it('recovers a collision only after an explicit read and preserves the unconfirmed earlier local request ID', async () => {
+  const id = '00000000-0000-4000-8000-000000000009';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      const selected =
+        method === 'POST'
+          ? JSON.parse(init!.body as string).id
+          : new URL(input, 'http://localhost').searchParams.get('id');
+      calls.push({ method, id: selected });
+      return method === 'POST'
+        ? Response.json(
+            { error: 'Earlier preparation', recoveryId: id },
+            { status: 409 },
+          )
+        : Response.json(f.recovery(id));
+    }),
+  );
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() =>
+    expect(button('Recover earlier preparation')).toBeTruthy(),
+  );
+  expect(calls).toHaveLength(1);
+  const previous = calls[0].id;
+  await click('Recover earlier preparation');
+  await settle(() =>
+    expect(host.textContent).toContain('Original unsigned review recovered'),
+  );
+  const marker = JSON.parse(sessionStorage.getItem(storageKey())!);
+  expect(marker.id).toBe(id);
+  expect(marker.priorRequestId).toBe(previous);
+  expect(marker.recovered).toBe(true);
+  expect(calls.map((c) => c.method)).toEqual(['POST', 'GET']);
+});
+it('does not replace the existing reminder with a wrong-owner or altered recovery context', async () => {
+  const id = '00000000-0000-4000-8000-000000000009';
+  lose = true;
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() => expect(host.querySelector('[role=alert]')).toBeTruthy());
+  const old = sessionStorage.getItem(storageKey());
+  const invalid = f.recovery(id);
+  invalid.recovery.originalJournal.termsSha256 = 'c'.repeat(64);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json(invalid)),
+  );
+  await typeRecovery(id);
+  await click('Read saved preparation context');
+  await settle(() =>
+    expect(host.textContent).toContain(
+      'Saved recovery context could not be confirmed',
+    ),
+  );
+  expect(sessionStorage.getItem(storageKey())).toBe(old);
+  expect(onRecovered).not.toHaveBeenCalled();
+});
+it('never offers retry or retirement when a confirmed read-only recovery later reads as absent', async () => {
+  const id = '00000000-0000-4000-8000-000000000007';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string) =>
+      input.includes('/recovery?')
+        ? Response.json(f.recovery(id))
+        : Response.json({ error: 'Absent' }, { status: 404 }),
+    ),
+  );
+  await ready();
+  await typeRecovery(id);
+  await click('Read saved preparation context');
+  await settle(() =>
+    expect(host.textContent).toContain('Original unsigned review recovered'),
+  );
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await render();
+  await settle(() =>
+    expect(host.textContent).toContain(
+      'cannot be retried as a new preparation',
+    ),
+  );
+  expect(button('Recovered preparation · read only').disabled).toBe(true);
+  expect(button('Retire absent request')).toBeUndefined();
+  expect(
+    host.querySelector<HTMLInputElement>('input[type=checkbox]'),
+  ).toBeNull();
+});
+it('keeps verified recovery display read-only when storing the browser reminder fails', async () => {
+  const id = '00000000-0000-4000-8000-000000000007';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json(f.recovery(id))),
+  );
+  await ready();
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw Error('Blocked');
+  });
+  await typeRecovery(id);
+  await click('Read saved preparation context');
+  await settle(() =>
+    expect(host.textContent).toContain(
+      'Saved review verified, but its browser reminder could not be retained',
+    ),
+  );
+  expect(host.textContent).toContain('Saved unsigned preparation');
+  expect(
+    host.querySelector<HTMLInputElement>('input[type=checkbox]'),
+  ).toBeNull();
+  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+});
+it('ignores a cancelled late context recovery response without storing or changing the parent', async () => {
+  const id = '00000000-0000-4000-8000-000000000007';
+  let resolve!: (response: Response) => void;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((r) => {
+          resolve = r;
+        }),
+    ),
+  );
+  await ready();
+  await typeRecovery(id);
+  await click('Read saved preparation context');
+  await settle(() => expect(button('Cancel preparation request')).toBeTruthy());
+  await click('Cancel preparation request');
+  await act(async () => {
+    resolve(Response.json(f.recovery(id)));
+    await new Promise<void>((r) => nextTurn(r));
+  });
+  expect(sessionStorage.getItem(storageKey())).toBeNull();
+  expect(onRecovered).not.toHaveBeenCalled();
+  expect(host.textContent).not.toContain('Original unsigned review recovered');
+});
+for (const status of [401, 429])
+  it(`keeps fixed saved-context ${status} guidance even on an HTML reply`, async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('<html>private error</html>', {
+            status,
+            headers: { 'content-type': 'text/html' },
+          }),
+      ),
+    );
+    await ready();
+    await typeRecovery('00000000-0000-4000-8000-000000000007');
+    await click('Read saved preparation context');
+    await settle(() =>
+      expect(host.textContent).toContain(
+        status === 401
+          ? 'Sign in again'
+          : 'Saved-context recovery is rate limited',
+      ),
+    );
+    expect(sessionStorage.getItem(storageKey())).toBeNull();
+    expect(host.textContent).not.toContain('private error');
+  });
