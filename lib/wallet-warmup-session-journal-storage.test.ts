@@ -17,13 +17,15 @@ afterEach(() => {
 async function fixture() {
   const f = await warmupSessionConsentFixture();
   clients.push(f.client);
-  for (const sql of readFileSync(
-    'drizzle/0124_wallet_warmup_session_journals.sql',
-    'utf8',
-  )
-    .split('--> statement-breakpoint')
-    .map((v) => v.trim())
-    .filter(Boolean))
+  for (const sql of [
+    '0124_wallet_warmup_session_journals',
+    '0125_wallet_warmup_session_settlements',
+  ].flatMap((name) =>
+    readFileSync(`drizzle/${name}.sql`, 'utf8')
+      .split('--> statement-breakpoint')
+      .map((v) => v.trim())
+      .filter(Boolean),
+  ))
     await f.db.prepare(sql).run();
   const consent = await retainWalletWarmupSessionConsent(
     f.db,
@@ -454,13 +456,15 @@ it('recovers a root whose INSERT committed before its response was lost', async 
   // An independent disposable database has no journal yet; intercept only its INSERT.
   const g = await warmupSessionConsentFixture();
   clients.push(g.client);
-  for (const sql of readFileSync(
-    'drizzle/0124_wallet_warmup_session_journals.sql',
-    'utf8',
-  )
-    .split('--> statement-breakpoint')
-    .map((v) => v.trim())
-    .filter(Boolean))
+  for (const sql of [
+    '0124_wallet_warmup_session_journals',
+    '0125_wallet_warmup_session_settlements',
+  ].flatMap((name) =>
+    readFileSync(`drizzle/${name}.sql`, 'utf8')
+      .split('--> statement-breakpoint')
+      .map((v) => v.trim())
+      .filter(Boolean),
+  ))
     await g.db.prepare(sql).run();
   const consent = await retainWalletWarmupSessionConsent(
     g.db,

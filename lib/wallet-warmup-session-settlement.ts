@@ -94,6 +94,10 @@ export type WarmupSessionSettlementSelection = {
   receiptId: string;
   candidate: ReturnType<WalletWarmupSessionSequence['beginReview']>;
 };
+/** Shape consistency only; use the real replay function for receipt verification. */
+export function parseWarmupSessionSettlementSelection(value: unknown) {
+  return selection.parse(value);
+}
 type Row = WarmupSessionSettlementSourceRow;
 const fail = (): never => {
   throw Error('Owned finalized settlement evidence is unavailable or changed.');
@@ -246,7 +250,7 @@ export async function replayWarmupSessionSettlement(
 ) {
   if (typeof owner !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(owner))
     return fail();
-  const selected = selection.parse(input),
+  const selected = parseWarmupSessionSettlementSelection(input),
     a = selected.candidate.action;
   const base = `${a.side}:${a.cycle}:${a.wallet}`;
   if (

@@ -37,12 +37,20 @@ const actionId = z.string().min(1).max(1024);
 const transition = z.discriminatedUnion('operation', [
   base.extend({ operation: z.literal('begin-review'), actionId }).strict(),
   base.extend({ operation: z.literal('submitted'), actionId }).strict(),
-  base.extend({ operation: z.literal('unknown'), actionId }).strict(),
+  base
+    .extend({
+      operation: z.literal('unknown'),
+      actionId,
+      proofSha256: digest.optional(),
+    })
+    .strict(),
   base
     .extend({
       operation: z.literal('finalized'),
       actionId,
       settlement: z.record(z.string(), z.unknown()),
+      // Required by persisted verified transitions; older internal fixtures omit it.
+      proofSha256: digest.optional(),
     })
     .strict(),
   base.extend({ operation: z.literal('pause') }).strict(),

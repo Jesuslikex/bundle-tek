@@ -7,9 +7,10 @@ import { reviewWalletWarmupSession } from '@/lib/wallet-warmup-session-review';
 import { walletWarmupSessionDigest as digest } from '@/lib/wallet-warmup-session-digest';
 import { retainWalletWarmupSessionReview } from '@/lib/wallet-warmup-session-storage';
 import { reviewWalletWarmupSessionConsent as review } from '@/lib/wallet-warmup-session-consent';
+import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 const signal = () => new AbortController().signal;
 /** Synthetic public plan and disposable memory SQL. No secrets or provider requests. */
-export async function warmupSessionConsentFixture() {
+export async function warmupSessionConsentFixture(planOverride?: SavedWarmup) {
   const client = createClient({ url: 'file::memory:', intMode: 'number' });
   const db = createTursoDatabase(client);
   for (const sql of [
@@ -31,7 +32,9 @@ export async function warmupSessionConsentFixture() {
       .map((x) => x.trim())
       .filter(Boolean))
       await db.prepare(sql).run();
-  const f = warmupSessionReviewFixture();
+  const f = planOverride
+    ? { plan: structuredClone(planOverride) }
+    : warmupSessionReviewFixture();
   await db
     .prepare('INSERT INTO wallet_warmup_plans VALUES(?,?,?,?,?,?)')
     .bind(

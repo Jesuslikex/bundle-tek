@@ -12,6 +12,7 @@ import {
 } from './warmup-lot-performance';
 import type { SavedWarmup } from './wallet-warmup-storage';
 import { WARMUP_SESSION_REVIEW_GAP_MS } from './wallet-warmup-session-sequence';
+import { parseWalletWarmupSessionSettlementRecord } from './wallet-warmup-session-settlement-record';
 
 const uuid = z.uuid().refine((v) => v === v.toLowerCase());
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -68,7 +69,7 @@ function fail(
   throw new WalletWarmupJournalError(message, status);
 }
 function ownerId(owner: string) {
-  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(owner))
+  if (typeof owner !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(owner))
     fail('Verified session owner required.', 400);
 }
 function clock(at: number) {
@@ -83,10 +84,10 @@ function clock(at: number) {
 async function installed(db: D1Database) {
   const row = await db
     .prepare(
-      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_journals_insert','wallet_warmup_session_journals_no_update','wallet_warmup_session_journals_no_delete','wallet_warmup_session_journal_events_insert','wallet_warmup_session_journal_events_no_update','wallet_warmup_session_journal_events_no_delete','wallet_warmup_session_journals_head','wallet_warmup_session_journal_heads_insert','wallet_warmup_session_journal_heads_update','wallet_warmup_session_journal_heads_no_delete','wallet_warmup_session_journal_events_head')",
+      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_journals_insert','wallet_warmup_session_journals_no_update','wallet_warmup_session_journals_no_delete','wallet_warmup_session_journal_events_insert','wallet_warmup_session_journal_events_no_update','wallet_warmup_session_journal_events_no_delete','wallet_warmup_session_journals_head','wallet_warmup_session_journal_heads_insert','wallet_warmup_session_journal_heads_update','wallet_warmup_session_journal_heads_no_delete','wallet_warmup_session_journal_events_head','wallet_warmup_session_settlements_insert','wallet_warmup_session_settlements_no_update','wallet_warmup_session_settlements_no_delete','wallet_warmup_session_settlements_apply')",
     )
     .first<{ n: number }>();
-  if (row?.n !== 11) fail('Warmup recovery storage is not installed.', 503);
+  if (row?.n !== 15) fail('Warmup recovery storage is not installed.', 503);
 }
 async function context(
   db: D1Database,
@@ -178,7 +179,7 @@ async function raw(db: D1Database, owner: string, id: string) {
   // Root and the ordered complete event vector are obtained in ONE SQL snapshot.
   return db
     .prepare(`SELECT j.*,h.version AS head_version,h.head_sha256,h.document_bytes,h.updated_at AS head_updated_at,COALESCE((SELECT json_group_array(json(v)) FROM
-    (SELECT json_object('id',e.id,'document',e.document,'event_sha256',e.event_sha256,'version',e.version,'previous_sha256',e.previous_sha256,'created_at',e.created_at) AS v
+    (SELECT json_object('id',e.id,'document',e.document,'event_sha256',e.event_sha256,'version',e.version,'previous_sha256',e.previous_sha256,'created_at',e.created_at,'proof',json((SELECT json_object('document',p.document,'record_sha256',p.record_sha256,'event_document',p.event_document,'event_sha256',p.event_sha256,'mode',p.mode) FROM wallet_warmup_session_settlements p WHERE p.owner_id=e.owner_id AND p.journal_id=e.journal_id AND p.id=e.id))) AS v
      FROM wallet_warmup_session_journal_events e WHERE e.owner_id=j.owner_id AND e.journal_id=j.id ORDER BY e.version)), '[]') AS events
     FROM wallet_warmup_session_journals j LEFT JOIN wallet_warmup_session_journal_heads h ON h.owner_id=j.owner_id AND h.journal_id=j.id WHERE j.owner_id=? AND j.id=?`)
     .bind(owner, id)
@@ -213,12 +214,28 @@ async function decode(
           version: z.number().int().min(1).max(4096),
           previous_sha256: hash,
           created_at: z.string(),
+          proof: z
+            .object({
+              document: z.string().max(16384),
+              record_sha256: hash,
+              event_document: z.string(),
+              event_sha256: hash,
+              mode: z.enum(['applied', 'held']),
+            })
+            .strict()
+            .nullable(),
         })
         .strict(),
     )
     .max(4096)
     .parse(JSON.parse(row.events));
   const ids = new Set<string>();
+  const originalActions = new Map<string, string>(
+    JSON.parse(row.source_document).review.actions.map((a: { id: string }) => [
+      a.id,
+      canonical(a),
+    ]),
+  );
   for (const event of events) {
     const document = JSON.parse(event.document);
     if (
@@ -230,6 +247,39 @@ async function decode(
       document.eventId !== event.id
     )
       fail();
+    if (
+      document.operation === 'finalized' ||
+      document.proofSha256 !== undefined
+    ) {
+      if (
+        !event.proof ||
+        event.proof.event_document !== event.document ||
+        event.proof.event_sha256 !== event.event_sha256 ||
+        document.proofSha256 !== event.proof.record_sha256
+      )
+        return fail();
+      const proof = await parseWalletWarmupSessionSettlementRecord(
+        event.proof.document,
+        event.proof.record_sha256,
+      );
+      if (
+        proof.id !== event.id ||
+        proof.journalId !== row.id ||
+        proof.version !== event.version - 1 ||
+        proof.headSha256 !== event.previous_sha256 ||
+        proof.createdAt !== event.created_at ||
+        proof.actionId !== document.actionId ||
+        proof.mode !== event.proof.mode ||
+        canonical(proof.candidate.action) !==
+          originalActions.get(proof.actionId) ||
+        (proof.mode === 'applied'
+          ? document.operation !== 'finalized' ||
+            canonical(proof.settlement) !== canonical(document.settlement)
+          : document.operation !== 'unknown' ||
+            document.settlement !== undefined)
+      )
+        return fail();
+    } else if (event.proof !== null) return fail();
     ids.add(event.id);
   }
   const anchor = {

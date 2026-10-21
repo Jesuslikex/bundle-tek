@@ -50,6 +50,10 @@ const settlement = z.discriminatedUnion('side', [
     .strict(),
 ]);
 type Settlement = z.infer<typeof settlement>;
+/** Shape consistency only. This does not verify a receipt or grant authority. */
+export function parseWalletWarmupSessionSettlement(value: unknown) {
+  return settlement.parse(value);
+}
 type Entry = {
   action: WarmupSessionAction;
   state: 'queued' | 'reviewing' | 'submitted' | 'unknown' | 'finalized';
@@ -216,7 +220,7 @@ export class WalletWarmupSessionSequence {
   /** Record only after the existing finalized-receipt verifier has admitted it. */
   recordFinalized(value: unknown, now = Date.now()) {
     this.clock(now);
-    const result = settlement.parse(value),
+    const result = parseWalletWarmupSessionSettlement(value),
       entry = this.entry(result.actionId),
       action = entry.action;
     if (entry.state === 'finalized') {
