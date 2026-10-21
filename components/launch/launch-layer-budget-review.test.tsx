@@ -28,7 +28,9 @@ it('pages the full declared wallet set, filters roles/addresses and preserves ev
       });
     expect(rows()).toHaveLength(25);
     expect(host.textContent).toContain('62 of 62 wallets');
-    const totals = host.querySelector('dl')!.textContent;
+    const totals = host.querySelector(
+      'dl[aria-label="Full plan ceilings"]',
+    )!.textContent;
     await click('Next review wallets');
     await click('Next review wallets');
     expect(rows()).toHaveLength(12);
@@ -58,7 +60,9 @@ it('pages the full declared wallet set, filters roles/addresses and preserves ev
     expect(host.textContent).toContain('No wallets match');
     await click('Show all review wallets');
     expect(rows()).toHaveLength(25);
-    expect(host.querySelector('dl')!.textContent).toBe(totals);
+    expect(
+      host.querySelector('dl[aria-label="Full plan ceilings"]')!.textContent,
+    ).toBe(totals);
     expect(JSON.stringify(envelope)).toBe(original);
     expect(host.textContent).toContain('not verified costs');
   } finally {

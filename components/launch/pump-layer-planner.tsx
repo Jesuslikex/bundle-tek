@@ -24,6 +24,7 @@ import type { LaunchLayerEnvelope } from '@/lib/launch-layer-terms';
 import styles from './pump-layer-planner.module.css';
 import { LaunchLayerHistory } from './launch-layer-history';
 import { LaunchLayerNativeCoverage } from './launch-layer-native-coverage';
+import { LaunchLayerSetupSummary } from './launch-layer-setup-summary';
 
 const endpoint = '/api/launch/layers';
 const names: Record<LayerRole, string> = {
@@ -62,10 +63,12 @@ async function read(response: Response) {
 }
 export function LayerBudgetReview({
   envelope,
+  contextLabel = 'Layer',
 }: {
   envelope: LaunchLayerEnvelope;
+  contextLabel?: string;
 }) {
-  const { quote, totals, delays, roles } = envelope.terms;
+  const { quote, totals, roles } = envelope.terms;
   const filterId = useId();
   const [roleFilter, setRoleFilter] = useState<LayerRole | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -96,13 +99,21 @@ export function LayerBudgetReview({
   const pages = Math.max(1, Math.ceil(matching.length / 25));
   const selectedPage = Math.min(page, pages - 1);
   return (
-    <section className={styles.review} aria-label="Layer budget review">
+    <section
+      className={styles.review}
+      aria-label={`${contextLabel} budget review`}
+    >
       <h4>Declared ceiling review</h4>
+      <LaunchLayerSetupSummary
+        envelope={envelope}
+        contextLabel={contextLabel}
+      />
       <p>
         These are your maximum planning amounts. They are not verified costs,
         current balances or funding requirements.
       </p>
-      <dl className={styles.totals}>
+      <h5>Ceilings</h5>
+      <dl className={styles.totals} aria-label="Full plan ceilings">
         <div>
           <dt>Total buy ceiling ({quote.symbol})</dt>
           <dd>{layerDisplay(totals.maximumBuyQuoteRaw, quote.decimals)}</dd>
@@ -129,11 +140,7 @@ export function LayerBudgetReview({
           ? 'The native total includes SOL buys, fees, rent and reserves.'
           : `${quote.symbol} buys are separate from the SOL total. Units use the saved quote catalog; live mint scaling is not verified.`}
       </p>
-      <p>
-        Funding delay: {delays.fundingDelaySeconds} seconds. Front to Back:{' '}
-        {delays.frontToBackDelayMs} milliseconds. Back to temporary:{' '}
-        {delays.backToTemporaryDelayMs} milliseconds.
-      </p>
+      <h5>Wallets</h5>
       <div className={styles.fields}>
         <label htmlFor={filterId + '-role'}>
           Review wallet role
@@ -189,18 +196,57 @@ export function LayerBudgetReview({
           .slice(selectedPage * 25, (selectedPage + 1) * 25)
           .map(({ role, member, index, count }) => (
             <li key={member.wallet.address}>
-              <strong>
-                {names[role]} {count > 1 ? index + 1 : ''}
-              </strong>{' '}
-              <code>{member.wallet.address}</code>
-              <span>
-                Buy ≤ {layerDisplay(member.maximumBuyQuoteRaw, quote.decimals)}{' '}
-                {quote.symbol}; fee ≤{' '}
-                {layerDisplay(member.maximumNetworkFeeLamports, 9)} SOL; rent ≤{' '}
-                {layerDisplay(member.maximumAccountRentLamports, 9)} SOL;
-                reserve {layerDisplay(member.retainedNativeReserveLamports, 9)}{' '}
-                SOL.
-              </span>
+              <div className={styles.walletIdentity}>
+                <strong>
+                  {names[role]} {count > 1 ? index + 1 : ''}
+                </strong>{' '}
+                <code>{member.wallet.address}</code>
+              </div>
+              <div className={styles.walletAmounts}>
+                <span>
+                  Buy ≤{' '}
+                  {layerDisplay(member.maximumBuyQuoteRaw, quote.decimals)}{' '}
+                  {quote.symbol}
+                </span>
+                <span>
+                  {quote.kind === 'native'
+                    ? 'SOL ceiling (includes buy)'
+                    : `SOL ceiling (excludes ${quote.symbol} buy)`}{' '}
+                  ≤{' '}
+                  {layerDisplay(
+                    String(
+                      BigInt(member.maximumNetworkFeeLamports) +
+                        BigInt(member.maximumAccountRentLamports) +
+                        BigInt(member.retainedNativeReserveLamports) +
+                        (quote.kind === 'native'
+                          ? BigInt(member.maximumBuyQuoteRaw)
+                          : 0n),
+                    ),
+                    9,
+                  )}{' '}
+                  SOL
+                </span>
+                <details>
+                  <summary
+                    aria-label={`Fees, rent and reserve for ${names[role]} ${index + 1}: ${member.wallet.address}`}
+                  >
+                    Fees, rent and reserve
+                  </summary>
+                  <span>
+                    {quote.kind === 'native' && (
+                      <>
+                        Buy ≤ {layerDisplay(member.maximumBuyQuoteRaw, 9)}{' '}
+                        SOL;{' '}
+                      </>
+                    )}
+                    Fee ≤ {layerDisplay(member.maximumNetworkFeeLamports, 9)}{' '}
+                    SOL; rent ≤{' '}
+                    {layerDisplay(member.maximumAccountRentLamports, 9)} SOL;
+                    reserve{' '}
+                    {layerDisplay(member.retainedNativeReserveLamports, 9)} SOL.
+                  </span>
+                </details>
+              </div>
             </li>
           ))}
       </ol>
@@ -786,6 +832,7 @@ function Planner({
               <LayerBudgetReview
                 key={review.envelope.sha256}
                 envelope={review.envelope}
+                contextLabel="Draft layer"
               />
               <Button
                 disabled={blocked || !historyRead}
@@ -922,6 +969,7 @@ function Planner({
           <LayerBudgetReview
             key={saved.envelope.sha256}
             envelope={saved.envelope}
+            contextLabel="Saved layer"
           />
           <LaunchLayerNativeCoverage
             key={`${saved.id}:${saved.sha256}:${saved.current}`}

@@ -1,0 +1,58 @@
+.summary {
+  container-type: inline-size;
+  min-width: 0;
+  margin-block: 16px;
+}
+.summary h5 {
+  margin-block: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.tiles > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border, #30333c);
+  border-radius: 6px;
+  background: var(--card, #12131a);
+}
+.summary dt {
+  color: var(--muted-foreground, #a1a8b8);
+  font-size: 12px;
+}
+.summary dd {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.summary p {
+  margin-block: 12px;
+}
+.token {
+  overflow-wrap: anywhere;
+}
+.token strong {
+  color: var(--foreground, #f4f4f5);
+}
+.identity summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 12px;
+}
+.identity dl {
+  margin: 8px 0;
+}
+@container (max-width: 650px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 360px) {
+  .tiles > div {
+    padding: 8px;
+  }
+}

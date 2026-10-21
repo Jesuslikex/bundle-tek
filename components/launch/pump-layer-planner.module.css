@@ -80,6 +80,24 @@
 }
 .roleList li {
   min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--border, #30333c);
+}
+.walletIdentity,
+.walletAmounts {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.walletAmounts {
+  font-variant-numeric: tabular-nums;
+}
+.walletAmounts summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
 }
 .roleList code,
 .roleList span {
@@ -139,6 +157,10 @@
   overflow-wrap: anywhere;
 }
 @media (max-width: 480px) {
+  .roleList li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
   .panel {
     padding: 10px;
   }

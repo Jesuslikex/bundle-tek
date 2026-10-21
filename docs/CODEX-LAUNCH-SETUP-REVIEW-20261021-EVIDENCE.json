@@ -1,0 +1,105 @@
+{
+  "base": "40c2a4c9b53430c77bf32e1bb3e1dae5307f19c3",
+  "sourceOnly": true,
+  "reference": "user-provided Launch Setup screenshot; no fresh live capture",
+  "scope": "connected layer review presentation, not complete execution approval",
+  "tests": {
+    "files": 14,
+    "passed": 153,
+    "failed": 0,
+    "skipped": 0
+  },
+  "plainTypeScriptPassed": true,
+  "typedLintFiles": 4,
+  "formatFiles": 6,
+  "isolatedBuild": {
+    "base": "40c2a4c9b53430c77bf32e1bb3e1dae5307f19c3",
+    "overlays": [
+      "components/launch/pump-layer-planner.tsx",
+      "components/launch/pump-layer-planner.module.css",
+      "components/launch/launch-layer-budget-review.test.tsx",
+      "components/launch/launch-layer-setup-summary.tsx",
+      "components/launch/launch-layer-setup-summary.module.css",
+      "components/launch/launch-layer-setup-summary.test.tsx"
+    ],
+    "hashes": {
+      "components/launch/pump-layer-planner.tsx": "89df5c3500462d92649ef6eb881700344668076d02feaf600c83b9de702b8786",
+      "components/launch/pump-layer-planner.module.css": "9892116c6f02ec86d2f4d745d563a92dacfb087e6ffd98fa5f8504cba280eb8a",
+      "components/launch/launch-layer-budget-review.test.tsx": "a4a401999a7669bf9a6d4a5fde1b9ad455eef3dc003d77189b1b27c4e2064d48",
+      "components/launch/launch-layer-setup-summary.tsx": "9a7040336181bb60d9ed0500a3c082273b1f2c9e23adac16e75007fa586513f8",
+      "components/launch/launch-layer-setup-summary.module.css": "78426a8aa039818a819d5f2e06f20abd2401ff53f5962d00279132cea54ddbdf",
+      "components/launch/launch-layer-setup-summary.test.tsx": "e17c02926d89847c66ba125bafacbbab05b8c747b80d5098fcad1f98f69c8b4d"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "supersededBuild": {
+    "compilerExitCode": 0,
+    "acceptedDelivery": false,
+    "reason": "review changes made after initial overlay; final build above matches delivery"
+  },
+  "freeze": {
+    "selectedSourceFiles": 2362,
+    "unchanged": true,
+    "sha256": "d30dc42b2f65e764c385cce21870ee7baa99d0a98904b741845c1655bf3c6e3b"
+  },
+  "plannerGuardSourceUnchanged": true,
+  "onlyPlannerCallsiteChanges": "two contextLabel display props",
+  "opusReviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    }
+  ],
+  "finalFilesChangedAfterFollowup": [
+    "components/launch/launch-layer-setup-summary.tsx",
+    "components/launch/launch-layer-setup-summary.test.tsx"
+  ],
+  "finalDelta": "independently tested wording/default timing, heading placement, semantic output and assertions; not rereviewed",
+  "browserVerified": false,
+  "browserBlocker": "existing Chrome control times out",
+  "protectedClaudeFilesEdited": false,
+  "notPerformed": [
+    "deployment",
+    "application/hosted SQL",
+    "provider/credential/cron changes",
+    "real wallet unlock/sign/send",
+    "funded tests"
+  ],
+  "remaining": [
+    "live rendered/signed-in review",
+    "composite revision-bound artwork/slippage/rewards/fees/funding/qualified transaction approval",
+    "full Proxima parity"
+  ]
+}
