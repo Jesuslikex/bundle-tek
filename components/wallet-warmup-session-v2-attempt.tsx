@@ -536,8 +536,8 @@ export function WalletWarmupSessionV2Attempt({
         <p id={disabledDescription}>
           {busy
             ? readingSaved
-              ? 'Reading saved records. Pause and Stop remain available above.'
-              : 'Checking and recording this request. Pause and Stop remain available above.'
+              ? 'Reading saved records. This does not start another provider check.'
+              : 'Checking and recording this request. Keep its original request ID for recovery.'
             : journal.snapshot.phase === 'stopped'
               ? 'Session review is stopped. Saved-only recovery remains available; no new preview or trade can start.'
               : invalidated || now >= Date.parse(journal.sessionExpiresAt)

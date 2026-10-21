@@ -155,6 +155,256 @@ async function record() {
   await click('Record session history');
   await done(() => expect(host.textContent).toContain('Saved progress:'));
 }
+it('keeps preparation steps separate from unavailable execution and never starts a check automatically', async () => {
+  await mount();
+  const steps = () => [
+    ...host.querySelectorAll('ol[aria-label="Warmup preparation steps"] li'),
+  ];
+  expect(steps()).toHaveLength(4);
+  expect(steps()[3].textContent).toBe('4. Read-only checks');
+  expect(steps()[0].getAttribute('aria-current')).toBe('step');
+  expect(host.textContent).toContain('first pending action');
+  expect(fetch).not.toHaveBeenCalled();
+  await approve();
+  expect(steps()[1].getAttribute('aria-current')).toBe('step');
+  await record();
+  expect(steps()[2].getAttribute('aria-current')).toBe('step');
+  await check('Apply the control I choose');
+  await click('Review next action');
+  await done(() =>
+    expect(steps()[3].getAttribute('aria-current')).toBe('step'),
+  );
+  expect(host.textContent).toContain(
+    'Signing and execution remain unavailable',
+  );
+  expect(button('Request unsigned preview').disabled).toBe(true);
+  expect(host.querySelector('input[type="password"]')).toBeNull();
+  expect(
+    vi
+      .mocked(fetch)
+      .mock.calls.every(
+        ([url]) => typeof url === 'string' && !url.includes('attempts'),
+      ),
+  ).toBe(true);
+  await act(async () => {
+    vi.setSystemTime(Date.parse(journal!.journal.sessionExpiresAt) + 1);
+    vi.advanceTimersByTime(1000);
+  });
+  expect(steps().some((node) => node.hasAttribute('aria-current'))).toBe(false);
+  expect(host.textContent).toContain('Saved progress: expired');
+});
+it.each(
+  (['pause', 'stop'] as const).flatMap((control) =>
+    (['preview', 'runtime'] as const).flatMap((mode) =>
+      (['late', 'abort'] as const).map((delivery) => ({
+        control,
+        mode,
+        delivery,
+      })),
+    ),
+  ),
+)(
+  '$control during a pending $mode ($delivery) explains the reserved attempt and preserves original-ID recovery',
+  async ({ control, mode, delivery }) => {
+    const originalFetch = fetch;
+    const captured = {
+      signal: null as AbortSignal | null,
+      id: '',
+      posts: 0,
+      gets: 0,
+      postBody: null as Record<string, unknown> | null,
+      postReminder: null as string | null,
+      getId: null as string | null,
+      getMethod: undefined as string | undefined,
+    };
+    let release: (value: Response) => void = () => {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init?: RequestInit) => {
+        if (
+          input.endsWith('/session-v2-attempts') ||
+          input.endsWith('/session-v2-runtime-attempts')
+        ) {
+          captured.posts++;
+          captured.signal = init!.signal as AbortSignal;
+          const body = JSON.parse(init!.body as string);
+          captured.id = body.id;
+          captured.postBody = body;
+          captured.postReminder = sessionStorage.getItem(
+            'bundle:warmup-attempt-v2:' + body.journalId,
+          );
+          return new Promise<Response>((resolve, reject) => {
+            release = resolve;
+            if (delivery === 'abort')
+              captured.signal!.addEventListener(
+                'abort',
+                () =>
+                  reject(
+                    new DOMException('Synthetic aborted request', 'AbortError'),
+                  ),
+                { once: true },
+              );
+          });
+        }
+        if (input.includes('/session-v2-read-history')) {
+          captured.gets++;
+          captured.getMethod = init?.method;
+          captured.getId = new URL(input, 'http://localhost').searchParams.get(
+            'id',
+          );
+          return Response.json(
+            { error: 'No saved synthetic result' },
+            { status: 404 },
+          );
+        }
+        return originalFetch(input, init);
+      }),
+    );
+    try {
+      await mount();
+      await approve();
+      await record();
+      await check('Apply the control I choose');
+      await click('Review next action');
+      await done(() =>
+        expect(host.textContent).toContain('Pending review: Buy'),
+      );
+      if (mode === 'runtime') await check('Runtime checks');
+      await check(
+        mode === 'runtime'
+          ? 'Request the exact runtime checks'
+          : 'Request this exact unsigned quote',
+      );
+      await click(
+        mode === 'runtime'
+          ? 'Request runtime checks'
+          : 'Request unsigned preview',
+      );
+      await done(() => expect(captured.posts).toBe(1));
+      expect(
+        captured.postBody?.[
+          mode === 'runtime' ? 'runtimeRequested' : 'previewRequested'
+        ],
+      ).toBe(true);
+      expect(Object.keys(captured.postBody!).sort()).toEqual(
+        [
+          'id',
+          'journalId',
+          'version',
+          'headSha256',
+          mode === 'runtime' ? 'runtimeRequested' : 'previewRequested',
+        ].sort(),
+      );
+      expect(JSON.parse(captured.postReminder!).id).toBe(captured.id);
+      const attemptKey = 'bundle:warmup-attempt-v2:' + journal!.journal.id;
+      const originalReminder = sessionStorage.getItem(attemptKey);
+      expect(JSON.parse(originalReminder!).id).toBe(captured.id);
+      expect(captured.signal?.aborted).toBe(false);
+      expect(host.textContent).not.toContain('remain available above');
+      await check('Apply the control I choose');
+      const controlButton = button(
+        control === 'pause' ? 'Pause session review' : 'Stop session review',
+      );
+      expect(controlButton.disabled).toBe(false);
+      const note = document.getElementById(
+        controlButton.getAttribute('aria-describedby')!,
+      );
+      expect(note?.textContent).toContain(
+        'already reserved an attempt can still count',
+      );
+      expect(note?.textContent).toContain('Recover its original request ID');
+      await click(controlButton.textContent!);
+      await done(() =>
+        expect(host.textContent).toContain(
+          'Saved progress: ' + (control === 'pause' ? 'paused' : 'stopped'),
+        ),
+      );
+      expect(captured.signal?.aborted).toBe(true);
+      expect(
+        host.querySelector(
+          'ol[aria-label="Warmup preparation steps"] [aria-current]',
+        ),
+      ).toBeNull();
+      expect(sessionStorage.getItem(attemptKey)).toBe(originalReminder);
+      expect(captured.postReminder).toBe(originalReminder);
+      await act(async () => {
+        release(
+          Response.json({ error: 'Synthetic late refusal' }, { status: 409 }),
+        );
+        await new Promise<void>((resolve) => nextTurn(resolve));
+      });
+      expect(host.querySelector('[role="alert"]')).toBeNull();
+      expect(host.textContent).not.toContain('No confirmed new result');
+      expect(host.textContent).not.toContain('Unsigned request recorded.');
+      expect(host.textContent).not.toContain('Exact input:');
+      expect(document.activeElement?.textContent).toContain('Saved progress:');
+      expect(button('Recover unsigned request').disabled).toBe(false);
+      await click('Recover unsigned request');
+      await done(() => expect(captured.gets).toBe(1));
+      expect(captured.getMethod).toBe('GET');
+      expect(captured.getId).toBe(captured.id);
+      expect(captured.posts).toBe(1);
+      expect(sessionStorage.getItem(attemptKey)).toBe(originalReminder);
+      expect(controlCount).toBe(2);
+    } finally {
+      release(Response.json({ error: 'Synthetic cleanup' }, { status: 409 }));
+    }
+  },
+);
+it.each(['pagehide', 'receipt', 'storage'] as const)(
+  'clears the preparation highlight after %s invalidates its source',
+  async (event) => {
+    await mount();
+    await approve();
+    await record();
+    await check('Apply the control I choose');
+    await click('Review next action');
+    await done(() =>
+      expect(host.querySelector('ol [aria-current]')?.textContent).toContain(
+        'Read-only checks',
+      ),
+    );
+    const calls = vi.mocked(fetch).mock.calls.length;
+    await act(async () =>
+      window.dispatchEvent(
+        event === 'receipt'
+          ? new CustomEvent('bundle:warmup-receipt-saved', {
+              detail: { planId: f.plan.id },
+            })
+          : event === 'storage'
+            ? new StorageEvent('storage', {
+                key: key(),
+                storageArea: sessionStorage,
+              })
+            : new Event('pagehide'),
+      ),
+    );
+    expect(host.querySelector('ol [aria-current]')).toBeNull();
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
+  },
+);
+it('clears the preparation highlight for a server-expired history while the client clock is behind', async () => {
+  await mount();
+  await approve();
+  await record();
+  await check('Apply the control I choose');
+  await click('Review next action');
+  await done(() =>
+    expect(host.querySelector('ol [aria-current]')?.textContent).toContain(
+      'Read-only checks',
+    ),
+  );
+  expect(Date.now()).toBeLessThan(
+    Date.parse(journal!.journal.sessionExpiresAt),
+  );
+  journal!.journal.snapshot.expired = true;
+  journal!.journal.snapshot.phase = 'expired';
+  await click('Recover session history');
+  await done(() =>
+    expect(host.textContent).toContain('Saved progress: expired'),
+  );
+  expect(host.querySelector('ol [aria-current]')).toBeNull();
+});
 it('requires separate unchecked approvals and displays saved state without claiming execution', async () => {
   await mount();
   expect(fetch).not.toHaveBeenCalled();

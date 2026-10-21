@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import type { WalletWarmupSessionView } from '@/lib/wallet-warmup-session-view';
 import type { RetainedWarmupSessionSummary } from '@/lib/wallet-warmup-session-retained-view';
@@ -48,6 +48,7 @@ export function WalletWarmupSessionV2(props: Props) {
   );
 }
 function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
+  const controlEffectsId = useId();
   const key = 'bundle:warmup-v2:' + plan.id,
     active = useRef<AbortController | null>(null),
     mounted = useRef(false),
@@ -779,8 +780,8 @@ function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
           Prepare your warmup session
         </h6>
         <p>
-          Save one plan and recover its progress later. This session does not
-          run trades yet.
+          Save one plan and recover its history later. You can inspect its first
+          pending action.
         </p>
       </div>
       <ol className={styles.steps} aria-label="Warmup preparation steps">
@@ -788,14 +789,31 @@ function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
           'Approve plan',
           'Record history',
           'Review action',
-          'Runtime check',
+          'Read-only checks',
         ].map((name, i) => (
-          <li key={name} aria-current={step === i ? 'step' : undefined}>
+          <li
+            key={name}
+            aria-current={
+              step === i &&
+              !ended &&
+              !changed &&
+              !baselineChanged &&
+              !sourceDirty &&
+              !journal?.snapshot.expired &&
+              !journal?.snapshot.paused &&
+              !journal?.snapshot.stopped
+                ? 'step'
+                : undefined
+            }
+          >
             {i + 1}. {name}
-            {i === 3 ? ' · unavailable' : ''}
           </li>
         ))}
       </ol>
+      <p role="note">
+        <strong>Signing and execution remain unavailable.</strong> Read-only
+        checks do not run the planned buy/sell sequence.
+      </p>
       {!consent && (
         <>
           <label className={styles.field}>
@@ -998,6 +1016,11 @@ function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
               now={clock}
             />
           )}
+          <p id={controlEffectsId} role="note">
+            A check that already reserved an attempt can still count after Pause
+            or Stop. Recover its original request ID to inspect its saved
+            status. These controls update the saved review.
+          </p>
           {!journal.snapshot.stopped && (
             <>
               <label className={styles.check}>
@@ -1034,6 +1057,7 @@ function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
                 </Button>
                 <Button
                   variant="outline"
+                  aria-describedby={controlEffectsId}
                   disabled={
                     locked ||
                     !controlChecked ||
@@ -1061,6 +1085,7 @@ function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
                 <Button
                   variant="outline"
                   disabled={locked || !controlChecked}
+                  aria-describedby={controlEffectsId}
                   onClick={() => void control('stop')}
                 >
                   Stop session review

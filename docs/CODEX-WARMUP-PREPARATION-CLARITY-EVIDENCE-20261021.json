@@ -1,0 +1,137 @@
+{
+  "baseCommit": "bbbbab2e483472f6e179134efd866d12ef472a81",
+  "scope": "Owned saved warmup V2 preparation/read-only UI clarity; execution remains unavailable",
+  "protectedClaudeFilesChanged": false,
+  "cssChanged": false,
+  "apiStorageProviderOrFinancialBehaviorChanged": false,
+  "applicationOrHostedSqlRun": false,
+  "credentialsOrCronChanged": false,
+  "walletUnlockSignSend": false,
+  "fundedTests": false,
+  "deployed": false,
+  "fullProximaParityProven": false,
+  "changes": [
+    "Read-only checks replace misleading runtime-unavailable step label",
+    "Preparation highlight clears for source invalidation, client/server expiry and paused/stopped reviews",
+    "First-action scope and unavailable signing/execution stated explicitly",
+    "Stable accessible Pause/Stop explanation of retained attempt and original-ID recovery, including stopped view",
+    "Busy saved-history text does not imply new provider reads or mislocate controls"
+  ],
+  "tests": {
+    "files": 18,
+    "passed": 315,
+    "failed": 0,
+    "skipped": 0,
+    "newCases": 13,
+    "newCasesScope": "Preparation progression/expiry; pause/stop x preview/runtime x late/abort; three source invalidation events; server expiry with client-clock lag",
+    "entireRepositorySuite": false,
+    "report": "work/release-qa/warmup-preparation-clarity-final-20261021.json"
+  },
+  "checks": {
+    "plainTypeScript": true,
+    "typeAwareLintFiles": 3,
+    "formatFiles": 3,
+    "reactReview": "Stable useId/aria associations and informational note semantics; unchanged effects, handlers and fetch ownership"
+  },
+  "existingBehaviorProof": {
+    "base": "bbbbab2e483472f6e179134efd866d12ef472a81",
+    "checks": [
+      {
+        "file": "components/wallet-warmup-session-v2.tsx",
+        "unchangedPreReturnStatements": 31,
+        "onlyNewPreReturnStatement": "const controlEffectsId = useId()"
+      },
+      {
+        "file": "components/wallet-warmup-session-v2-attempt.tsx",
+        "unchangedPreReturnStatements": 15,
+        "onlyNewPreReturnStatement": null
+      }
+    ],
+    "passed": true,
+    "scope": "Existing pre-return component statements unchanged; parent adds only useId. JSX capability label, aria-current and informational notes intentionally change. Not a browser/financial qualification."
+  },
+  "build": {
+    "base": "bbbbab2e483472f6e179134efd866d12ef472a81",
+    "overlays": [
+      "components/wallet-warmup-session-v2.tsx",
+      "components/wallet-warmup-session-v2-attempt.tsx",
+      "components/wallet-warmup-session-v2.test.tsx"
+    ],
+    "hashes": {
+      "components/wallet-warmup-session-v2.tsx": "e81e7f3a2c3733d3f01bb0e2001c2cc10aaf8b5dc65c5335a2bd7215c08cb50f",
+      "components/wallet-warmup-session-v2-attempt.tsx": "739b245067bd77e3cddd8aba338b8bccfef4d37a72158e8828b001e1af1b6b1b",
+      "components/wallet-warmup-session-v2.test.tsx": "e43f40e865f87a441ee96c946021da52cfafde735065c110446966276da095df"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "reviews": [
+    {
+      "artifact": "work/release-qa/opus-warmup-preparation-clarity-bbbbab2-20261021",
+      "model": "claude-opus-5-5",
+      "modelsUsed": ["claude-opus-5-5"],
+      "copiedFiles": 3441,
+      "sourceCopyUnchanged": true,
+      "permissionDenials": 0,
+      "tools": ["Glob", "Grep", "Read"],
+      "testsRun": false
+    },
+    {
+      "artifact": "work/release-qa/opus-warmup-preparation-followup-bbbbab2-20261021",
+      "model": "claude-opus-5-5",
+      "modelsUsed": ["claude-opus-5-5"],
+      "copiedFiles": 3442,
+      "sourceCopyUnchanged": true,
+      "permissionDenials": 0,
+      "tools": ["Glob", "Grep", "Read"],
+      "testsRun": false
+    }
+  ],
+  "reviewDisposition": {
+    "initial": "No high/medium production issue; two medium test assertion defects and low UI consistency findings",
+    "followup": "Actionable findings resolved; no new high/medium issue in reviewed scope",
+    "independentLowDisposition": "Parser retains pending review and rejects absent begin-review pending metadata; no-auto-start proven by captured fetch URLs, not unchecked button assertion; capability intro grants no authority",
+    "followupMatchesFinalFunctionalFiles": true
+  },
+  "sourceFreeze": {
+    "selectedFiles": 2349,
+    "sha256": "70ad99698adf0584e3a582f039e98e6e6997b6ea9253a2c855dc1c0c20a2cb6d",
+    "changed": [],
+    "scope": "Tracked TS/TSX/MJS/CSS/SQL/JSON captured for final checks; excludes env/runtime artifacts, Markdown handoff and new evidence JSON"
+  },
+  "retainedReports": [
+    {
+      "name": "warmup-preparation-clarity-baseline-20261021.json",
+      "meaning": "Five added UI checks fail against original labels/direction wording; 23 tests deselected, not five financial bugs"
+    },
+    {
+      "name": "warmup-preparation-clarity-first-fix-20261021.json",
+      "meaning": "50/50 before review refinements"
+    },
+    {
+      "name": "warmup-preparation-clarity-cohort-20261021.json",
+      "meaning": "307/307 before review refinements"
+    },
+    {
+      "name": "warmup-preparation-clarity-review-fixes-20261021.json",
+      "meaning": "57/58, one async test observation before actual POST; corrected by awaiting captured boundary"
+    }
+  ],
+  "reference": {
+    "publicDocs": "https://docs.proxima.tools/wallets/generate-activity/",
+    "freshPrivateReferenceCapture": false,
+    "freshSignedInBundleBrowserCheck": false,
+    "lastBrowserControlObservation": "Prior inventory retry timed out even after user confirmed connection; no browser restart/profile switch or running warmup interaction",
+    "productionStateQueried": false
+  },
+  "remaining": [
+    "Rendered signed-in keyboard/viewport verification",
+    "Live runtime provider/program-policy qualification",
+    "Exclusive financial reservation and short signing authorization",
+    "Receipt-driven finalized/unknown action and budget progress",
+    "Durable session orchestration and qualified alternative routing"
+  ]
+}
