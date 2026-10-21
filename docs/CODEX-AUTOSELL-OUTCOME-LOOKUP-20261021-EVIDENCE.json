@@ -1,0 +1,206 @@
+{
+  "sourceBase": "40ec795fb5deb39701ce67fc95a3601a19cac1c1",
+  "combinedTests": {
+    "passed": 236,
+    "failed": 0,
+    "pending": 0,
+    "files": 22,
+    "success": true,
+    "terminalExit": 0,
+    "sourceDigest": "fde83e16e35766ede815881d9a4915df0302aa97e38d5b879da25415552c0dce",
+    "filesRun": [
+      "components/auto-sell-lifecycle.test.tsx",
+      "components/auto-sell-modal.test.tsx",
+      "components/auto-sell-outcome-modal.test.tsx",
+      "components/auto-sell-outcome-read.test.tsx",
+      "components/auto-sell-session-summary.test.tsx",
+      "lib/auto-sell-display.test.ts",
+      "lib/auto-sell-edit-changes.test.ts",
+      "lib/auto-sell-edit.test.ts",
+      "lib/auto-sell-execute.test.ts",
+      "lib/auto-sell-feed.test.ts",
+      "lib/auto-sell-market-observation.test.ts",
+      "lib/auto-sell-modes.test.ts",
+      "lib/auto-sell-outcome-route.test.ts",
+      "lib/auto-sell-outcome-runner.test.ts",
+      "lib/auto-sell-outcome.test.ts",
+      "lib/auto-sell-pause.test.ts",
+      "lib/auto-sell-quote-trigger.test.ts",
+      "lib/auto-sell-runner.test.ts",
+      "lib/auto-sell-session.test.ts",
+      "lib/auto-sell.test.ts",
+      "lib/imported-approval-history.test.ts",
+      "app/api/imported-projects/signing/route.test.ts"
+    ]
+  },
+  "finalAssertionRecheck": {
+    "passed": 13,
+    "failed": 0,
+    "files": 2,
+    "terminalExit": 0,
+    "onlyFilesChangedAfterCombinedRun": [
+      "components/auto-sell-outcome-modal.test.tsx",
+      "components/auto-sell-outcome-read.test.tsx"
+    ],
+    "productionSourceUnchangedAfterCombinedRun": true
+  },
+  "finalSourceFreeze": {
+    "files": 2812,
+    "digest": "ba4935aacdd754a4444142908c287e83cda313cac702c115da93cdf979ff6088",
+    "unchanged": true
+  },
+  "staticChecks": {
+    "plainTypeScript": "pass",
+    "typedLint13Files": "pass",
+    "format14Files": "pass",
+    "unchangedOriginalFiles": {
+      "lib/auto-sell.ts": true,
+      "lib/auto-sell-feed.ts": true,
+      "lib/browser-wallet-vault.ts": true,
+      "app/api/imported-projects/signing/route.ts": true
+    }
+  },
+  "build": {
+    "base": "40ec795",
+    "overlay": [
+      "lib/auto-sell-outcome-reference.ts",
+      "lib/auto-sell-outcome.ts",
+      "lib/auto-sell-outcome.test.ts",
+      "lib/auto-sell-outcome-runner.test.ts",
+      "lib/auto-sell-outcome-route.test.ts",
+      "lib/auto-sell-execute.ts",
+      "lib/auto-sell-execute.test.ts",
+      "lib/auto-sell-runner.ts",
+      "components/auto-sell-outcome-read.tsx",
+      "components/auto-sell-outcome-read.module.css",
+      "components/auto-sell-outcome-read.test.tsx",
+      "components/auto-sell-outcome-modal.test.tsx",
+      "components/auto-sell-modal.tsx",
+      "test/auto-sell-outcome-fixture.ts"
+    ],
+    "hashes": {
+      "lib/auto-sell-outcome-reference.ts": "2c7fae0a0d30f53c22afe04846471d7be6644f5253d6a189c98ed3942fb141ae",
+      "lib/auto-sell-outcome.ts": "000268a155618c3f288217524e2212087cd9aaee30da01427282efc92868d77f",
+      "lib/auto-sell-outcome.test.ts": "c6e7c1feb45188e169782c6c09f4deffbb29ca9dbd986f369a09f5ac01ad0894",
+      "lib/auto-sell-outcome-runner.test.ts": "05b7a87edf26adc7c9c186531e1915aef63ecba61b3589058e13fa76eb5672d3",
+      "lib/auto-sell-outcome-route.test.ts": "370f1e943f07115a67cda32bd0638665073a9906846f6f7aec9ce0de08e897b8",
+      "lib/auto-sell-execute.ts": "f50a95c7c5927ea3bb78ea0cceb7883310995796a6b63b6772f79473706cb014",
+      "lib/auto-sell-execute.test.ts": "955f3ce5135e427808c69812a86d6daa80cb4ec8d1cf206ebc01a0d9fdf8aa79",
+      "lib/auto-sell-runner.ts": "cc529953b4577c9c6036e65bbc4a2fb0a88bf23ab3cf394e11fa20eb1e8859f7",
+      "components/auto-sell-outcome-read.tsx": "b80f613959f1a6549f8432ec240e04f59b56c58e7ff2629d3558c1523d645be0",
+      "components/auto-sell-outcome-read.module.css": "70ba08229b09b6ea1563e4a14b5923a71001ac9d091170fad44e0d90c9b18796",
+      "components/auto-sell-outcome-read.test.tsx": "2dc3b19b2d4b6f8a3200ae308b1bf65b1c63660dc69f68f0f523120e8f1de934",
+      "components/auto-sell-outcome-modal.test.tsx": "e3d76ffc3983273aff771a96f1bc9537f797f4f647183cf532c13df2f914b42f",
+      "components/auto-sell-modal.tsx": "ad58a339e6986bf200bd39cdfe07fad2afcb245af3dfe28803f28d9cdba580b3",
+      "test/auto-sell-outcome-fixture.ts": "95b778cef9fb05653b2b807711c618b0727b581982c05c7050d89b59365a2415"
+    },
+    "code": 0,
+    "unchanged": true,
+    "passed": true
+  },
+  "opus": [
+    {
+      "startedAt": "2026-10-21T16:48:00.741Z",
+      "finishedAt": "2026-10-21T16:51:20.591Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "40ec795fb5deb39701ce67fc95a3601a19cac1c1",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.8124616,
+      "sourceUnchanged": true,
+      "changed": [],
+      "sourceFiles": 2778
+    },
+    {
+      "startedAt": "2026-10-21T16:57:18.337Z",
+      "finishedAt": "2026-10-21T16:59:37.381Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "40ec795fb5deb39701ce67fc95a3601a19cac1c1",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.6444357999999999,
+      "sourceUnchanged": true,
+      "changed": [],
+      "sourceFiles": 2780
+    }
+  ],
+  "reviewCorrections": [
+    "Metadata log rows use stable original intentId+kind keys; actual modal/runner test proves Pause appends a log without aborting lookup or losing its open disclosure",
+    "Timeout/late/cancel/context/unmount, precise signed/failed/finalized labels and register-stage no-send/original-source cases checked",
+    "Final two added assertion lines independently verified, not rereviewed",
+    "Lookup object is frozen after original sign call and before register, not at executor construction; original deps/session semantics preserved"
+  ],
+  "contract": {
+    "request": "Explicit same-origin GET /api/imported-projects/signing?projectId&intentId",
+    "match": [
+      "projectId",
+      "preparationId",
+      "intentId",
+      "projectRevision",
+      "walletRevision",
+      "wallet",
+      "Sell",
+      "inputMint",
+      "outputSOL",
+      "inputRaw",
+      "unsignedPacketSha256",
+      "signatureWhenStored"
+    ],
+    "resultFlags": {
+      "finalityVerified": false,
+      "signingAllowed": false,
+      "submissionAllowed": false
+    },
+    "noMountOrDisclosureFetch": true,
+    "noAutomaticRetryOrCounterReconciliation": true,
+    "noPacketInProjection": true,
+    "legacyMetadataOptional": true,
+    "lookupReferenceLifetime": "Recent in-memory activity entry only; normal saved approval history remains. No new persistent reminder store."
+  },
+  "nativeReadProof": "Actual GET and parser use disposable native read-side SQL projections with non-SELECT statements refused;401noSQL and owner/project404s. This is not financial write-guard or hosted-schema proof. Broader unchanged40-route tests use disposable Miniflare/synthetic signing/provider data.",
+  "browser": "Unavailable on existing Chrome connection; no new browser/server launched this checkpoint. Prior final rendered status QA and new outcome disclosure/phone/keyboard/live session QA remain open. No browser or production/funded proof claimed.",
+  "limits": [
+    "No new signing authority, financial rule, execution order, quote, cap, retry/send or receipt transition",
+    "No migration/schema or application/hosted SQL",
+    "No provider/credential/cron, real wallet unlock/sign/send, funded action or deploy",
+    "No complete Proxima/automatic warmup/marketplace parity claim"
+  ]
+}

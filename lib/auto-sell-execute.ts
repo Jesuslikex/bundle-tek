@@ -1,5 +1,6 @@
 import { rawToDecimal } from './auto-sell';
 import type { VaultSession } from './browser-wallet-vault';
+import type { AutoSellOutcomeReference } from './auto-sell-outcome-reference';
 import {
   signApprovedWarmupPacket,
   type WarmupSigningReview,
@@ -49,6 +50,7 @@ export class AutoSellUncertainError extends Error {
     message: string,
     readonly signature: string,
     readonly wallet: string,
+    readonly outcome?: AutoSellOutcomeReference,
   ) {
     super(message);
   }
@@ -222,6 +224,18 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
         throw new Error('Auto Sell stopped.');
     };
     const packet = await sign(session, review, assertCurrent);
+    const outcome: AutoSellOutcomeReference = Object.freeze({
+      projectId: deps.projectId,
+      projectRevision: deps.projectRevision,
+      walletRevision: wallet.revision,
+      preparationId: review.preparationId,
+      intentId: review.id,
+      wallet: wallet.address,
+      mint: deps.mint,
+      inputRaw: amountRaw.toString(),
+      preparationSha256: review.sha256,
+      signature: packet.signature,
+    });
     try {
       const registered = await postJson(
         fetcher,
@@ -251,12 +265,14 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
         `${error instanceof Error ? error.message : 'Submission unknown'}. Check signature ${packet.signature} in preparation history.`,
         packet.signature,
         wallet.address,
+        outcome,
       );
     }
     return {
       soldRaw: amountRaw,
       signature: packet.signature,
       wallet: wallet.address,
+      outcome,
     };
   }
 

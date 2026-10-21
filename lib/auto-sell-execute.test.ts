@@ -3,12 +3,13 @@ import {
   AutoSellUncertainError,
   createAutoSellExecutor,
 } from './auto-sell-execute';
+import { autoSellOutcomeReference as retained } from '../test/auto-sell-outcome-fixture';
 import type { VaultSession } from './browser-wallet-vault';
 
-const MINT = 'Mint111111111111111111111111111111111111111';
+const MINT = retained.mint;
 const SOL = 'So11111111111111111111111111111111111111112';
-const W1 = 'Wal1111111111111111111111111111111111111111';
-const W2 = 'Wal2111111111111111111111111111111111111111';
+const W1 = retained.wallet;
+const W2 = SOL;
 const session = { payload: { wallets: [] } } as unknown as VaultSession;
 const ok = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -16,7 +17,13 @@ const ok = (body: unknown, status = 200) =>
     headers: { 'content-type': 'application/json' },
   });
 
-function server(opts: { failWallet?: string; submitFails?: boolean } = {}) {
+function server(
+  opts: {
+    failWallet?: string;
+    submitFails?: boolean;
+    registerFails?: boolean;
+  } = {},
+) {
   const calls: { url: string; body: Record<string, unknown> }[] = [];
   const fetcher = vi.fn(async (url: string, init: RequestInit) => {
     const body = JSON.parse(init.body as string);
@@ -30,9 +37,13 @@ function server(opts: { failWallet?: string; submitFails?: boolean } = {}) {
           inAmount: '1500000',
           inputMint: MINT,
           outputMint: SOL,
-          preparation: { wallet: body.wallet, transaction: 'tx', sha256: 'h' },
+          preparation: {
+            wallet: body.wallet,
+            transaction: 'tx',
+            sha256: retained.preparationSha256,
+          },
         },
-        history: { id: 'prep' },
+        history: { id: retained.preparationId },
         simulation: { succeeded: true },
         reviewWaitMs: 5000,
       });
@@ -43,10 +54,10 @@ function server(opts: { failWallet?: string; submitFails?: boolean } = {}) {
       )!.body.wallet;
       return ok({
         review: {
-          id: 'rev',
-          preparationId: 'prep',
+          id: retained.intentId,
+          preparationId: retained.preparationId,
           wallet,
-          sha256: 'h',
+          sha256: retained.preparationSha256,
           transaction: 'tx',
           inputRaw: '1500000',
           inputMint: MINT,
@@ -57,14 +68,16 @@ function server(opts: { failWallet?: string; submitFails?: boolean } = {}) {
     }
     if (body.action === 'submit' && opts.submitFails)
       return ok({ error: 'send unknown' }, 502);
-    return ok({ signature: 'SIG', state: 'submitted' });
+    if (body.action === 'register' && opts.registerFails)
+      return ok({ error: 'registration unknown' }, 502);
+    return ok({ signature: retained.signature, state: 'submitted' });
   });
   return { calls, fetcher: fetcher as unknown as typeof fetch };
 }
 
 const make = (s: ReturnType<typeof server>) =>
   createAutoSellExecutor({
-    projectId: 'p',
+    projectId: retained.projectId,
     projectRevision: 3,
     mint: MINT,
     decimals: 6,
@@ -75,7 +88,10 @@ const make = (s: ReturnType<typeof server>) =>
     session: () => session,
     fetcher: s.fetcher,
     sleep: async () => {},
-    sign: vi.fn(async () => ({ signature: 'SIG', transaction: 'signed' })),
+    sign: vi.fn(async () => ({
+      signature: retained.signature,
+      transaction: 'signed',
+    })),
   });
 
 describe('auto sell executor', () => {
@@ -84,8 +100,14 @@ describe('auto sell executor', () => {
     const result = await make(s)(1_500_000n, new AbortController().signal);
     expect(result).toEqual({
       soldRaw: 1_500_000n,
-      signature: 'SIG',
+      signature: retained.signature,
       wallet: W1,
+      outcome: {
+        ...retained,
+        projectRevision: 3,
+        walletRevision: 1,
+        inputRaw: '1500000',
+      },
     });
     expect(s.calls[0].body).toMatchObject({
       side: 'Sell',
@@ -108,9 +130,16 @@ describe('auto sell executor', () => {
 
   it('reports a signed but unconfirmed submission as uncertain', async () => {
     const s = server({ submitFails: true });
-    await expect(
-      make(s)(1_500_000n, new AbortController().signal),
-    ).rejects.toBeInstanceOf(AutoSellUncertainError);
+    const error = await make(s)(1_500_000n, new AbortController().signal).catch(
+      (e) => e,
+    );
+    expect(error).toBeInstanceOf(AutoSellUncertainError);
+    expect(error.outcome).toEqual({
+      ...retained,
+      projectRevision: 3,
+      walletRevision: 1,
+      inputRaw: '1500000',
+    });
     expect(s.calls.filter((c) => c.url.endsWith('/prepare'))).toHaveLength(1);
   });
 
@@ -125,7 +154,7 @@ describe('auto sell executor', () => {
       },
     );
     const sell = createAutoSellExecutor({
-      projectId: 'p',
+      projectId: retained.projectId,
       projectRevision: 3,
       mint: MINT,
       decimals: 6,
@@ -133,11 +162,29 @@ describe('auto sell executor', () => {
       session: () => session,
       fetcher: fetcher as unknown as typeof fetch,
       sleep: async () => {},
-      sign: vi.fn(async () => ({ signature: 'SIG', transaction: 'signed' })),
+      sign: vi.fn(async () => ({
+        signature: retained.signature,
+        transaction: 'signed',
+      })),
     });
     const error = await sell(1_500_000n, controller.signal).catch((e) => e);
     expect(error).not.toBeInstanceOf(AutoSellUncertainError);
     expect(error.message).toMatch(/before sending/);
+    expect(s.calls.some((c) => c.body.action === 'submit')).toBe(false);
+  });
+  it('retains the original lookup context after a registration-stage refusal without another wallet or send', async () => {
+    const s = server({ registerFails: true });
+    const error = await make(s)(1500000n, new AbortController().signal).catch(
+      (e) => e,
+    );
+    expect(error).toBeInstanceOf(AutoSellUncertainError);
+    expect(error.outcome).toEqual({
+      ...retained,
+      projectRevision: 3,
+      walletRevision: 1,
+      inputRaw: '1500000',
+    });
+    expect(s.calls.filter((c) => c.url.endsWith('/prepare'))).toHaveLength(1);
     expect(s.calls.some((c) => c.body.action === 'submit')).toBe(false);
   });
 });

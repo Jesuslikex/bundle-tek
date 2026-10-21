@@ -42,6 +42,7 @@ import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import styles from './auto-sell-modal.module.css';
 import { AutoSellSessionSummary } from './auto-sell-session-summary';
+import { AutoSellOutcomeRead } from './auto-sell-outcome-read';
 import {
   autoSellActivityLabel,
   autoSellEndLabel,
@@ -835,12 +836,23 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
             {snapshot && snapshot.log.length > 0 && (
               <section aria-label="Auto Sell activity" className={styles.log}>
                 <h3>Activity</h3>
+                <p>
+                  Latest {Math.min(20, snapshot.log.length)} activity entries.
+                  Older approvals remain in preparation history.
+                </p>
                 <ol>
                   {[...snapshot.log]
                     .reverse()
                     .slice(0, 20)
                     .map((entry, n) => (
-                      <li key={`${entry.at}-${n}`} data-kind={entry.kind}>
+                      <li
+                        key={
+                          entry.outcome
+                            ? `${entry.outcome.intentId}:${entry.kind}`
+                            : `${entry.at}-${n}`
+                        }
+                        data-kind={entry.kind}
+                      >
                         <time>{new Date(entry.at).toLocaleTimeString()}</time>{' '}
                         {autoSellActivityLabel(entry)}
                         {entry.signature && (
@@ -852,6 +864,13 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                             {' '}
                             tx
                           </a>
+                        )}
+                        {entry.outcome && (
+                          <AutoSellOutcomeRead
+                            reference={entry.outcome}
+                            projectId={project.id}
+                            mint={token.address}
+                          />
                         )}
                       </li>
                     ))}

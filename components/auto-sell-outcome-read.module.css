@@ -1,0 +1,59 @@
+.readout {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border, #2b2d38);
+  border-radius: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.readout summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #b4b0ff;
+}
+.readout summary:focus-visible {
+  outline: 2px solid #a99bff;
+  outline-offset: 2px;
+}
+.readout p,
+.readout dl,
+.readout dd {
+  margin: 0;
+}
+.readout p,
+.readout dt {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a0a2b1;
+}
+.readout dl {
+  display: grid;
+  gap: 8px;
+  margin-block: 10px;
+}
+.readout code {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.readout button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+  margin: 8px 8px 0 0;
+}
+.readout a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-block: 10px;
+}
+.readout output {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+}

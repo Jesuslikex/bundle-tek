@@ -24,6 +24,10 @@ import {
   autoSellMarketObservation,
   AUTO_SELL_MARKET_MAX_AGE_MS,
 } from './auto-sell-market-observation';
+import {
+  validatedAutoSellOutcomeReference,
+  type AutoSellOutcomeReference,
+} from './auto-sell-outcome-reference';
 
 export type AutoSellLogEntry = {
   at: number;
@@ -31,6 +35,7 @@ export type AutoSellLogEntry = {
   kind: 'info' | 'sell' | 'error';
   text: string;
   signature?: string;
+  outcome?: AutoSellOutcomeReference;
 };
 
 export type AutoSellSnapshot = {
@@ -56,7 +61,12 @@ export type AutoSellRunnerDeps = {
   sell: (
     amountRaw: bigint,
     signal: AbortSignal,
-  ) => Promise<{ soldRaw: bigint; signature: string; wallet: string }>;
+  ) => Promise<{
+    soldRaw: bigint;
+    signature: string;
+    wallet: string;
+    outcome?: AutoSellOutcomeReference;
+  }>;
   onUpdate: (snapshot: AutoSellSnapshot) => void;
   session?: AutoSellSessionRules;
   now?: () => number;
@@ -478,13 +488,23 @@ export class AutoSellRunner {
     kind: AutoSellLogEntry['kind'],
     text: string,
     signature?: string,
+    outcome?: AutoSellOutcomeReference,
   ) {
+    let retained: AutoSellOutcomeReference | undefined;
+    if (outcome) {
+      try {
+        retained = validatedAutoSellOutcomeReference(outcome);
+      } catch {
+        /* Invalid lookup coordinates grant no read capability. */
+      }
+    }
     this.log.push({
       at: this.deps.now(),
       strategyId,
       kind,
       text,
       ...(signature ? { signature } : {}),
+      ...(retained ? { outcome: retained } : {}),
     });
     if (this.log.length > 200) this.log = this.log.slice(-100);
     this.emit();
@@ -707,7 +727,7 @@ export class AutoSellRunner {
       this.emit();
       void this.deps
         .sell(amount, this.controller.signal)
-        .then(({ soldRaw, signature, wallet }) => {
+        .then(({ soldRaw, signature, wallet, outcome }) => {
           this.failures = 0;
           const current = this.states.get(s.id)!;
           const sold = soldRaw < amount ? soldRaw : amount;
@@ -726,6 +746,7 @@ export class AutoSellRunner {
             'sell',
             `${s.name}: sold ${sold} raw from ${short(wallet)}.`,
             signature,
+            outcome,
           );
         })
         .catch((error) => {
@@ -742,6 +763,8 @@ export class AutoSellRunner {
               s.id,
               'error',
               `${s.name}: ${error instanceof Error ? error.message : 'submission unknown'}`,
+              undefined,
+              (error as { outcome?: AutoSellOutcomeReference }).outcome,
             );
             if (
               !this.controller.signal.aborted &&
