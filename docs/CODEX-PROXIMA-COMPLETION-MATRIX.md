@@ -1,5 +1,13 @@
 # Proxima reconstruction completion matrix
 
+## Versioned consent backend, 21 October 2026
+
+Sourcec4b748f adds separate immutable v2 read-policy consent and an authenticated review/save/saved-only recovery API in source-only migration0132. Initial60-second capture, original finish, exact plan/source/budget binding, explicit approval, both-order version/ID isolation and false authority remain. Existing v1 functions are unchanged except an additive historical-builder export; all earlier migration bytes/schema objects/trigger bodies are unchanged. Read `CODEX-WARMUP-V2-CONSENT-API-20261021.md`.
+
+Final194distinct tests/eightfiles (193regressions plus real61-second database-clock QA), plain TypeScript/eight-file typed lint/format, unchanged2731-file freeze and isolated production build pass. All133migrations pass the disposable checksum runner and whole-file Wrangler; no application/hosted SQL was applied. Actual Opus5.5 reviewed the uncommitted source overlay read-only with2672unchanged copied files, zero denials/edits/tests and no SQL bypass/authority finding. Its error/conflict/capacity/recovery findings were independently corrected and Codex-verified, not rereviewed.
+
+This is the consent backend segment, not a mounted long-session UI or finished activity flow. V2 journal, head-bound per-attempt fresh qualification, client admission/progress UI, cross-review wallet/lot holds, short signing, settlement/terminal recovery and orchestration remain open. No Start/signing, provider/credential/cron, protected UI, deployment or funded action changed.0132is committed;0133is unclaimed and must be rechecked. Full Proxima parity remains incomplete.
+
 ## Provider conflict guard and versioned long-session design, 21 October 2026
 
 Source2c7fa11 repeats active shared swap/execution reservation checks for all selected wallets in the existing exact owner/plan/head provider read, before cooldown and around quote/simulation work.168relatedtests/fourfiles, plain TypeScript/scoped typed lint/format, unchanged2723-file source and final isolated production build pass. This is an advisory unsigned-preparation guard, not an atomic reservation or execution clearance. Read `CODEX-WARMUP-PROVIDER-CONFLICT-GUARD-20261021.md`.

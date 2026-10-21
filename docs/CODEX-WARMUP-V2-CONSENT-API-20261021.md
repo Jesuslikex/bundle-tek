@@ -25,3 +25,5 @@ Opus did not run tests/builds, inspect auth/body-reader internals or verify old 
 -The final isolated production build passed with exit0; all ten candidate overlay hashes stayed unchanged. Result: work/release-qa/warmup-v2-consent-final-build-20261021/result.json. No browser or deployed verification is claimed for this backend-only slice.
 
 0132 is finalized at its first source commit; never rewrite it. Next0133 is unclaimed and must be rechecked against the current journal. No application or hosted database was migrated. No protected UI, provider/credential/cron setting, deployment, real wallet unlock/sign/send or funded test changed. Full Proxima parity remains incomplete. Next implementation is the connected v2 journal and head-bound fresh per-attempt qualification, followed by explicit client admission/progress UI. Preserve the precise consent policy, original caps and all false authority flags.
+
+Source implementation committed as c4b748f. The bounded consent/API claim is released. Next0133 remains unclaimed. Git push does not deploy this source or migrate any application database.
