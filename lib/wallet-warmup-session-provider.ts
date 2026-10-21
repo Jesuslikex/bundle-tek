@@ -154,7 +154,7 @@ export function createWalletWarmupSessionProvider(
         );
       const row = await db
         .prepare(
-          "SELECT p.document FROM wallet_warmup_plans p JOIN wallet_warmup_session_journal_heads h ON h.owner_id=p.owner_id WHERE p.owner_id=? AND p.id=? AND p.revision=? AND p.updated_at=? AND p.archived=0 AND h.journal_id=? AND h.version=? AND h.head_sha256=? AND (SELECT COUNT(*) FROM json_each(json_extract(p.document,'$.walletRevisions')) j JOIN workspace_wallets w ON w.owner_id=p.owner_id AND w.address=json_extract(j.value,'$.address') AND w.revision=json_extract(j.value,'$.revision') AND w.chain='Solana' AND w.archived=0)=json_array_length(json_extract(p.document,'$.addresses'))",
+          "SELECT p.document,(EXISTS(SELECT 1 FROM json_each(p.document,'$.addresses') a JOIN solana_swap_reservations r ON r.owner_id=p.owner_id AND r.wallet_address=a.value) OR EXISTS(SELECT 1 FROM json_each(p.document,'$.addresses') a JOIN solana_execution_reservations r ON r.owner_id=p.owner_id AND r.wallet_address=a.value)) AS busy FROM wallet_warmup_plans p JOIN wallet_warmup_session_journal_heads h ON h.owner_id=p.owner_id WHERE p.owner_id=? AND p.id=? AND p.revision=? AND p.updated_at=? AND p.archived=0 AND h.journal_id=? AND h.version=? AND h.head_sha256=? AND (SELECT COUNT(*) FROM json_each(json_extract(p.document,'$.walletRevisions')) j JOIN workspace_wallets w ON w.owner_id=p.owner_id AND w.address=json_extract(j.value,'$.address') AND w.revision=json_extract(j.value,'$.revision') AND w.chain='Solana' AND w.archived=0)=json_array_length(json_extract(p.document,'$.addresses'))",
         )
         .bind(
           owner,
@@ -165,11 +165,17 @@ export function createWalletWarmupSessionProvider(
           c.version,
           c.headSha256,
         )
-        .first<{ document: string }>();
+        .first<{ document: string; busy: number }>();
       signal.throwIfAborted();
       if (!row || row.document !== c.planDocument)
         return fail(
           'Saved session, plan or wallets changed. Recover the current status.',
+        );
+      // Advisory read guard in the same snapshot as plan/head checks. It does
+      // not reserve funds or close the later signing/broadcast race.
+      if (row.busy !== 0)
+        return fail(
+          'A selected wallet has active transaction work. Recover that work and the original preparation before another attempt.',
         );
       if (receipt && canonical(await loadReceipt()) !== canonical(receipt))
         return fail(

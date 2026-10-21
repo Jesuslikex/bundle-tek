@@ -273,6 +273,76 @@ it.each([
   expect((await post()).status).toBe(kind === 'amount' ? 502 : 409);
   expect(await f.count()).toEqual([0, 0, 0]);
 });
+it.each(['swap', 'execution'] as const)(
+  'holds a pre-existing %s wallet reservation before cooldown or providers',
+  async (kind) => {
+    if (kind === 'swap')
+      await f.db
+        .prepare('INSERT INTO solana_swap_reservations VALUES(?,?,?,?)')
+        .bind('owner', 'other-intent', f.packets.wallet, 'submitted')
+        .run();
+    else
+      await f.db
+        .prepare('INSERT INTO solana_execution_reservations VALUES(?,?,?)')
+        .bind('owner', f.packets.wallet, 'submitted')
+        .run();
+    const response = await post();
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain('active transaction work');
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(mocks.simulate).not.toHaveBeenCalled();
+    expect(
+      await f.db
+        .prepare('SELECT count(*) AS n FROM wallet_balance_gates')
+        .first(),
+    ).toEqual({ n: 0 });
+    expect(await f.count()).toEqual([0, 0, 0]);
+  },
+);
+it.each(['quote', 'simulation'] as const)(
+  'holds a wallet becoming busy during %s without retaining an unsigned packet',
+  async (stage) => {
+    const lock = async () => {
+      await f.db
+        .prepare('INSERT INTO solana_execution_reservations VALUES(?,?,?)')
+        .bind('owner', f.packets.wallet, 'submitted')
+        .run();
+    };
+    if (stage === 'quote')
+      fetcher.mockImplementationOnce(async (input) => {
+        await lock();
+        return Response.json(f.quote(new URL(String(input))));
+      });
+    else
+      mocks.simulate.mockImplementationOnce(async (order) => {
+        await lock();
+        return f.simulation(order);
+      });
+    const response = await post();
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain('active transaction work');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(mocks.simulate).toHaveBeenCalledTimes(stage === 'quote' ? 0 : 1);
+    expect(await f.count()).toEqual([0, 0, 0]);
+  },
+);
+it.each(['foreign-owner', 'other-wallet'] as const)(
+  'does not block an unsigned action for an unrelated %s reservation',
+  async (kind) => {
+    await f.db
+      .prepare('INSERT INTO solana_execution_reservations VALUES(?,?,?)')
+      .bind(
+        kind === 'foreign-owner' ? 'other' : 'owner',
+        kind === 'other-wallet'
+          ? '11111111111111111111111111111111'
+          : f.packets.wallet,
+        'submitted',
+      )
+      .run();
+    expect((await post()).status).toBe(200);
+    expect(await f.count()).toEqual([1, 1, 1]);
+  },
+);
 it('does not double-count the independently observed network fee and provider network estimate', async () => {
   f.client.close();
   f = await warmupSessionProviderFixture('0.000005');
