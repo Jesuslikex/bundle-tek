@@ -1,0 +1,76 @@
+.panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  overflow-wrap: anywhere;
+}
+.panel h6,
+.panel p {
+  margin: 0;
+}
+.panel h6 {
+  font-size: 14px;
+}
+.panel p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.panel button,
+.panel summary {
+  min-height: 44px;
+}
+.panel button {
+  white-space: normal;
+}
+.panel summary {
+  padding-block: 12px;
+  cursor: pointer;
+}
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  padding-block: 8px;
+}
+.consent input {
+  margin-top: 4px;
+  min-width: 18px;
+  min-height: 18px;
+}
+.review {
+  display: grid;
+  gap: 10px;
+}
+.review dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.review dl > div {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.review dt {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.review dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.panel code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

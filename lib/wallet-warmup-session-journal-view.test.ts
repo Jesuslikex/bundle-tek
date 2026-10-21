@@ -252,7 +252,43 @@ it('composes the actual owned SQL journal and control projection with client adm
       true,
       signal,
     );
-    const dto = await warmupJournalView({ journal: project(journal) }, context);
+    const rootDto = await warmupJournalView(
+      { journal: project(journal) },
+      context,
+    );
+    const begin = warmupJournalRequest(
+      {
+        format: 'warmup-journal-request-v1',
+        kind: 'control',
+        id: crypto.randomUUID(),
+        consentId: saved.id,
+        termsSha256: saved.termsSha256,
+        journalId: rootDto.id,
+        control: 'begin-review',
+        expectedVersion: rootDto.version,
+        expectedHeadSha256: rootDto.headSha256,
+      },
+      context,
+    );
+    if (begin.kind !== 'control') throw Error('Wrong fixture command');
+    const started = await appendWalletWarmupSessionJournal(
+      f.db,
+      'owner',
+      {
+        id: begin.id,
+        journalId: rootDto.id,
+        expectedVersion: begin.expectedVersion,
+        expectedHeadSha256: begin.expectedHeadSha256,
+        command: { operation: 'begin-review', actionId: context.actions[0].id },
+      },
+      signal,
+    );
+    const dto = await warmupJournalView(
+      { journal: project(started, begin.id) },
+      context,
+      { request: begin, requireReceipt: true },
+    );
+    expect(dto.snapshot.pending?.state).toBe('reviewing');
     const request = warmupJournalRequest(
       {
         format: 'warmup-journal-request-v1',

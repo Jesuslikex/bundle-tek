@@ -13,6 +13,7 @@ import {
 import { WARMUP_RECEIPT_SAVED } from '@/lib/warmup-receipt-events';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { Button } from './ui/button';
+import { WalletWarmupSessionPreparation } from './wallet-warmup-session-preparation';
 import styles from './wallet-warmup-session-progress.module.css';
 const endpoint = '/api/wallet-workspace/warmup/session-journals';
 type Props = {
@@ -41,13 +42,20 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
   const previous = useRef<WarmupJournalView | null>(null);
   const [journal, setJournal] = useState<WarmupJournalView | null>(null),
     [marker, setMarker] = useState<WarmupJournalRequest | null>(null),
-    [busy, setBusy] = useState(false),
+    [statusBusy, setBusy] = useState(false),
+    [preparationBusy, setPreparationBusy] = useState(false),
     [checked, setChecked] = useState(false),
     [invalidReminder, setInvalidReminder] = useState(false),
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
     [expired, setExpired] = useState(false),
     [stopReview, setStopReview] = useState<string | null>(null);
+  const preparationPending = useRef(false);
+  const preparationBusyChanged = useCallback((value: boolean) => {
+    preparationPending.current = value;
+    setPreparationBusy(value);
+  }, []);
+  const busy = statusBusy || preparationBusy;
   useEffect(() => {
     onBusyChange(busy);
     return () => onBusyChange(false);
@@ -110,7 +118,7 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
   }, [context, storageKey]);
   const exchange = useCallback(
     async (write: WarmupJournalRequest | null) => {
-      if (!context || pending.current) return;
+      if (!context || pending.current || preparationPending.current) return;
       const c = new AbortController();
       pending.current = c;
       setBusy(true);
@@ -197,7 +205,9 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
           setMessage(
             write
               ? write.kind === 'control'
-                ? `Plan ${write.control === 'pause' ? 'paused' : write.control === 'resume' ? 'resumed' : 'stopped'}. No signing or trades were started.`
+                ? write.control === 'begin-review'
+                  ? 'Action review recorded. Request its unsigned quote and simulation separately. No signing or trades were started.'
+                  : `Plan ${write.control === 'pause' ? 'paused' : write.control === 'resume' ? 'resumed' : 'stopped'}. No signing or trades were started.`
                 : 'Session history saved. No signing or trades were started.'
               : request?.kind === 'record' && request.id !== admitted.id
                 ? 'History already exists for this approval under a different request ID. Its saved status was recovered; your earlier save request is not being credited.'
@@ -244,8 +254,16 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
   async function refresh() {
     await exchange(null);
   }
-  function write(control?: 'pause' | 'resume' | 'stop') {
-    if (!context || busy || !checked || marker || invalidReminder) return;
+  function write(control?: 'begin-review' | 'pause' | 'resume' | 'stop') {
+    if (
+      !context ||
+      busy ||
+      preparationPending.current ||
+      !checked ||
+      marker ||
+      invalidReminder
+    )
+      return;
     const request: WarmupJournalRequest = {
       format: 'warmup-journal-request-v1',
       consentId: context.consentId,
@@ -315,7 +333,9 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
       : s.stopped
         ? 'Plan stopped'
         : s.pending
-          ? 'Action needs recovery'
+          ? s.pending.state === 'reviewing'
+            ? 'Action ready for unsigned review'
+            : 'Action needs recovery'
           : s.phase === 'complete'
             ? 'Recorded session complete'
             : s.paused
@@ -345,7 +365,10 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
         </div>
         <span className={styles.badge}>Automatic activity off</span>
       </div>
-      <p>History and plan controls only. Automatic signing is not enabled.</p>
+      <p>
+        History, plan controls and unsigned review. Automatic signing is not
+        enabled.
+      </p>
       {journal && s && (
         <>
           <div className={styles.progress}>
@@ -438,6 +461,22 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
         </>
       )}
       <div className={styles.controls}>
+        {s && !s.pending && !s.stopped && !s.paused && (
+          <Button
+            disabled={
+              busy ||
+              !checked ||
+              !!marker ||
+              invalidReminder ||
+              expired ||
+              !s.sourceReviewFresh ||
+              s.phase !== 'review-required'
+            }
+            onClick={() => write('begin-review')}
+          >
+            Review next action
+          </Button>
+        )}
         <Button
           variant="outline"
           disabled={busy}
@@ -484,7 +523,7 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
           </>
         )}
         <Button disabled>Start automatic activity</Button>
-        {busy && (
+        {statusBusy && (
           <Button variant="ghost" onClick={cancel}>
             Cancel status request
           </Button>
@@ -521,7 +560,15 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
         Automatic activity is unavailable in this release. Saving, pausing or
         resuming a plan does not start trades.
       </p>
-      {busy && (
+      {journal && (
+        <WalletWarmupSessionPreparation
+          journal={journal}
+          context={context}
+          disabled={busy || !checked || !!marker || invalidReminder}
+          onBusyChange={preparationBusyChanged}
+        />
+      )}
+      {statusBusy && (
         <output>Checking or saving session history. No wallet request.</output>
       )}
       {message && <output>{message}</output>}

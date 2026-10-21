@@ -58,7 +58,7 @@ export async function warmupJournalClientFixture(at = Date.now()) {
   function request(
     journal: WarmupJournalView,
     control: 'pause' | 'resume' | 'stop' = 'pause',
-  ): WarmupJournalRequest {
+  ): Extract<WarmupJournalRequest, { kind: 'control' }> {
     return {
       format: 'warmup-journal-request-v1',
       kind: 'control',
@@ -79,8 +79,15 @@ export async function warmupJournalClientFixture(at = Date.now()) {
     const j = structuredClone(journal),
       version = j.version + 1,
       date = new Date(clock).toISOString();
+    const next =
+      command.control === 'begin-review'
+        ? context.actions[j.snapshot.completedActions]
+        : null;
+    if (command.control === 'begin-review' && !next)
+      throw Error('No synthetic next action');
     j.headSha256 = await digest(
       JSON.stringify({
+        ...(next ? { actionId: next.id } : {}),
         at: date,
         eventId: command.id,
         operation: command.control,
@@ -89,6 +96,21 @@ export async function warmupJournalClientFixture(at = Date.now()) {
       }),
     );
     j.version = version;
+    if (next) {
+      j.snapshot.pending = {
+        state: 'reviewing',
+        action: {
+          id: next.id,
+          side: next.side,
+          cycle: next.cycle,
+          wallet: next.wallet,
+          walletRevision: next.walletRevision,
+          mint: next.mint,
+          scheduledAt: next.scheduledAt,
+        },
+      };
+      j.recoveryRequired = true;
+    }
     if (command.control === 'pause') j.snapshot.paused = true;
     if (command.control === 'resume') j.snapshot.paused = false;
     if (command.control === 'stop') j.snapshot.stopped = true;
@@ -107,7 +129,7 @@ export async function warmupJournalClientFixture(at = Date.now()) {
     j.commandReceipt = {
       id: command.id,
       operation: command.control,
-      actionId: null,
+      actionId: next?.id ?? null,
       version,
       headSha256: j.headSha256,
       at: date,

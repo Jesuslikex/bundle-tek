@@ -6,6 +6,7 @@ import { webcrypto } from 'node:crypto';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { WalletWarmupSessionProgress } from './wallet-warmup-session-progress';
 import { warmupJournalClientFixture } from '@/test/warmup-session-journal-client-fixture';
+import { warmupPreparationClientFixture } from '@/test/warmup-session-preparation-client-fixture';
 import {
   warmupJournalRequest,
   type WarmupJournalView,
@@ -162,6 +163,39 @@ it('loads owned history on open without writes, keeps Start disabled and shows n
   expect(host.textContent).toContain('Automatic activity off');
   expect(host.querySelector('details')?.open).toBe(false);
   expect(requests[0].url).toContain('consentId=' + f.consent.id);
+});
+it('opens the next action review explicitly, then requests a preparation only after its separate unchecked consent', async () => {
+  const p = await warmupPreparationClientFixture(at),
+    originalFetch = fetch;
+  vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
+    if (!input.startsWith('/api/wallet-workspace/warmup/session-preparations'))
+      return originalFetch(input, init);
+    const body = JSON.parse(init!.body as string);
+    requests.push({ url: input, body });
+    return Response.json(p.preparation(body.id, saved!));
+  });
+  await create();
+  expect(button('Review next action').disabled).toBe(false);
+  await click('Review next action');
+  await done(() =>
+    expect(host.querySelector('input[type=checkbox]')).toBeTruthy(),
+  );
+  expect(writes()).toHaveLength(2);
+  expect(
+    host.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+  expect(button('Prepare unsigned action').disabled).toBe(true);
+  expect(button('Start automatic activity').disabled).toBe(true);
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(),
+  );
+  await click('Prepare unsigned action');
+  await done(() =>
+    expect(host.textContent).toContain('Unsigned preparation recovered'),
+  );
+  expect(writes()).toHaveLength(3);
+  expect(writes()[1].body?.control).toBe('begin-review');
+  expect(writes()[2].body?.prepareRequested).toBe(true);
 });
 it('saves history once, then explicitly pauses/resumes/stops without any wallet or provider endpoint', async () => {
   await create();

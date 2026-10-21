@@ -23,7 +23,7 @@ const action = z
     scheduledAt: iso,
   })
   .strict();
-const control = z.enum(['pause', 'resume', 'stop']);
+const control = z.enum(['begin-review', 'pause', 'resume', 'stop']);
 const journalSchema = z
   .object({
     id: uuid,
@@ -83,7 +83,7 @@ const journalSchema = z
       .object({
         id: uuid,
         operation: control,
-        actionId: z.null(),
+        actionId: z.string().min(1).max(1024).nullable(),
         version: z.number().int().min(1).max(4096),
         headSha256: hash,
         at: iso,
@@ -348,10 +348,24 @@ export async function warmupJournalView(
             receipt.headSha256 !== j.headSha256))
       )
         fail();
+      if (receipt) {
+        if (request.control === 'begin-review') {
+          if (
+            !context.actions.some((a) => a.id === receipt.actionId) ||
+            (receipt.version === j.version &&
+              (s.pending?.state !== 'reviewing' ||
+                s.pending.action.id !== receipt.actionId))
+          )
+            fail();
+        } else if (receipt.actionId !== null) fail();
+      }
       if (
         receipt &&
         (await digest(
           JSON.stringify({
+            ...(request.control === 'begin-review'
+              ? { actionId: receipt.actionId }
+              : {}),
             at: receipt.at,
             eventId: request.id,
             operation: request.control,
