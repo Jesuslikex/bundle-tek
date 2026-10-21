@@ -1,0 +1,106 @@
+{
+  "format": "warmup-runtime-collector-evidence-v1",
+  "sourceBaseCommit": "51958c94fb8c9f3081f7fd6b2cde1ebb1595f14f",
+  "nodeVersion": "v24.19.0",
+  "collector": {
+    "path": "lib/wallet-warmup-runtime-order.ts",
+    "sha256": "60860de1d08a2c4c9823e4d11a02201cf41e7bb8f951b534cb4571cb3556c113",
+    "matchesFinalReview": true
+  },
+  "combinedTests": {
+    "files": 48,
+    "passed": 771,
+    "failed": 0
+  },
+  "subsequentAssertionTests": {
+    "files": 1,
+    "passed": 39,
+    "failed": 0,
+    "change": "exact wrapped-SOL rows asserted; no collector or fixture change"
+  },
+  "typecheckPassed": true,
+  "typedLintPassed": true,
+  "formattingPassed": true,
+  "deliveryFreeze": {
+    "files": 2775,
+    "sha256": "77f86bd5cc1653d27d9b8305da2d8cd830cd7af0fa0f1fa417722400c738621e"
+  },
+  "build": {
+    "sourceBaseCommit": "51958c94fb8c9f3081f7fd6b2cde1ebb1595f14f",
+    "buildPassed": true,
+    "rows": [
+      {
+        "path": "lib/wallet-warmup-runtime-order.ts",
+        "buildSha256": "60860de1d08a2c4c9823e4d11a02201cf41e7bb8f951b534cb4571cb3556c113",
+        "currentSha256": "60860de1d08a2c4c9823e4d11a02201cf41e7bb8f951b534cb4571cb3556c113",
+        "unchanged": true
+      },
+      {
+        "path": "lib/wallet-warmup-runtime-order.test.ts",
+        "buildSha256": "bf42e10aea8bb2af027b9b33cfdc4e85669bff8de84134030f1560cd5d868f0e",
+        "currentSha256": "40bd32d2ec998523b687cc439959bd391da4d86e4280480f94a11c1bb4be761f",
+        "unchanged": false
+      },
+      {
+        "path": "test/warmup-runtime-order-fixture.ts",
+        "buildSha256": "33c38c3c0cafc10d04f577c5167ee65ac5e5cbea86ce6e69de6f1280f53f306d",
+        "currentSha256": "33c38c3c0cafc10d04f577c5167ee65ac5e5cbea86ce6e69de6f1280f53f306d",
+        "unchanged": true
+      }
+    ],
+    "qualification": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "reviews": [
+    {
+      "record": "opus-warmup-runtime-order-51958c9-20261021",
+      "startedAt": "2026-10-21T11:29:45.422Z",
+      "finishedAt": "2026-10-21T11:34:21.956Z",
+      "requestedModel": "claude-opus-5-5",
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "terminalStatus": 0,
+      "isError": false
+    },
+    {
+      "record": "opus-warmup-runtime-order-followup-51958c9-20261021",
+      "startedAt": "2026-10-21T11:41:16.691Z",
+      "finishedAt": "2026-10-21T11:44:03.396Z",
+      "requestedModel": "claude-opus-5-5",
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "permissionDenials": 1,
+      "sourceUnchanged": true,
+      "terminalStatus": 0,
+      "isError": false
+    }
+  ],
+  "clockPolicy": {
+    "accountClock": "exact equality on actual Clock reads",
+    "code": "context-slot-floor-only",
+    "slotLimit": 32
+  },
+  "applicationRuntimeModeConnected": false,
+  "migration0135Written": false,
+  "liveQualification": false,
+  "programCodeAttested": false,
+  "independentPriceProtectionEstablished": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "deployed": false
+}
