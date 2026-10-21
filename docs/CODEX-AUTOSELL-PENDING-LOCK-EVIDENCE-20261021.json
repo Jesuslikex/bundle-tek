@@ -1,0 +1,132 @@
+{
+  "sourceBaseCommit": "bfb6a19b6c6c799ae262786f22872e181bcc77e4",
+  "scope": "Owned Auto Sell run-lock lifecycle; broad parity evidence rebase, no full parity claim",
+  "functionalHashes": {
+    "components/auto-sell-modal.tsx": "3fa5ee19aa42c4b4e8d1cc697dd53e170b7403bc445391712fbca2f5e2bf3c96",
+    "components/auto-sell-pending-lock.test.tsx": "f2a4fd45dd0436d54ec3b534113b243345122eb26e92f2b1c76873bba132259e"
+  },
+  "baselineReproduction": {
+    "tests": 6,
+    "passed": 1,
+    "failed": 5,
+    "report": "work/release-qa/auto-sell-pending-lock-baseline-20261021.json",
+    "method": "Test-only Vite load of exact git show bfb6a19 module; app file never reverted"
+  },
+  "finalTests": {
+    "tests": 204,
+    "files": 21,
+    "passed": 204,
+    "failed": 0,
+    "skipped": 0,
+    "newPendingLockCases": 12,
+    "report": "work/release-qa/auto-sell-pending-lock-final-expanded-20261021.json",
+    "fullRepositorySuite": false,
+    "provider": "Declared synthetic only"
+  },
+  "typecheck": {
+    "command": "Pinned Node24 node_modules/typescript/bin/tsc --noEmit",
+    "exitCode": 0
+  },
+  "lint": {
+    "command": "Pinned Node24 oxlint --type-aware components/auto-sell-modal.tsx components/auto-sell-pending-lock.test.tsx",
+    "exitCode": 0
+  },
+  "format": {
+    "files": 2,
+    "exitCode": 0
+  },
+  "build": {
+    "base": "bfb6a19b6c6c799ae262786f22872e181bcc77e4",
+    "overlays": [
+      "components/auto-sell-modal.tsx",
+      "components/auto-sell-pending-lock.test.tsx"
+    ],
+    "hashes": {
+      "components/auto-sell-modal.tsx": "3fa5ee19aa42c4b4e8d1cc697dd53e170b7403bc445391712fbca2f5e2bf3c96",
+      "components/auto-sell-pending-lock.test.tsx": "f2a4fd45dd0436d54ec3b534113b243345122eb26e92f2b1c76873bba132259e"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false,
+    "report": "work/release-qa/auto-sell-pending-lock-final-build-20261021/result.json"
+  },
+  "sourceFreeze": {
+    "files": 2339,
+    "sha256": "6c0b44f8bd36662c2c1115d8e179dd446f41128afdd752fef559e781d837890d",
+    "report": "work/release-qa/auto-sell-pending-lock-final-freeze-20261021.json"
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-21T17:22:28.538Z",
+      "finishedAt": "2026-10-21T17:26:41.005Z",
+      "sourceBaseCommit": "bfb6a19b6c6c799ae262786f22872e181bcc77e4",
+      "uncommittedOverlay": false,
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "copiedFiles": 3424,
+      "directory": "work/release-qa/opus-parity-operational-bfb6a19-20261021",
+      "testsRunByReviewer": false
+    },
+    {
+      "startedAt": "2026-10-21T17:32:12.421Z",
+      "finishedAt": "2026-10-21T17:34:45.372Z",
+      "sourceBaseCommit": "bfb6a19b6c6c799ae262786f22872e181bcc77e4",
+      "uncommittedOverlay": true,
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "copiedFiles": 3425,
+      "directory": "work/release-qa/opus-auto-sell-pending-lock-bfb6a19-20261021",
+      "testsRunByReviewer": false
+    }
+  ],
+  "followupAfterReview": "Only error wording in product; six extra tests/helper extension independently verified, not rereviewed",
+  "rea": {
+    "evidenceIds": [
+      "ev_a000a5867b2c0bbec3024e702acb0e47e0db2708297382cb507207dcff7533aa",
+      "ev_2d1f653413cb596049cdabc510886a87093b8c5a50a08f3d35bb361f7abd47a5"
+    ],
+    "privateExportSha256": "be99a9ab20d74fbefdf7abde72e2e0d2c2dd91820f774fe55bc64b2413a25117",
+    "privateExportBytes": 241837,
+    "records": 2,
+    "scope": "Passive Proxima account only, no backend/financial proof",
+    "temporaryRelayStopped": true,
+    "userChromePreserved": true
+  },
+  "renderedQA": {
+    "completed": false,
+    "reason": "Chrome inventory timed out, including one retry after user confirmed connected; no browser restart or session switch"
+  },
+  "unchangedBoundaries": [
+    "engine/evaluator/executor/API",
+    "context invalidation",
+    "vault erasure",
+    "financial limits",
+    "protected Claude shell/parent/layout/global CSS",
+    "all committed migrations and schema",
+    "signing safeguards"
+  ],
+  "actionsNotTaken": [
+    "application/hosted SQL",
+    "provider/credential/cron changes",
+    "real wallet unlock/sign/send",
+    "funded tests",
+    "deployment"
+  ],
+  "openGaps": [
+    "Web Locks unsupported fallback and project-specific key",
+    "actual browser-destruction durable exclusion",
+    "outcome persistence across remount/log truncation",
+    "final rendered QA",
+    "warmup operational execution and full Proxima parity"
+  ]
+}

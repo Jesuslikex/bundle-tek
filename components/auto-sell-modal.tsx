@@ -330,8 +330,12 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
       runner.current?.stop(reason);
       if (vault.current) vault.current.payload.wallets = [];
       vault.current = null;
-      releaseLock.current?.();
-      releaseLock.current = null;
+      // Stopping prevents new work, but a signed/send request can still finish.
+      // Its own terminal update retains and releases this lock after unmount.
+      if (!runner.current?.snapshot().selling) {
+        releaseLock.current?.();
+        releaseLock.current = null;
+      }
     };
     const onHide = () => {
       halt('Tab closed.');
@@ -449,7 +453,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
       if (!current()) return;
       if (!release)
         throw new Error(
-          'Auto Sell is already running for this token in another tab.',
+          'An Auto Sell run for this token is active or still settling. Wait for its outcome before starting another session.',
         );
       const session = await unlockVault(encrypted, password);
       unlocked = session;
@@ -471,6 +475,16 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
       const selected = solanaWallets.filter((w) =>
         sellWallets.includes(w.address),
       );
+      // This release belongs to this exact run, not a later mounted instance.
+      // Keep it reachable by the runner's final update even after UI teardown.
+      const acquiredRelease = release;
+      let released = false;
+      const releaseThisRun = () => {
+        if (released) return;
+        released = true;
+        acquiredRelease();
+        if (releaseLock.current === releaseThisRun) releaseLock.current = null;
+      };
       const instance: AutoSellRunner = new AutoSellRunner({
         strategies,
         session: sessionRules,
@@ -493,6 +507,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
           session: () => vault.current,
         }),
         onUpdate: (next) => {
+          if (!next.running && !next.selling) releaseThisRun();
           // A previous run finishing its last sell must not touch this one.
           if (!mounted.current || runner.current !== instance) return;
           setSnapshot(next);
@@ -513,7 +528,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
         },
       });
       runner.current = instance;
-      releaseLock.current = release;
+      releaseLock.current = releaseThisRun;
       release = null;
       instance.start();
     } catch (e) {
