@@ -13,6 +13,7 @@ import { inspectWarmupSellInventory } from './warmup-sell-inventory';
 import { WARMUP_SESSION_PREPARATION_TIMEOUT_MS } from './wallet-warmup-session-provider';
 import type { WarmupV2AttemptRow } from './wallet-warmup-session-v2-attempt-types';
 import type { WarmupSessionPreparationCandidate } from './wallet-warmup-session-preparation';
+import { readWarmupRuntimeReceiptFloor } from './wallet-warmup-runtime-receipt-floor';
 export type WarmupRuntimeProviderDependencies = {
   runtime?: Omit<WarmupRuntimeOrderDependencies, 'signal' | 'apiKey'>;
   inventory?: typeof inspectWarmupSellInventory;
@@ -52,10 +53,27 @@ export function createWalletWarmupV2RuntimeProvider(
     try {
       await requireActiveWarmupRuntimePurpose(db, lease, signal);
       const run = createWalletWarmupV2Provider(db, owner, key, lease, {
-        inventory: async (...args) => {
-          inventory = await (deps.inventory ?? inspectWarmupSellInventory)(
-            ...args,
+        inventory: async (wallet, mint, readSignal, amount) => {
+          const minimumSlot = await readWarmupRuntimeReceiptFloor(
+            db,
+            lease,
+            candidate,
+            readSignal,
           );
+          inventory = await (deps.inventory ?? inspectWarmupSellInventory)(
+            wallet,
+            mint,
+            readSignal,
+            amount,
+            undefined,
+            minimumSlot,
+          );
+          if (
+            inventory.minSlot < minimumSlot ||
+            inventory.mintSlot === null ||
+            inventory.mintSlot < minimumSlot
+          )
+            throw Error('Inventory predates a recorded finalized receipt.');
           return inventory;
         },
         quote: async (input, apiKey, readSignal) => {

@@ -139,10 +139,16 @@ export async function inspectWarmupSellInventory(
   signal: AbortSignal,
   amount?: string,
   fetcher: typeof fetch = fetch,
+  minimumSlot = 0,
 ) {
   wallet = walletAddress(wallet, 'Solana');
   mint = walletAddress(mint, 'Solana');
-  const snapshot = await observeWalletHoldings(wallet, signal, fetcher);
+  const snapshot = await observeWalletHoldings(
+    wallet,
+    signal,
+    fetcher,
+    minimumSlot,
+  );
   const observation = await observeSellMint(
     snapshot,
     wallet,

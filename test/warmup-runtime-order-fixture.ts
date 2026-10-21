@@ -7,6 +7,7 @@ import { PAIR_RENT } from '../lib/pair-rent-evidence';
 import { SOLANA_MAINNET_GENESIS } from '../lib/wallet-balances';
 import { assessWarmupSellInventory } from '../lib/warmup-sell-inventory';
 import { walletWarmupRuntimeOrderRequestDigest } from '../lib/wallet-warmup-runtime-order';
+import { formatNativeBalance } from '../lib/wallet-balance-format';
 import type {
   WarmupRuntimeOrderRequest,
   WarmupRuntimeOrderDependencies,
@@ -251,12 +252,12 @@ export async function warmupRuntimeOrderFixture(
                   mint: f.mint,
                   program: f.mints[0].owner,
                   decimals: 6,
-                  raw: '1000',
-                  amount: '0.001',
+                  raw: order.inAmount,
+                  amount: formatNativeBalance(order.inAmount, 6),
                   accounts: [
                     {
                       address: keys[0],
-                      raw: '1000',
+                      raw: order.inAmount,
                       frozen: false,
                       extensions: Boolean(options?.token2022),
                       extensionTypes: options?.token2022
@@ -273,7 +274,7 @@ export async function warmupRuntimeOrderFixture(
             },
             f.wallet,
             f.mint,
-            '0.001',
+            formatNativeBalance(order.inAmount, 6),
             {
               mint: f.mint,
               program: f.mints[0].owner,

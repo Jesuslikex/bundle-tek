@@ -1,0 +1,117 @@
+{
+  "sourceBaseCommit": "e17fab8c317f814a47e9e7f4317261c803a64c64",
+  "runtime": "v24.19.0",
+  "completedAt": "2026-10-21T13:38:03.662Z",
+  "scope": "unsigned saved-buy Sell runtime composition; synthetic provider/native SQL only",
+  "finalRegression": {
+    "files": 111,
+    "passedFiles": 111,
+    "failedFiles": 0,
+    "tests": 2010,
+    "passed": 2009,
+    "failed": 0,
+    "pending": 1,
+    "success": true
+  },
+  "reviewFollowup": {
+    "files": 3,
+    "passedFiles": 3,
+    "failedFiles": 0,
+    "tests": 54,
+    "passed": 54,
+    "failed": 0,
+    "pending": 0,
+    "success": true
+  },
+  "uiFollowup": {
+    "files": 1,
+    "passedFiles": 1,
+    "failedFiles": 0,
+    "tests": 22,
+    "passed": 22,
+    "failed": 0,
+    "pending": 0,
+    "success": true
+  },
+  "firstRegression": {
+    "files": 110,
+    "passedFiles": 109,
+    "failedFiles": 1,
+    "tests": 1990,
+    "passed": 1988,
+    "failed": 1,
+    "pending": 1,
+    "success": false
+  },
+  "initialFailures": [
+    "actual inventory HTTP429 incorrectly classified as evidence-refused",
+    "inventory newer than buy but older than selected-lot finalized partial sale accepted",
+    "fixed-event-loop UI recovery assertion read sessionStorage before asynchronous adoption completed"
+  ],
+  "review": {
+    "model": [
+      "claude-opus-5-5"
+    ],
+    "sourceFiles": 2749,
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "exitCode": 0,
+    "blockingProductionFindings": 0,
+    "testOnlyFollowupsIndependentlyVerified": true,
+    "followupsRereviewed": false
+  },
+  "build": {
+    "base": "e17fab8",
+    "passed": true,
+    "unchangedAtBuildEnd": true,
+    "productionOverlaysStillIdentical": true,
+    "testOnlyChangesAfterBuild": true
+  },
+  "staticChecks": {
+    "plainTypeScript": true,
+    "typedLintFiles": 14,
+    "formattedFiles": 14
+  },
+  "sourceFreeze": {
+    "files": 2792,
+    "digest": "89ec91260451d30573f2fe09009bb3eef986515d97d7fa12d7cc9e33da835a8f"
+  },
+  "changedSourceHashes": {
+    "components/wallet-warmup-session-v2-attempt.test.tsx": "10d52839ad639ab11f792700d88559d06466107911ae4f4d0636c54acd2375b8",
+    "lib/wallet-holdings.test.ts": "d02eb565938794b17610f1608602904301f88eb7f6e4e9ef33704b1cf449a755",
+    "lib/wallet-holdings.ts": "54c057b86bd9a834f687bb9cc06425be23fc6d3cf15dbe6af6ecba69897376cc",
+    "lib/wallet-warmup-session-v2-attempts.ts": "979383c0f0044f753dfa871a551a18ed8bb01e28973b5d6c30603314ce83b3b4",
+    "lib/wallet-warmup-session-v2-runtime-provider.ts": "b7dd6290dac79fad77ba639d7f2844f7789610b74b3712b3daaf7452179e575f",
+    "lib/warmup-sell-inventory.ts": "d5d45450e039a1403037e018154c889c5500c2213a24b8e84ddacf943485cf2d",
+    "test/warmup-native-fixture.ts": "78b6d8d575edcee7d269f53ecf46d4dd47fdf465450be0f03d01188dc3ebb305",
+    "test/warmup-runtime-order-fixture.ts": "55c0e150cb3f50cf26712348ca822c9d33b612d5538a5755fd1d671ac17d4150",
+    "test/warmup-session-v2-attempt-provider-fixture.ts": "286a5fb3db22e2756a778756bafd0aa8d0a3117fcaf034b2fa704c43484ddf89",
+    "lib/wallet-warmup-runtime-receipt-floor.test.ts": "d716bef2801ad30b9853f4cc96af60a53b7080f0fda8e3a283ff991d66566963",
+    "lib/wallet-warmup-runtime-receipt-floor.ts": "633380e74f7965d45bd2ea115b3489d94f8bd99d8eac5f4e59a4dc1ee33a706e",
+    "lib/wallet-warmup-session-v2-runtime-sell.test.ts": "4dc5b044b05bad4dbec5dcb0cf9e33ff37bcb5c4fd38c8160b949b7e36f90f81",
+    "test/warmup-native-fixture-amount.test.ts": "41624fe5271d4ef7e40d02f03b6e1001bb16fcefb394ec82eaa2a8fc99655eb2",
+    "test/warmup-session-v2-runtime-sell-fixture.ts": "e006c747c90bec7702e62503116058bcffe0b5fd4441f5da6eba9099dcb13f3b"
+  },
+  "unchanged": [
+    "db/**",
+    "drizzle/**",
+    "production UI and protected Claude shell/layout/global CSS",
+    "Clock and 32-slot policy",
+    "both full serial code scans",
+    "custody and minimum/output checks",
+    "providers, credentials and cron"
+  ],
+  "limitations": [
+    "selected lot floor only, not global wallet/mint history",
+    "legacy preview paths unchanged",
+    "partial sale fixture inserted directly after native packet decoding, not full capture-save proof",
+    "no new live provider/qualification or Token-2022 runtime Sell proof",
+    "no full repository suite or new signed-in browser QA",
+    "no independent price or trusted code policy authority",
+    "financial holds, signing authorization, finalized settlement and orchestration remain unfinished"
+  ],
+  "deployment": false,
+  "signingEnabled": false,
+  "fundedTests": false,
+  "applicationOrHostedSql": false
+}

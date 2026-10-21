@@ -384,10 +384,24 @@ it('keeps an older discovered result historical until the newest saved request i
   );
   await render(false, at + 40000);
   await click('Find saved requests');
+  await vi.waitFor(async () => {
+    await act(flush);
+    expect(button('Recover saved attempt 1').disabled).toBe(false);
+  });
   await click('Recover saved attempt 1');
+  await vi.waitFor(async () => {
+    await act(flush);
+    expect(button('Recover saved attempt 3').disabled).toBe(false);
+  });
   expect(sessionStorage.getItem(key())).toBeNull();
   expect(button('Request unsigned preview').disabled).toBe(true);
   await click('Recover saved attempt 3');
+  await vi.waitFor(async () => {
+    await act(flush);
+    expect(JSON.parse(sessionStorage.getItem(key()) ?? '{}').id).toBe(
+      newer.attempt.id,
+    );
+  });
   expect(JSON.parse(sessionStorage.getItem(key())!).id).toBe(newer.attempt.id);
   expect(button('Request next unsigned attempt').disabled).toBe(true);
   expect(host.textContent).toContain('three');

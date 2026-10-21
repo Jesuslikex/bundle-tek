@@ -31,6 +31,7 @@ import {
 import { WalletWarmupSessionProviderError } from './wallet-warmup-session-provider';
 import type { WarmupSessionProviderFeeEvidence } from './wallet-warmup-session-provider-core';
 import { WalletRpcError } from './wallet-balances';
+import { HoldingsReadError } from './wallet-holdings';
 import { WarmupQuoteError } from './warmup-swap-quote';
 import { SwapBlockhashExpiredError } from './imported-swap-simulation';
 import {
@@ -67,7 +68,7 @@ async function sqlNow(db: D1Database, signal: AbortSignal) {
 function classifyRefusal(
   error: unknown,
 ): NonNullable<WarmupV2OutcomeRow['refusal_code']> {
-  if (error instanceof WalletRpcError)
+  if (error instanceof WalletRpcError || error instanceof HoldingsReadError)
     return error.status === 429 ? 'provider-limited' : 'provider-unavailable';
   if (error instanceof WarmupQuoteError)
     return error.providerStatus === 429

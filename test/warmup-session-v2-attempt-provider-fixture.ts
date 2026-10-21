@@ -57,6 +57,7 @@ export async function warmupV2AttemptProviderFixture(reserve = '0.01') {
 /** Synthetic saved-buy read-model capture; never a funded receipt. */
 export async function warmupV2SavedBuyAttemptProviderFixture(
   nullRemaining = false,
+  remainingRaw = '101',
 ) {
   const f = await warmupV2AttemptProviderFixture();
   try {
@@ -75,12 +76,69 @@ export async function warmupV2SavedBuyAttemptProviderFixture(
         1,
         f.packets.wallet,
         f.packets.buy.signature,
-        '101',
+        remainingRaw,
         JSON.stringify(f.packets.buyDocument),
         f.packets.buy.preparation.id,
         new Date().toISOString(),
       )
       .run();
+    if (remainingRaw !== '101') {
+      // A reduced balance must have matching finalized-sale evidence; never
+      // invent missing units merely to make the progress guard admit a test.
+      const { nativeWarmupFixture } = await import('./warmup-native-fixture');
+      const { unsignedPreparationSummary } =
+        await import('../lib/imported-swap-preparation-history');
+      const { decodeWarmupReceipt } = await import('../lib/warmup-buy-receipt');
+      const consumed = 101n - BigInt(remainingRaw);
+      const prior = await nativeWarmupFixture({
+        side: 'Sell',
+        mint: f.packets.mint,
+        tokenRaw: consumed,
+        tokenBalanceRaw: 101n,
+        slot: f.packets.buyDocument.slot + 1,
+      });
+      const { acquiredRaw: consumedRaw, ...receipt } =
+        await decodeWarmupReceipt(
+          prior.receipt,
+          {
+            document: unsignedPreparationSummary(prior.order, prior.simulation),
+          },
+          prior.signed.signature,
+          'Sell',
+        );
+      if (
+        prior.wallet !== f.packets.wallet ||
+        receipt.slot <= f.packets.buyDocument.slot ||
+        consumedRaw !== consumed.toString() ||
+        receipt.tokenProgram !== f.packets.buyDocument.tokenProgram ||
+        receipt.decimals !== f.packets.buyDocument.decimals
+      )
+        throw Error('Synthetic partial-sale capture differs from its buy');
+      const document = {
+        ...receipt,
+        consumedRaw,
+        buyReceiptId: f.packets.buy.receiptId,
+        observedAt: new Date().toISOString(),
+        source: 'synthetic.partial-sale',
+        limitations:
+          'Synthetic signed native receipt and controlled balance metadata; no live/funded trade.',
+      };
+      await f.db
+        .prepare(
+          'INSERT INTO warmup_sell_receipts(owner_id,plan_id,id,buy_receipt_id,consumed_raw,signature,document,preparation_id) VALUES(?,?,?,?,?,?,?,?)',
+        )
+        .bind(
+          'owner',
+          planId,
+          crypto.randomUUID(),
+          f.packets.buy.receiptId,
+          consumedRaw,
+          document.signature,
+          JSON.stringify(document),
+          crypto.randomUUID(),
+        )
+        .run();
+    }
     const { loadWalletWarmupProgress } =
       await import('@/lib/wallet-warmup-progress-server');
     const { reviewWalletWarmupSession } =

@@ -51,6 +51,38 @@ function provider(results: unknown[][], patch: Record<string, unknown> = {}) {
   return { fetcher, calls };
 }
 describe('complete Solana token-account observations', () => {
+  it.each([0, 100, 101])(
+    'sends the explicit floor %s and refuses an older actual baseline',
+    async (floor) => {
+      const { fetcher, calls } = provider([[], []]);
+      const result = observeWalletHoldings(owner, undefined, fetcher, floor);
+      if (floor > 100) await expect(result).rejects.toThrow('predates');
+      else
+        await expect(result).resolves.toMatchObject({
+          minSlot: 100,
+          maxSlot: 101,
+        });
+      expect(calls.find((c) => c.method === 'getSlot')?.params).toEqual([
+        {
+          commitment: 'confirmed',
+          ...(floor ? { minContextSlot: floor } : {}),
+        },
+      ]);
+      expect(
+        calls.filter((c) => c.method === 'getTokenAccountsByOwner'),
+      ).toHaveLength(floor > 100 ? 0 : 2);
+    },
+  );
+  it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid explicit slot %s before network reads',
+    async (floor) => {
+      const { fetcher, calls } = provider([[], []]);
+      await expect(
+        observeWalletHoldings(owner, undefined, fetcher, floor),
+      ).rejects.toThrow('Invalid holdings slot floor');
+      expect(calls).toHaveLength(0);
+    },
+  );
   it('enumerates both programs, preserves u64 units and aggregates same-mint accounts without uiAmount rounding', async () => {
     const { fetcher, calls } = provider([
       [row(TOKEN_PROGRAMS[0]), row(TOKEN_PROGRAMS[0], account2, '7')],

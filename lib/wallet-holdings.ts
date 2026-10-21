@@ -65,7 +65,10 @@ export async function observeWalletHoldings(
   address: string,
   signal: AbortSignal = AbortSignal.timeout(25000),
   fetcher: typeof fetch = fetch,
+  minimumSlot = 0,
 ): Promise<HoldingsSnapshot> {
+  if (!Number.isSafeInteger(minimumSlot) || minimumSlot < 0)
+    throw Error('Invalid holdings slot floor.');
   address = walletAddress(address, 'Solana');
   const endpoint = getSolanaIndexerRpcEndpoint();
   const rpc = async (method: string, params: unknown[]) => {
@@ -84,10 +87,17 @@ export async function observeWalletHoldings(
     throw new Error('Holdings provider network mismatch.');
   const baseline = Number(
     uint(
-      await rpc('getSlot', [{ commitment: 'confirmed' }]),
+      await rpc('getSlot', [
+        {
+          commitment: 'confirmed',
+          ...(minimumSlot > 0 ? { minContextSlot: minimumSlot } : {}),
+        },
+      ]),
       BigInt(Number.MAX_SAFE_INTEGER),
     ),
   );
+  if (baseline < minimumSlot)
+    throw Error('Holdings observation predates the required receipt.');
   const snapshots = await Promise.all(
     TOKEN_PROGRAMS.map(async (program) => {
       const result = (await rpc('getTokenAccountsByOwner', [

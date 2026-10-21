@@ -45,9 +45,22 @@ export async function nativeWarmupFixture(
     token2022?: boolean;
     signer?: { address: string; keyPair: CryptoKeyPair };
     mint?: string;
+    tokenRaw?: bigint;
+    tokenBalanceRaw?: bigint;
   } = {},
 ) {
   const origin = options.slot ?? 100;
+  const tokenAmount = options.tokenRaw ?? 1000n;
+  const tokenBalance = options.tokenBalanceRaw ?? tokenAmount;
+  if (tokenAmount <= 0n || tokenAmount > (1n << 64n) - 1n)
+    throw Error('Synthetic token amount is outside u64.');
+  if (
+    tokenBalance < tokenAmount ||
+    tokenBalance > (1n << 64n) - 1n ||
+    (options.tokenBalanceRaw !== undefined &&
+      (options.side ?? 'Buy') !== 'Sell')
+  )
+    throw Error('Synthetic Sell balance is inconsistent.');
   if (options.token2022 && !options.v2)
     throw new Error('Token-2022 fixture requires a V2 route.');
   const mintProgram = options.token2022 ? SWAP_TOKEN_2022 : TOKEN,
@@ -157,8 +170,8 @@ export async function nativeWarmupFixture(
     v2: options.v2,
     fee: options.fee,
     variant,
-    amount: side === 'Buy' ? 1000000n : 1000n,
-    output: side === 'Buy' ? 1000n : 1000000n,
+    amount: side === 'Buy' ? 1000000n : tokenAmount,
+    output: side === 'Buy' ? tokenAmount : 1000000n,
   }).instructions[0].data!;
   add(
     JUPITER,
@@ -283,9 +296,10 @@ export async function nativeWarmupFixture(
     side,
     inputMint: side === 'Buy' ? NATIVE : mint,
     outputMint: side === 'Buy' ? mint : NATIVE,
-    inAmount: side === 'Buy' ? '1000000' : '1000',
-    outAmount: side === 'Buy' ? '1000' : '1000000',
-    minimumOutAmount: side === 'Buy' ? '995' : '995000',
+    inAmount: side === 'Buy' ? '1000000' : tokenAmount.toString(),
+    outAmount: side === 'Buy' ? tokenAmount.toString() : '1000000',
+    minimumOutAmount:
+      side === 'Buy' ? ((tokenAmount * 9950n) / 10000n).toString() : '995000',
     slippageBps: 50,
     router: 'metis',
     ...(options.fee ? { platformFee: { bps: options.fee, mint: NATIVE } } : {}),
@@ -330,7 +344,7 @@ export async function nativeWarmupFixture(
       ? nativeExists
         ? tokenAccount(NATIVE, beforeWrapped)
         : null
-      : tokenAccount(mint, 1000n),
+      : tokenAccount(mint, tokenBalance),
     side === 'Buy'
       ? null
       : nativeExists
@@ -346,9 +360,9 @@ export async function nativeWarmupFixture(
       ? closes
         ? null
         : tokenAccount(NATIVE, nativeAfter)
-      : tokenAccount(mint, 0n),
+      : tokenAccount(mint, tokenBalance - tokenAmount),
     side === 'Buy'
-      ? tokenAccount(mint, 1000n)
+      ? tokenAccount(mint, tokenAmount)
       : closes
         ? null
         : tokenAccount(NATIVE, nativeAfter),
@@ -393,10 +407,10 @@ export async function nativeWarmupFixture(
                       ? beforeWrapped
                       : nativeAfter
                     : accounts === first
-                      ? 1000n
-                      : 0n
+                      ? tokenBalance
+                      : tokenBalance - tokenAmount
                   : side === 'Buy'
-                    ? 1000n
+                    ? tokenAmount
                     : accounts === first
                       ? beforeWrapped
                       : nativeAfter
