@@ -32,6 +32,10 @@ import { getSolanaRpcEndpoint } from '@/lib/solana-rpc';
 import type { WarmupApprovalHistoryRow } from '@/lib/warmup-approval-history';
 import { requireStoredWarmupBuyLink } from '@/lib/warmup-buy-link';
 import type { SavedWarmupBuyReceipt } from '@/lib/warmup-buy-receipt';
+import {
+  isSessionBoundWarmupPreparation,
+  SESSION_PREPARATION_SIGNING_DISABLED,
+} from '@/lib/warmup-session-preparation-scope';
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -215,6 +219,8 @@ export async function POST(request: Request) {
         >();
       if (!row || typeof body.transaction !== 'string')
         return json({ error: 'Current saved preparation unavailable.' }, 409);
+      if (await isSessionBoundWarmupPreparation(db, user.userId, row.id))
+        return json({ error: SESSION_PREPARATION_SIGNING_DISABLED }, 409);
       const saved = {
         ...row,
         document: JSON.parse(row.document),
@@ -369,6 +375,15 @@ export async function POST(request: Request) {
       .bind(user.userId, body.id)
       .first<Intent>();
     if (!row) return json({ error: 'Approval unavailable.' }, 404);
+    if (
+      ['register', 'submit'].includes(body.action) &&
+      (await isSessionBoundWarmupPreparation(
+        db,
+        user.userId,
+        row.preparationId,
+      ))
+    )
+      return json({ error: SESSION_PREPARATION_SIGNING_DISABLED }, 409);
     const review = JSON.parse(row.document) as WarmupSigningReview;
     if (body.action === 'recover') {
       if (
@@ -693,6 +708,11 @@ export async function POST(request: Request) {
       );
     }
   } catch (err) {
+    if (
+      err instanceof Error &&
+      err.message.includes(SESSION_PREPARATION_SIGNING_DISABLED)
+    )
+      return json({ error: SESSION_PREPARATION_SIGNING_DISABLED }, 409);
     if (err instanceof SwapBlockhashExpiredError)
       return json(
         {

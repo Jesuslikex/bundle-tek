@@ -897,6 +897,13 @@
       "when": 1794499200000,
       "tag": "0127_wallet_warmup_action_binding_freshness",
       "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "6",
+      "when": 1794585600000,
+      "tag": "0128_wallet_warmup_session_preparations",
+      "breakpoints": true
     }
   ]
 }

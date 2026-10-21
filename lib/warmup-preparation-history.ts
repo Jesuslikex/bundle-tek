@@ -65,9 +65,8 @@ export type SavedWarmupPreparation = {
   createdAt: string;
   document: WarmupPreparationSummary;
 };
-export async function saveWarmupPreparation(
-  db: D1Database,
-  owner: string,
+/** Shared original history validation, not signing or runtime qualification. */
+export function warmupPreparationHistoryDocument(
   context: {
     planId: string;
     planRevision: number;
@@ -77,9 +76,7 @@ export async function saveWarmupPreparation(
   document: WarmupPreparationSummary,
   capturedDocument: string,
 ) {
-  const text = JSON.stringify(document),
-    id = crypto.randomUUID(),
-    createdAt = new Date().toISOString();
+  const text = JSON.stringify(document);
   const plan = JSON.parse(capturedDocument) as SavedWarmup['document'];
   if (
     document.side === 'Buy' &&
@@ -108,6 +105,27 @@ export async function saveWarmupPreparation(
     document.instructionsVerified !== false
   )
     throw new Error('Invalid preparation history.');
+  return text;
+}
+export async function saveWarmupPreparation(
+  db: D1Database,
+  owner: string,
+  context: {
+    planId: string;
+    planRevision: number;
+    cycle: number;
+    walletRevision: number;
+  },
+  document: WarmupPreparationSummary,
+  capturedDocument: string,
+) {
+  const text = warmupPreparationHistoryDocument(
+      context,
+      document,
+      capturedDocument,
+    ),
+    id = crypto.randomUUID(),
+    createdAt = new Date().toISOString();
   const result = await db
     .prepare(
       `INSERT INTO warmup_swap_preparations
