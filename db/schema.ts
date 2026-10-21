@@ -1608,3 +1608,4 @@ export const walletWarmupSessionV2RuntimeObservations = sqliteTable(
   ],
 );
 export * from './auth-schema';
+export * from './auto-buy-budget-schema';

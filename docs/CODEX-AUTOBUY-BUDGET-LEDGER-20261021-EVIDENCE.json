@@ -1,0 +1,129 @@
+{
+  "sourceBase": "164329bbe963a54f2f65fc93c805fb82ff13e020",
+  "phase": "internal durable budget accounting only",
+  "authorityFlagsAllFalse": true,
+  "newMigration": "0136_auto_buy_budget_ledger",
+  "existingCommittedMigrationsEdited": false,
+  "focused": {
+    "files": 3,
+    "passed": 100,
+    "failed": 0,
+    "skipped": 0
+  },
+  "related": {
+    "files": 32,
+    "passed": 438,
+    "failed": 0,
+    "skipped": 0
+  },
+  "plainTypeScriptPassed": true,
+  "typedLintFiles": 7,
+  "formatFiles": 7,
+  "isolatedBuild": {
+    "base": "164329bbe963a54f2f65fc93c805fb82ff13e020",
+    "overlays": [
+      "db/schema.ts",
+      "db/auto-buy-budget-schema.ts",
+      "drizzle/meta/_journal.json",
+      "drizzle/0136_auto_buy_budget_ledger.sql",
+      "lib/auto-buy-budget.ts",
+      "lib/auto-buy-budget-store.ts",
+      "lib/auto-buy-budget.test.ts",
+      "lib/auto-buy-budget-store.test.ts",
+      "lib/auto-buy-budget-turso.test.ts",
+      "test/auto-buy-budget-fixture.ts"
+    ],
+    "hashes": {
+      "db/schema.ts": "de86084235b1c6b5ae008a94ede14a35992bf5ce2180838c2006a60cd0cec15f",
+      "db/auto-buy-budget-schema.ts": "aace6e9b633676842d57be076d2abeb820b0825c0c3ce235313b9e3c2a59e364",
+      "drizzle/meta/_journal.json": "79220647d75765003e5426fe5c275a76eb653729f3eb439de7bf47fba85349eb",
+      "drizzle/0136_auto_buy_budget_ledger.sql": "32c9c132e821ff3565b68a86e52d0b44693bef6a55bb81bc08570ececf8c12e5",
+      "lib/auto-buy-budget.ts": "6794e5fdca17a1a0830db60dab052760b5f0a215673ecef0fdabc10db7c18785",
+      "lib/auto-buy-budget-store.ts": "97b23979e26d85727342b06896a842dfadadd7f7eeb49a2d23a7a67b2ba59b8a",
+      "lib/auto-buy-budget.test.ts": "58d9c8f8fedef037addd8fbdcb1c40494ff315381b5a68314b986517bf158d04",
+      "lib/auto-buy-budget-store.test.ts": "f0a0a18b9753dae4abdff12e470dd227d762193da99ab005653020049c63b0b0",
+      "lib/auto-buy-budget-turso.test.ts": "7ecccedd1ad70ea0d2a926efdb010fe3ca7366e901ffa347176f6118ae668e7e",
+      "test/auto-buy-budget-fixture.ts": "47f2a15f793df68581d524fc700bba8e4b3c6c228774c3b19b735670d6914970"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "sourceFreeze": {
+    "count": 2359,
+    "unchanged": true,
+    "manifestSha256": "c2f024de77b20d2fb2e386bcd562403b8e527442b87eb524cfc5dd0c03ed86bc"
+  },
+  "localMigrations": {
+    "wranglerVersion": "4.127.1",
+    "wholeFileApplied": 137,
+    "checksumVerification": {
+      "mode": "local-read-only-verification",
+      "migrationCount": 137,
+      "allChecksumsMatch": true,
+      "foreignKeyViolations": 0,
+      "integrity": [
+        {
+          "integrity_check": "ok"
+        }
+      ],
+      "passed": true
+    }
+  },
+  "opusInitialReview": {
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "isError": false,
+    "permissionDenials": 0,
+    "sourceUnchanged": true
+  },
+  "opusFinalFollowup": {
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5",
+      "<synthetic>"
+    ],
+    "status": {
+      "code": 1,
+      "signal": null
+    },
+    "isError": true,
+    "permissionDenials": 0,
+    "sourceUnchanged": true,
+    "completedApproval": false,
+    "blocker": "Account session limit before final review"
+  },
+  "browser": "Connected Chrome inventory still times out; no fresh rendered or live qualification claim",
+  "notPerformed": [
+    "deploy",
+    "application or hosted SQL",
+    "provider/credential/cron changes",
+    "wallet unlock/sign/send",
+    "funded tests"
+  ],
+  "open": [
+    "canonical strategy/event producer and existing Counter guard composition",
+    "explicit authorization",
+    "qualified packet/program/quote replay",
+    "exclusive wallet funds/cross-feature lease",
+    "continuous runner/scheduler",
+    "verified finalized settlement/refund",
+    "API/UI",
+    "final Opus follow-up",
+    "rendered and live qualification"
+  ]
+}
