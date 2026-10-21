@@ -1,4 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { createClient } from '@libsql/client';
+import { createTursoDatabase } from '@/db/turso';
 import { warmupSessionSettlementStorageFixture } from '@/test/warmup-session-settlement-storage-fixture';
 import {
   retainWalletWarmupSessionActionBinding as retain,
@@ -336,3 +339,104 @@ it('refuses a binding if its original review expires before the write', async ()
   ).rejects.toThrow();
   expect(await count(f.db)).toBe(0);
 });
+
+it.each(['expired', 'failed-simulation', 'execution-flag', 'instruction-flag'])(
+  'refuses a one-shot unusable preparation: %s',
+  async (kind) => {
+    const f = await fixture(),
+      p = structuredClone(f.packets.buy.preparation.document);
+    if (kind === 'expired') p.expiresAt = new Date(f.clock() - 1).toISOString();
+    if (kind === 'failed-simulation') p.simulation.succeeded = false;
+    const document = {
+      ...p,
+      executionAllowed: kind === 'execution-flag',
+      instructionsVerified: kind === 'instruction-flag',
+    };
+    await f.db
+      .prepare('UPDATE warmup_swap_preparations SET document=? WHERE id=?')
+      .bind(JSON.stringify(document), f.packets.buy.preparation.id)
+      .run();
+    await expect(
+      retain(f.db, 'owner', input(f), signal(), f.clock),
+    ).rejects.toThrow('binding');
+    expect(await count(f.db)).toBe(0);
+  },
+);
+
+it('returns the same admitted identity to identical concurrent calls with different observation times', async () => {
+  const f = await fixture();
+  let reached = 0,
+    release!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const db = intercept(f.db, async (run) => {
+    if (++reached === 2) release();
+    await barrier;
+    return run();
+  });
+  const results = await Promise.all([
+    retain(db, 'owner', input(f), signal(), () => f.clock() + 1),
+    retain(db, 'owner', input(f), signal(), () => f.clock() + 2),
+  ]);
+  expect(reached).toBe(2);
+  expect(results[0]).toEqual(results[1]);
+  expect(await count(f.db)).toBe(1);
+});
+
+it.each(['review', 'preparation', 'neither'])(
+  'actual SQL clock refuses an expired %s even when the captured write time was earlier',
+  async (expired) => {
+    // Isolate the actual additive freshness trigger from 0126's other guards.
+    // This exercises database time without a timing-sensitive sleep or changing
+    // the application clock. It is not a complete historical-schema fixture.
+    const client = createClient({ url: 'file::memory:', intMode: 'number' });
+    clients.push(client);
+    const db = createTursoDatabase(client);
+    await db
+      .prepare(
+        'CREATE TABLE wallet_warmup_session_journals(owner_id TEXT,id TEXT,source_document TEXT)',
+      )
+      .run();
+    await db
+      .prepare(
+        'CREATE TABLE wallet_warmup_session_action_bindings(owner_id TEXT,journal_id TEXT,preparation_document TEXT,created_at TEXT)',
+      )
+      .run();
+    await db
+      .prepare(
+        readFileSync(
+          'drizzle/0127_wallet_warmup_action_binding_freshness.sql',
+          'utf8',
+        ),
+      )
+      .run();
+    const past = '2000-01-01T00:00:00.000Z',
+      future = '2099-01-01T00:00:00.000Z';
+    await db
+      .prepare('INSERT INTO wallet_warmup_session_journals VALUES(?,?,?)')
+      .bind(
+        'owner',
+        'journal',
+        JSON.stringify({
+          reviewExpiresAt: expired === 'review' ? past : future,
+        }),
+      )
+      .run();
+    const document = JSON.stringify({
+      chain: 'Solana',
+      simulation: { succeeded: true },
+      executionAllowed: false,
+      instructionsVerified: false,
+      expiresAt: expired === 'preparation' ? past : future,
+    });
+    const write = db
+      .prepare(
+        'INSERT INTO wallet_warmup_session_action_bindings VALUES(?,?,?,?)',
+      )
+      .bind('owner', 'journal', document, '1999-01-01T00:00:00.000Z')
+      .run();
+    if (expired === 'neither') await expect(write).resolves.toBeDefined();
+    else await expect(write).rejects.toThrow('expired or is unusable');
+  },
+);

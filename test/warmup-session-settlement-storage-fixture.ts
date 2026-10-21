@@ -56,6 +56,7 @@ export async function warmupSessionSettlementStorageFixture(
       '0124_wallet_warmup_session_journals',
       '0125_wallet_warmup_session_settlements',
       '0126_wallet_warmup_session_action_bindings',
+      '0127_wallet_warmup_action_binding_freshness',
     ])
       for (const sql of readFileSync(`drizzle/${name}.sql`, 'utf8')
         .split('--> statement-breakpoint')

@@ -40,10 +40,10 @@ function ownerId(owner: string) {
 async function installed(db: D1Database) {
   const row = await db
     .prepare(
-      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_action_bindings_insert','wallet_warmup_session_action_bindings_no_update','wallet_warmup_session_action_bindings_no_delete','wallet_warmup_session_settlements_action_binding')",
+      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_action_bindings_insert','wallet_warmup_session_action_bindings_no_update','wallet_warmup_session_action_bindings_no_delete','wallet_warmup_session_settlements_action_binding','wallet_warmup_session_action_bindings_fresh')",
     )
     .first<{ n: number }>();
-  if (row?.n !== 4) fail();
+  if (row?.n !== 5) fail();
 }
 async function parse(row: Binding) {
   const value = schema.parse(row);
@@ -194,6 +194,19 @@ export async function retainWalletWarmupSessionActionBinding(
     AbortSignal.timeout(15000),
   );
   signal.throwIfAborted();
-  if (!recovered || recovered.binding_sha256 !== row.binding_sha256) fail();
+  if (!recovered) fail();
+  const {
+    created_at: _savedAt,
+    binding_sha256: _savedHash,
+    ...savedIdentity
+  } = recovered;
+  const {
+    created_at: _attemptAt,
+    binding_sha256: _attemptHash,
+    ...attemptIdentity
+  } = row;
+  // Each row's hash was checked independently. Identical concurrent requests
+  // recover the admitted identity even when their observation times differ.
+  if (canonical(savedIdentity) !== canonical(attemptIdentity)) fail();
   return recovered;
 }
