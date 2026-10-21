@@ -9,10 +9,14 @@ import {
 } from '@/lib/wallet-warmup-session-journal-storage';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
+import { retainWalletWarmupSessionActionBinding } from '@/lib/wallet-warmup-session-action-binding';
 const signal = () => new AbortController().signal;
 
 /** In-memory SQL and synthetic signed transfer packets only, NOT a live DEX/funded swap. */
-export async function warmupSessionSettlementStorageFixture(reserve = '0.01') {
+export async function warmupSessionSettlementStorageFixture(
+  reserve = '0.01',
+  options: { bindBuy?: boolean; reviewOnly?: boolean } = {},
+) {
   const packets = await warmupSessionSettlementFixture();
   const at = Date.now(),
     date = new Date(at).toISOString();
@@ -44,13 +48,14 @@ export async function warmupSessionSettlementStorageFixture(reserve = '0.01') {
       'CREATE UNIQUE INDEX fixture_sell_id ON warmup_sell_receipts(id)',
       'CREATE UNIQUE INDEX fixture_buy_preparation ON warmup_buy_receipts(owner_id,preparation_id)',
       'CREATE UNIQUE INDEX fixture_sell_preparation ON warmup_sell_receipts(owner_id,preparation_id)',
-      'CREATE TABLE warmup_swap_preparations(id TEXT PRIMARY KEY,owner_id TEXT,plan_id TEXT,plan_revision INTEGER,cycle INTEGER,wallet_revision INTEGER,created_at TEXT,document TEXT CHECK(json_valid(document) AND length(document)<=8192))',
-      'CREATE TABLE warmup_signing_intents(id TEXT PRIMARY KEY,owner_id TEXT,preparation_id TEXT,wallet_address TEXT,signature TEXT,state TEXT,document TEXT CHECK(json_valid(document) AND length(document)<=8192),UNIQUE(owner_id,preparation_id))',
     ])
       await f.db.prepare(sql).run();
     for (const name of [
+      '0042_warmup_swap_preparations',
+      '0045_warmup_signing_intents',
       '0124_wallet_warmup_session_journals',
       '0125_wallet_warmup_session_settlements',
+      '0126_wallet_warmup_session_action_bindings',
     ])
       for (const sql of readFileSync(`drizzle/${name}.sql`, 'utf8')
         .split('--> statement-breakpoint')
@@ -79,6 +84,8 @@ export async function warmupSessionSettlementStorageFixture(reserve = '0.01') {
     let logical = Date.now();
     const clock = () => logical;
     const append = async (operation: string, actionId?: string) => {
+      if (operation === 'submitted' && actionId?.startsWith('Sell:'))
+        await bindAction(packets.sell);
       journal = await appendWalletWarmupSessionJournal(
         f.db,
         'owner',
@@ -96,11 +103,13 @@ export async function warmupSessionSettlementStorageFixture(reserve = '0.01') {
     };
     const actionId = JSON.parse(journal.sourceDocument).review.actions[0].id;
     await append('begin-review', actionId);
-    await append('submitted', actionId);
     for (const part of [packets.buy, packets.sell]) {
       const p = part.preparation;
+      p.createdAt = new Date(logical).toISOString();
       await f.db
-        .prepare('INSERT INTO warmup_swap_preparations VALUES(?,?,?,?,?,?,?,?)')
+        .prepare(
+          'INSERT INTO warmup_swap_preparations(id,owner_id,plan_id,plan_revision,cycle,wallet_revision,created_at,document,wallet_address) VALUES(?,?,?,?,?,?,?,?,?)',
+        )
         .bind(
           p.id,
           'owner',
@@ -110,10 +119,33 @@ export async function warmupSessionSettlementStorageFixture(reserve = '0.01') {
           p.walletRevision,
           p.createdAt,
           JSON.stringify(p.document),
+          packets.wallet,
         )
         .run();
+    }
+    async function bindAction(part: typeof packets.buy) {
+      const p = part.preparation;
+      p.createdAt = new Date(logical).toISOString();
       await f.db
-        .prepare('INSERT INTO warmup_signing_intents VALUES(?,?,?,?,?,?,?)')
+        .prepare('UPDATE warmup_swap_preparations SET created_at=? WHERE id=?')
+        .bind(p.createdAt, p.id)
+        .run();
+      const binding = await retainWalletWarmupSessionActionBinding(
+        f.db,
+        'owner',
+        {
+          journalId: journal.id,
+          version: journal.version,
+          headSha256: journal.headSha256,
+          preparationId: p.id,
+        },
+        signal(),
+        clock,
+      );
+      await f.db
+        .prepare(
+          'INSERT INTO warmup_signing_intents(id,owner_id,preparation_id,wallet_address,signature,state,document,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',
+        )
         .bind(
           part.approval.id,
           'owner',
@@ -122,27 +154,37 @@ export async function warmupSessionSettlementStorageFixture(reserve = '0.01') {
           part.signature,
           'finalized',
           JSON.stringify(part.approval),
+          new Date(logical).toISOString(),
+          new Date(logical).toISOString(),
         )
         .run();
+      return binding;
     }
-    await f.db
-      .prepare(
-        'INSERT INTO warmup_buy_receipts(owner_id,plan_id,id,plan_revision,wallet_revision,cycle,wallet_address,signature,remaining_raw,document,preparation_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
-      )
-      .bind(
-        'owner',
-        plan.id,
-        packets.buy.receiptId,
-        1,
-        1,
-        1,
-        packets.wallet,
-        packets.buy.signature,
-        '101',
-        JSON.stringify(packets.buyDocument),
-        packets.buy.preparation.id,
-      )
-      .run();
+    if (!options.reviewOnly) {
+      if (options.bindBuy !== false) await bindAction(packets.buy);
+      await append('submitted', actionId);
+    }
+    const installBuy = async () => {
+      await f.db
+        .prepare(
+          'INSERT INTO warmup_buy_receipts(owner_id,plan_id,id,plan_revision,wallet_revision,cycle,wallet_address,signature,remaining_raw,document,preparation_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+        )
+        .bind(
+          'owner',
+          plan.id,
+          packets.buy.receiptId,
+          1,
+          1,
+          1,
+          packets.wallet,
+          packets.buy.signature,
+          '101',
+          JSON.stringify(packets.buyDocument),
+          packets.buy.preparation.id,
+        )
+        .run();
+    };
+    if (!options.reviewOnly) await installBuy();
     const installSell = async () => {
       await f.db
         .prepare("UPDATE warmup_buy_receipts SET remaining_raw='0'")
@@ -196,7 +238,9 @@ export async function warmupSessionSettlementStorageFixture(reserve = '0.01') {
       methods,
       fetcher,
       installSell,
+      installBuy,
       append,
+      bindAction,
       advance: (ms: number) => {
         logical += ms;
       },

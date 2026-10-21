@@ -70,6 +70,82 @@ it('atomically retains a real-parser Buy outcome and advances its journal/head/s
   expect(f.methods).toHaveLength(2);
 });
 
+it('records a verified outcome after the original submission became unknown', async () => {
+  const f = await fixture();
+  await f.append('unknown', f.journal.snapshot.pending!.action.id);
+  const saved = await retain(
+    f.db,
+    'owner',
+    f.request(),
+    signal(),
+    f.fetcher,
+    f.clock,
+  );
+  expect(saved.record.mode).toBe('applied');
+  expect(saved.journal.snapshot.completedActions).toBe(1);
+  expect(saved.journal.snapshot.pending).toBeNull();
+});
+
+it('holds an actual Sell fee overrun without charging or completing it', async () => {
+  const f = await fixture('0.000007');
+  const buy = await retain(
+    f.db,
+    'owner',
+    f.request(),
+    signal(),
+    f.fetcher,
+    f.clock,
+  );
+  f.setJournal(buy.journal);
+  f.advance(WARMUP_SESSION_REVIEW_GAP_MS);
+  const action = JSON.parse(buy.journal.sourceDocument).review.actions[1].id;
+  await f.append('begin-review', action);
+  await f.append('submitted', action);
+  await f.installSell();
+  const saved = await retain(
+    f.db,
+    'owner',
+    f.request(f.packets.sell.receiptId),
+    signal(),
+    f.fetcher,
+    f.clock,
+  );
+  expect(saved.record).toMatchObject({
+    mode: 'held',
+    settlement: { side: 'Sell', networkFeeLamports: '5000' },
+  });
+  expect(saved.journal.snapshot).toMatchObject({
+    completedActions: 1,
+    phase: 'recovery-required',
+    wallets: [
+      {
+        remainingReserveLamports: '2000',
+        recordedFurtherFeeRentLamports: '5000',
+      },
+    ],
+  });
+});
+
+it('rejects a head-only race at settlement insertion without losing the actual receipt', async () => {
+  const f = await fixture();
+  const db = intercept(f.db, async (run) => {
+    await f.append('stop');
+    return run();
+  });
+  await expect(
+    retain(db, 'owner', f.request(), signal(), f.fetcher, f.clock),
+  ).rejects.toThrow();
+  expect(await count(f.db)).toBe(0);
+  expect(
+    (
+      await f.db
+        .prepare('SELECT count(*) AS n FROM warmup_buy_receipts')
+        .first<{ n: number }>()
+    )?.n,
+  ).toBe(1);
+  expect(f.methods).toHaveLength(2);
+});
+
 it('records a verified Sell with its exact session-buy dependency and completes both outcomes', async () => {
   const f = await fixture();
   const buy = await retain(
@@ -718,7 +794,7 @@ it('refuses a backwards capture clock after provider replay without changing the
   expect(f.methods).toHaveLength(2);
 });
 
-it('points to the owned original proof instead of charging a receipt again through another retained review', async () => {
+it('rejects another journal before provider reads regardless of which journal captures first', async () => {
   const f = await fixture();
   const buy = await retain(
     f.db,
@@ -820,6 +896,18 @@ it('points to the owned original proof instead of charging a receipt again throu
       f.clock,
     );
   await f.installSell();
+  const foreignRequest = {
+    id: crypto.randomUUID(),
+    journalId: other.id,
+    version: other.version,
+    headSha256: other.headSha256,
+    receiptId: f.packets.sell.receiptId,
+  };
+  const before = f.methods.length;
+  await expect(
+    retain(f.db, 'owner', foreignRequest, signal(), f.fetcher, f.clock),
+  ).rejects.toThrow('exact preparation');
+  expect(f.methods).toHaveLength(before);
   const original = await retain(
     f.db,
     'owner',
@@ -846,7 +934,9 @@ it('points to the owned original proof instead of charging a receipt again throu
     () => null,
     (e: unknown) => e,
   );
-  expect(error).toMatchObject({ status: 409, recoveryId: original.record.id });
+  expect(error).toMatchObject({ status: 409, recoveryId: undefined });
+  expect(original.record.mode).toBe('applied');
+  expect(f.methods).toHaveLength(before + 4);
   expect(await count(f.db)).toBe(2);
   expect(
     (

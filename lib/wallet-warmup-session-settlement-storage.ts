@@ -10,6 +10,8 @@ import {
 } from './wallet-warmup-session-sequence';
 import { parseWalletWarmupSessionSettlementRecord } from './wallet-warmup-session-settlement-record';
 import { warmupSessionSettlementSourceGuard } from './wallet-warmup-session-settlement-source';
+import { warmupSessionSettlementSourceSql } from './wallet-warmup-session-settlement-source';
+import { readWalletWarmupSessionActionBinding } from './wallet-warmup-session-action-binding';
 
 const uuid = z.uuid().refine((v) => v === v.toLowerCase());
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -252,6 +254,29 @@ export async function retainWalletWarmupSessionSettlement(
   )
     fail('The journal changed. Recover its current original action.');
   const selectedCandidate = candidate(current);
+  const binding = await readWalletWarmupSessionActionBinding(
+    db,
+    owner,
+    current.id,
+    selectedCandidate.action.id,
+    signal,
+  );
+  const selectedSource = await db
+    .prepare(warmupSessionSettlementSourceSql(selectedCandidate.action.side))
+    .bind(owner, input.receiptId, current.plan.id)
+    .first<{ preparationId: string; preparationDocument: string }>();
+  signal.throwIfAborted();
+  if (
+    !binding ||
+    !selectedSource ||
+    binding.preparation_id !== selectedSource.preparationId ||
+    binding.preparation_document !== selectedSource.preparationDocument ||
+    binding.packet_sha256 !==
+      JSON.parse(selectedSource.preparationDocument).transaction?.sha256
+  )
+    fail(
+      'This receipt does not belong to the exact preparation bound to this action.',
+    );
   let verified: Awaited<ReturnType<typeof replayWarmupSessionSettlement>>;
   try {
     verified = await replayWarmupSessionSettlement(
@@ -331,8 +356,16 @@ export async function retainWalletWarmupSessionSettlement(
   }
   try {
     await preview(prepared);
-  } catch {
-    // Preserve actual verified facts without inventing a successful budget outcome.
+  } catch (error) {
+    const wallet = current.snapshot.wallets.find(
+      (w) => w.wallet === verified.settlement.wallet,
+    );
+    const rent = BigInt(verified.settlement.rentChangeLamports);
+    const cost =
+      BigInt(verified.settlement.networkFeeLamports) + (rent > 0n ? rent : 0n);
+    // Only a known fee/rent overrun may become a held outcome. Any other
+    // replay refusal must remain an error, including future replay invariants.
+    if (!wallet || cost <= BigInt(wallet.remainingReserveLamports)) throw error;
     prepared = await prepare('held');
     await preview(prepared);
   }

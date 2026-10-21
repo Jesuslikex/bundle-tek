@@ -883,6 +883,13 @@
       "when": 1794326400000,
       "tag": "0125_wallet_warmup_session_settlements",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "6",
+      "when": 1794412800000,
+      "tag": "0126_wallet_warmup_session_action_bindings",
+      "breakpoints": true
     }
   ]
 }
