@@ -1,0 +1,167 @@
+{
+  "baseCommit": "8659deb25e5ae858b3ed7846596ab5ecc445a103",
+  "completedAt": "2026-10-21T15:24:26.595Z",
+  "node": "v24.19.0",
+  "scope": "Unsigned runtime wallet availability; not financial reservation or execution",
+  "finalRegression": {
+    "files": 112,
+    "passed": 2081,
+    "failed": 0,
+    "skipped": 1,
+    "success": true
+  },
+  "focusedCorrections": {
+    "files": 1,
+    "passed": 72,
+    "failed": 0,
+    "skipped": 0,
+    "success": true
+  },
+  "firstRegressionBeforeCorrections": {
+    "files": 112,
+    "passed": 2041,
+    "failed": 0,
+    "skipped": 1,
+    "success": true
+  },
+  "reproducedBeforeFix": {
+    "test": "current stock-pair parent",
+    "expected": "refused",
+    "actual": "prepared",
+    "originalReport": "work/release-qa/warmup-runtime-wallet-busy-regression-20261021.json"
+  },
+  "initialOpusReview": {
+    "model": [
+      "claude-opus-5-5"
+    ],
+    "copiedFiles": 2754,
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "mediumFindings": 3,
+    "corrected": [
+      "additional parent locks",
+      "Volume in-flight children surviving cancellation",
+      "pre-existing busy attempt consumption"
+    ]
+  },
+  "opusFollowup": {
+    "selectedModel": [
+      "claude-opus-5-5"
+    ],
+    "reportedModels": [
+      "claude-opus-5-5",
+      "<synthetic>"
+    ],
+    "exitCode": 1,
+    "isError": true,
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "completedReview": false,
+    "blocker": "Claude session usage limit; CLI showed reset at 4:40pm Europe/London",
+    "syntheticMarker": "CLI error record, not an alternative model",
+    "correctionsIndependentlyVerified": true
+  },
+  "staticChecks": {
+    "plainTypeScript": true,
+    "typedLintFiles": 7,
+    "formattedFiles": 7
+  },
+  "build": {
+    "passed": true,
+    "base": "8659deb",
+    "unchanged": true,
+    "overlays": [
+      "lib/wallet-warmup-runtime-wallet-busy.test.ts",
+      "lib/wallet-warmup-runtime-wallet-busy.ts",
+      "lib/wallet-warmup-session-v2-attempts.ts",
+      "lib/wallet-warmup-session-v2-provider.ts",
+      "lib/wallet-warmup-session-v2-runtime-provider.ts",
+      "test/warmup-runtime-wallet-busy-fixture.ts",
+      "test/warmup-session-v2-runtime-fixture.ts"
+    ]
+  },
+  "freeze": {
+    "files": 2795,
+    "digest": "1ce32e283a1eaa658d9c177a92b6eaba8f6b4956bc5377904533d268a26ffc80"
+  },
+  "changedSourceHashes": {
+    "lib/wallet-warmup-session-v2-attempts.ts": "d9647912be4b1c0aedf70a9a0869bc07be7062eec63c83eb4cb5e2fbd1a1a255",
+    "lib/wallet-warmup-session-v2-provider.ts": "66b01eae2d3ac31ae1bfd9095056d5d15f6c8ad6322c7ce8a6605e766f267494",
+    "lib/wallet-warmup-session-v2-runtime-provider.ts": "20260d2317d8d16f50c25e682229c5578fb9898cd90014d7bc12103a7b169f4c",
+    "test/warmup-session-v2-runtime-fixture.ts": "c49bd2ae9ae358ea5d381ce5feccfe8813ca002f80bd91ce105463410375c759",
+    "lib/wallet-warmup-runtime-wallet-busy.test.ts": "5ee011e6ff160c9f29fa8a2e45e4ab27e4ddce73bda1d78dee6f07ba275febb4",
+    "lib/wallet-warmup-runtime-wallet-busy.ts": "811157ca509b4116d73e07d43d2f280e831b344038dd7d0bcddd38c5d05931b4",
+    "test/warmup-runtime-wallet-busy-fixture.ts": "3c1dd6a723e7c572ed4f507db6a9c3be9b792d7c66ca281b0982247ca02203cc"
+  },
+  "sqlProof": "All 136 committed migrations applied in disposable native memory; real-schema positive Volume session/batch/submitted trade remains busy after cancellation and clears after finalization. Not a cryptographic parent lifecycle proof.",
+  "runtimeAdmission": "Friendly owned preflight after saved recovery, same expression in lease INSERT SELECT, existing deferred FK rollback leaves purpose/lease/gate unchanged on a competing-parent race; explicit same-ID request later creates attempt1.",
+  "inFlightRace": "Already-admitted work can consume that attempt if a competing parent appears during provider work. Existing post-provider checks refuse successful observation and saved recovery never reruns provider.",
+  "limitations": [
+    "No shared financial wallet hold; later acquisition/result-publication race remains",
+    "No trusted code policy, short browser authorization or signing",
+    "Preview/legacy behavior unchanged; devnet-only wallet_operations excluded from mainnet locks",
+    "Runtime mid-work busy refusal is still generic provider-refused",
+    "No new live provider, signed-in browser, funded or full-repository qualification"
+  ],
+  "unchanged": [
+    "db/**",
+    "drizzle/**",
+    "app/**",
+    "components/**",
+    "Clock, 32-slot, both serial scans, custody, minimum, provider pacing",
+    "providers, credentials and cron"
+  ],
+  "applicationOrHostedSql": false,
+  "deployed": false,
+  "realWalletAction": false,
+  "signingEnabled": false,
+  "verifiedTerminalRun": {
+    "code": 0,
+    "passed": true,
+    "files": 112,
+    "tests": 2082,
+    "passedTests": 2081,
+    "skipped": 1,
+    "incomplete": [],
+    "changed": []
+  },
+  "precedingWorkerFailure": {
+    "terminalExitCode": 1,
+    "terminalError": "[vitest-pool]: Worker forks emitted error; Worker exited unexpectedly",
+    "reportedFiles": 112,
+    "total": 2082,
+    "passed": 2078,
+    "pending": 2,
+    "failed": 0,
+    "nonPassed": [
+      {
+        "file": "C:/Users/Julian/Desktop/Bundle/lib/wallet-warmup-session-consent-view.test.ts",
+        "name": "refuses expanded or foreign local reminders",
+        "status": "pending"
+      },
+      {
+        "file": "C:/Users/Julian/Desktop/Bundle/lib/wallet-warmup-session-consent-view.test.ts",
+        "name": "reads bounded JSON and refuses HTML, oversized UTF-8 or malformed bodies without parser text",
+        "status": "pending"
+      },
+      {
+        "file": "C:/Users/Julian/Desktop/Bundle/lib/wallet-warmup-session-consent-view.test.ts",
+        "name": "cancels a response body stalled after headers",
+        "status": "pending"
+      },
+      {
+        "file": "C:/Users/Julian/Desktop/Bundle/lib/wallet-warmup-session-v2-runtime.test.ts",
+        "name": "recovers expired runtime observations against the real SQL clock without renewing or rerunning",
+        "status": "skipped"
+      }
+    ],
+    "warning": "Reporter success flag is not proof of completion after a worker error"
+  },
+  "isolatedAffectedFile": {
+    "files": 1,
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0,
+    "success": true
+  }
+}

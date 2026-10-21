@@ -52,72 +52,79 @@ export function createWalletWarmupV2RuntimeProvider(
       material: WarmupRuntimeMaterial | null = null;
     try {
       await requireActiveWarmupRuntimePurpose(db, lease, signal);
-      const run = createWalletWarmupV2Provider(db, owner, key, lease, {
-        inventory: async (wallet, mint, readSignal, amount) => {
-          const minimumSlot = await readWarmupRuntimeReceiptFloor(
-            db,
-            lease,
-            candidate,
-            readSignal,
-          );
-          inventory = await (deps.inventory ?? inspectWarmupSellInventory)(
-            wallet,
-            mint,
-            readSignal,
-            amount,
-            undefined,
-            minimumSlot,
-          );
-          if (
-            inventory.minSlot < minimumSlot ||
-            inventory.mintSlot === null ||
-            inventory.mintSlot < minimumSlot
-          )
-            throw Error('Inventory predates a recorded finalized receipt.');
-          return inventory;
+      const run = createWalletWarmupV2Provider(
+        db,
+        owner,
+        key,
+        lease,
+        {
+          inventory: async (wallet, mint, readSignal, amount) => {
+            const minimumSlot = await readWarmupRuntimeReceiptFloor(
+              db,
+              lease,
+              candidate,
+              readSignal,
+            );
+            inventory = await (deps.inventory ?? inspectWarmupSellInventory)(
+              wallet,
+              mint,
+              readSignal,
+              amount,
+              undefined,
+              minimumSlot,
+            );
+            if (
+              inventory.minSlot < minimumSlot ||
+              inventory.mintSlot === null ||
+              inventory.mintSlot < minimumSlot
+            )
+              throw Error('Inventory predates a recorded finalized receipt.');
+            return inventory;
+          },
+          quote: async (input, apiKey, readSignal) => {
+            if (
+              input.wallet !== candidate.action.wallet ||
+              input.tokenMint !== candidate.action.mint ||
+              input.side !== candidate.action.side
+            )
+              throw Error('Runtime action changed.');
+            const request: WarmupRuntimeOrderRequest = {
+              requestSha256: '0'.repeat(64),
+              wallet: input.wallet,
+              mint: input.tokenMint,
+              side: input.side,
+              inputRaw:
+                candidate.action.side === 'Buy'
+                  ? candidate.action.inputLamports
+                  : candidate.sellSource!.remainingRaw,
+              feeAndRentLimitRaw: candidate.budget.remainingReserveLamports,
+              deadline: candidate.deadline,
+              inventory,
+            };
+            request.requestSha256 =
+              await walletWarmupRuntimeOrderRequestDigest(request);
+            const result = await collectWalletWarmupRuntimeOrder(request, {
+              ...deps.runtime,
+              signal: readSignal,
+              apiKey,
+            });
+            material = { request, result };
+            return result.order;
+          },
+          simulate: async (order, readSignal) => {
+            readSignal.throwIfAborted();
+            const retained = material as WarmupRuntimeMaterial | null;
+            if (
+              !retained ||
+              order.preparation.sha256 !==
+                retained.result.order.preparation.sha256
+            )
+              throw Error('Original runtime packet is unavailable.');
+            return retained.result.simulation;
+          },
         },
-        quote: async (input, apiKey, readSignal) => {
-          if (
-            input.wallet !== candidate.action.wallet ||
-            input.tokenMint !== candidate.action.mint ||
-            input.side !== candidate.action.side
-          )
-            throw Error('Runtime action changed.');
-          const request: WarmupRuntimeOrderRequest = {
-            requestSha256: '0'.repeat(64),
-            wallet: input.wallet,
-            mint: input.tokenMint,
-            side: input.side,
-            inputRaw:
-              candidate.action.side === 'Buy'
-                ? candidate.action.inputLamports
-                : candidate.sellSource!.remainingRaw,
-            feeAndRentLimitRaw: candidate.budget.remainingReserveLamports,
-            deadline: candidate.deadline,
-            inventory,
-          };
-          request.requestSha256 =
-            await walletWarmupRuntimeOrderRequestDigest(request);
-          const result = await collectWalletWarmupRuntimeOrder(request, {
-            ...deps.runtime,
-            signal: readSignal,
-            apiKey,
-          });
-          material = { request, result };
-          return result.order;
-        },
-        simulate: async (order, readSignal) => {
-          readSignal.throwIfAborted();
-          const retained = material as WarmupRuntimeMaterial | null;
-          if (
-            !retained ||
-            order.preparation.sha256 !==
-              retained.result.order.preparation.sha256
-          )
-            throw Error('Original runtime packet is unavailable.');
-          return retained.result.simulation;
-        },
-      });
+        true,
+      );
       const result = await run(candidate, signal);
       await requireActiveWarmupRuntimePurpose(db, lease, signal);
       if (!material) throw Error('Runtime observations are unavailable.');

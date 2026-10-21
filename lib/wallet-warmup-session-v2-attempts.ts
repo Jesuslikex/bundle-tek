@@ -17,6 +17,10 @@ import type { WarmupSessionPreparationCandidate } from './wallet-warmup-session-
 import { createWalletWarmupV2Provider } from './wallet-warmup-session-v2-provider';
 import { createWalletWarmupV2RuntimeProvider } from './wallet-warmup-session-v2-runtime-provider';
 import {
+  WARMUP_RUNTIME_WALLET_BUSY_SQL,
+  requireWarmupRuntimeWalletAvailability,
+} from './wallet-warmup-runtime-wallet-busy';
+import {
   warmupRuntimeInstalled,
   warmupPurposeInsert,
   readWarmupPurpose,
@@ -812,6 +816,8 @@ async function prepareAttempt(
       409,
       pending.id,
     );
+  if (mode === 'runtime')
+    await requireWarmupRuntimeWalletAvailability(db, owner, input, signal);
   let claimed = false;
   try {
     signal.throwIfAborted();
@@ -822,7 +828,7 @@ async function prepareAttempt(
  (SELECT count(*)+1 FROM wallet_warmup_session_v2_attempts a WHERE a.owner_id=c.owner_id AND a.journal_id=c.journal_id AND a.action_id=c.action_id),
  (SELECT id FROM wallet_warmup_session_v2_attempts a WHERE a.owner_id=c.owner_id AND a.journal_id=c.journal_id ORDER BY sequence DESC LIMIT 1),c.version,c.head_sha256,c.terms_sha256,
  strftime('%Y-%m-%dT%H:%M:%fZ','now'),min(strftime('%Y-%m-%dT%H:%M:%fZ','now','+60 seconds'),c.finish_at)
- FROM wallet_warmup_session_v2_attempt_context c WHERE c.owner_id=? AND c.journal_id=? AND c.version=? AND c.head_sha256=?`)
+ FROM wallet_warmup_session_v2_attempt_context c WHERE c.owner_id=? AND c.journal_id=? AND c.version=? AND c.head_sha256=?${mode === 'runtime' ? ` AND (${WARMUP_RUNTIME_WALLET_BUSY_SQL})=0` : ''}`)
       .bind(input.id, owner, input.journalId, input.version, input.headSha256);
     const result = purposesInstalled
       ? (
