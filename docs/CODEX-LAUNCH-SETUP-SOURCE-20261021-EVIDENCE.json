@@ -1,0 +1,116 @@
+{
+  "base": "b7f6ffd5571e630bc777958f0bfedc467e43ac35",
+  "sourceOnly": true,
+  "scope": "owner-scoped immutable historical setup projection and display",
+  "authorityFlagsAllFalse": true,
+  "tests": {
+    "files": 15,
+    "passed": 186,
+    "failed": 0,
+    "skipped": 0
+  },
+  "plainTypeScriptPassed": true,
+  "typedLintFiles": 10,
+  "formatFiles": 11,
+  "isolatedBuild": {
+    "base": "b7f6ffd5571e630bc777958f0bfedc467e43ac35",
+    "overlays": [
+      "lib/launch-layer-setup.ts",
+      "lib/launch-layer-setup.test.ts",
+      "lib/launch-layer-service.ts",
+      "lib/launch-layer-service.test.ts",
+      "lib/launch-layer-client.ts",
+      "lib/launch-layer-client.test.ts",
+      "components/launch/launch-layer-setup-summary.tsx",
+      "components/launch/launch-layer-setup-summary.test.tsx",
+      "components/launch/launch-layer-setup-summary.module.css",
+      "components/launch/pump-layer-planner.tsx",
+      "components/launch/pump-layer-planner.test.tsx"
+    ],
+    "hashes": {
+      "lib/launch-layer-setup.ts": "43c4e45744feeb6610907c11e5fbaced36996bf1593f0d2045c5068656c1b246",
+      "lib/launch-layer-setup.test.ts": "5e819acb7aa09ee051d64ac0628e38ecdcd4da4132999b1cc1419201b0ccd932",
+      "lib/launch-layer-service.ts": "eed62d9efdafcfc0496f5b3b50bbf0f6f9c40f34f5e6e2de4d09ab970043a213",
+      "lib/launch-layer-service.test.ts": "b24a8718698d44c90f038fdf15fe74276e0f7de58d78687be6734cf80e416908",
+      "lib/launch-layer-client.ts": "0fe2b82837a4f7a2b37666d63cc8447bb248b75a718e8f69ddcdcf77a8e5519e",
+      "lib/launch-layer-client.test.ts": "acabf4e821d88fe720ad8c70696f018671efa78b6bf2e8a233c867c4e5fcaba3",
+      "components/launch/launch-layer-setup-summary.tsx": "aa8f3039e072d192a1e90bba9672c48b3633c6efc2fd9fae450d65d3567fc886",
+      "components/launch/launch-layer-setup-summary.test.tsx": "4211bde7b27a5177039d7d05ca6960f9c940dcb679265e190830530b30b33fc5",
+      "components/launch/launch-layer-setup-summary.module.css": "dddd8784bb63f0d4c513faeea2c58c983be25ebcc7b3a478de005284378b9870",
+      "components/launch/pump-layer-planner.tsx": "2b0ea1156e18656f2039aeeb0ad0b4f5c6142c0a2e1f000d943db4e7d4045760",
+      "components/launch/pump-layer-planner.test.tsx": "9aa84a453902afb13ce3581dc3711fba4007bcc9365df45cbb48f6776ac7a2e9"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "sourceFreeze": {
+    "selectedFiles": 2364,
+    "unchanged": true,
+    "sha256": "71d2b57006cdfad08ff93c512fe30a8b8a5ccd70383d482fb22a96218f2da0e2"
+  },
+  "opusReview": {
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "isError": false,
+    "permissionDenials": 0,
+    "sourceUnchanged": true
+  },
+  "reviewedCoreUnchanged": [
+    "lib/launch-layer-setup.ts",
+    "lib/launch-layer-service.ts",
+    "lib/launch-layer-client.ts",
+    "components/launch/pump-layer-planner.tsx",
+    "components/launch/pump-layer-planner.test.tsx"
+  ],
+  "filesChangedAfterReview": [
+    "lib/launch-layer-setup.test.ts",
+    "lib/launch-layer-service.test.ts",
+    "lib/launch-layer-client.test.ts",
+    "components/launch/launch-layer-setup-summary.tsx",
+    "components/launch/launch-layer-setup-summary.test.tsx",
+    "components/launch/launch-layer-setup-summary.module.css"
+  ],
+  "postReviewChanges": "Low display/wording/empty details/artwork branch fixes and expanded assertions independently tested, not rereviewed",
+  "bindingBoundary": "authenticated service verifies private retained root/source/terms; client matches outer result. UI performs structural/URL/envelope/revision checks, not independent private-root reconstruction.",
+  "historicalNativeTest": "Current artwork/fee choices changed; original retained setup preserved, non-current marker and foreign-owner refusal checked",
+  "rea": {
+    "discoveryEvidence": "ev_a000a5867b2c0bbec3024e702acb0e47e0db2708297382cb507207dcff7533aa",
+    "pageEvidence": "ev_132438a715208406fa31201af3c4cd50c5c8ca24df88944f69002a1fb88cd0b7",
+    "path": "/account",
+    "domNodes": 1147,
+    "accessibilityNodes": 525,
+    "coverage": "policy-filtered; attach-limited; no truncation",
+    "privateExportBytes": 483006,
+    "privateExportSha256": "53e1ba55ba3a29adb9f78c4f2448bea83ff63297c543a86c040984e2410c4550",
+    "relayStopped": true,
+    "pageNavigatedOrMutated": false,
+    "launchOrWarmupExecutionObserved": false
+  },
+  "protectedClaudeFilesEdited": false,
+  "schemaOrMigrationsChanged": false,
+  "notPerformed": [
+    "deployment",
+    "application/hosted SQL",
+    "provider/credential/cron changes",
+    "real wallet unlock/sign/send",
+    "funded tests"
+  ],
+  "remaining": [
+    "final rendered/signed-in UI QA",
+    "qualified combined launch approval and funding/receipt/slippage composition",
+    "live transaction/runtime proof",
+    "full Proxima parity"
+  ]
+}

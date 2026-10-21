@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseLaunchLayerSetup } from './launch-layer-setup';
 import {
   createLaunchLayerTerms,
   parseLaunchLayerEnvelope,
@@ -79,6 +80,7 @@ export function parseSavedLayer(value: unknown, projectId: string) {
         signingAllowed: z.literal(false),
         executionAllowed: z.literal(false),
         envelope: z.unknown(),
+        setup: z.unknown().optional(),
       })
       .parse(value);
     const envelope = parseLaunchLayerEnvelope(record.envelope);
@@ -87,7 +89,15 @@ export function parseSavedLayer(value: unknown, projectId: string) {
       Boolean(record.importedTarget)
     )
       throw new Error('Saved imported identity is unavailable.');
-    return { ...record, envelope };
+    const setup =
+      record.setup === undefined
+        ? undefined
+        : parseLaunchLayerSetup(record.setup, envelope, {
+            projectId: record.projectId,
+            projectUpdatedAt: record.projectUpdatedAt,
+            snapshotSha256: record.sha256,
+          });
+    return { ...record, envelope, setup };
   } catch {
     throw new Error(
       'Saved planning data could not be confirmed. Reload layer history before retrying.',

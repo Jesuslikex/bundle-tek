@@ -12,6 +12,44 @@ import {
 } from './launch-layer-service';
 let client: Client, db: D1Database, f: ReturnType<typeof launchLayerFixture>;
 const save = () => saveOwnedLaunchLayerPlan(db, 'alice', f.input, f.now);
+it('retains original artwork and fee choices after the current project changes', async () => {
+  f.document.identity.artworkUrl = '/api/artwork/' + '1'.repeat(64);
+  f.document.options.settings.pumpfun.feeSharing = true;
+  f.document.options.settings.pumpfun.feeShares = [
+    { address: f.address(1), shareBps: 10000 },
+  ];
+  await db
+    .prepare(
+      'UPDATE workspace_projects SET document=? WHERE owner_id=? AND id=?',
+    )
+    .bind(JSON.stringify(f.document), 'alice', f.selection.projectId)
+    .run();
+  const original = await save();
+  expect(original.setup.identity.artworkUrl).toBe(
+    f.document.identity.artworkUrl,
+  );
+  expect(original.setup.snapshotSha256).toBe(original.sha256);
+  f.document.identity.artworkUrl = '/api/artwork/' + '2'.repeat(64);
+  f.document.options.settings.pumpfun.feeSharing = false;
+  f.document.options.settings.pumpfun.feeShares = [];
+  await db
+    .prepare(
+      'UPDATE workspace_projects SET document=? WHERE owner_id=? AND id=?',
+    )
+    .bind(JSON.stringify(f.document), 'alice', f.selection.projectId)
+    .run();
+  const historical = await readOwnedLaunchLayerPlan(
+    db,
+    'alice',
+    f.selection.projectId,
+    original.id,
+  );
+  expect(historical!.current).toBe(false);
+  expect(historical!.setup).toEqual(original.setup);
+  await expect(
+    readOwnedLaunchLayerPlan(db, 'bob', f.selection.projectId, original.id),
+  ).rejects.toMatchObject({ status: 404 });
+});
 it('lists all owned snapshot metadata in stable order, including archived source history', async () => {
   expect(
     (await listOwnedLaunchLayerPlans(db, 'alice', f.selection.projectId)).items,
@@ -518,6 +556,7 @@ it('keeps StonkFun Front-only stock quote ceilings separate from native SOL budg
     symbol: 'TSLAX',
     evidence: 'saved-catalog-units-only',
   });
+  expect(saved.setup.pumpfun).toBeNull();
   expect(saved.envelope.terms.totals.maximumBuyQuoteRaw).toBe(
     '9007199254741093',
   );

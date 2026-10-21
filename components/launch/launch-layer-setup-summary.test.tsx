@@ -6,6 +6,8 @@ import { largeLayerReviewFixture } from '../../test/launch-layer-review-fixture'
 import { LayerBudgetReview } from './pump-layer-planner';
 import { LaunchLayerSetupSummary } from './launch-layer-setup-summary';
 import { layerDisplay } from '@/lib/launch-layer-client';
+import { layerNativeFixture } from '../../test/launch-layer-native-fixture';
+import { createLaunchLayerSetup } from '@/lib/launch-layer-setup';
 
 vi.stubGlobal('React', React);
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -38,7 +40,7 @@ it('shows bound role counts and preserves subsecond timing without inventing rea
     expect(host.textContent).toContain(envelope.terms.binding.target.mint);
     expect(host.textContent).toContain(envelope.terms.quote.address);
     expect(host.textContent).toContain(
-      'Slippage, rewards and fee sharing are not confirmed by these layer terms',
+      'Slippage, rewards and fee sharing are not confirmed here',
     );
     expect(host.querySelector('button,input')).toBeNull();
     expect(host.querySelector('details')!.open).toBe(false);
@@ -50,6 +52,122 @@ it('shows bound role counts and preserves subsecond timing without inventing rea
     await act(async () => root.unmount());
   }
 });
+
+it('shows original uploaded artwork and saved fee shares without presenting them as executed', async () => {
+  const { f, plan } = await layerNativeFixture(),
+    host = document.createElement('div'),
+    root = createRoot(host);
+  f.document.identity.artworkUrl = '/api/artwork/' + '1'.repeat(64);
+  f.document.identity.website = 'https://example.test/original';
+  f.document.options.settings.pumpfun.feeSharing = true;
+  f.document.options.settings.pumpfun.feeShares = [
+    { address: f.address(1), shareBps: 3333 },
+    { address: f.address(2), shareBps: 6667 },
+  ];
+  const setup = createLaunchLayerSetup(f.document, plan.envelope, {
+    projectId: f.selection.projectId,
+    projectUpdatedAt: f.updatedAt,
+    snapshotSha256: 'a'.repeat(64),
+  });
+  f.document.identity.artworkUrl = '/api/artwork/' + '2'.repeat(64);
+  try {
+    await act(async () =>
+      root.render(
+        <LaunchLayerSetupSummary envelope={plan.envelope} setup={setup} />,
+      ),
+    );
+    const imageUrl = new URL(host.querySelector('img')!.src);
+    expect(imageUrl.origin).toBe(document.location.origin);
+    expect(imageUrl.pathname).toBe(setup.identity.artworkUrl);
+    expect(host.querySelector('a')!.getAttribute('href')).toBe(
+      'https://example.test/original',
+    );
+    expect(host.textContent).toContain('2 recipient(s)');
+    expect(host.textContent).toContain('33.33%');
+    expect(host.textContent).toContain('66.67%');
+    expect(host.textContent).toContain(
+      'saved requests, not verified execution settings',
+    );
+    expect([...host.querySelectorAll('details')].every((d) => !d.open)).toBe(
+      true,
+    );
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+it('explains missing saved artwork and retries only on an explicit click', async () => {
+  const { f, plan } = await layerNativeFixture(),
+    host = document.createElement('div'),
+    root = createRoot(host);
+  f.document.identity.artworkUrl = '/api/artwork/' + '1'.repeat(64);
+  const setup = createLaunchLayerSetup(f.document, plan.envelope, {
+    projectId: f.selection.projectId,
+    projectUpdatedAt: f.updatedAt,
+    snapshotSha256: 'a'.repeat(64),
+  });
+  try {
+    await act(async () =>
+      root.render(
+        <LaunchLayerSetupSummary envelope={plan.envelope} setup={setup} />,
+      ),
+    );
+    await act(async () =>
+      host.querySelector('img')!.dispatchEvent(new Event('error')),
+    );
+    expect(host.querySelector('img')).toBeNull();
+    expect(host.textContent).toContain('Saved artwork unavailable');
+    const retry = host.querySelector('button')!;
+    expect(retry.textContent).toBe('Retry artwork');
+    await act(async () => retry.click());
+    const retried = new URL(host.querySelector('img')!.src);
+    expect(retried.origin).toBe(document.location.origin);
+    expect(retried.pathname).toBe(setup.identity.artworkUrl);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+it.each(['external', 'stale', 'unsafe-url', 'authority'] as const)(
+  'does not automatically load untrusted artwork or mismatched setup: %s',
+  async (kind) => {
+    const { f, plan } = await layerNativeFixture(),
+      host = document.createElement('div'),
+      root = createRoot(host);
+    f.document.identity.artworkUrl = 'https://example.test/saved.png';
+    const setup = createLaunchLayerSetup(f.document, plan.envelope, {
+      projectId: f.selection.projectId,
+      projectUpdatedAt: f.updatedAt,
+      snapshotSha256: 'a'.repeat(64),
+    });
+    if (kind === 'stale') setup.termsSha256 = 'b'.repeat(64);
+    if (kind === 'unsafe-url') setup.identity.website = 'javascript:alert(1)';
+    if (kind === 'authority') Object.assign(setup, { signingAllowed: true });
+    try {
+      await act(async () =>
+        root.render(
+          <LaunchLayerSetupSummary envelope={plan.envelope} setup={setup} />,
+        ),
+      );
+      expect(host.querySelector('img')).toBeNull();
+      if (kind === 'external') {
+        expect(host.querySelector('a')!.textContent).toBe(
+          'Open saved external artwork',
+        );
+        expect(host.querySelector('a')!.getAttribute('rel')).toContain(
+          'noreferrer',
+        );
+      } else {
+        expect(host.querySelector('a')).toBeNull();
+        expect(host.textContent).toContain(
+          'Artwork and venue choices are unavailable for this review',
+        );
+      }
+    } finally {
+      await act(async () => root.unmount());
+    }
+  },
+);
 
 it.each([
   'unreadable',
@@ -120,6 +238,77 @@ it('distinguishes draft and saved reviews and labels the configuration headings 
     await act(async () => root.unmount());
   }
 });
+
+it.each(['empty', 'uploaded', 'unreadable-name'] as const)(
+  'keeps StonkFun setup useful without an empty details panel: %s',
+  async (kind) => {
+    const { f, plan } = await layerNativeFixture(true),
+      host = document.createElement('div'),
+      root = createRoot(host);
+    if (kind !== 'empty')
+      f.document.identity.artworkUrl = '/api/artwork/' + '1'.repeat(64);
+    const setup = createLaunchLayerSetup(f.document, plan.envelope, {
+      projectId: f.selection.projectId,
+      projectUpdatedAt: f.updatedAt,
+      snapshotSha256: 'a'.repeat(64),
+    });
+    if (kind === 'unreadable-name')
+      plan.envelope.terms.binding.savedPlanJson = '{';
+    try {
+      await act(async () =>
+        root.render(
+          <LaunchLayerSetupSummary envelope={plan.envelope} setup={setup} />,
+        ),
+      );
+      for (const label of ['Holder rewards', 'Creator fee', 'Fee sharing'])
+        expect(
+          [...host.querySelectorAll('dt')].find((n) => n.textContent === label)!
+            .nextElementSibling!.textContent,
+        ).toBe('Not applicable (StonkFun)');
+      expect(host.querySelectorAll('ul')).toHaveLength(0);
+      expect(
+        [...host.querySelectorAll('summary')].some((n) =>
+          n.textContent!.startsWith('Saved project artwork'),
+        ),
+      ).toBe(false);
+      expect(Boolean(host.querySelector('img'))).toBe(kind !== 'empty');
+      if (kind === 'unreadable-name')
+        expect(host.textContent).toContain(
+          'Saved launch details are unavailable',
+        );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  },
+);
+
+it.each([null, 'a'.repeat(64)])(
+  'describes the original setup source correctly for snapshot %s',
+  async (sha) => {
+    const { f, plan } = await layerNativeFixture(),
+      host = document.createElement('div'),
+      root = createRoot(host);
+    const setup = createLaunchLayerSetup(f.document, plan.envelope, {
+      projectId: f.selection.projectId,
+      projectUpdatedAt: f.updatedAt,
+      snapshotSha256: sha,
+    });
+    try {
+      await act(async () =>
+        root.render(
+          <LaunchLayerSetupSummary envelope={plan.envelope} setup={setup} />,
+        ),
+      );
+      expect(host.textContent).toContain(
+        sha === null
+          ? 'come from the loaded saved project'
+          : 'come from the retained project snapshot',
+      );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  },
+);
 
 it('shows explicitly saved buy timings from the validated snapshot', async () => {
   const envelope = await largeLayerReviewFixture(),

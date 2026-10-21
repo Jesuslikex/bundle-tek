@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  createLaunchLayerSetup,
+  type LaunchLayerSetup,
+} from './launch-layer-setup';
 import { parseLaunchLayerHistory } from './launch-layer-history';
 import { validateProjectDocument, projectIdValid } from './workspace-project';
 import {
@@ -359,6 +363,7 @@ export async function saveOwnedLaunchLayerPlan(
 }
 async function decode(db: D1Database, owner: string, row: Row) {
   let snapshot: Snapshot;
+  let setup: LaunchLayerSetup;
   try {
     snapshot = JSON.parse(row.document) as Snapshot;
     if (
@@ -397,6 +402,11 @@ async function decode(db: D1Database, owner: string, row: Row) {
             referenceKey(roles.developer.wallet)))
     )
       throw new Error('Saved role assignment differs.');
+    setup = createLaunchLayerSetup(source, snapshot.envelope, {
+      projectId: row.project_id,
+      projectUpdatedAt: row.project_revision,
+      snapshotSha256: row.sha256,
+    });
   } catch {
     return fail('Saved layer plan is inconsistent.', 503);
   }
@@ -420,6 +430,7 @@ async function decode(db: D1Database, owner: string, row: Row) {
     createdAt: row.created_at,
     sha256: row.sha256,
     envelope: snapshot.envelope,
+    setup,
     ...(snapshot.selection.target.kind === 'imported'
       ? {
           importedTarget: {

@@ -25,6 +25,10 @@ import styles from './pump-layer-planner.module.css';
 import { LaunchLayerHistory } from './launch-layer-history';
 import { LaunchLayerNativeCoverage } from './launch-layer-native-coverage';
 import { LaunchLayerSetupSummary } from './launch-layer-setup-summary';
+import {
+  createLaunchLayerSetup,
+  type LaunchLayerSetup,
+} from '@/lib/launch-layer-setup';
 
 const endpoint = '/api/launch/layers';
 const names: Record<LayerRole, string> = {
@@ -64,9 +68,11 @@ async function read(response: Response) {
 export function LayerBudgetReview({
   envelope,
   contextLabel = 'Layer',
+  setup,
 }: {
   envelope: LaunchLayerEnvelope;
   contextLabel?: string;
+  setup?: LaunchLayerSetup;
 }) {
   const { quote, totals, roles } = envelope.terms;
   const filterId = useId();
@@ -107,6 +113,7 @@ export function LayerBudgetReview({
       <LaunchLayerSetupSummary
         envelope={envelope}
         contextLabel={contextLabel}
+        setup={setup}
       />
       <p>
         These are your maximum planning amounts. They are not verified costs,
@@ -833,6 +840,21 @@ function Planner({
                 key={review.envelope.sha256}
                 envelope={review.envelope}
                 contextLabel="Draft layer"
+                setup={(() => {
+                  try {
+                    return createLaunchLayerSetup(
+                      context.document,
+                      review.envelope,
+                      {
+                        projectId: context.projectId,
+                        projectUpdatedAt: context.projectUpdatedAt,
+                        snapshotSha256: null,
+                      },
+                    );
+                  } catch {
+                    return undefined;
+                  }
+                })()}
               />
               <Button
                 disabled={blocked || !historyRead}
@@ -970,6 +992,7 @@ function Planner({
             key={saved.envelope.sha256}
             envelope={saved.envelope}
             contextLabel="Saved layer"
+            setup={saved.setup}
           />
           <LaunchLayerNativeCoverage
             key={`${saved.id}:${saved.sha256}:${saved.current}`}

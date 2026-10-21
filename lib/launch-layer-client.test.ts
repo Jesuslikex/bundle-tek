@@ -18,7 +18,51 @@ import {
   saveOwnedLaunchLayerPlan,
   readLaunchLayerContext,
 } from './launch-layer-service';
-
+it('binds saved setup to the retained result and refuses draft substitution', async () => {
+  const f = layerUiFixture(),
+    storage = await layerTestStorage(f);
+  try {
+    const saved = await saveOwnedLaunchLayerPlan(storage.db, 'alice', {
+      ...f.selection,
+      layers: f.layers,
+    });
+    expect(parseSavedLayer(saved, f.selection.projectId).setup).toEqual(
+      saved.setup,
+    );
+    expect(() =>
+      parseSavedLayer(
+        { ...saved, setup: { ...saved.setup, snapshotSha256: null } },
+        f.selection.projectId,
+      ),
+    ).toThrow(/could not be confirmed/);
+    expect(() =>
+      parseSavedLayer({ ...saved, setup: null }, f.selection.projectId),
+    ).toThrow(/could not be confirmed/);
+    expect(() =>
+      parseSavedLayer(
+        { ...saved, setup: { ...saved.setup, pumpfun: null } },
+        f.selection.projectId,
+      ),
+    ).toThrow(/could not be confirmed/);
+    const fake = '2026-10-18T04:00:00.000Z';
+    expect(() =>
+      parseSavedLayer(
+        {
+          ...saved,
+          projectUpdatedAt: fake,
+          setup: { ...saved.setup, projectUpdatedAt: fake },
+        },
+        f.selection.projectId,
+      ),
+    ).toThrow(/could not be confirmed/);
+    expect(
+      parseSavedLayer({ ...saved, setup: undefined }, f.selection.projectId)
+        .setup,
+    ).toBeUndefined();
+  } finally {
+    storage.client.close();
+  }
+});
 it('retains a Front-only editor request through actual storage', async () => {
   const f = layerUiFixture();
   const storage = await layerTestStorage(f);

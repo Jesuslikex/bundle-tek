@@ -33,7 +33,37 @@
   margin-block: 12px;
 }
 .token {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+.token p {
+  min-width: 0;
+}
+.token img {
+  display: inline-block;
+  object-fit: cover;
+  vertical-align: middle;
+  border-radius: 6px;
+  margin-inline-end: 8px;
+}
+.artwork button {
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--border, #30333c);
+  border-radius: 6px;
+}
+.identity li {
+  overflow-wrap: anywhere;
+}
+.identity a {
+  display: inline-block;
+  min-height: 44px;
+  padding-block: 12px;
+  text-decoration: underline;
 }
 .token strong {
   color: var(--foreground, #f4f4f5);

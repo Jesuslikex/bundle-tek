@@ -367,8 +367,13 @@ it('refuses a detail record that differs from its selected history metadata', as
     url.includes('&id=')
       ? (async () => {
           const response = await GET(new Request('https://bundle.test' + url));
-          const body = (await response.json()) as { plan: { sha256: string } };
+          const body = (await response.json()) as {
+            plan: { sha256: string; setup: { snapshotSha256: string | null } };
+          };
           body.plan.sha256 = '0'.repeat(64);
+          // Keep the new projection internally coherent so this case reaches
+          // the existing selected-history binding guard, not DTO admission.
+          body.plan.setup.snapshotSha256 = body.plan.sha256;
           return Response.json(body);
         })()
       : undefined;
