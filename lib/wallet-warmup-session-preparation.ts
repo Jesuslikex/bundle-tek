@@ -9,6 +9,7 @@ import {
   type WarmupPreparationSummary,
 } from './warmup-preparation-history';
 import type { WarmupSessionAction } from './wallet-warmup-session-review';
+import type { SavedWarmup } from './wallet-warmup-storage';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
 import { walletWarmupSessionFinishGuardInstalled } from './wallet-warmup-session-finish-guard';
 import {
@@ -49,8 +50,19 @@ const rowSchema = z
   })
   .strict();
 type Row = z.infer<typeof rowSchema>;
-type Candidate = {
+export type WarmupSessionPreparationCandidate = {
   action: WarmupSessionAction;
+  plan: SavedWarmup;
+  planDocument: string;
+  journalId: string;
+  version: number;
+  headSha256: string;
+  deadline: number;
+  budget: {
+    buySpendLamports: string;
+    recordedFurtherBuySpendLamports: string;
+    remainingReserveLamports: string;
+  };
   sellSource: null | {
     buyReceiptId: string;
     remainingRaw: string;
@@ -238,7 +250,7 @@ export async function prepareWalletWarmupSessionAction(
   value: unknown,
   signal: AbortSignal,
   prepare: (
-    candidate: Candidate,
+    candidate: WarmupSessionPreparationCandidate,
     signal: AbortSignal,
   ) => Promise<WarmupPreparationSummary | WarmupSessionPacketMaterial>,
   clock: () => number = Date.now,
@@ -317,13 +329,14 @@ export async function prepareWalletWarmupSessionAction(
   }
   const plan = await db
     .prepare(
-      "SELECT document FROM wallet_warmup_plans p WHERE owner_id=? AND id=? AND revision=? AND archived=0 AND (SELECT COUNT(*) FROM json_each(json_extract(p.document,'$.walletRevisions')) j JOIN workspace_wallets w ON w.address=json_extract(j.value,'$.address') AND w.revision=json_extract(j.value,'$.revision') WHERE w.owner_id=p.owner_id AND w.chain=json_extract(p.document,'$.chain') AND w.archived=0)=json_array_length(json_extract(p.document,'$.addresses'))",
+      "SELECT document,updated_at AS updatedAt FROM wallet_warmup_plans p WHERE owner_id=? AND id=? AND revision=? AND archived=0 AND (SELECT COUNT(*) FROM json_each(json_extract(p.document,'$.walletRevisions')) j JOIN workspace_wallets w ON w.address=json_extract(j.value,'$.address') AND w.revision=json_extract(j.value,'$.revision') WHERE w.owner_id=p.owner_id AND w.chain=json_extract(p.document,'$.chain') AND w.archived=0)=json_array_length(json_extract(p.document,'$.addresses'))",
     )
     .bind(owner, journal.plan.id, journal.plan.revision)
-    .first<{ document: string }>();
+    .first<{ document: string; updatedAt: string }>();
   if (
     !plan ||
-    canonical(JSON.parse(plan.document)) !== canonical(journal.plan.document)
+    canonical(JSON.parse(plan.document)) !== canonical(journal.plan.document) ||
+    plan.updatedAt !== journal.plan.updatedAt
   )
     return recoverBeforeRefusal(
       db,
@@ -359,7 +372,7 @@ export async function prepareWalletWarmupSessionAction(
       409,
     );
   const action = structuredClone(pending.action);
-  let sellSource: Candidate['sellSource'] = null;
+  let sellSource: WarmupSessionPreparationCandidate['sellSource'] = null;
   if (action.side === 'Sell') {
     if (action.source.kind === 'saved-buy')
       sellSource = {
@@ -390,8 +403,34 @@ export async function prepareWalletWarmupSessionAction(
       'The retained unsigned session packet is unavailable. No signing is enabled.',
       503,
     );
+  const originalBudget = z
+    .object({
+      wallet: z.string(),
+      buySpendLamports: z.string().regex(/^(0|[1-9]\d{0,24})$/),
+    })
+    .array()
+    .parse(JSON.parse(journal.sourceDocument).review.wallets)
+    .find((w) => w.wallet === action.wallet);
+  const budget = journal.snapshot.wallets.find(
+    (w) => w.wallet === action.wallet,
+  );
+  if (!originalBudget || !budget) fail(undefined, 503);
   const material = await prepare(
-    structuredClone({ action, sellSource }),
+    structuredClone({
+      action,
+      sellSource,
+      plan: journal.plan,
+      planDocument: plan.document,
+      journalId: journal.id,
+      version: input.version,
+      headSha256: input.headSha256,
+      deadline: Date.parse(journal.effectiveReviewExpiresAt),
+      budget: {
+        buySpendLamports: originalBudget.buySpendLamports,
+        recordedFurtherBuySpendLamports: budget.recordedFurtherBuySpendLamports,
+        remainingReserveLamports: budget.remainingReserveLamports,
+      },
+    }),
     signal,
   );
   signal.throwIfAborted();
@@ -448,7 +487,7 @@ export async function prepareWalletWarmupSessionAction(
   });
   const statement = db
     .prepare(
-      'INSERT INTO wallet_warmup_session_preparations(owner_id,preparation_id,journal_id,action_id,review_version,review_sha256,plan_id,plan_revision,cycle,wallet_address,wallet_revision,preparation_document,plan_document,created_at,binding_sha256,record_sha256) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      "INSERT INTO wallet_warmup_session_preparations(owner_id,preparation_id,journal_id,action_id,review_version,review_sha256,plan_id,plan_revision,cycle,wallet_address,wallet_revision,preparation_document,plan_document,created_at,binding_sha256,record_sha256) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE (?=0 OR EXISTS(SELECT 1 FROM warmup_buy_receipts WHERE owner_id=? AND id=? AND remaining_raw=? AND json_extract(document,'$.decimals')=?))",
     )
     .bind(
       row.owner_id,
@@ -467,6 +506,11 @@ export async function prepareWalletWarmupSessionAction(
       row.created_at,
       row.binding_sha256,
       row.record_sha256,
+      sellSource ? 1 : 0,
+      owner,
+      sellSource?.buyReceiptId ?? null,
+      sellSource?.remainingRaw ?? null,
+      sellSource?.decimals ?? null,
     );
   const write =
     'summary' in material

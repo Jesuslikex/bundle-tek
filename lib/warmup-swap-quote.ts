@@ -175,6 +175,10 @@ async function quoteSolanaSwap(
     redirect: 'manual',
     cache: 'no-store',
   });
+  if (signal.aborted) {
+    void response.body?.cancel().catch(() => {});
+    signal.throwIfAborted();
+  }
   if (!response.ok)
     throw new WarmupQuoteError(
       response.status === 401 || response.status === 403
@@ -193,19 +197,27 @@ async function quoteSolanaSwap(
   let text = '',
     size = 0;
   const decoder = new TextDecoder();
+  const cancel = () => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', cancel, { once: true });
   try {
     while (true) {
+      signal.throwIfAborted();
       const { done, value } = await reader.read();
+      signal.throwIfAborted();
       if (done) break;
       size += value.length;
       if (size > 262144) {
-        await reader.cancel();
+        cancel();
         throw new WarmupQuoteError('Quote response exceeds the size limit.');
       }
       text += decoder.decode(value, { stream: true });
     }
     text += decoder.decode();
   } finally {
+    signal.removeEventListener('abort', cancel);
+    cancel();
     reader.releaseLock();
   }
   let data: Record<string, unknown>;

@@ -9,6 +9,37 @@ import {
   WRAPPED_SOL,
 } from './warmup-swap-quote';
 const mint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+it('cancels a stalled quote response body when the request is aborted', async () => {
+  const c = new AbortController(),
+    cancel = vi.fn();
+  let opened!: () => void;
+  const started = new Promise<void>((r) => {
+    opened = r;
+  });
+  const fetcher = vi.fn(
+    async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{'));
+            opened();
+          },
+          cancel,
+        }),
+        { status: 200 },
+      ),
+  );
+  const pending = quoteSolanaBuy(
+    { outputMint: mint, amount: '0.001' },
+    'synthetic-key',
+    c.signal,
+    fetcher,
+  );
+  await started;
+  c.abort(new DOMException('Synthetic cancellation', 'AbortError'));
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
 const doc = () => ({
   name: 'QA',
   chain: 'Solana',
