@@ -51,8 +51,15 @@ export async function collectPairRuntimePreview(
   now: () => number = Date.now,
   quoteBoundsMode: PairQuoteBoundsMode = 'strict',
   inventoryAccountLimit?: 5 | 100,
+  codeReadConcurrency: 1 | 4 = 4,
 ) {
   const scopedLimit = stockPairRpcScope(rpc)?.accountLimit === 5 ? 5 : 100;
+  if (
+    ![1, 4].includes(codeReadConcurrency) ||
+    (codeReadConcurrency === 1 &&
+      (scopedLimit === 5 || stockPairRpcScope(programRpc)?.accountLimit === 5))
+  )
+    throw Error('Runtime code-read concurrency or account profile differs.');
   if (
     scopedLimit === 5 &&
     stockPairRpcScope(programRpc) !== stockPairRpcScope(rpc)
@@ -76,6 +83,7 @@ export async function collectPairRuntimePreview(
       now,
       quoteBoundsMode,
       scopedLimit === 5 ? 5 : (inventoryAccountLimit ?? 100),
+      codeReadConcurrency,
     );
   } finally {
     controller.abort();
@@ -89,6 +97,7 @@ async function inspectPairRuntime(
   now: () => number,
   quoteBoundsMode: PairQuoteBoundsMode,
   inventoryAccountLimit: 5 | 100,
+  codeReadConcurrency: 1 | 4,
 ) {
   const started = now(),
     slots = [
@@ -377,7 +386,7 @@ async function inspectPairRuntime(
       requestedFloor,
       signal,
       (method, params) => codeCall(method, params),
-      4,
+      codeReadConcurrency,
       stockPairRpcScope(programRpc)?.accountLimit === 5 ? 5 : 100,
     );
     context(String(code.maximumSlot), requestedFloor);
