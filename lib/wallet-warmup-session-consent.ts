@@ -134,6 +134,8 @@ async function build(
     reviewedAt: retained.reviewedAt,
   };
 }
+/** Historical terms reconstruction only; this never renews a review or saves consent. */
+export { build as buildWalletWarmupSessionConsentTerms };
 /** Internal only: the owner must come from a verified server session. No execution grant. */
 export async function reviewWalletWarmupSessionConsent(
   db: D1Database,
