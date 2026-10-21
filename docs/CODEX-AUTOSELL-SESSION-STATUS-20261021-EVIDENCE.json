@@ -1,0 +1,188 @@
+{
+  "sourceBase": "0a6b136b5a1503a2027f6c131ea3356f60a22290",
+  "tests": {
+    "passed": 142,
+    "failed": 0,
+    "pending": 0,
+    "files": 15,
+    "success": true,
+    "terminalExit": 0,
+    "filesRun": [
+      "components/auto-sell-lifecycle.test.tsx",
+      "components/auto-sell-modal.test.tsx",
+      "components/auto-sell-session-summary.test.tsx",
+      "lib/auto-sell-display.test.ts",
+      "lib/auto-sell-edit-changes.test.ts",
+      "lib/auto-sell-edit.test.ts",
+      "lib/auto-sell-execute.test.ts",
+      "lib/auto-sell-feed.test.ts",
+      "lib/auto-sell-market-observation.test.ts",
+      "lib/auto-sell-modes.test.ts",
+      "lib/auto-sell-pause.test.ts",
+      "lib/auto-sell-quote-trigger.test.ts",
+      "lib/auto-sell-runner.test.ts",
+      "lib/auto-sell-session.test.ts",
+      "lib/auto-sell.test.ts"
+    ]
+  },
+  "sourceFreeze": {
+    "files": 2802,
+    "digest": "f9ce3eeb40c9cdf3153bef2419e15f4adcee89b4cdded1324aeb904696bfc6ed",
+    "unchanged": true
+  },
+  "staticChecks": {
+    "typeScript": "pass",
+    "typedLintFiveFiles": "pass",
+    "formatSixFiles": "pass",
+    "originalRunHandlerUnchanged": true,
+    "originalLibrariesUnchanged": {
+      "lib/auto-sell.ts": true,
+      "lib/auto-sell-runner.ts": true,
+      "lib/auto-sell-execute.ts": true,
+      "lib/auto-sell-feed.ts": true,
+      "lib/browser-wallet-vault.ts": true
+    }
+  },
+  "build": {
+    "base": "0a6b136",
+    "overlay": [
+      "components/auto-sell-session-summary.tsx",
+      "components/auto-sell-session-summary.module.css",
+      "components/auto-sell-session-summary.test.tsx",
+      "components/auto-sell-modal.tsx",
+      "lib/auto-sell-display.ts",
+      "lib/auto-sell-display.test.ts"
+    ],
+    "hashes": {
+      "components/auto-sell-session-summary.tsx": "4c1d9d2a843da63b0aa3253dd4d142f4c2036212c6252c6cef8b5ca9e7a83ab9",
+      "components/auto-sell-session-summary.module.css": "61c68b3e74ae98e3b91c566c3dec0f9ceea708f32f2c5f417dcd8ba45441d9ae",
+      "components/auto-sell-session-summary.test.tsx": "7a0d2371dcef228edd9902ed7b104c616c33c4b81dd0a98b24fe310c8650b66a",
+      "components/auto-sell-modal.tsx": "8fa92c2a4436211d0a50df47f26256559e761bbffa5bab290d4fff8fb9228b52",
+      "lib/auto-sell-display.ts": "8fa2342e03cde2892c685a71b352eb8e6e41c498f2a87e12d28dc0236a7dcc86",
+      "lib/auto-sell-display.test.ts": "b31162292905cbffd15ad862bac882e3532e29b976623d2943ee6d51010a1c9f"
+    },
+    "code": 0,
+    "unchanged": true,
+    "passed": true
+  },
+  "opus": [
+    {
+      "startedAt": "2026-10-21T16:16:28.399Z",
+      "finishedAt": "2026-10-21T16:19:25.216Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "0a6b136b5a1503a2027f6c131ea3356f60a22290",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.843727,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    {
+      "startedAt": "2026-10-21T16:23:35.515Z",
+      "finishedAt": "2026-10-21T16:25:29.215Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "0a6b136b5a1503a2027f6c131ea3356f60a22290",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 1,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.7208950000000001,
+      "sourceUnchanged": true,
+      "changed": []
+    }
+  ],
+  "reviewNotes": [
+    "Initial mixed-encoding appended test assertion corrected to UTF8; then all final tests passed",
+    "Initial end/log/edit/lifecycle ambiguities corrected in presentation only",
+    "Follow-up found no blocking/high/medium issues; later notes disclosure, limited stopped-status announcement, suffix-only replacement and label/test-title nits independently verified, not rereviewed",
+    "One follow-up Read outside source copy to nonexistent sibling components path was denied; no bypass or successful outside read, copied files unchanged"
+  ],
+  "reference": {
+    "source": "Existing signed-in Chrome Proxima funding tab, unsent Auto Sell form",
+    "observed": [
+      "Counter replication/rate/minimum supply and exclusions",
+      "DCA fixed/random amount, interval h/m/s",
+      "Separate per-strategy endings and session-wide endings",
+      "Limit amount/market-cap ladder, advanced delay/slippage/wallet controls"
+    ],
+    "actions": "Opened mode/end/advanced controls, no amounts entered, no wallets selected, no Add/Run/funding/signing action; closed original form",
+    "rea": "list_browser_targets http://127.0.0.1:9223 returned provider_unavailable endpoint_unreachable; no fresh REA capture or launch workaround"
+  },
+  "browser": {
+    "scope": "Synthetic actual AutoSell UI and runner, blocked fetch, fake vault, fake feed/executor, fixed clock, no real keys/sign/send",
+    "observedBeforeFinalDisclosureChanges": {
+      "unknownAccountedTokens": "5",
+      "queued": "0",
+      "inFlight": "0",
+      "CloseRetainsRun": true,
+      "PauseRetainsCounts": true,
+      "desktop": {
+        "viewport": 1920,
+        "scrollWidth": 1920,
+        "dialogWidth": 620,
+        "footerButtonsHeight": 44,
+        "footerButtonsBottom": 824
+      },
+      "phone375": {
+        "viewport": 375,
+        "scrollWidth": 375,
+        "dialogClient": 335,
+        "dialogScroll": 335,
+        "footerButtonsHeight": 44,
+        "footerButtonsBottom": 781
+      },
+      "phone320Paused": {
+        "viewport": 320,
+        "scrollWidth": 320,
+        "dialogClient": 280,
+        "dialogScroll": 280,
+        "footerButtonsHeight": 44,
+        "stopBottom": 781
+      }
+    },
+    "finalSourceRenderedCheck": "Pending: existing Chrome tab1751430284 browser control timed out and kernel reset during final pass; no claim that prior screenshots show final disclosure/live-status changes",
+    "cleanup": "Own Vite server stopped after final documentation; own tab left for automatic ephemeral cleanup. Temporary viewport reset was requested but confirmation unavailable."
+  },
+  "limits": [
+    "Display checkpoint only; whole product/live Proxima parity not achieved",
+    "No application/hosted SQL, migrations, provider/credential/cron, real wallet unlock/sign/send, funded action or deploy",
+    "No new signing authority; existing browser-tab approved Auto Sell behavior unchanged",
+    "Final browser QA remains open"
+  ]
+}

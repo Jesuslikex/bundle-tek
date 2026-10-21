@@ -1,0 +1,71 @@
+.summary {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border, #2b2d38);
+  border-radius: 8px;
+  background: #11131b;
+  overflow-wrap: anywhere;
+}
+.summary header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.summary h3,
+.summary p,
+.summary dl,
+.summary dd {
+  margin: 0;
+}
+.summary h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.summary .status {
+  font-size: 12px;
+  color: #b4b0ff;
+}
+.summary dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.summary dl > div {
+  min-width: 0;
+}
+.summary dt,
+.summary p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a0a2b1;
+}
+.summary dd {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.summary .notice {
+  padding-left: 8px;
+  border-left: 2px solid #efc77d;
+  color: #efc77d;
+}
+.explanation summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 12px;
+  color: #b4b0ff;
+  cursor: pointer;
+}
+.explanation p + p {
+  margin-top: 8px;
+}
+.explanation summary:focus-visible {
+  outline: 2px solid #a99bff;
+  outline-offset: 2px;
+  border-radius: 3px;
+}

@@ -41,6 +41,11 @@ import {
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import styles from './auto-sell-modal.module.css';
+import { AutoSellSessionSummary } from './auto-sell-session-summary';
+import {
+  autoSellActivityLabel,
+  autoSellEndLabel,
+} from '@/lib/auto-sell-display';
 
 type Section = 'range' | 'end' | 'whitelist' | null;
 
@@ -581,6 +586,12 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
               }
             }}
           >
+            {snapshot && (
+              <AutoSellSessionSummary
+                snapshot={snapshot}
+                decimals={token.decimals}
+              />
+            )}
             {strategies.map((s, i) => (
               <StrategyCard
                 key={`${s.id}:${generation}`}
@@ -735,9 +746,9 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
               >
                 <h3>Edit paused session</h3>
                 <p>
-                  Sold amounts, completed orders and elapsed time are retained.
-                  Wallet selection and the original start delay stay fixed.
-                  Applying changes does not resume selling.
+                  Accounted amounts, processed targets and elapsed time are
+                  retained. Wallet selection and the original start delay stay
+                  fixed. Applying changes does not resume selling.
                 </p>
                 {currentReview ? (
                   <>
@@ -756,7 +767,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                       ))}
                     </dl>
                     <p>
-                      Accounted sales:{' '}
+                      Accounted tokens:{' '}
                       {rawToDecimal(
                         toRaw(currentReview.accountedRaw),
                         token.decimals,
@@ -777,7 +788,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                       <p>
                         Strategies enabled again under the new limits:{' '}
                         {currentReview.reactivatedStrategies.join(', ')}.
-                        Completed orders stay completed.
+                        Processed targets stay processed.
                       </p>
                     )}
                     {currentReview.endsSession && (
@@ -831,7 +842,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                     .map((entry, n) => (
                       <li key={`${entry.at}-${n}`} data-kind={entry.kind}>
                         <time>{new Date(entry.at).toLocaleTimeString()}</time>{' '}
-                        {entry.text}
+                        {autoSellActivityLabel(entry)}
                         {entry.signature && (
                           <a
                             href={`https://solscan.io/tx/${entry.signature}`}
@@ -1053,10 +1064,10 @@ function StrategyCard({
   const stats = !state
     ? ''
     : s.mode === 'dca'
-      ? `${state.responses} DCA sell${state.responses === 1 ? '' : 's'}`
+      ? `${state.responses} DCA interval${state.responses === 1 ? '' : 's'} processed`
       : s.mode === 'limit'
-        ? `${state.filledLimitIds.length}/${s.limitOrders.length} limit orders hit`
-        : `${state.responses} buys countered`;
+        ? `${state.filledLimitIds.length}/${s.limitOrders.length} limit targets processed`
+        : `${state.responses} buy trigger${state.responses === 1 ? '' : 's'} accepted`;
   const t = s.trigger;
   const triggerValue = t.kind === 'rate' ? t.percent : t.amount;
   const endLabel =
@@ -1087,7 +1098,7 @@ function StrategyCard({
             </span>
             {state && state.status !== 'running' && (
               <span className={styles.outRange}>
-                {state.endedReason ?? state.status}
+                {autoSellEndLabel(state.endedReason, state.status)}
               </span>
             )}
           </span>
@@ -1113,10 +1124,10 @@ function StrategyCard({
       </div>
       {state && (
         <p className={styles.stats}>
-          Sold {rawToDecimal(state.soldRaw, decimals)} ({pct(state.soldRaw)}{' '}
-          supply) · queued{' '}
-          {rawToDecimal(state.bufferedRaw + state.inFlightRaw, decimals)} ·{' '}
-          {stats}
+          Accounted {rawToDecimal(state.soldRaw, decimals)} (
+          {pct(state.soldRaw)} supply) · queued{' '}
+          {rawToDecimal(state.bufferedRaw, decimals)} · in progress{' '}
+          {rawToDecimal(state.inFlightRaw, decimals)} · {stats}
         </p>
       )}
       {expanded && (
@@ -1397,7 +1408,7 @@ function StrategyCard({
                         />
                       </div>
                       {hit ? (
-                        <span className={styles.inRange}>Hit</span>
+                        <span className={styles.inRange}>Processed</span>
                       ) : (
                         s.limitOrders.length > 1 && (
                           <button
@@ -1536,8 +1547,9 @@ function StrategyCard({
                 <br />
                 <span className={styles.hint}>
                   You can choose to stop this strategy only after a certain
-                  amount of tokens has been sold, after a certain amount of time
-                  has passed, or both. Other strategies will continue running.
+                  amount of tokens has been accounted for, after a certain
+                  amount of time has passed, or both. Other strategies will
+                  continue running.
                 </span>
               </p>
               <div className={styles.row}>
