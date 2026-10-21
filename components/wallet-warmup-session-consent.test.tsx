@@ -39,6 +39,11 @@ beforeEach(async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url: string, init?: RequestInit) => {
+      if (_url.startsWith('/api/wallet-workspace/warmup/session-journals'))
+        return Response.json(
+          { error: 'No synthetic session yet' },
+          { status: 404 },
+        );
       if (init?.method === 'POST') {
         const body = JSON.parse(init.body as string);
         if (body.operation === 'review') {

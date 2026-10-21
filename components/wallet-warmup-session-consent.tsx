@@ -19,6 +19,7 @@ import { UUID } from '@/lib/wallet-operation';
 import { WARMUP_RECEIPT_SAVED } from '@/lib/warmup-receipt-events';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { Button } from './ui/button';
+import { WalletWarmupSessionProgress } from './wallet-warmup-session-progress';
 import styles from './wallet-warmup-session-consent.module.css';
 const endpoint = '/api/wallet-workspace/warmup/session-consents';
 const quantity = (count: number, label: string) =>
@@ -61,6 +62,7 @@ function ConsentPanel({ plan, view, retained, onBusyChange }: Props) {
     [message, setMessage] = useState(''),
     [error, setError] = useState(''),
     [clearedContext, setClearedContext] = useState<string | null>(null);
+  const [journalBusy, setJournalBusy] = useState(false);
   useEffect(() => {
     let mounted = true;
     void Promise.resolve().then(() => {
@@ -89,9 +91,9 @@ function ConsentPanel({ plan, view, retained, onBusyChange }: Props) {
     };
   }, [plan.id, storageKey]);
   useEffect(() => {
-    onBusyChange(operation !== null);
+    onBusyChange(operation !== null || journalBusy);
     return () => onBusyChange(false);
-  }, [operation, onBusyChange]);
+  }, [operation, journalBusy, onBusyChange]);
   useEffect(() => {
     const invalidate = () => {
       pending.current?.abort();
@@ -146,7 +148,7 @@ function ConsentPanel({ plan, view, retained, onBusyChange }: Props) {
     : null;
   const selectedDeadline =
     last === null ? '' : new Date(last + finish * 60000).toISOString();
-  const busy = operation !== null;
+  const busy = operation !== null || journalBusy;
   function begin(kind: NonNullable<typeof operation>) {
     if (pending.current) return null;
     const c = new AbortController();
@@ -441,7 +443,7 @@ function ConsentPanel({ plan, view, retained, onBusyChange }: Props) {
         >
           Review plan approval
         </Button>
-        {busy && (
+        {operation !== null && (
           <Button variant="outline" onClick={stop}>
             Stop waiting for approval
           </Button>
@@ -562,6 +564,10 @@ function ConsentPanel({ plan, view, retained, onBusyChange }: Props) {
             running and this record cannot authorize signing.
           </p>
           <code>{saved.id}</code>
+          <WalletWarmupSessionProgress
+            consent={saved}
+            onBusyChange={setJournalBusy}
+          />
         </div>
       )}
       {(marker || invalidReminder) && (
