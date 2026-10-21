@@ -20,6 +20,8 @@ import { WARMUP_RECEIPT_SAVED } from '@/lib/warmup-receipt-events';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { Button } from './ui/button';
 import { WalletWarmupSessionProgress } from './wallet-warmup-session-progress';
+import { WalletWarmupSessionV2 } from './wallet-warmup-session-v2';
+import v2Styles from './wallet-warmup-session-v2.module.css';
 import styles from './wallet-warmup-session-consent.module.css';
 const endpoint = '/api/wallet-workspace/warmup/session-consents';
 const quantity = (count: number, label: string) =>
@@ -31,15 +33,43 @@ type Props = {
   onBusyChange: (busy: boolean) => void;
 };
 export function WalletWarmupSessionConsent(props: Props) {
+  const { onBusyChange } = props;
+  const [legacyBusy, setLegacyBusy] = useState(false),
+    [v2Busy, setV2Busy] = useState(false);
+  useEffect(() => {
+    onBusyChange(legacyBusy || v2Busy);
+    return () => onBusyChange(false);
+  }, [legacyBusy, v2Busy, onBusyChange]);
   return (
-    <ConsentPanel
-      key={JSON.stringify([
-        props.plan,
-        props.retained.id,
-        props.view?.review.contextKey ?? null,
-      ])}
-      {...props}
-    />
+    <div>
+      {v2Busy && (
+        <output>
+          Finish the new session request to use existing approval recovery.
+        </output>
+      )}
+      {legacyBusy && (
+        <output>
+          Finish the existing approval request to use the new session controls.
+        </output>
+      )}
+      <fieldset className={v2Styles.compatibility} disabled={v2Busy}>
+        <details>
+          <summary>Existing approval recovery · short review window</summary>
+          <ConsentPanel
+            key={JSON.stringify([
+              props.plan,
+              props.retained.id,
+              props.view?.review.contextKey ?? null,
+            ])}
+            {...props}
+            onBusyChange={setLegacyBusy}
+          />
+        </details>
+      </fieldset>
+      <fieldset className={v2Styles.compatibility} disabled={legacyBusy}>
+        <WalletWarmupSessionV2 {...props} onBusyChange={setV2Busy} />
+      </fieldset>
+    </div>
   );
 }
 function ConsentPanel({ plan, view, retained, onBusyChange }: Props) {

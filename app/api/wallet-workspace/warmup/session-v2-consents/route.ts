@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { walletRequest } from '@/lib/wallet-request';
+import { publicWalletWarmupV2Consent } from '@/lib/wallet-warmup-session-v2-public';
 import {
   readWalletWarmupV2Consent,
   reviewWalletWarmupV2Consent,
@@ -91,7 +92,14 @@ export async function GET(request: Request) {
     );
     signal.throwIfAborted();
     return consent
-      ? json({ consent })
+      ? json({
+          consent: await publicWalletWarmupV2Consent(
+            getD1(),
+            user.userId,
+            consent,
+            signal,
+          ),
+        })
       : json({ error: 'Versioned approval not found for this account.' }, 404);
   } catch (error) {
     return failure(error, signal);
@@ -138,7 +146,14 @@ export async function POST(request: Request) {
         signal,
       );
       signal.throwIfAborted();
-      return json({ consentReview });
+      return json({
+        consentReview: await publicWalletWarmupV2Consent(
+          db,
+          user.userId,
+          consentReview,
+          signal,
+        ),
+      });
     }
     const { operation: _operation, approved, ...selection } = input;
     const consent = await retainWalletWarmupV2Consent(
@@ -149,7 +164,14 @@ export async function POST(request: Request) {
       signal,
     );
     signal.throwIfAborted();
-    return json({ consent });
+    return json({
+      consent: await publicWalletWarmupV2Consent(
+        db,
+        user.userId,
+        consent,
+        signal,
+      ),
+    });
   } catch (error) {
     return failure(error, signal);
   }

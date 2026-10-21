@@ -61,7 +61,7 @@ it('reviews and saves exact v2 policy with separate approval, then recovers the 
   expect(preview.status).toBe(200);
   expect(
     ((await preview.json()) as { consentReview: unknown }).consentReview,
-  ).toEqual(f.v2Prepared);
+  ).toEqual({ ...f.v2Prepared, reviewCreatedAt: f.retainedReview.createdAt });
   const response = await post(saveBody());
   expect(response.status).toBe(200);
   const saved = (await response.json()) as {

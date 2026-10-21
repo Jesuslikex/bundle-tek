@@ -103,6 +103,26 @@ async function admit(
   original?: WalletWarmupSessionView['review'],
 ) {
   if ((await digest(canonical(record.terms))) !== record.termsSha256) fail();
+  return admitWarmupConsentManifest(record, planId, original);
+}
+/** Shared manifest validation only. Callers must independently admit their own
+ * version, hashed terms and policy first; this never converts saved approvals. */
+export async function admitWarmupConsentManifest(
+  record: {
+    terms: {
+      reviewDocument: string;
+      reviewId: string;
+      reviewSha256: string;
+      sessionExpiresAt: string;
+    };
+    reviewCreatedAt: string;
+    reviewedAt?: string;
+    reviewExpiresAt?: string;
+    createdAt?: string;
+  },
+  planId: string,
+  original?: WalletWarmupSessionView['review'],
+) {
   const root: unknown = JSON.parse(record.terms.reviewDocument);
   if (!root || typeof root !== 'object' || Array.isArray(root)) fail();
   const { format, contextSha256, sourceSha256, ...document } = root as Record<
@@ -145,12 +165,12 @@ async function admit(
   iso.parse(document.effectiveStartAt);
   const expires = new Date(Date.parse(reviewedAt) + 60000).toISOString();
   if (
-    'reviewedAt' in record &&
+    record.reviewedAt !== undefined &&
     (record.reviewedAt !== reviewedAt || record.reviewExpiresAt !== expires)
   )
     fail();
   if (
-    'createdAt' in record &&
+    record.createdAt !== undefined &&
     (Date.parse(record.createdAt) < Date.parse(reviewedAt) ||
       Date.parse(record.createdAt) >= Date.parse(expires) ||
       Date.parse(record.createdAt) >= Date.parse(record.terms.sessionExpiresAt))

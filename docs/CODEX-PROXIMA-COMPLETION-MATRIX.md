@@ -1,5 +1,13 @@
 # Proxima reconstruction completion matrix
 
+## Connected versioned warmup UI, 21 October 2026
+
+The owned consent screen now connects v2 terms, separate unchecked approval, saved history, exact-state controls and original-ID recovery. Existing v1 approval/packet recovery stays available; old approvals cannot be relabelled. Public creation-time enrichment binds the exact original parent, without changing private consent hashes or service shapes. Pending Stop is separately approved against the original predecessor, keeps both IDs and can only win one SQL version. Local archives preserve unknown passive-save outcomes instead of declaring them cancelled; confirmed active reviews require recovered status and Stop/server expiry. Known history is recovered rather than recreated. Read `CODEX-WARMUP-V2-UI-20261021.md`.
+
+Final906related tests/36files, whole-project plain TypeScript,11-file typed lint/12-file formatting, unchanged2748-file freeze and isolated production build pass. Actual Opus5.5 performed two read-only reviews:2691copied files unchanged each, zero denials/edits/tests. It confirmed the high Stop fix on follow-up; remaining archive/message/storage/UX findings and the final browser recovery correction were independently fixed and verified, not rereviewed. Final synthetic Chrome320/375/1440has no horizontal overflow,44px controls and result focus; no mount fetches, GET-only recovery, unchanged finish and preserved pending review on Stop are observed. Own tab/server closed and viewport reset.
+
+This supersedes the missing v2 consent/progress UI segment below. Runtime qualification, shared financial wallet/lot reservations, exact browser authorization, receipt/budget advancement and orchestration remain open. Completed actions remain0, qualification unavailable, signing/automatic Start false. Full Proxima parity and funded proof are not achieved. No protected layout, migration/provider/credential/cron, application/hosted SQL, deployment or funded action changed; next0134unclaimed, recheck before use.
+
 ## Versioned warmup history checkpoint, 21 October 2026
 
 Read `CODEX-WARMUP-V2-JOURNAL-20261021.md`. Source-only0133 connects immutable v2 consent to passive saved history, exact-head metadata review/Pause/Resume/Stop, original-ID recovery and an authenticated saved-only API. Late metadata review is allowed after initial60s capture only before the original approved finish. Pause/Stop preserve pending; no fake completion or budget advancement exists. Both-version overlapping reviews, unresolved legacy submissions and admitted legacy packets remain excluded; this is not a financial reservation.
