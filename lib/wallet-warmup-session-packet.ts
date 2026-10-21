@@ -19,17 +19,27 @@ const schema = z
   })
   .strict();
 type Row = z.infer<typeof schema>;
-const unavailable = () =>
-  new Error(
-    'The retained unsigned session packet is unavailable. No signing is enabled.',
-  );
+export class WalletWarmupSessionPacketError extends Error {
+  readonly status = 503;
+  constructor() {
+    super(
+      'The retained unsigned session packet is unavailable. No signing is enabled.',
+    );
+  }
+}
+const unavailable = () => new WalletWarmupSessionPacketError();
 
 /** Envelope identity only. Route, custody, lifetime and signing are NOT authorized. */
 export async function validateWalletWarmupSessionPacket(
   transaction: unknown,
   summary: WarmupPreparationSummary,
 ) {
-  const packet = await reviewUnsignedSwapEnvelope(transaction, summary.wallet);
+  let packet;
+  try {
+    packet = await reviewUnsignedSwapEnvelope(transaction, summary.wallet);
+  } catch {
+    throw unavailable();
+  }
   if (
     packet.sha256 !== summary.transaction.sha256 ||
     packet.transactionBytes !== summary.transaction.bytes ||
@@ -40,8 +50,10 @@ export async function validateWalletWarmupSessionPacket(
   return { transaction: packet.transaction, sha256: packet.sha256 };
 }
 
-export async function walletWarmupSessionPacketStatement(
+/** Only returns a whole atomic write operation, never a standalone packet INSERT. */
+export async function prepareWalletWarmupSessionPacketWrite(
   db: D1Database,
+  preparationStatement: D1PreparedStatement,
   owner: string,
   id: string,
   preparationSha256: string,
@@ -50,10 +62,10 @@ export async function walletWarmupSessionPacketStatement(
 ) {
   const installed = await db
     .prepare(
-      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_packets_insert','wallet_warmup_session_packets_no_update','wallet_warmup_session_packets_no_delete')",
+      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_packets_insert','wallet_warmup_session_packets_no_update','wallet_warmup_session_packets_no_delete','wallet_warmup_session_packets_fresh')",
     )
     .first<{ n: number }>();
-  if (installed?.n !== 3) throw unavailable();
+  if (installed?.n !== 4) throw unavailable();
   const packet = await validateWalletWarmupSessionPacket(transaction, summary);
   const facts = {
     owner_id: owner,
@@ -66,7 +78,7 @@ export async function walletWarmupSessionPacketStatement(
     ...facts,
     record_sha256: await digest(canonical(facts)),
   });
-  return db
+  const statement = db
     .prepare(
       'INSERT INTO wallet_warmup_session_packets(owner_id,preparation_id,preparation_sha256,unsigned_transaction,packet_sha256,record_sha256) VALUES(?,?,?,?,?,?)',
     )
@@ -78,6 +90,7 @@ export async function walletWarmupSessionPacketStatement(
       row.packet_sha256,
       row.record_sha256,
     );
+  return () => db.batch([preparationStatement, statement]);
 }
 
 /** Saved-only recovery deliberately works after expiry; it cannot renew authority. */
@@ -95,7 +108,14 @@ export async function readWalletWarmupSessionPacket(
       "SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name='wallet_warmup_session_packets'",
     )
     .first();
-  if (!installed) return null; // Old summary-only preparations remain historical.
+  if (!installed)
+    return { packet: null, packetAvailability: 'storage-unavailable' as const };
+  const guards = await db
+    .prepare(
+      "SELECT count(*) AS n FROM sqlite_master WHERE type='trigger' AND name IN ('wallet_warmup_session_packets_insert','wallet_warmup_session_packets_no_update','wallet_warmup_session_packets_no_delete','wallet_warmup_session_packets_fresh')",
+    )
+    .first<{ n: number }>();
+  if (guards?.n !== 4) throw unavailable();
   const stored = await db
     .prepare(
       'SELECT * FROM wallet_warmup_session_packets WHERE owner_id=? AND preparation_id=?',
@@ -103,8 +123,11 @@ export async function readWalletWarmupSessionPacket(
     .bind(owner, id)
     .first<Row>();
   signal.throwIfAborted();
-  if (!stored) return null;
-  const { record_sha256, ...facts } = schema.parse(stored);
+  if (!stored)
+    return { packet: null, packetAvailability: 'summary-only' as const };
+  const parsed = schema.safeParse(stored);
+  if (!parsed.success) throw unavailable();
+  const { record_sha256, ...facts } = parsed.data;
   if (
     facts.owner_id !== owner ||
     facts.preparation_id !== id ||
@@ -118,5 +141,5 @@ export async function readWalletWarmupSessionPacket(
     summary,
   );
   signal.throwIfAborted();
-  return packet;
+  return { packet, packetAvailability: 'retained' as const };
 }

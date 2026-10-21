@@ -12,7 +12,7 @@ import type { WarmupSessionAction } from './wallet-warmup-session-review';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
 import {
   readWalletWarmupSessionPacket,
-  walletWarmupSessionPacketStatement,
+  prepareWalletWarmupSessionPacketWrite,
   type WarmupSessionPacketMaterial,
 } from './wallet-warmup-session-packet';
 
@@ -147,14 +147,14 @@ export async function readWalletWarmupSessionPreparation(
     fail(undefined, 503);
   return {
     identity: row,
-    packet: await readWalletWarmupSessionPacket(
+    ...(await readWalletWarmupSessionPacket(
       db,
       owner,
       id,
       row.record_sha256,
       JSON.parse(row.preparation_document) as WarmupPreparationSummary,
       signal,
-    ),
+    )),
     preparation: {
       id,
       planId: row.plan_id,
@@ -437,45 +437,45 @@ export async function prepareWalletWarmupSessionAction(
     ...facts,
     record_sha256: await digest(canonical(facts)),
   });
-  const packetStatement =
+  const statement = db
+    .prepare(
+      'INSERT INTO wallet_warmup_session_preparations(owner_id,preparation_id,journal_id,action_id,review_version,review_sha256,plan_id,plan_revision,cycle,wallet_address,wallet_revision,preparation_document,plan_document,created_at,binding_sha256,record_sha256) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    )
+    .bind(
+      row.owner_id,
+      row.preparation_id,
+      row.journal_id,
+      row.action_id,
+      row.review_version,
+      row.review_sha256,
+      row.plan_id,
+      row.plan_revision,
+      row.cycle,
+      row.wallet_address,
+      row.wallet_revision,
+      row.preparation_document,
+      row.plan_document,
+      row.created_at,
+      row.binding_sha256,
+      row.record_sha256,
+    );
+  const write =
     'summary' in material
-      ? await walletWarmupSessionPacketStatement(
+      ? await prepareWalletWarmupSessionPacketWrite(
           db,
+          statement,
           owner,
           input.id,
           row.record_sha256,
           material.transaction,
           document,
         )
-      : null;
+      : () => statement.run();
   signal.throwIfAborted();
   try {
-    const statement = db
-      .prepare(
-        'INSERT INTO wallet_warmup_session_preparations(owner_id,preparation_id,journal_id,action_id,review_version,review_sha256,plan_id,plan_revision,cycle,wallet_address,wallet_revision,preparation_document,plan_document,created_at,binding_sha256,record_sha256) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      )
-      .bind(
-        row.owner_id,
-        row.preparation_id,
-        row.journal_id,
-        row.action_id,
-        row.review_version,
-        row.review_sha256,
-        row.plan_id,
-        row.plan_revision,
-        row.cycle,
-        row.wallet_address,
-        row.wallet_revision,
-        row.preparation_document,
-        row.plan_document,
-        row.created_at,
-        row.binding_sha256,
-        row.record_sha256,
-      );
     // Turso write batches and D1 batch are transactional. A packet refusal rolls
     // back the preparation, its binding and every trigger-created parent row.
-    if (packetStatement) await db.batch([statement, packetStatement]);
-    else await statement.run();
+    await write();
   } catch {
     /* Unknown outcome: one original-ID recovery, never another INSERT/callback. */
   }

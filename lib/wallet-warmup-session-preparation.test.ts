@@ -11,6 +11,7 @@ import { retainWalletWarmupSessionSettlement } from './wallet-warmup-session-set
 import { isSessionBoundWarmupPreparation } from './warmup-session-preparation-scope';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
 import { retainWalletWarmupSessionActionBinding } from './wallet-warmup-session-action-binding';
+import { validateWalletWarmupSessionPacket } from './wallet-warmup-session-packet';
 const mocks = vi.hoisted(() => ({
   db: null as unknown as D1Database,
   user: { userId: 'owner' } as { userId: string } | null,
@@ -32,6 +33,7 @@ async function install(db: D1Database) {
   for (const name of [
     '0128_wallet_warmup_session_preparations',
     '0129_wallet_warmup_session_packets',
+    '0130_wallet_warmup_session_packet_freshness',
   ])
     for (const sql of readFileSync(`drizzle/${name}.sql`, 'utf8')
       .split('--> statement-breakpoint')
@@ -281,10 +283,181 @@ it('refuses corrupted packet bytes on saved-only recovery even if its SQL guard 
       "UPDATE wallet_warmup_session_packets SET unsigned_transaction='AAAA'",
     )
     .run();
+  await f.db
+    .prepare(
+      "CREATE TRIGGER wallet_warmup_session_packets_no_update BEFORE UPDATE ON wallet_warmup_session_packets BEGIN SELECT RAISE(ABORT,'immutable'); END",
+    )
+    .run();
   await expect(read(f.db, 'owner', request.id, signal())).rejects.toThrow(
     'retained unsigned session packet',
   );
 });
+it('checks the envelope payer itself, independently of plan validation', async () => {
+  const f = await fixture(),
+    summary = structuredClone(f.packets.buy.preparation.document);
+  summary.wallet = '11111111111111111111111111111111';
+  await expect(
+    validateWalletWarmupSessionPacket(
+      f.packets.buy.approval.transaction,
+      summary,
+    ),
+  ).rejects.toMatchObject({ status: 503 });
+});
+it('labels a summary-only retry explicitly and never adds bytes to that saved identity', async () => {
+  const f = await fixture(),
+    request = input(f);
+  const saved = await prepare(
+    f.db,
+    'owner',
+    request,
+    signal(),
+    callback(f),
+    f.clock,
+  );
+  const quote = vi.fn(async () => ({
+    summary: f.packets.buy.preparation.document,
+    transaction: f.packets.buy.approval.transaction,
+  }));
+  expect(saved.packetAvailability).toBe('summary-only');
+  expect(
+    await prepare(f.db, 'owner', request, signal(), quote, f.clock),
+  ).toEqual(saved);
+  expect(quote).not.toHaveBeenCalled();
+  await f.append('stop');
+  await expect(
+    f.db
+      .prepare(
+        'INSERT INTO wallet_warmup_session_packets(owner_id,preparation_id,preparation_sha256,unsigned_transaction,packet_sha256,record_sha256) VALUES(?,?,?,?,?,?)',
+      )
+      .bind(
+        'owner',
+        request.id,
+        saved.identity.record_sha256,
+        f.packets.buy.approval.transaction,
+        f.packets.buy.preparation.document.transaction.sha256,
+        'a'.repeat(64),
+      )
+      .run(),
+  ).rejects.toThrow('context expired or changed');
+});
+it('refuses recovery from a partially installed packet schema with a stable 503', async () => {
+  const f = await fixture(),
+    request = input(f);
+  await prepare(
+    f.db,
+    'owner',
+    request,
+    signal(),
+    async () => ({
+      summary: f.packets.buy.preparation.document,
+      transaction: f.packets.buy.approval.transaction,
+    }),
+    f.clock,
+  );
+  await f.db.prepare('DROP TRIGGER wallet_warmup_session_packets_fresh').run();
+  await expect(read(f.db, 'owner', request.id, signal())).rejects.toMatchObject(
+    { status: 503 },
+  );
+});
+it.each(['same', 'different'] as const)(
+  'recovers the first exact bytes when %s IDs race through the native batch path',
+  async (kind) => {
+    const f = await fixture(),
+      request = input(f);
+    let calls = 0,
+      reached = 0,
+      release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    const quote = vi.fn(async () => {
+      const packet = calls++ === 0 ? f.packets.buy : f.packets.sell;
+      const summary = structuredClone(f.packets.buy.preparation.document);
+      summary.transaction = structuredClone(
+        packet.preparation.document.transaction,
+      );
+      return { summary, transaction: packet.approval.transaction };
+    });
+    const db = {
+      prepare: f.db.prepare.bind(f.db),
+      batch: async (statements: Parameters<D1Database['batch']>[0]) => {
+        if (++reached === 2) release();
+        await barrier;
+        return f.db.batch(statements);
+      },
+    } as unknown as D1Database;
+    const results = await Promise.allSettled([
+      prepare(db, 'owner', request, signal(), quote, f.clock),
+      prepare(
+        db,
+        'owner',
+        kind === 'same' ? request : input(f),
+        signal(),
+        quote,
+        f.clock,
+      ),
+    ]);
+    const winner = results.find((r) => r.status === 'fulfilled');
+    expect(winner?.status).toBe('fulfilled');
+    if (kind === 'same') {
+      expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+      if (
+        results[0].status === 'fulfilled' &&
+        results[1].status === 'fulfilled'
+      )
+        expect(results[0].value).toEqual(results[1].value);
+    } else {
+      const loser = results.find((r) => r.status === 'rejected');
+      expect(loser?.status === 'rejected' ? loser.reason : null).toMatchObject({
+        status: 409,
+        recoveryId:
+          winner?.status === 'fulfilled' ? winner.value.preparation.id : null,
+      });
+    }
+    expect(await counts(f.db)).toEqual([1, 1, 3]);
+    expect(
+      await f.db
+        .prepare('SELECT count(*) AS n FROM wallet_warmup_session_packets')
+        .first(),
+    ).toEqual({ n: 1 });
+  },
+);
+it.each(['stop', 'wallet', 'plan'] as const)(
+  'rolls the entire packet batch back after %s drift',
+  async (kind) => {
+    const f = await fixture();
+    const db = {
+      prepare: f.db.prepare.bind(f.db),
+      batch: async (statements: Parameters<D1Database['batch']>[0]) => {
+        if (kind === 'stop') await f.append('stop');
+        if (kind === 'wallet')
+          await f.db.prepare('UPDATE workspace_wallets SET revision=2').run();
+        if (kind === 'plan')
+          await f.db.prepare('UPDATE wallet_warmup_plans SET revision=2').run();
+        return f.db.batch(statements);
+      },
+    } as unknown as D1Database;
+    await expect(
+      prepare(
+        db,
+        'owner',
+        input(f),
+        signal(),
+        async () => ({
+          summary: f.packets.buy.preparation.document,
+          transaction: f.packets.buy.approval.transaction,
+        }),
+        f.clock,
+      ),
+    ).rejects.toThrow();
+    expect(await counts(f.db)).toEqual([0, 0, 2]);
+    expect(
+      await f.db
+        .prepare('SELECT count(*) AS n FROM wallet_warmup_session_packets')
+        .first(),
+    ).toEqual({ n: 0 });
+  },
+);
 it('withholds material when packet storage guards are missing without retaining a partial preparation', async () => {
   const f = await fixture();
   await f.db.prepare('DROP TRIGGER wallet_warmup_session_packets_insert').run();
