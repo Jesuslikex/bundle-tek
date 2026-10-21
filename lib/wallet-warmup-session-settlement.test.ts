@@ -843,10 +843,21 @@ it('binds every projected scalar and explicit NULL for both root and linked sour
         changed[row][key] = value + 'changed';
       }
       const sourceDocument = JSON.stringify(changed);
-      const guard = await warmupSessionSettlementSourceGuard('owner', 'Sell', {
-        sourceDocument,
-        sourceSha256: await walletWarmupSessionDigest(sourceDocument),
-      });
+      let guard;
+      try {
+        guard = await warmupSessionSettlementSourceGuard('owner', 'Sell', {
+          sourceDocument,
+          sourceSha256: await walletWarmupSessionDigest(sourceDocument),
+        });
+      } catch (error) {
+        // Cross-row/finalized-state hardening can refuse before SQL execution.
+        expect(error, `${row}:${key}`).toBeInstanceOf(Error);
+        expect((error as Error).message, `${row}:${key}`).toBe(
+          'Finalized settlement source binding is unavailable or changed.',
+        );
+        index++;
+        continue;
+      }
       expect(
         (await guardedWrite(guard, ++index)).meta.changes,
         `${row}:${key}`,
@@ -872,6 +883,116 @@ it('isolates the owner when the captured packet and source bytes are otherwise i
   ).toBe(0);
   await expect(
     warmupSessionSettlementSourceGuard("owner' OR 1=1", 'Buy', result),
+  ).rejects.toThrow('source binding');
+});
+
+it.each(['linked-receipt', 'linked-plan'])(
+  'refuses a rehashed unrelated %s before constructing the predicate',
+  async (kind) => {
+    const result = await replayWarmupSessionSettlement(
+      db,
+      'owner',
+      input('Sell'),
+      signal(),
+      fetcher,
+    );
+    const rows = JSON.parse(result.sourceDocument);
+    if (kind === 'linked-receipt') rows[1].receiptId = crypto.randomUUID();
+    else rows[1].receiptPlanId = 'another-owned-plan';
+    const sourceDocument = JSON.stringify(rows);
+    const count = queries.length;
+    await expect(
+      warmupSessionSettlementSourceGuard('owner', 'Sell', {
+        sourceDocument,
+        sourceSha256: await walletWarmupSessionDigest(sourceDocument),
+      }),
+    ).rejects.toThrow('source binding');
+    expect(queries.length).toBe(count);
+  },
+);
+
+it.each(['Buy-root', 'Sell-root', 'Sell-linked'])(
+  'refuses %s captured from a non-finalized intent even with a matching digest',
+  async (kind) => {
+    const side = kind === 'Buy-root' ? 'Buy' : 'Sell';
+    const result = await replayWarmupSessionSettlement(
+      db,
+      'owner',
+      input(side),
+      signal(),
+      fetcher,
+    );
+    const rows = JSON.parse(result.sourceDocument);
+    rows[kind === 'Sell-linked' ? 1 : 0].approvalState = 'submitted';
+    const sourceDocument = JSON.stringify(rows);
+    await expect(
+      warmupSessionSettlementSourceGuard('owner', side, {
+        sourceDocument,
+        sourceSha256: await walletWarmupSessionDigest(sourceDocument),
+      }),
+    ).rejects.toThrow('source binding');
+  },
+);
+
+it('requires an actual owner string rather than coercing a request-like array', async () => {
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    input(),
+    signal(),
+    fetcher,
+  );
+  await expect(
+    warmupSessionSettlementSourceGuard(
+      ['owner'] as unknown as string,
+      'Buy',
+      result,
+    ),
+  ).rejects.toThrow('source binding');
+});
+
+it('keeps the exact lower-revision historical buy eligible for its verified current sell', async () => {
+  const selected = await historicalInput();
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    selected,
+    signal(),
+    fetcher,
+  );
+  const rows = JSON.parse(result.sourceDocument);
+  expect(rows[0].planRevision).toBe(2);
+  expect(rows[1].planRevision).toBe(1);
+  const guard = await warmupSessionSettlementSourceGuard(
+    'owner',
+    'Sell',
+    result,
+  );
+  expect((await guardedWrite(guard)).meta.changes).toBe(1);
+});
+
+it('refuses a Sell source supplied as Buy and a single oversized field below the total cap', async () => {
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    input('Sell'),
+    signal(),
+    fetcher,
+  );
+  await expect(
+    warmupSessionSettlementSourceGuard('owner', 'Buy', result),
+  ).rejects.toThrow('source binding');
+  const rows = JSON.parse(result.sourceDocument);
+  rows[0].preparationDocument = 'x'.repeat(1048577);
+  const sourceDocument = JSON.stringify(rows);
+  expect(new TextEncoder().encode(sourceDocument).byteLength).toBeLessThan(
+    4194304,
+  );
+  await expect(
+    warmupSessionSettlementSourceGuard('owner', 'Sell', {
+      sourceDocument,
+      sourceSha256: await walletWarmupSessionDigest(sourceDocument),
+    }),
   ).rejects.toThrow('source binding');
 });
 

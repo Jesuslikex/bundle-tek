@@ -67,7 +67,8 @@ export async function warmupSessionSettlementSourceGuard(
       'Finalized settlement source binding is unavailable or changed.',
     );
   };
-  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(owner)) return fail();
+  if (typeof owner !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(owner))
+    return fail();
   const selected = sideSchema.parse(side);
   // Copy scalar bytes before hashing. No provider or database read happens here.
   const document = evidence.sourceDocument,
@@ -93,6 +94,14 @@ export async function warmupSessionSettlementSourceGuard(
   if (
     (selected === 'Buy' && rows[1] !== null) ||
     (selected === 'Sell' && rows[1] === null)
+  )
+    return fail();
+  if (
+    rows[0].approvalState !== 'finalized' ||
+    (rows[1] !== null &&
+      (rows[1].approvalState !== 'finalized' ||
+        rows[0].buyReceiptId !== rows[1].receiptId ||
+        rows[0].receiptPlanId !== rows[1].receiptPlanId))
   )
     return fail();
   const bindings: (string | number | null)[] = [];
