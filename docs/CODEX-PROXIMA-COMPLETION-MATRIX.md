@@ -1,5 +1,13 @@
 # Proxima reconstruction completion matrix
 
+## Versioned warmup history checkpoint, 21 October 2026
+
+Read `CODEX-WARMUP-V2-JOURNAL-20261021.md`. Source-only0133 connects immutable v2 consent to passive saved history, exact-head metadata review/Pause/Resume/Stop, original-ID recovery and an authenticated saved-only API. Late metadata review is allowed after initial60s capture only before the original approved finish. Pause/Stop preserve pending; no fake completion or budget advancement exists. Both-version overlapping reviews, unresolved legacy submissions and admitted legacy packets remain excluded; this is not a financial reservation.
+
+Actual Opus5.5 reviewed the initial uncommitted copy, with2679files unchanged and zero denials/edits/tests. Its aggregate-capacity and retained-packet findings were independently corrected and tested, not rereviewed. Final172tests/11files include real61s DB-clock and seeded65,535-event replay plus guarded final Stop. All134migrations pass disposable checksum/whole-file Wrangler; all133earlier bytes and all old schema/trigger bodies stay unchanged. Whole-project plain TypeScript, eight-file typed lint/format, unchanged2740-file freeze and final isolated production build pass.0133finalizes in this checkpoint; next0134unclaimed, recheck before use.
+
+This supersedes only the v2 journal gap below. Client admission/progress UI, fresh per-attempt qualification, shared wallet/lot financial reservations, short exact-packet authorization, real settlement advancement and orchestration remain open. Signing/automatic Start stay off. No protected UI, provider, application/hosted SQL, deploy or funded action. Full Proxima parity remains unachieved.
+
 ## Versioned consent backend, 21 October 2026
 
 Sourcec4b748f adds separate immutable v2 read-policy consent and an authenticated review/save/saved-only recovery API in source-only migration0132. Initial60-second capture, original finish, exact plan/source/budget binding, explicit approval, both-order version/ID isolation and false authority remain. Existing v1 functions are unchanged except an additive historical-builder export; all earlier migration bytes/schema objects/trigger bodies are unchanged. Read `CODEX-WARMUP-V2-CONSENT-API-20261021.md`.
