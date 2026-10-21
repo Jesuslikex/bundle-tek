@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
 import { reviewUnsignedSwapEnvelope } from './unsigned-swap-order';
+import { walletWarmupSessionFinishGuardInstalled } from './wallet-warmup-session-finish-guard';
 import type { WarmupPreparationSummary } from './warmup-preparation-history';
 
 export type WarmupSessionPacketMaterial = {
@@ -66,6 +67,8 @@ export async function prepareWalletWarmupSessionPacketWrite(
     )
     .first<{ n: number }>();
   if (installed?.n !== 4) throw unavailable();
+  if (!(await walletWarmupSessionFinishGuardInstalled(db, 'packet')))
+    throw unavailable();
   const packet = await validateWalletWarmupSessionPacket(transaction, summary);
   const facts = {
     owner_id: owner,

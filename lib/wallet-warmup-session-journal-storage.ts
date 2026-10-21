@@ -13,6 +13,7 @@ import {
 import type { SavedWarmup } from './wallet-warmup-storage';
 import { WARMUP_SESSION_REVIEW_GAP_MS } from './wallet-warmup-session-sequence';
 import { parseWalletWarmupSessionSettlementRecord } from './wallet-warmup-session-settlement-record';
+import { walletWarmupSessionFinishGuardInstalled } from './wallet-warmup-session-finish-guard';
 
 const uuid = z.uuid().refine((v) => v === v.toLowerCase());
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -309,12 +310,33 @@ async function decode(
     now,
   );
   signal.throwIfAborted();
+  const sessionExpiresAt = c.consent.terms.sessionExpiresAt;
+  const effectiveReviewExpiresAt = new Date(
+    Math.min(
+      Date.parse(sessionExpiresAt),
+      Date.parse(state.snapshot.sourceReviewExpiresAt),
+    ),
+  ).toISOString();
+  const sourceReviewFresh =
+    state.snapshot.sourceReviewFresh &&
+    now < Date.parse(effectiveReviewExpiresAt);
   return {
     id: row.id,
     consentId: row.consent_id,
     termsSha256: row.terms_sha256,
     createdAt: row.created_at,
     ...state,
+    sessionExpiresAt,
+    effectiveReviewExpiresAt,
+    snapshot: {
+      ...state.snapshot,
+      sourceReviewFresh,
+      phase:
+        !sourceReviewFresh &&
+        ['waiting', 'review-required'].includes(state.snapshot.phase)
+          ? ('refresh-required' as const)
+          : state.snapshot.phase,
+    },
     // Server-internal append/recovery inputs. Never publish this object as an API DTO.
     sourceDocument: row.source_document,
     plan: c.plan,
@@ -459,6 +481,20 @@ export async function appendWalletWarmupSessionJournal(
     current.headSha256 !== input.expectedHeadSha256
   )
     fail();
+  if (
+    (input.command.operation === 'pause' &&
+      (current.snapshot.paused || current.snapshot.stopped)) ||
+    (input.command.operation === 'stop' && current.snapshot.stopped)
+  )
+    fail('This control is already recorded. Recover the current session.');
+  if (input.command.operation === 'begin-review') {
+    if (!current.snapshot.sourceReviewFresh)
+      fail(
+        'The approved session or source review has finished. Recover this session before a fresh review.',
+      );
+    if (!(await walletWarmupSessionFinishGuardInstalled(db, 'review')))
+      fail('Warmup session finish guard is unavailable.', 503);
+  }
   // Caller command cannot override server-generated time, version or predecessor.
   if (
     ['at', 'version', 'previousSha256'].some((key) =>
@@ -493,7 +529,7 @@ export async function appendWalletWarmupSessionJournal(
   if (
     writeAt < at ||
     (input.command.operation === 'begin-review' &&
-      writeAt >= Date.parse(current.snapshot.sourceReviewExpiresAt))
+      writeAt >= Date.parse(current.effectiveReviewExpiresAt))
   )
     fail();
   signal.throwIfAborted();
@@ -523,13 +559,21 @@ export async function appendWalletWarmupSessionJournal(
     AbortSignal.timeout(15000),
     now(),
   );
+  if (!saved) fail();
+  const recorded = saved.events.find((e) => e.id === input.id);
+  if (!recorded) fail();
+  const {
+    at: _at,
+    eventId,
+    version,
+    previousSha256,
+    ...savedCommand
+  } = JSON.parse(recorded.document);
   if (
-    !saved?.events.some(
-      (e) =>
-        e.id === input.id &&
-        e.document === document &&
-        e.event_sha256 === eventSha256,
-    )
+    eventId !== input.id ||
+    version !== input.expectedVersion + 1 ||
+    previousSha256 !== input.expectedHeadSha256 ||
+    canonical(savedCommand) !== canonical(input.command)
   )
     fail();
   signal.throwIfAborted();

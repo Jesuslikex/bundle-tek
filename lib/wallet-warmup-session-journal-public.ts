@@ -11,7 +11,7 @@ export function publicWalletWarmupSessionJournal(
   const snapshot = journal.snapshot;
   const event = eventId
     ? journal.events.find((e) => e.id === eventId)
-    : journal.events.at(-1);
+    : undefined;
   const document = event ? JSON.parse(event.document) : null;
   const pending = snapshot.pending;
   return {
@@ -19,6 +19,8 @@ export function publicWalletWarmupSessionJournal(
     consentId: journal.consentId,
     termsSha256: journal.termsSha256,
     createdAt: journal.createdAt,
+    sessionExpiresAt: journal.sessionExpiresAt,
+    effectiveReviewExpiresAt: journal.effectiveReviewExpiresAt,
     version: journal.version,
     headSha256: journal.headSha256,
     recoveryRequired: journal.recoveryRequired,

@@ -8,14 +8,15 @@ import {
   appendWalletWarmupSessionJournal as append,
 } from './wallet-warmup-session-journal-storage';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
+import { installWarmupSessionFinishGuards } from '@/test/warmup-session-finish-guard-fixture';
 const signal = () => new AbortController().signal;
 const clients: { close(): void }[] = [];
 afterEach(() => {
   for (const client of clients.splice(0)) client.close();
   vi.unstubAllGlobals();
 });
-async function fixture() {
-  const f = await warmupSessionConsentFixture();
+async function fixture(options: { finishAfterLastMs?: number } = {}) {
+  const f = await warmupSessionConsentFixture(undefined, options);
   clients.push(f.client);
   for (const sql of [
     '0124_wallet_warmup_session_journals',
@@ -27,6 +28,7 @@ async function fixture() {
       .filter(Boolean),
   ))
     await f.db.prepare(sql).run();
+  await installWarmupSessionFinishGuards(f.db);
   const consent = await retainWalletWarmupSessionConsent(
     f.db,
     'owner',
@@ -49,6 +51,137 @@ async function fixture() {
   });
   return { ...f, consent, input, saved, command };
 }
+it('uses the earlier approved finish deadline without rewriting source preview history', async () => {
+  const f = await fixture({ finishAfterLastMs: 1000 });
+  const finish = Date.parse(f.consent.terms.sessionExpiresAt);
+  expect(finish).toBeLessThan(
+    Date.parse(f.saved.snapshot.sourceReviewExpiresAt),
+  );
+  expect(
+    (await read(f.db, 'owner', f.input.id, signal(), finish - 1))?.snapshot
+      .sourceReviewFresh,
+  ).toBe(true);
+  const result = await read(f.db, 'owner', f.input.id, signal(), finish);
+  expect(result).toMatchObject({
+    sessionExpiresAt: f.consent.terms.sessionExpiresAt,
+    effectiveReviewExpiresAt: f.consent.terms.sessionExpiresAt,
+    snapshot: {
+      phase: 'refresh-required',
+      sourceReviewFresh: false,
+      sourceReviewExpiresAt: f.saved.snapshot.sourceReviewExpiresAt,
+    },
+  });
+  const actionId = JSON.parse(f.saved.sourceDocument).review.actions[0].id;
+  await expect(
+    append(
+      f.db,
+      'owner',
+      f.command('begin-review', { actionId }),
+      signal(),
+      () => finish,
+    ),
+  ).rejects.toThrow('approved session');
+  expect(
+    (await append(f.db, 'owner', f.command('stop'), signal(), () => finish))
+      .snapshot.stopped,
+  ).toBe(true);
+});
+it('the SQL finish guard refuses a begin-review timestamp at the consent deadline even while the source preview is fresh', async () => {
+  const f = await fixture({ finishAfterLastMs: 1000 });
+  const id = crypto.randomUUID(),
+    at = f.consent.terms.sessionExpiresAt;
+  const document = JSON.stringify({
+    operation: 'begin-review',
+    actionId: JSON.parse(f.saved.sourceDocument).review.actions[0].id,
+    eventId: id,
+    at,
+    version: 1,
+    previousSha256: f.saved.headSha256,
+  });
+  await expect(
+    f.db
+      .prepare(
+        'INSERT INTO wallet_warmup_session_journal_events(owner_id,journal_id,id,version,previous_sha256,document,event_sha256,created_at) VALUES(?,?,?,?,?,?,?,?)',
+      )
+      .bind(
+        'owner',
+        f.input.id,
+        id,
+        1,
+        f.saved.headSha256,
+        document,
+        await digest(document),
+        at,
+      )
+      .run(),
+  ).rejects.toThrow('Approved warmup session has finished');
+  expect((await read(f.db, 'owner', f.input.id, signal()))?.version).toBe(0);
+});
+it('withholds a new review when the finish guard is unavailable but keeps history readable', async () => {
+  const f = await fixture();
+  await f.db.prepare('DROP TRIGGER wallet_warmup_session_review_finish').run();
+  const actionId = JSON.parse(f.saved.sourceDocument).review.actions[0].id;
+  await expect(
+    append(f.db, 'owner', f.command('begin-review', { actionId }), signal()),
+  ).rejects.toMatchObject({ status: 503 });
+  expect((await read(f.db, 'owner', f.input.id, signal()))?.version).toBe(0);
+});
+it.each(['same-command', 'different-command'] as const)(
+  'recovers only the identical winner when one event ID races with different server timestamps: %s',
+  async (kind) => {
+    const f = await fixture(),
+      request = f.command('pause'),
+      base = Date.now() + 10;
+    let reached = 0,
+      release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    const db = {
+      batch: f.db.batch.bind(f.db),
+      prepare(sql: string) {
+        const original = f.db.prepare(sql);
+        if (!sql.startsWith('INSERT INTO wallet_warmup_session_journal_events'))
+          return original;
+        return {
+          bind(...args: unknown[]) {
+            const bound = original.bind(...args);
+            return {
+              async run() {
+                if (++reached === 2) release();
+                await barrier;
+                return bound.run();
+              },
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+    const results = await Promise.allSettled([
+      append(db, 'owner', request, signal(), () =>
+        reached >= 2 ? base + 2 : base,
+      ),
+      append(
+        db,
+        'owner',
+        kind === 'same-command'
+          ? request
+          : { ...request, command: { operation: 'stop' } },
+        signal(),
+        () => (reached >= 2 ? base + 2 : base + 1),
+      ),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(
+      kind === 'same-command' ? 2 : 1,
+    );
+    if (
+      kind === 'same-command' &&
+      results[0].status === 'fulfilled' &&
+      results[1].status === 'fulfilled'
+    )
+      expect(results[0].value).toEqual(results[1].value);
+  },
+);
 it('retains exactly one immutable owner-bound recovery root without execution authority', async () => {
   const f = await fixture();
   expect(f.saved).toMatchObject({

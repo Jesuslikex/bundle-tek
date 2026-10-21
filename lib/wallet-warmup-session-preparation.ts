@@ -10,6 +10,7 @@ import {
 } from './warmup-preparation-history';
 import type { WarmupSessionAction } from './wallet-warmup-session-review';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
+import { walletWarmupSessionFinishGuardInstalled } from './wallet-warmup-session-finish-guard';
 import {
   readWalletWarmupSessionPacket,
   prepareWalletWarmupSessionPacketWrite,
@@ -381,6 +382,8 @@ export async function prepareWalletWarmupSessionAction(
     }
   }
   signal.throwIfAborted();
+  if (!(await walletWarmupSessionFinishGuardInstalled(db, 'binding')))
+    fail('Warmup session finish guard is unavailable.', 503);
   const material = await prepare(
     structuredClone({ action, sellSource }),
     signal,
@@ -401,7 +404,7 @@ export async function prepareWalletWarmupSessionAction(
   if (
     !Number.isSafeInteger(now) ||
     now < at ||
-    now >= Date.parse(JSON.parse(journal.sourceDocument).reviewExpiresAt)
+    now >= Date.parse(journal.effectiveReviewExpiresAt)
   )
     fail();
   const createdAt = new Date(now).toISOString(),

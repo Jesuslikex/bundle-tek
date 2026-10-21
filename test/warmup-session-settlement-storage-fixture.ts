@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { installWarmupSessionFinishGuards } from './warmup-session-finish-guard-fixture';
 import { warmupSessionConsentFixture } from './warmup-session-consent-fixture';
 import { warmupSessionSettlementFixture } from './warmup-session-settlement-fixture';
 import { buildWarmupPlan } from '@/lib/wallet-warmup';
@@ -15,7 +16,11 @@ const signal = () => new AbortController().signal;
 /** In-memory SQL and synthetic signed transfer packets only, NOT a live DEX/funded swap. */
 export async function warmupSessionSettlementStorageFixture(
   reserve = '0.01',
-  options: { bindBuy?: boolean; reviewOnly?: boolean } = {},
+  options: {
+    bindBuy?: boolean;
+    reviewOnly?: boolean;
+    finishAfterLastMs?: number;
+  } = {},
 ) {
   const packets = await warmupSessionSettlementFixture();
   const at = Date.now(),
@@ -39,7 +44,9 @@ export async function warmupSessionSettlementStorageFixture(
     updatedAt: date,
     document: { ...input, totalBudget: buildWarmupPlan(input, at).totalBudget },
   };
-  const f = await warmupSessionConsentFixture(plan);
+  const f = await warmupSessionConsentFixture(plan, {
+    finishAfterLastMs: options.finishAfterLastMs,
+  });
   try {
     for (const sql of [
       'ALTER TABLE warmup_buy_receipts ADD COLUMN preparation_id TEXT',
@@ -63,6 +70,7 @@ export async function warmupSessionSettlementStorageFixture(
         .map((v) => v.trim())
         .filter(Boolean))
         await f.db.prepare(sql).run();
+    await installWarmupSessionFinishGuards(f.db);
     const consent = await retainWalletWarmupSessionConsent(
       f.db,
       'owner',

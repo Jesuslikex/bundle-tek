@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { walletWarmupSessionFinishGuardInstalled } from './wallet-warmup-session-finish-guard';
 import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
 import { readWalletWarmupSessionJournal } from './wallet-warmup-session-journal-storage';
@@ -111,6 +112,7 @@ export async function retainWalletWarmupSessionActionBinding(
       fail();
     return saved;
   }
+  if (!(await walletWarmupSessionFinishGuardInstalled(db, 'binding'))) fail();
   const now = clock();
   if (!Number.isSafeInteger(now) || now < 0) fail();
   const createdAt = new Date(now).toISOString();
@@ -161,8 +163,7 @@ export async function retainWalletWarmupSessionActionBinding(
   if (
     !Number.isSafeInteger(beforeWrite) ||
     beforeWrite < now ||
-    beforeWrite >=
-      Date.parse(JSON.parse(journal.sourceDocument).reviewExpiresAt)
+    beforeWrite >= Date.parse(journal.effectiveReviewExpiresAt)
   )
     fail();
   try {

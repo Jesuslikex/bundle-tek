@@ -10,7 +10,10 @@ import { reviewWalletWarmupSessionConsent as review } from '@/lib/wallet-warmup-
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 const signal = () => new AbortController().signal;
 /** Synthetic public plan and disposable memory SQL. No secrets or provider requests. */
-export async function warmupSessionConsentFixture(planOverride?: SavedWarmup) {
+export async function warmupSessionConsentFixture(
+  planOverride?: SavedWarmup,
+  options: { finishAfterLastMs?: number } = {},
+) {
   const client = createClient({ url: 'file::memory:', intMode: 'number' });
   const db = createTursoDatabase(client);
   for (const sql of [
@@ -81,7 +84,13 @@ export async function warmupSessionConsentFixture(planOverride?: SavedWarmup) {
   const selected = {
     reviewId: kept.id,
     reviewSha256: kept.reviewSha256,
-    sessionExpiresAt: new Date(at + 120000).toISOString(),
+    sessionExpiresAt: new Date(
+      options.finishAfterLastMs === undefined
+        ? at + 120000
+        : Math.max(
+            ...kept.document.actions.map((a) => Date.parse(a.scheduledAt)),
+          ) + options.finishAfterLastMs,
+    ).toISOString(),
   };
   const prepared = await review(db, 'owner', selected, signal());
   const input = {

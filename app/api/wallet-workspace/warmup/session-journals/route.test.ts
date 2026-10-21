@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { warmupSessionConsentFixture } from '@/test/warmup-session-consent-fixture';
 import { retainWalletWarmupSessionConsent } from '@/lib/wallet-warmup-session-consent';
+import { installWarmupSessionFinishGuards } from '@/test/warmup-session-finish-guard-fixture';
 import type { publicWalletWarmupSessionJournal } from '@/lib/wallet-warmup-session-journal-public';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'owner' } as { userId: string } | null,
@@ -42,7 +43,7 @@ beforeEach(async () => {
       throw Error('No provider requests permitted');
     }),
   );
-  f = await warmupSessionConsentFixture();
+  f = await warmupSessionConsentFixture(undefined, { finishAfterLastMs: 1000 });
   for (const name of [
     '0124_wallet_warmup_session_journals',
     '0125_wallet_warmup_session_settlements',
@@ -52,6 +53,7 @@ beforeEach(async () => {
       .map((s) => s.trim())
       .filter(Boolean))
       await f.db.prepare(sql).run();
+  await installWarmupSessionFinishGuards(f.db);
   const consent = await retainWalletWarmupSessionConsent(
     f.db,
     'owner',
@@ -152,7 +154,8 @@ it.each(['unchecked', 'owner', 'extra', 'missing', 'noncanonical'] as const)(
     if (kind === 'owner') body.owner = 'other';
     if (kind === 'extra') body.signingAllowed = true;
     if (kind === 'missing') delete body.termsSha256;
-    if (kind === 'noncanonical') body.id = record.id.toUpperCase();
+    if (kind === 'noncanonical')
+      body.id = 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA';
     expect((await post(body)).status).toBe(400);
     expect(mocks.reads).toBe(0);
   },
@@ -246,6 +249,8 @@ it('records only the exact owned consent and projects a bounded non-authorizing 
       'consentId',
       'termsSha256',
       'createdAt',
+      'sessionExpiresAt',
+      'effectiveReviewExpiresAt',
       'version',
       'headSha256',
       'recoveryRequired',
@@ -278,6 +283,36 @@ it('records only the exact owned consent and projects a bounded non-authorizing 
   expect(await eventCount()).toBe(0);
   expect(fetch).not.toHaveBeenCalled();
 });
+it('refuses a new review at the approved finish deadline before the source preview expires', async () => {
+  const j = await create();
+  expect(Date.parse(j.sessionExpiresAt)).toBeLessThan(
+    Date.parse(j.snapshot.sourceReviewExpiresAt),
+  );
+  expect(j.effectiveReviewExpiresAt).toBe(j.sessionExpiresAt);
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(j.sessionExpiresAt));
+  const recovered = await journalResponse(await get());
+  expect(recovered.snapshot).toMatchObject({
+    sourceReviewFresh: false,
+    phase: 'refresh-required',
+  });
+  expect((await post(control(recovered, 'begin-review'))).status).toBe(409);
+  expect((await post(control(recovered, 'stop'))).status).toBe(200);
+});
+it('does not write redundant pause/stop controls or report unrelated receipts on plain reads or root recovery', async () => {
+  const j = await create(),
+    pause = control(j, 'pause');
+  const paused = await journalResponse(await post(pause));
+  expect((await post(control(paused, 'pause'))).status).toBe(409);
+  expect((await journalResponse(await get())).commandReceipt).toBeNull();
+  expect((await journalResponse(await post())).commandReceipt).toBeNull();
+  const stop = control(paused, 'stop'),
+    stopped = await journalResponse(await post(stop));
+  expect((await post(control(stopped, 'stop'))).status).toBe(409);
+  expect((await journalResponse(await post(stop))).commandReceipt?.id).toBe(
+    stop.id,
+  );
+  expect(await eventCount()).toBe(2);
+});
 it('isolates owners and does not create missing journals during reads or controls', async () => {
   const j = await create();
   mocks.user = { userId: 'other' };
@@ -288,6 +323,50 @@ it('isolates owners and does not create missing journals during reads or control
   expect((await get('id=' + crypto.randomUUID())).status).toBe(404);
   expect(await eventCount()).toBe(0);
 });
+it('discovers an existing journal from its owned approval without a local journal reminder or write', async () => {
+  const j = await create();
+  expect(
+    await journalResponse(await get('consentId=' + record.consentId)),
+  ).toEqual(j);
+  const c = control(j, 'pause');
+  const paused = await journalResponse(await post(c));
+  expect(
+    (
+      await journalResponse(
+        await get('consentId=' + record.consentId + '&eventId=' + c.id),
+      )
+    ).commandReceipt,
+  ).toEqual(paused.commandReceipt);
+  mocks.user = { userId: 'other' };
+  expect((await get('consentId=' + record.consentId)).status).toBe(404);
+  expect(await eventCount()).toBe(1);
+});
+it('does not create a journal when discovery finds no record for an existing approval', async () => {
+  expect((await get('consentId=' + record.consentId)).status).toBe(404);
+  expect((await get('consentId=' + crypto.randomUUID())).status).toBe(404);
+  expect(
+    (
+      await f.db
+        .prepare('SELECT count(*) AS n FROM wallet_warmup_session_journals')
+        .first<{ n: number }>()
+    )?.n,
+  ).toBe(0);
+});
+it.each(['both', 'duplicate', 'malformed', 'uppercase'] as const)(
+  'rejects ambiguous or invalid approval discovery: %s',
+  async (kind) => {
+    const query =
+      kind === 'both'
+        ? 'id=' + record.id + '&consentId=' + record.consentId
+        : kind === 'duplicate'
+          ? 'consentId=' + record.consentId + '&consentId=' + record.consentId
+          : kind === 'malformed'
+            ? 'consentId=wrong'
+            : 'consentId=AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA';
+    expect((await get(query)).status).toBe(400);
+    expect(mocks.reads).toBe(0);
+  },
+);
 it('persists pause/resume/stop, refuses invalid resume and cannot resume a stopped session', async () => {
   let j = await create();
   expect((await post(control(j, 'resume'))).status).toBe(409);

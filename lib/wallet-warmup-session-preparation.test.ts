@@ -10,6 +10,7 @@ import {
 import { retainWalletWarmupSessionSettlement } from './wallet-warmup-session-settlement-storage';
 import { isSessionBoundWarmupPreparation } from './warmup-session-preparation-scope';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
+import { installWarmupSessionFinishGuards } from '@/test/warmup-session-finish-guard-fixture';
 import { retainWalletWarmupSessionActionBinding } from './wallet-warmup-session-action-binding';
 import { validateWalletWarmupSessionPacket } from './wallet-warmup-session-packet';
 const mocks = vi.hoisted(() => ({
@@ -149,16 +150,67 @@ it.each([
     expect(await counts(f.db)).toEqual([0, 0, 2]);
   },
 );
-async function fixture() {
+async function fixture(options: { finishAfterLastMs?: number } = {}) {
   const f = await warmupSessionSettlementStorageFixture('0.01', {
     reviewOnly: true,
+    ...options,
   });
   clients.push(f.client);
   await install(f.db);
+  await installWarmupSessionFinishGuards(f.db);
   mocks.db = f.db;
   mocks.user = { userId: 'owner' };
   return f;
 }
+it.each(['before-quote', 'during-quote'] as const)(
+  'withholds preparation at the earlier consent finish: %s',
+  async (kind) => {
+    const f = await fixture({ finishAfterLastMs: 1000 }),
+      request = input(f);
+    const finish = Date.parse(f.journal.sessionExpiresAt);
+    expect(finish).toBeLessThan(
+      Date.parse(f.journal.snapshot.sourceReviewExpiresAt),
+    );
+    const expire = () => f.advance(finish - f.clock());
+    if (kind === 'before-quote') expire();
+    const quote = vi.fn(async () => {
+      if (kind === 'during-quote') expire();
+      return {
+        summary: f.packets.buy.preparation.document,
+        transaction: f.packets.buy.approval.transaction,
+      };
+    });
+    await expect(
+      prepare(f.db, 'owner', request, signal(), quote, f.clock),
+    ).rejects.toThrow();
+    expect(quote).toHaveBeenCalledTimes(kind === 'before-quote' ? 0 : 1);
+    expect(await counts(f.db)).toEqual([0, 0, 2]);
+  },
+);
+it('the binding SQL guard rejects a new identity timestamp at the consent finish', async () => {
+  const f = await fixture({ finishAfterLastMs: 1000 });
+  const p = f.packets.buy.preparation;
+  await expect(
+    f.db
+      .prepare(
+        'INSERT INTO wallet_warmup_session_action_bindings(owner_id,journal_id,action_id,preparation_id,preparation_document,packet_sha256,review_version,review_sha256,created_at,binding_sha256) VALUES(?,?,?,?,?,?,?,?,?,?)',
+      )
+      .bind(
+        'owner',
+        f.journal.id,
+        f.journal.snapshot.pending!.action.id,
+        p.id,
+        JSON.stringify(p.document),
+        p.document.transaction.sha256,
+        f.journal.version,
+        f.journal.headSha256,
+        f.journal.sessionExpiresAt,
+        'a'.repeat(64),
+      )
+      .run(),
+  ).rejects.toThrow('Approved warmup session has finished');
+  expect(await counts(f.db)).toEqual([0, 0, 2]);
+});
 function input(f: Awaited<ReturnType<typeof fixture>>) {
   return {
     id: crypto.randomUUID(),

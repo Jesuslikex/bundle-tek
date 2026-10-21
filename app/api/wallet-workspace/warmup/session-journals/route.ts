@@ -63,24 +63,57 @@ export async function GET(request: Request) {
   if (!user)
     return json({ error: 'Sign in to recover a warmup session.' }, 401);
   const params = new URL(request.url).searchParams;
-  const id = uuid.safeParse(params.get('id'));
+  const byConsent = params.has('consentId');
+  const id = uuid.safeParse(params.get(byConsent ? 'consentId' : 'id'));
   const eventId = params.has('eventId')
     ? uuid.safeParse(params.get('eventId'))
     : null;
   if (
     !id.success ||
     eventId?.success === false ||
-    [...params.keys()].some((k) => k !== 'id' && k !== 'eventId') ||
-    params.getAll('id').length !== 1 ||
+    [...params.keys()].some(
+      (k) => k !== 'id' && k !== 'consentId' && k !== 'eventId',
+    ) ||
+    params.getAll('id').length + params.getAll('consentId').length !== 1 ||
     params.getAll('eventId').length > 1
   )
     return json(
-      { error: 'Choose one journal ID and optionally one command ID.' },
+      {
+        error:
+          'Choose one journal or plan approval ID and optionally one command ID.',
+      },
       400,
     );
   if (request.signal.aborted) return cancelled();
   try {
-    const journal = await read(getD1(), user.userId, id.data, request.signal);
+    const db = getD1();
+    let journalId = id.data;
+    if (byConsent) {
+      const found = await db
+        .prepare(
+          'SELECT id FROM wallet_warmup_session_journals WHERE owner_id=? AND consent_id=?',
+        )
+        .bind(user.userId, id.data)
+        .first<{ id: string }>();
+      request.signal.throwIfAborted();
+      if (!found)
+        return json(
+          { error: 'Warmup session not found for this account.' },
+          404,
+        );
+      if (!uuid.safeParse(found.id).success)
+        throw new WalletWarmupJournalError(
+          'Retained warmup recovery identity is unavailable.',
+          503,
+        );
+      journalId = found.id;
+    }
+    const journal = await read(db, user.userId, journalId, request.signal);
+    if (journal && byConsent && journal.consentId !== id.data)
+      throw new WalletWarmupJournalError(
+        'Retained warmup recovery identity differs.',
+        503,
+      );
     if (request.signal.aborted) return cancelled();
     return journal
       ? json({ journal: project(journal, eventId?.data) })
@@ -143,7 +176,8 @@ export async function POST(request: Request) {
     const prior = current.events.find((e) => e.id === input.id);
     if (
       !prior &&
-      ((current.snapshot.stopped && control !== 'stop') ||
+      (current.snapshot.stopped ||
+        (control === 'pause' && current.snapshot.paused) ||
         (control === 'resume' && !current.snapshot.paused))
     )
       throw new WalletWarmupJournalError(
