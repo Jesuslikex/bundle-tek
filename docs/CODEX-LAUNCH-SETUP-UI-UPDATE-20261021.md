@@ -41,3 +41,12 @@ Source commit `bfaa0825047c0e49fef731bacf03d38cc511f907` corrects the owned hist
 499tests/42files plus2selected existing financial-policy tests (21unselected), plain TypeScript, seven-file typed lint/format, unchanged-overlay isolated build and2376-file source freeze pass. Actual Opus5.5 completed two read-only reviews with unchanged copies/zero denials; production runtime matches follow-up exactly, optional later test diagnostics independently verified. See CODEX-PROXY-FUNDING-PROGRESS-20261021.md and companion evidence.
 
 No protected Claude file, financial/signing/recovery backend, migration, application/hosted SQL, provider/credential/cron, real wallet/funded action or deployment changed. Browser/signed-in/live-provider verification remains open after the URL-policy stop. Combined source-bound launch approval and full parity remain unfinished.0136 unchanged; next0137 subject to recheck.
+
+
+## Funding-history read recovery, 22 October 2026
+
+Source commit `419372316eed0a741cf77e5f1b1239c030d69dc7` changes only the owned history UI/test: existing1MiB reader, explicit15s timeout and Cancel, safe static messages, stale-read disclosure, immediate revision clearing, exact cursor retention and keyboard handoff/recovery. Metadata cancellation is not transfer cancellation. Automatic read on displayed saved-plan ID/revision changes remains. Reload returns to newest transitions; older loading keeps previous transition pages while refreshing summary.
+
+Four regressions reproduced;506related tests/42files passed before review refinements,45final focused tests/3files after all refinements. Plain TypeScript, two-file typed lint/format, unchanged-overlay isolated production build and2376-file freeze pass. Actual Opus5.5 two read-only reviews complete/unchanged; first attempted one canonical-path read outside its allowed copy and was denied, not retried/bypassed; follow-up zero denials and no high/medium issue. Final focus/presentation/test changes independently verified, not rereviewed. See CODEX-FUNDING-HISTORY-RECOVERY-20261022.md/evidence for exact limits.
+
+No protected Claude file, API/DTO/backend/financial/schema, provider/credential/cron, application/hosted SQL, real wallet/funded action or deployment changed. Browser, signed-in, live-provider and screen-reader QA and combined executable setup review remain open. Git deployment disabled;0136 unchanged, next0137 subject to recheck.
