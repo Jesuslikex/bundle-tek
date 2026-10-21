@@ -167,3 +167,116 @@ export function walletWarmupActivity(
   }));
 }
 export type WalletWarmupActivity = ReturnType<typeof walletWarmupActivity>;
+
+/** Display-only aggregation of admitted receipt rows. Never runner/balance/P&L evidence. */
+export function walletWarmupActivityTotals(rows: WalletWarmupActivity) {
+  const fail = (): never => {
+    throw Error('Recorded activity totals are unavailable.');
+  };
+  if (!Array.isArray(rows) || rows.length > WARMUP_MAX_WALLETS) fail();
+  const seen = new Set<string>();
+  let completedWallets = 0,
+    completedCycles = 0,
+    totalCycles = 0,
+    buyTransactions = 0,
+    sellTransactions = 0,
+    recoveryWallets = 0,
+    recoveryCount = 0;
+  let buyVolume = 0n,
+    sellVolume = 0n;
+  const add = (a: number, b: number) =>
+    Number.isSafeInteger(b) && b >= 0 && Number.isSafeInteger(a + b)
+      ? a + b
+      : fail();
+  // Each retained lot contributes bounded buy spending and sell proceeds.
+  const maxVolume = BigInt(WARMUP_HISTORY_LIMIT) * 2n * (10n ** 25n - 1n);
+  const raw = (v: string) => {
+    if (
+      typeof v !== 'string' ||
+      v.length > maxVolume.toString().length ||
+      !/^(0|[1-9]\d*)$/.test(v)
+    )
+      return fail();
+    const amount = BigInt(v);
+    return amount <= maxVolume ? amount : fail();
+  };
+  for (const row of rows) {
+    if (
+      !row ||
+      typeof row.wallet !== 'string' ||
+      !row.wallet.length ||
+      row.wallet.length > 64 ||
+      row.wallet.trim() !== row.wallet ||
+      seen.has(row.wallet)
+    )
+      fail();
+    seen.add(row.wallet);
+    const buys = add(0, row.buyTransactions),
+      sells = add(0, row.sellTransactions),
+      loops = add(0, row.completedCycles),
+      cycles = add(0, row.totalCycles),
+      recoveries = add(0, row.recoveryCount);
+    if (
+      cycles < 1 ||
+      cycles > WARMUP_MAX_CYCLES ||
+      cycles !== rows[0].totalCycles ||
+      loops > cycles ||
+      loops > buys ||
+      loops > sells ||
+      (buys === 0 && sells > 0) ||
+      row.transactionCount !== add(buys, sells)
+    )
+      fail();
+    const buy = raw(row.buyVolumeLamports),
+      sell = raw(row.sellVolumeLamports);
+    if (
+      raw(row.volumeLamports) !== buy + sell ||
+      (buys === 0 ? buy !== 0n : buy === 0n) ||
+      (sells === 0 ? sell !== 0n : sell === 0n)
+    )
+      fail();
+    const state =
+      recoveries > 0
+        ? 'Recovery required'
+        : loops === cycles
+          ? 'Recorded loops complete'
+          : buys > 0
+            ? 'Partially recorded'
+            : 'No recorded trades';
+    if (row.state !== state) fail();
+    if (state === 'Recorded loops complete') completedWallets++;
+    if (recoveries > 0) recoveryWallets++;
+    completedCycles = add(completedCycles, loops);
+    totalCycles = add(totalCycles, cycles);
+    buyTransactions = add(buyTransactions, buys);
+    sellTransactions = add(sellTransactions, sells);
+    recoveryCount = add(recoveryCount, recoveries);
+    buyVolume += buy;
+    sellVolume += sell;
+  }
+  const transactionCount = add(buyTransactions, sellTransactions);
+  return {
+    walletCount: rows.length,
+    completedWallets,
+    completedCycles,
+    totalCycles,
+    buyTransactions,
+    sellTransactions,
+    transactionCount,
+    recoveryWallets,
+    recoveryCount,
+    buyVolumeLamports: buyVolume.toString(),
+    sellVolumeLamports: sellVolume.toString(),
+    volumeLamports: (buyVolume + sellVolume).toString(),
+    state:
+      rows.length === 0
+        ? 'empty'
+        : recoveryWallets > 0
+          ? 'recovery'
+          : transactionCount === 0
+            ? 'unrecorded'
+            : completedWallets === rows.length
+              ? 'complete'
+              : 'partial',
+  };
+}

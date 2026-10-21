@@ -173,7 +173,13 @@ export function WarmupCycleProgress({
                 onReview={onReview}
                 onRecover={onRecover}
               />
-              <WalletWarmupActivitySummary rows={result.activity} />
+              <WalletWarmupActivitySummary
+                rows={result.activity}
+                revision={result.revision}
+                includeEarlier={result.includeEarlier}
+                archived={result.archived}
+                onRecover={onRecover}
+              />
               <WarmupPerformance performance={result.performance} />
               {result.excludedBuys > 0 && (
                 <p>

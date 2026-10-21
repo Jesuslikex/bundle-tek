@@ -1,0 +1,153 @@
+{
+  "sourceBase": "4cef9e3f1fd85823f04b52028910cefff84c5cf8",
+  "scope": "Display-only warmup receipt results; no automatic execution/signing or deployment",
+  "tests": {
+    "files": 11,
+    "passed": 202,
+    "failed": 0,
+    "pending": 0,
+    "success": true,
+    "terminalExit": 0,
+    "command": "Pinned Node24 vitest run --config work/release-qa/layer-save.config.mjs --maxWorkers=1; files listed below",
+    "filesRun": [
+      "components/wallet-warmup-activity-summary-interactions.test.tsx",
+      "components/wallet-warmup-activity-summary.test.tsx",
+      "components/warmup-cycle-workflow.test.tsx",
+      "components/warmup-next-review.test.tsx",
+      "lib/wallet-warmup-activity-totals.test.ts",
+      "lib/wallet-warmup-activity.test.ts",
+      "lib/wallet-warmup-session-review.test.ts",
+      "lib/wallet-warmup-session-sequence.test.ts",
+      "lib/wallet-warmup-session-settlement.test.ts",
+      "lib/warmup-cycle-progress.test.ts",
+      "lib/warmup-lot-performance.test.ts"
+    ]
+  },
+  "sourceFreeze": {
+    "files": 2797,
+    "digest": "c58bd6f0f03af3a899bbf5fe4d76f5f6b16f4e188a4b1cba8d7f2cdd401e5fca",
+    "unchanged": true
+  },
+  "opus": {
+    "startedAt": "2026-10-21T15:56:01.243Z",
+    "finishedAt": "2026-10-21T15:59:08.674Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "4cef9e3f1fd85823f04b52028910cefff84c5cf8",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.8305706,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "reviewCorrections": [
+    "Recovery withholds loop/completion totals instead of falsely reporting zero; original builder unchanged",
+    "Full retained-volume bound derived with BigInt, exact boundary and next integer tested",
+    "Distinct table caption, no replacing rowheader label, native details hint changes on expansion",
+    "Mobile outside padding scoped, consistent recovery navigation wording and cross-plan warning",
+    "Malformed data stays withheld and names per-step recovery fallback"
+  ],
+  "reviewLimits": "Corrections independently verified, not rereviewed by Opus. Reviewer ran no tests. Protected global CSS not included in review copy; actual browser fixture imports it.",
+  "browser": {
+    "kind": "Synthetic actual components with production CSS; no credentials, app database or real provider",
+    "desktop": {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "completeRows": 7,
+      "rowHeight": 57,
+      "summaryTouchHeight": 44
+    },
+    "phoneRecovery": {
+      "width": 375,
+      "scrollWidth": 360,
+      "recoveryTouchHeight": 44,
+      "exactWalletNavigation": true
+    },
+    "phoneComplete": {
+      "width": 375,
+      "scrollWidth": 360,
+      "summaryTouchHeight": 58
+    },
+    "phonePrecision": {
+      "width": 320,
+      "scrollWidth": 305,
+      "tableWidth": 255,
+      "volume": "9007199.254741093 SOL"
+    },
+    "maximum": {
+      "wallets": 20,
+      "loops": "220 / 220",
+      "transactions": 440,
+      "volume": "0.04 SOL"
+    },
+    "parent": {
+      "width": 320,
+      "scrollWidth": 305,
+      "initialReads": 1,
+      "readsAfterExplicitEarlierCheckbox": 2,
+      "revision": 2,
+      "archived": true,
+      "currentTransactions": 0,
+      "earlierTransactions": 2,
+      "earlierVolume": "0.00000015 SOL"
+    },
+    "keyboardDetailsEnter": true,
+    "viewportReset": true,
+    "ownTabClosed": true,
+    "ownServerStopped": true
+  },
+  "limits": [
+    "Not a signed-in production or independent blockchain audit",
+    "No funded action, wallet unlock/sign/send, SQL, migration, provider/credential/cron or deploy",
+    "Isolated production build exit0 with unchanged seven overlays, no .env or production credentials; no whole-repository full-suite claim"
+  ],
+  "staticChecks": {
+    "plainTypeScript": "pass",
+    "typedLintSixFiles": "pass",
+    "formatSevenFiles": "pass",
+    "originalActivityBuilderUnchanged": true,
+    "protectedFilesUnchanged": true
+  },
+  "build": {
+    "base": "4cef9e3",
+    "overlay": [
+      "lib/wallet-warmup-activity.ts",
+      "lib/wallet-warmup-activity-totals.test.ts",
+      "components/wallet-warmup-activity-summary.tsx",
+      "components/wallet-warmup-activity-summary.module.css",
+      "components/wallet-warmup-activity-summary.test.tsx",
+      "components/wallet-warmup-activity-summary-interactions.test.tsx",
+      "components/warmup-cycle-progress.tsx"
+    ],
+    "hashes": {
+      "lib/wallet-warmup-activity.ts": "b6bb68e029ea23fe44d4a1b94297dc979b6f7ce880f4ec42f8d52125b1907ef2",
+      "lib/wallet-warmup-activity-totals.test.ts": "29f68356f2fc7681fc53e014ce3482d0d45f7b4da2f57ba8a15bee2079e13e37",
+      "components/wallet-warmup-activity-summary.tsx": "092b1e2ecbe388e569bf3c7ec3aca10c0f76c704a7be0b70ebb9949c03e32432",
+      "components/wallet-warmup-activity-summary.module.css": "7a339deec3eccb34a186ab5842e72bbf24cb47226eca31b3273a8d107d935df5",
+      "components/wallet-warmup-activity-summary.test.tsx": "44c8604e1322c2bf2fef3bedfc26c85ce65cc20dfe6167d32eb839b90c517227",
+      "components/wallet-warmup-activity-summary-interactions.test.tsx": "8cf8010856111a3fcec9233e345b89a1a9f4b9efed6144e6101642235bf4d798",
+      "components/warmup-cycle-progress.tsx": "f1d03366129d3dadbf7a8605ecf05a0b8edd31327ab7c1068601c7592002a799"
+    },
+    "code": 0,
+    "unchanged": true,
+    "passed": true
+  }
+}
