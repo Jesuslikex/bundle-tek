@@ -3,6 +3,7 @@ import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { env } from '@/lib/server-env';
 import { walletRequest } from '@/lib/wallet-request';
+import { readWarmupPurpose } from '@/lib/wallet-warmup-session-v2-runtime-storage';
 import {
   warmupV2AttemptInput,
   warmupAttemptUuid,
@@ -101,6 +102,14 @@ export async function GET(request: Request) {
       id.data,
       signal,
     );
+    if (
+      saved &&
+      (await readWarmupPurpose(getD1(), saved.lease))?.mode === 'runtime'
+    )
+      throw new WalletWarmupV2AttemptError(
+        'Recover runtime checks through the current saved-check history.',
+        409,
+      );
     signal.throwIfAborted();
     return saved
       ? json({ attempt: publicWalletWarmupV2Attempt(saved) })

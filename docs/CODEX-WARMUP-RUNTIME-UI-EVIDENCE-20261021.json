@@ -1,0 +1,132 @@
+{
+  "sourceBaseCommit": "297bf1f9b81ec7c369ea1a15f61401a3e69f2342",
+  "scope": "manual unsigned warmup runtime mode UI, exact approval, expiry and saved-only mode-aware history",
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "automaticExecutionAllowed": false,
+  "relatedTests": {
+    "files": 95,
+    "passed": 1844,
+    "total": 1845,
+    "failed": 0,
+    "skippedRealClockCases": 1,
+    "success": true
+  },
+  "plainTypeScript": {
+    "command": "tsc --noEmit --incremental false",
+    "passed": true
+  },
+  "typedLint": {
+    "ownedFiles": 11,
+    "passed": true
+  },
+  "format": {
+    "ownedFiles": 12,
+    "passed": true
+  },
+  "sourceFreeze": {
+    "files": 2787,
+    "digest": "6d076951637c388f1807b10a20a599e800f201ba3f1bd3a64524c96f7133b8e0",
+    "unchanged": true
+  },
+  "build": {
+    "base": "297bf1f",
+    "overlay": [
+      "app/api/wallet-workspace/warmup/session-v2-attempts/route.ts",
+      "components/wallet-warmup-session-v2-attempt.test.tsx",
+      "components/wallet-warmup-session-v2-attempt.tsx",
+      "components/wallet-warmup-session-v2.module.css",
+      "components/wallet-warmup-session-v2.tsx",
+      "lib/wallet-warmup-session-v2-attempts.ts",
+      "lib/wallet-warmup-session-v2-runtime-storage.ts",
+      "app/api/wallet-workspace/warmup/session-v2-read-history/route.test.ts",
+      "app/api/wallet-workspace/warmup/session-v2-read-history/route.ts",
+      "lib/wallet-warmup-session-v2-read-view.test.ts",
+      "lib/wallet-warmup-session-v2-read-view.ts",
+      "test/warmup-session-v2-read-client-fixture.ts"
+    ],
+    "exitCode": 0,
+    "sourceUnchanged": true,
+    "passed": true
+  },
+  "browser": {
+    "syntheticOnly": true,
+    "actualComponentsAndCss": true,
+    "layouts": [
+      {
+        "minimumVisibleButtonHeight": 44,
+        "scrollWidth": 1440,
+        "width": 1440
+      },
+      {
+        "scrollWidth": 360,
+        "width": 375
+      },
+      {
+        "scrollWidth": 305,
+        "width": 320
+      }
+    ],
+    "noHorizontalOverflow": true,
+    "explicitRuntimeApproval": true,
+    "passiveRemount": {
+      "posts": 1,
+      "gets": 0
+    },
+    "manualRecovery": {
+      "posts": 1,
+      "gets": 1
+    },
+    "historicalExpiredLabelVerified": true,
+    "priorSameLayoutStopRejectsLateResult": true,
+    "noRealAccountProviderSqlWalletOrSigning": true
+  },
+  "reviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "resultSubtype": "success",
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "sourceFiles": 2743
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "resultSubtype": "success",
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "sourceFiles": 2743
+    }
+  ],
+  "reviewScope": "Both actual Opus5.5 reviews are read-only and completed without blockers. Final low-severity boot/read, self-hint, historical/refused copy, accessibility and late-discovery corrections were independently tested afterwards, not rereviewed.",
+  "migrationAndSchemaUnchanged": true,
+  "previousMigrationProofs": "297bf1f server checkpoint; all136 disposable migrations and checksums, not rerun or applied to application/hosted state here",
+  "protectedClaudeUiUntouched": true,
+  "noApplicationOrHostedSql": true,
+  "noProviderCredentialCronChanges": true,
+  "noRealWalletAction": true,
+  "noFundedTest": true,
+  "noDeployment": true,
+  "limits": [
+    "standalone synthetic browser harness, not signed-in full workspace QA",
+    "no new live provider qualification",
+    "first pending action only; no automatic warmup execution",
+    "saved-buy Sell runtime composition and reviewed program policy still required",
+    "financial reservations, browser authorization, finalized settlement and action/budget advancement remain open"
+  ]
+}

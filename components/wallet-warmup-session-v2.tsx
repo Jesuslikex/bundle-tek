@@ -982,12 +982,13 @@ function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
             </p>
           )}
           <p>
-            Runtime qualification is not connected yet. Saving or reviewing this
-            action does not make it signable. The separate quote and simulation
-            preview below also grants no signing permission.
+            Choose a basic preview or separate read-only runtime checks below.
+            Neither approves signing or a trade. Automatic activity remains
+            unavailable until execution and recovery are qualified.
           </p>
           {consent && (
             <WalletWarmupSessionV2Attempt
+              key={journal.id}
               journal={journal}
               consent={consent}
               disabled={

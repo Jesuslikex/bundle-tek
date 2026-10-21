@@ -24,6 +24,7 @@ import {
   warmupRuntimeInsert,
   readWarmupRuntimeObservation,
   WarmupRuntimeReadRace,
+  readWarmupPurposePage,
   type WarmupAttemptMode,
   type WarmupRuntimeMaterial,
 } from './wallet-warmup-session-v2-runtime-storage';
@@ -466,7 +467,7 @@ export async function readWalletWarmupV2Attempt(
 }
 type Saved = NonNullable<Awaited<ReturnType<typeof readWalletWarmupV2Attempt>>>;
 /** Explicit saved-only discovery for another tab/browser; bounded immutable cursor. */
-export async function listWalletWarmupV2Attempts(
+async function listAttemptPage(
   db: D1Database,
   owner: string,
   journalId: string,
@@ -521,7 +522,7 @@ export async function listWalletWarmupV2Attempts(
   }
   const selected = leases.slice(0, 25),
     tail = selected.at(-1);
-  return {
+  const page = {
     format: 'wallet-warmup-attempt-page-v2' as const,
     journalId,
     termsSha256: journal.termsSha256,
@@ -535,6 +536,82 @@ export async function listWalletWarmupV2Attempts(
     })),
     nextBefore: leases.length > 25 && tail ? tail.sequence : null,
     ...flags,
+  };
+  return { page, selected };
+}
+export async function listWalletWarmupV2Attempts(
+  db: D1Database,
+  owner: string,
+  journalId: string,
+  before: number | null,
+  signal: AbortSignal,
+) {
+  const { page, selected } = await listAttemptPage(
+    db,
+    owner,
+    journalId,
+    before,
+    signal,
+  );
+  const purposes = await readWarmupPurposePage(db, selected, signal);
+  if (purposes.some((p) => p?.mode === 'runtime'))
+    fail(
+      'This history contains runtime checks. Recover it through the current saved-check history.',
+      409,
+    );
+  return page;
+}
+export async function listWalletWarmupV2ReadAttempts(
+  db: D1Database,
+  owner: string,
+  journalId: string,
+  before: number | null,
+  signal: AbortSignal,
+) {
+  const { page, selected } = await listAttemptPage(
+    db,
+    owner,
+    journalId,
+    before,
+    signal,
+  );
+  const purposes = await readWarmupPurposePage(db, selected, signal);
+  return {
+    ...page,
+    format: 'wallet-warmup-read-page-v1' as const,
+    requests: page.requests.map((row, index) => ({
+      ...row,
+      mode: purposes[index]?.mode ?? ('preview' as WarmupAttemptMode),
+    })),
+  };
+}
+export async function readWalletWarmupV2ReadAttempt(
+  db: D1Database,
+  owner: string,
+  id: string,
+  signal: AbortSignal,
+) {
+  const attempt = await readWalletWarmupV2Attempt(db, owner, id, signal);
+  if (!attempt) return null;
+  const purpose = await readWarmupPurpose(db, attempt.lease);
+  signal.throwIfAborted();
+  if (purpose?.mode !== 'runtime')
+    return {
+      mode: 'preview' as const,
+      attempt: publicWalletWarmupV2Attempt(attempt),
+    };
+  let runtime;
+  try {
+    runtime = await runtimeFromSavedAttempt(db, attempt, signal);
+  } catch (error) {
+    if (!(error instanceof WarmupRuntimeReadRace)) throw error;
+    signal.throwIfAborted();
+    runtime = await readRuntimeAttemptSnapshot(db, owner, id, signal);
+  }
+  if (!runtime) return fail(undefined, 503);
+  return {
+    mode: 'runtime' as const,
+    ...publicWalletWarmupV2RuntimeAttempt(runtime),
   };
 }
 export function publicWalletWarmupV2Attempt(saved: Saved) {
@@ -944,6 +1021,13 @@ async function readRuntimeAttemptSnapshot(
 ) {
   const attempt = await readWalletWarmupV2Attempt(db, owner, id, signal);
   if (!attempt) return null;
+  return runtimeFromSavedAttempt(db, attempt, signal);
+}
+async function runtimeFromSavedAttempt(
+  db: D1Database,
+  attempt: Saved,
+  signal: AbortSignal,
+) {
   const runtime = await readWarmupRuntimeObservation(
     db,
     attempt.lease,

@@ -7,17 +7,22 @@ import type {
   WarmupV2Saved,
 } from '@/lib/wallet-warmup-session-v2-view';
 import {
-  warmupV2AttemptReminder,
-  warmupV2AttemptView,
-  recoverWarmupV2AttemptView,
-  warmupV2AttemptPage,
-  type WarmupV2AttemptPage,
-  type WarmupV2AttemptReminder,
-  type WarmupV2AttemptView,
-} from '@/lib/wallet-warmup-session-v2-attempt-view';
+  warmupReadReminder as warmupV2AttemptReminder,
+  warmupReadView as warmupV2AttemptView,
+  recoverWarmupReadView as recoverWarmupV2AttemptView,
+  warmupReadPage as warmupV2AttemptPage,
+  warmupReadPostResponse,
+  type WarmupReadPage as WarmupV2AttemptPage,
+  type WarmupReadReminder as WarmupV2AttemptReminder,
+  type WarmupReadView,
+  type WarmupReadMode,
+} from '@/lib/wallet-warmup-session-v2-read-view';
 import { readWarmupConsentResponse } from '@/lib/wallet-warmup-session-consent-view';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 const endpoint = '/api/wallet-workspace/warmup/session-v2-attempts';
+const runtimeEndpoint =
+  '/api/wallet-workspace/warmup/session-v2-runtime-attempts';
+const historyEndpoint = '/api/wallet-workspace/warmup/session-v2-read-history';
 type Props = {
   journal: WarmupV2Journal;
   consent: WarmupV2Saved;
@@ -49,10 +54,13 @@ export function WalletWarmupSessionV2Attempt({
     mounted = useRef(false),
     rawMarker = useRef<string | null>(null),
     heading = useRef<HTMLHeadingElement | null>(null);
+  const choiceVersion = useRef(0);
   const [marker, setMarker] = useState<WarmupV2AttemptReminder | null>(null),
-    [saved, setSaved] = useState<WarmupV2AttemptView | null>(null),
+    [readResult, setSaved] = useState<WarmupReadView | null>(null),
+    [mode, setMode] = useState<WarmupReadMode>('preview'),
     [checked, setChecked] = useState(false),
     [busy, setBusy] = useState(false),
+    [readingSaved, setReadingSaved] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
     [invalid, setInvalid] = useState(false),
@@ -63,7 +71,9 @@ export function WalletWarmupSessionV2Attempt({
     [loadedFor, setLoadedFor] = useState(''),
     [page, setPage] = useState<WarmupV2AttemptPage | null>(null),
     [newestDiscoveredId, setNewestDiscoveredId] = useState(''),
+    [discoveryContext, setDiscoveryContext] = useState(''),
     [archivePage, setArchivePage] = useState(0);
+  const saved = readResult?.attempt ?? null;
   useEffect(() => {
     mounted.current = true;
     let live = true;
@@ -76,7 +86,10 @@ export function WalletWarmupSessionV2Attempt({
             JSON.parse(raw),
             consent,
           );
-          if (live) setMarker(original);
+          if (live) {
+            setMarker(original);
+            setMode(original.mode);
+          }
         }
         if (live)
           setArchives(
@@ -117,6 +130,10 @@ export function WalletWarmupSessionV2Attempt({
         setRepeatChecked(false);
         setMissing(false);
         setSaved(null);
+        setPage(null);
+        setNewestDiscoveredId('');
+        setDiscoveryContext('');
+        setHint('');
       }
     });
     return () => {
@@ -147,7 +164,14 @@ export function WalletWarmupSessionV2Attempt({
   async function request(
     original: WarmupV2AttemptReminder | string,
     method: 'GET' | 'POST',
+    expectedMode?: WarmupReadMode,
   ) {
+    if (
+      !mounted.current ||
+      scope.current !== context ||
+      loadedFor !== loadIdentity
+    )
+      return;
     if (active.current || (invalid && method === 'POST')) return;
     if (method === 'POST' && (blocked.current || loadedFor !== loadIdentity))
       return;
@@ -157,6 +181,7 @@ export function WalletWarmupSessionV2Attempt({
       controller = new AbortController();
     active.current = controller;
     setBusy(true);
+    setReadingSaved(method === 'GET');
     setChecked(false);
     setRepeatChecked(false);
     setError('');
@@ -169,8 +194,10 @@ export function WalletWarmupSessionV2Attempt({
       ]);
       const response = await fetch(
         method === 'GET'
-          ? endpoint + '?id=' + encodeURIComponent(originalId)
-          : endpoint,
+          ? historyEndpoint + '?id=' + encodeURIComponent(originalId)
+          : typeof original !== 'string' && original.mode === 'runtime'
+            ? runtimeEndpoint
+            : endpoint,
         {
           method,
           signal,
@@ -183,7 +210,9 @@ export function WalletWarmupSessionV2Attempt({
                   journalId: original.journal.id,
                   version: original.journal.version,
                   headSha256: original.journal.headSha256,
-                  previewRequested: true,
+                  [original.mode === 'runtime'
+                    ? 'runtimeRequested'
+                    : 'previewRequested']: true,
                 }),
               }
             : {}),
@@ -202,6 +231,7 @@ export function WalletWarmupSessionV2Attempt({
           const recoveryId = (value as { recoveryId?: unknown })?.recoveryId;
           if (
             typeof recoveryId === 'string' &&
+            recoveryId !== originalId &&
             /^[a-f0-9-]{36}$/.test(recoveryId)
           )
             setHint(recoveryId);
@@ -210,14 +240,23 @@ export function WalletWarmupSessionV2Attempt({
           'The unsigned request was not confirmed. Keep its original ID and recover it before trying another request.',
         );
       }
+      const displayValue =
+        method === 'GET'
+          ? value
+          : warmupReadPostResponse(
+              value,
+              (original as WarmupV2AttemptReminder).mode,
+            );
       const recovered =
         typeof original === 'string'
-          ? await recoverWarmupV2AttemptView(value, original, consent)
+          ? await recoverWarmupV2AttemptView(displayValue, original, consent)
           : null;
+      if (recovered && expectedMode && recovered.marker.mode !== expectedMode)
+        throw Error('Saved mode changed.');
       const admitted = recovered
-        ? recovered.attempt
+        ? recovered.view
         : await warmupV2AttemptView(
-            value,
+            displayValue,
             original as WarmupV2AttemptReminder,
             consent,
           );
@@ -235,12 +274,14 @@ export function WalletWarmupSessionV2Attempt({
             current === null &&
             rawMarker.current === null &&
             !invalid &&
+            discoveryContext === token &&
             newestDiscoveredId === recovered.marker.id
           ) {
             sessionStorage.setItem(key, text);
             if (sessionStorage.getItem(key) !== text) throw Error();
             rawMarker.current = text;
             setMarker(recovered.marker);
+            setMode(recovered.marker.mode);
           } else if (marker?.id !== recovered.marker.id) {
             const archiveKey = archivePrefix + recovered.marker.id;
             if (sessionStorage.getItem(archiveKey) === null) {
@@ -257,6 +298,7 @@ export function WalletWarmupSessionV2Attempt({
         }
       }
       setSaved(admitted);
+      setHint('');
       setNotice(
         method === 'GET'
           ? 'Saved-only recovery complete. No provider request or deadline renewal.'
@@ -281,12 +323,20 @@ export function WalletWarmupSessionV2Attempt({
     }
   }
   async function loadHistory(before: number | null) {
-    if (active.current) return;
+    if (
+      !mounted.current ||
+      scope.current !== context ||
+      loadedFor !== loadIdentity ||
+      active.current
+    )
+      return;
     const token = context,
       controller = new AbortController();
     active.current = controller;
     setBusy(true);
+    setReadingSaved(true);
     setError('');
+    setNotice('');
     setChecked(false);
     try {
       const signal = AbortSignal.any([
@@ -294,7 +344,7 @@ export function WalletWarmupSessionV2Attempt({
           AbortSignal.timeout(25000),
         ]),
         response = await fetch(
-          endpoint +
+          historyEndpoint +
             '?journalId=' +
             encodeURIComponent(journal.id) +
             (before === null ? '' : '&before=' + before),
@@ -306,7 +356,10 @@ export function WalletWarmupSessionV2Attempt({
       const next = warmupV2AttemptPage(value, journal, consent, before);
       if (mounted.current && scope.current === token) {
         setPage(next);
-        if (before === null) setNewestDiscoveredId(next.requests[0]?.id ?? '');
+        if (before === null) {
+          setNewestDiscoveredId(next.requests[0]?.id ?? '');
+          setDiscoveryContext(token);
+        }
         setNotice(
           'Saved request IDs loaded. No provider work or deadline renewal.',
         );
@@ -342,8 +395,16 @@ export function WalletWarmupSessionV2Attempt({
       now < Date.parse(journal.sessionExpiresAt) &&
       ((!marker && !saved) || previousFinished) &&
       !maxed;
+  const nextAvailableAt = saved
+    ? Math.max(
+        Date.parse(saved.nextAttemptAt),
+        Date.parse(saved.outcome?.expiresAt ?? saved.leaseExpiresAt),
+      )
+    : null;
+  const disabledDescription = 'warmup-check-disabled-' + journal.id;
   async function start() {
     if (!eligible || !checked) return;
+    const choice = choiceVersion.current;
     try {
       if (
         typeof AbortSignal.any !== 'function' ||
@@ -353,13 +414,20 @@ export function WalletWarmupSessionV2Attempt({
       if (sessionStorage.getItem(key) !== rawMarker.current) throw Error();
       const next = await warmupV2AttemptReminder(
         {
-          format: 'wallet-warmup-attempt-reminder-v2',
+          format: 'wallet-warmup-read-reminder-v1',
+          mode,
           id: crypto.randomUUID(),
           journal,
         },
         consent,
       );
-      if (scope.current !== context || blocked.current || active.current)
+      if (
+        !mounted.current ||
+        scope.current !== context ||
+        blocked.current ||
+        active.current ||
+        choiceVersion.current !== choice
+      )
         return;
       if (marker && rawMarker.current) {
         const archiveKey = archivePrefix + marker.id;
@@ -382,57 +450,125 @@ export function WalletWarmupSessionV2Attempt({
       );
     }
   }
+  function chooseMode(next: WarmupReadMode) {
+    choiceVersion.current++;
+    setMode(next);
+    setChecked(false);
+    setRepeatChecked(false);
+  }
   return (
     <section
       className={`${styles.card} ${styles.attempt}`}
-      aria-label="Fresh unsigned warmup preview"
+      aria-label="Fresh unsigned warmup checks"
     >
       <h6 ref={heading} tabIndex={-1}>
-        Fresh quote and simulation
+        Check the pending action
       </h6>
       <p>
         Preview the pending action using the original spending limits and finish
         time. Maximum three attempts, at least 30 seconds apart. No wallet is
         unlocked and no trade is sent.
       </p>
+      <fieldset
+        className={styles.modes}
+        disabled={busy || (!!marker && !previousFinished)}
+        aria-describedby={!eligible ? disabledDescription : undefined}
+      >
+        <legend>Choose a read-only check</legend>
+        <label className={styles.check}>
+          <input
+            type="radio"
+            name={'warmup-read-mode-' + journal.id}
+            checked={mode === 'preview'}
+            onChange={() => chooseMode('preview')}
+          />
+          <span>
+            <strong>Quote and simulation</strong>
+            <br />A basic unsigned preview of the exact pending action.
+          </span>
+        </label>
+        <label className={styles.check}>
+          <input
+            type="radio"
+            name={'warmup-read-mode-' + journal.id}
+            checked={mode === 'runtime'}
+            onChange={() => chooseMode('runtime')}
+          />
+          <span>
+            <strong>Runtime checks</strong>
+            <br />
+            Also check account state and spending limits, and record program
+            identity. No trading permission.
+          </span>
+        </label>
+      </fieldset>
       <label className={styles.check}>
         <input
           type="checkbox"
           checked={checked}
           disabled={!eligible}
-          onChange={(e) => setChecked(e.target.checked)}
+          aria-describedby={!eligible ? disabledDescription : undefined}
+          onChange={(e) => {
+            choiceVersion.current++;
+            setChecked(e.target.checked);
+          }}
         />
         <span>
-          Request this exact unsigned quote and simulation, and retain the
-          private unsigned packet for recovery.
+          {mode === 'runtime'
+            ? 'Request the exact runtime checks and retain their observations and private unsigned packet. This does not approve signing or a trade.'
+            : 'Request this exact unsigned quote and simulation, and retain the private unsigned packet for recovery.'}
         </span>
       </label>
-      <Button disabled={!eligible || !checked} onClick={() => void start()}>
-        {marker ? 'Request next unsigned attempt' : 'Request unsigned preview'}
+      <Button
+        disabled={!eligible || !checked}
+        aria-describedby={!eligible ? disabledDescription : undefined}
+        onClick={() => void start()}
+      >
+        {mode === 'runtime'
+          ? marker
+            ? 'Request next runtime check'
+            : 'Request runtime checks'
+          : marker
+            ? 'Request next unsigned attempt'
+            : 'Request unsigned preview'}
       </Button>
       {!eligible && (
-        <p>
+        <p id={disabledDescription}>
           {busy
-            ? 'Reading and recording this request. Pause and Stop remain available above.'
+            ? readingSaved
+              ? 'Reading saved records. Pause and Stop remain available above.'
+              : 'Checking and recording this request. Pause and Stop remain available above.'
             : journal.snapshot.phase === 'stopped'
               ? 'Session review is stopped. Saved-only recovery remains available; no new preview or trade can start.'
               : invalidated || now >= Date.parse(journal.sessionExpiresAt)
                 ? 'The original plan changed or finished. Recover its history; this session cannot request new previews.'
                 : maxed
                   ? 'All three attempts for this action are used. Recover history before reviewing a new plan.'
-                  : marker && !previousFinished
-                    ? 'Recover the original request first. A pending or unexpired request and its cooldown cannot be replaced.'
-                    : 'Begin the pending review first. Paused, stopped, changed or finished sessions cannot request new previews.'}
+                  : invalid
+                    ? 'The local recovery reminder needs attention. Recover this session before requesting another check.'
+                    : disabled
+                      ? 'A session history or control request is in progress. Wait for it before requesting another check.'
+                      : recoveredCurrent && !previousFinished
+                        ? 'This request is recovered. Its original expiry and shared cooldown must finish before another check. Recovering it again does not shorten that wait.'
+                        : saved && !recoveredCurrent
+                          ? 'This is an earlier saved result. Recover the current or newest request before another check.'
+                          : marker && !previousFinished
+                            ? 'Recover the original request first. A pending or unexpired request and its cooldown cannot be replaced.'
+                            : 'Begin the pending review first. Paused, stopped, changed or finished sessions cannot request new previews.'}
         </p>
       )}
       {marker && (
         <div className={styles.field}>
           <p>
-            Original request ID: <code>{marker.id}</code>
+            Saved mode:{' '}
+            {marker.mode === 'runtime'
+              ? 'Runtime checks'
+              : 'Quote and simulation'}
+            . Original request ID: <code>{marker.id}</code>
           </p>
           <Button
             variant="outline"
-            disabled={busy || invalid}
+            disabled={busy || invalid || loadedFor !== loadIdentity}
             onClick={() => void request(marker, 'GET')}
           >
             Recover unsigned request
@@ -481,7 +617,7 @@ export function WalletWarmupSessionV2Attempt({
           </p>
           <Button
             variant="outline"
-            disabled={busy || invalid}
+            disabled={busy || invalid || loadedFor !== loadIdentity}
             onClick={() => void request(hint, 'GET')}
           >
             Read earlier pending request
@@ -492,19 +628,43 @@ export function WalletWarmupSessionV2Attempt({
         <div className={styles.field}>
           <p>
             Attempt {saved.attempt} of 3 ·{' '}
-            {saved.outcome?.kind ?? 'Result not confirmed'}.
+            {saved.outcome?.kind === 'prepared'
+              ? readResult?.mode === 'runtime'
+                ? 'Runtime observations saved'
+                : 'Unsigned preview saved'
+              : saved.outcome?.kind === 'refused'
+                ? 'Check refused'
+                : 'Result not confirmed'}
+            .
           </p>
           <p>
             Original lease ends{' '}
-            {new Date(saved.leaseExpiresAt).toLocaleString()}. Earliest next
-            attempt {new Date(saved.nextAttemptAt).toLocaleString()}.
+            {new Date(saved.leaseExpiresAt).toLocaleString()}.
+            {recoveredCurrent ? (
+              <>
+                {' '}
+                Next check no earlier than{' '}
+                {new Date(nextAvailableAt!).toLocaleString()}.
+              </>
+            ) : (
+              ' Historical result only. Recover the current request for its timing.'
+            )}
           </p>
+          {readResult?.runtime?.observation && (
+            <p>
+              Shared request expiry:{' '}
+              {new Date(
+                saved.outcome?.expiresAt ?? saved.leaseExpiresAt,
+              ).toLocaleString()}
+              . The runtime observation below can expire sooner.
+            </p>
+          )}
           {saved.outcome?.kind === 'refused' && (
             <p>
               {saved.outcome.refusalCode === 'provider-limited'
                 ? 'Provider rate limit refused this attempt. Wait for the original cooldown.'
                 : saved.outcome.refusalCode === 'provider-unavailable'
-                  ? 'The quote or simulation service was unavailable. This attempt is retained; its original limits still apply.'
+                  ? 'A required provider read was unavailable. This attempt is retained; its original limits still apply.'
                   : 'Fresh evidence was refused. This attempt is retained; it did not authorize a trade.'}
             </p>
           )}
@@ -525,13 +685,55 @@ export function WalletWarmupSessionV2Attempt({
               <p>
                 Provisional fee and rent cap:{' '}
                 {formatNativeBalance(saved.preview.feeUpperBoundLamports, 9)}{' '}
-                SOL. Preview expires{' '}
-                {new Date(saved.outcome!.expiresAt).toLocaleString()}.
+                SOL.{' '}
+                {readResult?.mode === 'runtime'
+                  ? 'Runtime observations expire'
+                  : 'Preview expires'}{' '}
+                {new Date(
+                  readResult?.runtime?.effectiveExpiresAt ??
+                    saved.outcome!.expiresAt,
+                ).toLocaleString()}
+                .
               </p>
               <p>
-                Private packet retained. Simulation is not full instruction,
-                custody or signing clearance.
+                Private packet retained.{' '}
+                {readResult?.mode === 'runtime'
+                  ? 'Saved runtime observations do not grant signing or trading permission.'
+                  : 'Simulation is not full instruction, custody or signing clearance.'}
               </p>
+              {readResult?.runtime?.observation && (
+                <div className={styles.runtime}>
+                  <strong>
+                    {now >= Date.parse(readResult.runtime.effectiveExpiresAt!)
+                      ? 'Runtime checks expired. Saved history only.'
+                      : 'Runtime observations saved. No trade approved.'}
+                  </strong>
+                  <p>
+                    These observations do not check an independent price or
+                    establish trusted program code.
+                  </p>
+                  <p>
+                    A new request still waits for the original request expiry
+                    and shared cooldown. Recovery never renews these
+                    observations.
+                  </p>
+                  <details>
+                    <summary>View check coverage</summary>
+                    <p>
+                      Account observations span{' '}
+                      {readResult.runtime.observation.maximumSlot -
+                        readResult.runtime.observation.minimumSlot}{' '}
+                      of 32 slots. Both full code scans were observed for{' '}
+                      {readResult.runtime.observation.programCount} programs.
+                    </p>
+                    <p>
+                      Code chunks use context-slot floors, without a Clock read
+                      for each chunk. These records cannot approve a signature
+                      or trade.
+                    </p>
+                  </details>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -544,7 +746,7 @@ export function WalletWarmupSessionV2Attempt({
         </p>
         <Button
           variant="outline"
-          disabled={busy}
+          disabled={busy || loadedFor !== loadIdentity}
           onClick={() => void loadHistory(null)}
         >
           Find saved requests
@@ -560,14 +762,17 @@ export function WalletWarmupSessionV2Attempt({
               page.requests.map((row) => (
                 <div className={styles.field} key={row.id}>
                   <p>
-                    Attempt {row.attempt} ·{' '}
+                    {row.mode === 'runtime'
+                      ? 'Runtime checks'
+                      : 'Quote and simulation'}{' '}
+                    · Attempt {row.attempt} ·{' '}
                     {new Date(row.createdAt).toLocaleString()} ·{' '}
                     <code>{row.id}</code>
                   </p>
                   <Button
                     variant="outline"
-                    disabled={busy}
-                    onClick={() => void request(row.id, 'GET')}
+                    disabled={busy || loadedFor !== loadIdentity}
+                    onClick={() => void request(row.id, 'GET', row.mode)}
                   >
                     Recover saved attempt {row.attempt}
                   </Button>
@@ -577,7 +782,7 @@ export function WalletWarmupSessionV2Attempt({
             {page.nextBefore !== null && (
               <Button
                 variant="outline"
-                disabled={busy}
+                disabled={busy || loadedFor !== loadIdentity}
                 onClick={() => void loadHistory(page.nextBefore)}
               >
                 Older saved requests
@@ -601,7 +806,7 @@ export function WalletWarmupSessionV2Attempt({
               <Button
                 variant="outline"
                 key={archiveKey}
-                disabled={busy || invalid}
+                disabled={busy || invalid || loadedFor !== loadIdentity}
                 onClick={() => {
                   void (async () => {
                     try {
@@ -645,7 +850,9 @@ export function WalletWarmupSessionV2Attempt({
       )}
       {busy && (
         <output>
-          Read-only provider work is in progress. No signature or transaction.
+          {readingSaved
+            ? 'Reading saved records. No provider request or deadline renewal.'
+            : 'Read-only provider checks are in progress. No signature or transaction.'}
         </output>
       )}
       {error && <p role="alert">{error}</p>}

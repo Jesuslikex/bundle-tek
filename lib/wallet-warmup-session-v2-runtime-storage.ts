@@ -134,6 +134,13 @@ export async function readWarmupPurpose(
     )
     .bind(lease.owner_id, lease.id)
     .first();
+  return admitPurpose(raw, lease, mode);
+}
+async function admitPurpose(
+  raw: unknown,
+  lease: WarmupV2AttemptRow,
+  mode?: WarmupAttemptMode,
+) {
   if (!raw) {
     if (mode === 'runtime')
       throw new WalletWarmupV2AttemptError(
@@ -163,6 +170,34 @@ export async function readWarmupPurpose(
       lease.id,
     );
   return p;
+}
+/** At most one metadata page, one saved-only batch, no packet/provider reads. */
+export async function readWarmupPurposePage(
+  db: D1Database,
+  leases: WarmupV2AttemptRow[],
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  if (leases.length > 25) return fail();
+  if (!(await warmupRuntimeInstalled(db))) return leases.map(() => null);
+  if (!leases.length) return [];
+  const rows = await db.batch(
+    leases.map((lease) =>
+      db
+        .prepare(
+          'SELECT * FROM wallet_warmup_session_v2_attempt_purposes WHERE owner_id=? AND attempt_id=?',
+        )
+        .bind(lease.owner_id, lease.id),
+    ),
+  );
+  signal.throwIfAborted();
+  if (rows.length !== leases.length) return fail();
+  return Promise.all(
+    rows.map((row, index) => {
+      if (row.success !== true || row.results.length > 1) return fail();
+      return admitPurpose(row.results[0] ?? null, leases[index]);
+    }),
+  );
 }
 export async function requireActiveWarmupRuntimePurpose(
   db: D1Database,
