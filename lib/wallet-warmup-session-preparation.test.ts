@@ -29,15 +29,124 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 async function install(db: D1Database) {
-  for (const sql of readFileSync(
-    'drizzle/0128_wallet_warmup_session_preparations.sql',
-    'utf8',
-  )
-    .split('--> statement-breakpoint')
-    .map((s) => s.trim())
-    .filter(Boolean))
-    await db.prepare(sql).run();
+  for (const name of [
+    '0128_wallet_warmup_session_preparations',
+    '0129_wallet_warmup_session_packets',
+  ])
+    for (const sql of readFileSync(`drizzle/${name}.sql`, 'utf8')
+      .split('--> statement-breakpoint')
+      .map((s) => s.trim())
+      .filter(Boolean))
+      await db.prepare(sql).run();
 }
+it('retains exact unsigned bytes atomically and recovers after expiry without another quote', async () => {
+  const f = await fixture(),
+    request = input(f);
+  const quote = vi.fn(async () => ({
+    summary: structuredClone(f.packets.buy.preparation.document),
+    transaction: f.packets.buy.approval.transaction,
+  }));
+  const saved = await prepare(f.db, 'owner', request, signal(), quote, f.clock);
+  expect(saved.packet).toEqual({
+    transaction: f.packets.buy.approval.transaction,
+    sha256: f.packets.buy.preparation.document.transaction.sha256,
+  });
+  expect(await counts(f.db)).toEqual([1, 1, 3]);
+  await f.append('stop');
+  f.advance(120000);
+  expect(
+    await prepare(f.db, 'owner', request, signal(), quote, f.clock),
+  ).toEqual(saved);
+  expect(quote).toHaveBeenCalledTimes(1);
+  expect(await read(f.db, 'other', request.id, signal())).toBeNull();
+  for (const sql of [
+    "UPDATE wallet_warmup_session_packets SET unsigned_transaction='AAAA'",
+    'DELETE FROM wallet_warmup_session_packets',
+    'INSERT OR REPLACE INTO wallet_warmup_session_packets SELECT * FROM wallet_warmup_session_packets',
+  ])
+    await expect(f.db.prepare(sql).run()).rejects.toThrow();
+});
+it('rolls the preparation and binding back when the packet insert fails', async () => {
+  const f = await fixture();
+  await f.db
+    .prepare(
+      "CREATE TRIGGER fixture_packet_refusal BEFORE INSERT ON wallet_warmup_session_packets BEGIN SELECT RAISE(ABORT,'fixture refusal'); END",
+    )
+    .run();
+  await expect(
+    prepare(
+      f.db,
+      'owner',
+      input(f),
+      signal(),
+      async () => ({
+        summary: f.packets.buy.preparation.document,
+        transaction: f.packets.buy.approval.transaction,
+      }),
+      f.clock,
+    ),
+  ).rejects.toThrow('No saved preparation could be confirmed');
+  expect(await counts(f.db)).toEqual([0, 0, 2]);
+  expect(
+    await f.db
+      .prepare('SELECT count(*) AS n FROM wallet_warmup_session_packets')
+      .first(),
+  ).toEqual({ n: 0 });
+});
+it('recovers the original exact packet after the committed batch loses its response', async () => {
+  const f = await fixture(),
+    request = input(f);
+  const quote = vi.fn(async () => ({
+    summary: f.packets.buy.preparation.document,
+    transaction: f.packets.buy.approval.transaction,
+  }));
+  const db = {
+    prepare: f.db.prepare.bind(f.db),
+    batch: async (statements: Parameters<D1Database['batch']>[0]) => {
+      await f.db.batch(statements);
+      throw new Error('response lost');
+    },
+  } as unknown as D1Database;
+  const saved = await prepare(db, 'owner', request, signal(), quote, f.clock);
+  expect(saved.packet?.transaction).toBe(f.packets.buy.approval.transaction);
+  expect(await read(f.db, 'owner', request.id, signal())).toEqual(saved);
+  expect(quote).toHaveBeenCalledTimes(1);
+});
+it.each([
+  'signed',
+  'wrong-wallet',
+  'hash',
+  'bytes',
+  'instructions',
+  'lookups',
+  'malformed',
+] as const)(
+  'refuses %s packet material before saving any session state',
+  async (kind) => {
+    const f = await fixture(),
+      summary = structuredClone(f.packets.buy.preparation.document);
+    let transaction = f.packets.buy.approval.transaction;
+    if (kind === 'signed') transaction = f.packets.buy.raw.transaction[0];
+    if (kind === 'wrong-wallet')
+      summary.wallet = '11111111111111111111111111111111';
+    if (kind === 'hash') summary.transaction.sha256 = 'a'.repeat(64);
+    if (kind === 'bytes') summary.transaction.bytes++;
+    if (kind === 'instructions') summary.transaction.instructionCount++;
+    if (kind === 'lookups') summary.transaction.lookupTableCount++;
+    if (kind === 'malformed') transaction = 'AAAA';
+    await expect(
+      prepare(
+        f.db,
+        'owner',
+        input(f),
+        signal(),
+        async () => ({ summary, transaction }),
+        f.clock,
+      ),
+    ).rejects.toThrow();
+    expect(await counts(f.db)).toEqual([0, 0, 2]);
+  },
+);
 async function fixture() {
   const f = await warmupSessionSettlementStorageFixture('0.01', {
     reviewOnly: true,
@@ -149,6 +258,50 @@ it('creates the action-owned preparation and binding in one INSERT and recovers 
   expect(quote).toHaveBeenCalledTimes(1);
   expect(writes).toBe(1);
   expect(await read(f.db, 'other', request.id, signal())).toBeNull();
+});
+it('refuses corrupted packet bytes on saved-only recovery even if its SQL guard was bypassed', async () => {
+  const f = await fixture(),
+    request = input(f);
+  await prepare(
+    f.db,
+    'owner',
+    request,
+    signal(),
+    async () => ({
+      summary: f.packets.buy.preparation.document,
+      transaction: f.packets.buy.approval.transaction,
+    }),
+    f.clock,
+  );
+  await f.db
+    .prepare('DROP TRIGGER wallet_warmup_session_packets_no_update')
+    .run();
+  await f.db
+    .prepare(
+      "UPDATE wallet_warmup_session_packets SET unsigned_transaction='AAAA'",
+    )
+    .run();
+  await expect(read(f.db, 'owner', request.id, signal())).rejects.toThrow(
+    'retained unsigned session packet',
+  );
+});
+it('withholds material when packet storage guards are missing without retaining a partial preparation', async () => {
+  const f = await fixture();
+  await f.db.prepare('DROP TRIGGER wallet_warmup_session_packets_insert').run();
+  await expect(
+    prepare(
+      f.db,
+      'owner',
+      input(f),
+      signal(),
+      async () => ({
+        summary: f.packets.buy.preparation.document,
+        transaction: f.packets.buy.approval.transaction,
+      }),
+      f.clock,
+    ),
+  ).rejects.toThrow('retained unsigned session packet');
+  expect(await counts(f.db)).toEqual([0, 0, 2]);
 });
 it('refuses a second ID for a bound action before invoking a preparation callback', async () => {
   const f = await fixture(),

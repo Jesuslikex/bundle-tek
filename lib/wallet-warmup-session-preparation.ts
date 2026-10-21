@@ -10,6 +10,11 @@ import {
 } from './warmup-preparation-history';
 import type { WarmupSessionAction } from './wallet-warmup-session-review';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
+import {
+  readWalletWarmupSessionPacket,
+  walletWarmupSessionPacketStatement,
+  type WarmupSessionPacketMaterial,
+} from './wallet-warmup-session-packet';
 
 const uuid = z.uuid().refine((v) => v === v.toLowerCase()),
   hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -80,7 +85,7 @@ async function parse(row: Row) {
   if ((await digest(canonical(facts))) !== record_sha256) fail(undefined, 503);
   return value;
 }
-/** Server-internal recovery only. No private transaction, authorization or runtime grant. */
+/** Server-internal recovery, including retained unsigned bytes when present. No authority. */
 export async function readWalletWarmupSessionPreparation(
   db: D1Database,
   owner: string,
@@ -142,6 +147,14 @@ export async function readWalletWarmupSessionPreparation(
     fail(undefined, 503);
   return {
     identity: row,
+    packet: await readWalletWarmupSessionPacket(
+      db,
+      owner,
+      id,
+      row.record_sha256,
+      JSON.parse(row.preparation_document) as WarmupPreparationSummary,
+      signal,
+    ),
     preparation: {
       id,
       planId: row.plan_id,
@@ -213,8 +226,9 @@ async function recoverBeforeRefusal(
 }
 /**
  * A trusted server callback prepares the exact derived action without persisting
- * anything. One INSERT then creates its preparation AND immutable binding via
- * triggers. Never accept the callback/document from an HTTP request.
+ * anything. One INSERT creates its preparation AND immutable binding via
+ * triggers. Packet material adds its insert in the same atomic write batch.
+ * Never accept the callback/document from an HTTP request.
  */
 export async function prepareWalletWarmupSessionAction(
   db: D1Database,
@@ -224,7 +238,7 @@ export async function prepareWalletWarmupSessionAction(
   prepare: (
     candidate: Candidate,
     signal: AbortSignal,
-  ) => Promise<WarmupPreparationSummary>,
+  ) => Promise<WarmupPreparationSummary | WarmupSessionPacketMaterial>,
   clock: () => number = Date.now,
 ) {
   ownerId(owner);
@@ -367,11 +381,12 @@ export async function prepareWalletWarmupSessionAction(
     }
   }
   signal.throwIfAborted();
-  const document = await prepare(
+  const material = await prepare(
     structuredClone({ action, sellSource }),
     signal,
   );
   signal.throwIfAborted();
+  const document = 'summary' in material ? material.summary : material;
   const text = warmupPreparationHistoryDocument(
     {
       planId: journal.plan.id,
@@ -422,9 +437,20 @@ export async function prepareWalletWarmupSessionAction(
     ...facts,
     record_sha256: await digest(canonical(facts)),
   });
+  const packetStatement =
+    'summary' in material
+      ? await walletWarmupSessionPacketStatement(
+          db,
+          owner,
+          input.id,
+          row.record_sha256,
+          material.transaction,
+          document,
+        )
+      : null;
   signal.throwIfAborted();
   try {
-    await db
+    const statement = db
       .prepare(
         'INSERT INTO wallet_warmup_session_preparations(owner_id,preparation_id,journal_id,action_id,review_version,review_sha256,plan_id,plan_revision,cycle,wallet_address,wallet_revision,preparation_document,plan_document,created_at,binding_sha256,record_sha256) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       )
@@ -445,8 +471,11 @@ export async function prepareWalletWarmupSessionAction(
         row.created_at,
         row.binding_sha256,
         row.record_sha256,
-      )
-      .run();
+      );
+    // Turso write batches and D1 batch are transactional. A packet refusal rolls
+    // back the preparation, its binding and every trigger-created parent row.
+    if (packetStatement) await db.batch([statement, packetStatement]);
+    else await statement.run();
   } catch {
     /* Unknown outcome: one original-ID recovery, never another INSERT/callback. */
   }
