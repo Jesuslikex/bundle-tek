@@ -157,6 +157,31 @@ export async function readWalletWarmupSessionPreparation(
     automaticExecutionAllowed: false as const,
   };
 }
+async function refuseExistingBinding(
+  db: D1Database,
+  owner: string,
+  binding: Awaited<ReturnType<typeof readWalletWarmupSessionActionBinding>>,
+  signal: AbortSignal,
+): Promise<never> {
+  const retained = binding
+    ? await readWalletWarmupSessionPreparation(
+        db,
+        owner,
+        binding.preparation_id,
+        signal,
+      )
+    : null;
+  if (binding && !retained)
+    fail(
+      'An earlier journal binding has no action-owned preparation record. Recover that binding; do not create a replacement.',
+      409,
+    );
+  return fail(
+    'This action already has a preparation or needs original-ID recovery.',
+    409,
+    retained?.preparation.id,
+  );
+}
 /**
  * A trusted server callback prepares the exact derived action without persisting
  * anything. One INSERT then creates its preparation AND immutable binding via
@@ -219,12 +244,7 @@ export async function prepareWalletWarmupSessionAction(
     pending.action.id,
     signal,
   );
-  if (existing)
-    fail(
-      'This action already has a preparation. Recover its original ID.',
-      409,
-      existing.preparation_id,
-    );
+  if (existing) return refuseExistingBinding(db, owner, existing, signal);
   const plan = await db
     .prepare(
       'SELECT document FROM wallet_warmup_plans WHERE owner_id=? AND id=? AND revision=? AND archived=0',
@@ -359,7 +379,7 @@ export async function prepareWalletWarmupSessionAction(
       action.id,
       signal,
     );
-    fail(undefined, 409, conflict?.preparation_id);
+    return refuseExistingBinding(db, owner, conflict, signal);
   }
   const {
     created_at: _savedAt,

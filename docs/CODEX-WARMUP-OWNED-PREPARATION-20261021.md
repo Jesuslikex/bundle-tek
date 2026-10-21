@@ -10,7 +10,7 @@ Additive migration0128 retains an immutable owner/journal/action/preparation ide
 
 The original JavaScript history validator was extracted and reused. Its input/cycle/wallet/mint/amount and false-capability checks, and the manual writer's existing SQL, remain in place. The new trigger keeps the same4000-record history capacity and uses the database clock for expiry. This history limit is not a spending or signing permission.
 
-The record and original session-owned preparation are immutable, including replacement paths. Exact same-ID reads recover after expiry, archival or Stop without another callback or INSERT; the record, preparation and binding must still agree. Two identical concurrent writes recover the admitted identity despite differing timestamps, while distinct IDs racing for an action return the original winner's ID. Cancellation after commit preserves original-ID recovery. No write retry, replacement quote or signature is made.
+The record and original session-owned preparation are immutable, including replacement paths. Exact same-ID reads recover after expiry, archival or Stop without another callback or INSERT; the record, preparation and binding must still agree. Two identical concurrent writes recover the admitted identity despite differing timestamps, while distinct IDs racing for an action return the original winner's ID. If an earlier bare binding has no action-owned preparation record, the service holds the action with explicit recovery guidance; it never offers a nonexistent owned-record GET ID. Both initial and insertion-time legacy races are tested. Cancellation after commit preserves original-ID recovery. No write retry, replacement quote or signature is made.
 
 ## Manual signing isolation
 
@@ -20,9 +20,9 @@ No session intent/signing path is introduced. The actual session-owned preparati
 
 ## Verification
 
-- 535 tests across23 related files pass together. This includes24 new native SQLite/parser/real Request-Response cases,40 existing plan/quote/preparation/buy-to-sell cases and4 existing signing/failure/recovery cases. The four native vault/external/restored buy-to-sell cases use controlled RPC and synthetic keys; none are funded tests.
+- Final537 tests across23 related files pass together. This includes26 new native SQLite/parser/real Request-Response cases,40 existing plan/quote/preparation/buy-to-sell cases and4 existing signing/failure/recovery cases. The four native vault/external/restored buy-to-sell cases use controlled RPC and synthetic keys; none are funded tests. Initial535-test candidate was superseded after Codex's legacy-recovery clarification.
 - New cases exercise atomic creation, no adoption of an existing preparation, action-derived Buy/Sell context, history-cap zero-row rollback, Stop/plan/wallet/guard races, failed-simulation rollback, owner isolation, exact recovery, lost response/cancel, concurrent same/different IDs, immutability/replacement, direct SQL intent refusal, and actual manual review/register/submit409 responses without provider calls.
-- Full plain TypeScript, five-file typed lint/format and unchanged2690file source snapshot pass. Snapshot digest `7e3a727dfc0422e463923080cc35eb62696615d1f341e57b06140692bea31580`.
+- Full plain TypeScript, scoped typed lint/format and unchanged2690file source snapshot pass. Final snapshot digest `ad7bf2d4479e8888e6e184e0a19474a86d49aea9159f96b3da5e5db0653a55aa`. Five-file lint passed on the initial candidate, and both changed service/test files were linted again with a full TypeScript rerun after the recovery clarification.
 - All129 migrations apply with matching ledger/checksums in fresh disposable databases using both the native runner and real whole-file Wrangler command. Final Wrangler scratch: `bundle-wrangler-migrations-ZaoXP1`. No historical migration was edited.
 - No full repository suite, build, mounted-session-preparation API/UI, rendered Bundle flow or live-provider qualification is claimed. This checkpoint has not yet received its own completed Opus review.
 

@@ -10,6 +10,7 @@ import {
 import { retainWalletWarmupSessionSettlement } from './wallet-warmup-session-settlement-storage';
 import { isSessionBoundWarmupPreparation } from './warmup-session-preparation-scope';
 import { WARMUP_HISTORY_LIMIT } from './warmup-history-capacity';
+import { retainWalletWarmupSessionActionBinding } from './wallet-warmup-session-action-binding';
 const mocks = vi.hoisted(() => ({
   db: null as unknown as D1Database,
   user: { userId: 'owner' } as { userId: string } | null,
@@ -170,6 +171,44 @@ it('never adopts a preparation that already exists', async () => {
   ).rejects.toThrow();
   expect(await counts(f.db)).toEqual([0, 0, 2]);
 });
+
+it.each(['before', 'write-boundary'])(
+  'does not offer a missing owned-record recovery ID for a legacy binding %s',
+  async (when) => {
+    const f = await fixture(),
+      quote = callback(f);
+    const bindLegacy = () =>
+      retainWalletWarmupSessionActionBinding(
+        f.db,
+        'owner',
+        {
+          journalId: f.journal.id,
+          version: f.journal.version,
+          headSha256: f.journal.headSha256,
+          preparationId: f.packets.buy.preparation.id,
+        },
+        signal(),
+        f.clock,
+      );
+    if (when === 'before') await bindLegacy();
+    const db =
+      when === 'before'
+        ? f.db
+        : intercept(f.db, async (run) => {
+            await bindLegacy();
+            return run();
+          });
+    await expect(
+      prepare(db, 'owner', input(f), signal(), quote, f.clock),
+    ).rejects.toMatchObject({
+      status: 409,
+      recoveryId: undefined,
+      message: expect.stringContaining('no action-owned preparation record'),
+    });
+    expect(quote).toHaveBeenCalledTimes(when === 'before' ? 0 : 1);
+    expect(await counts(f.db)).toEqual([0, 1, 2]);
+  },
+);
 it.each(['stop', 'plan', 'wallet', 'binding-guard'])(
   'rolls back both preparation and ownership on insertion-time %s drift',
   async (kind) => {
