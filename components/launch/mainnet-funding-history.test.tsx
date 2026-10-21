@@ -125,7 +125,7 @@ it('loads on open, shows unresolved progress and exact finalized delivery, and p
   await respond(0, first);
   expect(container.textContent).toContain('Archived draft');
   expect(container.textContent).toContain(
-    '0 verified deliveries · 1 unresolved',
+    '0 verified deliveries for direct routes · 0 verified proxy-leg transfers · 1 unresolved steps',
   );
   expect(container.textContent).toContain('recipient received 0.01 SOL');
   expect(container.textContent).toContain(
@@ -250,4 +250,122 @@ it('rejects noncanonical and overflowing atomic units in fetched DTOs', () => {
       null,
     ),
   ).not.toThrow();
+});
+it('names a proxy leg receipt without counting it as final allocation delivery', async () => {
+  await click('Open mainnet');
+  const leg = {
+    ...record(1, 2),
+    funding: { ...record(1, 2).funding, leg: 1 },
+    state: 'finalized' as const,
+    signature: 'synthetic-signature',
+    receipt: {
+      slot: 100,
+      observedAt: '2026-10-12T23:59:59.000Z',
+      deliveredRaw: '10000000',
+      networkFeeLamports: '5000',
+      accountRentLamports: '0',
+      transferFeeRaw: null,
+    },
+  };
+  const history = page([leg]);
+  history.progress.records = [leg];
+  await respond(0, history);
+  expect(container.textContent).toContain('Proxy leg 1');
+  expect(container.textContent).toContain(
+    '0 verified deliveries for direct routes',
+  );
+  expect(container.textContent).toContain('1 verified proxy-leg transfer');
+  expect(container.textContent).toContain(
+    'Finalized proxy-leg transfer verified',
+  );
+  expect(container.textContent).toContain('does not by itself prove');
+});
+it('pages all400 route steps locally while keeping full-scope counts and exact focus', async () => {
+  await click('Open mainnet');
+  const history = page([]);
+  history.progress.records = Array.from({ length: 400 }, (_, i) => ({
+    ...record(i + 1, 2),
+    funding: {
+      ...record(i + 1, 2).funding,
+      item: Math.floor(i / 4) + 1,
+      leg: (i % 4) + 1,
+    },
+  }));
+  await respond(0, history);
+  const rows = () =>
+    container.querySelectorAll(
+      'ul[aria-label="Mainnet recipient progress"] > li',
+    );
+  const status = container.querySelector(
+    'output[aria-label="Mainnet route progress page"]',
+  );
+  expect(rows()).toHaveLength(25);
+  expect(status?.textContent).toContain('25 of 400');
+  expect(container.textContent).toContain('400 unresolved steps');
+  for (let n = 2; n <= 16; n++) {
+    await click('Next route steps');
+    expect(document.activeElement).toBe(status);
+    expect(status?.textContent).toContain(`page ${n} of 16`);
+    expect(rows()).toHaveLength(25);
+  }
+  expect(rows()[24].textContent).toContain('Recipient 100');
+  expect(rows()[24].textContent).toContain('Proxy leg 4');
+  expect(
+    [...container.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Next route steps',
+    )?.disabled,
+  ).toBe(true);
+  await click('Previous route steps');
+  expect(status?.textContent).toContain('page 15 of 16');
+  expect(document.activeElement).toBe(status);
+  expect(requests).toHaveLength(1);
+});
+it('keeps captured transitions visible without zero-delivery claims when progress is unavailable', async () => {
+  await click('Open mainnet');
+  const history = page([record(1)]);
+  history.progress = { revision: 2, records: null, unavailable: true };
+  await respond(0, history);
+  expect(
+    container.querySelectorAll(
+      'ol[aria-label="Mainnet funding transitions"] li',
+    ),
+  ).toHaveLength(1);
+  expect(container.textContent).toContain('Route-step summary is unavailable');
+  expect(container.textContent).not.toContain('0 verified deliveries');
+  expect(
+    container.querySelector('ul[aria-label="Mainnet recipient progress"]'),
+  ).toBeNull();
+  expect(
+    container.querySelector('output[aria-label="Mainnet route progress page"]'),
+  ).toBeNull();
+});
+it('separates direct deliveries and proxy transfers in a mixed revision', async () => {
+  await click('Open mainnet');
+  const receipt = {
+    slot: 100,
+    observedAt: '2026-10-12T23:59:59.000Z',
+    deliveredRaw: '10000000',
+    networkFeeLamports: '5000',
+    accountRentLamports: '0',
+    transferFeeRaw: null,
+  };
+  const proxy = {
+    ...record(1, 2),
+    state: 'finalized' as const,
+    funding: { ...record(1, 2).funding, leg: 1 },
+    receipt,
+  };
+  const direct = {
+    ...record(2, 2),
+    state: 'finalized' as const,
+    funding: { ...record(2, 2).funding, item: 2 },
+    receipt,
+  };
+  const history = page([]);
+  history.progress.records = [proxy, direct];
+  await respond(0, history);
+  expect(container.textContent).toContain(
+    '1 verified deliveries for direct routes',
+  );
+  expect(container.textContent).toContain('1 verified proxy-leg transfers');
 });

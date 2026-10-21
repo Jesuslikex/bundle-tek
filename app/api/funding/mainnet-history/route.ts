@@ -4,6 +4,9 @@ import {
   mainnetFundingHistoryCursor,
   readMainnetFundingHistoryCursor,
   decodeMainnetFundingHistory,
+  MAINNET_FUNDING_PROGRESS_LIMIT,
+  decodeMainnetFundingProgress,
+  type MainnetFundingProgress,
 } from '@/lib/mainnet-funding-history';
 import { mainnetFundingHistoryRecord } from '@/lib/mainnet-funding-history-server';
 import type { NativeWithdrawal } from '@/lib/native-withdrawal';
@@ -102,7 +105,7 @@ export async function GET(request: Request) {
     if (sequence !== null && !anchor)
       return json({ error: 'Mainnet funding cursor unavailable.' }, 400);
     const progressRevision = revision ?? saved.revision;
-    const [history, progress] = await Promise.all([
+    const [historyResult, progressResult] = await Promise.allSettled([
       db
         .prepare(
           `SELECT ${columns} FROM ${from} WHERE ${scope} AND (? IS NULL OR e.created_at<? OR (e.created_at=? AND e.sequence<?)) ORDER BY e.created_at DESC,e.sequence DESC LIMIT 51`,
@@ -120,17 +123,39 @@ export async function GET(request: Request) {
         .all<Row>(),
       db
         .prepare(
-          `SELECT ${columns} FROM ${from} WHERE ${scope} AND e.sequence=(SELECT MAX(last.sequence) FROM native_withdrawal_events last WHERE last.owner_id=w.owner_id AND last.intent_id=w.id AND last.wallet_address=w.wallet_address) AND NOT EXISTS(SELECT 1 FROM native_withdrawals newer WHERE newer.owner_id=w.owner_id AND json_extract(newer.document,'$.funding.planId')=json_extract(w.document,'$.funding.planId') AND json_extract(newer.document,'$.funding.revision')=json_extract(w.document,'$.funding.revision') AND json_extract(newer.document,'$.funding.item')=json_extract(w.document,'$.funding.item') AND (newer.created_at>w.created_at OR (newer.created_at=w.created_at AND newer.id>w.id))) ORDER BY json_extract(w.document,'$.funding.item') LIMIT 101`,
+          `SELECT ${columns} FROM ${from} WHERE ${scope} AND e.sequence=(SELECT MAX(last.sequence) FROM native_withdrawal_events last WHERE last.owner_id=w.owner_id AND last.intent_id=w.id AND last.wallet_address=w.wallet_address) AND NOT EXISTS(SELECT 1 FROM native_withdrawals newer WHERE newer.owner_id=w.owner_id AND json_extract(newer.document,'$.funding.planId')=json_extract(w.document,'$.funding.planId') AND json_extract(newer.document,'$.funding.revision')=json_extract(w.document,'$.funding.revision') AND json_extract(newer.document,'$.funding.item')=json_extract(w.document,'$.funding.item') AND json_extract(newer.document,'$.funding.leg') IS json_extract(w.document,'$.funding.leg') AND (newer.created_at>w.created_at OR (newer.created_at=w.created_at AND newer.id>w.id))) ORDER BY json_extract(w.document,'$.funding.item'),COALESCE(json_extract(w.document,'$.funding.leg'),0) LIMIT ${MAINNET_FUNDING_PROGRESS_LIMIT + 1}`,
         )
         .bind(user.userId, id, progressRevision, progressRevision)
         .all<Row>(),
     ]);
+    if (historyResult.status !== 'fulfilled')
+      throw new Error('History storage unavailable.');
+    const history = historyResult.value;
     const events = await Promise.all(
       history.results.slice(0, 50).map((row) => project(row, id!, revision)),
     );
-    const records = await Promise.all(
-      progress.results.map((row) => project(row, id!, progressRevision)),
-    );
+    let progress: MainnetFundingProgress;
+    try {
+      if (progressResult.status !== 'fulfilled')
+        throw new Error('Progress storage unavailable.');
+      const records = await Promise.all(
+        progressResult.value.results.map((row) =>
+          project(row, id!, progressRevision),
+        ),
+      );
+      progress = decodeMainnetFundingProgress(
+        { revision: progressRevision, records },
+        id!,
+        progressRevision,
+      );
+    } catch {
+      // An unavailable summary is not an empty/zero-delivery summary.
+      progress = {
+        revision: progressRevision,
+        records: null,
+        unavailable: true,
+      };
+    }
     return json(
       decodeMainnetFundingHistory(
         {
@@ -141,7 +166,7 @@ export async function GET(request: Request) {
           revision,
           executionAllowed: false,
           events,
-          progress: { revision: progressRevision, records },
+          progress,
           nextCursor:
             history.results.length > 50
               ? mainnetFundingHistoryCursor(

@@ -1,0 +1,143 @@
+{
+  "base": "78c14cc0c75fd19d2093b0ad4719f28123db539e",
+  "sourceOnly": true,
+  "scope": "proxy funding history leg coverage and uncertain-summary recovery",
+  "executionAllowed": false,
+  "baseline": {
+    "existingPasses": 19,
+    "newFailures": 2,
+    "confirmed": "Latest recipient-only grouping hid other legs; proxy receipt lacked correct label/count scope."
+  },
+  "tests": {
+    "files": 42,
+    "passed": 499,
+    "failed": 0,
+    "skipped": 0
+  },
+  "selectedExistingFinancialPolicyTests": {
+    "passed": 2,
+    "failed": 0,
+    "unselected": 21
+  },
+  "plainTypeScriptPassed": true,
+  "typedLintFiles": 7,
+  "formatFiles": 7,
+  "isolatedBuild": {
+    "base": "78c14cc0c75fd19d2093b0ad4719f28123db539e",
+    "overlays": [
+      "app/api/funding/mainnet-history/route.ts",
+      "app/api/funding/mainnet-history/route.test.ts",
+      "lib/mainnet-funding-history.ts",
+      "lib/mainnet-funding-history-legs.test.ts",
+      "test/mainnet-funding-leg-history-fixture.ts",
+      "components/launch/mainnet-funding-history.tsx",
+      "components/launch/mainnet-funding-history.test.tsx"
+    ],
+    "hashes": {
+      "app/api/funding/mainnet-history/route.ts": "df2e0d0e5281c7b492c49cafc574331cce242d9ce6502702e0348346d2d58b73",
+      "app/api/funding/mainnet-history/route.test.ts": "eea27650a69925bbc90f5ce9b2d5b57622205eae87fab82834303f9ce72b18bb",
+      "lib/mainnet-funding-history.ts": "dc8abfa6b44c5dbb912ab17cda607f7ef7fbad9a38e132b211e59224cd719d0d",
+      "lib/mainnet-funding-history-legs.test.ts": "0cd508e7de76356c0c4e01d371794a65ab7682ab761cfebf56c3997a6dd2ad12",
+      "test/mainnet-funding-leg-history-fixture.ts": "93708287f048b44d9945a0bd3fafecd85b02f114039a0709e286d537993f738b",
+      "components/launch/mainnet-funding-history.tsx": "2d6fd06757b59bf65fc6f25b2739c4c08039bdc2c1813206de25d98402a8b071",
+      "components/launch/mainnet-funding-history.test.tsx": "899aa687de10a4a8c73654819d356e9f0b6e912988b18f0fb67341ab50c74838"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "opusReviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    }
+  ],
+  "runtimeMatchesFollowup": [
+    "app/api/funding/mainnet-history/route.ts",
+    "lib/mainnet-funding-history.ts",
+    "components/launch/mainnet-funding-history.tsx"
+  ],
+  "postFollowupDelta": [
+    "app/api/funding/mainnet-history/route.test.ts"
+  ],
+  "postReviewDeltaScope": "Optional local-only test timing diagnostics, independently tested; no production runtime delta.",
+  "sourceFreeze": {
+    "selectedFiles": 2376,
+    "unchanged": true,
+    "sha256": "de5323a6ae42e6b080f82cb676c310dc922ace026edb5e45e6e88f051d23429e"
+  },
+  "limits": {
+    "recipients": 100,
+    "proxyLegsPerRecipient": 4,
+    "progressRows": 400,
+    "queryOverflowSentinel": 401,
+    "transitionPageRows": 50,
+    "localProgressPageRows": 25
+  },
+  "capacityProof": "Actual owned GET/local D1/all source migrations, canonical unsigned packet and captured terms per step; batched insert/cancel pairs preserve wallet reservation/event triggers.400cancelled fixture steps prove history coverage, not execution.",
+  "localCapacityTiming": {
+    "rows": 400,
+    "fixtureMs": 36285.8955,
+    "firstReadMs": 645.5354999999981,
+    "olderReadMs": 715.8151999999973,
+    "scope": "local synthetic history only, not a live latency qualification"
+  },
+  "summaryUnavailable": {
+    "records": null,
+    "unavailable": true,
+    "countsWithheld": true,
+    "validEventsRemainReadable": true,
+    "invalidEventsStillRefuse": true,
+    "legacyArrayDecodersRejectNull": true
+  },
+  "finalizedRepeatGuard": "Existing pre-provider and atomic insert predicates in withdrawal handler already block new attempts for finalized explicit legs; no guard change.",
+  "readiness": "Latest-attempt summary is not an execution ledger, final-allocation proof for proxy routes, or new transfer permission.",
+  "financialAndReceiptSourcesUnchanged": [
+    "app/api/wallet-workspace/withdrawals/route.ts",
+    "lib/mainnet-funding.ts",
+    "lib/mainnet-funding-server.ts",
+    "lib/mainnet-funding-history-server.ts",
+    "lib/native-withdrawal.ts",
+    "lib/native-withdrawal-server.ts",
+    "lib/token-withdrawal-server.ts",
+    "components/native-withdrawal-panel.tsx",
+    "components/launch/mainnet-funding-execution.tsx"
+  ],
+  "reference": "https://docs.proxima.tools/create-launch/funding/",
+  "browser": "Live UI remains unverified after desktop URL-policy stop; no bypass.",
+  "applicationOrHostedSql": false,
+  "migrationsChanged": false,
+  "providerCredentialsCronChanged": false,
+  "realWalletUnlockSignSendOrFundedTest": false,
+  "deployed": false
+}

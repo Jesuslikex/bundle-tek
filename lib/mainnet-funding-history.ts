@@ -1,4 +1,5 @@
 import type { FundingCapture } from './mainnet-funding';
+import { validatedFundingCapture } from './mainnet-funding';
 import type { NativeWithdrawal } from './native-withdrawal';
 
 export type MainnetFundingRecord = {
@@ -42,9 +43,19 @@ export type MainnetFundingHistory = {
   revision: number | null;
   executionAllowed: false;
   events: MainnetFundingRecord[];
-  progress: { revision: number; records: MainnetFundingRecord[] };
+  progress: MainnetFundingProgress;
   nextCursor: string | null;
 };
+export type MainnetFundingProgress =
+  | { revision: number; records: MainnetFundingRecord[]; unavailable?: false }
+  | { revision: number; records: null; unavailable: true };
+// Up to100 saved recipients, each direct or with at most3 proxies (4 legs).
+export const MAINNET_FUNDING_PROGRESS_LIMIT = 400;
+export function mainnetFundingProgressKey(
+  record: Pick<MainnetFundingRecord, 'funding'>,
+) {
+  return `${record.funding.item}:${record.funding.leg ?? 'direct'}`;
+}
 
 export function mainnetFundingHistoryCursor(
   id: string,
@@ -89,6 +100,7 @@ function recordContext(
   id: string,
   revision: number | null,
 ) {
+  validatedFundingCapture(record?.funding);
   if (
     !record ||
     !Number.isSafeInteger(record.sequence) ||
@@ -144,6 +156,8 @@ function recordContext(
         record.failure !== null))
   )
     throw new Error('Mainnet funding history context differs.');
+  if (record.funding.leg !== undefined && record.asset.kind !== 'native')
+    throw new Error('Proxy funding legs require native SOL evidence.');
   for (const outcome of [record.receipt, record.failure])
     if (
       outcome &&
@@ -165,6 +179,45 @@ function recordContext(
   )
     throw new Error('Mainnet funding receipt differs.');
 }
+export function decodeMainnetFundingProgress(
+  value: unknown,
+  id: string,
+  revision: number,
+): MainnetFundingProgress {
+  const progress = value as MainnetFundingProgress;
+  if (!progress || progress.revision !== revision)
+    throw new Error('Funding progress scope differs.');
+  if (progress.unavailable === true) {
+    if (progress.records !== null)
+      throw new Error('Unavailable funding progress must withhold all counts.');
+    return progress;
+  }
+  if (
+    (progress.unavailable !== undefined && progress.unavailable !== false) ||
+    !Array.isArray(progress.records) ||
+    progress.records.length > MAINNET_FUNDING_PROGRESS_LIMIT
+  )
+    throw new Error('Funding progress unavailable.');
+  const records = progress.records;
+  records.forEach((record) => recordContext(record, id, revision));
+  if (
+    new Set(records.map(mainnetFundingProgressKey)).size !== records.length ||
+    new Set(records.map((record) => record.sequence)).size !== records.length ||
+    new Set(records.map((record) => record.withdrawalId)).size !==
+      records.length ||
+    new Set(records.map((record) => record.funding.termsSha256)).size > 1
+  )
+    throw new Error('Duplicate or inconsistent funding progress.');
+  const forms = new Map<number, boolean>();
+  for (const record of records) {
+    const explicit = record.funding.leg !== undefined,
+      item = record.funding.item;
+    if (forms.has(item) && forms.get(item) !== explicit)
+      throw new Error('Mixed direct and proxy funding progress.');
+    forms.set(item, explicit);
+  }
+  return progress;
+}
 export function decodeMainnetFundingHistory(
   value: unknown,
   id: string,
@@ -182,22 +235,18 @@ export function decodeMainnetFundingHistory(
     page.currentRevision < 1 ||
     !Array.isArray(page.events) ||
     page.events.length > 50 ||
-    !page.progress ||
-    page.progress.revision !== (revision ?? page.currentRevision) ||
-    !Array.isArray(page.progress.records) ||
-    page.progress.records.length > 100 ||
     !(page.nextCursor === null || typeof page.nextCursor === 'string')
   )
     throw new Error('Mainnet funding history unavailable or context differs.');
   page.events.forEach((record) => recordContext(record, id, revision));
-  page.progress.records.forEach((record) =>
-    recordContext(record, id, page.progress.revision),
+  decodeMainnetFundingProgress(
+    page.progress,
+    id,
+    revision ?? page.currentRevision,
   );
   if (
     new Set(page.events.map((event) => event.sequence)).size !==
-      page.events.length ||
-    new Set(page.progress.records.map((record) => record.funding.item)).size !==
-      page.progress.records.length
+    page.events.length
   )
     throw new Error('Duplicate mainnet funding history context.');
   if (page.nextCursor !== null)
@@ -217,7 +266,10 @@ export function mainnetFundingStateLabel(state: NativeWithdrawal['state']) {
   }[state];
 }
 export function mainnetFundingRecordLabel(record: MainnetFundingRecord) {
-  if (record.receipt) return 'Finalized delivery verified';
+  if (record.receipt)
+    return record.funding.leg === undefined
+      ? 'Finalized delivery verified'
+      : 'Finalized proxy-leg transfer verified';
   if (record.failure) return 'Finalized execution failure verified';
   return mainnetFundingStateLabel(record.state);
 }

@@ -5,6 +5,7 @@ import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import {
   decodeMainnetFundingHistory,
   mainnetFundingRecordLabel,
+  mainnetFundingProgressKey,
   type MainnetFundingHistory,
   type MainnetFundingRecord,
 } from '@/lib/mainnet-funding-history';
@@ -15,8 +16,17 @@ function FundingRecord({ record }: { record: MainnetFundingRecord }) {
     <details>
       <summary>
         Recipient {record.funding.item} · revision {record.funding.revision} ·{' '}
+        {record.funding.leg !== undefined && (
+          <>Proxy leg {record.funding.leg} · </>
+        )}
         {mainnetFundingRecordLabel(record)}
       </summary>
+      {record.funding.leg !== undefined && (
+        <p>
+          This record describes one proxy-route transfer. Its receipt does not
+          by itself prove that the final allocation reached its intended wallet.
+        </p>
+      )}
       <p>
         {record.amount} {units} requested from {record.wallet} to{' '}
         {record.recipient}.
@@ -50,7 +60,11 @@ function FundingRecord({ record }: { record: MainnetFundingRecord }) {
       )}
       {record.receipt ? (
         <p>
-          Verified finalized slot {record.receipt.slot} · recipient received{' '}
+          Verified finalized slot {record.receipt.slot} ·{' '}
+          {record.funding.leg === undefined
+            ? 'recipient'
+            : 'this leg’s destination wallet'}{' '}
+          received{' '}
           {formatNativeBalance(
             record.receipt.deliveredRaw,
             record.asset.decimals,
@@ -149,6 +163,8 @@ function FundingHistory({
     [page, setPage] = useState<MainnetFundingHistory | null>(null),
     [busy, setBusy] = useState(true),
     [error, setError] = useState('');
+  const [progressPage, setProgressPage] = useState(0);
+  const pageStatus = useRef<HTMLOutputElement>(null);
   const pending = useRef<AbortController | null>(null);
   const read = useCallback(
     async (after: string | null) => {
@@ -232,7 +248,14 @@ function FundingHistory({
     ]),
   ].sort((a, b) => b - a);
   const records = page?.progress.records ?? [];
-  const finalized = records.filter((record) => record.receipt !== null).length;
+  const finalized = records.filter(
+    (record) => record.receipt !== null && record.funding.leg === undefined,
+  ).length;
+  const proxyFinalized = records.filter(
+    (record) => record.receipt !== null && record.funding.leg !== undefined,
+  ).length;
+  const progressPages = Math.max(1, Math.ceil(records.length / 25));
+  const selectedProgressPage = Math.min(progressPage, progressPages - 1);
   const unresolved = records.filter((record) =>
     ['awaiting_signature', 'signing', 'signed', 'submitted'].includes(
       record.state,
@@ -250,11 +273,12 @@ function FundingHistory({
         Funding revision{' '}
         <select
           value={revision ?? 'all'}
-          onChange={(event) =>
+          onChange={(event) => {
+            setProgressPage(0);
             setRevision(
               event.target.value === 'all' ? null : Number(event.target.value),
-            )
-          }
+            );
+          }}
         >
           <option value="all">All revisions</option>
           {revisions.map((value) => (
@@ -274,45 +298,114 @@ function FundingHistory({
           {page.archived && (
             <p>Archived draft. Retained mainnet outcomes remain available.</p>
           )}
-          <h5>Recipient progress for revision {page.progress.revision}</h5>
-          <p>
-            {finalized} verified deliveries · {unresolved} unresolved ·{' '}
-            {records.filter((record) => record.failure !== null).length}{' '}
-            verified failures ·{' '}
-            {records.filter((record) => record.state === 'cancelled').length}{' '}
-            cancelled.
-          </p>
-          {records.some(
-            (record) =>
-              (record.state === 'finalized' && !record.receipt) ||
-              (record.state === 'failed' && !record.failure),
-          ) && (
-            <p>
-              Recorded outcomes without verified evidence:{' '}
-              {
-                records.filter(
-                  (record) =>
-                    (record.state === 'finalized' && !record.receipt) ||
-                    (record.state === 'failed' && !record.failure),
-                ).length
-              }
-              . They are excluded from verified delivery and failure totals.
-            </p>
-          )}
-          <p>
-            Latest retained attempt per saved recipient. Allocations without a
-            retained attempt are not counted. Earlier attempts remain in the
-            transition history.
-          </p>
-          <ul aria-label="Mainnet recipient progress">
-            {records.map((record) => (
-              <li key={record.funding.item}>
-                <FundingRecord record={record} />
-              </li>
-            ))}
-          </ul>
-          {!records.length && (
-            <p>No retained mainnet recipient attempts for this revision.</p>
+          <h5>
+            Recipient and route-step progress for revision{' '}
+            {page.progress.revision}
+          </h5>
+          {page.progress.unavailable ? (
+            <output>
+              Route-step summary is unavailable or inconsistent. Captured
+              transitions remain available below. No delivery totals or route
+              readiness are inferred.
+            </output>
+          ) : (
+            <>
+              <p>
+                {finalized} verified deliveries for direct routes ·{' '}
+                {proxyFinalized} verified proxy-leg transfers · {unresolved}{' '}
+                unresolved steps ·{' '}
+                {records.filter((record) => record.failure !== null).length}{' '}
+                verified failures ·{' '}
+                {
+                  records.filter((record) => record.state === 'cancelled')
+                    .length
+                }{' '}
+                cancelled.
+              </p>
+              {records.some(
+                (record) =>
+                  (record.state === 'finalized' && !record.receipt) ||
+                  (record.state === 'failed' && !record.failure),
+              ) && (
+                <p>
+                  Recorded outcomes without verified evidence:{' '}
+                  {
+                    records.filter(
+                      (record) =>
+                        (record.state === 'finalized' && !record.receipt) ||
+                        (record.state === 'failed' && !record.failure),
+                    ).length
+                  }
+                  . They are excluded from verified delivery and failure totals.
+                </p>
+              )}
+              <p>
+                Latest retained attempt per saved recipient or proxy leg.
+                Proxy-leg transfers are not counted as final allocation
+                deliveries. Allocations without a retained attempt are not
+                counted. Earlier attempts remain in the transition history. This
+                is latest-attempt history, not an execution ledger or permission
+                to repeat a transfer. Loading older transitions also refreshes
+                this summary.
+              </p>
+              <output
+                ref={pageStatus}
+                tabIndex={-1}
+                aria-label="Mainnet route progress page"
+              >
+                Showing{' '}
+                {Math.min(
+                  25,
+                  Math.max(0, records.length - selectedProgressPage * 25),
+                )}{' '}
+                of {records.length} retained route steps, page{' '}
+                {selectedProgressPage + 1} of {progressPages}. Counts cover all
+                retained steps, not only this page.
+              </output>
+              <ul aria-label="Mainnet recipient progress">
+                {records
+                  .slice(
+                    selectedProgressPage * 25,
+                    (selectedProgressPage + 1) * 25,
+                  )
+                  .map((record) => (
+                    <li key={mainnetFundingProgressKey(record)}>
+                      <FundingRecord record={record} />
+                    </li>
+                  ))}
+              </ul>
+              {progressPages > 1 && (
+                <nav aria-label="Mainnet route progress pages">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11"
+                    disabled={selectedProgressPage === 0}
+                    onClick={() => {
+                      setProgressPage(selectedProgressPage - 1);
+                      pageStatus.current?.focus();
+                    }}
+                  >
+                    Previous route steps
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11"
+                    disabled={selectedProgressPage === progressPages - 1}
+                    onClick={() => {
+                      setProgressPage(selectedProgressPage + 1);
+                      pageStatus.current?.focus();
+                    }}
+                  >
+                    Next route steps
+                  </Button>
+                </nav>
+              )}
+              {!records.length && (
+                <p>No retained mainnet recipient attempts for this revision.</p>
+              )}
+            </>
           )}
           <h5>Captured funding transitions</h5>
           <p>

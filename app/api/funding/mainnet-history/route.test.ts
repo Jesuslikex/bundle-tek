@@ -1,18 +1,23 @@
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { Miniflare } from 'miniflare';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import bs58 from 'bs58';
 import { nativeWithdrawalFixture } from '../../../../test/native-withdrawal-fixture';
 import { tokenWithdrawalFixture } from '../../../../test/token-withdrawal-fixture';
 import { validateFunding, type SavedFunding } from '@/lib/funding-plan';
-import { selectedFundingCapture } from '@/lib/mainnet-funding';
+import { selectedFundingCapture, fundingLegs } from '@/lib/mainnet-funding';
+import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { decodeNativeWithdrawalReceipt } from '@/lib/native-withdrawal-server';
 import { decodeTokenWithdrawalReceipt } from '@/lib/token-withdrawal-server';
 import type {
   NativeWithdrawalReview,
   NativeWithdrawalReceipt,
 } from '@/lib/native-withdrawal';
-import { withdrawalInput } from '@/lib/native-withdrawal';
+import {
+  withdrawalInput,
+  inspectNativeWithdrawal,
+} from '@/lib/native-withdrawal';
+import { solanaTransferMessage } from '@/lib/solana-transfer-message';
 import { prepareNativeWithdrawal } from '@/lib/native-withdrawal-server';
 import {
   decodeMainnetFundingHistory,
@@ -154,14 +159,24 @@ async function insert(
   owner = 'alice',
   selected = fixture.review,
   item = 1,
+  leg?: number,
 ) {
   const review: NativeWithdrawalReview = { ...selected, id: id(n) };
   review.funding = await selectedFundingCapture(
     saved,
-    { planId, revision: saved.revision, item },
+    {
+      planId,
+      revision: saved.revision,
+      item,
+      ...(leg === undefined ? {} : { leg }),
+    },
     review,
   );
-  await context.db
+  await withdrawalInsert(review, owner).run();
+  return review;
+}
+function withdrawalInsert(review: NativeWithdrawalReview, owner: string) {
+  return context.db
     .prepare(
       "INSERT INTO native_withdrawals(id,owner_id,wallet_address,wallet_revision,document,state,signature,receipt,created_at,updated_at) VALUES(?,?,?,?,?,'awaiting_signature',NULL,NULL,?,?)",
     )
@@ -173,10 +188,248 @@ async function insert(
       JSON.stringify(review),
       date,
       date,
-    )
-    .run();
-  return review;
+    );
 }
+async function proxyPlan() {
+  const saved = await plan();
+  const proxy = bs58.encode(new Uint8Array(32).fill(10));
+  saved.document = validateFunding({
+    ...saved.document,
+    recipients: [
+      { address: fixture.recipient, amount: '0.01', proxies: [proxy] },
+    ],
+  });
+  await context.db
+    .prepare('UPDATE funding_plans SET document=? WHERE owner_id=? AND id=?')
+    .bind(JSON.stringify(saved.document), 'alice', saved.id)
+    .run();
+  const first = await prepareNativeWithdrawal(
+    withdrawalInput(fixture.wallet, proxy, '0.0101', 1),
+    new AbortController().signal,
+    fixture.fetcher,
+  );
+  const last = await prepareNativeWithdrawal(
+    withdrawalInput(proxy, fixture.recipient, '0.01', 1),
+    new AbortController().signal,
+    fixture.fetcher,
+  );
+  return { saved, first, last };
+}
+it('keeps every proxy leg and replaces only a newer attempt of that same leg', async () => {
+  const { saved, first, last } = await proxyPlan();
+  const a = await insert(1, saved, 'alice', first, 1, 1);
+  await insert(2, saved, 'alice', last, 1, 2);
+  await transition(a, 'cancelled', null, null, null, date);
+  await insert(3, saved, 'alice', first, 1, 1);
+  const history = await read();
+  expect(
+    history.progress.records.map((r) => [
+      r.funding.item,
+      r.funding.leg,
+      r.withdrawalId,
+    ]),
+  ).toEqual([
+    [1, 1, id(3)],
+    [1, 2, id(2)],
+  ]);
+  expect(history.events.some((r) => r.withdrawalId === id(1))).toBe(true);
+  expect(context.rpc).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+it('returns every one of400 route steps across100 recipients while paginating only transitions', async () => {
+  const address = (n: number) => {
+    const b = new Uint8Array(32);
+    b[0] = 1;
+    b[30] = n >> 8;
+    b[31] = n & 255;
+    return bs58.encode(b);
+  };
+  const saved = await plan();
+  saved.document = validateFunding({
+    ...saved.document,
+    recipients: Array.from({ length: 100 }, (_, i) => ({
+      address: address(i * 4 + 1),
+      amount: '0.01',
+      proxies: [address(i * 4 + 2), address(i * 4 + 3), address(i * 4 + 4)],
+    })),
+  });
+  await context.db
+    .prepare('UPDATE funding_plans SET document=? WHERE owner_id=? AND id=?')
+    .bind(JSON.stringify(saved.document), 'alice', saved.id)
+    .run();
+  const fixtureStarted = performance.now();
+  for (let item = 1; item <= 100; item++) {
+    if (performance.now() - fixtureStarted > 90000)
+      throw new Error(
+        'Local capacity-fixture setup exceeded its90second budget.',
+      );
+    const statements: D1PreparedStatement[] = [];
+    const legs = fundingLegs(saved.document, item);
+    for (const [n, leg] of legs.entries()) {
+      // Offline capacity fixtures: canonical unsigned packets, not runtime qualification.
+      const message = solanaTransferMessage(
+        leg.wallet,
+        leg.recipient,
+        fixture.review.blockhash,
+        BigInt(leg.amountRaw),
+      );
+      const bytes = Uint8Array.from([1, ...new Uint8Array(64), ...message]);
+      const digest = new Uint8Array(
+        await crypto.subtle.digest('SHA-256', Uint8Array.from(bytes).buffer),
+      );
+      const review: NativeWithdrawalReview = {
+        ...fixture.review,
+        id: id((item - 1) * 4 + n + 1),
+        wallet: leg.wallet,
+        recipient: leg.recipient,
+        amount: formatNativeBalance(leg.amountRaw, 9),
+        amountRaw: leg.amountRaw,
+        maximumDebitRaw: (
+          BigInt(leg.amountRaw) + BigInt(fixture.review.feeLamports)
+        ).toString(),
+        transaction: btoa(String.fromCharCode(...bytes)),
+        sha256: [...digest]
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join(''),
+      };
+      await inspectNativeWithdrawal(review, review.transaction, false);
+      review.funding = await selectedFundingCapture(
+        saved,
+        { planId: saved.id, revision: saved.revision, item, leg: n + 1 },
+        review,
+      );
+      // Preserve exclusive wallet holds: release each unsigned fixture before reuse.
+      statements.push(
+        withdrawalInsert(review, 'alice'),
+        context.db
+          .prepare(
+            "UPDATE native_withdrawals SET state='cancelled',updated_at=? WHERE id=?",
+          )
+          .bind(date, review.id),
+      );
+    }
+    await context.db.batch(statements);
+  }
+  const firstReadStarted = performance.now();
+  const history = await read();
+  expect(history.progress.records).toHaveLength(400);
+  expect(
+    history.progress.records.map((r) => [r.funding.item, r.funding.leg]),
+  ).toEqual(
+    Array.from({ length: 400 }, (_, i) => [Math.floor(i / 4) + 1, (i % 4) + 1]),
+  );
+  expect(history.events).toHaveLength(50);
+  expect(history.nextCursor).not.toBeNull();
+  const firstReadMs = performance.now() - firstReadStarted;
+  const olderStarted = performance.now();
+  const older = await read({ cursor: history.nextCursor! });
+  if (process.env.BUNDLE_FUNDING_HISTORY_CAPACITY_DIAGNOSTICS === '1') {
+    const directory = new URL('../../../../work/release-qa/', import.meta.url);
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      new URL('proxy-funding-capacity-timing-20261021.json', directory),
+      JSON.stringify(
+        {
+          rows: 400,
+          fixtureMs: firstReadStarted - fixtureStarted,
+          firstReadMs,
+          olderReadMs: performance.now() - olderStarted,
+          scope:
+            'local synthetic history only, not a live latency qualification',
+        },
+        null,
+        2,
+      ),
+    );
+  }
+  expect(older.progress.records).toHaveLength(400);
+  expect(
+    older.events.some((r) =>
+      history.events.some((e) => e.sequence === r.sequence),
+    ),
+  ).toBe(false);
+  expect(context.rpc).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+it('keeps validated transitions when a current-revision progress root is inconsistent', async () => {
+  const saved = await plan();
+  const recipient = bs58.encode(new Uint8Array(32).fill(6));
+  saved.document = validateFunding({
+    ...saved.document,
+    recipients: [
+      ...saved.document.recipients,
+      { address: recipient, amount: '0.01' },
+    ],
+  });
+  await context.db
+    .prepare('UPDATE funding_plans SET document=?')
+    .bind(JSON.stringify(saved.document))
+    .run();
+  const a = await insert(1, saved);
+  await transition(a, 'cancelled', null, null, null, date);
+  // Synthetic legacy inconsistency: distinct valid captures under one revision.
+  const changed = {
+    ...saved,
+    document: validateFunding({
+      ...saved.document,
+      name: 'Changed legacy document',
+    }),
+  };
+  await context.db
+    .prepare('UPDATE funding_plans SET document=?')
+    .bind(JSON.stringify(changed.document))
+    .run();
+  const second = await prepareNativeWithdrawal(
+    withdrawalInput(fixture.wallet, recipient, '0.01', 1),
+    new AbortController().signal,
+    fixture.fetcher,
+  );
+  await insert(2, changed, 'alice', second, 2);
+  const response = await GET(request());
+  expect(response.status).toBe(200);
+  const history = decodeMainnetFundingHistory(
+    await response.json(),
+    planId,
+    null,
+  );
+  expect(history.events).toHaveLength(3);
+  expect(history.progress).toEqual({
+    revision: 1,
+    records: null,
+    unavailable: true,
+  });
+  expect(fetch).not.toHaveBeenCalled();
+});
+it('keeps validated transitions when only the progress SELECT fails', async () => {
+  const saved = await plan();
+  await insert(1, saved);
+  const actual = context.db;
+  context.db = {
+    prepare(sql: string) {
+      if (sql.includes('MAX(last.sequence)'))
+        return {
+          bind: () => ({
+            all: async () => {
+              throw new Error('private progress-store detail');
+            },
+          }),
+        } as unknown as D1PreparedStatement;
+      return actual.prepare(sql);
+    },
+  } as D1Database;
+  try {
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const history = decodeMainnetFundingHistory(body, planId, null);
+    expect(history.events).toHaveLength(1);
+    expect(history.progress.records).toBeNull();
+    expect(history.progress.unavailable).toBe(true);
+    expect(JSON.stringify(body)).not.toContain('private progress-store');
+  } finally {
+    context.db = actual;
+  }
+});
 async function transition(
   review: NativeWithdrawalReview,
   state: string,
@@ -220,11 +473,14 @@ const request = (extra: Record<string, string> = {}) =>
 const read = async (extra: Record<string, string> = {}) => {
   const response = await GET(request(extra));
   expect(response.status).toBe(200);
-  return decodeMainnetFundingHistory(
+  const history = decodeMainnetFundingHistory(
     await response.json(),
     planId,
     extra.revision ? Number(extra.revision) : null,
   );
+  if (history.progress.unavailable)
+    throw new Error('Expected available fixture progress.');
+  return { ...history, progress: history.progress };
 };
 it('requires owner access, rejects cross-plan/revision cursors and never calls a provider', async () => {
   const saved = await plan();
