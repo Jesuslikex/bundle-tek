@@ -17,6 +17,7 @@ export class WarmupQuoteError extends Error {
   constructor(
     message: string,
     readonly code: QuoteErrorCode = 'QUOTE_UNAVAILABLE',
+    readonly providerStatus?: number,
   ) {
     super(message);
     this.name = 'WarmupQuoteError';
@@ -192,6 +193,7 @@ async function quoteSolanaSwap(
       response.status === 400 && input.taker
         ? 'PROVIDER_REJECTED'
         : 'QUOTE_UNAVAILABLE',
+      response.status,
     );
   }
   const reader = response.body?.getReader();

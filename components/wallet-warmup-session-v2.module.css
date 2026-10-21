@@ -97,6 +97,15 @@
   margin-top: 3px;
   accent-color: var(--primary, #8577ff);
 }
+.attempt button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.attempt code {
+  overflow-wrap: anywhere;
+}
 @media (max-width: 400px) {
   .steps {
     grid-template-columns: 1fr;

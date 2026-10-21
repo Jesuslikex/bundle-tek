@@ -19,6 +19,7 @@ import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { WARMUP_RECEIPT_SAVED } from '@/lib/warmup-receipt-events';
 import { Button } from './ui/button';
 import styles from './wallet-warmup-session-v2.module.css';
+import { WalletWarmupSessionV2Attempt } from './wallet-warmup-session-v2-attempt';
 type Props = {
   plan: SavedWarmup;
   view: WalletWarmupSessionView | null;
@@ -141,7 +142,13 @@ function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
   }, [consent, journal, marker, invalid]);
   function showConsent(value: WarmupV2Saved) {
     focusTarget.current = 'consent';
-    setConsent(value);
+    setConsent((previous) =>
+      previous &&
+      previous.id === value.id &&
+      previous.termsSha256 === value.termsSha256
+        ? previous
+        : value,
+    );
   }
   function showJournal(value: WarmupV2Journal) {
     focusTarget.current = 'journal';
@@ -976,8 +983,20 @@ function SessionPanel({ plan, view, retained, onBusyChange }: Props) {
           )}
           <p>
             Runtime qualification is not connected yet. Saving or reviewing this
-            action does not make it signable.
+            action does not make it signable. The separate quote and simulation
+            preview below also grants no signing permission.
           </p>
+          {consent && (
+            <WalletWarmupSessionV2Attempt
+              journal={journal}
+              consent={consent}
+              disabled={
+                locked || sourceDirty || changed || baselineChanged || ended
+              }
+              invalidated={sourceDirty || changed || baselineChanged || ended}
+              now={clock}
+            />
+          )}
           {!journal.snapshot.stopped && (
             <>
               <label className={styles.check}>

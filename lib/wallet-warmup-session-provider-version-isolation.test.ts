@@ -10,7 +10,7 @@ import { createWalletWarmupSessionProviderCore } from './wallet-warmup-session-p
 import { prepareWalletWarmupSessionAction } from './wallet-warmup-session-preparation';
 import type { WarmupSessionPreparationCandidate } from './wallet-warmup-session-preparation';
 
-it('only the reviewed server adapter and this boundary test may import the trusted provider core', () => {
+it('only the reviewed server adapters and this boundary test may import the trusted provider core at runtime', () => {
   const importers = new Set<string>();
   for (const path of globSync(
     ['app', 'lib', 'components', 'db', 'test'].flatMap((root) => [
@@ -29,7 +29,12 @@ it('only the reviewed server adapter and this boundary test may import the trust
     );
     const visit = (node: ts.Node) => {
       let specifier: ts.Expression | undefined;
-      if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      if (
+        ts.isImportDeclaration(node) &&
+        node.importClause?.phaseModifier !== ts.SyntaxKind.TypeKeyword
+      )
+        specifier = node.moduleSpecifier;
+      else if (ts.isExportDeclaration(node) && !node.isTypeOnly)
         specifier = node.moduleSpecifier;
       else if (
         ts.isCallExpression(node) &&
@@ -53,6 +58,7 @@ it('only the reviewed server adapter and this boundary test may import the trust
   expect([...importers].sort()).toEqual([
     'lib/wallet-warmup-session-provider-version-isolation.test.ts',
     'lib/wallet-warmup-session-provider.ts',
+    'lib/wallet-warmup-session-v2-provider.ts',
   ]);
 });
 

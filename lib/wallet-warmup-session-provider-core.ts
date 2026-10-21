@@ -64,6 +64,18 @@ export type WarmupSessionProviderPlanReader = (
 type ReceiptRow = Omit<SavedWarmupBuyReceipt, 'document'> & {
   document: string;
 };
+export type WarmupSessionProviderFeeEvidence = {
+  signatureFeeLamports: string;
+  prioritizationFeeLamports: string;
+  rentFeeLamports: string;
+  observedNetworkFeeLamports: string;
+  boundLamports: string;
+};
+export type WarmupSessionProviderLease = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+};
 /** Trusted server callback only. No history write, signature, send or execution authority. */
 export function createWalletWarmupSessionProviderCore(
   db: D1Database,
@@ -71,7 +83,9 @@ export function createWalletWarmupSessionProviderCore(
   apiKey: string | undefined,
   readCurrentPlan: WarmupSessionProviderPlanReader,
   deps: WarmupSessionProviderDependencies = {},
+  preclaimedLease?: Readonly<WarmupSessionProviderLease>,
 ) {
+  const lease = preclaimedLease ? structuredClone(preclaimedLease) : null;
   const quote = deps.quote ?? prepareSolanaSwap,
     simulate = deps.simulate ?? simulateImportedSwap,
     inventoryRead = deps.inventory ?? inspectWarmupSellInventory,
@@ -203,20 +217,48 @@ export function createWalletWarmupSessionProviderCore(
     const reserve = uint(c.budget.remainingReserveLamports);
     if (reserve === 0n) return fail('The approved fee budget is exhausted.');
     await current();
-    // This is a cooldown, not a funds reservation or an execution lease.
-    const at = now();
-    const gate = await db
-      .prepare(
-        'INSERT INTO wallet_balance_gates(owner_id,next_allowed_at) VALUES (?,?) ON CONFLICT(owner_id) DO UPDATE SET next_allowed_at=excluded.next_allowed_at WHERE wallet_balance_gates.next_allowed_at<=?',
-      )
-      .bind(owner, at + WARMUP_SESSION_PROVIDER_COOLDOWN_MS, at)
-      .run();
-    signal.throwIfAborted();
-    if (!gate.meta.changes)
-      return fail(
-        'A wallet read or preparation is still cooling down. Recover the same request ID and wait before retrying.',
-        429,
-      );
+    if (lease) {
+      if (c.deadline !== Date.parse(lease.expiresAt)) return fail();
+      const held = await db
+        .prepare(`SELECT a.id FROM wallet_warmup_session_v2_attempts a
+ JOIN wallet_warmup_session_v2_attempt_context context ON context.owner_id=a.owner_id AND context.journal_id=a.journal_id AND context.version=a.review_version AND context.head_sha256=a.review_sha256
+ JOIN wallet_balance_gates g ON g.owner_id=a.owner_id
+ WHERE a.owner_id=? AND a.id=? AND a.journal_id=? AND a.review_version=? AND a.review_sha256=? AND a.action_id=? AND a.created_at=? AND a.expires_at=?
+ AND a.terms_sha256=context.terms_sha256 AND a.action_id=context.action_id AND strftime('%Y-%m-%dT%H:%M:%fZ','now')<a.expires_at
+ AND g.next_allowed_at>=CAST(strftime('%s',a.created_at) AS INTEGER)*1000+CAST(substr(a.created_at,21,3) AS INTEGER)+30000
+ AND NOT EXISTS(SELECT 1 FROM wallet_warmup_session_v2_attempt_outcomes o WHERE o.owner_id=a.owner_id AND o.attempt_id=a.id)`)
+        .bind(
+          owner,
+          lease.id,
+          c.journalId,
+          c.version,
+          c.headSha256,
+          a.id,
+          lease.createdAt,
+          lease.expiresAt,
+        )
+        .first();
+      signal.throwIfAborted();
+      if (!held)
+        return fail(
+          'The original unsigned lease or provider cooldown is unavailable. Recover its request ID.',
+        );
+    } else {
+      // This is a cooldown, not a funds reservation or an execution lease.
+      const at = now();
+      const gate = await db
+        .prepare(
+          'INSERT INTO wallet_balance_gates(owner_id,next_allowed_at) VALUES (?,?) ON CONFLICT(owner_id) DO UPDATE SET next_allowed_at=excluded.next_allowed_at WHERE wallet_balance_gates.next_allowed_at<=?',
+        )
+        .bind(owner, at + WARMUP_SESSION_PROVIDER_COOLDOWN_MS, at)
+        .run();
+      signal.throwIfAborted();
+      if (!gate.meta.changes)
+        return fail(
+          'A wallet read or preparation is still cooling down. Recover the same request ID and wait before retrying.',
+          429,
+        );
+    }
     await current();
     const amount = formatNativeBalance(raw, decimals);
     const inventory =
@@ -341,6 +383,15 @@ export function createWalletWarmupSessionProviderCore(
     );
     summary.limitations =
       'Unsigned session packet retained privately for exact recovery. Simulation and provisional fee/rent bounds are not instruction, custody or signing qualification. No signing, submission or automatic execution is enabled.';
-    return { summary, transaction: order.preparation.transaction };
+    const feeEvidence: WarmupSessionProviderFeeEvidence = {
+      signatureFeeLamports: uint(estimates.signatureFeeLamports).toString(),
+      prioritizationFeeLamports: uint(
+        estimates.prioritizationFeeLamports,
+      ).toString(),
+      rentFeeLamports: rent.toString(),
+      observedNetworkFeeLamports: fee.toString(),
+      boundLamports: feeBound.toString(),
+    };
+    return { summary, transaction: order.preparation.transaction, feeEvidence };
   };
 }

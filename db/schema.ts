@@ -1511,4 +1511,63 @@ export const sessionPreparationJobEvents = sqliteTable(
     ),
   ],
 );
+export const walletWarmupSessionV2Attempts = sqliteTable(
+  'wallet_warmup_session_v2_attempts',
+  {
+    ownerId: text('owner_id').notNull(),
+    id: text('id').notNull(),
+    journalId: text('journal_id').notNull(),
+    actionId: text('action_id').notNull(),
+    sequence: integer('sequence').notNull(),
+    attemptNo: integer('attempt_no').notNull(),
+    previousId: text('previous_id'),
+    reviewVersion: integer('review_version').notNull(),
+    reviewSha256: text('review_sha256').notNull(),
+    termsSha256: text('terms_sha256').notNull(),
+    createdAt: text('created_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ownerId, t.id] }),
+    uniqueIndex('warmup_v2_attempt_sequence').on(
+      t.ownerId,
+      t.journalId,
+      t.sequence,
+    ),
+    uniqueIndex('warmup_v2_attempt_identity').on(t.id),
+    uniqueIndex('warmup_v2_attempt_action_number').on(
+      t.ownerId,
+      t.journalId,
+      t.actionId,
+      t.attemptNo,
+    ),
+  ],
+);
+export const walletWarmupSessionV2AttemptOutcomes = sqliteTable(
+  'wallet_warmup_session_v2_attempt_outcomes',
+  {
+    ownerId: text('owner_id').notNull(),
+    attemptId: text('attempt_id').notNull(),
+    kind: text('kind').notNull(),
+    summaryDocument: text('summary_document'),
+    unsignedTransaction: text('unsigned_transaction'),
+    packetSha256: text('packet_sha256'),
+    feeDocument: text('fee_document'),
+    refusalCode: text('refusal_code'),
+    createdAt: text('created_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    recordSha256: text('record_sha256').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ownerId, t.attemptId] }),
+    foreignKey({
+      columns: [t.ownerId, t.attemptId],
+      foreignColumns: [
+        walletWarmupSessionV2Attempts.ownerId,
+        walletWarmupSessionV2Attempts.id,
+      ],
+    }),
+    uniqueIndex('warmup_v2_attempt_packet').on(t.ownerId, t.packetSha256),
+  ],
+);
 export * from './auth-schema';
