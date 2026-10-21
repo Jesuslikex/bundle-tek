@@ -8,6 +8,10 @@ import { unlockVault, type VaultSession } from '@/lib/browser-wallet-vault';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import type { AutoSellObservedTrade } from '@/lib/auto-sell';
+import {
+  autoSellOutcomePage,
+  autoSellOutcomeReference as outcomeRef,
+} from '../test/auto-sell-outcome-fixture';
 const feed = vi.hoisted(() => ({
   read: vi.fn(async () => [] as AutoSellObservedTrade[]),
 }));
@@ -252,6 +256,129 @@ async function editSession(selector: string, value: string) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+
+it.each([false, true])(
+  'allows saved-history inspection while locked (archived=%s) without vault unlock or runner start',
+  async (archived) => {
+    const fetcher = vi.fn(async () => Response.json(autoSellOutcomePage()));
+    vi.stubGlobal('fetch', fetcher);
+    const start = vi.spyOn(AutoSellRunner.prototype, 'start');
+    await act(async () =>
+      root!.render(
+        <AutoSell
+          project={{
+            ...project,
+            id: outcomeRef.projectId,
+            archived,
+            document: {
+              ...project.document,
+              token: { ...project.document.token, address: outcomeRef.mint },
+            },
+          }}
+          wallets={wallets}
+          locked={true}
+        />,
+      ),
+    );
+    await click('Auto Sell');
+    await editSession('input[id$="-rep"]', '50');
+    await editSession('input[type="password"]', 'SYNTHETIC ONLY');
+    await act(async () =>
+      host
+        .querySelector<HTMLInputElement>('fieldset input[type="checkbox"]')!
+        .click(),
+    );
+    const run = [...host.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Run 1 Strategy',
+    )!;
+    expect(run.disabled).toBe(true);
+    await act(async () => run.click());
+    const summary = [...host.querySelectorAll('summary')].find(
+      (s) => s.textContent === 'Find saved Sell approvals',
+    )!;
+    await act(async () => summary.click());
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(feed.read).not.toHaveBeenCalled();
+    await click('Read latest saved approvals');
+    await vi.waitFor(() =>
+      expect(host.textContent).toContain(
+        'Submission recorded; receipt proof not loaded',
+      ),
+    );
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(unlockVault).not.toHaveBeenCalled();
+    expect(feed.read).not.toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+    expect(run.disabled).toBe(true);
+  },
+);
+
+it.each(['locked', 'wallet'] as const)(
+  'announces an inner %s context reset and focuses the replacement trigger without retaining a stale read',
+  async (change) => {
+    let finish!: (response: Response) => void;
+    const fetcher = vi.fn(
+      (_url: RequestInfo | URL, _init?: RequestInit) =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    const valid = {
+      ...project,
+      id: outcomeRef.projectId,
+      document: {
+        ...project.document,
+        token: { ...project.document.token, address: outcomeRef.mint },
+      },
+    };
+    await act(async () =>
+      root!.render(
+        <AutoSell project={valid} wallets={wallets} locked={true} />,
+      ),
+    );
+    await click('Auto Sell');
+    const summary = [...host.querySelectorAll('summary')].find(
+      (s) => s.textContent === 'Find saved Sell approvals',
+    )!;
+    await act(async () => summary.click());
+    await click('Read latest saved approvals');
+    const signal = fetcher.mock.calls[0][1]!.signal!;
+    await act(async () =>
+      root!.render(
+        <AutoSell
+          project={valid}
+          wallets={
+            change === 'wallet'
+              ? wallets.map((w) => ({ ...w, revision: 2 }))
+              : wallets
+          }
+          locked={change === 'locked' ? false : true}
+        />,
+      ),
+    );
+    expect(signal.aborted).toBe(true);
+    expect(host.querySelector('dialog')).toBeNull();
+    const trigger = [...host.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Auto Sell',
+    )!;
+    expect(document.activeElement).toBe(trigger);
+    expect(
+      host.querySelector('output[aria-label="Auto Sell view change"]')!
+        .textContent,
+    ).toContain('Workspace context changed');
+    await act(async () => finish(Response.json(autoSellOutcomePage())));
+    expect(host.textContent).not.toContain(outcomeRef.intentId);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(unlockVault).not.toHaveBeenCalled();
+    await click('Auto Sell');
+    expect(
+      host.querySelector('output[aria-label="Auto Sell view change"]')!
+        .textContent,
+    ).toBe('');
+    expect(fetcher).toHaveBeenCalledOnce();
+  },
+);
 
 it('binds the selected session delay to the running strategy clock', async () => {
   const session = {

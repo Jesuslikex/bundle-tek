@@ -1,0 +1,86 @@
+.panel {
+  min-width: 0;
+  padding: 12px;
+  margin-block: 12px;
+  border: 1px solid var(--border, #2b2d38);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.panel summary,
+.panel button,
+.panel input,
+.panel a {
+  min-height: 44px;
+}
+.panel summary {
+  display: list-item;
+  align-content: center;
+  cursor: pointer;
+  color: #b4b0ff;
+}
+.panel h3:focus-visible {
+  outline: 2px solid #a99bff;
+  outline-offset: 2px;
+}
+.panel summary:focus-visible {
+  outline: 2px solid #a99bff;
+  outline-offset: 2px;
+}
+.panel p,
+.panel dl,
+.panel output {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a0a2b1;
+}
+.panel output {
+  display: block;
+  margin-block: 12px;
+}
+.panel label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.panel input {
+  width: 100%;
+  min-width: 0;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.buttons button {
+  white-space: normal;
+  max-width: 100%;
+}
+.rows {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.rows li {
+  border-top: 1px solid var(--border, #2b2d38);
+  padding-top: 10px;
+  min-width: 0;
+}
+.rows dl {
+  display: grid;
+  gap: 6px;
+}
+.rows dd {
+  margin: 0;
+}
+.rows code {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.rows a {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}

@@ -70,3 +70,7 @@ Remaining findings to verify or address:
 - The warmup step label must distinguish available runtime observations from unavailable execution qualification.
 
 Opus proposed skipped-action advancement as one possible next slice. That proposal is not accepted or implemented here: recorded skips must not be used to present an executing buy/sell warmup loop as complete. Its review did not read the full Counter evaluator, feed, consent/view parsers, runtime order collector or receipt-floor helper, so those domains are not independently cleared by this review. Its broader wording about missing warmup execution does not negate the existing saved-buy runtime Sell composition above.
+
+## Saved-outcome discovery follow-up
+
+`CODEX-AUTOSELL-OUTCOME-DISCOVERY-20261021.md` and its portable evidence now cover a separate bounded reminder list and explicit saved Sell history browsing/recovery after local entries disappear. This supersedes the earlier assertion that the rolling log is the only route to those saved approvals. It does not make reminders durable, restore a missing local signature, classify every record as Auto Sell, reconcile counters or prove finality. The existing authenticated GET, signing/financial rules and false authority flags are preserved. Rendered desktop/phone verification, durable execution and the broader product checklist remain open.

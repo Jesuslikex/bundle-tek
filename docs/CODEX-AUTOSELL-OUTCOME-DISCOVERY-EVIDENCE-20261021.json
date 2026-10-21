@@ -1,0 +1,219 @@
+{
+  "sourceBaseCommit": "4f56dc29e9a322bae47238e1299f6b9247afb84c",
+  "scope": "Bounded runner reminders and explicit saved Sell approval discovery, no active-run persistence or reconciliation",
+  "ownedFunctionalFiles": [
+    "lib/auto-sell-runner.ts",
+    "lib/auto-sell-saved-outcomes.ts",
+    "lib/auto-sell-saved-outcomes.test.ts",
+    "lib/auto-sell-outcome-runner.test.ts",
+    "lib/auto-sell-outcome-route.test.ts",
+    "lib/auto-sell-outcome-reminders.test.ts",
+    "components/auto-sell-modal.tsx",
+    "components/auto-sell-modal.module.css",
+    "components/auto-sell-outcome-modal.test.tsx",
+    "components/auto-sell-saved-outcomes.tsx",
+    "components/auto-sell-saved-outcomes.module.css",
+    "components/auto-sell-saved-outcomes.test.tsx",
+    "components/auto-sell-lifecycle.test.tsx",
+    "components/auto-sell-outcome-read.module.css"
+  ],
+  "functionalHashes": {
+    "lib/auto-sell-runner.ts": "88a330d7cddc1ed2df705bb7d3c176d271c39ad640e9e4103156f0a98563d1f2",
+    "lib/auto-sell-saved-outcomes.ts": "205ba80025787707f018a288c0faf1c9ed69ccbd0584be17e90b63ea21620a73",
+    "lib/auto-sell-saved-outcomes.test.ts": "2cbfc537d96d9ab709fcb051eb46d161bc55fc08afe38e12ff6c179e1c70de72",
+    "lib/auto-sell-outcome-runner.test.ts": "41adb56b6bba3e034d80904b6e41b44260907bfa44adf9c7b492a19ac79eff97",
+    "lib/auto-sell-outcome-route.test.ts": "ae0ef922d4bb042bea321a82bc920d6d258b6e0168543fe3a8f5bf8513f254ee",
+    "lib/auto-sell-outcome-reminders.test.ts": "99157612efe4368ebe261cb55880c2f5373442862a0c9325f30b19bb5ff366a0",
+    "components/auto-sell-modal.tsx": "a531c7a80a2e09cfb73eb1b695866eb1f7861ac2d0cfb858d39525348916d3c6",
+    "components/auto-sell-modal.module.css": "5ad1ee17c9ae96282c9e3d571c1d0ee193fd8412f1f1e021c3056ddd5d6898dc",
+    "components/auto-sell-outcome-modal.test.tsx": "ab6e54572fb15275dadecddcc9d85f6ab1ec2ef7692d13e2ac8f1e5edaf3e558",
+    "components/auto-sell-saved-outcomes.tsx": "a36854848cd13e60fc0c6221c14a1d2ba838455f1f6802bf8f5a6602cbe39303",
+    "components/auto-sell-saved-outcomes.module.css": "de66dcd60c5d89a2c85fd68a8728e2f816e83599b43659fe47a7615e077725a3",
+    "components/auto-sell-saved-outcomes.test.tsx": "dda2788cdf7cc37a2cdd757900393282d29e5b54a675a46fc0041be16cde3554",
+    "components/auto-sell-lifecycle.test.tsx": "ac6bcde31be4ac7a3e57a6b2fcef4caf23677996cfd1f3818909d1e8b540c83d",
+    "components/auto-sell-outcome-read.module.css": "dba0240c2342dd65320e4af40fa53e340245ca4af697154719241077f12abddc"
+  },
+  "tests": {
+    "passed": 269,
+    "failed": 0,
+    "skipped": 0,
+    "files": 24,
+    "report": "work/release-qa/auto-sell-discovery-verified-final-20261021.json",
+    "fullRepositorySuite": false,
+    "liveProviderOrFunded": false,
+    "declaredDoublesAndDisposableReadSideSqlOnly": true
+  },
+  "freeze": {
+    "files": 2346,
+    "sha256": "e788e2da5a1aed5f0bd26b7eceff06d71646d930cf0fe678a047d1d34db0a229",
+    "unchanged": true,
+    "report": "work/release-qa/auto-sell-discovery-verified-freeze-20261021.json"
+  },
+  "typecheck": {
+    "command": "Pinned Node24 tsc --noEmit, whole project",
+    "exitCode": 0
+  },
+  "lint": {
+    "files": 11,
+    "typeAware": true,
+    "exitCode": 0
+  },
+  "format": {
+    "functionalFiles": 14,
+    "exitCode": 0
+  },
+  "build": {
+    "base": "4f56dc29e9a322bae47238e1299f6b9247afb84c",
+    "overlays": [
+      "lib/auto-sell-runner.ts",
+      "lib/auto-sell-saved-outcomes.ts",
+      "lib/auto-sell-saved-outcomes.test.ts",
+      "lib/auto-sell-outcome-runner.test.ts",
+      "lib/auto-sell-outcome-route.test.ts",
+      "lib/auto-sell-outcome-reminders.test.ts",
+      "components/auto-sell-modal.tsx",
+      "components/auto-sell-modal.module.css",
+      "components/auto-sell-outcome-modal.test.tsx",
+      "components/auto-sell-saved-outcomes.tsx",
+      "components/auto-sell-saved-outcomes.module.css",
+      "components/auto-sell-saved-outcomes.test.tsx",
+      "components/auto-sell-lifecycle.test.tsx",
+      "components/auto-sell-outcome-read.module.css"
+    ],
+    "hashes": {
+      "lib/auto-sell-runner.ts": "88a330d7cddc1ed2df705bb7d3c176d271c39ad640e9e4103156f0a98563d1f2",
+      "lib/auto-sell-saved-outcomes.ts": "205ba80025787707f018a288c0faf1c9ed69ccbd0584be17e90b63ea21620a73",
+      "lib/auto-sell-saved-outcomes.test.ts": "2cbfc537d96d9ab709fcb051eb46d161bc55fc08afe38e12ff6c179e1c70de72",
+      "lib/auto-sell-outcome-runner.test.ts": "41adb56b6bba3e034d80904b6e41b44260907bfa44adf9c7b492a19ac79eff97",
+      "lib/auto-sell-outcome-route.test.ts": "ae0ef922d4bb042bea321a82bc920d6d258b6e0168543fe3a8f5bf8513f254ee",
+      "lib/auto-sell-outcome-reminders.test.ts": "99157612efe4368ebe261cb55880c2f5373442862a0c9325f30b19bb5ff366a0",
+      "components/auto-sell-modal.tsx": "a531c7a80a2e09cfb73eb1b695866eb1f7861ac2d0cfb858d39525348916d3c6",
+      "components/auto-sell-modal.module.css": "5ad1ee17c9ae96282c9e3d571c1d0ee193fd8412f1f1e021c3056ddd5d6898dc",
+      "components/auto-sell-outcome-modal.test.tsx": "ab6e54572fb15275dadecddcc9d85f6ab1ec2ef7692d13e2ac8f1e5edaf3e558",
+      "components/auto-sell-saved-outcomes.tsx": "a36854848cd13e60fc0c6221c14a1d2ba838455f1f6802bf8f5a6602cbe39303",
+      "components/auto-sell-saved-outcomes.module.css": "de66dcd60c5d89a2c85fd68a8728e2f816e83599b43659fe47a7615e077725a3",
+      "components/auto-sell-saved-outcomes.test.tsx": "dda2788cdf7cc37a2cdd757900393282d29e5b54a675a46fc0041be16cde3554",
+      "components/auto-sell-lifecycle.test.tsx": "ac6bcde31be4ac7a3e57a6b2fcef4caf23677996cfd1f3818909d1e8b540c83d",
+      "components/auto-sell-outcome-read.module.css": "dba0240c2342dd65320e4af40fa53e340245ca4af697154719241077f12abddc"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false,
+    "report": "work/release-qa/auto-sell-discovery-delivery-build-20261021/result.json"
+  },
+  "engineComparison": {
+    "base": "4f56dc29e9a322bae47238e1299f6b9247afb84c",
+    "protectedMembers": 43,
+    "changed": [],
+    "snapshotUnchangedAfterRemovingOnlyMetadataFields": true,
+    "printedSnapshotMatched": false,
+    "snapshotComparison": "TypeScript AST node kinds/literals/ordered children; ignores formatting and optional trailing commas",
+    "noteUnchangedAfterRemovingOnlyReminderBlock": true,
+    "metadataBlockCount": 1,
+    "sourceSha256": "88a330d7cddc1ed2df705bb7d3c176d271c39ad640e9e4103156f0a98563d1f2",
+    "passed": true,
+    "report": "work/release-qa/auto-sell-discovery-engine-proof-20261021.json",
+    "initialPrinterMismatchRetained": "work/release-qa/auto-sell-discovery-engine-proof-initial-20261021.json"
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-21T17:56:46.885Z",
+      "finishedAt": "2026-10-21T18:01:01.849Z",
+      "sourceBaseCommit": "4f56dc29e9a322bae47238e1299f6b9247afb84c",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "copiedFiles": 3434,
+      "path": "work/release-qa/opus-auto-sell-discovery-4f56dc2-20261021",
+      "testsOrEditsRun": false
+    },
+    {
+      "startedAt": "2026-10-21T18:07:37.918Z",
+      "finishedAt": "2026-10-21T18:10:31.687Z",
+      "sourceBaseCommit": "4f56dc29e9a322bae47238e1299f6b9247afb84c",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "copiedFiles": 3434,
+      "path": "work/release-qa/opus-auto-sell-discovery-followup-4f56dc2-20261021",
+      "testsOrEditsRun": false
+    },
+    {
+      "startedAt": "2026-10-21T18:17:01.178Z",
+      "finishedAt": "2026-10-21T18:18:48.215Z",
+      "sourceBaseCommit": "4f56dc29e9a322bae47238e1299f6b9247afb84c",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "copiedFiles": 3434,
+      "path": "work/release-qa/opus-auto-sell-discovery-context-final-4f56dc2-20261021",
+      "testsOrEditsRun": false
+    }
+  ],
+  "postReviewFiles": [
+    "components/auto-sell-modal.tsx",
+    "components/auto-sell-modal.module.css"
+  ],
+  "postReviewExplanation": "Same guarded replacement-trigger read moved into stable owning-parent callback for hook lint; empty notice removed from normal layout. Independently tested and built, not rereviewed.",
+  "transport": {
+    "existingGetOnly": "/api/imported-projects/signing",
+    "rawApprovalsPerPage": 50,
+    "maxActualBytes": 1048576,
+    "timeoutMilliseconds": 15000,
+    "automaticReadsOrRetries": false,
+    "postOrRpc": false,
+    "unsignedReviewDocumentsCrossExistingAuthenticatedGet": true,
+    "packetsPersistedOrRenderedByNewProjection": false
+  },
+  "reminders": {
+    "maximum": 100,
+    "frozenDetachedMetadata": true,
+    "independentOfLog": true,
+    "overflowReported": true,
+    "surviveContextRemountOrReload": false
+  },
+  "authority": {
+    "finalityVerified": false,
+    "signingAllowed": false,
+    "submissionAllowed": false,
+    "counterReconciliation": false,
+    "durableRunner": false
+  },
+  "renderedQA": {
+    "completed": false,
+    "reason": "Existing Chrome control timeouts; DOM and source CSS are not browser/AT proof"
+  },
+  "unchangedBoundaries": [
+    "financial/evaluator/executor/signing rules",
+    "existing API and ownership SQL",
+    "all schema and migrations",
+    "protected Claude parent/shell/layout/globalCSS",
+    "provider/credential/cron settings"
+  ],
+  "actionsNotTaken": [
+    "application/hosted SQL",
+    "real wallet unlock/sign/send",
+    "funded test",
+    "deployment"
+  ],
+  "remaining": [
+    "browser/AT and real provider qualification",
+    "durable financial reservation and session execution",
+    "finalized receipt reconciliation",
+    "missing local signature if registration was not retained",
+    "whole-parent remount/navigation focus",
+    "full Proxima parity"
+  ],
+  "supersededReports": "Earlier candidate tests/builds/lint and printer comparison retained under work/release-qa; only final report/freeze/build above cover delivery source"
+}

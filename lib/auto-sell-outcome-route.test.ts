@@ -5,6 +5,7 @@ import {
   autoSellOutcomeReference as ref,
 } from '../test/auto-sell-outcome-fixture';
 import { savedAutoSellOutcome } from './auto-sell-outcome';
+import { autoSellSavedOutcomePage } from './auto-sell-saved-outcomes';
 const mocks = vi.hoisted(() => ({
   user: { userId: 'alice' } as { userId: string } | null,
   db: null as unknown as D1Database,
@@ -119,4 +120,99 @@ it('does not adopt a known approval that belongs to another owned project', asyn
     .prepare('UPDATE imported_swap_preparations SET project_id=?')
     .run(other);
   expect((await read()).status).toBe(404);
+});
+
+it('rediscovers archived/prior-revision saved Sell state through actual project history without a local reference', async () => {
+  const response = await GET(
+    new Request(
+      `http://local/api/imported-projects/signing?projectId=${ref.projectId}`,
+    ),
+  );
+  expect(response.status).toBe(200);
+  const result = autoSellSavedOutcomePage(await response.json(), {
+    projectId: ref.projectId,
+    mint: ref.mint,
+  });
+  expect(result.rows).toHaveLength(1);
+  expect(result.rows[0]).toMatchObject({
+    intentId: ref.intentId,
+    projectRevision: 7,
+    state: 'submitted',
+    finalityVerified: false,
+    signingAllowed: false,
+    submissionAllowed: false,
+  });
+  expect(JSON.stringify(result)).not.toContain('SYNTHETIC-UNSIGNED');
+  expect(statements.every((s) => /^\s*SELECT\b/i.test(s))).toBe(true);
+});
+it('composes real cursor pagination through a page with zero Sell matches, without skipping the older Sell', async () => {
+  const original = autoSellOutcomePage().intents[0];
+  for (let n = 1; n <= 51; n++) {
+    const id = `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    const prep = `00000000-0000-4000-8001-${String(n).padStart(12, '0')}`;
+    const created = new Date(
+      Date.parse('2026-10-02T00:00:00Z') + n * 1000,
+    ).toISOString();
+    sqlite
+      .prepare('INSERT INTO imported_swap_preparations VALUES(?,?,?,?,?,?)')
+      .run(prep, 'alice', ref.projectId, 7, 9, JSON.stringify({ side: 'Buy' }));
+    sqlite
+      .prepare(
+        'INSERT INTO imported_swap_signing_intents VALUES(?,?,?,?,?,?,?,?,?,?)',
+      )
+      .run(
+        id,
+        'alice',
+        prep,
+        ref.wallet,
+        JSON.stringify({
+          ...original.document,
+          id,
+          preparationId: prep,
+          inputMint: 'So11111111111111111111111111111111111111112',
+          outputMint: ref.mint,
+        }),
+        'submitted',
+        ref.signature,
+        null,
+        created,
+        created,
+      );
+  }
+  const before = sqlite
+    .prepare('SELECT * FROM imported_swap_signing_intents ORDER BY id')
+    .all();
+  const response = await GET(
+    new Request(
+      `http://local/api/imported-projects/signing?projectId=${ref.projectId}`,
+    ),
+  );
+  expect(response.status).toBe(200);
+  const first = autoSellSavedOutcomePage(await response.json(), {
+    projectId: ref.projectId,
+    mint: ref.mint,
+  });
+  expect(first.scanned).toBe(50);
+  expect(first.rows).toEqual([]);
+  expect(first.nextCursor).not.toBeNull();
+  const older = await GET(
+    new Request(
+      `http://local/api/imported-projects/signing?projectId=${ref.projectId}&cursor=${first.nextCursor}`,
+    ),
+  );
+  expect(older.status).toBe(200);
+  const last = autoSellSavedOutcomePage(await older.json(), {
+    projectId: ref.projectId,
+    mint: ref.mint,
+    cursor: first.nextCursor,
+  });
+  expect(last.scanned).toBe(2);
+  expect(last.nextCursor).toBeNull();
+  expect(last.rows.map((r) => r.intentId)).toEqual([ref.intentId]);
+  expect(
+    sqlite
+      .prepare('SELECT * FROM imported_swap_signing_intents ORDER BY id')
+      .all(),
+  ).toEqual(before);
+  expect(statements.every((s) => /^\s*SELECT\b/i.test(s))).toBe(true);
 });

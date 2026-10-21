@@ -118,6 +118,12 @@ it('keeps an open original-outcome lookup mounted when the actual modal appends 
     ];
     await act(async () => vi.advanceTimersByTimeAsync(4000));
     expect(mocks.sell).toHaveBeenCalledTimes(1);
+    const reminders = [...host.querySelectorAll('details')].find(
+      (e) =>
+        e.querySelector('summary')?.textContent === 'Transaction reminders (1)',
+    )!;
+    expect(reminders).toBeTruthy();
+    await act(async () => reminders.querySelector('summary')!.click());
     const details = [...host.querySelectorAll('details')].find(
       (e) =>
         e.querySelector('summary')?.textContent ===
@@ -140,6 +146,22 @@ it('keeps an open original-outcome lookup mounted when the actual modal appends 
       'Submission recorded; receipt proof not loaded',
     );
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(host.textContent).toContain('Accounted tokens5');
+    for (let n = 0; n < 105; n++) {
+      await click('Resume');
+      await click('Pause');
+    }
+    expect(
+      host.querySelector('[aria-label="Auto Sell activity"]')!.textContent,
+    ).not.toContain('Synthetic unknown outcome');
+    expect(details.isConnected).toBe(true);
+    expect(details.open).toBe(true);
+    expect(reminders.open).toBe(true);
+    expect(details.textContent).toContain(
+      'Submission recorded; receipt proof not loaded',
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(mocks.sell).toHaveBeenCalledOnce();
     expect(host.textContent).toContain('Accounted tokens5');
   } finally {
     await act(async () => root.unmount());

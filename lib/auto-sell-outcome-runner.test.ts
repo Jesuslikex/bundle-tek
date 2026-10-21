@@ -69,9 +69,14 @@ it.each(['submitted', 'unknown', 'invalid', 'legacy'] as const)(
       if (kind === 'submitted' || kind === 'unknown') {
         expect(log.outcome).toEqual(ref);
         expect(Object.isFrozen(log.outcome)).toBe(true);
+        expect(result.outcomes).toHaveLength(1);
+        expect(result.outcomes![0].outcome).toEqual(ref);
         reference.wallet = ref.mint;
         expect(log.outcome!.wallet).toBe(ref.wallet);
-      } else expect(log.outcome).toBeUndefined();
+      } else {
+        expect(log.outcome).toBeUndefined();
+        expect(result.outcomes).toEqual([]);
+      }
       now = 20000;
       await runner.tick();
       await flush();

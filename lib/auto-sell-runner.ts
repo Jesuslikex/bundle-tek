@@ -37,6 +37,12 @@ export type AutoSellLogEntry = {
   signature?: string;
   outcome?: AutoSellOutcomeReference;
 };
+export const AUTO_SELL_OUTCOME_REMINDER_LIMIT = 100;
+export type AutoSellOutcomeReminder = Readonly<{
+  at: number;
+  kind: 'sell' | 'error';
+  outcome: AutoSellOutcomeReference;
+}>;
 
 export type AutoSellSnapshot = {
   running: boolean;
@@ -48,6 +54,9 @@ export type AutoSellSnapshot = {
   states: Record<string, AutoSellStrategyState & { inRange: boolean }>;
   log: AutoSellLogEntry[];
   selling: boolean;
+  /** Bounded lookup metadata, independent of the rolling activity log. */
+  outcomes?: AutoSellOutcomeReminder[];
+  outcomeOverflow?: boolean;
 };
 
 export type AutoSellRunnerDeps = {
@@ -120,6 +129,8 @@ export class AutoSellRunner {
   private marketCapAt = 0;
   private failures = 0;
   private log: AutoSellLogEntry[] = [];
+  private outcomes = new Map<string, AutoSellOutcomeReminder>();
+  private outcomeOverflow = false;
   private timer: unknown = null;
   private controller = new AbortController();
   private polling = false;
@@ -476,6 +487,8 @@ export class AutoSellRunner {
       states,
       log: this.log.slice(-50),
       selling: this.selling,
+      outcomes: [...this.outcomes.values()],
+      outcomeOverflow: this.outcomeOverflow,
     };
   }
 
@@ -496,6 +509,20 @@ export class AutoSellRunner {
         retained = validatedAutoSellOutcomeReference(outcome);
       } catch {
         /* Invalid lookup coordinates grant no read capability. */
+      }
+    }
+    if (retained && kind !== 'info' && !this.outcomes.has(retained.intentId)) {
+      this.outcomes.set(
+        retained.intentId,
+        Object.freeze({
+          at: this.deps.now(),
+          kind,
+          outcome: retained,
+        }),
+      );
+      if (this.outcomes.size > AUTO_SELL_OUTCOME_REMINDER_LIMIT) {
+        this.outcomes.delete(this.outcomes.keys().next().value!);
+        this.outcomeOverflow = true;
       }
     }
     this.log.push({

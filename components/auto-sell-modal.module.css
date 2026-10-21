@@ -387,6 +387,31 @@
   margin: 0 0 6px;
   font-size: 13px;
 }
+.contextNotice {
+  display: block;
+  width: 100%;
+  color: #a0a2b1;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.contextNotice:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.reminders > summary {
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+  cursor: pointer;
+}
+.reminders > summary:focus-visible {
+  outline: 2px solid #a99bff;
+  outline-offset: 2px;
+}
 .log ol {
   display: grid;
   gap: 4px;

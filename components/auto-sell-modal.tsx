@@ -1,6 +1,14 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -43,6 +51,7 @@ import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import styles from './auto-sell-modal.module.css';
 import { AutoSellSessionSummary } from './auto-sell-session-summary';
 import { AutoSellOutcomeRead } from './auto-sell-outcome-read';
+import { AutoSellSavedOutcomes } from './auto-sell-saved-outcomes';
 import {
   autoSellActivityLabel,
   autoSellEndLabel,
@@ -113,6 +122,26 @@ type AutoSellProps = {
 };
 
 export function AutoSell(props: AutoSellProps) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [contextNotice, setContextNotice] = useState('');
+  const contextClosed = useCallback(
+    (originalTrigger: HTMLButtonElement | null) => {
+      const replacement = trigger.current;
+      if (
+        !replacement ||
+        replacement === originalTrigger ||
+        !replacement.isConnected
+      )
+        return false;
+      replacement.focus();
+      setContextNotice(
+        'Workspace context changed. This view closed and new work stopped; an existing operation can still settle. Reopen for saved history or fresh settings.',
+      );
+      return true;
+    },
+    [],
+  );
+  const opened = useCallback(() => setContextNotice(''), []);
   // A review/run belongs to one exact project and wallet roster. Changing that
   // context must stop the old instance, including an unfinished vault unlock.
   const context = JSON.stringify([
@@ -128,10 +157,39 @@ export function AutoSell(props: AutoSellProps) {
       wallet.archived,
     ]),
   ]);
-  return <AutoSellContext key={context} {...props} />;
+  return (
+    <>
+      <AutoSellContext
+        key={context}
+        {...props}
+        triggerRef={trigger}
+        onContextClosed={contextClosed}
+        onOpened={opened}
+      />
+      <output
+        className={styles.contextNotice}
+        aria-label="Auto Sell view change"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {contextNotice}
+      </output>
+    </>
+  );
 }
 
-function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
+function AutoSellContext({
+  project,
+  wallets,
+  locked,
+  triggerRef,
+  onContextClosed,
+  onOpened,
+}: AutoSellProps & {
+  triggerRef: RefObject<HTMLButtonElement | null>;
+  onContextClosed: (originalTrigger: HTMLButtonElement | null) => boolean;
+  onOpened: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const advanced = useRef<HTMLDetailsElement>(null);
@@ -140,16 +198,21 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
     if (!open) return;
     const element = dialog.current;
     const previous = document.activeElement;
+    const originalTrigger = triggerRef.current;
     if (element && !element.open) {
       if (typeof element.showModal === 'function') element.showModal();
       else element.setAttribute('open', '');
     }
     return () => {
       element?.close?.();
-      if (previous instanceof HTMLElement && previous.isConnected)
+      if (
+        !onContextClosed(originalTrigger) &&
+        previous instanceof HTMLElement &&
+        previous.isConnected
+      )
         previous.focus();
     };
-  }, [open]);
+  }, [open, triggerRef, onContextClosed]);
   const [strategies, setStrategies] = useState<AutoSellStrategy[]>(() => [
     newAutoSellStrategy(0),
   ]);
@@ -352,7 +415,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
 
   // Live market cap for the In-Range pill before Run.
   useEffect(() => {
-    if (!open || running || token.chain !== 'Solana') return;
+    if (!open || running || locked || token.chain !== 'Solana') return;
     const controller = new AbortController();
     const read = createAutoSellFeed(token.address);
     const load = () =>
@@ -378,6 +441,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   }, [
     open,
     running,
+    locked,
     token.address,
     token.chain,
     token.decimals,
@@ -554,9 +618,12 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
   return (
     <>
       <Button
+        ref={triggerRef}
         variant="outline"
-        disabled={locked && !running}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          onOpened();
+          setOpen(true);
+        }}
       >
         {paused
           ? 'Auto Sell · paused'
@@ -848,6 +915,42 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                 to lock the browser vault.
               </output>
             )}
+            {!!snapshot?.outcomes?.length && (
+              <details className={`${styles.log} ${styles.reminders}`}>
+                <summary>
+                  Transaction reminders ({snapshot.outcomes.length})
+                </summary>
+                <p>
+                  {snapshot.outcomeOverflow
+                    ? 'Latest 100 reminders'
+                    : 'Transaction reminders'}{' '}
+                  from this run, kept separately from activity entries.
+                  Submitted reports and unknown outcomes are not receipt proof.
+                  Remounting or a new run clears this local list; use saved
+                  approvals below.
+                </p>
+                <ol>
+                  {[...snapshot.outcomes].reverse().map((entry) => (
+                    <li key={entry.outcome.intentId}>
+                      <strong>
+                        {entry.kind === 'error'
+                          ? 'Outcome unknown'
+                          : 'Submission reported'}
+                      </strong>
+                      <AutoSellOutcomeRead
+                        reference={entry.outcome}
+                        projectId={project.id}
+                        mint={token.address}
+                      />
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
+            <AutoSellSavedOutcomes
+              projectId={project.id}
+              mint={token.address}
+            />
             {snapshot && snapshot.log.length > 0 && (
               <section aria-label="Auto Sell activity" className={styles.log}>
                 <h3>Activity</h3>
@@ -880,7 +983,7 @@ function AutoSellContext({ project, wallets, locked }: AutoSellProps) {
                             tx
                           </a>
                         )}
-                        {entry.outcome && (
+                        {entry.outcome && !snapshot.outcomes && (
                           <AutoSellOutcomeRead
                             reference={entry.outcome}
                             projectId={project.id}
