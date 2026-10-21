@@ -1,0 +1,122 @@
+{
+  "base": "4193a045219f8b3ed7f8d3ba4227233b2a49b167",
+  "sourceOnly": true,
+  "scope": "mainnet funding source metadata load/cancel/recheck/recovery",
+  "newFinancialAuthority": false,
+  "existingSigningFlowUnchanged": true,
+  "baseline": {
+    "testsFailed": 4,
+    "testsPassed": 0,
+    "source": "4193a045219f8b3ed7f8d3ba4227233b2a49b167"
+  },
+  "tests": {
+    "files": 40,
+    "passed": 462,
+    "failed": 0,
+    "skipped": 0
+  },
+  "plainTypeScriptPassed": true,
+  "typedLintFiles": 7,
+  "formatFiles": 7,
+  "isolatedBuild": {
+    "base": "4193a045219f8b3ed7f8d3ba4227233b2a49b167",
+    "overlays": [
+      "components/launch/mainnet-funding-execution.tsx",
+      "components/launch/mainnet-funding-execution.test.tsx",
+      "lib/mainnet-funding-source.ts",
+      "lib/mainnet-funding-source.test.ts",
+      "lib/read-bounded-panel-json.ts",
+      "lib/read-bounded-panel-json.test.ts",
+      "lib/launch-layer-balance-refresh.ts"
+    ],
+    "hashes": {
+      "components/launch/mainnet-funding-execution.tsx": "0e4463989e74de684a262ce7f2bc8acc63cc5d7cfacc53b7362d092363a1291f",
+      "components/launch/mainnet-funding-execution.test.tsx": "2fcd0bff8414723607fca45e5d0261d0e4ac33e9c3a5c6ea2b3aaa9c81470219",
+      "lib/mainnet-funding-source.ts": "53ad685354a3a9a7516e14ec8a90e895f2d56aa6c4ab836f4ab783679e5bd1bc",
+      "lib/mainnet-funding-source.test.ts": "66a36aa10ca43b86ee717969de1c0776a091f17f64bee1f5e983a8359b843de7",
+      "lib/read-bounded-panel-json.ts": "d6da5d0c0561aaf112aa1b192609c08294d54dc3db8ee61faa49e08dedf90bac",
+      "lib/read-bounded-panel-json.test.ts": "b46a6ba1f9c21951c220060ab730e5107978c4ca39b28628ee8aaffb1896de0c",
+      "lib/launch-layer-balance-refresh.ts": "9e85037b9aef56f60a7c927623b443bffd22b579c0781a3f8efe034445dcfd76"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "opusReviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    }
+  ],
+  "sourceFreeze": {
+    "selectedFiles": 2374,
+    "unchanged": true,
+    "sha256": "bc2d7e4ee74fdf019c37d23e57f87a2efa89744275c66bac7d590e5000e11734"
+  },
+  "readerExtraction": {
+    "readerMechanicallyEquivalentExceptNamesAndInternalFixedError": true,
+    "layerDriverAndReceiptAdmissionUnchanged": true
+  },
+  "nativeWithdrawalJsxContractUnchanged": true,
+  "unchangedBackendAndParent": [
+    "components/native-withdrawal-panel.tsx",
+    "app/api/wallet-workspace/withdrawals/route.ts",
+    "app/api/wallet-workspace/route.ts",
+    "lib/native-withdrawal.ts",
+    "lib/native-withdrawal-server.ts",
+    "lib/mainnet-funding.ts",
+    "components/launch/funding-planner.tsx"
+  ],
+  "postFollowupDelta": [
+    "components/launch/mainnet-funding-execution.tsx",
+    "components/launch/mainnet-funding-execution.test.tsx",
+    "lib/mainnet-funding-source.ts"
+  ],
+  "postReviewVerification": "Readable-JSON source refusal uses recovery guidance, before-paint context cleanup, metadata confirmation notice and exact retained-wallet-revision assertions for missing/archived/duplicate/changed rows. Independently verified in final tests/typecheck/lint/build, not rereviewed.",
+  "transport": "Fixed same-origin metadata GET, no-store, redirect:error, no mount read or automatic retry",
+  "deadlineMilliseconds": 10000,
+  "responseBytes": 1048576,
+  "recheck": "Open financial review keeps its exact original wallet object/revision; rechecking never replaces it. Changed/unavailable readable source metadata uses recovery guidance.",
+  "financialParentScope": "Explicit recipient/leg selection or parent invalidation can still unmount a review as before; this checkpoint does not solve every financial interruption.",
+  "serverCurrentnessEvidence": {
+    "path": "app/api/wallet-workspace/withdrawals/route.ts",
+    "checks": "Current owned unarchived exact wallet revision in preparation/signing/submission conditional SQL; unchanged source only, not funded qualification."
+  },
+  "browser": "Existing Chrome desktop tool stopped for URL-policy confidence; no bypass or new rendered/live claim.",
+  "renderedSignedInOrLiveProviderQa": false,
+  "applicationOrHostedSql": false,
+  "migrationsChanged": false,
+  "providerCredentialCronChanged": false,
+  "realWalletUnlockSignSendOrFundedTest": false,
+  "deployed": false
+}

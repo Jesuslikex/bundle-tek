@@ -1,12 +1,39 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { SavedFunding } from '@/lib/funding-plan';
 import { fundingLegs, mainnetFundingAsset } from '@/lib/mainnet-funding';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import { NativeWithdrawalPanel } from '../native-withdrawal-panel';
 import { Button } from '../ui/button';
+import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
+import {
+  mainnetFundingSource,
+  FUNDING_SOURCE_UNAVAILABLE,
+  FUNDING_SOURCE_RECHECK_UNAVAILABLE,
+} from '@/lib/mainnet-funding-source';
 
 export function MainnetFundingExecution({
+  plan,
+  enabled,
+}: {
+  plan: SavedFunding;
+  enabled: boolean;
+}) {
+  return (
+    <FundingSourceContent
+      key={JSON.stringify([
+        plan.id,
+        plan.revision,
+        plan.updatedAt,
+        plan.archived,
+        plan.document,
+      ])}
+      plan={plan}
+      enabled={enabled}
+    />
+  );
+}
+function FundingSourceContent({
   plan,
   enabled,
 }: {
@@ -26,59 +53,119 @@ export function MainnetFundingExecution({
   const sourceWallet = legs[(proxies ? leg : 1) - 1]?.wallet ?? '';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const pending = useRef<AbortController | null>(null);
+  const [notice, setNotice] = useState('');
+  const [readEnabled, setReadEnabled] = useState(enabled);
+  // Clear metadata in the same render as disabling, while retaining item/leg selection.
+  if (readEnabled !== enabled) {
+    setReadEnabled(enabled);
+    setWallets(null);
+    setBusy(false);
+    setError('');
+    setNotice('');
+  }
+  const pending = useRef<{
+    controller: AbortController;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
+  const loadButton = useRef<HTMLButtonElement>(null),
+    cancelButton = useRef<HTMLButtonElement>(null);
   let asset: ReturnType<typeof mainnetFundingAsset> | undefined;
   try {
     asset = mainnetFundingAsset(plan.document);
   } catch {
     /* Unsupported profiles withhold transfer controls. */
   }
-  useEffect(() => () => pending.current?.abort(), []);
+  const finishFocus = () => {
+    if (document.activeElement === cancelButton.current)
+      loadButton.current?.focus();
+  };
+  useLayoutEffect(() => {
+    return () => {
+      pending.current?.controller.abort();
+      if (pending.current) clearTimeout(pending.current.timer);
+      pending.current = null;
+    };
+  }, [enabled]);
+  function stop(message: string) {
+    const operation = pending.current;
+    if (!operation) return;
+    finishFocus();
+    operation.controller.abort();
+    clearTimeout(operation.timer);
+    pending.current = null;
+    setBusy(false);
+    setError(message);
+  }
   async function load() {
-    pending.current?.abort();
+    if (pending.current || !enabled || plan.archived || !asset || !sourceWallet)
+      return;
     const controller = new AbortController();
-    pending.current = controller;
+    const operation = {
+      controller,
+      timer: setTimeout(() => {
+        if (pending.current === operation)
+          stop(
+            'Source loading timed out. Load the saved source again; nothing was transferred.',
+          );
+      }, 10000),
+    };
+    pending.current = operation;
     setBusy(true);
     setError('');
-    setWallets(null);
+    setNotice('');
     try {
       const response = await fetch('/api/wallet-workspace', {
         cache: 'no-store',
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(10000),
-        ]),
+        redirect: 'error',
+        signal: controller.signal,
       });
-      const value = (await response.json()) as {
-        wallets?: WorkspaceWallet[];
-        error?: string;
-      };
-      if (
-        !response.ok ||
-        !Array.isArray(value.wallets) ||
-        value.wallets.length > 500
-      )
-        throw new Error(value.error || 'Saved funding source unavailable.');
-      const source = value.wallets.filter(
-        (w) =>
-          w.chain === 'Solana' &&
-          w.address === sourceWallet &&
-          !w.archived &&
-          Number.isSafeInteger(w.revision) &&
-          w.revision > 0,
-      );
-      if (source.length !== 1)
+      if (!response.ok) {
+        void response.body?.cancel().catch(() => {});
         throw new Error(
-          'Save this exact active Solana source wallet in the wallet workspace first.',
+          response.status === 401 || response.status === 403
+            ? 'Sign in again before loading the saved funding source.'
+            : FUNDING_SOURCE_UNAVAILABLE,
         );
-      if (!controller.signal.aborted) setWallets(source);
+      }
+      const body = await readBoundedPanelJson(response, controller.signal);
+      let source: WorkspaceWallet[];
+      try {
+        source = mainnetFundingSource(body, sourceWallet);
+      } catch {
+        if (
+          wallets &&
+          !controller.signal.aborted &&
+          pending.current === operation
+        ) {
+          setError(FUNDING_SOURCE_RECHECK_UNAVAILABLE);
+          return;
+        }
+        throw new Error(FUNDING_SOURCE_UNAVAILABLE);
+      }
+      if (!controller.signal.aborted && pending.current === operation) {
+        if (wallets) {
+          if (JSON.stringify(source) !== JSON.stringify(wallets)) {
+            setError(FUNDING_SOURCE_RECHECK_UNAVAILABLE);
+          } else setNotice('Saved source details still match the open review.');
+        } else setWallets(source);
+      }
     } catch (error) {
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted && pending.current === operation)
         setError(
-          error instanceof Error ? error.message : 'Saved source unavailable.',
+          error instanceof Error &&
+            error.message ===
+              'Sign in again before loading the saved funding source.'
+            ? error.message
+            : FUNDING_SOURCE_UNAVAILABLE,
         );
     } finally {
-      if (!controller.signal.aborted) setBusy(false);
+      clearTimeout(operation.timer);
+      if (pending.current === operation) {
+        finishFocus();
+        pending.current = null;
+        setBusy(false);
+      }
+      controller.abort();
     }
   }
   return (
@@ -97,17 +184,67 @@ export function MainnetFundingExecution({
           Select an exact supported Solana token mint or native SOL before
           funding.
         </p>
-      ) : !enabled ? (
-        <p>Save the current draft before preparing mainnet transfers.</p>
+      ) : !sourceWallet ? (
+        <p>
+          The saved funding route is unavailable. Reload the saved plan and
+          choose a valid recipient and leg before loading its source.
+        </p>
+      ) : !enabled || plan.archived ? (
+        <p>Save the current active draft before preparing mainnet transfers.</p>
       ) : (
         <>
-          <Button variant="outline" disabled={busy} onClick={() => void load()}>
+          <p>
+            Load saved public-wallet details only. Transfers still require a
+            separate review and approval.
+          </p>
+          {wallets && (
+            <p>
+              Rechecking keeps the open transfer review intact. Recover any
+              pending transfer before changing the recipient or route.
+            </p>
+          )}
+          <p>
+            Source wallet: <code>{sourceWallet}</code>. Save or restore this
+            exact active wallet in My wallets if it is missing.
+          </p>
+          <Button
+            ref={loadButton}
+            variant="outline"
+            aria-disabled={busy}
+            className="min-h-11 aria-disabled:opacity-50"
+            onClick={() => void load()}
+          >
             {busy
               ? 'Reading saved source…'
-              : proxies
-                ? `Load leg ${leg} source wallet`
-                : 'Load saved mainnet funder'}
+              : wallets
+                ? 'Recheck saved source'
+                : proxies
+                  ? `Load leg ${leg} source wallet`
+                  : 'Load saved mainnet funder'}
           </Button>
+          {busy && (
+            <Button
+              ref={cancelButton}
+              variant="outline"
+              className="min-h-11"
+              onClick={() =>
+                stop(
+                  'Source loading cancelled. Load the saved source again when ready; nothing was transferred.',
+                )
+              }
+            >
+              Cancel source loading
+            </Button>
+          )}
+          <p>
+            <output>
+              {busy
+                ? 'Reading saved public-wallet details…'
+                : wallets
+                  ? 'Saved source loaded. Review this exact transfer below.'
+                  : 'Source not loaded.'}
+            </output>
+          </p>
           <label>
             Saved recipient
             <select
@@ -118,6 +255,8 @@ export function MainnetFundingExecution({
                 setItem(Number(e.target.value));
                 setLeg(1);
                 setWallets(null);
+                setError('');
+                setNotice('');
               }}
             >
               {plan.document.items.map((entry, i) => (
@@ -139,6 +278,8 @@ export function MainnetFundingExecution({
                 onChange={(e) => {
                   setLeg(Number(e.target.value));
                   setWallets(null);
+                  setError('');
+                  setNotice('');
                 }}
               >
                 {legs.map((l, i) => (
@@ -172,6 +313,11 @@ export function MainnetFundingExecution({
         </>
       )}
       {error && <p role="alert">{error}</p>}
+      {notice && (
+        <p>
+          <output>{notice}</output>
+        </p>
+      )}
     </section>
   );
 }

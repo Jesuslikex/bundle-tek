@@ -1,3 +1,7 @@
+import {
+  readBoundedPanelJson,
+  PANEL_JSON_RESPONSE_BYTES,
+} from './read-bounded-panel-json';
 import { z } from 'zod';
 import type { LaunchLayerEnvelope } from './launch-layer-terms';
 import {
@@ -44,60 +48,16 @@ export function layerSolRefreshHttpError(status: number) {
           : 'unconfirmed',
   );
 }
-export const LAYER_SOL_RESPONSE_BYTES = 1048576;
+export const LAYER_SOL_RESPONSE_BYTES = PANEL_JSON_RESPONSE_BYTES;
 export async function readLayerSolJson(
   response: Response,
   signal: AbortSignal,
 ): Promise<unknown> {
-  if (signal.aborted) {
-    void response.body?.cancel().catch(() => {});
-    signal.throwIfAborted();
-  }
-  if (
-    !/^application\/json(?:\s*;|$)/i.test(
-      response.headers.get('content-type') ?? '',
-    )
-  ) {
-    void response.body?.cancel().catch(() => {});
-    throw new LayerSolRefreshError('unconfirmed');
-  }
-  const reader = response.body?.getReader();
-  if (!reader) throw new LayerSolRefreshError('unconfirmed');
-  let finished = false,
-    cancelled = false,
-    size = 0,
-    text = '';
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  const cancel = () => {
-    if (!cancelled) {
-      cancelled = true;
-      void reader.cancel().catch(() => {});
-    }
-  };
-  signal.addEventListener('abort', cancel, { once: true });
   try {
-    while (true) {
-      signal.throwIfAborted();
-      const next = await reader.read();
-      signal.throwIfAborted();
-      if (next.done) {
-        finished = true;
-        break;
-      }
-      size += next.value.byteLength;
-      if (size > LAYER_SOL_RESPONSE_BYTES)
-        throw new LayerSolRefreshError('unconfirmed');
-      text += decoder.decode(next.value, { stream: true });
-    }
-    text += decoder.decode();
-    return JSON.parse(text);
+    return await readBoundedPanelJson(response, signal);
   } catch {
     if (signal.aborted) throw signal.reason;
     throw new LayerSolRefreshError('unconfirmed');
-  } finally {
-    signal.removeEventListener('abort', cancel);
-    if (!finished) cancel();
-    reader.releaseLock();
   }
 }
 export function layerSolRefreshGroups(envelope: LaunchLayerEnvelope) {
