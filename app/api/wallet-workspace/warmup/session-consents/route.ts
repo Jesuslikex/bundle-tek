@@ -74,7 +74,15 @@ function failure(error: unknown, request: Request) {
     error instanceof WalletWarmupSessionConsentError ||
     error instanceof WalletWarmupSessionStorageError
   )
-    return json({ error: error.message }, error.status);
+    return json(
+      {
+        error: error.message,
+        ...(error instanceof WalletWarmupSessionConsentError && error.recoveryId
+          ? { recoveryId: error.recoveryId }
+          : {}),
+      },
+      error.status,
+    );
   if (error instanceof WalletWarmupSessionReviewError)
     return json(
       { error: 'The source review is unavailable. Request a fresh review.' },

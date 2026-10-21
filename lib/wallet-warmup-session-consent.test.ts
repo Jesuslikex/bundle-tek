@@ -252,7 +252,7 @@ it('does not replace an identity or grant a second consent for the same retained
   ).rejects.toThrow('different terms');
   await expect(
     retain(db, 'owner', { ...input, id: crypto.randomUUID() }, true, signal()),
-  ).rejects.toThrow('Recover the same');
+  ).rejects.toMatchObject({ status: 409, recoveryId: input.id });
   expect(await total()).toBe(1);
 });
 it('recovers one committed insert after a lost response without another write', async () => {

@@ -37,6 +37,7 @@ export class WalletWarmupSessionConsentError extends Error {
   constructor(
     message: string,
     readonly status = 409,
+    readonly recoveryId?: string,
   ) {
     super(message);
   }
@@ -291,6 +292,18 @@ export async function retainWalletWarmupSessionConsent(
     );
     if (recovered && recovered.termsSha256 === input.termsSha256)
       return recovered;
+    const existing = await db
+      .prepare(
+        'SELECT id FROM wallet_warmup_session_consents WHERE owner_id=? AND review_id=? AND id<>?',
+      )
+      .bind(owner, input.reviewId, input.id)
+      .first<{ id: string }>();
+    if (existing && uuid.safeParse(existing.id).success)
+      throw new WalletWarmupSessionConsentError(
+        'This review already has a saved plan approval. Recover its original approval ID.',
+        409,
+        existing.id,
+      );
     fail(
       'Consent save was refused or its outcome is unknown. Recover the same consent ID before another attempt.',
     );

@@ -195,3 +195,55 @@ it('fails closed when the latest immutable guard is missing', async () => {
   expect((await post()).status).toBe(503);
   expect(await count()).toBe(0);
 });
+it('returns an owner-bound original recovery ID after a competing identity is refused', async () => {
+  await post();
+  const refused = await post({ ...saveBody(), id: crypto.randomUUID() });
+  expect(refused.status).toBe(409);
+  expect(await refused.json()).toEqual({
+    error:
+      'This review already has a saved plan approval. Recover its original approval ID.',
+    recoveryId: fixture.input.id,
+  });
+  expect(await count()).toBe(1);
+  mocks.user = { userId: 'other' };
+  const foreign = await post({ ...saveBody(), id: crypto.randomUUID() });
+  expect(JSON.stringify(await foreign.json())).not.toContain(fixture.input.id);
+});
+it('reports cancellation after a committed insert while same-ID recovery returns the retained record', async () => {
+  const controller = new AbortController();
+  let inserts = 0;
+  mocks.db = new Proxy(fixture.db, {
+    get(target, key) {
+      if (key !== 'prepare') {
+        const v = Reflect.get(target, key);
+        return typeof v === 'function' ? v.bind(target) : v;
+      }
+      return (sql: string) => {
+        const s = target.prepare(sql);
+        if (!sql.startsWith('INSERT INTO wallet_warmup_session_consents'))
+          return s;
+        return {
+          bind(...values: Parameters<D1PreparedStatement['bind']>) {
+            const bound = s.bind(...values);
+            return {
+              run: async () => {
+                const result = await bound.run();
+                inserts++;
+                controller.abort();
+                return result;
+              },
+            } as D1PreparedStatement;
+          },
+        } as D1PreparedStatement;
+      };
+    },
+  });
+  expect((await post(saveBody(), headers, controller.signal)).status).toBe(408);
+  expect(inserts).toBe(1);
+  expect(await count()).toBe(1);
+  mocks.db = fixture.db;
+  const recovered = await get();
+  expect(recovered.status).toBe(200);
+  expect(await recovered.json()).toEqual(await (await post()).json());
+  expect(await count()).toBe(1);
+});
