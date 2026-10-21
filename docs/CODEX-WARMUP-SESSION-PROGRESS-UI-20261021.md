@@ -1,6 +1,6 @@
 # Warmup session progress UI, 21 October 2026
 
-Owned checkpoint after `0164b7f`. This is saved history and metadata controls, not an automatic trading runner. The active claim remains held for the focused Opus 5.5 review and follow-up.
+Owned checkpoint `24f28d8` after `0164b7f`, followed by the independently verified review fixes below. This is saved history and metadata controls, not an automatic trading runner. The bounded UI/client claim is released after this follow-up.
 
 ## Behavior
 
@@ -27,3 +27,21 @@ The authorized existing Chrome Proxima tab is accessible again. Its UI currently
 No actual signed-in Bundle/provider/funded qualification is claimed for this new panel. No migration bytes changed; journal still ends at 0131. No application or hosted SQL, provider/credential/cron change, protected shell/layout/global CSS edit, deployment, real wallet unlock/sign/send or funded trade occurred.
 
 Remaining before automatic sessions: real owned per-action preparation API/callback and client review, appropriate fresh action qualification rather than extending the old 60-second preview, shared wallet/lot reservations, short authorization, browser-only signing, one-send recovery and multi-wallet orchestration. Preserve every current freshness, custody and signing safeguard.
+
+## Completed Opus 5.5 review and follow-up
+
+Actual installed CLI review of committed `24f28d8bf167b350e4321b8ae2c85d98ef5fa29b` completed successfully. Requested, selected and every actual model were `claude-opus-5-5`; only Read/Glob/Grep were available. Zero permission denials, edits or test execution. All 2641 copied source files remained unchanged. Private ignored evidence: `work/release-qa/opus-progress-ui-review-24f28d8-20261021/status.json` and `review.jsonl`. The reviewer found no blockers, with two medium UX recommendations and optional low polish. It read client/API/public/replay/digest code, parts of storage/sequence and only test titles; it did not execute or independently confirm Codex's tests/browser checks.
+
+Accepted and independently fixed:
+
+- Unknown outcomes now have a prominent alert saying a trade may already have been sent; other pending states are named. Stop never hides the unknown outcome.
+- Stop requires a separate confirmation bound to the currently displayed journal head. Keep plan cancels without a POST; refreshing clears confirmation. Confirmation uses a native fieldset, caught and corrected by typed accessibility lint.
+- History markers must read back exactly before any POST. A recovered different unique root ID is identified honestly rather than crediting the missing original save.
+- Waiting shows the scheduled review time. Closed windows do not claim review availability. Review deadlines show date and time; Stop/complete labels match the server's priority. Control success messages name Pause/Resume/Stop.
+- The section exposes `aria-busy`, and native recovery-details disclosure markers remain visible.
+
+Final follow-up: 61 tests across the three affected client/component/parent files pass, including three new cases for cancelled/stale Stop confirmation, failed marker read-back and waiting/closed-window guidance. Plain TypeScript and two-file typed lint pass with explicit failure checks; final formatting/diff checks pass. The earlier 669/26 run remains the broader checkpoint result, not a rerun of every file after these UI-only changes.
+
+The follow-up isolated production build passed with unchanged source overlays (`work/release-qa/warmup-session-progress-build-reviewed-20261021/result.json`), and its 2705-file freeze matched digest `f9cf0951982e256d8a2b10f1ed940b7bf6f3effa70d42905161d57d3c7925d65`. That build precedes the final div-to-fieldset semantic correction and its test assertion; those final two edits passed the TypeScript/lint/61-test checks above, without another full build. The browser disconnected during the follow-up visual attempt; the new confirmation/alert has no fresh rendered verification. Both disposable QA tabs were closed, both identity-checked servers stopped, and user tabs preserved.
+
+The follow-up was Codex-verified, not rereviewed by Opus. Optional conservative invalidation on unrelated storage events and equivalent consent-object replacement remains; no current caller was found to replace a saved consent object during a request. These events withhold activity and require recovery rather than granting authority. No signing, provider, SQL or deployment behavior changed.

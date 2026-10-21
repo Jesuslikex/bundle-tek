@@ -41,9 +41,15 @@
   text-align: center;
 }
 .panel summary {
-  display: flex;
-  align-items: center;
+  display: list-item;
+  padding-block: 12px;
   cursor: pointer;
+}
+.warning {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary, #8577ff);
+  border-radius: 8px;
+  padding: 12px;
 }
 .panel code {
   font-size: 12px;

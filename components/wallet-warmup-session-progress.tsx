@@ -46,7 +46,8 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
     [invalidReminder, setInvalidReminder] = useState(false),
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
-    [expired, setExpired] = useState(false);
+    [expired, setExpired] = useState(false),
+    [stopReview, setStopReview] = useState<string | null>(null);
   useEffect(() => {
     onBusyChange(busy);
     return () => onBusyChange(false);
@@ -57,6 +58,7 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
       pending.current = null;
       setBusy(false);
       setChecked(false);
+      setStopReview(null);
       setMessage(
         'Status needs refresh. Recover any pending request before another change.',
       );
@@ -87,7 +89,10 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
   );
   const remember = useCallback(
     (request: WarmupJournalRequest) => {
-      sessionStorage.setItem(storageKey, JSON.stringify(request));
+      const document = JSON.stringify(request);
+      sessionStorage.setItem(storageKey, document);
+      if (sessionStorage.getItem(storageKey) !== document)
+        throw Error('Recovery reminder was not retained');
       setMarker(request);
     },
     [storageKey],
@@ -109,6 +114,7 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
       const c = new AbortController();
       pending.current = c;
       setBusy(true);
+      setStopReview(null);
       setError('');
       setMessage('');
       const timer = setTimeout(() => c.abort(), 15000);
@@ -190,8 +196,12 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
           if (request) forget();
           setMessage(
             write
-              ? 'Session history saved. No signing or trades were started.'
-              : 'Saved status recovered. No request was sent to a wallet or trading provider.',
+              ? write.kind === 'control'
+                ? `Plan ${write.control === 'pause' ? 'paused' : write.control === 'resume' ? 'resumed' : 'stopped'}. No signing or trades were started.`
+                : 'Session history saved. No signing or trades were started.'
+              : request?.kind === 'record' && request.id !== admitted.id
+                ? 'History already exists for this approval under a different request ID. Its saved status was recovered; your earlier save request is not being credited.'
+                : 'Saved status recovered. No request was sent to a wallet or trading provider.',
           );
         }
       } catch (cause) {
@@ -297,21 +307,24 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
     }
   }
   const s = journal?.snapshot;
+  const stopContext = journal ? journal.version + ':' + journal.headSha256 : '';
   const label = !s
     ? 'No session history yet'
-    : s.phase === 'complete'
-      ? 'Recorded session complete'
-      : s.pending?.state === 'unknown'
-        ? 'Recovery required'
-        : s.stopped
-          ? 'Plan stopped'
-          : s.pending
-            ? 'Action needs recovery'
+    : s.pending?.state === 'unknown'
+      ? 'Recovery required'
+      : s.stopped
+        ? 'Plan stopped'
+        : s.pending
+          ? 'Action needs recovery'
+          : s.phase === 'complete'
+            ? 'Recorded session complete'
             : s.paused
               ? 'Plan paused'
               : expired || !s.sourceReviewFresh || s.reviewWindowUnavailable
                 ? 'Fresh review required'
-                : 'Ready for review';
+                : s.phase === 'waiting'
+                  ? 'Waiting for scheduled review'
+                  : 'Ready for review';
   if (!context)
     return (
       <p role="alert">
@@ -320,7 +333,11 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
       </p>
     );
   return (
-    <section className={styles.panel} aria-label="Warmup session history">
+    <section
+      className={styles.panel}
+      aria-label="Warmup session history"
+      aria-busy={busy}
+    >
       <div className={styles.heading}>
         <div>
           <h6>Session progress</h6>
@@ -344,18 +361,41 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
           <p>
             {expired || !s.sourceReviewFresh
               ? 'Review expired at'
-              : 'Review available until'}{' '}
-            {new Date(journal.effectiveReviewExpiresAt).toLocaleTimeString()}.
+              : s.reviewWindowUnavailable
+                ? 'Review window closes at'
+                : 'Review available until'}{' '}
+            {new Date(journal.effectiveReviewExpiresAt).toLocaleString()}.
             Approved finish{' '}
             {new Date(journal.sessionExpiresAt).toLocaleString()}.
           </p>
+          {s.reviewWindowUnavailable && (
+            <p>
+              No new action fits within this review window. A fresh review is
+              required.
+            </p>
+          )}
+          {s.phase === 'waiting' && s.nextReviewAt && (
+            <p>
+              Next scheduled review: {new Date(s.nextReviewAt).toLocaleString()}
+              .
+            </p>
+          )}
           {s.pending && (
-            <output>
+            <div
+              role={s.pending.state === 'unknown' ? 'alert' : 'status'}
+              className={styles.warning}
+            >
+              {s.pending.state === 'unknown' && (
+                <strong>
+                  Outcome unknown. A trade may already have been sent. Recover
+                  its outcome before another trade.{' '}
+                </strong>
+              )}
               {s.pending.action.side} action for wallet{' '}
               {s.pending.action.wallet.slice(0, 5)}…
-              {s.pending.action.wallet.slice(-4)} is retained. Stop does not
-              erase a pending outcome.
-            </output>
+              {s.pending.action.wallet.slice(-4)} is retained ({s.pending.state}
+              ). Stop does not erase a pending outcome.
+            </div>
           )}
           <div className={styles.wallets}>
             {s.wallets.map((w) => (
@@ -437,7 +477,7 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
                 invalidReminder ||
                 s.phase === 'complete'
               }
-              onClick={() => write('stop')}
+              onClick={() => setStopReview(stopContext)}
             >
               Stop plan
             </Button>
@@ -450,6 +490,33 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
           </Button>
         )}
       </div>
+      {s && !s.stopped && stopReview === stopContext && (
+        <fieldset
+          aria-label="Confirm permanent plan stop"
+          className={styles.recovery}
+        >
+          <strong>Stop this plan permanently?</strong>
+          <p>
+            This cannot be resumed. It prevents new session actions; it does not
+            cancel a trade already sent or erase an unknown outcome.
+          </p>
+          <div className={styles.controls}>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => setStopReview(null)}
+            >
+              Keep plan
+            </Button>
+            <Button
+              disabled={busy || !checked || !!marker || invalidReminder}
+              onClick={() => write('stop')}
+            >
+              Confirm stop plan
+            </Button>
+          </div>
+        </fieldset>
+      )}
       <p className={styles.note}>
         Automatic activity is unavailable in this release. Saving, pausing or
         resuming a plan does not start trades.

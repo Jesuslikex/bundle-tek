@@ -172,6 +172,8 @@ it('saves history once, then explicitly pauses/resumes/stops without any wallet 
   await click('Resume plan');
   await done(() => expect(button('Pause plan')).toBeTruthy());
   await click('Stop plan');
+  expect(writes()).toHaveLength(3);
+  await click('Confirm stop plan');
   await done(() => expect(host.textContent).toContain('Plan stopped'));
   expect(
     writes().map((r) =>
@@ -325,8 +327,50 @@ it('keeps an unknown outcome prominent after Stop and labels reserves as budgets
   await done(() => expect(host.textContent).toContain('Recovery required'));
   expect(host.textContent).toContain('Fee budget remaining');
   expect(host.textContent).toContain('erase a pending outcome');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'A trade may already have been sent',
+  );
   expect(button('Start automatic activity').disabled).toBe(true);
   expect(writes()).toHaveLength(0);
+});
+it('allows cancelling Stop without a write and clears confirmation after a status refresh', async () => {
+  await create();
+  await click('Stop plan');
+  expect(host.textContent).toContain('This cannot be resumed');
+  expect(host.querySelector('fieldset')?.getAttribute('aria-label')).toBe(
+    'Confirm permanent plan stop',
+  );
+  expect(writes()).toHaveLength(1);
+  await click('Keep plan');
+  expect(button('Confirm stop plan')).toBeUndefined();
+  await click('Stop plan');
+  await click('Refresh saved status');
+  await done(() => expect(button('Pause plan').disabled).toBe(false));
+  expect(button('Confirm stop plan')).toBeUndefined();
+  expect(writes()).toHaveLength(1);
+});
+it('withholds a POST when the recovery reminder cannot be read back', async () => {
+  await ready();
+  vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
+  await click('Save session history');
+  await done(() => expect(host.querySelector('[role=alert]')).toBeTruthy());
+  expect(writes()).toHaveLength(0);
+});
+it('shows waiting and closed-window guidance without implying an available review', async () => {
+  saved = f.root();
+  saved.snapshot.phase = 'waiting';
+  saved.snapshot.nextReviewAt = new Date(at + 10000).toISOString();
+  await render();
+  await done(() =>
+    expect(host.textContent).toContain('Waiting for scheduled review'),
+  );
+  expect(host.textContent).toContain('Next scheduled review:');
+  saved.snapshot.phase = 'refresh-required';
+  saved.snapshot.reviewWindowUnavailable = true;
+  saved.snapshot.nextReviewAt = null;
+  await click('Refresh saved status');
+  await done(() => expect(host.textContent).toContain('No new action fits'));
+  expect(host.textContent).not.toContain('Review available until');
 });
 it('ignores a cancelled late response and preserves recovery before any new write', async () => {
   await ready();
