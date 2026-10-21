@@ -29,7 +29,7 @@ import {
   SWAP_WRAPPED_SOL,
 } from './swap-token-program-evidence';
 import { pairUiAmount, activePairMultiplier } from './pair-ui-amount';
-import type { ImportedPairQuote } from './imported-trade-pair';
+import type { SolanaSwapRuntimeReference } from './solana-swap-runtime-context';
 import {
   PAIR_RENT,
   inspectPairRentAccount,
@@ -520,7 +520,7 @@ async function collectPairWalletEvidence(
   };
 }
 export function assessPairWalletFunding(
-  quote: ImportedPairQuote,
+  quote: SolanaSwapRuntimeReference,
   evidence: PairWalletEvidence,
   feeAndRentLimitRaw: string,
 ) {

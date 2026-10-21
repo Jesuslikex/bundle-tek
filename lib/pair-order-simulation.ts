@@ -13,7 +13,7 @@ import {
   SWAP_TOKEN_2022,
   SWAP_WRAPPED_SOL,
 } from './swap-token-program-evidence';
-import type { ImportedPairWalletPreflight } from './imported-pair-wallet-preflight';
+import type { SolanaSwapRuntimeContext } from './solana-swap-runtime-context';
 import type {
   reviewPairOrderInstructions,
   PairOrderAccountSnapshot,
@@ -52,7 +52,7 @@ function account(raw: unknown) {
 }
 /** Inspect standard RPC post-account bytes, never provider-reported token deltas. */
 export async function reviewPairOrderSimulation(
-  preflight: ImportedPairWalletPreflight,
+  preflight: SolanaSwapRuntimeContext,
   assessment: Assessment,
   before: PairOrderAccountSnapshot[],
   writable: string[],

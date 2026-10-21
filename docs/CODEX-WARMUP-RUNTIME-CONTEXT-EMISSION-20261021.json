@@ -1,0 +1,43 @@
+{
+  "base": "14687e7",
+  "typeOnly": true,
+  "rows": [
+    {
+      "file": "lib/pair-order-review.ts",
+      "identical": true,
+      "beforeSha256": "1dba7f1f47a6a4c4606472b1638abbae3cc4dfbb40d8534996110f66701a0b91",
+      "afterSha256": "1dba7f1f47a6a4c4606472b1638abbae3cc4dfbb40d8534996110f66701a0b91"
+    },
+    {
+      "file": "lib/pair-order-simulation.ts",
+      "identical": true,
+      "beforeSha256": "b127e2543a2edafc6d1ea93f5dfc4c6c9d5fb411f5341a8e958754f0371a4767",
+      "afterSha256": "b127e2543a2edafc6d1ea93f5dfc4c6c9d5fb411f5341a8e958754f0371a4767"
+    },
+    {
+      "file": "lib/pair-order-collector.ts",
+      "identical": true,
+      "beforeSha256": "fba32baed85df1e98bab214e762269c49efefc4d0f1aff29cb5c08739944c1a7",
+      "afterSha256": "fba32baed85df1e98bab214e762269c49efefc4d0f1aff29cb5c08739944c1a7"
+    },
+    {
+      "file": "lib/pair-order-quote-bounds.ts",
+      "identical": true,
+      "beforeSha256": "79a31b8b85debfcbfcc14adb9c47ff4366c420290d213ea8ad0aeb92f580ca82",
+      "afterSha256": "79a31b8b85debfcbfcc14adb9c47ff4366c420290d213ea8ad0aeb92f580ca82"
+    },
+    {
+      "file": "lib/pair-runtime-preview.ts",
+      "identical": true,
+      "beforeSha256": "960802b4050d4896184f19c7a1a64177a0afebb848be5df0be633b05d2035d81",
+      "afterSha256": "960802b4050d4896184f19c7a1a64177a0afebb848be5df0be633b05d2035d81"
+    },
+    {
+      "file": "lib/pair-wallet-evidence.ts",
+      "identical": true,
+      "beforeSha256": "6d25ce84f4276a35f5e17b2b4a11f0b569dfdddfa57ecb85dd401f02240f15be",
+      "afterSha256": "6d25ce84f4276a35f5e17b2b4a11f0b569dfdddfa57ecb85dd401f02240f15be"
+    }
+  ],
+  "passed": true
+}

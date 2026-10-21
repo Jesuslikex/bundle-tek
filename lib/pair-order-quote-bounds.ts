@@ -1,4 +1,4 @@
-import type { ImportedPairQuote } from './imported-trade-pair';
+import type { SolanaSwapRuntimeReference } from './solana-swap-runtime-context';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 import { pairWalletUint } from './pair-wallet-evidence';
 import {
@@ -10,7 +10,7 @@ export const PAIR_FRESH_REFERENCE_MINIMUM_TOLERANCE_BPS = 10;
 export type PairQuoteBoundsMode = 'strict' | 'fresh-reference';
 /** Cheap request/response checks precede expensive RPC work and repeat in instruction review. */
 export function assertPairOrderQuoteBounds(
-  quote: ImportedPairQuote,
+  quote: SolanaSwapRuntimeReference,
   order: SolanaPairPreparation,
   wallet: string,
   mode: PairQuoteBoundsMode = 'strict',

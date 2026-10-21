@@ -36,7 +36,7 @@ import { reviewPairRuntimeTrace } from './pair-runtime-trace';
 import { assertPairRuntimeWritableAccount } from './pair-runtime-exposure';
 import type { PairQuoteBoundsMode } from './pair-order-quote-bounds';
 import { pairAccountProvenance } from './pair-account-provenance';
-import type { ImportedPairWalletPreflight } from './imported-pair-wallet-preflight';
+import type { SolanaSwapRuntimeContext } from './solana-swap-runtime-context';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
 function slot(value: unknown, floor: number) {
@@ -52,7 +52,7 @@ function slot(value: unknown, floor: number) {
 }
 /** Reviews and simulates an unsigned candidate, without signing, sending or reserving funds. */
 export async function collectPairOrderReview(
-  preflight: ImportedPairWalletPreflight,
+  preflight: SolanaSwapRuntimeContext,
   order: SolanaPairPreparation,
   rpc: Rpc,
   now: () => number = Date.now,

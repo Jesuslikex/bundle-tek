@@ -1,0 +1,171 @@
+{
+  "sourceCommit": "14687e7",
+  "operatorDiagnosticOnly": true,
+  "applicationQualification": false,
+  "providerRole": "configured-indexer",
+  "providerKind": "Helius",
+  "providerSettingRole": "explicit indexer",
+  "startedAt": "2026-10-21T10:45:04.264Z",
+  "finishedAt": "2026-10-21T10:45:10.832Z",
+  "completed": true,
+  "failure": null,
+  "callCount": 27,
+  "elapsedMs": 6568,
+  "slotSpan": 28,
+  "clocks": [
+    {
+      "contextSlot": "459600360",
+      "clockSlot": "459600360",
+      "unixTimestamp": "1792579504",
+      "serverTimeMs": 1792579504788
+    },
+    {
+      "contextSlot": "459600387",
+      "clockSlot": "459600387",
+      "unixTimestamp": "1792579510",
+      "serverTimeMs": 1792579510651
+    }
+  ],
+  "stages": [
+    {
+      "stage": "genesis",
+      "calls": 1,
+      "startMs": 1,
+      "endMs": 215,
+      "statuses": [200]
+    },
+    {
+      "stage": "initial-slot",
+      "calls": 1,
+      "startMs": 215,
+      "endMs": 315,
+      "statuses": [200]
+    },
+    {
+      "stage": "initial-strict-clock",
+      "calls": 1,
+      "startMs": 315,
+      "endMs": 524,
+      "statuses": [200]
+    },
+    {
+      "stage": "code-scan-1",
+      "calls": 11,
+      "startMs": 525,
+      "endMs": 3375,
+      "statuses": [200]
+    },
+    {
+      "stage": "code-scan-2",
+      "calls": 11,
+      "startMs": 3376,
+      "endMs": 6175,
+      "statuses": [200]
+    },
+    {
+      "stage": "final-strict-clock",
+      "calls": 1,
+      "startMs": 6175,
+      "endMs": 6387,
+      "statuses": [200]
+    },
+    {
+      "stage": "final-genesis",
+      "calls": 1,
+      "startMs": 6387,
+      "endMs": 6567,
+      "statuses": [200]
+    }
+  ],
+  "scans": [
+    {
+      "minimumSlot": 459600360,
+      "maximumSlot": 459600371,
+      "reads": 11,
+      "programs": [
+        {
+          "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+          "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+          "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "deploymentSlot": "459479624",
+          "upgradeAuthority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+          "codeSha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+          "codeBytes": 2892224,
+          "identityKind": "elf-code"
+        },
+        {
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+          "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+          "deploymentSlot": "419472000",
+          "upgradeAuthority": null,
+          "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+          "codeBytes": 108600,
+          "identityKind": "elf-code"
+        }
+      ]
+    },
+    {
+      "minimumSlot": 459600371,
+      "maximumSlot": 459600385,
+      "reads": 11,
+      "programs": [
+        {
+          "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+          "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+          "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "deploymentSlot": "459479624",
+          "upgradeAuthority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+          "codeSha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+          "codeBytes": 2892224,
+          "identityKind": "elf-code"
+        },
+        {
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+          "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+          "deploymentSlot": "419472000",
+          "upgradeAuthority": null,
+          "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+          "codeBytes": 108600,
+          "identityKind": "elf-code"
+        }
+      ]
+    }
+  ],
+  "pinComparison": {
+    "readOnly": true,
+    "newProviderCalls": 0,
+    "pinnedPolicyChanged": false,
+    "warmupTrustedPolicyEstablished": false,
+    "signingAllowed": false,
+    "comparisonScope": "two public programs only; not complete runtime or semantic audit",
+    "rows": [
+      {
+        "program": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "knownStockEntry": true,
+        "codeHashMatchesStockEntry": false,
+        "loaderMatches": true,
+        "authorityMatches": true,
+        "identityMatches": true
+      },
+      {
+        "program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "knownStockEntry": true,
+        "codeHashMatchesStockEntry": true,
+        "loaderMatches": true,
+        "authorityMatches": true,
+        "identityMatches": true
+      }
+    ]
+  },
+  "sourceUnchanged": true,
+  "readOnly": true,
+  "realWalletActions": false,
+  "providerConfigurationChanged": false,
+  "quotes": 0,
+  "simulations": 0,
+  "broadcasts": 0,
+  "signingAllowed": false,
+  "executionAllowed": false
+}

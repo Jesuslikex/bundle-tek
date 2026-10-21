@@ -10,7 +10,7 @@ import {
   inspectPairTokenAccount,
   pairWalletUint,
 } from './pair-wallet-evidence';
-import type { ImportedPairWalletPreflight } from './imported-pair-wallet-preflight';
+import type { SolanaSwapRuntimeContext } from './solana-swap-runtime-context';
 import type { SolanaPairPreparation } from './warmup-swap-quote';
 import type { SwapInstructionReview } from './swap-instruction-review';
 import { pairAssociatedAddress } from './pair-wallet-evidence';
@@ -61,7 +61,7 @@ function rawAccount(raw: unknown) {
 }
 /** Exact top-level setup and raw budget checks. Inner effects still require independent simulation. */
 export async function reviewPairOrderInstructions(
-  preflight: ImportedPairWalletPreflight,
+  preflight: SolanaSwapRuntimeContext,
   order: SolanaPairPreparation,
   review: SwapInstructionReview,
   snapshots: PairOrderAccountSnapshot[],

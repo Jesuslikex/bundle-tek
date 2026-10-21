@@ -33,11 +33,12 @@ import { assessJupiterRoute } from './jupiter-route-assessment';
 import { discoverPairAuxiliaryAccounts } from './pair-order-auxiliary';
 import { PAIR_RENT, inspectPairRentAccount } from './pair-rent-evidence';
 import { assertPairOrderQuoteBounds } from './pair-order-quote-bounds';
-import type { prepareOwnedImportedPairOrder } from './imported-pair-order-candidate';
-type Candidate = Pick<
-  Awaited<ReturnType<typeof prepareOwnedImportedPairOrder>>,
-  'preflight' | 'order'
->;
+import type { SolanaSwapRuntimeContext } from './solana-swap-runtime-context';
+import type { SolanaPairPreparation } from './warmup-swap-quote';
+type Candidate = {
+  preflight: SolanaSwapRuntimeContext;
+  order: SolanaPairPreparation;
+};
 type Rpc = StockPairRpc;
 const COMPUTE = 'ComputeBudget111111111111111111111111111111',
   NATIVE = 'NativeLoader1111111111111111111111111111111';
