@@ -128,6 +128,22 @@
   margin-block: 8px;
   line-height: 1.5;
 }
+.nativeReview button {
+  min-height: 44px;
+}
+.nativeProgress {
+  min-width: 0;
+  margin-block: 12px;
+  padding: 12px;
+  border: 1px solid var(--border, #30333c);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.nativeProgress progress {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
 .nativeReview select {
   display: block;
   width: min(320px, 100%);

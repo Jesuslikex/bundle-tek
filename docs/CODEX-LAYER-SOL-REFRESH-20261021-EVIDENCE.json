@@ -1,0 +1,120 @@
+{
+  "base": "d6169e2342e00992a913bd5cdb6c3a8dfc5f36ab",
+  "sourceOnly": true,
+  "scope": "explicit finite source-bound launch-layer SOL observation refresh",
+  "authorityFlagsAllFalse": true,
+  "tests": {
+    "files": 19,
+    "passed": 239,
+    "failed": 0,
+    "skipped": 0
+  },
+  "plainTypeScriptPassed": true,
+  "typedLintFiles": 6,
+  "formatFiles": 7,
+  "isolatedBuild": {
+    "base": "d6169e2342e00992a913bd5cdb6c3a8dfc5f36ab",
+    "overlays": [
+      "lib/launch-layer-balance-refresh.ts",
+      "lib/launch-layer-balance-refresh.test.ts",
+      "lib/launch-layer-balance-refresh-route.test.ts",
+      "components/launch/launch-layer-balance-refresh-ui.test.tsx",
+      "test/launch-layer-balance-refresh-fixture.ts",
+      "components/launch/launch-layer-native-coverage.tsx",
+      "components/launch/pump-layer-planner.module.css"
+    ],
+    "hashes": {
+      "lib/launch-layer-balance-refresh.ts": "b642bbfd8501bc32fb7e1c6904102b461e3890afa4f01300024427e4f944c260",
+      "lib/launch-layer-balance-refresh.test.ts": "c05b3f5330e55142246656b8f8b6a52a2d9cf2375f39690127090fc089f05e2b",
+      "lib/launch-layer-balance-refresh-route.test.ts": "a313ea9f49940b5af1560ea91ad1eb04a2e5dc66851d13348a4d56244abe6792",
+      "components/launch/launch-layer-balance-refresh-ui.test.tsx": "e114245f0eac7d253e9507ca6bcfe3a2143dd169fbaa4a7a2cbdcf3edf94279a",
+      "test/launch-layer-balance-refresh-fixture.ts": "10cfd172abdefc937eacc42143568cfa8b1ac46a33e7f50367766fa54110cb9f",
+      "components/launch/launch-layer-native-coverage.tsx": "fb9260444d230f3c2d2894817fe283504257befee83126b0fc20d50a570f5482",
+      "components/launch/pump-layer-planner.module.css": "b5881804d3c40495a562f30c97d2f008540d641e030ba53cb8bd6df63df38be5"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "sourceFreeze": {
+    "selectedFiles": 2369,
+    "unchanged": true,
+    "sha256": "ae8d82e21110ff4127dfff87e0dd074ca1bb4aafd07b43e03accd0edbd1e65c7"
+  },
+  "opusReviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    }
+  ],
+  "filesChangedAfterFollowup": [
+    "components/launch/launch-layer-balance-refresh-ui.test.tsx",
+    "components/launch/launch-layer-native-coverage.tsx"
+  ],
+  "postReviewDelta": "Named semantic section tags/ref type, targeted keyboard-scroll lint exception, clear-filter focus restoration and stronger exact-node/immediate/last-page/previous/clear focus assertions. Driver/contract unchanged. Final tests/typecheck/lint/build cover final source; these small deltas independently verified, not rereviewed.",
+  "unchangedBackend": [
+    "app/api/wallet-workspace/balances/route.ts",
+    "lib/wallet-balances.ts",
+    "app/api/launch/layers/route.ts",
+    "lib/launch-layer-native-service.ts",
+    "lib/launch-layer-native-coverage.ts",
+    "lib/launch-layer-terms.ts"
+  ],
+  "routeVerification": "Actual authenticated handlers, unchanged shared gate and atomic local libSQL; controlled identity/provider only;105wallet success across15000ms boundary plus early refusal and wallet revision atomic refusal.",
+  "providerCalls": "controlled tests only; no live RPC",
+  "renderedSignedInQa": false,
+  "limits": {
+    "wallets": 500,
+    "groupAddresses": 100,
+    "groupCount": 5,
+    "waitMilliseconds": 15000,
+    "responseBytes": 1048576,
+    "rowPageSize": 25,
+    "retries": 0
+  },
+  "unknownReadRecovery": "Explicit saved-evidence GET; no automatic replay POST.",
+  "notProven": [
+    "live provider qualification",
+    "rendered/signed-in flow",
+    "current spendability",
+    "required launch funding",
+    "quote-token balances",
+    "combined executable launch approval",
+    "full Proxima parity"
+  ],
+  "applicationOrHostedSql": false,
+  "migrationsChanged": false,
+  "providerCredentialCronChanged": false,
+  "walletUnlockSignSendOrFunding": false,
+  "deployed": false
+}
