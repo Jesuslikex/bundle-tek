@@ -96,6 +96,19 @@ afterEach(() => {
 });
 const get = (suffix = '?id=' + selection.id, signal?: AbortSignal) =>
   GET(new Request(url + suffix, { signal }));
+it('verifies the complete journal once during current-action discovery', async () => {
+  const response = await get('?journalId=' + selection.journalId);
+  expect(response.status).toBe(200);
+  expect(
+    statements.filter((sql) => sql.includes('SELECT j.*,h.version')),
+  ).toHaveLength(1);
+  const { recovery } = (await response.json()) as { recovery: Recovery };
+  expect(recovery.originalJournal.headSha256).toBe(selection.headSha256);
+  expect(recovery.currentJournal.snapshot.pending?.action.id).toBe(
+    recovery.originalJournal.snapshot.pending?.action.id,
+  );
+  expect(fetch).not.toHaveBeenCalled();
+});
 it('returns only whitelisted original/current views from read-only SQL, without packet bytes or provider calls', async () => {
   const before = await f.count(),
     response = await get();

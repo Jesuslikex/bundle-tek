@@ -627,6 +627,43 @@ it('recovers by ID from a different browser with GET only, no reminder and no ne
     host.querySelector<HTMLInputElement>('input[type=checkbox]'),
   ).toBeNull();
 });
+it.each([false, true])(
+  'preserves a confirmed reminder against replacement (recovered=%s)',
+  async (recovered) => {
+    const first = '00000000-0000-4000-8000-000000000007',
+      other = '00000000-0000-4000-8000-000000000008';
+    if (recovered) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => Response.json(f.recovery(first))),
+      );
+      await render(f.root);
+      await typeRecovery(first);
+      await click('Read saved preparation context');
+      await settle(() =>
+        expect(host.textContent).toContain(
+          'Original unsigned review recovered',
+        ),
+      );
+    } else {
+      await ready();
+      await approve();
+      await click('Prepare unsigned action');
+      await settle(() =>
+        expect(host.textContent).toContain('Unsigned preparation saved'),
+      );
+    }
+    const before = sessionStorage.getItem(storageKey()),
+      count = vi.mocked(fetch).mock.calls.length;
+    for (const id of [other, '00000000-0000-4000-8000-000000000009']) {
+      await typeRecovery(id);
+      await click('Read saved preparation context');
+      expect(host.textContent).toContain('Keep this confirmed saved review');
+      expect(sessionStorage.getItem(storageKey())).toBe(before);
+      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(count);
+    }
+  },
+);
 it('finds a saved action without any browser reminder or known preparation ID', async () => {
   const id = '00000000-0000-4000-8000-000000000007';
   vi.stubGlobal(

@@ -215,6 +215,15 @@ export function WalletWarmupSessionPreparation({
         return;
       }
       const requestedId = selected?.success ? selected.data : null;
+      if (
+        (result || marker?.recovered) &&
+        (!requestedId || requestedId !== marker?.id)
+      ) {
+        setError(
+          'Keep this confirmed saved review. Recover its original ID; another review cannot replace its browser reminder.',
+        );
+        return;
+      }
       const c = new AbortController();
       pending.current = c;
       changeBusy(true);
@@ -304,6 +313,7 @@ export function WalletWarmupSessionPreparation({
       changeBusy,
       live,
       marker,
+      result,
       unreadableId,
       journal,
       context,
@@ -714,7 +724,7 @@ export function WalletWarmupSessionPreparation({
             </Button>
           </div>
         )}
-      {!result && (
+      {!result && !marker?.recovered && (
         <Button
           type="button"
           variant="outline"
@@ -726,6 +736,12 @@ export function WalletWarmupSessionPreparation({
       )}
       <details>
         <summary>Recover by saved preparation ID</summary>
+        {(result || marker?.recovered) && (
+          <p>
+            Keep the confirmed review’s original ID. Another preparation cannot
+            replace this browser reminder.
+          </p>
+        )}
         <label htmlFor={recoveryInputId}>Preparation ID</label>
         <input
           id={recoveryInputId}

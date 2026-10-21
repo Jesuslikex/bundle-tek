@@ -27,19 +27,35 @@ export async function readWalletWarmupSessionPreparationRecovery(
   );
   signal.throwIfAborted();
   if (!retained) return null;
-  const facts = retained.identity;
   const current = await readWalletWarmupSessionJournal(
     db,
     owner,
-    facts.journal_id,
+    retained.identity.journal_id,
     signal,
     now,
   );
   if (!current) fail();
+  return projectRecovery(retained, current, signal, now);
+}
+
+/** Both inputs were admitted by the owner-scoped readers in this module.
+ * Discovery reuses its complete verified journal rather than replaying it twice. */
+async function projectRecovery(
+  retained: NonNullable<
+    Awaited<ReturnType<typeof readWalletWarmupSessionPreparation>>
+  >,
+  current: NonNullable<
+    Awaited<ReturnType<typeof readWalletWarmupSessionJournal>>
+  >,
+  signal: AbortSignal,
+  now: number,
+) {
+  const facts = retained.identity;
   const events = current.events.slice(0, facts.review_version),
     last = events.at(-1);
   const created = Date.parse(retained.preparation.createdAt);
   if (
+    current.id !== facts.journal_id ||
     events.length !== facts.review_version ||
     !last ||
     last.version !== facts.review_version ||
@@ -105,8 +121,8 @@ export async function readWalletWarmupSessionPreparationRecovery(
   };
 }
 
-/** Find only the authenticated journal's current pending action, never an action
- * chosen by the client. A concurrent move to another action fails closed. */
+/** Find only the authenticated journal snapshot's pending action, never an action
+ * chosen by the client. Subsequent controls still require their own head check. */
 export async function findWalletWarmupSessionPreparationRecovery(
   db: D1Database,
   owner: string,
@@ -132,13 +148,15 @@ export async function findWalletWarmupSessionPreparationRecovery(
     .first<{ preparation_id: string }>();
   signal.throwIfAborted();
   if (!row) return null;
-  const recovery = await readWalletWarmupSessionPreparationRecovery(
+  const retained = await readWalletWarmupSessionPreparation(
     db,
     owner,
     row.preparation_id,
     signal,
-    now,
   );
+  signal.throwIfAborted();
+  if (!retained) fail();
+  const recovery = await projectRecovery(retained, journal, signal, now);
   if (
     !recovery ||
     recovery.currentJournal.id !== journalId ||

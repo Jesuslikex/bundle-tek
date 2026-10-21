@@ -265,6 +265,49 @@ it('updates the parent to verified current history after read-only recovery from
   expect(button('Start automatic activity').disabled).toBe(true);
   expect(host.querySelector('input[type=checkbox]')).toBeNull();
 });
+it('keeps parent controls held when storage invalidates an in-flight child recovery', async () => {
+  const p = await warmupPreparationClientFixture(at),
+    originalFetch = fetch,
+    id = '00000000-0000-4000-8000-000000000007';
+  let resolve!: (r: Response) => void;
+  vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+    if (!input.includes('/session-preparations/recovery?'))
+      return originalFetch(input, init);
+    return new Promise<Response>((r) => {
+      resolve = r;
+    });
+  });
+  await create();
+  await act(async () => {
+    const input = host.querySelector<HTMLInputElement>(
+      'input:not([type=checkbox])',
+    )!;
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, id);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('Read saved preparation context');
+  await done(() => expect(resolve).toBeTypeOf('function'));
+  await act(async () =>
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'unrelated',
+        storageArea: localStorage,
+      }),
+    ),
+  );
+  const review = { ...p.journal, id: saved!.id };
+  await act(async () => resolve(Response.json(p.recovery(id, review, review))));
+  await done(() =>
+    expect(host.textContent).toContain('Original unsigned review recovered'),
+  );
+  expect(button('Pause plan').disabled).toBe(true);
+  expect(button('Stop plan').disabled).toBe(true);
+  expect(host.textContent).toContain('Status needs refresh');
+  expect(writes()).toHaveLength(1);
+});
 it('saves history once, then explicitly pauses/resumes/stops without any wallet or provider endpoint', async () => {
   await create();
   expect(writes()).toHaveLength(1);

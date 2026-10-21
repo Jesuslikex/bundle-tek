@@ -58,7 +58,7 @@ function ProgressPanel({ consent, onBusyChange }: Props) {
   const preparationRecovered = useCallback((value: WarmupJournalView) => {
     previous.current = value;
     setJournal(value);
-    setChecked(true);
+    // A child read must not undo a concurrent parent refresh requirement.
     setExpired(Date.now() >= Date.parse(value.effectiveReviewExpiresAt));
   }, []);
   const busy = statusBusy || preparationBusy;
