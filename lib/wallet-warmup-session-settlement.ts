@@ -14,6 +14,10 @@ import { reviewUnsignedSwapOrder } from './unsigned-swap-order';
 import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
 import { walletAddress } from './wallet-workspace';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
+import {
+  warmupSessionSettlementSourceSql,
+  type WarmupSessionSettlementSourceRow,
+} from './wallet-warmup-session-settlement-source';
 
 const uuid = z.uuid().refine((v) => v === v.toLowerCase());
 const units = z
@@ -90,32 +94,7 @@ export type WarmupSessionSettlementSelection = {
   receiptId: string;
   candidate: ReturnType<WalletWarmupSessionSequence['beginReview']>;
 };
-type Row = {
-  receiptWallet: string | null;
-  remainingRaw: string | null;
-  receiptId: string;
-  receiptPlanId: string;
-  receiptSignature: string;
-  receiptDocument: string;
-  receiptPlanRevision: number | null;
-  receiptWalletRevision: number | null;
-  receiptCycle: number | null;
-  buyReceiptId: string | null;
-  consumedRaw: string | null;
-  preparationId: string;
-  planId: string;
-  planRevision: number;
-  cycle: number;
-  walletRevision: number;
-  preparationCreatedAt: string;
-  preparationDocument: string;
-  approvalId: string;
-  approvalPreparationId: string;
-  approvalWallet: string;
-  approvalSignature: string;
-  approvalState: string;
-  approvalDocument: string;
-};
+type Row = WarmupSessionSettlementSourceRow;
 const fail = (): never => {
   throw Error('Owned finalized settlement evidence is unavailable or changed.');
 };
@@ -137,19 +116,8 @@ async function read(
   id: string,
   side: 'Buy' | 'Sell',
 ) {
-  // Table names are closed constants, never supplied by the caller.
-  const table = side === 'Buy' ? 'warmup_buy_receipts' : 'warmup_sell_receipts';
-  const specific =
-    side === 'Buy'
-      ? 'r.wallet_address AS receiptWallet,r.remaining_raw AS remainingRaw,r.plan_revision AS receiptPlanRevision,r.wallet_revision AS receiptWalletRevision,r.cycle AS receiptCycle,NULL AS buyReceiptId,NULL AS consumedRaw'
-      : 'NULL AS receiptWallet,NULL AS remainingRaw,NULL AS receiptPlanRevision,NULL AS receiptWalletRevision,NULL AS receiptCycle,r.buy_receipt_id AS buyReceiptId,r.consumed_raw AS consumedRaw';
   const row = await db
-    .prepare(`SELECT r.id AS receiptId,r.plan_id AS receiptPlanId,r.signature AS receiptSignature,r.document AS receiptDocument,${specific},
-    s.id AS preparationId,s.plan_id AS planId,s.plan_revision AS planRevision,s.cycle,s.wallet_revision AS walletRevision,s.created_at AS preparationCreatedAt,s.document AS preparationDocument,
-    i.id AS approvalId,i.preparation_id AS approvalPreparationId,i.wallet_address AS approvalWallet,i.signature AS approvalSignature,i.state AS approvalState,i.document AS approvalDocument
-    FROM ${table} r JOIN warmup_swap_preparations s ON s.owner_id=r.owner_id AND s.id=r.preparation_id
-    JOIN warmup_signing_intents i ON i.owner_id=s.owner_id AND i.preparation_id=s.id
-    WHERE r.owner_id=? AND r.id=? AND r.plan_id=? AND EXISTS(SELECT 1 FROM wallet_warmup_plans p WHERE p.owner_id=r.owner_id AND p.id=r.plan_id)`)
+    .prepare(warmupSessionSettlementSourceSql(side))
     .bind(owner, id, planId)
     .first<Row>();
   if (!row) return fail();
@@ -466,11 +434,14 @@ export async function replayWarmupSessionSettlement(
           consumedRaw: (observed as WarmupSellReceipt).consumedRaw,
         };
   signal.throwIfAborted();
-  const sourceSha256 = await digest(canonical([before, linked ?? null]));
+  const sourceDocument = canonical([before, linked ?? null]);
+  const sourceSha256 = await digest(sourceDocument);
   signal.throwIfAborted();
   return {
     settlement,
     sourceSha256,
+    // Server-internal exact facts for a later guarded write. Never a public DTO.
+    sourceDocument,
     replayScope: 'owned-signature-packet-finalized-balances' as const,
     executionAllowed: false as const,
     signingAllowed: false as const,

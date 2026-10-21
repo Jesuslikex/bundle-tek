@@ -1,0 +1,31 @@
+# Warmup finalized-source insertion guard
+
+21 October2026. Internal source-binding checkpoint after durable journalbde2a31. Journal finalization remains blocked.
+
+## Concrete race addressed
+
+The original receipt adapter already verifies the owned historical packet/signature/finalized balances, rereads its database sources after provider work and returns their digest. That does not by itself guard a later database write: a receipt counter, preparation or signing-intent field could change between returning the result and inserting a settlement. A hash passed as a label cannot compare those live rows inside the insertion transaction.
+
+The adapter now also returns the exact canonical source document it already hashes: root joined receipt/preparation/intent row plus linked buy row for a sell, or explicit NULL for a buy. This is server-internal data, including raw retained documents, and must never be exposed by directly serializing the adapter result as an HTTP DTO. Source bytes and the existing digest are unchanged; the original provider/parsing/signature logic and post-read comparisons are unchanged.
+
+`wallet-warmup-session-settlement-source.ts` contains the closed source projection now shared by the original reader and the insertion predicate. The projection preserves every original column, join, owner/receipt/plan selector and owned-plan existence condition. Buy still makes two source SELECTs/two provider calls and sell four/four; historical saved-buy handling and current-revision automatic review restrictions are unchanged.
+
+`warmupSessionSettlementSourceGuard` checks the exact source-document SHA-256, complete strict two-row shape and buy/sell linked-source presence, with a4MiB UTF-8 total limit. It captures input strings before asynchronous hashing, then returns a closed parameterized SQL predicate and bindings for every projected value. NULL-safe `IS` comparisons bind all24 columns on each relevant row, including mutable remaining/consumed units, original documents, receipt identity/signature, preparation identity/revisions/timestamp and signing-intent identity/document/state. The owned plan must still exist; historical receipt capture does not require making an archived plan executable again. Buy uses27bindings and sell54; source values never become table names, column names or interpolated SQL.
+
+## Trust boundary
+
+This helper is a fact comparison, not receipt verification, source ownership authentication, signing approval or an execution capability. The internal caller must first run the real receipt adapter with an owner from its verified server session, then use that exact result in the same guarded write statement/transaction. Request-body snapshots and flags are not proof. Evaluating the predicate in a separate SELECT and writing afterwards would leave the original race open. The helper itself makes no provider/database request, starts no timer and returns all authority flags false.
+
+No production writer or API uses the predicate yet. The durable journal's service/SQL refusal of finalized labels stays intact. Next integration must atomically retain verified source evidence, exact action/receipt uniqueness, journal predecessor/head and the single budget delta, with unknown outcomes recovered by the original identity. Exact preparation/signing-intent/packet recovery, shared wallet/funds reservations and fresh per-action authorization remain separate requirements before automatic Start. No finalization, scheduler or live warmup readiness is implied by this checkpoint.
+
+## Verification
+
+Focused65 adapter cases pass, including27new insertion-binding cases. Existing tests still run the original packet/signature/finalized-balance parsers against synthetic signed transfer envelopes and controlled token metadata; they are not real DEX/funded swaps. New tests execute actual conditional INSERTs only into an in-memory test table constrained to zero authority. They cover unchanged Buy/Sell admission without additional source/provider reads, all48 root/linked scalar and NULL mutations, changes after completed replay and before insertion, linked buy counters/packet/approval, root sell consumption/document, owned-plan removal, owner isolation, mutable input during hashing and strict malformed/oversized/changed-hash refusal. The guarded test INSERT is not an application settlement or proof of atomic budget integration.
+
+Final398tests/18relatedfiles, whole-project plain TypeScript and three-file typed lint/format pass. Source snapshot2677files is verified separately before publication. No migration or SQL schema changed, so no unchanged migration chain rerun is claimed. No build/rendered/browser/live-provider result, deployment, application/hosted SQL, provider/credential/cron change, real wallet unlock/sign/send or funded action occurred. Protected UI/layout is untouched; migration0125 remains unclaimed, subject to recheck.
+
+## Claude review handoff
+
+This turn's bounded inventory attempt on the existing Chrome connection timed out, with the runtime reset. No browser message or reply was delivered. The installed Claude CLI's own status confirms an existing first-party Claude account sign-in. A bounded CLI review of this committed checkpoint is being prepared with explicit `claude-opus-5-5`, an isolated tracked-source snapshot, only Read/Glob/Grep tools, restricted/safe mode, no configured MCP tools and no fallback model. Authentication metadata does not prove a review has run or that the selected model is available; actual result/model metadata must be checked before claiming Opus review completion.
+
+Review request: read the committed adapter/helper/test diff and the original journal/replay contracts. Read actual test bodies; verify the moved SQL projection, complete parameter binding, NULL handling, owner scope, no extra provider calls and the distinction between a fact guard and cryptographic receipt verification. State exact files/tests read/run. No edits, migrations, deployment, provider changes or wallet actions. This reviewer has no test/command tool, so Codex's398-test result is independent. The earlier UI/journal review requests remain pending separately; this source-guard review does not replace them.

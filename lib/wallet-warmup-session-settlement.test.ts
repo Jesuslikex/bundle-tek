@@ -16,6 +16,8 @@ import { warmupCycleProgress } from './warmup-cycle-progress';
 import { warmupLotPerformance } from './warmup-lot-performance';
 import { reviewWalletWarmupSession } from './wallet-warmup-session-review';
 import type { SavedWarmup } from './wallet-warmup-storage';
+import { warmupSessionSettlementSourceGuard } from './wallet-warmup-session-settlement-source';
+import { walletWarmupSessionDigest } from './wallet-warmup-session-digest';
 vi.mock('@/lib/wallet-rpc-pacing', () => ({ paceWalletRpc: async () => {} }));
 let client: Client,
   db: D1Database,
@@ -29,6 +31,7 @@ beforeEach(async () => {
   db = createTursoDatabase(client);
   f = await warmupSessionSettlementFixture();
   for (const sql of [
+    'CREATE TABLE guarded_settlement_test(id INTEGER PRIMARY KEY,authority INTEGER NOT NULL CHECK(authority=0))',
     'CREATE TABLE wallet_warmup_plans(id TEXT,owner_id TEXT,revision INTEGER,archived INTEGER)',
     'CREATE TABLE warmup_swap_preparations(id TEXT,owner_id TEXT,plan_id TEXT,plan_revision INTEGER,cycle INTEGER,wallet_revision INTEGER,created_at TEXT,document TEXT)',
     'CREATE TABLE warmup_signing_intents(id TEXT,owner_id TEXT,preparation_id TEXT,wallet_address TEXT,signature TEXT,state TEXT,document TEXT)',
@@ -658,4 +661,286 @@ it('refuses a buy-lot link that differs from the retained exact signing approval
     ),
   ).rejects.toThrow();
   expect(methods).toHaveLength(0);
+});
+
+async function guardedWrite(
+  guard: Awaited<ReturnType<typeof warmupSessionSettlementSourceGuard>>,
+  id = 1,
+) {
+  return db
+    .prepare(
+      `INSERT INTO guarded_settlement_test(id,authority) SELECT ?,0 WHERE ${guard.sql}`,
+    )
+    .bind(id, ...guard.bindings)
+    .run();
+}
+
+it.each(['Buy', 'Sell'] as const)(
+  'compares exact verified %s facts inside a real SQL INSERT without further provider reads',
+  async (side) => {
+    const result = await replayWarmupSessionSettlement(
+      db,
+      'owner',
+      input(side),
+      signal(),
+      fetcher,
+    );
+    expect(await walletWarmupSessionDigest(result.sourceDocument)).toBe(
+      result.sourceSha256,
+    );
+    const count = { sql: queries.length, rpc: methods.length };
+    const guard = await warmupSessionSettlementSourceGuard(
+      'owner',
+      side,
+      result,
+    );
+    expect(queries.length).toBe(count.sql);
+    expect(methods.length).toBe(count.rpc);
+    expect(guard).toMatchObject({
+      executionAllowed: false,
+      signingAllowed: false,
+      automaticExecutionAllowed: false,
+    });
+    expect(guard.sql).not.toContain(f.wallet);
+    expect(guard.sql).not.toContain(f.buy.signature);
+    expect((await guardedWrite(guard)).meta.changes).toBe(1);
+    expect(methods.length).toBe(count.rpc);
+    expect(
+      (
+        await db
+          .prepare('SELECT authority FROM guarded_settlement_test')
+          .first<{ authority: number }>()
+      )?.authority,
+    ).toBe(0);
+  },
+);
+
+it('does not write after a receipt remaining-unit counter changes following completed replay', async () => {
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    input(),
+    signal(),
+    fetcher,
+  );
+  const guard = await warmupSessionSettlementSourceGuard(
+    'owner',
+    'Buy',
+    result,
+  );
+  await db.prepare("UPDATE warmup_buy_receipts SET remaining_raw='1'").run();
+  expect((await guardedWrite(guard)).meta.changes).toBe(0);
+});
+
+it.each([
+  [
+    'preparation document',
+    "UPDATE warmup_swap_preparations SET document=document||' '",
+  ],
+  [
+    'preparation timestamp',
+    "UPDATE warmup_swap_preparations SET created_at='2020-01-01T00:00:00.000Z'",
+  ],
+  [
+    'preparation revision',
+    'UPDATE warmup_swap_preparations SET plan_revision=plan_revision+1',
+  ],
+  [
+    'approval document',
+    "UPDATE warmup_signing_intents SET document=document||' '",
+  ],
+  ['approval state', "UPDATE warmup_signing_intents SET state='submitted'"],
+  [
+    'approval signature',
+    "UPDATE warmup_signing_intents SET signature='changed'",
+  ],
+  ['receipt document', "UPDATE warmup_buy_receipts SET document=document||' '"],
+  ['receipt signature', "UPDATE warmup_buy_receipts SET signature='changed'"],
+  ['owned plan existence', 'DELETE FROM wallet_warmup_plans'],
+])(
+  'rejects %s drift after provider verification and before the write',
+  async (_label, sql) => {
+    const result = await replayWarmupSessionSettlement(
+      db,
+      'owner',
+      input(),
+      signal(),
+      fetcher,
+    );
+    const guard = await warmupSessionSettlementSourceGuard(
+      'owner',
+      'Buy',
+      result,
+    );
+    await db.prepare(sql).run();
+    expect((await guardedWrite(guard)).meta.changes).toBe(0);
+  },
+);
+
+it.each([
+  ['linked buy counter', "UPDATE warmup_buy_receipts SET remaining_raw='1'"],
+  [
+    'linked buy packet',
+    "UPDATE warmup_swap_preparations SET document=document||' ' WHERE id=?",
+  ],
+  [
+    'linked buy approval',
+    "UPDATE warmup_signing_intents SET state='submitted' WHERE preparation_id=?",
+  ],
+  [
+    'root sell consumption',
+    "UPDATE warmup_sell_receipts SET consumed_raw='100'",
+  ],
+  [
+    'root sell receipt',
+    "UPDATE warmup_sell_receipts SET document=document||' '",
+  ],
+])(
+  'checks %s as well as the root sell inside the guarded statement',
+  async (_label, sql) => {
+    const result = await replayWarmupSessionSettlement(
+      db,
+      'owner',
+      input('Sell'),
+      signal(),
+      fetcher,
+    );
+    const guard = await warmupSessionSettlementSourceGuard(
+      'owner',
+      'Sell',
+      result,
+    );
+    const statement = db.prepare(sql);
+    await (
+      sql.includes('?') ? statement.bind(f.buy.preparation.id) : statement
+    ).run();
+    expect((await guardedWrite(guard)).meta.changes).toBe(0);
+  },
+);
+
+it('binds every projected scalar and explicit NULL for both root and linked sources', async () => {
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    input('Sell'),
+    signal(),
+    fetcher,
+  );
+  const original = JSON.parse(result.sourceDocument) as Record<
+    string,
+    unknown
+  >[];
+  let index = 0;
+  for (let row = 0; row < 2; row++)
+    for (const key of Object.keys(original[row])) {
+      const changed = structuredClone(original);
+      const value = changed[row][key];
+      if (typeof value === 'number') changed[row][key] = value + 1;
+      else if (value === null)
+        changed[row][key] = /Revision$|Cycle$/.test(key) ? 1 : 'changed';
+      else {
+        if (typeof value !== 'string') throw Error('Expected captured scalar');
+        changed[row][key] = value + 'changed';
+      }
+      const sourceDocument = JSON.stringify(changed);
+      const guard = await warmupSessionSettlementSourceGuard('owner', 'Sell', {
+        sourceDocument,
+        sourceSha256: await walletWarmupSessionDigest(sourceDocument),
+      });
+      expect(
+        (await guardedWrite(guard, ++index)).meta.changes,
+        `${row}:${key}`,
+      ).toBe(0);
+    }
+  expect(index).toBe(48);
+});
+
+it('isolates the owner when the captured packet and source bytes are otherwise identical', async () => {
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    input(),
+    signal(),
+    fetcher,
+  );
+  expect(
+    (
+      await guardedWrite(
+        await warmupSessionSettlementSourceGuard('other', 'Buy', result),
+      )
+    ).meta.changes,
+  ).toBe(0);
+  await expect(
+    warmupSessionSettlementSourceGuard("owner' OR 1=1", 'Buy', result),
+  ).rejects.toThrow('source binding');
+});
+
+it('copies exact source strings before asynchronous hashing', async () => {
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    input(),
+    signal(),
+    fetcher,
+  );
+  const expected = {
+    sourceDocument: result.sourceDocument,
+    sourceSha256: result.sourceSha256,
+  };
+  const pending = warmupSessionSettlementSourceGuard('owner', 'Buy', expected);
+  expected.sourceDocument = 'changed';
+  expected.sourceSha256 = 'a'.repeat(64);
+  expect((await guardedWrite(await pending)).meta.changes).toBe(1);
+});
+
+it.each([
+  'digest',
+  'missing-column',
+  'extra-column',
+  'wrong-tuple',
+  'oversized',
+  'invalid-json',
+  'wrong-side',
+])('rejects %s source binding before any database write', async (kind) => {
+  const result = await replayWarmupSessionSettlement(
+    db,
+    'owner',
+    input(),
+    signal(),
+    fetcher,
+  );
+  let sourceDocument = result.sourceDocument;
+  const rows = JSON.parse(sourceDocument);
+  if (kind === 'missing-column') {
+    delete rows[0].receiptSignature;
+    sourceDocument = JSON.stringify(rows);
+  }
+  if (kind === 'extra-column') {
+    rows[0].executionAllowed = true;
+    sourceDocument = JSON.stringify(rows);
+  }
+  if (kind === 'wrong-tuple') sourceDocument = JSON.stringify([rows[0]]);
+  if (kind === 'oversized') sourceDocument = ' '.repeat(4194305);
+  if (kind === 'invalid-json') sourceDocument = '{';
+  const sourceSha256 =
+    kind === 'digest'
+      ? 'a'.repeat(64)
+      : await walletWarmupSessionDigest(sourceDocument);
+  await expect(
+    warmupSessionSettlementSourceGuard(
+      'owner',
+      kind === 'wrong-side' ? 'Sell' : 'Buy',
+      {
+        sourceDocument,
+        sourceSha256,
+      },
+    ),
+  ).rejects.toThrow('source binding');
+  expect(
+    (
+      await db
+        .prepare('SELECT count(*) AS n FROM guarded_settlement_test')
+        .first<{ n: number }>()
+    )?.n,
+  ).toBe(0);
 });
