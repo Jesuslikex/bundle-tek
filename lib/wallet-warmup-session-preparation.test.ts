@@ -70,6 +70,28 @@ it('retains exact unsigned bytes atomically and recovers after expiry without an
   ])
     await expect(f.db.prepare(sql).run()).rejects.toThrow();
 });
+it('refuses a quote that expires after callback completion but before the final app-clock write check', async () => {
+  const f = await fixture();
+  const document = structuredClone(f.packets.buy.preparation.document);
+  const inputValue = input(f);
+  await expect(
+    prepare(
+      f.db,
+      'owner',
+      inputValue,
+      signal(),
+      async () => {
+        f.advance(Date.parse(document.expiresAt) - f.clock());
+        return {
+          summary: document,
+          transaction: f.packets.buy.approval.transaction,
+        };
+      },
+      f.clock,
+    ),
+  ).rejects.toThrow();
+  expect(await counts(f.db)).toEqual([0, 0, 2]);
+});
 it('rolls the preparation and binding back when the packet insert fails', async () => {
   const f = await fixture();
   await f.db

@@ -452,7 +452,8 @@ export async function prepareWalletWarmupSessionAction(
   if (
     !Number.isSafeInteger(now) ||
     now < at ||
-    now >= Date.parse(journal.effectiveReviewExpiresAt)
+    now >= Date.parse(journal.effectiveReviewExpiresAt) ||
+    Date.parse(document.expiresAt) <= now
   )
     fail();
   const createdAt = new Date(now).toISOString(),
