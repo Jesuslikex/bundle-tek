@@ -179,7 +179,8 @@ async function quoteSolanaSwap(
     void response.body?.cancel().catch(() => {});
     signal.throwIfAborted();
   }
-  if (!response.ok)
+  if (!response.ok) {
+    void response.body?.cancel().catch(() => {});
     throw new WarmupQuoteError(
       response.status === 401 || response.status === 403
         ? 'Jupiter quote service authentication failed.'
@@ -192,6 +193,7 @@ async function quoteSolanaSwap(
         ? 'PROVIDER_REJECTED'
         : 'QUOTE_UNAVAILABLE',
     );
+  }
   const reader = response.body?.getReader();
   if (!reader) throw new WarmupQuoteError('Empty quote response.');
   let text = '',

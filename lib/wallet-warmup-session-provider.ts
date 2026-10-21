@@ -8,9 +8,10 @@ import { warmupAtoms, warmupBuyAmount } from './wallet-warmup';
 import { formatNativeBalance } from './wallet-balance-format';
 import { warmupPreparationSummary } from './warmup-preparation-history';
 import type { WarmupSessionPreparationCandidate } from './wallet-warmup-session-preparation';
+import { SWAP_TOKEN, SWAP_TOKEN_2022 } from './swap-token-program-evidence';
 
-// The entire HTTP request is bounded to25s. A longer owner cooldown also prevents
-// another ordinary wallet read from starting a competing preparation in that time.
+// A25s cooperative request deadline and longer owner cooldown constrain provider
+// reads. They cannot cancel an already accepted remote request or database write.
 export const WARMUP_SESSION_PREPARATION_TIMEOUT_MS = 25000;
 export const WARMUP_SESSION_PROVIDER_COOLDOWN_MS = 30000;
 export class WalletWarmupSessionProviderError extends Error {
@@ -34,6 +35,16 @@ const uint = (value: string) => {
     BigInt(value) > (1n << 64n) - 1n
   )
     return fail();
+  return BigInt(value);
+};
+const signed = (value: string) => {
+  if (
+    typeof value !== 'string' ||
+    !/^(0|-?[1-9]\d{0,19})$/.test(value) ||
+    BigInt(value) < -((1n << 64n) - 1n) ||
+    BigInt(value) > (1n << 64n) - 1n
+  )
+    return fail('Native or token balance evidence is unavailable.');
   return BigInt(value);
 };
 type Dependencies = {
@@ -112,6 +123,10 @@ export function createWalletWarmupSessionProvider(
       if (!row)
         return fail(
           'The approved buy lot is unavailable. Recover its history.',
+        );
+      if (row.remainingRaw == null)
+        return fail(
+          'The approved buy lot has no current remaining-unit record. Refresh its history.',
         );
       const receipt = {
         ...row,
@@ -244,6 +259,8 @@ export function createWalletWarmupSessionProvider(
     signal.throwIfAborted();
     if (
       !simulation.succeeded ||
+      simulation.sha256 !== order.preparation.sha256 ||
+      simulation.wallet !== a.wallet ||
       !simulation.tokensComplete ||
       (a.side === 'Buy'
         ? simulation.minimumOutputCovered !== true ||
@@ -261,29 +278,50 @@ export function createWalletWarmupSessionProvider(
         uint(estimates.signatureFeeLamports) +
         uint(estimates.prioritizationFeeLamports),
       rent = uint(estimates.rentFeeLamports),
-      fee = uint(simulation.networkFeeLamports);
+      fee = uint(simulation.networkFeeLamports),
+      feeBound = (network > fee ? network : fee) + rent;
     if (
       network + rent !== uint(order.preparation.estimatedFeesLamports) ||
-      (network > fee ? network : fee) + rent > reserve
+      feeBound > reserve
     )
       return fail('Estimated fees and rent exceed the approved fee budget.');
-    const change = simulation.nativeChangeRaw;
+    const changes = simulation.tokenChanges;
+    const selected = changes.filter((t) => t.mint === a.mint),
+      wrapped = changes.filter((t) => t.mint === WRAPPED_SOL);
     if (
-      typeof change !== 'string' ||
-      !/^(0|-?[1-9]\d{0,19})$/.test(change) ||
-      BigInt(change) < -((1n << 64n) - 1n) ||
-      BigInt(change) > (1n << 64n) - 1n
+      selected.length !== 1 ||
+      ![SWAP_TOKEN, SWAP_TOKEN_2022].includes(selected[0].program) ||
+      wrapped.length > 1 ||
+      wrapped.some((t) => t.program !== SWAP_TOKEN || t.decimals !== 9) ||
+      changes.some(
+        (t) =>
+          t.mint !== a.mint &&
+          t.mint !== WRAPPED_SOL &&
+          signed(t.changeRaw) !== 0n,
+      )
     )
+      return fail('Simulation changes unrelated or ambiguous token balances.');
+    const delta = signed(selected[0].changeRaw);
+    if (
+      uint(selected[0].afterRaw) - uint(selected[0].beforeRaw) !== delta ||
+      (a.side === 'Sell' && selected[0].decimals !== decimals) ||
+      (a.side === 'Buy'
+        ? delta <= 0n || delta < uint(order.minimumOutAmount)
+        : delta !== -uint(raw))
+    )
+      return fail('Simulation token changes differ from the exact action.');
+    const wrappedDelta = wrapped.reduce((sum, t) => {
+      const change = signed(t.changeRaw);
+      if (uint(t.afterRaw) - uint(t.beforeRaw) !== change)
+        return fail('Wrapped SOL balance evidence differs.');
+      return sum + change;
+    }, 0n);
+    if (simulation.nativeChangeRaw === null)
       return fail('Native balance evidence is unavailable.');
-    if (
-      a.side === 'Buy' &&
-      (BigInt(change) > 0n || -BigInt(change) > uint(raw) + reserve)
-    )
+    const change = signed(simulation.nativeChangeRaw) + wrappedDelta;
+    if (a.side === 'Buy' && (change > 0n || -change > uint(raw) + feeBound))
       return fail('Simulated native spending exceeds the approved budget.');
-    if (
-      a.side === 'Sell' &&
-      BigInt(change) < uint(order.minimumOutAmount) - reserve
-    )
+    if (a.side === 'Sell' && change < uint(order.minimumOutAmount) - feeBound)
       return fail(
         'Simulated native output falls below the review budget bound.',
       );

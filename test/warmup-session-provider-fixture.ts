@@ -137,7 +137,17 @@ export async function warmupSessionProviderFixture(
           settlementEvidence: null,
           lookupObservation: null,
           tokensComplete: true,
-          tokenChanges: [],
+          tokenChanges: [
+            {
+              mint: f.packets.mint,
+              program: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+              decimals: 6,
+              beforeRaw: order.side === 'Buy' ? '0' : '101',
+              afterRaw: order.side === 'Buy' ? '101' : '0',
+              changeRaw: order.side === 'Buy' ? '101' : '-101',
+              accounts: ['11111111111111111111111111111111'],
+            },
+          ],
           inputAmountMatches: order.side === 'Buy' ? null : true,
           minimumOutputCovered: order.side === 'Buy' ? true : null,
           limitations:

@@ -94,7 +94,10 @@ async function installed(db: D1Database) {
   if (row?.n !== 8) fail('Session preparation storage is unavailable.', 503);
 }
 async function parse(row: Row) {
-  const value = rowSchema.parse(row),
+  const parsed = rowSchema.safeParse(row);
+  if (!parsed.success)
+    fail('Retained preparation integrity is unavailable.', 503);
+  const value = parsed.data,
     { record_sha256, ...facts } = value;
   if ((await digest(canonical(facts))) !== record_sha256) fail(undefined, 503);
   return value;

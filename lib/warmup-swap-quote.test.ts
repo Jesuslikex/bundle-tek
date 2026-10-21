@@ -9,6 +9,30 @@ import {
   WRAPPED_SOL,
 } from './warmup-swap-quote';
 const mint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+it('cancels a rejected provider body without reading or exposing it', async () => {
+  const cancel = vi.fn(),
+    fetcher = vi.fn(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(c) {
+              c.enqueue(new TextEncoder().encode('PRIVATE_PROVIDER_ERROR'));
+            },
+            cancel,
+          }),
+          { status: 429 },
+        ),
+    );
+  await expect(
+    quoteSolanaBuy(
+      { outputMint: mint, amount: '0.001' },
+      'synthetic-key',
+      new AbortController().signal,
+      fetcher,
+    ),
+  ).rejects.toMatchObject({ code: 'QUOTE_UNAVAILABLE' });
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
 it('cancels a stalled quote response body when the request is aborted', async () => {
   const c = new AbortController(),
     cancel = vi.fn();

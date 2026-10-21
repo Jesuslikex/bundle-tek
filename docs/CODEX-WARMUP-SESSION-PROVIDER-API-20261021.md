@@ -1,6 +1,6 @@
 # Owned unsigned session provider/API integration, 21 October 2026
 
-Checkpoint after `9fc0d41`. The implementation claim remains active for focused Opus 5.5 review/follow-up. This connects the existing session-owned preparation service to actual provider functions and an authenticated API; it does not enable signing or automatic activity.
+Checkpoint `a51b91c` after `9fc0d41`, followed by the accepted Opus review fixes below. The bounded implementation/review claim is complete and released. This connects the existing session-owned preparation service to actual provider functions and an authenticated API; it does not enable signing or automatic activity.
 
 ## Implemented
 
@@ -30,3 +30,20 @@ No migration bytes changed; the journal still ends at0131 and next0132 is unclai
 There is no new Start or preparation control in the UI yet. An already begun first due review can be prepared only within the existing earlier source/approved-finish window. With signing off, pending work cannot execute or advance to the next activity action; Stop/history recovery remain available.
 
 Read `CODEX-WARMUP-PROVIDER-INTEGRATION-PLAN-20261021.md`. Longer sessions still require fresh per-action qualification with original consent/plan/head/source/budget bindings, compatibility-preserving versioned SQL/replay design, shared wallet/lot reservations, short browser signing authorization, one-send recovery, final runtime/code/custody/lifetime/minimum checks and multi-wallet orchestration. A cooldown and successful simulation do not establish those capabilities. The full Proxima parity goal remains open.
+
+## Completed Opus review and independently verified follow-up
+
+Actual Opus 5.5 reviewed `a51b91cc68827947905e82b1e3d5145516ba3ab9` read-only. Requested, selected and actual models were only `claude-opus-5-5`, with Read/Glob/Grep only, zero permission denials/edits/tests and all 2645 copied source files unchanged. Ignored evidence: `work/release-qa/opus-session-provider-api-review-a51b91c-20261021/status.json` and `review.jsonl`. It found no blocker for the unsigned API, but highlighted high evidence-quality and medium token-change gaps that must not survive into signing. It read the new code/diff and relevant transport/receipt helpers; it did not inspect the 0127/0128/0131 triggers or all journal/auth/settlement code. Its result is not live or funded qualification.
+
+Accepted fixes, independently implemented and verified by Codex:
+
+- The native economic comparison now adds the wallet's wrapped-SOL delta, with exact legacy WSOL program/9-decimal and before/after consistency checks. It uses the action-specific provisional fee bound instead of allowing the whole remaining reserve to mask extra spending or absent Sell proceeds. Tests include Buy excess by one lamport, Sell exact-boundary/one-below/zero/negative proceeds and valid existing-WSOL Buy/Sell cases. This is still a provisional bound: exact rent/refund conservation, route/custody qualification and final settlement checks remain required before signing.
+- Nonzero unrelated wallet token changes and ambiguous token programs/mints refuse. The selected token delta must match its balances and exact Sell input or Buy minimum. Simulation wallet/hash must match the order. Nullable wrapped-side comparison remains visible and never becomes permission.
+- NULL current lot units refuse before cooldown, inventory or quote instead of silently falling back to acquisition units and then failing at insertion. The existing strict final remaining-unit SQL guard remains unchanged.
+- `walletRequest` now supports explicit cooperative cancellation. The new route passes its combined request/deadline signal directly, cancels a stalled incoming body and returns408 without touching providers/storage. Legacy callers retain their established error ordering. An initial global signal change produced two400-versus408 regressions; those were diagnosed and fixed by making cancellation opt-in, not by changing tests to accept400. Both old routes and the new stalled-body test pass together.
+- Rejected quote response bodies are cancelled, corrupt retained rows map to storage-integrity503 rather than user-input400, and the public DTO adds the native observation and fixed unsigned-only limitations.
+- Admission/refusal assertions now check exact expected statuses. Added independent changed-order-object refusal, competing-ID cooldown, NULL lot, corrupt stored row, explicit timeout-body cancellation and exact public key-allowlist coverage.
+
+Final verification: **757 tests across28 related files pass together**, including52 new API cases and32 shared quote cases; plain TypeScript, nine-file typed lint, nine-file formatting and diff checks pass. Final isolated production build succeeds with base`a51b91c` plus nine owned overlays, no copied provider configuration and matching source hashes. Ignored result: `work/release-qa/warmup-session-provider-api-build-followup-20261021/result.json`. All2710 frozen source files remain unchanged: digest`df7dbb80c002d954ed744b02664ece309f2e286c7b14a1627c2d0b63548bc200` (`warmup-provider-api-accepted-freeze-20261021.json`). Existing multiple-lockfile warning remains.
+
+The accepted follow-up was Codex-verified, not rereviewed by Opus. Remaining low UX issues include conservative fixed Retry-After and some generic pre-write provider refusal statuses. None authorizes a retry, replacement packet or signing; original-ID recovery remains required. The cooldown is not a financial lease, and in-flight database work may outlive cancellation. There is still no new preparation/Start UI, live provider proof, signed-in browser/API proof, shared funds reservation, new signing authority, application/hosted migration or deployment.

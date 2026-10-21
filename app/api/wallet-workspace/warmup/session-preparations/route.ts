@@ -139,9 +139,7 @@ export async function POST(request: Request) {
     signal.throwIfAborted();
     let selection: z.infer<typeof body>;
     try {
-      selection = body.parse(
-        await walletRequest(new Request(request, { signal }), 2048),
-      );
+      selection = body.parse(await walletRequest(request, 2048, signal));
     } catch (error) {
       if (signal.aborted) return cancelled();
       const large =

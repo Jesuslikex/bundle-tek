@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { warmupSessionProviderFixture } from '@/test/warmup-session-provider-fixture';
-import { readWalletWarmupSessionPreparation } from '@/lib/wallet-warmup-session-preparation';
+import {
+  readWalletWarmupSessionPreparation,
+  prepareWalletWarmupSessionAction,
+} from '@/lib/wallet-warmup-session-preparation';
+import { createWalletWarmupSessionProvider } from '@/lib/wallet-warmup-session-provider';
+import { prepareSolanaSwap, WRAPPED_SOL } from '@/lib/warmup-swap-quote';
 import type { publicWalletWarmupSessionPreparation } from '@/lib/wallet-warmup-session-preparation-public';
 import { retainWalletWarmupSessionSettlement } from '@/lib/wallet-warmup-session-settlement-storage';
 const mocks = vi.hoisted(() => ({
@@ -140,13 +145,19 @@ it('requires sign-in before storage or providers and isolates owner recovery', a
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it.each([
-  {},
-  { origin: 'http://elsewhere', 'content-type': 'application/json' },
-  { origin: 'http://localhost', 'content-type': 'text/html' },
+  { headers: {}, status: 403 },
+  {
+    headers: { origin: 'http://elsewhere', 'content-type': 'application/json' },
+    status: 403,
+  },
+  {
+    headers: { origin: 'http://localhost', 'content-type': 'text/html' },
+    status: 415,
+  },
 ])(
   'refuses origin/media admission %j without a provider call',
-  async (headers) => {
-    expect([403, 415]).toContain((await post(f.input(), headers)).status);
+  async ({ headers, status }) => {
+    expect((await post(f.input(), headers)).status).toBe(status);
     expect(fetcher).not.toHaveBeenCalled();
   },
 );
@@ -192,6 +203,7 @@ it('a competing request is held by the owner cooldown, while exact saved-ID reco
   const second = await post(input);
   expect(second.status).toBe(429);
   expect(second.headers.get('retry-after')).toBe('30');
+  expect((await post({ ...input, id: crypto.randomUUID() })).status).toBe(429);
   const request = new URL(String(fetcher.mock.calls[0][0]));
   release(Response.json(f.quote(request)));
   expect((await first).status).toBe(200);
@@ -258,7 +270,7 @@ it.each([
         await f.db.prepare('UPDATE workspace_wallets SET archived=1').run();
       return simulation;
     });
-  expect([409, 502, 408]).toContain((await post()).status);
+  expect((await post()).status).toBe(kind === 'amount' ? 502 : 409);
   expect(await f.count()).toEqual([0, 0, 0]);
 });
 it('does not double-count the independently observed network fee and provider network estimate', async () => {
@@ -370,7 +382,7 @@ it('refuses a changed lot before fetching a new order', async () => {
   await f.db
     .prepare("UPDATE warmup_buy_receipts SET remaining_raw='100'")
     .run();
-  expect([409, 503]).toContain((await post(input)).status);
+  expect((await post(input)).status).toBe(409);
   expect(fetcher).not.toHaveBeenCalled();
   expect(mocks.inventory).not.toHaveBeenCalled();
   expect(await f.count()).toEqual([0, 1, 0]);
@@ -428,4 +440,202 @@ it('aborts an open quote body without saving or retrying', async () => {
   expect(await f.count()).toEqual([0, 0, 0]);
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(cancel).toHaveBeenCalledTimes(1);
+});
+it.each([
+  'buy-excess',
+  'unrelated-token',
+  'wrapped-program',
+  'simulation-wallet',
+  'simulation-hash',
+] as const)(
+  'refuses %s evidence even when the entire fee reserve would cover it',
+  async (kind) => {
+    mocks.simulate.mockImplementationOnce(async (order) => {
+      const result = f.simulation(order);
+      if (kind === 'buy-excess') result.nativeChangeRaw = '-1005001';
+      if (kind === 'simulation-wallet')
+        result.wallet = '11111111111111111111111111111111';
+      if (kind === 'simulation-hash') result.sha256 = 'a'.repeat(64);
+      if (kind === 'unrelated-token')
+        result.tokenChanges.push({
+          ...result.tokenChanges[0],
+          mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          beforeRaw: '1',
+          afterRaw: '0',
+          changeRaw: '-1',
+        });
+      if (kind === 'wrapped-program')
+        result.tokenChanges.push({
+          ...result.tokenChanges[0],
+          mint: WRAPPED_SOL,
+          program: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+          decimals: 9,
+          beforeRaw: '0',
+          afterRaw: '0',
+          changeRaw: '0',
+        });
+      return result;
+    });
+    expect((await post()).status).toBe(409);
+    expect(await f.count()).toEqual([0, 0, 0]);
+  },
+);
+it.each([
+  { native: '990000', status: 200 },
+  { native: '989999', status: 409 },
+  { native: '0', status: 409 },
+  { native: '-5000', status: 409 },
+])(
+  'checks Sell combined proceeds against the fee bound: $native',
+  async ({ native, status }) => {
+    const input = await sellInput();
+    mocks.simulate.mockImplementationOnce(async (order) => ({
+      ...f.simulation(order),
+      nativeChangeRaw: native,
+    }));
+    expect((await post(input)).status).toBe(status);
+    expect(await f.count()).toEqual(status === 200 ? [1, 2, 1] : [0, 1, 0]);
+  },
+);
+it.each(['Buy', 'Sell'] as const)(
+  'includes existing wallet wrapped-SOL changes in the %s economic bound',
+  async (side) => {
+    const input = side === 'Sell' ? await sellInput() : f.input();
+    mocks.simulate.mockImplementationOnce(async (order) => {
+      const result = f.simulation(order);
+      result.nativeChangeRaw = side === 'Buy' ? '0' : '-5000';
+      result.tokenChanges.push({
+        ...result.tokenChanges[0],
+        mint: WRAPPED_SOL,
+        decimals: 9,
+        beforeRaw: side === 'Buy' ? '2000000' : '0',
+        afterRaw: side === 'Buy' ? '995000' : '1000000',
+        changeRaw: side === 'Buy' ? '-1005000' : '1000000',
+      });
+      return result;
+    });
+    expect((await post(input)).status).toBe(200);
+  },
+);
+it('refuses a NULL current lot before consuming cooldown or fetching providers', async () => {
+  const input = await sellInput();
+  await f.db.prepare('UPDATE warmup_buy_receipts SET remaining_raw=NULL').run();
+  expect((await post(input)).status).toBe(409);
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(mocks.inventory).not.toHaveBeenCalled();
+  expect(
+    await f.db
+      .prepare('SELECT count(*) AS n FROM wallet_balance_gates')
+      .first(),
+  ).toEqual({ n: 0 });
+});
+it('the provider refuses a changed order object independently of the quote parser', async () => {
+  const { prepareRequested: _intent, ...input } = f.input();
+  const provider = createWalletWarmupSessionProvider(
+    f.db,
+    'owner',
+    'synthetic-key',
+    {
+      quote: async (...args) => ({
+        ...(await prepareSolanaSwap(...args)),
+        inAmount: '2',
+      }),
+    },
+  );
+  await expect(
+    prepareWalletWarmupSessionAction(
+      f.db,
+      'owner',
+      input,
+      new AbortController().signal,
+      provider,
+    ),
+  ).rejects.toMatchObject({ status: 409 });
+  expect(mocks.simulate).not.toHaveBeenCalled();
+  expect(await f.count()).toEqual([0, 0, 0]);
+});
+it('the cooperative request deadline cancels a stalled incoming body before storage or providers', async () => {
+  const deadline = new AbortController(),
+    realTimeout = AbortSignal.timeout.bind(AbortSignal),
+    cancel = vi.fn();
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) =>
+    ms === 25000 ? deadline.signal : realTimeout(ms),
+  );
+  let reads = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (++reads === 1) controller.enqueue(new TextEncoder().encode('{'));
+    },
+    cancel,
+  });
+  const response = POST(
+    new Request(url, {
+      method: 'POST',
+      headers: {
+        origin: 'http://localhost',
+        'content-type': 'application/json',
+      },
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' }),
+  );
+  await vi.waitFor(() => expect(reads).toBeGreaterThan(1));
+  deadline.abort(new DOMException('Synthetic deadline', 'TimeoutError'));
+  expect((await response).status).toBe(408);
+  expect(cancel).toHaveBeenCalledTimes(1);
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(await f.count()).toEqual([0, 0, 0]);
+});
+it('publishes exactly the allowed review keys and fixed limitations', async () => {
+  const response = await post(),
+    value = (await response.json()) as { preparation: Record<string, unknown> };
+  expect(response.status).toBe(200);
+  expect(Object.keys(value.preparation).sort()).toEqual(
+    [
+      'id',
+      'journalId',
+      'actionId',
+      'reviewVersion',
+      'reviewHeadSha256',
+      'planId',
+      'planRevision',
+      'cycle',
+      'walletRevision',
+      'createdAt',
+      'side',
+      'wallet',
+      'mint',
+      'inputMint',
+      'outputMint',
+      'inAmountRaw',
+      'quotedOutRaw',
+      'minimumOutRaw',
+      'expiresAt',
+      'packetAvailability',
+      'packetSha256',
+      'estimatedFeesLamports',
+      'nativeChangeRaw',
+      'limitations',
+      'simulation',
+      'executionAllowed',
+      'signingAllowed',
+      'automaticExecutionAllowed',
+      'instructionsVerified',
+    ].sort(),
+  );
+  expect(value.preparation.limitations).toBe(
+    'Unsigned preparation only. No signing, sending or automatic execution. Simulation and fee estimates do not establish instruction or custody clearance.',
+  );
+});
+it('reports corrupt retained records as storage integrity failure rather than a bad user selection', async () => {
+  const input = f.input();
+  expect((await post(input)).status).toBe(200);
+  await f.db
+    .prepare('DROP TRIGGER wallet_warmup_session_preparations_no_update')
+    .run();
+  await f.db
+    .prepare('UPDATE wallet_warmup_session_preparations SET review_version=-1')
+    .run();
+  expect((await GET(new Request(url + '?id=' + input.id))).status).toBe(503);
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });

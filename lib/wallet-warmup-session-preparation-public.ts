@@ -29,6 +29,9 @@ export function publicWalletWarmupSessionPreparation(value: Retained) {
     packetAvailability: value.packetAvailability,
     packetSha256: value.packet?.sha256 ?? null,
     estimatedFeesLamports: d.transaction.estimatedFeesLamports,
+    nativeChangeRaw: d.simulation.nativeChangeRaw,
+    limitations:
+      'Unsigned preparation only. No signing, sending or automatic execution. Simulation and fee estimates do not establish instruction or custody clearance.',
     simulation: {
       succeeded: d.simulation.succeeded,
       networkFeeLamports: d.simulation.networkFeeLamports,
