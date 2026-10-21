@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import bs58 from 'bs58';
 import { warmupSessionReviewFixture } from '../test/warmup-session-review-fixture';
 import { walletWarmupSessionView } from './wallet-warmup-session-view';
 import {
@@ -58,6 +59,35 @@ it('allows historical recovery after review expiry without turning it into a fre
   ).rejects.toThrow();
   await expect(
     walletWarmupSessionSaveSelection(f.view, { ...f.plan, archived: true }, at),
+  ).rejects.toThrow();
+});
+it('admits an inactive wallet with an unused reserve and zero further spending', async () => {
+  const f = await fixture();
+  f.body.retainedReview.document.wallets.push({
+    ...f.body.retainedReview.document.wallets[0],
+    wallet: bs58.encode(new Uint8Array(32).fill(3)),
+    buySpendLamports: '0',
+    maximumNativeSpendLamports: '0',
+  });
+  expect(
+    await walletWarmupSessionRetainedView(f.body, {
+      id: f.selection.id,
+      planId: f.plan.id,
+    }),
+  ).toMatchObject({ walletCount: 2, maximumNativeSpendLamports: '12000000' });
+});
+it('refuses a claimed buy allowance for a wallet without a remaining action', async () => {
+  const f = await fixture();
+  f.body.retainedReview.document.wallets.push({
+    ...f.body.retainedReview.document.wallets[0],
+    wallet: bs58.encode(new Uint8Array(32).fill(3)),
+    maximumNativeSpendLamports: '0',
+  });
+  await expect(
+    walletWarmupSessionRetainedView(f.body, {
+      id: f.selection.id,
+      planId: f.plan.id,
+    }),
   ).rejects.toThrow();
 });
 it.each([

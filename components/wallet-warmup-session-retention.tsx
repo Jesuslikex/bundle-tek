@@ -14,6 +14,7 @@ import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { Button } from './ui/button';
 import { readPanelJson } from './read-panel-json';
 import styles from './wallet-warmup-session-review.module.css';
+import { WalletWarmupSessionConsent } from './wallet-warmup-session-consent';
 export function WalletWarmupSessionRetention({
   plan,
   view,
@@ -29,6 +30,7 @@ export function WalletWarmupSessionRetention({
     [reviewId, setReviewId] = useState(''),
     [invalidReminder, setInvalidReminder] = useState(false),
     [operation, setOperation] = useState<'save' | 'recover' | null>(null),
+    [consentBusy, setConsentBusy] = useState(false),
     [retained, setRetained] = useState<RetainedWarmupSessionSummary | null>(
       null,
     ),
@@ -63,9 +65,9 @@ export function WalletWarmupSessionRetention({
     };
   }, [key, plan.id]);
   useEffect(() => {
-    onBusyChange(operation !== null);
+    onBusyChange(operation !== null || consentBusy);
     return () => onBusyChange(false);
-  }, [operation, onBusyChange]);
+  }, [operation, consentBusy, onBusyChange]);
   useEffect(() => {
     if (pending.current) {
       pending.current.abort();
@@ -248,7 +250,7 @@ export function WalletWarmupSessionRetention({
       }
     }
   }
-  const busy = operation !== null;
+  const busy = operation !== null || consentBusy;
   return (
     <section
       className={styles.retention}
@@ -362,6 +364,15 @@ export function WalletWarmupSessionRetention({
             Clear local reminder
           </Button>
         </details>
+      )}
+      {retained && (
+        <WalletWarmupSessionConsent
+          key={retained.id}
+          plan={plan}
+          view={view}
+          retained={retained}
+          onBusyChange={setConsentBusy}
+        />
       )}
     </section>
   );

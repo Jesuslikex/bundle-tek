@@ -1,0 +1,69 @@
+.panel,
+.field,
+.review {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.panel {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  overflow-wrap: anywhere;
+}
+.panel h6,
+.panel p {
+  margin: 0;
+}
+.panel h6 {
+  font-size: 14px;
+}
+.panel code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.panel button,
+.panel summary,
+.field input,
+.field select {
+  min-height: 44px;
+}
+.panel summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background, #101114);
+  color: inherit;
+  padding: 8px;
+  font: inherit;
+}
+.review {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.approval {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-height: 44px;
+  cursor: pointer;
+}
+.approval input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  accent-color: var(--primary, #8577ff);
+}

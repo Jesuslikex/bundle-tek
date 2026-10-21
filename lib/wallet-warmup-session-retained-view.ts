@@ -173,6 +173,9 @@ export async function walletWarmupSessionRetainedView(
   )
     return fail();
   const wallets = new Map<string, number>();
+  const activeWallets = new Set(
+    document.actions.map((item) => object(item).wallet),
+  );
   let total = 0n;
   for (const item of document.wallets) {
     const wallet = object(item);
@@ -184,10 +187,11 @@ export async function walletWarmupSessionRetainedView(
       return fail();
     wallets.set(wallet.wallet, wallet.walletRevision);
     const max = amount(wallet.maximumNativeSpendLamports);
+    const buys = amount(wallet.buySpendLamports),
+      reserve = amount(wallet.remainingFeeReserveLamports);
     if (
-      max !==
-      amount(wallet.buySpendLamports) +
-        amount(wallet.remainingFeeReserveLamports)
+      max !== (activeWallets.has(wallet.wallet) ? buys + reserve : 0n) ||
+      (!activeWallets.has(wallet.wallet) && buys !== 0n)
     )
       return fail();
     total += max;
