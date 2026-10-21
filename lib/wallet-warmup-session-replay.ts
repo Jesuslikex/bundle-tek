@@ -23,6 +23,12 @@ const anchorSchema = z
   })
   .strict();
 const base = z.object({
+  // Durable writers bind their idempotency ID inside the hashed document.
+  // Earlier internal (non-stored) journals did not carry this field.
+  eventId: z
+    .uuid()
+    .refine((v) => v === v.toLowerCase())
+    .optional(),
   version: z.number().int().min(1).max(MAX_EVENTS),
   previousSha256: digest,
   at: timestamp,

@@ -351,3 +351,15 @@ it('binds the exact source bytes and rejects a changed plan even with valid jour
   f.plan.revision++;
   await expect(f.read()).rejects.toThrow('Session journal');
 });
+
+it('supports a canonical durable event ID inside the hashed transition without granting authority', async () => {
+  const f = await fixture();
+  await f.append('pause', { eventId: '00000000-0000-4000-8000-000000000001' });
+  expect((await f.read()).snapshot.phase).toBe('paused');
+});
+
+it('refuses a malformed durable event ID even with a matching raw-document digest', async () => {
+  const f = await fixture();
+  await f.append('pause', { eventId: 'changed' });
+  await expect(f.read()).rejects.toThrow('Session journal');
+});
