@@ -1,7 +1,14 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
+import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 import {
   decodeMainnetFundingHistory,
   mainnetFundingRecordLabel,
@@ -10,11 +17,22 @@ import {
   type MainnetFundingRecord,
 } from '@/lib/mainnet-funding-history';
 
+const historyUnavailable =
+  'Mainnet funding history is unavailable. Reload history to try again.';
+function historyStatus(status: number) {
+  if (status === 401) return 'Sign in again before loading funding history.';
+  if (status === 403 || status === 404)
+    return 'This saved funding history is unavailable to your account. Reopen the saved funding plan.';
+  if (status === 429)
+    return 'Funding history is rate limited. Wait before reloading.';
+  return historyUnavailable;
+}
+
 function FundingRecord({ record }: { record: MainnetFundingRecord }) {
   const units = record.asset.kind === 'native' ? 'SOL' : 'tokens';
   return (
     <details>
-      <summary>
+      <summary className="min-h-11 cursor-pointer py-2">
         Recipient {record.funding.item} · revision {record.funding.revision} ·{' '}
         {record.funding.leg !== undefined && (
           <>Proxy leg {record.funding.leg} · </>
@@ -132,7 +150,9 @@ export function MainnetFundingHistoryPanel({
       aria-label="Mainnet funding history"
     >
       <Button
+        type="button"
         variant="outline"
+        className="h-auto min-h-11 whitespace-normal"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
@@ -163,37 +183,77 @@ function FundingHistory({
     [page, setPage] = useState<MainnetFundingHistory | null>(null),
     [busy, setBusy] = useState(true),
     [error, setError] = useState('');
+  const [noticeRole, setNoticeRole] = useState<'status' | 'alert'>('alert');
   const [progressPage, setProgressPage] = useState(0);
   const pageStatus = useRef<HTMLOutputElement>(null);
+  const reloadButton = useRef<HTMLButtonElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const olderButton = useRef<HTMLButtonElement>(null);
+  const readInitiator = useRef<Element | null>(null);
+  const restoreReadFocus = useRef(false);
   const pending = useRef<AbortController | null>(null);
+  useLayoutEffect(() => {
+    if (busy && readInitiator.current) {
+      const initiator = readInitiator.current;
+      readInitiator.current = null;
+      if (
+        document.activeElement === initiator ||
+        document.activeElement === document.body
+      )
+        cancelButton.current?.focus();
+    }
+    if (!busy && restoreReadFocus.current) {
+      restoreReadFocus.current = false;
+      if (
+        document.activeElement === document.body ||
+        document.activeElement === cancelButton.current
+      )
+        reloadButton.current?.focus();
+    }
+  }, [busy]);
   const read = useCallback(
     async (after: string | null) => {
       pending.current?.abort();
       const controller = new AbortController();
       pending.current = controller;
+      restoreReadFocus.current = false;
+      const active = document.activeElement;
+      readInitiator.current =
+        active === reloadButton.current || active === olderButton.current
+          ? active
+          : null;
       setBusy(true);
       setError('');
+      setNoticeRole('alert');
+      const deadline = setTimeout(() => {
+        if (pending.current !== controller) return;
+        restoreReadFocus.current =
+          document.activeElement === cancelButton.current;
+        pending.current = null;
+        controller.abort();
+        setBusy(false);
+        setNoticeRole('status');
+        setError('History loading timed out. Reload history to try again.');
+      }, 15000);
+      const clearDeadline = () => clearTimeout(deadline);
+      controller.signal.addEventListener('abort', clearDeadline, {
+        once: true,
+      });
       try {
         const params = new URLSearchParams({ id });
         if (revision !== null) params.set('revision', String(revision));
         if (after !== null) params.set('cursor', after);
         const response = await fetch('/api/funding/mainnet-history?' + params, {
           cache: 'no-store',
-          signal: AbortSignal.any([
-            controller.signal,
-            AbortSignal.timeout(15000),
-          ]),
+          signal: controller.signal,
         });
-        const body = await response.json();
-        if (!response.ok)
-          throw new Error(
-            body &&
-              typeof body === 'object' &&
-              'error' in body &&
-              typeof body.error === 'string'
-              ? body.error
-              : 'Mainnet funding history unavailable.',
-          );
+        if (!response.ok) {
+          void response.body?.cancel().catch(() => {});
+          if (!controller.signal.aborted && pending.current === controller)
+            setError(historyStatus(response.status));
+          return;
+        }
+        const body = await readBoundedPanelJson(response, controller.signal);
         const next = decodeMainnetFundingHistory(body, id, revision);
         if (controller.signal.aborted || pending.current !== controller) return;
         setPage((prior) =>
@@ -212,16 +272,18 @@ function FundingHistory({
               }
             : next,
         );
-      } catch (failure) {
+      } catch {
         if (!controller.signal.aborted && pending.current === controller)
-          setError(
-            failure instanceof Error
-              ? failure.message
-              : 'Mainnet funding history unavailable.',
-          );
+          setError(historyUnavailable);
       } finally {
-        if (!controller.signal.aborted && pending.current === controller)
+        clearDeadline();
+        controller.signal.removeEventListener('abort', clearDeadline);
+        if (!controller.signal.aborted && pending.current === controller) {
+          restoreReadFocus.current =
+            document.activeElement === cancelButton.current;
+          pending.current = null;
           setBusy(false);
+        }
       }
     },
     [id, revision],
@@ -272,8 +334,15 @@ function FundingHistory({
       <label>
         Funding revision{' '}
         <select
+          className="min-h-11"
           value={revision ?? 'all'}
           onChange={(event) => {
+            pending.current?.abort();
+            pending.current = null;
+            setPage(null);
+            setError('');
+            setNoticeRole('alert');
+            setBusy(true);
             setProgressPage(0);
             setRevision(
               event.target.value === 'all' ? null : Number(event.target.value),
@@ -288,13 +357,47 @@ function FundingHistory({
           ))}
         </select>
       </label>
-      <Button variant="outline" disabled={busy} onClick={() => void read(null)}>
+      <Button
+        ref={reloadButton}
+        type="button"
+        variant="outline"
+        className="h-auto min-h-11 whitespace-normal"
+        disabled={busy}
+        onClick={() => void read(null)}
+      >
         Reload mainnet funding history
       </Button>
-      {error && <p role="alert">{error}</p>}
+      {busy && (
+        <Button
+          ref={cancelButton}
+          type="button"
+          variant="outline"
+          className="h-auto min-h-11 whitespace-normal"
+          onClick={() => {
+            const controller = pending.current;
+            if (!controller) return;
+            restoreReadFocus.current =
+              document.activeElement === cancelButton.current;
+            pending.current = null;
+            controller.abort();
+            setBusy(false);
+            setNoticeRole('status');
+            setError('History loading cancelled. Reload history when ready.');
+          }}
+        >
+          Cancel history loading
+        </Button>
+      )}
+      {error && <p role={noticeRole}>{error}</p>}
       {busy && <output>Loading mainnet funding history…</output>}
       {page && (
         <>
+          {(busy || error) && (
+            <p>
+              Previously loaded history is shown below. Its current state has
+              not been refreshed.
+            </p>
+          )}
           {page.archived && (
             <p>Archived draft. Retained mainnet outcomes remain available.</p>
           )}
@@ -379,7 +482,7 @@ function FundingHistory({
                   <Button
                     type="button"
                     variant="outline"
-                    className="min-h-11"
+                    className="h-auto min-h-11 whitespace-normal"
                     disabled={selectedProgressPage === 0}
                     onClick={() => {
                       setProgressPage(selectedProgressPage - 1);
@@ -391,7 +494,7 @@ function FundingHistory({
                   <Button
                     type="button"
                     variant="outline"
-                    className="min-h-11"
+                    className="h-auto min-h-11 whitespace-normal"
                     disabled={selectedProgressPage === progressPages - 1}
                     onClick={() => {
                       setProgressPage(selectedProgressPage + 1);
@@ -410,7 +513,9 @@ function FundingHistory({
           <h5>Captured funding transitions</h5>
           <p>
             Transitions are history records, not transfer counts. An earlier
-            approval does not inherit a later receipt.
+            approval does not inherit a later receipt. Loading older entries
+            retains previously loaded transition pages. Use Reload mainnet
+            funding history to refresh and return to the newest transitions.
           </p>
           <ol aria-label="Mainnet funding transitions">
             {page.events.map((event) => (
@@ -424,7 +529,10 @@ function FundingHistory({
           )}
           {page.nextCursor && (
             <Button
+              ref={olderButton}
+              type="button"
               variant="outline"
+              className="h-auto min-h-11 whitespace-normal"
               disabled={busy}
               onClick={() => void read(page.nextCursor)}
             >

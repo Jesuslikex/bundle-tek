@@ -1,0 +1,146 @@
+{
+  "sourceBase": "326206fcc945c47c8267aa442077aa568984e0ab",
+  "sourceOnly": true,
+  "executionAllowed": false,
+  "baseline": {
+    "existingPasses": 9,
+    "newFailures": 4,
+    "reproduced": [
+      "raw parser text",
+      "no cancellation/stale notice",
+      "hung fetch did not release controls",
+      "stalled response body not cancelled"
+    ]
+  },
+  "relatedBeforeReviewRefinements": {
+    "files": 42,
+    "passed": 506,
+    "failed": 0,
+    "skipped": 0
+  },
+  "finalFocusedAfterAllRefinements": {
+    "files": 3,
+    "passed": 45,
+    "failed": 0,
+    "skipped": 0
+  },
+  "testScope": "42-file cohort not rerun after final UI polish; final3-file tests cover refined UI/reader/DTO, all non-owned selected source unchanged.",
+  "static": {
+    "results": [
+      {
+        "check": "typescript",
+        "exitCode": 0,
+        "output": ""
+      },
+      {
+        "check": "typed-lint",
+        "exitCode": 0,
+        "output": ""
+      },
+      {
+        "check": "format",
+        "exitCode": 0,
+        "output": "Checking formatting...\n\nAll matched files use the correct format.\nFinished in 14824ms on 2 files using 16 threads.\n"
+      }
+    ],
+    "hashes": {
+      "components/launch/mainnet-funding-history.tsx": "65588711d7af73a32ffd319e7b6310d215a4e0abfe680c8c495ae22db972460a",
+      "components/launch/mainnet-funding-history.test.tsx": "169e5e211b98bd2d0d30409a9933d9e0e9521243133a28b53c43b22960ad89e4"
+    },
+    "sourceUnchanged": true,
+    "passed": true
+  },
+  "isolatedBuild": {
+    "base": "326206fcc945c47c8267aa442077aa568984e0ab",
+    "overlays": [
+      "components/launch/mainnet-funding-history.tsx",
+      "components/launch/mainnet-funding-history.test.tsx"
+    ],
+    "hashes": {
+      "components/launch/mainnet-funding-history.tsx": "65588711d7af73a32ffd319e7b6310d215a4e0abfe680c8c495ae22db972460a",
+      "components/launch/mainnet-funding-history.test.tsx": "169e5e211b98bd2d0d30409a9933d9e0e9521243133a28b53c43b22960ad89e4"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "supersededBuild": "Earlier build compiled exit0 but correctly failed unchanged-source delivery after final UI/test refinements.",
+  "opusReviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 1,
+      "sourceUnchanged": true
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "permissionDenials": 0,
+      "sourceUnchanged": true
+    }
+  ],
+  "postFollowupChangedFiles": [
+    "components/launch/mainnet-funding-history.tsx",
+    "components/launch/mainnet-funding-history.test.tsx"
+  ],
+  "postFollowupDelta": "Keyboard initiator handoff/final active-element guard, Reload-return wording, StrictMode and summary-refresh assertions, erased test event annotation. Independently tested, not rereviewed.",
+  "reviewLimit": "First review had one denied canonical-path read outside permitted copy, not retried or bypassed. Allowed source hashes matched canonical files. Follow-up bounded copy had zero denials. Neither review ran tests.",
+  "readPolicy": {
+    "jsonBytes": 1048576,
+    "deadlineMs": 15000,
+    "automaticRetries": 0,
+    "automaticContextRead": "Displayed saved plan ID/revision change while open remounts the read",
+    "cancelScope": "Metadata GET/body only, not a transfer cancellation"
+  },
+  "preserved": [
+    "owner-plan/revision and false authority admission",
+    "exact cursor/duplicate merge",
+    "400step and50event page bounds",
+    "unavailable summary retains null counts",
+    "direct versus proxy receipt distinction",
+    "financial and signing handlers"
+  ],
+  "sourceFreeze": {
+    "selectedFiles": 2376,
+    "unchanged": true,
+    "sha256": "0ec4ae7dbfb3216585fa71fcaea2a8f28ae986d283eed30cfc048f58bb1749d8"
+  },
+  "unchangedScopes": [
+    "lib",
+    "app/api",
+    "drizzle",
+    "db",
+    "app/page.tsx",
+    "app/ux.css",
+    "components/imported-token-market.tsx",
+    "components/launch/funding-planner.tsx",
+    "components/native-withdrawal-panel.tsx"
+  ],
+  "remaining": [
+    "rendered/signed-in/live provider and screen-reader QA",
+    "conditional live-region announcements unqualified",
+    "tiny pre-request StrictMode microtask Cancel visibility unchanged",
+    "source-bound combined executable launch review",
+    "full Proxima feature parity"
+  ],
+  "applicationOrHostedSql": false,
+  "providerCredentialsCronChanged": false,
+  "realWalletUnlockSignSendOrFundedTest": false,
+  "deployed": false
+}
