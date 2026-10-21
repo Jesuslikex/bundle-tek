@@ -29,4 +29,4 @@ No protected UI files, committed migration bytes, application/hosted SQL, provid
 Plain whole-project TypeScript (`tsc --noEmit --incremental false`) passed on checkpoint 9712191. The frozen source stayed unchanged. The Opus review is now complete; see below.
 
 Final accepted follow-up: 801 tests / 29 related files pass together, plain whole-project TypeScript and four-file typed lint/format pass. The unchanged 2712-file freeze has digest d3e1170e38af16c5e1da0559983c9bcdd3f059794412933f9566bb3e3d6c053f (work/release-qa/warmup-preparation-client-followup-freeze-20261021.json). No full-repository suite, new production build, browser panel or live-provider proof is claimed.
-`nClient follow-up commit: c36bff0. Separate server expiry correction: 31ca76d. The initial client checkpoint was 9712191.
+Client follow-up commit: c36bff0. Separate server expiry correction: 31ca76d. The initial client checkpoint was 9712191.
