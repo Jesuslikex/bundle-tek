@@ -1,0 +1,71 @@
+{
+  "baseCommit": "d8498cfb3f328993632500ec3eeefb3bac7d7e63",
+  "scope": "Current Auto Buy entry-path capability audit and implementation dependency; no new product behavior",
+  "productCodeChanged": false,
+  "protectedClaudeFilesChanged": false,
+  "apiSchemaProviderCredentialsCronChanged": false,
+  "applicationOrHostedSqlRun": false,
+  "walletUnlockSignSend": false,
+  "fundedTests": false,
+  "deployed": false,
+  "fullParityProven": false,
+  "observations": {
+    "existing": "Manual single-wallet Buy, manual conditional Buy behind storage capability, timed Buy sessions, mixed DCA/Limit drafts, Counter token-target evaluator/pricing/owned unsigned simulation, per-proposal durable Counter reservations/approval guards and paired-operation Buy settlement pattern",
+    "boundedGap": "No continuous combined Buy runner with durable session SOL budget found through the inspected entry/call paths; no whole-repository absence claim",
+    "units": "Counter Buy uses exact token output and reviewed SOL ceiling; ordinary session Buy uses fixed native input. Counter token queue is never lamports. Supply-percentage sizing is Sell-only.",
+    "nextDependency": "Server-enforced aggregate session/strategy/wallet input and fee budgets plus owned lease, reusing Counter per-proposal guards and a canonical Counter review producer; preserve owner pacing and all qualification gates"
+  },
+  "tests": {
+    "files": 26,
+    "passed": 305,
+    "failed": 0,
+    "skipped": 0,
+    "entireSuite": false,
+    "report": "work/release-qa/autobuy-flow-audit-tests-20261021.json",
+    "selection": "work/release-qa/autobuy-flow-audit-test-files-20261021.json",
+    "meaning": "Representative current source regressions, not live Auto Buy, provider qualification or new execution proof"
+  },
+  "checksNotRepeated": [
+    "No new build/typecheck/lint needed for documentation-only changes; functional code remains exact base. Prior build evidence is not claimed as a newly run check."
+  ],
+  "review": {
+    "model": "claude-opus-5-5",
+    "modelsUsed": ["claude-opus-5-5"],
+    "tools": ["Glob", "Grep", "Read"],
+    "copiedFiles": 3442,
+    "sourceCopyUnchanged": true,
+    "permissionDenials": 0,
+    "testsRun": false,
+    "artifact": "work/release-qa/opus-autobuy-flow-audit-d8498cf-20261021",
+    "disposition": "Confirmed bounded continuous-Buy gap; corrected Buy/Sell supply-sizing error and omissions of existing manual/conditional/paired/proposal protections. Codex independently inspected indicated sources and amended report.",
+    "finalAuditDocumentMatchesReviewedCopy": false,
+    "reason": "Factual corrections, explicit ExactIn/ExactOut unit boundary and independent review disposition added after review; no product source changed.",
+    "knownConstraints": "Unsupported Web Locks no-op fallback and tab-local Sell accounting cannot authorize durable cross-device Buy budgets. Vault separately fails closed on absent locks; no new unapproved path/funded reproduction established. Shared owner 15-second gates must not be loosened."
+  },
+  "sourceFreeze": {
+    "selectedFiles": 2350,
+    "sha256": "ec6c2c9506407e9f1f35a87548ffb343f74118954d2ec47f86287cd5668ccef8",
+    "changed": [],
+    "scope": "Tracked TS/TSX/MJS/CSS/SQL/JSON source; excludes env/runtime artifacts, Markdown bookkeeping and new audit evidence JSON"
+  },
+  "reference": {
+    "docs": "https://docs.proxima.tools/live-settings/auto-buy/",
+    "publicDocsRefreshed": true,
+    "freshPrivateAutoBuyCapture": false,
+    "newReaEvidenceId": null,
+    "windowsLoopbackEndpointReachable": true,
+    "currentApprovedTargetPath": "/account",
+    "reaWslTargetList": "provider_unavailable/endpoint_unreachable; approved temporary relay stopped and not started for unrelated account page",
+    "targetedExistingChromeControl": "Timed out after 35 seconds; kernel reset",
+    "browserRestartNavigationOrTradeInteraction": false,
+    "providerOrPrivateBackendBehaviorInferred": false
+  },
+  "openRequirements": [
+    "Current rendered/private Auto Buy workflow and counter unit evidence",
+    "Durable aggregate budget/lease and canonical reviewed candidate binding",
+    "Qualified Counter approval producer plus existing exact packet guards",
+    "Shared pacing and fair admission; no missed-cycle burst or silent target shrinking",
+    "Browser-only consent/signing and one-send/finalized-or-unknown recovery",
+    "Funded proof only with specific user approval; no deployment authorized here"
+  ]
+}
