@@ -354,7 +354,9 @@ export async function warmupJournalView(
             !context.actions.some((a) => a.id === receipt.actionId) ||
             (receipt.version === j.version &&
               (s.pending?.state !== 'reviewing' ||
-                s.pending.action.id !== receipt.actionId))
+                s.pending.action.id !== receipt.actionId ||
+                context.actions.findIndex((a) => a.id === receipt.actionId) !==
+                  s.completedActions))
           )
             fail();
         } else if (receipt.actionId !== null) fail();

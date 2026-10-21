@@ -191,11 +191,40 @@ it('opens the next action review explicitly, then requests a preparation only af
   );
   await click('Prepare unsigned action');
   await done(() =>
-    expect(host.textContent).toContain('Unsigned preparation recovered'),
+    expect(host.textContent).toContain('Unsigned preparation saved'),
   );
   expect(writes()).toHaveLength(3);
   expect(writes()[1].body?.control).toBe('begin-review');
   expect(writes()[2].body?.prepareRequested).toBe(true);
+});
+it('locks parent history controls while a child preparation is pending', async () => {
+  const p = await warmupPreparationClientFixture(at),
+    originalFetch = fetch;
+  let resolve!: (value: Response) => void,
+    id = '';
+  vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+    if (!input.startsWith('/api/wallet-workspace/warmup/session-preparations'))
+      return originalFetch(input, init);
+    id = JSON.parse(init!.body as string).id;
+    return new Promise<Response>((r) => {
+      resolve = r;
+    });
+  });
+  await create();
+  await click('Review next action');
+  await done(() => expect(host.querySelector('input')).toBeTruthy());
+  await act(async () => host.querySelector<HTMLInputElement>('input')!.click());
+  await click('Prepare unsigned action');
+  await done(() => expect(button('Cancel preparation request')).toBeTruthy());
+  for (const name of [
+    'Pause plan',
+    'Stop plan',
+    'Refresh saved status',
+    'Start automatic activity',
+  ])
+    expect(button(name).disabled).toBe(true);
+  await act(async () => resolve(Response.json(p.preparation(id, saved!))));
+  await done(() => expect(button('Pause plan').disabled).toBe(false));
 });
 it('saves history once, then explicitly pauses/resumes/stops without any wallet or provider endpoint', async () => {
   await create();

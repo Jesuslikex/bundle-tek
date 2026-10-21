@@ -42,6 +42,7 @@ export function WalletWarmupSessionPreparation({
     head = useRef(journal.headSha256),
     starting = useRef(false),
     generation = useRef(0);
+  const resultFocus = useRef<HTMLFieldSetElement>(null);
   const [marker, setMarker] = useState<WarmupPreparationRequest | null>(null),
     [result, setResult] = useState<Prepared | null>(null),
     [busy, setBusy] = useState(false),
@@ -51,6 +52,7 @@ export function WalletWarmupSessionPreparation({
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
     [recoveryId, setRecoveryId] = useState<string | null>(null),
+    [unreadableId, setUnreadableId] = useState<string | null>(null),
     [now, setNow] = useState(Date.now);
   const live = useCallback(
     (c: AbortController) =>
@@ -96,7 +98,6 @@ export function WalletWarmupSessionPreparation({
       setRetryReady(false);
       setError('');
       setMessage('');
-      setRecoveryId(null);
       setApproved(false);
       const timeout = setTimeout(() => c.abort(), 30000);
       try {
@@ -120,6 +121,14 @@ export function WalletWarmupSessionPreparation({
             signal: c.signal,
           },
         );
+        if (response.status === 401 || response.status === 429) {
+          void response.body?.cancel().catch(() => {});
+          throw Error(
+            response.status === 401
+              ? 'Sign in again, then recover the original preparation.'
+              : 'The provider is rate limited. Wait at least 30 seconds, then recover the original request. Nothing is retried automatically.',
+          );
+        }
         const value = await readWarmupJournalResponse(response, c.signal);
         if (!live(c)) return;
         if (!response.ok) {
@@ -131,8 +140,14 @@ export function WalletWarmupSessionPreparation({
             return;
           }
           const conflict = collision.safeParse(value);
-          if (response.status === 409 && conflict.success)
+          if (response.status === 409 && conflict.success) {
             setRecoveryId(conflict.data.recoveryId);
+            persist({
+              ...original,
+              format: 'warmup-preparation-request-v2',
+              recoveryId: conflict.data.recoveryId,
+            });
+          }
           throw Error(
             response.status === 401
               ? 'Sign in again, then recover the original preparation.'
@@ -151,7 +166,9 @@ export function WalletWarmupSessionPreparation({
         setResult(admitted);
         setApproved(false);
         setMessage(
-          'Unsigned preparation recovered. No wallet was unlocked, signed or sent.',
+          write
+            ? 'Unsigned preparation saved. No wallet was unlocked, signed or sent.'
+            : 'Unsigned preparation recovered. No wallet was unlocked, signed or sent.',
         );
       } catch (cause) {
         if (mounted.current && pending.current === c) {
@@ -179,18 +196,28 @@ export function WalletWarmupSessionPreparation({
   useEffect(() => {
     mounted.current = true;
     const c = new AbortController();
+    let displayId: string | null = null;
     void (async () => {
       try {
         const raw = sessionStorage.getItem(key);
+        if (raw && raw.length <= 81920) {
+          const display = z
+            .object({ id: z.uuid() })
+            .loose()
+            .safeParse(JSON.parse(raw));
+          if (display.success) displayId = display.data.id;
+        }
         const saved = raw
           ? await warmupPreparationRequest(JSON.parse(raw), context)
           : null;
         if (c.signal.aborted || !mounted.current) return;
         setMarker(saved);
+        setRecoveryId(saved?.recoveryId ?? null);
         setLoaded(true);
         if (saved) void exchange(saved, false);
       } catch {
         if (!c.signal.aborted && mounted.current) {
+          setUnreadableId(displayId);
           setError(
             'The preparation reminder could not be read. Keep the original ID; no new preparation is allowed.',
           );
@@ -216,24 +243,42 @@ export function WalletWarmupSessionPreparation({
     const receipt = (event: Event) => {
       if ((event as CustomEvent).detail?.planId === context.planId) cancel();
     };
+    const storage = (event: StorageEvent) => {
+      try {
+        if (
+          event.storageArea === sessionStorage &&
+          (event.key === key || event.key === null)
+        )
+          cancel();
+      } catch {
+        cancel();
+      }
+    };
     window.addEventListener('pagehide', cancel);
-    window.addEventListener('storage', cancel);
+    window.addEventListener('storage', storage);
     window.addEventListener(WARMUP_RECEIPT_SAVED, receipt);
     return () => {
       window.removeEventListener('pagehide', cancel);
-      window.removeEventListener('storage', cancel);
+      window.removeEventListener('storage', storage);
       window.removeEventListener(WARMUP_RECEIPT_SAVED, receipt);
     };
-  }, [cancel, context.planId]);
+  }, [cancel, context.planId, key]);
   const deadline =
     result?.effectiveReviewExpiresAt ?? journal.effectiveReviewExpiresAt;
   useEffect(() => {
-    const timer = setTimeout(
-      () => setNow(Date.now()),
-      Math.max(0, Date.parse(deadline) - Date.now()),
-    );
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const current = Date.now();
+      setNow(current);
+      if (current < Date.parse(deadline))
+        timer = setTimeout(tick, Math.max(1, Date.parse(deadline) - current));
+    };
+    timer = setTimeout(tick, Math.max(0, Date.parse(deadline) - Date.now()));
     return () => clearTimeout(timer);
   }, [deadline]);
+  useEffect(() => {
+    if (result) resultFocus.current?.focus();
+  }, [result]);
   const expired = now >= Date.parse(deadline);
   const action = journal.snapshot.pending?.action;
   const displayAction = marker?.journal.snapshot.pending?.action ?? action;
@@ -271,7 +316,7 @@ export function WalletWarmupSessionPreparation({
         marker ??
         (await warmupPreparationRequest(
           {
-            format: 'warmup-preparation-request-v1',
+            format: 'warmup-preparation-request-v2',
             id: crypto.randomUUID(),
             consentId: context.consentId,
             termsSha256: context.termsSha256,
@@ -287,9 +332,46 @@ export function WalletWarmupSessionPreparation({
       )
         return;
       await exchange(original, true);
+    } catch {
+      if (mounted.current && captured === generation.current)
+        setError(
+          'Original review unavailable. Refresh saved status before another attempt.',
+        );
     } finally {
       starting.current = false;
-      if (!pending.current) changeBusy(false);
+      if (
+        mounted.current &&
+        captured === generation.current &&
+        !pending.current
+      )
+        changeBusy(false);
+    }
+  }
+  function retireAbsent() {
+    if (
+      disabled ||
+      busy ||
+      !marker ||
+      !retryReady ||
+      sameHead ||
+      result ||
+      recoveryId
+    )
+      return;
+    try {
+      sessionStorage.removeItem(key);
+      if (sessionStorage.getItem(key) !== null) throw Error();
+      setMarker(null);
+      setApproved(false);
+      setRetryReady(false);
+      setError('');
+      setMessage(
+        'Absent local request retired. This does not cancel server work. Review the current action before requesting again.',
+      );
+    } catch {
+      setError(
+        'The original reminder could not be retired. Keep its ID and recover before another preparation.',
+      );
     }
   }
   if (!action && !marker && !error) return null;
@@ -308,7 +390,14 @@ export function WalletWarmupSessionPreparation({
       {displayAction && (
         <p>
           {displayAction.side} · Cycle {displayAction.cycle} · Wallet{' '}
-          {displayAction.wallet.slice(0, 5)}…{displayAction.wallet.slice(-4)}
+          <span title={displayAction.wallet}>
+            {displayAction.wallet.slice(0, 5)}…{displayAction.wallet.slice(-4)}
+          </span>
+        </p>
+      )}
+      {displayAction && (
+        <p>
+          Token mint: <code>{displayAction.mint}</code>
         </p>
       )}
       {!sameHead && (
@@ -336,12 +425,19 @@ export function WalletWarmupSessionPreparation({
         </p>
       )}
       {result && (
-        <div className={styles.review}>
-          <strong>
-            {expired
-              ? 'Saved unsigned preparation · expired'
-              : 'Saved unsigned preparation'}
-          </strong>
+        <fieldset
+          className={styles.review}
+          ref={resultFocus}
+          tabIndex={-1}
+          aria-label="Saved unsigned preparation review"
+        >
+          <legend>
+            <strong>
+              {expired
+                ? 'Saved unsigned preparation · expired'
+                : 'Saved unsigned preparation'}
+            </strong>
+          </legend>
           <dl>
             <div>
               <dt>Input</dt>
@@ -368,7 +464,7 @@ export function WalletWarmupSessionPreparation({
               </dd>
             </div>
             <div>
-              <dt>Provider fee estimate</dt>
+              <dt>Provider network, priority and rent estimate</dt>
               <dd>
                 {formatNativeBalance(result.estimatedFeesLamports, 9)} SOL
               </dd>
@@ -402,7 +498,7 @@ export function WalletWarmupSessionPreparation({
             establish total cost, exact rent or spending clearance.
           </p>
           <p>{result.limitations}</p>
-        </div>
+        </fieldset>
       )}
       <div className={styles.controls}>
         {!result && (
@@ -418,11 +514,7 @@ export function WalletWarmupSessionPreparation({
               (!!marker && !retryReady)
             }
             onClick={() => {
-              void prepare().catch(() =>
-                setError(
-                  'Original review unavailable. Refresh saved status before another attempt.',
-                ),
-              );
+              void prepare();
             }}
           >
             {marker
@@ -445,6 +537,11 @@ export function WalletWarmupSessionPreparation({
           </Button>
         )}
       </div>
+      {busy && (
+        <output>
+          Checking an unsigned preparation. No signing or sending.
+        </output>
+      )}
       {message && <output>{message}</output>}
       {error && <p role="alert">{error}</p>}
       {recoveryId && (
@@ -454,11 +551,28 @@ export function WalletWarmupSessionPreparation({
           created here.
         </p>
       )}
-      {marker && (
+      {marker && retryReady && !sameHead && !result && !recoveryId && (
+        <div>
+          <p>
+            The original GET found no saved preparation and the session head has
+            changed. Keep request ID <code>{marker.id}</code> before retiring
+            its local reminder. Retiring does not cancel server work.
+          </p>
+          <Button
+            variant="outline"
+            disabled={disabled || busy}
+            onClick={retireAbsent}
+          >
+            Retire absent request
+          </Button>
+        </div>
+      )}
+      {(marker || unreadableId) && (
         <details>
           <summary>Preparation recovery details</summary>
           <p>
-            Request: <code>{marker.id}</code>
+            Request: <code>{marker?.id ?? unreadableId}</code>
+            {!marker && ' (unverified local ID, display only)'}
           </p>
           {recoveryId && (
             <p>
@@ -466,13 +580,19 @@ export function WalletWarmupSessionPreparation({
             </p>
           )}
           <p>
-            Original review version {marker.journal.version}. Keep this browser
-            reminder. A recovery read never renews the review or sends a
-            transaction.
+            Original review version {marker?.journal.version ?? 'unavailable'}.
+            Keep this browser reminder. A recovery read never renews the review
+            or sends a transaction.
           </p>
           {result && (
             <p>
               Token mint: <code>{result.mint}</code>
+            </p>
+          )}
+          {result?.simulation.inputAmountMatches === null && (
+            <p>
+              Native SOL input has no SPL-token amount comparison. This unsigned
+              review is not a signing clearance.
             </p>
           )}
         </details>

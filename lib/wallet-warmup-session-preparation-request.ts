@@ -7,11 +7,15 @@ import {
 
 const schema = z
   .object({
-    format: z.literal('warmup-preparation-request-v1'),
+    format: z.enum([
+      'warmup-preparation-request-v1',
+      'warmup-preparation-request-v2',
+    ]),
     id: z.uuid().refine((v) => v === v.toLowerCase()),
     consentId: z.uuid(),
     termsSha256: z.string().regex(/^[a-f0-9]{64}$/),
     journal: z.unknown(),
+    recoveryId: z.uuid().optional(),
   })
   .strict();
 export type WarmupPreparationRequest = Omit<
@@ -27,6 +31,11 @@ export async function warmupPreparationRequest(
     if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 81920)
       throw Error();
     const m = schema.parse(value);
+    if (
+      m.format === 'warmup-preparation-request-v1' &&
+      m.recoveryId !== undefined
+    )
+      throw Error();
     if (
       m.consentId !== context.consentId ||
       m.termsSha256 !== context.termsSha256

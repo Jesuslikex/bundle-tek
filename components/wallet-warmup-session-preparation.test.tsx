@@ -12,6 +12,7 @@ let host: HTMLDivElement,
   root: Root,
   f: Awaited<ReturnType<typeof warmupPreparationClientFixture>>,
   saved: ReturnType<typeof f.preparation> | null;
+let currentReview: typeof f.journal;
 let calls: { method: string; id: string }[], lose: boolean, notFound: boolean;
 const storageKey = () =>
   'bundle:warmup-preparation-request:' + f.context.consentId;
@@ -24,6 +25,7 @@ beforeEach(async () => {
   onBusy.mockClear();
   f = await warmupPreparationClientFixture(at);
   saved = null;
+  currentReview = f.journal;
   calls = [];
   lose = false;
   notFound = false;
@@ -45,7 +47,7 @@ beforeEach(async () => {
         const marker = JSON.parse(sessionStorage.getItem(storageKey())!);
         expect(marker.id).toBe(id);
         expect(marker.journal.headSha256).toBe(body.headSha256);
-        saved = f.preparation(id);
+        saved = f.preparation(id, currentReview);
         if (lose) {
           lose = false;
           throw Error('Lost synthetic reply');
@@ -69,6 +71,7 @@ const button = (label: string) =>
   [...host.querySelectorAll('button')].find((b) => b.textContent === label)!;
 const writes = () => calls.filter((c) => c.method === 'POST');
 async function render(journal = f.journal, disabled = false) {
+  currentReview = journal;
   await act(async () =>
     root.render(
       <WalletWarmupSessionPreparation
@@ -122,7 +125,7 @@ it('persists the original ID/head before one POST and displays honest provisiona
   await approve();
   await click('Prepare unsigned action');
   await settle(() =>
-    expect(host.textContent).toContain('Unsigned preparation recovered'),
+    expect(host.textContent).toMatch(/Unsigned preparation (saved|recovered)/),
   );
   expect(writes()).toHaveLength(1);
   expect(host.textContent).toContain('101 token base units');
@@ -140,7 +143,7 @@ it('holds a lost reply and recovers by GET with no replacement or automatic retr
   expect(button('Retry this preparation request').disabled).toBe(true);
   await click('Recover saved preparation');
   await settle(() =>
-    expect(host.textContent).toContain('Unsigned preparation recovered'),
+    expect(host.textContent).toMatch(/Unsigned preparation (saved|recovered)/),
   );
   expect(calls.map((c) => c.method)).toEqual(['POST', 'GET']);
   expect(calls.every((c) => c.id === id)).toBe(true);
@@ -151,7 +154,7 @@ it('recovers a saved original head on remount without provider POST', async () =
   await click('Prepare unsigned action');
   await settle(() => expect(writes()).toHaveLength(1));
   await settle(() =>
-    expect(host.textContent).toContain('Unsigned preparation recovered'),
+    expect(host.textContent).toMatch(/Unsigned preparation (saved|recovered)/),
   );
   await act(async () => root.unmount());
   root = createRoot(host);
@@ -197,7 +200,7 @@ it('does not accept rapid duplicate prepare clicks', async () => {
     button('Prepare unsigned action').click();
   });
   await settle(() =>
-    expect(host.textContent).toContain('Unsigned preparation recovered'),
+    expect(host.textContent).toMatch(/Unsigned preparation (saved|recovered)/),
   );
   expect(writes()).toHaveLength(1);
 });
@@ -206,7 +209,7 @@ it('expires the review without renewal while keeping GET recovery available', as
   await approve();
   await click('Prepare unsigned action');
   await settle(() =>
-    expect(host.textContent).toContain('Unsigned preparation recovered'),
+    expect(host.textContent).toMatch(/Unsigned preparation (saved|recovered)/),
   );
   await act(async () => {
     await vi.advanceTimersByTimeAsync(31000);
@@ -222,6 +225,7 @@ it('requires GET absence before an explicit same-ID retry, retaining consent gat
   await click('Prepare unsigned action');
   await settle(() => expect(host.querySelector('[role=alert]')).toBeTruthy());
   saved = null;
+  currentReview = f.journal;
   await click('Recover saved preparation');
   await settle(() =>
     expect(host.textContent).toContain('No saved result is confirmed'),
@@ -250,17 +254,44 @@ it('holds cancellation and ignores a late noncooperative response', async () => 
   const id = JSON.parse(sessionStorage.getItem(storageKey())!).id;
   await click('Cancel preparation request');
   await act(async () => resolve(Response.json(f.preparation(id))));
-  expect(host.textContent).not.toContain('Unsigned preparation recovered');
+  expect(host.textContent).not.toMatch(
+    /Unsigned preparation (saved|recovered)/,
+  );
   expect(host.textContent).toContain('Recover its original ID');
   expect(button('Retry this preparation request').disabled).toBe(true);
   expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
 });
-it('invalidates an in-flight result on a newer journal head and preserves original-head GET recovery', async () => {
+it('does not publish a late busy change after its original panel unmounts', async () => {
+  let resolve!: (value: Response) => void;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((r) => {
+          resolve = r;
+        }),
+    ),
+  );
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+  const id = JSON.parse(sessionStorage.getItem(storageKey())!).id;
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  onBusy.mockClear();
+  await act(async () => {
+    resolve(Response.json(f.preparation(id)));
+    await new Promise<void>((r) => nextTurn(r));
+  });
+  expect(onBusy).not.toHaveBeenCalled();
+});
+it('preserves original-head GET recovery after the current saved head advances', async () => {
   await ready();
   await approve();
   await click('Prepare unsigned action');
   await settle(() =>
-    expect(host.textContent).toContain('Unsigned preparation recovered'),
+    expect(host.textContent).toMatch(/Unsigned preparation (saved|recovered)/),
   );
   const newer = structuredClone(f.journal);
   newer.version++;
@@ -270,6 +301,38 @@ it('invalidates an in-flight result on a newer journal head and preserves origin
   await settle(() => expect(calls).toHaveLength(2));
   expect(calls[1].method).toBe('GET');
   expect(writes()).toHaveLength(1);
+  expect(
+    JSON.parse(sessionStorage.getItem(storageKey())!).journal.headSha256,
+  ).toBe(f.journal.headSha256);
+});
+it('ignores an in-flight response after the current head changes', async () => {
+  let resolve!: (value: Response) => void;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((r) => {
+          resolve = r;
+        }),
+    ),
+  );
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+  const id = JSON.parse(sessionStorage.getItem(storageKey())!).id;
+  const newer = structuredClone(f.journal);
+  newer.version++;
+  newer.headSha256 = 'c'.repeat(64);
+  await render(newer);
+  await act(async () => {
+    resolve(Response.json(f.preparation(id)));
+    await new Promise<void>((r) => nextTurn(r));
+  });
+  expect(host.textContent).not.toMatch(
+    /Unsigned preparation (saved|recovered)/,
+  );
+  expect(host.querySelector('input')).toBeNull();
   expect(
     JSON.parse(sessionStorage.getItem(storageKey())!).journal.headSha256,
   ).toBe(f.journal.headSha256);
@@ -291,4 +354,222 @@ it('holds a 429 with fixed guidance and no automatic retry', async () => {
   expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   expect(host.textContent).not.toContain('private upstream response');
   expect(button('Retry this preparation request').disabled).toBe(true);
+});
+it('retires only a confirmed absent request at a changed head, then requires new consent', async () => {
+  lose = true;
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() => expect(host.querySelector('[role=alert]')).toBeTruthy());
+  const id = writes()[0].id;
+  saved = null;
+  const newer = structuredClone(f.journal);
+  newer.version++;
+  newer.headSha256 = 'c'.repeat(64);
+  await render(newer);
+  expect(button('Retire absent request')).toBeUndefined();
+  await click('Recover saved preparation');
+  await settle(() => expect(button('Retire absent request')).toBeTruthy());
+  await click('Retire absent request');
+  expect(sessionStorage.getItem(storageKey())).toBeNull();
+  expect(button('Prepare unsigned action').disabled).toBe(true);
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() => expect(writes()).toHaveLength(2));
+  expect(writes()[1].id).not.toBe(id);
+  expect(
+    JSON.parse(sessionStorage.getItem(storageKey())!).journal.headSha256,
+  ).toBe(newer.headSha256);
+});
+it('keeps a colliding ID across GET absence and remount without adopting or fetching it', async () => {
+  const earlier = '00000000-0000-4000-8000-000000000009';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET',
+        id =
+          method === 'POST'
+            ? JSON.parse(init!.body as string).id
+            : new URL(input, 'http://localhost').searchParams.get('id');
+      calls.push({ method, id });
+      return method === 'POST'
+        ? Response.json(
+            { error: 'Already retained', recoveryId: earlier },
+            { status: 409 },
+          )
+        : Response.json({ error: 'Absent' }, { status: 404 });
+    }),
+  );
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() => expect(host.textContent).toContain(earlier));
+  expect(JSON.parse(sessionStorage.getItem(storageKey())!).recoveryId).toBe(
+    earlier,
+  );
+  await click('Recover saved preparation');
+  await settle(() => expect(calls).toHaveLength(2));
+  expect(button('Retry this preparation request').disabled).toBe(true);
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await render();
+  await settle(() => expect(calls).toHaveLength(3));
+  expect(host.textContent).toContain(earlier);
+  expect(calls.every((c) => c.id !== earlier)).toBe(true);
+});
+it('shows a valid unreadable local ID only as unverified guidance, without fetching it', async () => {
+  const id = '00000000-0000-4000-8000-000000000008';
+  sessionStorage.setItem(storageKey(), JSON.stringify({ id, invalid: true }));
+  await render();
+  await settle(() => expect(host.textContent).toContain('unverified local ID'));
+  expect(host.textContent).toContain(id);
+  expect(calls).toHaveLength(0);
+  expect(button('Prepare unsigned action').disabled).toBe(true);
+});
+for (const status of [401, 429])
+  it(`keeps specific fixed guidance on a non-JSON ${status}`, async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('<html>private failure</html>', {
+            status,
+            headers: { 'content-type': 'text/html' },
+          }),
+      ),
+    );
+    await ready();
+    await approve();
+    await click('Prepare unsigned action');
+    await settle(() =>
+      expect(host.textContent).toContain(
+        status === 401 ? 'Sign in again' : 'rate limited',
+      ),
+    );
+    expect(host.textContent).not.toContain('private failure');
+  });
+for (const event of ['pagehide', 'storage', 'receipt'])
+  it(`holds late publication after ${event}`, async () => {
+    let resolve!: (value: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((r) => {
+            resolve = r;
+          }),
+      ),
+    );
+    await ready();
+    await approve();
+    await click('Prepare unsigned action');
+    await settle(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+    const id = JSON.parse(sessionStorage.getItem(storageKey())!).id;
+    await act(async () =>
+      window.dispatchEvent(
+        event === 'storage'
+          ? new StorageEvent('storage', {
+              key: storageKey(),
+              storageArea: sessionStorage,
+            })
+          : event === 'receipt'
+            ? new CustomEvent('bundle:warmup-receipt-saved', {
+                detail: { planId: f.context.planId },
+              })
+            : new Event('pagehide'),
+      ),
+    );
+    await act(async () => {
+      resolve(Response.json(f.preparation(id)));
+      await new Promise<void>((r) => nextTurn(r));
+    });
+    expect(host.textContent).not.toMatch(
+      /Unsigned preparation (saved|recovered)/,
+    );
+    expect(JSON.parse(sessionStorage.getItem(storageKey())!).id).toBe(id);
+  });
+it('does not cancel for an unrelated child storage notification', async () => {
+  let resolve!: (value: Response) => void;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((r) => {
+          resolve = r;
+        }),
+    ),
+  );
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+  const id = JSON.parse(sessionStorage.getItem(storageKey())!).id;
+  await act(async () =>
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'unrelated',
+        storageArea: localStorage,
+      }),
+    ),
+  );
+  await act(async () => resolve(Response.json(f.preparation(id))));
+  await settle(() =>
+    expect(host.textContent).toContain('Unsigned preparation saved'),
+  );
+});
+it('holds a timed-out request and never sends another one automatically', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      (_input, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) =>
+          init!.signal!.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          ),
+        ),
+    ),
+  );
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(30001);
+  });
+  expect(host.querySelector('[role=alert]')).toBeTruthy();
+  expect(button('Retry this preparation request').disabled).toBe(true);
+  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+});
+it('rejects a recovered preparation using a newer head than the original reminder', async () => {
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() =>
+    expect(host.textContent).toContain('Unsigned preparation saved'),
+  );
+  saved!.preparation.reviewHeadSha256 = 'c'.repeat(64);
+  await click('Recover saved preparation');
+  await settle(() => expect(host.querySelector('[role=alert]')).toBeTruthy());
+  expect(writes()).toHaveLength(1);
+});
+it('rearms the display expiry if the local clock moves backwards', async () => {
+  await ready();
+  await approve();
+  await click('Prepare unsigned action');
+  await settle(() =>
+    expect(host.textContent).toContain('Unsigned preparation saved'),
+  );
+  expect(document.activeElement?.getAttribute('aria-label')).toBe(
+    'Saved unsigned preparation review',
+  );
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(29000);
+    vi.setSystemTime(at + 28000);
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  expect(host.textContent).not.toContain('· expired');
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  expect(host.textContent).toContain('· expired');
 });

@@ -29,6 +29,51 @@ it('retains the whole admitted original head and emits only the exact API reques
     prepareRequested: true,
   });
 });
+it('retains collision guidance in v2 without sending it in the API body', async () => {
+  const f = await fixture(),
+    recoveryId = '00000000-0000-4000-8000-000000000009';
+  const m = await admit(
+    { ...f.marker, format: 'warmup-preparation-request-v2', recoveryId },
+    f.context,
+  );
+  expect(m.recoveryId).toBe(recoveryId);
+  expect(warmupPreparationRequestBody(m)).not.toHaveProperty('recoveryId');
+  await expect(admit({ ...f.marker, recoveryId }, f.context)).rejects.toThrow(
+    'original preparation reminder',
+  );
+});
+it('checks the current action prefix without rejecting an older confirmed begin-review receipt', async () => {
+  const f = await fixture(),
+    bad = structuredClone(f.journal);
+  bad.snapshot.completedActions = 1;
+  await expect(
+    warmupJournalView({ journal: bad }, f.context, {
+      request: f.command,
+      requireReceipt: true,
+    }),
+  ).rejects.toThrow('Saved session status');
+  const later = structuredClone(bad),
+    a = f.context.actions[1];
+  later.version = 3;
+  later.headSha256 = 'c'.repeat(64);
+  later.snapshot.pending!.action = {
+    id: a.id,
+    side: a.side,
+    cycle: a.cycle,
+    wallet: a.wallet,
+    walletRevision: a.walletRevision,
+    mint: a.mint,
+    scheduledAt: a.scheduledAt,
+  };
+  expect(
+    (
+      await warmupJournalView({ journal: later }, f.context, {
+        request: f.command,
+        requireReceipt: true,
+      })
+    ).commandReceipt?.id,
+  ).toBe(f.command.id);
+});
 for (const key of ['consentId', 'termsSha256', 'id', 'format'])
   it(`refuses a changed marker ${key}`, async () => {
     const f = await fixture();
