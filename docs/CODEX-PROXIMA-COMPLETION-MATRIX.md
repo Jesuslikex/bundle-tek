@@ -1,5 +1,11 @@
 # Proxima reconstruction completion matrix
 
+## Provider conflict guard and versioned long-session design, 21 October 2026
+
+Source2c7fa11 repeats active shared swap/execution reservation checks for all selected wallets in the existing exact owner/plan/head provider read, before cooldown and around quote/simulation work.168relatedtests/fourfiles, plain TypeScript/scoped typed lint/format, unchanged2723-file source and final isolated production build pass. This is an advisory unsigned-preparation guard, not an atomic reservation or execution clearance. Read `CODEX-WARMUP-PROVIDER-CONFLICT-GUARD-20261021.md`.
+
+Actual Opus5.5 assessed the earlier d883a5a source read-only, without tests/edits/denials and with2661 copied files unchanged. `CODEX-WARMUP-LONG-SESSION-DESIGN-20261021.md` records the separate v2 consent/journal/per-attempt qualification direction, immutable v1 compatibility, required integrated API/UI/SQL proof and Codex corrections. The design is not implemented.0132 is unclaimed. Long sessions, shared wallet/lot reservations, signing/terminal recovery and orchestration remain open; Start/signing stay off. No deploy or funded proof.
+
 ## Cross-browser warmup recovery, 21 October 2026
 
 Source04ba5b1 and accepted review fixes0652336 add saved-only original-context recovery by preparation ID or authenticated current-action discovery. Losing the browser reminder or displaying an older journal root no longer requires a replacement quote. The original prefix/head and deadlines are verified against the complete stored journal. Confirmed reminders cannot be overwritten, recovered v3 records cannot POST, parent refresh requirements survive late child results, and discovery verifies the full journal once. Read `CODEX-WARMUP-CROSS-BROWSER-RECOVERY-20261021.md` for the exact scope and limits. This supersedes only the cross-browser context-recovery gap in the older section below.
