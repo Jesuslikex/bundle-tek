@@ -1,0 +1,110 @@
+{
+  "sourceBase": "ee540ec7670df0dd17de8c2b55fca8f0f4236e08",
+  "sourceHashes": {
+    "lib/wallet-funding-origin.ts": "c3aec03fc1c69623d276964191f865429b296f5af2b07c141acbf82a9f6523c2",
+    "lib/wallet-funding-origin.test.ts": "a0b6003d6384ce678d9a73cc3f3c602bcd982eacfdc0bd1ad0c50fcb8d8a6c40"
+  },
+  "regression": {
+    "passed": 131,
+    "failed": 0,
+    "skipped": 0,
+    "files": 13
+  },
+  "retainedPublicReceiptCheck": {
+    "passed": 1,
+    "failed": 0,
+    "mutationRefusals": [
+      "signature",
+      "slot",
+      "blockTime"
+    ],
+    "additionalRpcCalls": 0,
+    "historyCompletenessProven": false,
+    "independentLedgerMetadataProven": false
+  },
+  "readOnlyProbeCalls": {
+    "total": 9,
+    "getGenesisHash": 3,
+    "getTransactionsForAddress": 4,
+    "getTransaction": 2,
+    "allHttp200": true,
+    "retries": 0,
+    "scope": "official public example, then one deterministic public native-transfer source",
+    "additionalCandidatesAfterFixedOneHopSelection": 0
+  },
+  "initialPublicSampleRefusal": "unsupported-native-transaction, explicit null inner recording",
+  "privateFixtureSha256": "824bc8b577bad67b7571c5e6ad752269be6ce0b2f6f733ba046b6d400af28e5c",
+  "initialReview": {
+    "startedAt": "2026-10-22T03:28:27.748Z",
+    "finishedAt": "2026-10-22T03:30:58.931Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "ee540ec7670df0dd17de8c2b55fca8f0f4236e08",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.46877919999999995,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "followupReview": {
+    "startedAt": "2026-10-22T03:41:00.739Z",
+    "finishedAt": "2026-10-22T03:42:28.117Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "ee540ec7670df0dd17de8c2b55fca8f0f4236e08",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.33013719999999996,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "postFollowupCorrection": "negative-reason classification and conservation-before-funded-again decision; independently tested, not rereviewed",
+  "mountedOrProductionCaller": false,
+  "deployed": false,
+  "providerSettingsChanged": false,
+  "applicationOrHostedSqlWritten": false,
+  "signedOrSubmittedRealWallet": false,
+  "newNextBuild": false,
+  "checks": {
+    "typecheck": "passed",
+    "typedLint": "passed, two files",
+    "format": "passed, two files",
+    "existingProductionRuntimeEdits": false
+  }
+}
