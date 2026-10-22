@@ -102,9 +102,10 @@ export function BubbleMapPanel({
     <section aria-label="Bubble map" className="min-w-0 space-y-3">
       <h4>Bubble map</h4>
       <p className="text-xs text-muted-foreground">
-        Links these holders by the wallet that first sent each of them SOL, the
-        way bubble map tools do. It reads public history only. A shared funder
-        can be an exchange, so a cluster is a signal, not proof.
+        Looks for a supported SOL funding source in the oldest returned
+        transaction, within three provider history pages. Missing or unsupported
+        evidence stays unknown. Provider history may be incomplete. A shared
+        funder can be an exchange, so a cluster is a signal, not proof.
       </p>
       <Button
         type="button"
@@ -123,7 +124,7 @@ export function BubbleMapPanel({
             {teamWallets.length > 0 &&
               ` Linked to your team wallets: ${pct(map.ownedClusteredBasisPoints)}.`}
             {unknown > 0 &&
-              ` ${unknown} wallet(s) had no readable first funder.`}
+              ` ${unknown} wallet(s) had no usable funding evidence in this bounded lookup.`}
           </p>
           <svg
             viewBox={`0 0 ${size} ${size}`}

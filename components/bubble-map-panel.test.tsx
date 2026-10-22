@@ -44,13 +44,16 @@ it('maps holders and the team wallet only after a click and reports linked suppl
     ),
   );
   expect(fetchMock).not.toHaveBeenCalled();
+  expect(container.textContent).toContain(
+    'Provider history may be incomplete.',
+  );
   await act(async () => container.querySelector('button')!.click());
   expect(container.textContent).toContain('Clustered supply 40.00%');
   expect(container.textContent).toContain(
     'Linked to your team wallets: 40.00%',
   );
   expect(container.textContent).toContain(
-    '1 wallet(s) had no readable first funder',
+    '1 wallet(s) had no usable funding evidence in this bounded lookup',
   );
   act(() => root.unmount());
 });

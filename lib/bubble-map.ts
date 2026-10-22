@@ -1,6 +1,7 @@
 import { walletAddress } from './wallet-workspace';
+import bs58 from 'bs58';
 
-// Bubble maps link holders through who first funded them with SOL.
+// Bubble maps estimate links from bounded provider-reported funding evidence.
 // This is a read-only estimate: a shared funder can also be an exchange
 // hot wallet, so clusters are signals, not proof of common control.
 
@@ -8,6 +9,7 @@ export type BubbleFunder = {
   funder: string;
   signature: string;
   slot: number;
+  blockTime?: number | null;
 };
 export type BubbleHolder = { owner: string; raw: string };
 export type BubbleCluster = {
@@ -36,33 +38,140 @@ export type BubbleMap = {
 
 type Parsed = {
   program?: string;
+  programId?: string;
   parsed?: { type?: string; info?: Record<string, unknown> };
 };
 type ParsedTransaction = {
   slot?: number;
+  blockTime?: number | null;
   transaction?: {
     signatures?: string[];
     message?: { instructions?: Parsed[] };
   };
   meta?: {
     err?: unknown;
-    innerInstructions?: { instructions?: Parsed[] }[];
+    innerInstructions?: { index?: number; instructions?: Parsed[] }[] | null;
   } | null;
 };
 
-/** The wallet that sent `address` its first SOL in this transaction, if any. */
+/** First supported positive System transfer in this provider-parsed trace. */
 export function funderInTransaction(
   tx: ParsedTransaction | null,
   address: string,
 ): BubbleFunder | null {
-  if (!tx || tx.meta?.err) return null;
-  const all = [
-    ...(tx.transaction?.message?.instructions ?? []),
-    ...(tx.meta?.innerInstructions ?? []).flatMap((i) => i.instructions ?? []),
-  ];
+  if (
+    !tx ||
+    tx.meta?.err !== null ||
+    !Number.isSafeInteger(tx.slot) ||
+    tx.slot! < 0
+  )
+    return null;
+  const signature = tx.transaction?.signatures?.[0];
+  try {
+    if (
+      typeof signature !== 'string' ||
+      signature.length > 90 ||
+      bs58.decode(signature).length !== 64 ||
+      walletAddress(address, 'Solana') !== address
+    )
+      return null;
+  } catch {
+    return null;
+  }
+  if (
+    tx.blockTime !== undefined &&
+    tx.blockTime !== null &&
+    (!Number.isSafeInteger(tx.blockTime) ||
+      tx.blockTime < 0 ||
+      tx.blockTime > Date.now() / 1000)
+  )
+    return null;
+  const outer = tx.transaction?.message?.instructions;
+  const groups = tx.meta.innerInstructions;
+  if (
+    !Array.isArray(outer) ||
+    outer.length > 256 ||
+    !Array.isArray(groups) ||
+    groups.length > 256
+  )
+    return null;
+  const inner = new Map<number, Parsed[]>();
+  for (const group of groups) {
+    if (
+      !group ||
+      !Number.isSafeInteger(group.index) ||
+      group.index! < 0 ||
+      group.index! >= outer.length ||
+      inner.has(group.index!) ||
+      !Array.isArray(group.instructions) ||
+      group.instructions.length > 4096
+    )
+      return null;
+    inner.set(group.index!, group.instructions);
+  }
+  const all = outer.flatMap((ix, index) => [ix, ...(inner.get(index) ?? [])]);
+  if (all.length > 4096) return null;
   for (const ix of all) {
-    if (ix.program !== 'system' || !ix.parsed?.info) continue;
+    if (!ix || typeof ix !== 'object') return null;
+    try {
+      if (
+        typeof ix.programId !== 'string' ||
+        walletAddress(ix.programId, 'Solana') !== ix.programId
+      )
+        return null;
+    } catch {
+      return null;
+    }
+    if (
+      ix.program !== 'system' &&
+      ix.programId !== '11111111111111111111111111111111'
+    )
+      continue;
+    if (
+      ix.program !== 'system' ||
+      ix.programId !== '11111111111111111111111111111111' ||
+      !ix.parsed?.info
+    )
+      return null;
     const { type, info } = ix.parsed;
+    if (
+      [
+        'advanceNonce',
+        'advanceNonceAccount',
+        'allocate',
+        'allocateWithSeed',
+        'assign',
+        'assignWithSeed',
+        'initializeNonce',
+        'initializeNonceAccount',
+        'authorizeNonce',
+        'authorizeNonceAccount',
+        'upgradeNonce',
+        'upgradeNonceAccount',
+      ].includes(type ?? '')
+    )
+      continue;
+    if (
+      ![
+        'transfer',
+        'transferWithSeed',
+        'createAccount',
+        'createAccountWithSeed',
+      ].includes(type ?? '')
+    )
+      return null;
+    const amount = info.lamports;
+    if (
+      !(
+        (typeof amount === 'number' &&
+          Number.isSafeInteger(amount) &&
+          amount > 0) ||
+        (typeof amount === 'string' &&
+          /^[1-9]\d{0,19}$/.test(amount) &&
+          BigInt(amount) < 1n << 64n)
+      )
+    )
+      return null;
     const to =
       type === 'transfer' || type === 'transferWithSeed'
         ? info.destination
@@ -70,16 +179,22 @@ export function funderInTransaction(
           ? info.newAccount
           : undefined;
     const from = info.source;
-    if (to !== address || typeof from !== 'string' || from === address)
-      continue;
-    const signature = tx.transaction?.signatures?.[0];
-    if (typeof signature !== 'string' || !Number.isSafeInteger(tx.slot))
-      return null;
+    if (typeof to !== 'string') return null;
     try {
+      if (walletAddress(to, 'Solana') !== to) return null;
+    } catch {
+      return null;
+    }
+    if (to !== address) continue;
+    if (typeof from !== 'string') return null;
+    if (from === address) continue;
+    try {
+      if (walletAddress(from, 'Solana') !== from) return null;
       return {
         funder: walletAddress(from, 'Solana'),
         signature,
         slot: tx.slot as number,
+        ...(tx.blockTime !== undefined ? { blockTime: tx.blockTime } : {}),
       };
     } catch {
       return null;

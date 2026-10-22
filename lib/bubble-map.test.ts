@@ -1,4 +1,10 @@
 import { expect, it } from 'vitest';
+import bs58 from 'bs58';
+const signature = (n: number) => {
+  const bytes = new Uint8Array(64);
+  new DataView(bytes.buffer).setUint32(0, n);
+  return bs58.encode(bytes);
+};
 import { buildBubbleMap, funderInTransaction } from './bubble-map';
 import { findFirstFunder } from './bubble-map-funders';
 
@@ -16,12 +22,16 @@ const transfer = (
 ) => ({
   slot: 9,
   transaction: {
-    signatures: ['sig'],
+    signatures: [signature(9)],
     message: {
       instructions: [
         {
           program: 'system',
-          parsed: { type: 'transfer', info: { source, destination } },
+          programId: '11111111111111111111111111111111',
+          parsed: {
+            type: 'transfer',
+            info: { source, destination, lamports: 1000 },
+          },
         },
       ],
     },
@@ -32,7 +42,7 @@ const transfer = (
 it('reads the first SOL sender from transfers and created accounts', () => {
   expect(funderInTransaction(transfer(F, A), A)).toEqual({
     funder: F,
-    signature: 'sig',
+    signature: signature(9),
     slot: 9,
   });
   expect(funderInTransaction(transfer(F, B), A)).toBeNull();
@@ -40,7 +50,7 @@ it('reads the first SOL sender from transfers and created accounts', () => {
   const created = transfer(F, A);
   created.transaction.message.instructions[0].parsed = {
     type: 'createAccount',
-    info: { source: F, newAccount: A },
+    info: { source: F, newAccount: A, lamports: 1000 },
   } as never;
   expect(funderInTransaction(created, A)?.funder).toBe(F);
 });
@@ -83,26 +93,36 @@ it('clusters holders by shared funders and direct funding, with exact supply sha
   ).toThrow('once');
 });
 
-it('walks history to the oldest signatures and gives up on very long histories', async () => {
+it('walks bounded history without guessing beyond the lookup cap', async () => {
+  let page = 0;
   const calls: string[] = [];
   const short = await findFirstFunder(A, async <T>(method: string) => {
     calls.push(method);
     return (
       method === 'getSignaturesForAddress'
-        ? [
-            { signature: 'new', slot: 2, err: null },
-            { signature: 'old', slot: 1, err: null },
-          ]
+        ? page++ === 0
+          ? [{ signature: signature(9), slot: 9, err: null }]
+          : []
         : transfer(F, A)
     ) as T;
   });
   expect(short.funder?.funder).toBe(F);
-  expect(calls).toEqual(['getSignaturesForAddress', 'getTransaction']);
-  const full = Array.from({ length: 1000 }, (_, i) => ({
-    signature: 's' + i,
-    slot: 1,
-    err: null,
-  }));
-  const long = await findFirstFunder(A, async <T>() => full as T);
+  expect(calls).toEqual([
+    'getSignaturesForAddress',
+    'getSignaturesForAddress',
+    'getTransaction',
+  ]);
+  page = 0;
+  const long = await findFirstFunder(
+    A,
+    async <T>() =>
+      Array.from({ length: 1000 }, (_, i) => {
+        const n = 4000 - page * 1000 - i;
+        return { signature: signature(n), slot: n, err: null };
+      }).map((row, i, rows) => {
+        if (i === rows.length - 1) page++;
+        return row;
+      }) as T,
+  );
   expect(long).toEqual({ funder: null, reason: 'history-too-long' });
 });

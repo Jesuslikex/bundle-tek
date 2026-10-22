@@ -1,0 +1,110 @@
+{
+  "sourceBase": "787eeb5663886c5c31db776980dfeb262b753d56",
+  "files": {
+    "lib/bubble-map.ts": "55fcd5bb3b93550491f86dd8895332d311aa07987851e7a62ce3133c39f76bc9",
+    "lib/bubble-map-funders.ts": "a2d3d97e7f6de36b2bce6259b0551df33c0933764ac07355147050d2a2bdb39b",
+    "lib/bubble-map.test.ts": "e800d82aa9c9d242fb7e1671a205b251be1c9634bd842b97708d13ff4748d969",
+    "lib/bubble-map-funding-evidence.test.ts": "e1a8b19ec46931fbf833d2a6b31e3cc684273a7ae84a97636e6a8bd3ce610d97",
+    "components/bubble-map-panel.tsx": "2b2fd76d334368e0c20c46e699c46fdaae531a37258c405ec4f489ea0f95b2bf",
+    "components/bubble-map-panel.test.tsx": "86ed9b882da804cc3895ca0eecbfc53b188cdcbf58c7dd46748c5443a208d538",
+    "app/api/supply/bubble-map/route.test.ts": "79ed717e704baaf6f4646407963ddae42ff71373ea9bf65cdfda71cc60557086"
+  },
+  "tests": {
+    "files": 9,
+    "passed": 54,
+    "failed": 0,
+    "pending": 0
+  },
+  "review": {
+    "startedAt": "2026-10-22T02:42:00.560Z",
+    "finishedAt": "2026-10-22T02:44:14.963Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "787eeb5663886c5c31db776980dfeb262b753d56",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.4939433999999999,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "finalFollowupIndependentlyVerifiedNotRereviewed": true,
+  "initialRegression": {
+    "tests": 8,
+    "passed": 0,
+    "failed": 8
+  },
+  "liveProbe": {
+    "provider": "existing configured Alchemy holder endpoint",
+    "getGenesisHash": "corrected exact mainnet comparison passed",
+    "getTransactionsForAddress": {
+      "sortOrder": "asc",
+      "transactionDetails": "signatures",
+      "limit": 1,
+      "httpStatus": 200,
+      "rows": 1,
+      "paginationTokenPresent": true
+    },
+    "initialScriptNetworkConstantErrorRetained": true,
+    "totalRequestsIncludingInitialProbe": 3,
+    "fundingOriginQualified": false,
+    "configuredProviderChanged": false
+  },
+  "deployed": false,
+  "signed": false,
+  "submitted": false,
+  "applicationOrHostedSqlWritten": false,
+  "schemaChanged": false,
+  "renderedOrSignedInQa": false,
+  "build": {
+    "base": "787eeb5663886c5c31db776980dfeb262b753d56",
+    "overlays": [
+      "lib/bubble-map.ts",
+      "lib/bubble-map-funders.ts",
+      "lib/bubble-map.test.ts",
+      "lib/bubble-map-funding-evidence.test.ts",
+      "components/bubble-map-panel.tsx",
+      "components/bubble-map-panel.test.tsx",
+      "app/api/supply/bubble-map/route.test.ts"
+    ],
+    "hashes": {
+      "lib/bubble-map.ts": "55fcd5bb3b93550491f86dd8895332d311aa07987851e7a62ce3133c39f76bc9",
+      "lib/bubble-map-funders.ts": "a2d3d97e7f6de36b2bce6259b0551df33c0933764ac07355147050d2a2bdb39b",
+      "lib/bubble-map.test.ts": "e800d82aa9c9d242fb7e1671a205b251be1c9634bd842b97708d13ff4748d969",
+      "lib/bubble-map-funding-evidence.test.ts": "e1a8b19ec46931fbf833d2a6b31e3cc684273a7ae84a97636e6a8bd3ce610d97",
+      "components/bubble-map-panel.tsx": "2b2fd76d334368e0c20c46e699c46fdaae531a37258c405ec4f489ea0f95b2bf",
+      "components/bubble-map-panel.test.tsx": "86ed9b882da804cc3895ca0eecbfc53b188cdcbf58c7dd46748c5443a208d538",
+      "app/api/supply/bubble-map/route.test.ts": "79ed717e704baaf6f4646407963ddae42ff71373ea9bf65cdfda71cc60557086"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "typecheck": "passed",
+  "typedLint": "passed, seven files",
+  "format": "passed, seven files",
+  "priorBuild": {
+    "compileExitCode": 0,
+    "sourceChangedDuringOpusFollowup": true,
+    "qualifiesFinalSource": false
+  }
+}

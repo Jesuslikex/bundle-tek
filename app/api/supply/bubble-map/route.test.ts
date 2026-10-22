@@ -68,7 +68,7 @@ it('reads funders on mainnet only, using read-only methods', async () => {
   const ok = await post({ addresses: [A] });
   expect(await ok.json()).toEqual({
     network: 'mainnet',
-    funders: { [A]: { funder: null } },
+    funders: { [A]: { funder: null, reason: 'history-unavailable' } },
   });
   expect(new Set(mocks.rpc.mock.calls.map((c) => c[0]))).toEqual(
     new Set(['getGenesisHash', 'getSignaturesForAddress']),
@@ -87,4 +87,15 @@ it('throttles repeated maps per account before any RPC call', async () => {
   expect(mocks.rpc.mock.calls.length).toBe(calls);
   mocks.user = { userId: 'bob' };
   expect((await post({ addresses: [A] })).status).toBe(200);
+});
+
+it('returns a static 502 for malformed provider history without leaking provider text', async () => {
+  mocks.rpc.mockImplementation(async (method: string) =>
+    method === 'getGenesisHash'
+      ? SOLANA_MAINNET_GENESIS
+      : [{ signature: 'private-provider-text', slot: 1, err: null }],
+  );
+  const response = await post({ addresses: [A] });
+  expect(response.status).toBe(502);
+  expect(await response.text()).not.toContain('private-provider-text');
 });
