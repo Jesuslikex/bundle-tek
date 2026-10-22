@@ -1,0 +1,258 @@
+{
+  "format": "recovery-rendered-qa-evidence-v1",
+  "sourceBaseCommit": "eaa66ff9001663864fb5e01954c3b22e303b233f",
+  "changedApplicationFiles": [
+    "components/wallet-funding-proximity.module.css"
+  ],
+  "cssSha256LfNormalized": "662842ddd1f989039250c5a67066a660cc07a153615b3205bba46812c76fbd2e",
+  "browserScope": "actual React components and CSS in an isolated same-Chrome loopback Vite fixture; simulated in-memory feature transport; not production sign-in/API/provider execution",
+  "browserObservations": {
+    "sourceBaseCommit": "eaa66ff9001663864fb5e01954c3b22e303b233f",
+    "scope": "isolated actual React components with synthetic in-memory transport",
+    "desktopFunding": {
+      "clientWidth": 1440,
+      "innerWidth": 1440,
+      "scrollWidth": 1440,
+      "targets": [
+        18,
+        18
+      ]
+    },
+    "phoneFunding": {
+      "clientWidth": 375,
+      "innerWidth": 375,
+      "scrollWidth": 375,
+      "targetHeights": [
+        44,
+        44
+      ]
+    },
+    "outsideFocusAfterCompletedRead": {
+      "clientWidth": 305,
+      "focusedText": "Finish pending read",
+      "scrollWidth": 305
+    },
+    "narrowPhone": {
+      "requestedWidth": 320,
+      "clientWidth": 305,
+      "scrollWidth": 305,
+      "fundingTargetHeights": [
+        44,
+        44
+      ],
+      "cancellationControlHeights": [
+        44,
+        44,
+        44
+      ]
+    },
+    "lostCancellation": {
+      "transport": [
+        "GET saved signing",
+        "POST saved signing",
+        "GET saved signing"
+      ],
+      "parentReadBlockedWhileUnknown": true,
+      "explicitStatusReadResolvedTo": "cancelled",
+      "retryPostCount": 0
+    },
+    "consent": {
+      "initiallyUnchecked": true,
+      "activeRunLockWithdrawsApproval": true,
+      "releasingRunLockDoesNotRestoreApproval": true
+    },
+    "history": {
+      "mountOrDisclosureFetch": false,
+      "explicitLookupFetch": true,
+      "rawPacketRendered": false
+    },
+    "applicationErrors": []
+  },
+  "additionalBeforeAfter": {
+    "phone375Before": {
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "fundingSummaryHeight": 18
+    },
+    "phone375After": {
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "fundingSummaryHeight": 44,
+      "keyboardEnterOpensDetails": true
+    },
+    "phone320After": {
+      "clientWidth": 305,
+      "scrollWidth": 305,
+      "fundingSummaryHeight": 44
+    },
+    "desktop1440After": {
+      "clientWidth": 1440,
+      "scrollWidth": 1440,
+      "fundingSummaryHeight": 18
+    },
+    "initialDesktopRecovery": {
+      "clientWidth": 1920,
+      "scrollWidth": 1920,
+      "readAndStatusButtonsHeight": 44
+    }
+  },
+  "screenshots": [
+    {
+      "path": "work/auto-sell-review-browser-20261022/funding-before-375.jpg",
+      "bytes": 83941,
+      "sha256": "db9296ff488732a8312db1dd63ab50c57385ba468f9cbefac898b5117c5f7c02"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/funding-desktop-1440.jpg",
+      "bytes": 101872,
+      "sha256": "47128198d6fc7731e40d085c53134276a3dda5d95261e911567c58603df94c2b"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/funding-fixed-320.jpg",
+      "bytes": 90136,
+      "sha256": "e0d8ba9c9abf9d1c8407ad03db5ecb606f21d421d0e88b199d401793b2767497"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/funding-fixed-375.jpg",
+      "bytes": 92106,
+      "sha256": "af37baa99293d01e189c7d242714cb0cf50c0cdc3443201a66b5b2d66fba78c9"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/funding-phone-detail.jpg",
+      "bytes": 48825,
+      "sha256": "c44aeb21dd5d2543c32b00accf0496ff4de2531419afef2d957e0079bfc39b76"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/history-320.jpg",
+      "bytes": 114919,
+      "sha256": "c1b7c378c8b1121f79c3e3890ef79687c758c6e0488fc43662b68b41cc745568"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/recovery-unchecked-320.jpg",
+      "bytes": 83207,
+      "sha256": "0d7a80b000cf0687106ae7402c93bfbf09da8d556aa2672d6f869b7912bd89f1"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/recovery-unchecked-375.jpg",
+      "bytes": 82379,
+      "sha256": "c121aa5196b308d6ab96f44005f520e965a0ee6f547b1413fa3ab525e80af139"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/recovery-unknown-375.jpg",
+      "bytes": 82368,
+      "sha256": "3823d885bba7c44eab71d00ba2d143fd27a8faa628d0c9dfc546d6d950a7710b"
+    },
+    {
+      "path": "work/auto-sell-review-browser-20261022/recovery-unknown-desktop.jpg",
+      "bytes": 97640,
+      "sha256": "fa3823c6b3ef7a98fddbb96bedc4e858fb8457ddb191fed98e363480460a9669"
+    }
+  ],
+  "reference": {
+    "reaTargetEvidenceId": "ev_2fadf42114de932c5ceb3bf1e28160bd27f9a64035e1d588134d20070fbc96ca",
+    "reaPageEvidenceId": "ev_51b9f07abe7e7f4998b20cd7e3a572beb1fff1d5ea689b8d378144a825fd3ea8",
+    "reaScope": "passive Proxima-only live page; no clicks, page JS, raw payloads, storage values or script sources",
+    "privateBundle": {
+      "path": "/opt/rea/results/proxima-recovery-rendered-qa-20261022.json",
+      "bytes": 4683920,
+      "records": 10,
+      "freshRecordsThisCheckpoint": 2,
+      "sha256": "da16c72a4518b074ae23c6753a4365a211e310145973998dd51bbdafa7f30d19",
+      "policyFiltered": true,
+      "attachLimited": true,
+      "rawCapturePublished": false
+    },
+    "separateChromeUiObservation": [
+      "Generate Activity form fixed/range amount, loops, minute/second delay, alternative routing, selected count, required amount and estimated duration",
+      "completed activity summary has duration and per-wallet transaction/volume fields",
+      "observed completion is app-reported, not independently verified chain execution"
+    ],
+    "financialSessionControlsSubmitted": false
+  },
+  "tests": {
+    "passed": 66,
+    "failed": 0,
+    "skipped": 0,
+    "files": [
+      {
+        "file": "components/auto-sell-modal.test.tsx",
+        "passed": 5
+      },
+      {
+        "file": "components/auto-sell-review-recovery.test.tsx",
+        "passed": 20
+      },
+      {
+        "file": "components/auto-sell-saved-outcomes.test.tsx",
+        "passed": 20
+      },
+      {
+        "file": "components/wallet-funding-proximity.test.tsx",
+        "passed": 14
+      },
+      {
+        "file": "components/wallet-workspace.test.tsx",
+        "passed": 5
+      },
+      {
+        "file": "lib/wallet-funding-time.test.ts",
+        "passed": 2
+      }
+    ],
+    "report": "work/release-qa/recovery-rendered-qa-20261022.json"
+  },
+  "typecheckExitCode": 0,
+  "cssFormatExitCode": 0,
+  "review": {
+    "startedAt": "2026-10-22T08:54:49.344Z",
+    "finishedAt": "2026-10-22T08:55:27.070Z",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "permissionDenials": 0,
+    "sourceUnchanged": true,
+    "resultSubtype": "success",
+    "copiedFileCount": 7,
+    "ranTests": false,
+    "scope": "CSS rule/component, synthetic images and supplied geometry observations only"
+  },
+  "cleanup": {
+    "ownedQaServerPid": 49520,
+    "ownedQaServerStopped": true,
+    "ownedQaServerListenerAbsent": true,
+    "ownedQaTabsClosed": true,
+    "viewportReset": true,
+    "originalUserTabsPreserved": true,
+    "reaRelayStopCommand": "blocked by tool policy because approvals unavailable; not retried through another mechanism",
+    "reaRelayLastObservedNodePid": 16944,
+    "reaRelayLastObservedWslPid": 16664,
+    "reaRelayLastObservedListener": "WSL127.0.0.1:9223 only",
+    "windowsCdpListenerAbsentAtLastCheck": true,
+    "reaRelayCleanupComplete": false
+  },
+  "noChangesTo": [
+    "existing TS/TSX logic",
+    "API/financial writers",
+    "protected Claude shell/layout/global CSS",
+    "migrations/db",
+    "provider credentials/settings",
+    "cron"
+  ],
+  "noRealBundleApiOrProviderCalls": true,
+  "realWalletActions": false,
+  "fundedTest": false,
+  "deployment": false,
+  "fullSuite": false,
+  "productionBuild": false,
+  "remaining": [
+    "signed-in full Bundle frontend -> real API -> database QA",
+    "actual full Auto Sell modal Run/vault gate in rendered integration rather than callback/unit evidence",
+    "provider/receipt/funded execution qualification",
+    "warmup durable root/consent/CAS/shared-hold/outcome/reconciliation storage",
+    "touch tablet disclosures wider than640px remain existing density"
+  ]
+}

@@ -54,6 +54,12 @@
   cursor: pointer;
   width: fit-content;
 }
+@media (max-width: 640px) {
+  .warning summary,
+  .recorded summary {
+    min-height: 44px;
+  }
+}
 .warning summary:focus-visible,
 .recorded summary:focus-visible {
   outline: 2px solid currentColor;
