@@ -1,0 +1,223 @@
+{
+  "scope": "Offline source/model payload and local primitive transport measurement only",
+  "chunkBytes": 196608,
+  "measurements": [
+    {
+      "kind": "source-derived-maximum-plan",
+      "scope": "maximum-supported-plan-synthetic-source-and-provider",
+      "actions": 800,
+      "savedLots": 0,
+      "bytes": 1319493,
+      "rootBytes": 319896,
+      "chunks": 7,
+      "sha256": "b1bd304c358e4d8eea249c96c0c9f7e7aa761e98b5f751e2f87265b88c5dbf44"
+    },
+    {
+      "kind": "model-4800-saved-source-like",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 4800,
+      "bytes": 9475344,
+      "rootBytes": 3949722,
+      "chunks": 49,
+      "sha256": "8fabd05f4c170b7b57a61875168e553d9bc914791ad8cb3a81ebde79d08714b2"
+    },
+    {
+      "kind": "model-4800-saved-escaped",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 4800,
+      "bytes": 30296359,
+      "rootBytes": 10891075,
+      "chunks": 155,
+      "sha256": "d884e3c559d2027ce99c757864d861efdfa275846f0df9a11f9913db8a1f8277"
+    },
+    {
+      "kind": "model-4800-saved-unicode",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 4800,
+      "bytes": 18847074,
+      "rootBytes": 7067232,
+      "chunks": 96,
+      "sha256": "85e078ca4526d975588e91ee6b4b478d9aec8dd25a2801720a8ea13d844bb55b"
+    },
+    {
+      "kind": "model-4800-saved-surrogate",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 4800,
+      "bytes": 30296359,
+      "rootBytes": 10891075,
+      "chunks": 155,
+      "sha256": "e36b40241e65f8d691b7facd49c14050656b755f711313e9bc5175a9bc297a8b"
+    },
+    {
+      "kind": "model-4800-mixed-source-like",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 4000,
+      "bytes": 9075764,
+      "rootBytes": 3614082,
+      "chunks": 47,
+      "sha256": "01fe1d7e0a2fbeed0ee3ebb542da9590532b6e633f9a627563b23bd68c3ebb19"
+    },
+    {
+      "kind": "model-4800-mixed-escaped",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 4000,
+      "bytes": 30587079,
+      "rootBytes": 11181735,
+      "chunks": 156,
+      "sha256": "7cf5f4b471b62b43909dde21c1bfa7a8b7270a3e826b861cfb20196c3cbc9699"
+    },
+    {
+      "kind": "model-4800-mixed-unicode",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 4000,
+      "bytes": 18820994,
+      "rootBytes": 7041092,
+      "chunks": 96,
+      "sha256": "d74fac7f1b9b9d2f790880b99662642279cc3854d8655eb8f9eed26ee253e061"
+    },
+    {
+      "kind": "model-4800-mixed-surrogate",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 4000,
+      "bytes": 30587079,
+      "rootBytes": 11181735,
+      "chunks": 156,
+      "sha256": "03f18ea2b7a07cb0d40f1d242d722dc22c7d81f3933b45243aee6acd4244afad"
+    },
+    {
+      "kind": "model-4800-paired-source-like",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 0,
+      "bytes": 7090435,
+      "rootBytes": 1940913,
+      "chunks": 37,
+      "sha256": "e8251a8555db270e6f5d366e852a8934e150580139c90fb5ce31e12a32a7f941"
+    },
+    {
+      "kind": "model-4800-paired-escaped",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 0,
+      "bytes": 32040120,
+      "rootBytes": 12634756,
+      "chunks": 163,
+      "sha256": "118c0c0471ab65d55ec6dde7de25a9ed22110e996cb457f9b8c89e136febf36a"
+    },
+    {
+      "kind": "model-4800-paired-unicode",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 0,
+      "bytes": 18690035,
+      "rootBytes": 6910113,
+      "chunks": 96,
+      "sha256": "ebd6f4014701bf74934637370819bdebf07de42a7c74b4885b1e7363d5d793fa"
+    },
+    {
+      "kind": "model-4800-paired-surrogate",
+      "scope": "model-schema-and-parent-byte-stress-not-source-admission",
+      "actions": 4800,
+      "savedLots": 0,
+      "bytes": 32040120,
+      "rootBytes": 12634756,
+      "chunks": 163,
+      "sha256": "ca6a98d513e4409cc524add0aabf93ada8bc6eb990ccd30c460aae9096664ef9"
+    }
+  ],
+  "transportResults": [
+    {
+      "platform": "turso",
+      "chunks": 163,
+      "bytes": 32040120,
+      "modeledMaximumArrayJsonRowBytes": 786450,
+      "completeSha256": "118c0c0471ab65d55ec6dde7de25a9ed22110e996cb457f9b8c89e136febf36a",
+      "modelRootReboundAgainst": "in-memory-expected-selector",
+      "missingRowObserved": true,
+      "partialReaderRejectionTested": false,
+      "utf8BoundaryRoundTrip": true,
+      "jsonEscapedSurrogatePreserved": true
+    },
+    {
+      "platform": "d1",
+      "chunks": 163,
+      "bytes": 32040120,
+      "modeledMaximumArrayJsonRowBytes": 786450,
+      "completeSha256": "118c0c0471ab65d55ec6dde7de25a9ed22110e996cb457f9b8c89e136febf36a",
+      "modelRootReboundAgainst": "in-memory-expected-selector",
+      "missingRowObserved": true,
+      "partialReaderRejectionTested": false,
+      "utf8BoundaryRoundTrip": true,
+      "jsonEscapedSurrogatePreserved": true
+    }
+  ],
+  "hostedQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "sourceBaseCommit": "9e8d2c7d154ffda8cd73721a2738427cdb069b1e",
+  "limits": [
+    "Candidate envelope geometry only, not a published production schema or codec.",
+    "800-action case uses synthetic owned rows and controlled provider accounts; no funded or user-account proof.",
+    "4800-action models include source-inadmissible IDs and mismatched source/evidence byte placeholders; no approval/evidence admission proof.",
+    "Only largest full envelope is transported; a separate small specimen covers split UTF8 and a lone surrogate.",
+    "Root/approval binding is replayed against in-memory expected identity; evidence semantics are not replayed.",
+    "Whole envelope SHA verifies byte integrity; missing row observation is not an implemented fail-closed reader.",
+    "Numeric-array row JSON is constructed and excludes remote HTTP/protocol envelopes.",
+    "Local adapter proof does not qualify hosted limits, atomic publication, remote batching or history quota."
+  ],
+  "checks": {
+    "passedTests": 7,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "files": 2,
+    "report": "work/release-qa/warmup-complete-root-review-followup-20261022.json",
+    "reportSha256": "2440b73188ce574b4bdb6cc42a41aa71ba551f84c3b5013d1640bb11422ad905",
+    "nativeHarnessTestsPassed": 8,
+    "typecheckPassed": true,
+    "scopedTypedLintPassed": true,
+    "scopedFormattingPassed": true
+  },
+  "sourceHashes": {
+    "test/warmup-public-asset-review-fixture.ts": "b182c5bc5ef432b09631bd402839949a2a464f70d570cb0f894e3f8add9f7a3e",
+    "test/warmup-root-capacity-measurement.ts": "3e9e73c04ac9ee68da99be90faa3a7d6c1a312fa343c4f844c2dcd5b34e35c6e",
+    "lib/wallet-warmup-root-capacity.test.ts": "9385a319efc80a39b53bca2f1da5fd33a5d74c51a973b06bc05283cb909d9285"
+  },
+  "reviews": [
+    {
+      "report": "opus-warmup-root-capacity-20261022",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "resultSubtype": "success",
+      "isError": false
+    },
+    {
+      "report": "opus-warmup-root-capacity-final-20261022",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "resultSubtype": "success",
+      "isError": false
+    }
+  ]
+}
