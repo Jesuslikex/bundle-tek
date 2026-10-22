@@ -114,3 +114,12 @@ Source `e7e4c264ed18e12ea84d63a438d16ce75df39252`. Bounded Bubble Map claim rele
 54 tests/nine files, plain TypeScript/seven-file typed lint/format and final unchanged-overlay isolated build pass. Actual Opus5.5 read-only source review completed, eleven copies unchanged and zero denials; accepted follow-up independently verified. Initial eight-test baseline failures and earlier build source mismatch are retained. Existing Alchemy ascending-history signatures method availability was confirmed by a read-only probe; it is NOT full funding-origin qualification or wired into wallet warnings. External first-funding/time coverage, Bubble Map batching/gate/transport limitations and rendered/signed-in QA remain open.
 
 No deploy, application/hosted SQL or migration, provider/credential/cron change, real wallet unlock/sign/send or funded test.0136 unchanged; next0137 subject to recheck. Full Proxima parity and warmup execution remain unfinished.
+
+
+## Bubble Map read UX checkpoint, 22 October
+
+Source `e0faf7ec883397b7298adc0f55f8fa386f8089b6`. Bounded claim released. Read CODEX-BUBBLE-MAP-READ-UX-20261022.md and portable evidence. The existing32-wallet read now respects the unchanged20-address/10-second API gate with two finite groups, visible read/wait/completion, Cancel/focus and exact context remount. Strict one-MiB mainnet response admission, static errors, accessible unknown reasons, checked/excluded/team counts, duplicate conflict and supply preflight, no partial map on failure or automatic retry. Production route, protected parent/layout, schema/providers/signing unchanged.
+
+79tests/11files, plain TypeScript/five-file typed lint/six-file format and final unchanged-six-overlay isolated build pass. Initial test-only DOM type failure retained/corrected. Two actual Opus5.5 read-only reviews with12unchanged copies/zero denials each; final low cooldown/preflight corrections independently verified, not rereviewed. Parent project/revision/team and observation keys checked without edits. Chrome inventory timed out, so rendered/signed-in QA remains open. Official public Live Workspace and Marketplace references refreshed; this does not prove full private UI/backend parity.
+
+No deploy, application/hosted SQL, migration, provider/credential/cron, wallet unlock/sign/send, strategy run or funded test. No new live provider read. Full graph coverage, external first-funding qualification and full product parity remain open.0136 unchanged; next0137 subject to recheck. Fetch origin/main before branching.
