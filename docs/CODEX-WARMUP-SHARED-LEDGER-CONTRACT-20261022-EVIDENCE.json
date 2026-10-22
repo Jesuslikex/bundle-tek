@@ -1,0 +1,654 @@
+{
+  "format": "warmup-shared-ledger-contract-evidence-v1",
+  "sourceBaseCommit": "fb6ebabc13af05804e9f368fa5f9bd34e4f43def",
+  "scope": "source audit and unchanged full-chain disposable SQLite storage primitives; not execution admission",
+  "tests": [
+    {
+      "report": "warmup-shared-ledger-contract-verified-20261022.json",
+      "passed": 180,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "name": "test/warmup-shared-ledger-contract.test.ts",
+          "passed": 16,
+          "skipped": 0
+        },
+        {
+          "name": "lib/wallet-warmup-runtime-receipt-floor.test.ts",
+          "passed": 19,
+          "skipped": 0
+        },
+        {
+          "name": "lib/wallet-warmup-runtime-wallet-busy.test.ts",
+          "passed": 72,
+          "skipped": 0
+        },
+        {
+          "name": "lib/wallet-warmup-session-settlement.test.ts",
+          "passed": 73,
+          "skipped": 0
+        }
+      ]
+    },
+    {
+      "report": "warmup-shared-ledger-withdrawal-route-20261022.json",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 20,
+      "files": [
+        {
+          "name": "app/api/wallet-workspace/withdrawals/route.test.ts",
+          "passed": 3,
+          "skipped": 20
+        }
+      ]
+    }
+  ],
+  "typecheck": {
+    "command": "tsc --noEmit",
+    "exitCode": 0
+  },
+  "typedLint": {
+    "files": [
+      "test/warmup-shared-ledger-contract.test.ts"
+    ],
+    "exitCode": 0
+  },
+  "formatCheck": {
+    "files": [
+      "test/warmup-shared-ledger-contract.test.ts"
+    ],
+    "exitCode": 0
+  },
+  "migrations": {
+    "count": 137,
+    "last": "0136_auto_buy_budget_ledger",
+    "journalSha256": "79220647d75765003e5426fe5c275a76eb653729f3eb439de7bf47fba85349eb",
+    "unmodifiedFiles": [
+      {
+        "tag": "0000_daffy_lightspeed",
+        "sha256": "52353f600c6e9f7311146c05fd9edbbfe7a11fa068e37f0a3a455465cc1f0b20"
+      },
+      {
+        "tag": "0001_nice_blob",
+        "sha256": "b67b9b36b66eac95b0b1226a07ec7911573df199053a17d6cd7eee4e345701f3"
+      },
+      {
+        "tag": "0002_absent_wasp",
+        "sha256": "fc9d223c140760b572bb06fa63ebee35284d8897126b6e31ad76c1ef2364d147"
+      },
+      {
+        "tag": "0003_conscious_edwin_jarvis",
+        "sha256": "322ddac35bc9672af55e2009224ee00b2236ad71e7de7643531e27a8f5414a39"
+      },
+      {
+        "tag": "0004_sudden_wendigo",
+        "sha256": "e8ac78f279fc3dbe4c6f5a8cef4ff19829ebd301dfe616b99b04afd29561912a"
+      },
+      {
+        "tag": "0005_special_marten_broadcloak",
+        "sha256": "e833c84a2b6353933ffbbf83799d9f0424d6aa71b5849265fb3b1e4fa9807e5b"
+      },
+      {
+        "tag": "0006_worried_cassandra_nova",
+        "sha256": "0dffcb88d574f2258dfb1c2da0fdf72e3d2bce7a19199c3b313ac9b54cca0e9d"
+      },
+      {
+        "tag": "0007_superb_iron_monger",
+        "sha256": "6a38064b34809b2455c5b934224a7a68a294064acf18cf72dc6b652502c4adc8"
+      },
+      {
+        "tag": "0008_slim_wrecker",
+        "sha256": "42892d135a01908d0aa38cc9c05e150fd6d3f43860eb795bd666d7147e0868fd"
+      },
+      {
+        "tag": "0009_clever_leper_queen",
+        "sha256": "a5c858e3a3079a0316d8813d103d09ff99a66a1c84d3bc23124a7b1512ae2f65"
+      },
+      {
+        "tag": "0010_magical_ender_wiggin",
+        "sha256": "2f285d957770bafbbf5d04093334a50078b4c2d19b6e80f960b4b8d2a9223338"
+      },
+      {
+        "tag": "0011_huge_donald_blake",
+        "sha256": "3949a6a3e6ae6500008e77bf726a568d987c24b7e6885352357b5dd0b291d4ed"
+      },
+      {
+        "tag": "0012_messy_zzzax",
+        "sha256": "ec4ff2caa549febe5501cca2366dca9e96c7570dd277f899d956f4e73a25ae3b"
+      },
+      {
+        "tag": "0013_fresh_sandman",
+        "sha256": "5718af94c6c322fda16fe92f0bfcad9a43eaaa70651d97ae2e7db5d4dd789822"
+      },
+      {
+        "tag": "0014_fancy_vertigo",
+        "sha256": "f479640ca2869a41297fa1ec98e686d99cd3920128f11fd7488bb0b59c863355"
+      },
+      {
+        "tag": "0015_smiling_bloodstorm",
+        "sha256": "8c255853c5d7e2527ef01fddbc7699a21a27e190cf1254e61e380b088c6f28c6"
+      },
+      {
+        "tag": "0016_short_hedge_knight",
+        "sha256": "240752b8f2a2942e2c55ffdffc39b3488223cabcee6c00fe671954305fb619f1"
+      },
+      {
+        "tag": "0017_loving_mesmero",
+        "sha256": "df67bef5cdb684e4ae5d8e0237e0477d68640922613c7e659e09efff9fea20ec"
+      },
+      {
+        "tag": "0018_real_joshua_kane",
+        "sha256": "16ef9b777762cce2c942f7288c260ad7ac75bf8f5296f43ceaeab5407e23065d"
+      },
+      {
+        "tag": "0019_wallet_folder_memberships",
+        "sha256": "749c917ffc84058cdf8f468aabd7bdee73ec87d6b40c3428fc8082913c91c335"
+      },
+      {
+        "tag": "0020_wallet_folder_colors",
+        "sha256": "bee57000eef49595787ca93b35d3d741ae027e694c6583d6ce88af88940c7751"
+      },
+      {
+        "tag": "0021_wallet_warmup_plans",
+        "sha256": "2aefdda1b7811968f77dde078df5fcddfbc5cb4e33d0bb15f65ee539be96eb92"
+      },
+      {
+        "tag": "0022_owned_devnet_audit",
+        "sha256": "94f5ea3b2df1b2aa3c74de3fe13c17eff57d4c5351e5c14a1787d0d09e24fdd7"
+      },
+      {
+        "tag": "0023_wallet_operations",
+        "sha256": "6ffc6cdfb5536127413ba94d6fe464e95647a9617e6de344bbd8b451457f2bf0"
+      },
+      {
+        "tag": "0024_imported_token_projects",
+        "sha256": "d4500286a275061a9fa611cf6ae6fcfb8f5cee491cf254de63a1b6662142275e"
+      },
+      {
+        "tag": "0025_warmup_plan_events",
+        "sha256": "fb929a93fb786812c1d2665d3480b449eea204603fdff0814b245c936e23369b"
+      },
+      {
+        "tag": "0026_tracked_wallet_holdings",
+        "sha256": "d40c20c6352eb47f9eafefb3b94d2f5114f74c84af0cfb34a94327b7993c209b"
+      },
+      {
+        "tag": "0027_tracked_wallet_transactions",
+        "sha256": "8e73e585a7548f56750b078f035da7f2fa7529992b3e1a8272efb4f547d6ec42"
+      },
+      {
+        "tag": "0028_warmup_history_runs",
+        "sha256": "fbc145b86f6f71220d81049411877b9b16e2aef909e6802efc11057884526303"
+      },
+      {
+        "tag": "0029_warmup_history_run_events",
+        "sha256": "62637c2766e2704f75fd6a3c47e3a12b9ed4b01d4e0c0dd3033e07115ce063be"
+      },
+      {
+        "tag": "0030_workspace_wallet_tags",
+        "sha256": "d018bf231860d254b536097387b75f6e885e280f6f9c26a96472ff7072e982f4"
+      },
+      {
+        "tag": "0031_tracked_signature_snapshots",
+        "sha256": "120db85509e09b09ad73ed206be0f2be07fb01358aa727850f2de90451f56675"
+      },
+      {
+        "tag": "0032_artwork_archive",
+        "sha256": "5faf13e400ac4dea431409084e561ecbbcd20f2d57ad92b6a96709543933bf1e"
+      },
+      {
+        "tag": "0033_imported_market_observations",
+        "sha256": "5f851053f757f9e6fd1e4693755a17502f592eb96be826f63498c17eecf91574"
+      },
+      {
+        "tag": "0034_evm_tracker_snapshots",
+        "sha256": "697c4f13b89b8abf865a4963e8a79c3fe2afd4166b82b14e2f05702ef944b285"
+      },
+      {
+        "tag": "0035_tracked_evm_holdings",
+        "sha256": "8f5c2629967ac8d4ceacf24b4ac998711e49b9a680d80559b5fea813d2942ea8"
+      },
+      {
+        "tag": "0036_imported_pool_candles",
+        "sha256": "afa654c7bf582ce30136ee464d0a4ed79296a92e89b4d4a3955aa38a15e63fab"
+      },
+      {
+        "tag": "0037_imported_pool_trades",
+        "sha256": "29b253274a1eeb8a57d225d628d1dd35bff13fc9a2909ae5b0866e8255f66807"
+      },
+      {
+        "tag": "0038_imported_evm_balances",
+        "sha256": "4d43646b928fd8fb1e82bd856cb06b4e55b88b1a1d50c384875a03a996833e6f"
+      },
+      {
+        "tag": "0039_tracked_evm_transactions",
+        "sha256": "62ff4dca48d9346981d821a510f1c9612a2c02dccb3881dd7cb7650b7ae4896a"
+      },
+      {
+        "tag": "0040_tracked_evm_discovery",
+        "sha256": "482302e523cb8221977f907d27110575fde82cea66b96fa105e76a0c9cdeb799"
+      },
+      {
+        "tag": "0041_imported_swap_preparations",
+        "sha256": "7abcc4bee2550caf4f706e7fbfe0b809d1feaa7616e933bf472673afd65a522c"
+      },
+      {
+        "tag": "0042_warmup_swap_preparations",
+        "sha256": "cf1488f04db2f69c11681b7f8f82b01d8d3fd1f45b26bac28ef694fd96757583"
+      },
+      {
+        "tag": "0043_warmup_buy_receipts",
+        "sha256": "f486e1df6e4baeda5ed79276aa2e75589ecf5782f8019df5a0186bab4b912c84"
+      },
+      {
+        "tag": "0044_warmup_sell_receipts",
+        "sha256": "6d2145459ce594cff720679a8d8f485359d1301cc2cf57edb171a86e6bdac7fb"
+      },
+      {
+        "tag": "0045_warmup_signing_intents",
+        "sha256": "1e05c0e55576f0682c4c51e9f4aaced7772c4bb713aec42ea40575877843ea7a"
+      },
+      {
+        "tag": "0046_warmup_signing_events",
+        "sha256": "f11aa17f466b0a910b316ed9beb283cec9d4490a7d923bd25d68e685b009a049"
+      },
+      {
+        "tag": "0047_shared_swap_reservations",
+        "sha256": "f9d281044ffe5f59faa69d244022dd455b9bd4dd2f2d99b19b984c0270313097"
+      },
+      {
+        "tag": "0048_imported_signing_events",
+        "sha256": "a50b7e4bad9d3b983ecb700b4acaece9d9d172b1122a85d5a31f4150c360f8a0"
+      },
+      {
+        "tag": "0049_native_withdrawals",
+        "sha256": "d40a7133680a9f09c0545934249288b6c76b98582a350ef741598baa7d55378e"
+      },
+      {
+        "tag": "0050_withdrawal_failure_evidence",
+        "sha256": "aec13474cb840d782e5ff90ca739b87dbddaa286be1badeb63a1e0cb33637dde"
+      },
+      {
+        "tag": "0051_imported_swap_failure",
+        "sha256": "c51bc449ab6b0080c8ec0216f006fd9bd6497374f797a221ac55ac3be2639112"
+      },
+      {
+        "tag": "0052_warmup_swap_failure",
+        "sha256": "ce8e107670b9597784bdbf73f9222a1bd16c291e764a44baa841973d1bc3304b"
+      },
+      {
+        "tag": "0053_imported_lot_links",
+        "sha256": "64185ba242078d1b6b81d3f66118df4e001cc9bcc45cf06b1610a7fc5a7dfd06"
+      },
+      {
+        "tag": "0054_imported_approved_acquisition",
+        "sha256": "955e1a34e25320ce626ee58f46354be29d69bec71f02c7e9d63a40548baffe71"
+      },
+      {
+        "tag": "0055_imported_acquisition_baskets",
+        "sha256": "a43882c93596d391249e2ccf772148289b57f7d501ae34bcdf3ed0013607a853"
+      },
+      {
+        "tag": "0056_conditional_sell_orders",
+        "sha256": "63c7c0a1c212e7e1bdbd7f5aeda65daf5a2f386c639017a15334c8585b72e8da"
+      },
+      {
+        "tag": "0057_conditional_level_lifecycle",
+        "sha256": "c822ba38a28e3bc23784ef41e4d740a258a43ce6df6a5bcdffe7138e049249db"
+      },
+      {
+        "tag": "0058_imported_trade_sessions",
+        "sha256": "33afd28e0c26408720d5ab649962b641f1a3f56bc03a6f4ddefabb3bb754689f"
+      },
+      {
+        "tag": "0059_imported_trade_session_events",
+        "sha256": "2303e801f59d53e7c8f7af71eede0defc81157f8ce7ae1171c8edd02e110bac4"
+      },
+      {
+        "tag": "0060_imported_trade_session_timing",
+        "sha256": "7121a3adb13be15e55b613ccc1796ab8a00a5880d6952ef4030067d79d85db81"
+      },
+      {
+        "tag": "0061_imported_trade_session_controls",
+        "sha256": "d258f27c8501cd24317f9055426b1898837f4ca3365f97354e0ac8a7f40dcc8e"
+      },
+      {
+        "tag": "0062_session_preparation_jobs",
+        "sha256": "027051a4bc607174135a3a957aeb1459edcaea033f907576d7f899d0d6630995"
+      },
+      {
+        "tag": "0063_imported_supply_history",
+        "sha256": "4979b04fa797352cb4468463d08a7b42f56254acda15b47e79426ff81a0812b6"
+      },
+      {
+        "tag": "0064_supply_movement_evidence",
+        "sha256": "5d0ed765185d71969becfd104cc558350117bc88572c062d12ed4db116c7edcb"
+      },
+      {
+        "tag": "0065_supply_alert_reviews",
+        "sha256": "2539749cfb3c42007638fd211ae3f6cdd39c1dd057e757a0ec7138ef35edaab9"
+      },
+      {
+        "tag": "0066_wallet_mint_holdings",
+        "sha256": "009769d28fed4b112e441ff45950860376172a11692d5842b0bb887da2c38e6c"
+      },
+      {
+        "tag": "0067_petite_venus",
+        "sha256": "d32470c2f0ae06d34684e55b2939d4a077c57161c6cb86ed4faf2b47f30965e5"
+      },
+      {
+        "tag": "0068_remarkable_frightful_four",
+        "sha256": "b33173e45d39fdcf0056d34abc09b58dada43d8605a77b1b73f7802f3dcacd80"
+      },
+      {
+        "tag": "0069_amusing_viper",
+        "sha256": "c8478376c5edd340c79981e231f6978b408b7e43dd3669d9630c0235da4c9e4d"
+      },
+      {
+        "tag": "0070_overjoyed_betty_ross",
+        "sha256": "144fc1119e79417c5aecd6f31cfc9095e734c701be3718215304672801a18a34"
+      },
+      {
+        "tag": "0071_curious_glorian",
+        "sha256": "57aa07b97a9b7723a5eb6f89e0d85e6696fb73f01d8a4c64c59d864bed18cdf9"
+      },
+      {
+        "tag": "0072_conditional_buy_approval",
+        "sha256": "ce32a012c075c12c5bcd2a5cfdea1fed6c9ec1ca0ddceb7650fb09a8f2b111bf"
+      },
+      {
+        "tag": "0073_conditional_monitoring",
+        "sha256": "8a8b93a0daba267bad96b57dc0049a74677de737aca5a523074411df9f86652f"
+      },
+      {
+        "tag": "0074_dca_trade_session_timing",
+        "sha256": "74a04a52ca8a84153a2deb37007045e1a59ae4f867f7fca91d1fa2eb19d9528e"
+      },
+      {
+        "tag": "0075_dca_session_end_time",
+        "sha256": "498d2de76da2ddda2e4a1b81a6119cf06bb5d89972a10ebf7126edb3f01557a6"
+      },
+      {
+        "tag": "0076_flaky_crusher_hogan",
+        "sha256": "61f7b75bf0851e52b870fd9e7bea6a4378e343421e5fc79bf39924b6eb369628"
+      },
+      {
+        "tag": "0077_worried_owl",
+        "sha256": "f17b23f4c08572622a4a07456642c2e2a4c761ed3e839c4e06bd2bfc0e329bae"
+      },
+      {
+        "tag": "0078_lush_rictor",
+        "sha256": "448e2454c77d3090be4e2a0e9e12a5dc25b8dbfaa1bca53a6855f3710831a532"
+      },
+      {
+        "tag": "0079_real_justice",
+        "sha256": "7783d887f8b4b50573ffe4cb7e38c1bb25c601ba14ae6b0a7d0582da6ccf828f"
+      },
+      {
+        "tag": "0080_remarkable_winter_soldier",
+        "sha256": "b8e9a78c757929cf69c763a2f15c2d9b6739eeeb91fec5a7fbdf255709221467"
+      },
+      {
+        "tag": "0081_pump_holder_reservations",
+        "sha256": "65a38e9c5134d2d7fd553ac06f9eab4d5e793162779ada260221b298866289dd"
+      },
+      {
+        "tag": "0082_pump_group_reviews",
+        "sha256": "520881ae7f3d4e1a018d327891fdaa3c4c416661e45c1750c5c8eb6c8e68e2c6"
+      },
+      {
+        "tag": "0083_pump_group_approvals",
+        "sha256": "099dc8f4345387428891abf31ba3fb70c87516ce2f81d961656529355d63665f"
+      },
+      {
+        "tag": "0084_pump_group_signatures",
+        "sha256": "32ebc9cefe5c405c6a0551d15faf0016f36aa4a5cb43e99c29e0d1e551eec6f5"
+      },
+      {
+        "tag": "0085_pump_group_observations",
+        "sha256": "4b34a3f905e45a011cf6d203579e4d557444e73eb8cfeec226247189009bda88"
+      },
+      {
+        "tag": "0086_pump_group_terminal_recovery",
+        "sha256": "b1901b79c63197ff5fc8cbb70e11363ded76c039f6d497e2fa2efdfd8be995ab"
+      },
+      {
+        "tag": "0087_pump_group_runtime_authorization",
+        "sha256": "6515dcbbe598ccf1beb4a590ab059e15c46b3e3d4826d1a51b81d86ef64267dd"
+      },
+      {
+        "tag": "0088_pump_group_broadcast",
+        "sha256": "6dd12f50738224f8da6cef919e86de6f3766b1b1e7b2cc434a701fe718ad4f04"
+      },
+      {
+        "tag": "0089_pair_order_first_reviews",
+        "sha256": "4170bca9bc6df5d67d119e0786176362652e37d8eb7b646b4392303247060441"
+      },
+      {
+        "tag": "0090_pair_order_first_authorizations",
+        "sha256": "88d24b7c673b88b572e97163060a97eb1d17a5adcceaf181b2e11cbb6350efb9"
+      },
+      {
+        "tag": "0091_pair_order_independent_price_consent",
+        "sha256": "1138bd3d839254727cbcc2f9ad98aac8cfab6e3bf5e23c3482a2f01de11ce530"
+      },
+      {
+        "tag": "0092_pump_group_partial_closure",
+        "sha256": "da0548bb8dee735610b0c356adb2efabf0dbcc6aaa81c10ee62059fe6916446e"
+      },
+      {
+        "tag": "0093_pump_organic_sequences",
+        "sha256": "685738d058b95c1540b18344b550882d5075aeffec4ca1de7e9e2e12fc235b76"
+      },
+      {
+        "tag": "0094_wallet_cleanup",
+        "sha256": "0261ba592cd854e245ba882f6bad10b69453462fd3336c078bbf8ab28c1d05b3"
+      },
+      {
+        "tag": "0095_sniper_guards",
+        "sha256": "c0df1275c7c674f0ee378273f1bd20c50184b3523483b2877702d88bfbc38645"
+      },
+      {
+        "tag": "0096_token_supply_actions",
+        "sha256": "99334b0a4deb6664307f22d8147286a7111b3e2dd47d4916fdf4a5ab0bc5fcf5"
+      },
+      {
+        "tag": "0097_pair_order_executions",
+        "sha256": "a42544f8a64aca5163c0d1e70d4732797824b2d623faa1a8e1c7c8c892262cb1"
+      },
+      {
+        "tag": "0098_volume_bot_sessions",
+        "sha256": "2530b6be3ef1821cc29df88e3ec3b65585ed6b8d9d696d8896b53b99049b2a0b"
+      },
+      {
+        "tag": "0099_sniper_nuke_sells",
+        "sha256": "8da7cfb1d65506b2fb17492864ad9938fbfe9105ada5ae2a04f2c69beb5a6425"
+      },
+      {
+        "tag": "0100_project_shares",
+        "sha256": "40dadca32349e079cf8ed2a51854ff257963146a8af12f84a5db51fac0c63a92"
+      },
+      {
+        "tag": "0101_referrals",
+        "sha256": "f4835b212e50658018273367e914dd8971a18e9212e78dff4e59fe8629c781cc"
+      },
+      {
+        "tag": "0102_volume_usd_targets",
+        "sha256": "e896633edae5609194fac2115c767cc0af3a03b4b5d23df0a911fa6ff239a8a0"
+      },
+      {
+        "tag": "0103_exchange_funding_quotes",
+        "sha256": "7deb88108f32df1fac0e2961c3c100c1e365592c16849ff35927cc59a3bb9bc1"
+      },
+      {
+        "tag": "0104_exchange_funding_orders",
+        "sha256": "d74d29598a9556a09ef8cd42a1bb7a8f7b95547d12d62fbc0c578cc3f231c9ca"
+      },
+      {
+        "tag": "0105_volume_bundle_reservations",
+        "sha256": "5e5ca7e2bcb3655b93e4ed4cb09c1b95a113c6654c2b5b462b4684b427cddb62"
+      },
+      {
+        "tag": "0106_exchange_payout_receipts",
+        "sha256": "c6178a6d8c7db77a551fd92db7ac95129db2170be88972207fb5178ff04753ce"
+      },
+      {
+        "tag": "0107_volume_bundle_recovery",
+        "sha256": "a240f25c57ec4a9c156980d8429eaa4f2fb52c95a20a914404a20b776c7232e8"
+      },
+      {
+        "tag": "0108_strategy_session_drafts",
+        "sha256": "4e1b9eb552d8cd76f23b91dae22d6ac8be8c1717e4414968feb90daa31edfcc0"
+      },
+      {
+        "tag": "0109_launch_layer_plans",
+        "sha256": "fea93f24147d201cd5dea4423ac4d5bf5cad7780ac3e3ee0e7f4d2f384e49cbd"
+      },
+      {
+        "tag": "0110_strategy_review_capacity",
+        "sha256": "c641410167e0cd9da6aa3677a780ddea973c79b610364976aef1068a717a7e7b"
+      },
+      {
+        "tag": "0111_trade_amount_preferences",
+        "sha256": "edc4d502cea90670359f67e8c5b5ac8328a2a76091b638b18a2891d29bead8e5"
+      },
+      {
+        "tag": "0112_trade_preset_keyboard",
+        "sha256": "790c13d62a650eef5b3c28f0bd566cd3157d3a4e63b80d202e760c29669f2502"
+      },
+      {
+        "tag": "0113_pump_group_receipt_evidence",
+        "sha256": "74ffe13738cb05a953716b3d04a2fad1e4a8a7fe894f19478d0750b8900b79f0"
+      },
+      {
+        "tag": "0114_pump_purchase_cost_sources",
+        "sha256": "57995cf71fa441e118392a881ac341bdfd3a0588c64aacbbbc30069c09883766"
+      },
+      {
+        "tag": "0115_imported_sale_receipt_evidence",
+        "sha256": "2648463056fa312081f0d7cb0af95d0c358b67ceb7cbb0d9583cd236ad0aacf7"
+      },
+      {
+        "tag": "0116_launch_sale_allocations",
+        "sha256": "7f5b4a37edec3c9a7f5c3b383b6b4429c2df331a621fbb0b728a982eae858ab1"
+      },
+      {
+        "tag": "0117_wallet_warmup_session_reviews",
+        "sha256": "138034f51f964bbb27e9505b204ff62dcf690e252bb6382c54e62bb7c8e1caea"
+      },
+      {
+        "tag": "0118_marketplace_operator_drafts",
+        "sha256": "91a57fed779092240429c1d0a4f1b5c28886f4162f4d4fe931502679cd3712e0"
+      },
+      {
+        "tag": "0119_marketplace_publications",
+        "sha256": "895f09820cf7b12a9496271f8956f3dc43a41369177ae24e374aabecd709d6d9"
+      },
+      {
+        "tag": "0120_marketplace_reservations",
+        "sha256": "d36caa0d0bc1090eb6f8902e2b60f67fa50f3d5661c5a171c15b2f69e472e860"
+      },
+      {
+        "tag": "0121_marketplace_reservation_history",
+        "sha256": "430fe832a76f78959c4162d80a39f9e820a15ce5d503737d859afb670c45de3e"
+      },
+      {
+        "tag": "0122_wallet_warmup_session_consents",
+        "sha256": "79817004f7ce9fe6747d123f03d2be80fe40e5fc0f8bf6bfc90a4050b3998799"
+      },
+      {
+        "tag": "0123_wallet_warmup_session_consent_bounds",
+        "sha256": "6aa22294722a58b03a59b8fb3e87fa615a26f6f666b33323f90337e3e3a7d4f0"
+      },
+      {
+        "tag": "0124_wallet_warmup_session_journals",
+        "sha256": "9bfba54f04e92f759a8da2585a6a2325da081916fc3086c3facf35b6d818963b"
+      },
+      {
+        "tag": "0125_wallet_warmup_session_settlements",
+        "sha256": "eefac29f213bab3d0fcb06426f79ba903bb421fd62aa56dce781e7b800ab2a8e"
+      },
+      {
+        "tag": "0126_wallet_warmup_session_action_bindings",
+        "sha256": "b7869f8dbe5aca9c3112ac1d18ed9fe1db9159e043babb1bef09000f956f1a13"
+      },
+      {
+        "tag": "0127_wallet_warmup_action_binding_freshness",
+        "sha256": "ffaceb11a2d6e142de1b8bf604fe0df278d26042ead3cfbcb851c8b9a3a5d85b"
+      },
+      {
+        "tag": "0128_wallet_warmup_session_preparations",
+        "sha256": "f9450710c22bca826d3eca2f4800da1e42282eedfff8fd0b748e3758e1a9c211"
+      },
+      {
+        "tag": "0129_wallet_warmup_session_packets",
+        "sha256": "3a6dbabad5f90046d725a080ece47a6e68840b3cc21a08dbb8aeb7a5b37114cb"
+      },
+      {
+        "tag": "0130_wallet_warmup_session_packet_freshness",
+        "sha256": "1af7cdc37b1d30f70c24d31663c0cd19a5d04d8de893545d12694e4a96fc34c7"
+      },
+      {
+        "tag": "0131_wallet_warmup_session_finish_guards",
+        "sha256": "d1f2084475a375a5e577cfc491a72b0b172fd8d83611643974284f1eb68dde61"
+      },
+      {
+        "tag": "0132_wallet_warmup_session_v2_consents",
+        "sha256": "af5e3a95c8f494ef3c9b3e0bf83c7a5aa9a485c81fefd8f05ebb03796a996785"
+      },
+      {
+        "tag": "0133_wallet_warmup_session_v2_journals",
+        "sha256": "990007ffbdd89a8055f8eda9ffcb8d4a351576a5a60c59819eabd4df3284540d"
+      },
+      {
+        "tag": "0134_wallet_warmup_session_v2_attempts",
+        "sha256": "656216a5076cab8bd74a4245c0a45162bf5792bb64601f29b3489464d84817e4"
+      },
+      {
+        "tag": "0135_wallet_warmup_session_v2_runtime_observations",
+        "sha256": "97ba13df63125d38220ee15c267749801e0f312e7da97d0afa0d112555fbdd3f"
+      },
+      {
+        "tag": "0136_auto_buy_budget_ledger",
+        "sha256": "32c9c132e821ff3565b68a86e52d0b44693bef6a55bb81bc08570ececf8c12e5"
+      }
+    ]
+  },
+  "review": {
+    "startedAt": "2026-10-22T06:37:47.851Z",
+    "finishedAt": "2026-10-22T06:40:44.281Z",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "permissionDenials": 0,
+    "sourceUnchanged": true,
+    "timedOut": false,
+    "resultSubtype": "success"
+  },
+  "reviewCopyCount": 25,
+  "followUpsIndependentlyVerifiedAfterReview": true,
+  "applicationCodeChanged": false,
+  "migrationReserved": false,
+  "executionAllowed": false,
+  "signingAllowed": false,
+  "automaticExecutionAllowed": false,
+  "applicationOrHostedSqlExecuted": false,
+  "providerOrCredentialSettingsChanged": false,
+  "fundedTests": false,
+  "deployment": false,
+  "renderedQa": false,
+  "fullSuite": false,
+  "remaining": [
+    "distinct executable consent/root and compact CAS lifecycle",
+    "atomic bidirectional holds with valid production-parent conformance for every family",
+    "shared lot consumption and complete preparation/intent/event lineage",
+    "real source-bound finalized outcome writer and conservative unknown recovery",
+    "per-action runtime qualification and browser interruption QA"
+  ]
+}
