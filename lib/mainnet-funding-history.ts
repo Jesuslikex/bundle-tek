@@ -44,6 +44,8 @@ export type MainnetFundingHistory = {
   executionAllowed: false;
   events: MainnetFundingRecord[];
   progress: MainnetFundingProgress;
+  // Optional extension; admitted independently so unavailable routes do not hide valid history.
+  routeSource?: unknown;
   nextCursor: string | null;
 };
 export type MainnetFundingProgress =

@@ -1,0 +1,138 @@
+{
+  "base": "5d908f93f5e4f9f859056a9fb445ab8feb42105f",
+  "sourceOnly": true,
+  "executionAllowed": false,
+  "scope": "Exact current owned native Wallet SOL funding route projection and latest-attempt receipt coverage",
+  "tests": {
+    "files": 6,
+    "passed": 94,
+    "failed": 0,
+    "skipped": 0
+  },
+  "selectedExistingFinancialPolicyTests": {
+    "passed": 2,
+    "failed": 0,
+    "unselected": 21
+  },
+  "plainTypeScriptPassed": true,
+  "typedLintFiles": 9,
+  "formatFiles": 10,
+  "isolatedBuild": {
+    "base": "5d908f93f5e4f9f859056a9fb445ab8feb42105f",
+    "overlays": [
+      "lib/mainnet-funding-route-history.ts",
+      "lib/mainnet-funding-route-history.test.ts",
+      "test/mainnet-funding-route-fixture.ts",
+      "lib/mainnet-funding-history.ts",
+      "app/api/funding/mainnet-history/route.ts",
+      "app/api/funding/mainnet-history/route.test.ts",
+      "components/launch/mainnet-funding-history.tsx",
+      "components/launch/mainnet-funding-routes.tsx",
+      "components/launch/mainnet-funding-routes.module.css",
+      "components/launch/mainnet-funding-routes.test.tsx"
+    ],
+    "hashes": {
+      "lib/mainnet-funding-route-history.ts": "286dc56d5fdaa1bacf48e9aa1f747674a2b808636e1e4795cf62515e91f40e6b",
+      "lib/mainnet-funding-route-history.test.ts": "3a79e575708b750a4554a1651c3e513b5e2a738a84b2ec19fc990b43c8e6a666",
+      "test/mainnet-funding-route-fixture.ts": "5c603856839d052f9f3209798edf1c6b159c8bfe975ab420fa5f1a480eafbf43",
+      "lib/mainnet-funding-history.ts": "7ebeaf8cffbe86d818b4a8165a05a8f55e88e8e1b29a092dd0f86556e4729908",
+      "app/api/funding/mainnet-history/route.ts": "b8e4b366048d84540002b344d65bb5cf9c410f041f398e6fb32f1f5f9e00d138",
+      "app/api/funding/mainnet-history/route.test.ts": "719b888b190a15e016b4b75560b435f2b98bb2636c7f70bd101bdbe0b1ea4931",
+      "components/launch/mainnet-funding-history.tsx": "5ee1be52c8c936baa0371508408a7269b4f6d02cb6e0f639f6f3abd9e3ec7cc6",
+      "components/launch/mainnet-funding-routes.tsx": "31560113cf94b40c9e6c973f0bc2ee21dec74cf1de66d866529b322dabe68793",
+      "components/launch/mainnet-funding-routes.module.css": "e8edb861d492051b384d263b484e79c01b5463dc9bb794e8df4afb3ab824e680",
+      "components/launch/mainnet-funding-routes.test.tsx": "40fcff00722dc6780201acc4253c96684b17c6a66c1c5627541ae890c647a67b"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "opusReviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "sourceUnchanged": true,
+      "permissionDenials": 0
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "isError": false,
+      "sourceUnchanged": true,
+      "permissionDenials": 0
+    }
+  ],
+  "reviewOutcome": "First review3mediums resolved; follow-up no remaining high/medium. Actual prepare guard already blocks repeat finalized funding; actual writer uses canonical ISO. Neither reviewer ran tests.",
+  "postReviewDelta": [
+    "lib/mainnet-funding-route-history.ts",
+    "lib/mainnet-funding-route-history.test.ts"
+  ],
+  "postReviewDeltaScope": "One conservative refusal for a receipt without a signature, plus regression; independently verified, not rereviewed. Other production files exactly match follow-up.",
+  "sourceFreeze": {
+    "selectedFiles": 2382,
+    "unchanged": true,
+    "sha256": "58e9358ed10c20fe37276f30e582a847c28d5cfc2e1465317e32ad04243452e3"
+  },
+  "capacity": {
+    "plannedRecipients": 100,
+    "steps": 400,
+    "displayRecipients": 25,
+    "historyEventsPerPage": 50,
+    "bodyByteCap": 1048576,
+    "sourceStringLimit": 131072,
+    "checked": "Actual local D1/137source migrations and canonical captured unsigned packets; full source response plus pessimistic receipt/ASCII gap serialized-shape variants under1MiB."
+  },
+  "sourceBinding": [
+    "selected owner/plan/current revision",
+    "exact canonical JSON and original selectedFundingCapture hash",
+    "exact source/destination/amount/decimals/schedule/step",
+    "no unexpected steps or overlapping signatures",
+    "signature required for matched receipt"
+  ],
+  "policy": "Latest attempts only; final allocation counts only exact last planned destination receipt, once per recipient. Not cumulative accounting/order/current funds/readiness/project binding/repeat permission.",
+  "fallback": "Unsupported/old/inconsistent source withholds only route view. Valid history remains; unavailable is not an unfunded claim.",
+  "unchangedScopes": [
+    "lib/mainnet-funding.ts",
+    "lib/mainnet-funding-server.ts",
+    "lib/funding-plan.ts",
+    "lib/mainnet-funding-history-server.ts",
+    "lib/native-withdrawal.ts",
+    "lib/native-withdrawal-server.ts",
+    "lib/token-withdrawal-server.ts",
+    "app/api/funding/route.ts",
+    "app/api/wallet-workspace/withdrawals/route.ts",
+    "components/native-withdrawal-panel.tsx",
+    "components/launch/mainnet-funding-execution.tsx",
+    "app/page.tsx",
+    "app/ux.css",
+    "components/imported-token-market.tsx",
+    "drizzle",
+    "db"
+  ],
+  "limits": [
+    "No fresh REA/rendered/signed-in/live provider/screen-reader QA",
+    "Client clock skew may hide route view under unchanged future-date window",
+    "Old edited source and cross-revision cumulative accounting not reconstructed",
+    "Combined executable launch approval and full Proxima parity remain open"
+  ],
+  "applicationOrHostedDatabaseModified": false,
+  "migrationsChanged": false,
+  "providerCredentialsCronChanged": false,
+  "realWalletUnlockSignSendOrFundedTest": false,
+  "deployed": false
+}

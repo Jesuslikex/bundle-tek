@@ -10,6 +10,11 @@ import {
 } from '@/lib/mainnet-funding-history';
 import { mainnetFundingHistoryRecord } from '@/lib/mainnet-funding-history-server';
 import type { NativeWithdrawal } from '@/lib/native-withdrawal';
+import {
+  createFundingRouteSource,
+  decodeFundingRouteHistory,
+  type FundingRouteSource,
+} from '@/lib/mainnet-funding-route-history';
 export const dynamic = 'force-dynamic';
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
@@ -88,10 +93,16 @@ export async function GET(request: Request) {
     const db = getD1();
     const saved = await db
       .prepare(
-        "SELECT revision,archived,json_extract(document,'$.name') AS name FROM funding_plans WHERE owner_id=? AND id=?",
+        "SELECT revision,archived,document,updated_at AS updatedAt,json_extract(document,'$.name') AS name FROM funding_plans WHERE owner_id=? AND id=?",
       )
       .bind(user.userId, id)
-      .first<{ revision: number; archived: number; name: string }>();
+      .first<{
+        revision: number;
+        archived: number;
+        name: string;
+        document: string;
+        updatedAt: string;
+      }>();
     if (!saved) return json({ error: 'Saved funding plan not found.' }, 404);
     const anchor =
       sequence === null
@@ -156,30 +167,45 @@ export async function GET(request: Request) {
         unavailable: true,
       };
     }
-    return json(
-      decodeMainnetFundingHistory(
-        {
-          id,
-          name: saved.name,
-          currentRevision: saved.revision,
-          archived: Boolean(saved.archived),
-          revision,
-          executionAllowed: false,
-          events,
-          progress,
-          nextCursor:
-            history.results.length > 50
-              ? mainnetFundingHistoryCursor(
-                  id!,
-                  revision,
-                  events.at(-1)!.sequence,
-                )
-              : null,
-        },
-        id!,
+    const result = decodeMainnetFundingHistory(
+      {
+        id,
+        name: saved.name,
+        currentRevision: saved.revision,
+        archived: Boolean(saved.archived),
         revision,
-      ),
+        executionAllowed: false,
+        events,
+        progress,
+        nextCursor:
+          history.results.length > 50
+            ? mainnetFundingHistoryCursor(
+                id!,
+                revision,
+                events.at(-1)!.sequence,
+              )
+            : null,
+      },
+      id!,
+      revision,
     );
+    let routeSource: FundingRouteSource | null = null;
+    if (progressRevision === saved.revision && !progress.unavailable) {
+      try {
+        routeSource = await createFundingRouteSource({
+          id: id!,
+          revision: saved.revision,
+          archived: Boolean(saved.archived),
+          updatedAt: saved.updatedAt,
+          document: JSON.parse(saved.document),
+        });
+        await decodeFundingRouteHistory(routeSource, result);
+      } catch {
+        routeSource = null;
+        // Missing/unsupported saved route does not erase validated captured transitions.
+      }
+    }
+    return json({ ...result, routeSource });
   } catch {
     return json(
       {

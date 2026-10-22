@@ -41,8 +41,10 @@ vi.mock('@/lib/wallet-balances', async (original) => {
   };
 });
 import { GET } from './route';
+import { POST as saveFunding, GET as readFunding } from '../route';
 import { POST as recoverWithdrawal } from '../../wallet-workspace/withdrawals/route';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
+import { decodeFundingRouteHistory } from '@/lib/mainnet-funding-route-history';
 let mf: Miniflare, fixture: Awaited<ReturnType<typeof nativeWithdrawalFixture>>;
 const date = '2026-10-13T00:00:00.000Z';
 const planId = 'saved-funding';
@@ -101,6 +103,7 @@ beforeEach(async () => {
     'native_withdrawals',
     'solana_execution_reservations',
     'solana_execution_signatures',
+    'funding_events',
     'funding_plans',
   ])
     await context.db.prepare(`DELETE FROM ${table}`).run();
@@ -320,6 +323,50 @@ it('returns every one of400 route steps across100 recipients while paginating on
   );
   expect(history.events).toHaveLength(50);
   expect(history.nextCursor).not.toBeNull();
+  const routes = await decodeFundingRouteHistory(history.routeSource, history);
+  expect(routes.routes).toHaveLength(100);
+  expect(routes.routes.flatMap((r) => r.steps)).toHaveLength(400);
+  expect(
+    routes.routes
+      .flatMap((r) => r.steps)
+      .every((s) => s.record?.state === 'cancelled' && !s.receiptMatches),
+  ).toBe(true);
+  expect(
+    new TextEncoder().encode(JSON.stringify(history)).byteLength,
+  ).toBeLessThan(1048576);
+  // Serialized-shape capacity only, not execution evidence. The projection's
+  // generated evidence-gap text is ASCII; full receipt fields are checked too.
+  for (const outcome of ['gap', 'receipt'] as const) {
+    const larger = structuredClone(history);
+    for (const record of [...larger.events, ...larger.progress.records]) {
+      record.state = 'finalized';
+      record.signature =
+        '3'.repeat(80) + String(record.sequence).padStart(8, '1');
+      record.feeLimitLamports =
+        record.maximumDebitLamports =
+        record.reserveLamports =
+          '18446744073709551615';
+      record.evidenceGap = outcome === 'gap' ? 'x'.repeat(300) : null;
+      record.failure = null;
+      record.receipt =
+        outcome === 'receipt'
+          ? {
+              slot: Number.MAX_SAFE_INTEGER,
+              observedAt: record.createdAt,
+              deliveredRaw: record.amountRaw,
+              networkFeeLamports: '18446744073709551615',
+              accountRentLamports: '0',
+              transferFeeRaw: null,
+            }
+          : null;
+    }
+    expect(() =>
+      decodeMainnetFundingHistory(larger, planId, null),
+    ).not.toThrow();
+    expect(
+      new TextEncoder().encode(JSON.stringify(larger)).byteLength,
+    ).toBeLessThan(1048576);
+  }
   const firstReadMs = performance.now() - firstReadStarted;
   const olderStarted = performance.now();
   const older = await read({ cursor: history.nextCursor! });
@@ -574,6 +621,7 @@ it('reads historical revisions after editing and archiving the mutable plan and 
     true,
   );
   expect(history.progress.records[0].state).toBe('finalized');
+  expect(history.routeSource).toBeNull();
 });
 it('paginates equal-time transitions without repeats and chooses the latest attempt per recipient', async () => {
   const saved = await plan();
@@ -850,3 +898,77 @@ it.each(['2026-10-13T00:00:00Z', '2099-01-01T00:00:00.000Z'])(
     expect((await GET(request())).status).toBe(503);
   },
 );
+
+it('projects only the owned saved route and binds a real retained direct receipt without another provider read', async () => {
+  const saved = await plan();
+  const review = await insert(1, saved);
+  await finalized(review);
+  const history = await read();
+  const routes = await decodeFundingRouteHistory(history.routeSource, history);
+  expect(routes.routes).toHaveLength(1);
+  expect(routes.routes[0].steps[0]).toMatchObject({
+    wallet: fixture.wallet,
+    recipient: fixture.recipient,
+    amountRaw: '10000000',
+    receiptMatches: true,
+  });
+  expect(routes.executionAllowed).toBe(false);
+  const source = history.routeSource as { termsJson: string };
+  expect(source.termsJson).toBe(JSON.stringify(saved.document));
+  expect(context.rpc).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('shows unattempted proxy hops and withholds a mismatched saved source without hiding valid history', async () => {
+  const { saved, first } = await proxyPlan();
+  await insert(1, saved, 'alice', first, 1, 1);
+  const history = await read();
+  const routes = await decodeFundingRouteHistory(history.routeSource, history);
+  expect(routes.routes[0].steps).toHaveLength(2);
+  expect(routes.routes[0].steps[0].record).not.toBeNull();
+  expect(routes.routes[0].steps[1].record).toBeNull();
+  expect(routes.routes[0].steps.every((s) => !s.receiptMatches)).toBe(true);
+  await context.db
+    .prepare(
+      "UPDATE funding_plans SET document=json_set(document,'$.name','Changed terms') WHERE owner_id=? AND id=?",
+    )
+    .bind('alice', saved.id)
+    .run();
+  const mismatched = await read();
+  expect(mismatched.events).toHaveLength(1);
+  expect(mismatched.progress.records).toHaveLength(1);
+  expect(mismatched.routeSource).toBeNull();
+});
+
+it('admits the timestamp and canonical terms produced by the real saved-plan writer', async () => {
+  const saved = await plan();
+  const response = await saveFunding(
+    new Request('http://localhost/api/funding', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'http://localhost',
+      },
+      body: JSON.stringify({
+        id: saved.id,
+        action: 'save',
+        expectedRevision: 1,
+        document: saved.document,
+      }),
+    }),
+  );
+  expect(response.status).toBe(200);
+  const readResponse = await readFunding(
+    new Request('http://localhost/api/funding?id=' + saved.id),
+  );
+  expect(readResponse.status).toBe(200);
+  const current = ((await readResponse.json()) as { plan: SavedFunding }).plan;
+  expect(current.revision).toBe(2);
+  expect(new Date(current.updatedAt).toISOString()).toBe(current.updatedAt);
+  const history = await read();
+  const view = await decodeFundingRouteHistory(history.routeSource, history);
+  expect(view.updatedAt).toBe(current.updatedAt);
+  expect(view.revision).toBe(2);
+  expect(view.routes[0].steps[0].record).toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
+});

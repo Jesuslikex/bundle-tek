@@ -10,6 +10,11 @@ import { Button } from '@/components/ui/button';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 import {
+  decodeFundingRouteHistory,
+  type FundingRouteHistory,
+} from '@/lib/mainnet-funding-route-history';
+import { MainnetFundingRoutes } from './mainnet-funding-routes';
+import {
   decodeMainnetFundingHistory,
   mainnetFundingRecordLabel,
   mainnetFundingProgressKey,
@@ -184,6 +189,7 @@ function FundingHistory({
     [busy, setBusy] = useState(true),
     [error, setError] = useState('');
   const [noticeRole, setNoticeRole] = useState<'status' | 'alert'>('alert');
+  const [routes, setRoutes] = useState<FundingRouteHistory | null>(null);
   const [progressPage, setProgressPage] = useState(0);
   const pageStatus = useRef<HTMLOutputElement>(null);
   const reloadButton = useRef<HTMLButtonElement>(null);
@@ -255,6 +261,10 @@ function FundingHistory({
         }
         const body = await readBoundedPanelJson(response, controller.signal);
         const next = decodeMainnetFundingHistory(body, id, revision);
+        const nextRoutes = await decodeFundingRouteHistory(
+          next.routeSource,
+          next,
+        ).catch(() => null);
         if (controller.signal.aborted || pending.current !== controller) return;
         setPage((prior) =>
           after && prior
@@ -272,6 +282,7 @@ function FundingHistory({
               }
             : next,
         );
+        setRoutes(nextRoutes);
       } catch {
         if (!controller.signal.aborted && pending.current === controller)
           setError(historyUnavailable);
@@ -293,6 +304,7 @@ function FundingHistory({
     void Promise.resolve().then(() => {
       if (!disposed) {
         setPage(null);
+        setRoutes(null);
         void read(null);
       }
     });
@@ -340,6 +352,7 @@ function FundingHistory({
             pending.current?.abort();
             pending.current = null;
             setPage(null);
+            setRoutes(null);
             setError('');
             setNoticeRole('alert');
             setBusy(true);
@@ -401,6 +414,10 @@ function FundingHistory({
           {page.archived && (
             <p>Archived draft. Retained mainnet outcomes remain available.</p>
           )}
+          <MainnetFundingRoutes
+            key={`${routes?.revision}:${routes?.termsSha256}`}
+            view={routes}
+          />
           <h5>
             Recipient and route-step progress for revision{' '}
             {page.progress.revision}

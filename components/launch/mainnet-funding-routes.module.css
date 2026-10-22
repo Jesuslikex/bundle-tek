@@ -1,0 +1,65 @@
+.routes {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem;
+}
+.totals > div,
+.list > li {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  min-width: 0;
+}
+.totals dd,
+.step dd {
+  margin: 0;
+}
+.totals dt {
+  color: var(--muted-foreground);
+}
+.list {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.step {
+  padding-block: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.step dl {
+  display: grid;
+  grid-template-columns: minmax(5rem, 1fr) minmax(0, 3fr);
+  gap: 0.4rem 0.75rem;
+}
+.routes summary {
+  min-height: 2.75rem;
+  padding-block: 0.65rem;
+  cursor: pointer;
+}
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.button {
+  min-height: 2.75rem;
+  height: auto;
+  white-space: normal;
+}
+@media (max-width: 480px) {
+  .step dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
