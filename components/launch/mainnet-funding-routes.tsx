@@ -19,9 +19,10 @@ export function MainnetFundingRoutes({
         <h5>Saved funding routes</h5>
         <p>
           Exact native SOL routes are unavailable for this response. The
-          original saved Wallet funding terms and matching revision are
-          required; older or changed terms are not reconstructed from the
-          current draft. Captured transitions remain below.
+          original saved Wallet funding terms are required. Older revisions need
+          a retained capture with the exact whole terms hash; changed or
+          unproven terms are not filled from the current draft. Captured
+          transitions remain below.
         </p>
       </section>
     );
@@ -34,6 +35,14 @@ export function MainnetFundingRoutes({
   return (
     <section className={styles.routes} aria-label="Saved funding routes">
       <h5>Saved funding routes · revision {view.revision}</h5>
+      {view.sourceRevision !== view.revision && (
+        <p>
+          Historical funding revision {view.revision} is reconstructed from
+          saved source revision {view.sourceRevision} because its complete terms
+          hash matches the original retained captures. These receipts are not
+          credited to the current revision.
+        </p>
+      )}
       <p>
         Saved allocations and the latest retained attempt per step, not a
         cumulative transfer ledger, current balances or launch readiness.
@@ -190,7 +199,8 @@ export function MainnetFundingRoutes({
       <details>
         <summary>Saved route source</summary>
         <p>
-          Revision {view.revision}, saved{' '}
+          Funding evidence revision {view.revision} · source revision{' '}
+          {view.sourceRevision}, source saved{' '}
           <time dateTime={view.updatedAt}>
             {new Date(view.updatedAt).toLocaleString()}
           </time>

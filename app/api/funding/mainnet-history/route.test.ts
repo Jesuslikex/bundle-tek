@@ -972,3 +972,56 @@ it('admits the timestamp and canonical terms produced by the real saved-plan wri
   expect(view.routes[0].steps[0].record).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });
+
+it('recovers the original receipted route after a real archive without attributing the archive timestamp to the transfer', async () => {
+  const saved = await plan();
+  const review = await insert(1, saved);
+  await finalized(review);
+  const archive = await saveFunding(
+    new Request('http://localhost/api/funding', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'http://localhost',
+      },
+      body: JSON.stringify({
+        id: saved.id,
+        action: 'archive',
+        expectedRevision: 1,
+      }),
+    }),
+  );
+  expect(archive.status).toBe(200);
+  const history = await read({ revision: '1' });
+  expect(history.routeSource).toMatchObject({
+    format: 'funding-route-source-v2',
+    revision: 1,
+    sourceRevision: 2,
+  });
+  const view = await decodeFundingRouteHistory(history.routeSource, history);
+  expect(view.routes[0].steps[0].receiptMatches).toBe(true);
+  expect(view.sourceRevision).toBe(2);
+  expect(view.revision).toBe(1);
+  const current = (
+    (await (
+      await readFunding(
+        new Request('http://localhost/api/funding?id=' + saved.id),
+      )
+    ).json()) as { plan: SavedFunding }
+  ).plan;
+  expect(view.updatedAt).toBe(current.updatedAt);
+  expect(view.routes[0].steps[0].record?.createdAt).toBe(
+    history.events[0].createdAt,
+  );
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('does not invent an unattempted older route from the current saved document', async () => {
+  await plan();
+  await context.db
+    .prepare('UPDATE funding_plans SET revision=2,archived=1')
+    .run();
+  const history = await read({ revision: '1' });
+  expect(history.routeSource).toBeNull();
+  expect(history.events).toEqual([]);
+});

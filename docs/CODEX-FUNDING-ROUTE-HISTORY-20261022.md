@@ -1,5 +1,7 @@
 # Saved funding route evidence, 22 October 2026
 
+Snapshot note: the current-only limitation below describes30196d6. Exact-hash historical reconstruction is now covered separately in CODEX-HISTORICAL-FUNDING-ROUTES-20261022.md; changed or unproven terms still remain unavailable. Original verification below stays scoped to its source checkpoint.
+
 Before UI edits: Codex claims the new native funding route model/tests/fixture, route component/CSS/tests and narrow existing history API/DTO/panel wiring. Protected Claude shell/layout/token files remain unchanged. This is a dependency of the combined launch setup shown in the user's screenshot, not a complete executable launch review.
 
 ## Source and behavior

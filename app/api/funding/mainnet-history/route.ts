@@ -190,15 +190,18 @@ export async function GET(request: Request) {
       revision,
     );
     let routeSource: FundingRouteSource | null = null;
-    if (progressRevision === saved.revision && !progress.unavailable) {
+    if (progressRevision <= saved.revision && !progress.unavailable) {
       try {
-        routeSource = await createFundingRouteSource({
-          id: id!,
-          revision: saved.revision,
-          archived: Boolean(saved.archived),
-          updatedAt: saved.updatedAt,
-          document: JSON.parse(saved.document),
-        });
+        routeSource = await createFundingRouteSource(
+          {
+            id: id!,
+            revision: saved.revision,
+            archived: Boolean(saved.archived),
+            updatedAt: saved.updatedAt,
+            document: JSON.parse(saved.document),
+          },
+          progressRevision,
+        );
         await decodeFundingRouteHistory(routeSource, result);
       } catch {
         routeSource = null;

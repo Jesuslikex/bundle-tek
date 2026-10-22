@@ -1,5 +1,9 @@
 import { validateFunding, type SavedFunding } from './funding-plan';
-import { fundingLegs, selectedFundingCapture } from './mainnet-funding';
+import {
+  fundingLegs,
+  fundingSelection,
+  selectedFundingCapture,
+} from './mainnet-funding';
 import {
   decodeMainnetFundingHistory,
   decodeMainnetFundingProgress,
@@ -10,8 +14,7 @@ import {
 import { solanaTokenAtoms } from './solana-token-amount';
 
 /** Selected owner's saved funding terms only, never a wallet vault or authorization. */
-export type FundingRouteSource = {
-  format: 'funding-route-source-v1';
+type FundingRouteSourceFields = {
   planId: string;
   revision: number;
   updatedAt: string;
@@ -19,6 +22,11 @@ export type FundingRouteSource = {
   termsSha256: string;
   executionAllowed: false;
 };
+export type FundingRouteSource = FundingRouteSourceFields &
+  (
+    | { format: 'funding-route-source-v1' }
+    | { format: 'funding-route-source-v2'; sourceRevision: number }
+  );
 export type FundingRouteStep = {
   leg: number | null;
   wallet: string;
@@ -30,6 +38,7 @@ export type FundingRouteStep = {
 export type FundingRouteHistory = {
   planId: string;
   revision: number;
+  sourceRevision: number;
   updatedAt: string;
   termsSha256: string;
   executionAllowed: false;
@@ -68,12 +77,21 @@ async function sourceTerms(plan: SavedFunding) {
 
 export async function createFundingRouteSource(
   plan: SavedFunding,
+  historyRevision = plan.revision,
 ): Promise<FundingRouteSource> {
+  fundingSelection({ planId: plan.id, revision: historyRevision, item: 1 });
+  if (historyRevision > plan.revision)
+    throw new Error('Future funding route unavailable.');
   const { document, termsSha256 } = await sourceTerms(plan);
   return {
-    format: 'funding-route-source-v1',
+    ...(historyRevision === plan.revision
+      ? { format: 'funding-route-source-v1' as const }
+      : {
+          format: 'funding-route-source-v2' as const,
+          sourceRevision: plan.revision,
+        }),
     planId: plan.id,
-    revision: plan.revision,
+    revision: historyRevision,
     updatedAt: plan.updatedAt,
     termsJson: JSON.stringify(document),
     termsSha256,
@@ -89,15 +107,27 @@ export async function decodeFundingRouteHistory(
   decodeMainnetFundingHistory(page, page.id, page.revision);
   const source = value as FundingRouteSource;
   const revision = page.revision ?? page.currentRevision;
+  const sourceRevision =
+    source?.format === 'funding-route-source-v2'
+      ? source.sourceRevision
+      : source?.revision;
   if (
     !source ||
     Object.keys(source).sort().join(',') !==
-      'executionAllowed,format,planId,revision,termsJson,termsSha256,updatedAt' ||
-    source.format !== 'funding-route-source-v1' ||
+      (source.format === 'funding-route-source-v2'
+        ? 'executionAllowed,format,planId,revision,sourceRevision,termsJson,termsSha256,updatedAt'
+        : 'executionAllowed,format,planId,revision,termsJson,termsSha256,updatedAt') ||
+    !['funding-route-source-v1', 'funding-route-source-v2'].includes(
+      source.format,
+    ) ||
     source.executionAllowed !== false ||
     source.planId !== page.id ||
     source.revision !== revision ||
-    source.revision !== page.currentRevision ||
+    sourceRevision !== page.currentRevision ||
+    !Number.isSafeInteger(sourceRevision) ||
+    source.revision > sourceRevision ||
+    (source.format === 'funding-route-source-v2' &&
+      source.revision >= sourceRevision) ||
     typeof source.updatedAt !== 'string' ||
     !Number.isFinite(Date.parse(source.updatedAt)) ||
     new Date(source.updatedAt).toISOString() !== source.updatedAt ||
@@ -113,9 +143,13 @@ export async function decodeFundingRouteHistory(
   );
   if (progress.unavailable)
     throw new Error('Funding route progress unavailable.');
+  if (revision !== sourceRevision && progress.records.length === 0)
+    throw new Error(
+      'Historical route requires an original captured terms hash.',
+    );
   const plan: SavedFunding = {
     id: source.planId,
-    revision,
+    revision: sourceRevision,
     updatedAt: source.updatedAt,
     archived: page.archived,
     document: JSON.parse(source.termsJson),
@@ -177,6 +211,7 @@ export async function decodeFundingRouteHistory(
   return {
     planId: source.planId,
     revision,
+    sourceRevision,
     updatedAt: source.updatedAt,
     termsSha256,
     routes,

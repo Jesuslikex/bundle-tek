@@ -6,7 +6,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MainnetFundingRoutes } from './mainnet-funding-routes';
 import { MainnetFundingHistoryPanel } from './mainnet-funding-history';
 import { fundingRouteFixture } from '../../test/mainnet-funding-route-fixture';
-import { decodeFundingRouteHistory } from '@/lib/mainnet-funding-route-history';
+import {
+  createFundingRouteSource,
+  decodeFundingRouteHistory,
+} from '@/lib/mainnet-funding-route-history';
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -187,4 +190,25 @@ it('labels a mismatched receipt consistently and never calls it a matching deliv
     'Final recipient receipt matches',
   );
   expect(container.textContent).toContain('not a cumulative transfer ledger');
+});
+
+it('distinguishes the historical evidence revision from the newer saved source and timestamp', async () => {
+  const fixture = await fundingRouteFixture();
+  fixture.page.currentRevision = 2;
+  const updatedAt = '2026-10-22T00:00:00.000Z';
+  const source = await createFundingRouteSource(
+    { ...fixture.plan, revision: 2, updatedAt },
+    1,
+  );
+  const view = await decodeFundingRouteHistory(source, fixture.page);
+  await act(async () => root.render(<MainnetFundingRoutes view={view} />));
+  expect(container.textContent).toContain('Historical funding revision 1');
+  expect(container.textContent).toContain('source revision 2');
+  expect(container.textContent).toContain(
+    'not credited to the current revision',
+  );
+  expect(container.textContent).toContain('Funding evidence revision 1');
+  expect(
+    container.querySelector('time[datetime="' + updatedAt + '"]'),
+  ).not.toBeNull();
 });

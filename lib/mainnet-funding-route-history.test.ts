@@ -159,3 +159,61 @@ it('does not turn an older finalized transition into latest-attempt receipt cove
   expect(view.routes[0].steps[0].receiptMatches).toBe(false);
   expect(page.events[0].receipt).not.toBeNull();
 });
+
+it('recovers older routes only from whole-term hash-matched original captures while preserving v1', async () => {
+  const { plan, source, page } = await fundingRouteFixture();
+  expect(source.format).toBe('funding-route-source-v1');
+  const current = await decodeFundingRouteHistory(source, page);
+  expect(current.sourceRevision).toBe(1);
+  const newer = {
+    ...plan,
+    revision: 2,
+    archived: true,
+    updatedAt: '2026-10-22T00:00:00.000Z',
+  };
+  const historical = await createFundingRouteSource(newer, 1);
+  page.currentRevision = 2;
+  page.archived = true;
+  expect(historical).toMatchObject({
+    format: 'funding-route-source-v2',
+    revision: 1,
+    sourceRevision: 2,
+  });
+  const view = await decodeFundingRouteHistory(historical, page);
+  expect(view.revision).toBe(1);
+  expect(view.sourceRevision).toBe(2);
+  expect(view.updatedAt).toBe(newer.updatedAt);
+  expect(view.termsSha256).toBe(source.termsSha256);
+  expect(view.routes).toEqual(current.routes);
+  expect(view.executionAllowed).toBe(false);
+});
+
+it.each([
+  'empty',
+  'changed',
+  'source-revision',
+  'future',
+  'v1-extra',
+  'v2-current',
+] as const)('withholds unproven historical %s source', async (kind) => {
+  const { plan, source, page } = await fundingRouteFixture();
+  const newer = { ...plan, revision: 2 };
+  page.currentRevision = 2;
+  let candidate: unknown = await createFundingRouteSource(newer, 1);
+  if (kind === 'empty') page.progress = { revision: 1, records: [] };
+  if (kind === 'changed')
+    candidate = await createFundingRouteSource(
+      { ...newer, document: { ...newer.document, name: 'Changed label' } },
+      1,
+    );
+  if (kind === 'source-revision')
+    candidate = { ...(candidate as object), sourceRevision: 3 };
+  if (kind === 'future') {
+    await expect(createFundingRouteSource(plan, 2)).rejects.toThrow();
+    candidate = { ...(candidate as object), revision: 3 };
+  }
+  if (kind === 'v1-extra') candidate = { ...source, sourceRevision: 2 };
+  if (kind === 'v2-current')
+    candidate = { ...(candidate as object), sourceRevision: 1 };
+  await expect(decodeFundingRouteHistory(candidate, page)).rejects.toThrow();
+});

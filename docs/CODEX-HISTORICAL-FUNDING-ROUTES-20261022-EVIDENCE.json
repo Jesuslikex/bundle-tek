@@ -1,0 +1,85 @@
+{
+  "baseCommit": "44605a51f51744042f0efd33fee6c75c8bc23923",
+  "sourceHashes": {
+    "lib/mainnet-funding-route-history.ts": "e4fc02b9a22273403a8162f244e7a533e829a6105162ed6ea477475256b9bfb6",
+    "lib/mainnet-funding-route-history.test.ts": "f973888739246fee0faa501eeee60fa37eeab4d60d13d094ee7150f91bfe7b45",
+    "app/api/funding/mainnet-history/route.ts": "134dde1f73454394ad481f7f7f83fb1f4b70bf8fbf206ab26d2e6c14a4c3862a",
+    "app/api/funding/mainnet-history/route.test.ts": "da5b450e899048f3b4f318647ff4bf426d1c79e6cd9c66c8d0e915e27cc2ab79",
+    "components/launch/mainnet-funding-routes.tsx": "4583886a42f1fa3482db383ef705734e4654ff7726fcbf5bcf8aa8d37ed992a2",
+    "components/launch/mainnet-funding-routes.test.tsx": "2a85bbffe11d3a77c76301b4e173546c8636d47fd803c994cc2985c8adc47a2a"
+  },
+  "verification": {
+    "relatedTests": {
+      "files": 6,
+      "passed": 104,
+      "failed": 0,
+      "skipped": 0,
+      "scope": [
+        "C:/Users/Julian/Desktop/Bundle/lib/mainnet-funding-history-legs.test.ts",
+        "C:/Users/Julian/Desktop/Bundle/lib/mainnet-funding-route-history.test.ts",
+        "C:/Users/Julian/Desktop/Bundle/lib/read-bounded-panel-json.test.ts",
+        "C:/Users/Julian/Desktop/Bundle/components/launch/mainnet-funding-history.test.tsx",
+        "C:/Users/Julian/Desktop/Bundle/components/launch/mainnet-funding-routes.test.tsx",
+        "C:/Users/Julian/Desktop/Bundle/app/api/funding/mainnet-history/route.test.ts"
+      ]
+    },
+    "plainTypeScript": "passed",
+    "typedLintFiles": 6,
+    "formatFiles": 6,
+    "isolatedBuild": {
+      "base": "44605a51f51744042f0efd33fee6c75c8bc23923",
+      "overlays": [
+        "lib/mainnet-funding-route-history.ts",
+        "lib/mainnet-funding-route-history.test.ts",
+        "app/api/funding/mainnet-history/route.ts",
+        "app/api/funding/mainnet-history/route.test.ts",
+        "components/launch/mainnet-funding-routes.tsx",
+        "components/launch/mainnet-funding-routes.test.tsx"
+      ],
+      "hashes": {
+        "lib/mainnet-funding-route-history.ts": "e4fc02b9a22273403a8162f244e7a533e829a6105162ed6ea477475256b9bfb6",
+        "lib/mainnet-funding-route-history.test.ts": "f973888739246fee0faa501eeee60fa37eeab4d60d13d094ee7150f91bfe7b45",
+        "app/api/funding/mainnet-history/route.ts": "134dde1f73454394ad481f7f7f83fb1f4b70bf8fbf206ab26d2e6c14a4c3862a",
+        "app/api/funding/mainnet-history/route.test.ts": "da5b450e899048f3b4f318647ff4bf426d1c79e6cd9c66c8d0e915e27cc2ab79",
+        "components/launch/mainnet-funding-routes.tsx": "4583886a42f1fa3482db383ef705734e4654ff7726fcbf5bcf8aa8d37ed992a2",
+        "components/launch/mainnet-funding-routes.test.tsx": "2a85bbffe11d3a77c76301b4e173546c8636d47fd803c994cc2985c8adc47a2a"
+      },
+      "exitCode": 0,
+      "unchanged": true,
+      "passed": true,
+      "envFilesCopied": false,
+      "deployed": false
+    },
+    "sourceFreeze": {
+      "selectedFiles": 2382,
+      "unchanged": true,
+      "sha256": "c10ad2c83665a53f362ba453fc92f69ed58881199d7a6bedf3a39691ae309a2e"
+    },
+    "opusReview": {
+      "model": "claude-opus-5-5",
+      "exitCode": 0,
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "outcome": "No high or medium findings; optional low test coverage gaps retained in report. Reviewer ran no tests.",
+      "allSixOverlayHashesMatch": true
+    }
+  },
+  "authority": {
+    "executionAllowed": false,
+    "signingChanged": false,
+    "hostedSql": false,
+    "applicationDatabaseModified": false,
+    "deployed": false,
+    "fundedTest": false,
+    "providerChanged": false
+  },
+  "limits": [
+    "Historical reconstruction requires exact whole canonical document hash and at least one original capture.",
+    "Latest attempt coverage only; not a cumulative ledger, current funds, project binding or readiness.",
+    "Cross-revision repeated-funding policy unchanged; historical receipts do not become a current-revision guard.",
+    "No fresh rendered, signed-in, live-provider or screen-reader proof.",
+    "No executed launch evidence captured. REA endpoint unreachable and existing Chrome tab listing timed out.",
+    "Optional test gaps: isolated revision-guard branches, direct database timestamp anchor, identical resave and changed-back writer cases, integrated panel v2 selection.",
+    "Old-client v2 refusal inferred from strict base key admission, not executed against an old binary."
+  ]
+}
