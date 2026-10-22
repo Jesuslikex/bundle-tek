@@ -4,7 +4,7 @@ import {
   warmupAtoms,
   warmupDecimal,
 } from './wallet-warmup';
-import { inspectToken } from './token-import';
+import { createWarmupTokenInspector } from './wallet-warmup-token-identity';
 import { observeWalletBalances } from './wallet-balances';
 import type { SavedWarmup } from './wallet-warmup-storage';
 
@@ -22,6 +22,7 @@ export async function inspectWarmupPreflight(
       ...init,
       signal: AbortSignal.any([signal, ...(init?.signal ? [init.signal] : [])]),
     });
+  const inspectIdentity = createWarmupTokenInspector(signal, boundedFetch);
   const tokens: Array<{
     address: string;
     name?: string;
@@ -37,10 +38,7 @@ export async function inspectWarmupPreflight(
       while (index < plan.tokens.length && !signal.aborted) {
         const address = plan.tokens[index++];
         try {
-          const token = await inspectToken(
-            { chain: plan.chain, address },
-            boundedFetch,
-          );
+          const token = await inspectIdentity({ chain: plan.chain, address });
           tokens.push({
             address,
             name: token.name,
