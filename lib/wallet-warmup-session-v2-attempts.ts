@@ -4,6 +4,7 @@ import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-dig
 import {
   readWalletWarmupV2Journal,
   publicWalletWarmupV2Journal,
+  WalletWarmupV2JournalClockAheadError,
 } from './wallet-warmup-session-v2-journal';
 import {
   warmupPreparationHistoryDocument,
@@ -462,6 +463,7 @@ export async function readWalletWarmupV2Attempt(
     return { lease, journal, outcome, summary, feeCap, fee, ...flags };
   } catch (error) {
     signal.throwIfAborted();
+    if (error instanceof WalletWarmupV2JournalClockAheadError) throw error;
     if (error instanceof WalletWarmupV2AttemptError && error.status === 404)
       throw error;
     fail(

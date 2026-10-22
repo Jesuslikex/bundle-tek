@@ -1,5 +1,10 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
+import { WalletWarmupV2JournalClockAheadError } from '@/lib/wallet-warmup-session-v2-journal';
+import {
+  WARMUP_HISTORY_CLOCK_CODE,
+  WARMUP_HISTORY_CLOCK_MESSAGE,
+} from '@/lib/warmup-history-clock';
 import {
   warmupAttemptUuid,
   WalletWarmupV2AttemptError,
@@ -69,6 +74,14 @@ export async function GET(request: Request) {
             'Recovery ended before confirmation. Keep the original ID and recover it again.',
         },
         408,
+      );
+    if (error instanceof WalletWarmupV2JournalClockAheadError)
+      return json(
+        {
+          code: WARMUP_HISTORY_CLOCK_CODE,
+          error: WARMUP_HISTORY_CLOCK_MESSAGE,
+        },
+        409,
       );
     if (error instanceof WalletWarmupV2AttemptError)
       return json({ error: error.message }, error.status);

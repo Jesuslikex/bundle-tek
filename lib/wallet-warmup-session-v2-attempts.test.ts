@@ -10,6 +10,47 @@ const signal = () => new AbortController().signal;
 const refusingFactory = () => async () => {
   throw new WalletWarmupSessionProviderError('synthetic refusal');
 };
+it('returns a temporary clock conflict for the original saved ID without renewing its lease or calling the provider', async () => {
+  const f = await warmupSessionV2AttemptFixture();
+  try {
+    const input = f.input(),
+      callback = vi.fn(async () => {
+        throw new WalletWarmupSessionProviderError('synthetic refusal');
+      });
+    const saved = await prepare(
+      f.db,
+      'owner',
+      input,
+      true,
+      signal(),
+      'synthetic-key',
+      () => callback,
+    );
+    const counts = await f.counts();
+    const now = vi
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.parse(f.journal.createdAt) - 1);
+    try {
+      await expect(
+        read(f.db, 'owner', input.id, signal()),
+      ).rejects.toMatchObject({
+        status: 409,
+        message:
+          'Saved history is ahead of this server clock. Recover the same ID shortly.',
+      });
+    } finally {
+      now.mockRestore();
+    }
+    expect((await read(f.db, 'owner', input.id, signal()))?.lease).toEqual(
+      saved.lease,
+    );
+    expect(await f.counts()).toEqual(counts);
+    expect(callback).toHaveBeenCalledOnce();
+  } finally {
+    vi.restoreAllMocks();
+    f.client.close();
+  }
+});
 it('atomically claims one lease and cooldown, retains a sanitized refusal and never reruns that request', async () => {
   const f = await warmupSessionV2AttemptFixture();
   try {

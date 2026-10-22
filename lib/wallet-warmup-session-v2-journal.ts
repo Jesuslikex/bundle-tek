@@ -3,6 +3,7 @@ import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
 import { readWalletWarmupV2Consent } from './wallet-warmup-session-v2-consent';
 import type { WalletWarmupSessionReview } from './wallet-warmup-session-review';
+import { WARMUP_HISTORY_CLOCK_MESSAGE } from './warmup-history-clock';
 
 export const WARMUP_V2_JOURNAL_LIMITS = Object.freeze({
   events: 65536,
@@ -82,6 +83,11 @@ export class WalletWarmupV2JournalError extends Error {
     readonly recoveryId?: string,
   ) {
     super(message);
+  }
+}
+export class WalletWarmupV2JournalClockAheadError extends WalletWarmupV2JournalError {
+  constructor() {
+    super(WARMUP_HISTORY_CLOCK_MESSAGE, 409);
   }
 }
 function fail(
@@ -248,10 +254,7 @@ export async function readWalletWarmupV2Journal(
     )
       fail();
     if (Date.parse(row.created_at) > now)
-      fail(
-        'Saved history is ahead of this server clock. Recover the same ID shortly.',
-        409,
-      );
+      throw new WalletWarmupV2JournalClockAheadError();
     // readWalletWarmupV2Consent already reconstructs this exact manifest from its
     // original private source. No mutable sequence or raw source is made public.
     const manifest = JSON.parse(consent.terms.reviewDocument) as Omit<
@@ -310,10 +313,7 @@ export async function readWalletWarmupV2Journal(
       )
         fail();
       if (Date.parse(event.at) > now)
-        fail(
-          'Saved history is ahead of this server clock. Recover the same ID shortly.',
-          409,
-        );
+        throw new WalletWarmupV2JournalClockAheadError();
       if (event.operation !== 'stop' && Date.parse(event.at) >= finish) fail();
       switch (event.operation) {
         case 'begin-review':
@@ -393,9 +393,8 @@ export async function readWalletWarmupV2Journal(
   } catch (error) {
     signal.throwIfAborted();
     if (
-      error instanceof WalletWarmupV2JournalError &&
-      (error.status === 503 ||
-        error.message.startsWith('Saved history is ahead'))
+      error instanceof WalletWarmupV2JournalClockAheadError ||
+      (error instanceof WalletWarmupV2JournalError && error.status === 503)
     )
       throw error;
     fail(

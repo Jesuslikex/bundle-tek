@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
+import { WalletWarmupV2JournalClockAheadError } from '@/lib/wallet-warmup-session-v2-journal';
+import {
+  WARMUP_HISTORY_CLOCK_CODE,
+  WARMUP_HISTORY_CLOCK_MESSAGE,
+} from '@/lib/warmup-history-clock';
 import { env } from '@/lib/server-env';
 import { walletRequest } from '@/lib/wallet-request';
 import {
@@ -27,6 +32,11 @@ function failure(error: unknown, signal: AbortSignal) {
           'Request ended before confirmation. Keep the original runtime request ID and recover it; no replacement is started automatically.',
       },
       408,
+    );
+  if (error instanceof WalletWarmupV2JournalClockAheadError)
+    return json(
+      { code: WARMUP_HISTORY_CLOCK_CODE, error: WARMUP_HISTORY_CLOCK_MESSAGE },
+      409,
     );
   if (error instanceof WalletWarmupV2AttemptError)
     return json(

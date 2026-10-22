@@ -1,0 +1,46 @@
+{
+  "sourceBase": "349c555bd08f125166995e9b8149b6c7d666ff5e",
+  "tests": {
+    "passed": 238,
+    "failed": 0,
+    "skipped": 1,
+    "files": 13
+  },
+  "typecheck": true,
+  "typedLint": true,
+  "format": true,
+  "isolatedBuild": {
+    "passed": true,
+    "unchanged": true,
+    "environmentFilesCopied": false
+  },
+  "frozenSourceFiles": 2384,
+  "overlaySha256": {
+    "lib/warmup-history-clock.ts": "59efedb3cb59e2434761da76f9a5164112ac55a60001144fb161ed78537f369d",
+    "lib/warmup-history-clock.test.ts": "d84cbd2b7bbb26d8f220a2250dd918fd789746044d0569e2167bd0fb16c71ac9",
+    "lib/wallet-warmup-session-v2-journal.ts": "03f136a92d3386d6f53d08f192da268e879f9adcc9fe7b14ac52942c0e38e5d2",
+    "lib/wallet-warmup-session-v2-journal.test.ts": "71ad132ba3d20f0e17c1603a1c6957ac703394eb28412fe9bcb79d1a61f747e7",
+    "lib/wallet-warmup-session-v2-attempts.ts": "bc7da1c3f04bd70a2bf579827dfc80ebe551c85382347c5414b8751b472b7bff",
+    "lib/wallet-warmup-session-v2-attempts.test.ts": "88182a476fd0d5e669cd4c6298af0bfd846a20643f4b69378dc34d4e5811ef6a",
+    "components/wallet-warmup-session-v2-attempt.tsx": "c66eee785afec9ec845c4d143fa34be6d0d31778d73dd294ec5ff0078af60810",
+    "components/wallet-warmup-session-v2-attempt.test.tsx": "1da84a71195ec925389f34d6a8532f70747eb093c54c3664f44350b3d913ed12",
+    "app/api/wallet-workspace/warmup/session-v2-read-history/route.ts": "3842334d24baa34692183b31b6f0706ec9f75b8346d0ebcc078a91b1a2585d82",
+    "app/api/wallet-workspace/warmup/session-v2-read-history/route.test.ts": "86af722790fd3b9330a232e80c920d865ce8b52dfb4054cffe6809d3b2b5cfaa",
+    "app/api/wallet-workspace/warmup/session-v2-attempts/route.ts": "69410ca9fd0739ca81e04043fdffffb5e0716de82bbed1d7a10f4e0d1d2c5fc2",
+    "app/api/wallet-workspace/warmup/session-v2-runtime-attempts/route.ts": "07b25f0036abad0032d062c1b05f854eaf89a65c78f22551948bab78e1579e80"
+  },
+  "review": {
+    "model": [
+      "claude-opus-5-5"
+    ],
+    "finishedAt": "2026-10-22T01:11:33.767Z",
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "testsRunByReviewer": false,
+    "postReviewCopyAndTestsIndependentlyVerified": true
+  },
+  "deployed": false,
+  "fundedActions": false,
+  "schemaChanged": false,
+  "executionEnabled": false
+}

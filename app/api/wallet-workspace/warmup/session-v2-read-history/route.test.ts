@@ -13,6 +13,7 @@ vi.mock('@/lib/server-env', () => ({
 }));
 import { GET } from './route';
 import { GET as previewGET } from '../session-v2-attempts/route';
+import { GET as runtimeGET } from '../session-v2-runtime-attempts/route';
 import {
   prepareWalletWarmupV2RuntimeAttempt,
   prepareWalletWarmupV2Attempt,
@@ -31,6 +32,62 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 const get = (query: string) => GET(new Request(url + query));
+it.each([
+  'history-id',
+  'history-page',
+  'preview-id',
+  'preview-page',
+  'runtime-id',
+] as const)(
+  'reports temporary clock skew on %s without a provider request or deadline renewal',
+  async (kind) => {
+    const input = f.selection(),
+      callback = vi.fn(async () => {
+        throw Error('synthetic refusal');
+      });
+    const saved = await prepareWalletWarmupV2Attempt(
+      f.db,
+      'owner',
+      input,
+      true,
+      signal(),
+      'synthetic-key',
+      () => callback,
+    );
+    const now = vi
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.parse(f.v2Journal.createdAt) - 1);
+    try {
+      const query = kind.endsWith('page')
+        ? '?journalId=' + input.journalId
+        : '?id=' + input.id;
+      const result = kind.startsWith('history')
+        ? await get(query)
+        : kind === 'runtime-id'
+          ? await runtimeGET(new Request(url + query))
+          : await previewGET(new Request(url + query));
+      expect(result.status).toBe(409);
+      expect(result.headers.get('cache-control')).toBe('no-store');
+      expect(await result.json()).toEqual({
+        code: 'WARMUP_HISTORY_CLOCK_AHEAD',
+        error:
+          'Saved history is ahead of this server clock. Recover the same ID shortly.',
+      });
+    } finally {
+      now.mockRestore();
+    }
+    const recovered = await get('?id=' + input.id);
+    expect(recovered.status).toBe(200);
+    const body = (await recovered.json()) as {
+      attempt: { id: string; leaseExpiresAt: string };
+    };
+    expect(body.attempt.id).toBe(input.id);
+    expect(body.attempt.leaseExpiresAt).toBe(saved.lease.expires_at);
+    expect(callback).toHaveBeenCalledOnce();
+    expect(f.factory).not.toHaveBeenCalled();
+    expect(f.raw.prepare).not.toHaveBeenCalled();
+  },
+);
 it('requires authentication and isolates absent IDs and other owners', async () => {
   mocks.user = null;
   expect((await get('?id=' + crypto.randomUUID())).status).toBe(401);

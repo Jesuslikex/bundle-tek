@@ -19,6 +19,10 @@ import {
 } from '@/lib/wallet-warmup-session-v2-read-view';
 import { readWarmupConsentResponse } from '@/lib/wallet-warmup-session-consent-view';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
+import {
+  isWarmupHistoryClockConflict,
+  WARMUP_HISTORY_CLOCK_RECOVERY,
+} from '@/lib/warmup-history-clock';
 const endpoint = '/api/wallet-workspace/warmup/session-v2-attempts';
 const runtimeEndpoint =
   '/api/wallet-workspace/warmup/session-v2-runtime-attempts';
@@ -187,6 +191,7 @@ export function WalletWarmupSessionV2Attempt({
     setError('');
     setNotice('');
     setMissing(false);
+    let clockAhead = false;
     try {
       const signal = AbortSignal.any([
         controller.signal,
@@ -221,6 +226,7 @@ export function WalletWarmupSessionV2Attempt({
       const value = await readWarmupConsentResponse(response, signal);
       signal.throwIfAborted();
       if (!response.ok) {
+        clockAhead = isWarmupHistoryClockConflict(response.status, value);
         if (mounted.current && scope.current === token) {
           if (
             method === 'GET' &&
@@ -311,9 +317,14 @@ export function WalletWarmupSessionV2Attempt({
     } catch {
       if (mounted.current && scope.current === token)
         setError(
-          'No confirmed new result. Keep request ' +
-            originalId +
-            ' and use Recover unsigned request. No retry starts automatically.',
+          clockAhead
+            ? WARMUP_HISTORY_CLOCK_RECOVERY +
+                ' Wait briefly, then use Recover unsigned request for ' +
+                originalId +
+                '.'
+            : 'No confirmed new result. Keep request ' +
+                originalId +
+                ' and use Recover unsigned request. No retry starts automatically.',
         );
     } finally {
       if (active.current === controller) {
@@ -338,6 +349,7 @@ export function WalletWarmupSessionV2Attempt({
     setError('');
     setNotice('');
     setChecked(false);
+    let clockAhead = false;
     try {
       const signal = AbortSignal.any([
           controller.signal,
@@ -352,7 +364,10 @@ export function WalletWarmupSessionV2Attempt({
         );
       const value = await readWarmupConsentResponse(response, signal);
       signal.throwIfAborted();
-      if (!response.ok) throw Error();
+      if (!response.ok) {
+        clockAhead = isWarmupHistoryClockConflict(response.status, value);
+        throw Error();
+      }
       const next = warmupV2AttemptPage(value, journal, consent, before);
       if (mounted.current && scope.current === token) {
         setPage(next);
@@ -367,7 +382,10 @@ export function WalletWarmupSessionV2Attempt({
     } catch {
       if (mounted.current && scope.current === token)
         setError(
-          'Saved requests could not be read. Existing reminders are preserved.',
+          clockAhead
+            ? WARMUP_HISTORY_CLOCK_RECOVERY +
+                ' Wait briefly, then use Find saved requests again.'
+            : 'Saved requests could not be read. Existing reminders are preserved.',
         );
     } finally {
       if (active.current === controller) {

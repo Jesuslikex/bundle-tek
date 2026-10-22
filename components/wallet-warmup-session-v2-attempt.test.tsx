@@ -176,6 +176,125 @@ it('requires its own unchecked request, persists the ID before POST and never se
   expect(host.textContent).toContain('Exact input:');
   expect(host.textContent).toContain('Private packet retained.');
 });
+it('explains temporary clock disagreement while retaining the exact original reminder and requiring another explicit read', async () => {
+  await render();
+  lost = true;
+  await check();
+  await click('Request unsigned preview');
+  const original = sessionStorage.getItem(key());
+  const id = JSON.parse(original!).id;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_input: string, init?: RequestInit) => {
+      expect(init?.method).not.toBe('POST');
+      gets++;
+      return Response.json(
+        {
+          code: 'WARMUP_HISTORY_CLOCK_AHEAD',
+          error:
+            'Saved history is ahead of this server clock. Recover the same ID shortly.',
+        },
+        { status: 409 },
+      );
+    }),
+  );
+  await click('Recover unsigned request');
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain(
+    'ahead of this server clock',
+  );
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain(id);
+  expect(host.textContent).toContain('No deadline is renewed');
+  expect(host.textContent).toContain('has not been fully verified');
+  expect(host.textContent).toContain(
+    'then use Recover unsigned request for ' + id,
+  );
+  expect(sessionStorage.getItem(key())).toBe(original);
+  expect(posts).toBe(1);
+  expect(gets).toBe(1);
+  await flush();
+  expect(gets).toBe(1);
+});
+it('keeps a clock-refused POST recoverable by its original ID without automatically repeating it', async () => {
+  await render();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_input: string, init?: RequestInit) => {
+      expect(init?.method).toBe('POST');
+      posts++;
+      return Response.json(
+        {
+          code: 'WARMUP_HISTORY_CLOCK_AHEAD',
+          error:
+            'Saved history is ahead of this server clock. Recover the same ID shortly.',
+        },
+        { status: 409 },
+      );
+    }),
+  );
+  await check();
+  await click('Request unsigned preview');
+  const original = sessionStorage.getItem(key());
+  const id = JSON.parse(original!).id;
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain(
+    'then use Recover unsigned request for ' + id,
+  );
+  expect(host.textContent).toContain('has not been fully verified');
+  await flush();
+  expect(sessionStorage.getItem(key())).toBe(original);
+  expect(posts).toBe(1);
+  expect(gets).toBe(0);
+});
+it('explains a temporary clock conflict during saved request discovery without inventing a result or starting another request', async () => {
+  await render();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      gets++;
+      return Response.json(
+        {
+          code: 'WARMUP_HISTORY_CLOCK_AHEAD',
+          error:
+            'Saved history is ahead of this server clock. Recover the same ID shortly.',
+        },
+        { status: 409 },
+      );
+    }),
+  );
+  await click('Find saved requests');
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain(
+    'ahead of this server clock',
+  );
+  expect(host.textContent).toContain('No deadline is renewed');
+  expect(host.textContent).toContain('then use Find saved requests again');
+  expect(sessionStorage.getItem(key())).toBeNull();
+  expect(posts).toBe(0);
+  expect(gets).toBe(1);
+});
+it('does not display arbitrary provider text as a trusted clock-conflict explanation', async () => {
+  await render();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      gets++;
+      return Response.json(
+        {
+          code: 'WARMUP_HISTORY_CLOCK_AHEAD',
+          error: '<html>private diagnostics</html>',
+        },
+        { status: 409 },
+      );
+    }),
+  );
+  await click('Find saved requests');
+  expect(host.querySelector('[role="alert"]')!.textContent).toContain(
+    'Saved requests could not be read',
+  );
+  expect(host.textContent).not.toContain('private diagnostics');
+  expect(host.textContent).not.toContain('ahead of this server clock');
+  expect(sessionStorage.getItem(key())).toBeNull();
+  expect(posts).toBe(0);
+  expect(gets).toBe(1);
+});
 it('remounts a lost response without a fetch, then recovers with GET and no new POST', async () => {
   await render();
   lost = true;

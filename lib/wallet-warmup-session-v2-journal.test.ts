@@ -13,10 +13,66 @@ import {
   appendWalletWarmupV2Journal,
   publicWalletWarmupV2Journal,
   warmupV2JournalControlFits as fits,
+  WalletWarmupV2JournalClockAheadError,
 } from './wallet-warmup-session-v2-journal';
+import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
 import { appendWalletWarmupSessionJournal } from './wallet-warmup-session-journal-storage';
 import { prepareWalletWarmupSessionAction } from './wallet-warmup-session-preparation';
 describe('versioned warmup saved session history', () => {
+  it('distinguishes a future event from a future root and still refuses its corrupt digest when the clock catches up', async () => {
+    const f = await warmupSessionV2JournalFixture();
+    try {
+      await f.append('begin-review');
+      const now = Math.max(Date.now(), Date.parse(f.journal.updatedAt));
+      const future = new Date(now + 1000).toISOString();
+      // Fault only the read response; persistent SQL and its write guards stay intact.
+      const original = f.db.batch.bind(f.db);
+      const faulted = {
+        prepare: f.db.prepare.bind(f.db),
+        async batch(statements: D1PreparedStatement[]) {
+          const pages = await original<Record<string, unknown>>(statements);
+          return pages.map((page) => ({
+            ...page,
+            results: page.results.map((row) => {
+              if (typeof row.document !== 'string') return row;
+              const event = JSON.parse(row.document);
+              if (event.format !== 'wallet-warmup-session-event-v2') return row;
+              return {
+                ...row,
+                created_at: future,
+                document: canonical({ ...event, at: future }),
+              };
+            }),
+          }));
+        },
+      } as D1Database;
+      expect(Date.parse(f.journal.createdAt)).toBeLessThanOrEqual(now);
+      await expect(
+        readWalletWarmupV2Journal(
+          faulted,
+          'owner',
+          f.journal.id,
+          signal(),
+          now,
+        ),
+      ).rejects.toBeInstanceOf(WalletWarmupV2JournalClockAheadError);
+      await expect(
+        readWalletWarmupV2Journal(
+          faulted,
+          'owner',
+          f.journal.id,
+          signal(),
+          now + 1000,
+        ),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(
+        (await readWalletWarmupV2Journal(f.db, 'owner', f.journal.id, signal()))
+          ?.headSha256,
+      ).toBe(f.journal.headSha256);
+    } finally {
+      f.client.close();
+    }
+  });
   it.each(['submitted', 'unknown'])(
     'preserves an unresolved legacy %s hold after Stop',
     async (operation) => {
