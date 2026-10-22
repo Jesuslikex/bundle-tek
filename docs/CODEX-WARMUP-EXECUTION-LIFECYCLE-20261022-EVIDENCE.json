@@ -1,0 +1,197 @@
+{
+  "format": "warmup-execution-lifecycle-model-evidence-v1",
+  "sourceBaseCommit": "4f04ff67243808cca252441f38d60389286cb829",
+  "scope": "unmounted in-memory execution bookkeeping model; no consent/receipt verification or durable CAS",
+  "sourceHashes": [
+    {
+      "path": "lib/wallet-warmup-execution-manifest.ts",
+      "sha256LfNormalized": "ecafbae77b24585adc8bc20b387583c5b45012882e5ee5778634b69f18b65463"
+    },
+    {
+      "path": "lib/wallet-warmup-execution-ledger.ts",
+      "sha256LfNormalized": "a5c06d178ca3786875c373993ba4efde7541d106955baf094366d5a3080ec8ba"
+    },
+    {
+      "path": "lib/wallet-warmup-execution-manifest.test.ts",
+      "sha256LfNormalized": "549a7c7851741a789c090ef2bb782ecf298f5ebd5c595cd6c44abaec8a74ce91"
+    },
+    {
+      "path": "lib/wallet-warmup-execution-ledger.test.ts",
+      "sha256LfNormalized": "14082b8c1827a2b3e96fe16d3914e00d135da77768499da9fe7b4cc5ca5dde95"
+    },
+    {
+      "path": "test/warmup-execution-ledger-fixture.ts",
+      "sha256LfNormalized": "81ac9f9e8a9c80bf84a88cfa9cc9cd0b61bd29364c9423dd546be909632f26dc"
+    }
+  ],
+  "verification": {
+    "testReport": "work/release-qa/warmup-execution-lifecycle-verified-20261022.json",
+    "passed": 151,
+    "failed": 0,
+    "skipped": 0,
+    "files": [
+      {
+        "file": "lib/wallet-warmup-execution-ledger.test.ts",
+        "passed": 33,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "file": "lib/wallet-warmup-execution-manifest.test.ts",
+        "passed": 27,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "file": "lib/wallet-warmup-execution-pacing.test.ts",
+        "passed": 14,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "file": "lib/wallet-warmup-session-replay.test.ts",
+        "passed": 32,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "file": "lib/wallet-warmup-session-sequence.test.ts",
+        "passed": 29,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "file": "test/warmup-shared-ledger-contract.test.ts",
+        "passed": 16,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "typecheckExitCode": 0,
+    "typedLintExitCode": 0,
+    "typedLintFiles": [
+      "lib/wallet-warmup-execution-manifest.ts",
+      "lib/wallet-warmup-execution-ledger.ts",
+      "lib/wallet-warmup-execution-manifest.test.ts",
+      "lib/wallet-warmup-execution-ledger.test.ts",
+      "test/warmup-execution-ledger-fixture.ts"
+    ],
+    "formatExitCode": 0,
+    "formatFiles": [
+      "lib/wallet-warmup-execution-manifest.ts",
+      "lib/wallet-warmup-execution-ledger.ts",
+      "lib/wallet-warmup-execution-manifest.test.ts",
+      "lib/wallet-warmup-execution-ledger.test.ts",
+      "test/warmup-execution-ledger-fixture.ts"
+    ]
+  },
+  "capacityEvidence": {
+    "kind": "synthetic model only",
+    "wallets": 20,
+    "buyActions": 400,
+    "totalActions": 4800,
+    "qualifications": 14400,
+    "preparedUnsignedCancellations": 9600,
+    "dispatchIntents": 4800,
+    "unknownObservations": 4800,
+    "appliedOutcomes": 4800,
+    "acceptedSteps": 72000,
+    "policyModelStepLimit": 76100,
+    "ordinaryStepLimit": 76096,
+    "terminalReservedSteps": 4,
+    "exercisedTails": [
+      "authorized Stop first",
+      "authorized Stop last",
+      "dispatch",
+      "held",
+      "unsigned"
+    ],
+    "doesNotProve": [
+      "valid original source plan",
+      "SQL or byte capacity",
+      "stored replay or cross-process CAS",
+      "provider/runtime qualification",
+      "actual execution"
+    ]
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-22T07:01:01.255Z",
+      "finishedAt": "2026-10-22T07:04:01.631Z",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "timedOut": false,
+      "copiedFilesUnchanged": true,
+      "copiedFileCount": 11,
+      "currentFilesChangedSinceCopy": [
+        "lib/wallet-warmup-execution-manifest.ts",
+        "lib/wallet-warmup-execution-ledger.ts",
+        "lib/wallet-warmup-execution-manifest.test.ts",
+        "lib/wallet-warmup-execution-ledger.test.ts",
+        "test/warmup-execution-ledger-fixture.ts",
+        "docs/CODEX-WARMUP-EXECUTION-LIFECYCLE-20261022.md"
+      ],
+      "reviewRanTests": false,
+      "reviewEditedSource": false
+    },
+    {
+      "startedAt": "2026-10-22T07:15:59.031Z",
+      "finishedAt": "2026-10-22T07:19:09.549Z",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "timedOut": false,
+      "copiedFilesUnchanged": true,
+      "copiedFileCount": 14,
+      "currentFilesChangedSinceCopy": [
+        "lib/wallet-warmup-execution-manifest.ts",
+        "lib/wallet-warmup-execution-ledger.ts",
+        "lib/wallet-warmup-execution-ledger.test.ts",
+        "test/warmup-execution-ledger-fixture.ts",
+        "docs/CODEX-WARMUP-EXECUTION-LIFECYCLE-20261022.md"
+      ],
+      "reviewRanTests": false,
+      "reviewEditedSource": false
+    }
+  ],
+  "followUpsIndependentlyVerifiedAfterSecondReview": true,
+  "allCurrentAppCallers": [],
+  "existingFilesChanged": [
+    "AGENTS.md"
+  ],
+  "applicationMounted": false,
+  "existingSigningGatesChanged": false,
+  "executionAllowed": false,
+  "signingAllowed": false,
+  "automaticExecutionAllowed": false,
+  "migrationReserved": false,
+  "applicationOrHostedSql": false,
+  "providerCredentialCronChanges": false,
+  "realWalletActions": false,
+  "fundedTests": false,
+  "deployment": false,
+  "renderedQa": false,
+  "productionBuild": false,
+  "fullSuite": false,
+  "openDependencies": [
+    "actual source/consent/owner freshness and valid original schedule admission",
+    "compact trusted checkpoint and immutable source proof storage",
+    "all-family bidirectional shared wallet and token-lot guards",
+    "production packet/signature/runtime/finalized-outcome verifier in the write transaction",
+    "proven release/reconciliation for unsigned expired authorization and unknown/held outcomes",
+    "32-slot per-action qualification and browser interruption QA"
+  ]
+}
