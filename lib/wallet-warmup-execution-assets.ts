@@ -21,6 +21,7 @@ import {
 } from './swap-token-program-evidence';
 import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
+import { replayWarmupExecutionAssets } from './wallet-warmup-execution-assets-replay';
 
 export class WarmupExecutionAssetsError extends Error {
   constructor() {
@@ -250,8 +251,27 @@ export async function inspectWarmupExecutionAssets(
       automaticExecutionAllowed: false as const,
     };
     const evidenceSha256 = await digest(canonical(evidence));
+    const replayed = await replayWarmupExecutionAssets(
+      { evidence, evidenceSha256 },
+      {
+        ownerId: owner,
+        reviewId: source.retainedReview.id,
+        reviewSha256: source.retainedReview.reviewSha256,
+        sourceSnapshotSha256: source.sourceSnapshotSha256,
+        evidenceSha256,
+        provider: url.hostname,
+        mints,
+        reviewedAt: source.retainedReview.reviewedAt,
+        reviewExpiresAt: source.retainedReview.reviewExpiresAt,
+        expiresAt: evidence.expiresAt,
+      },
+      signal,
+    );
     fresh();
-    return { evidence, evidenceSha256 };
+    return {
+      evidence: replayed.evidence,
+      evidenceSha256: replayed.evidenceSha256,
+    };
   } catch {
     parentSignal.throwIfAborted();
     return fail();

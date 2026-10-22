@@ -1,0 +1,58 @@
+{
+  "sourceBaseCommit": "3da1e07080e4094b8a3ea058b8400452b142eb08",
+  "scope": "Historical raw asset decoder and integrity replay, not source/network/authentication or signing admission",
+  "checks": {
+    "passedTests": 294,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "files": 8,
+    "nativeHarnessPassed": 8,
+    "typecheckPassed": true,
+    "typedLintPassed": true,
+    "reviewedSourceUnchanged": true,
+    "frozenSourceFiles": 2377,
+    "frozenSourceUnchanged": true
+  },
+  "ownedSourceHashes": {
+    "lib/wallet-warmup-execution-assets.ts": "5d2206e4ff1093c8dae25ea8641ef797d53e890baf609cd0a62d24cdbcf1b76c",
+    "lib/wallet-warmup-execution-assets-replay.ts": "75a8b84928175f4f27f6c26275c33515aee85a751306bebea05b209a1e94f31a",
+    "lib/wallet-warmup-execution-assets-replay.test.ts": "a77e7c1c7bf2b295d710564e125289bb37b78d584ad1cd00987d8f08fd6209c4"
+  },
+  "integrationReportSha256": "ba6901c0dca861c277a0ded0b3db6e41c9424b231a14495aad6330e1377bc154",
+  "reviews": [
+    {
+      "report": "opus-warmup-assets-replay-20261022",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "resultSubtype": "success",
+      "isError": false
+    },
+    {
+      "report": "opus-warmup-assets-replay-final-20261022",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "resultSubtype": "success",
+      "isError": false
+    }
+  ],
+  "liveProviderRequests": 0,
+  "hostedSqlWrites": 0,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "automaticExecutionAllowed": false,
+  "deployment": false
+}
