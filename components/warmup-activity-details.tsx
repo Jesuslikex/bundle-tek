@@ -5,6 +5,9 @@ import { WarmupHistoryRunTimeline } from '@/components/warmup-history-run-timeli
 import { WalletWarmupPlanHistory } from '@/components/wallet-warmup-plan-history';
 import { WarmupApprovalHistory } from '@/components/warmup-approval-history';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
+import { readSavedWarmupDisplay } from '@/lib/warmup-saved-plan-display';
+import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
+import { nativeUnits } from '@/lib/wallet-warmup';
 export function WarmupActivityDetails({
   id,
   run,
@@ -26,46 +29,78 @@ export function WarmupActivityDetails({
     error: string;
   }>({ identity: '', plan: null, error: '' });
   const heading = useRef<HTMLHeadingElement | null>(null);
+  const pending = useRef<AbortController | null>(null);
   useEffect(() => {
     heading.current?.focus();
   }, [id]);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/wallet-workspace/warmup/plans?id=${encodeURIComponent(id)}`, {
-      cache: 'no-store',
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        const data = (await response.json()) as {
-          plan?: SavedWarmup;
-          error?: string;
-        };
-        if (!response.ok)
-          throw new Error(data.error || 'Warmup plan unavailable.');
-        const plan = data.plan;
-        if (
-          !plan ||
-          plan.id !== id ||
-          !Number.isSafeInteger(plan.revision) ||
-          plan.revision < 1 ||
-          typeof plan.archived !== 'boolean' ||
-          typeof plan.document?.name !== 'string' ||
-          !Array.isArray(plan.document.walletRevisions)
-        )
-          throw new Error('Warmup response mismatch.');
-        if (!controller.signal.aborted) setState({ identity, plan, error: '' });
-      })
-      .catch((e) => {
+    pending.current = controller;
+    if (!/^[a-zA-Z0-9-]{1,64}$/.test(id)) {
+      void Promise.resolve().then(() => {
         if (!controller.signal.aborted)
           setState({
             identity,
             plan: null,
-            error: e instanceof Error ? e.message : 'Warmup plan unavailable.',
+            error: 'Choose a saved warmup plan.',
           });
       });
-    return () => controller.abort();
+      return () => controller.abort();
+    }
+    const timeout = setTimeout(() => {
+      if (controller.signal.aborted) return;
+      controller.abort();
+      setState({
+        identity,
+        plan: null,
+        error:
+          'Loading saved warmup took too long. Check your connection and reload.',
+      });
+    }, 30_000);
+    let failure = 'Saved warmup unavailable. Reload to try again.';
+    fetch(`/api/wallet-workspace/warmup/plans?id=${encodeURIComponent(id)}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+      redirect: 'error',
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          failure =
+            response.status === 401
+              ? 'Sign in again, then reload this saved warmup.'
+              : response.status === 404
+                ? 'This saved warmup is no longer available. Open My wallets to choose a plan.'
+                : response.status === 429
+                  ? 'Too many requests. Wait a moment, then reload saved warmup.'
+                  : 'Saved warmup unavailable. Reload to try again.';
+          void response.body?.cancel().catch(() => {});
+          throw new Error();
+        }
+        const data = await readBoundedPanelJson(response, controller.signal);
+        failure =
+          'Saved warmup details do not match this plan. Reload to try again.';
+        const plan = readSavedWarmupDisplay(data, id);
+        if (!controller.signal.aborted) setState({ identity, plan, error: '' });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setState({ identity, plan: null, error: failure });
+      })
+      .finally(() => clearTimeout(timeout));
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
   }, [id, identity]);
   const current = state.identity === identity ? state : null;
+  let currency = 'native units';
+  if (current?.plan) {
+    try {
+      currency = nativeUnits(current.plan.document.chain).symbol;
+    } catch {
+      // A historical network may no longer be supported for new plans.
+    }
+  }
   return (
     <section
       className="wallet-holdings-panel"
@@ -99,11 +134,32 @@ export function WarmupActivityDetails({
           />
         </>
       )}
-      <Button variant="outline" onClick={() => setReload((v) => v + 1)}>
+      <Button
+        variant="outline"
+        disabled={!current}
+        onClick={() => setReload((v) => v + 1)}
+      >
         Reload saved warmup
       </Button>
       {!current ? (
-        <output>Loading saved warmup…</output>
+        <>
+          <output>
+            Loading saved warmup… No wallet unlock or transaction is requested.
+          </output>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              pending.current?.abort();
+              setState({
+                identity,
+                plan: null,
+                error: 'Saved warmup read cancelled. Reload when ready.',
+              });
+            }}
+          >
+            Cancel saved warmup read
+          </Button>
+        </>
       ) : current.error ? (
         <p role="alert">{current.error}</p>
       ) : (
@@ -119,9 +175,10 @@ export function WarmupActivityDetails({
               Buy amount: {current.plan.document.amount}
               {current.plan.document.amountMax
                 ? ` to ${current.plan.document.amountMax} (range)`
-                : ''}
-              . Total budget: {current.plan.document.totalBudget}. Fee reserve
-              per wallet: {current.plan.document.feeReserve}.
+                : ''}{' '}
+              {currency}. Total budget: {current.plan.document.totalBudget}{' '}
+              {currency}. Fee reserve per wallet:{' '}
+              {current.plan.document.feeReserve} {currency}.
             </p>
             <p className="warmup-address">
               Tokens: {current.plan.document.tokens.join(', ')}
@@ -148,6 +205,7 @@ export function WarmupActivityDetails({
             {current.plan.document.chain === 'Solana' && (
               <>
                 <WarmupApprovalHistory
+                  viewOnly
                   key={'approvals:' + identity + ':' + current.plan.revision}
                   plan={current.plan}
                 />

@@ -16,10 +16,13 @@ import { warmupApprovalStateLabel } from './warmup-transaction-progress';
 export function WarmupApprovalHistory({
   plan,
   autoOpen = false,
+  viewOnly = false,
   onChanged,
 }: {
   plan: SavedWarmup;
   autoOpen?: boolean;
+  /** Activity may remount while reloading. Keep recovery writes in My wallets. */
+  viewOnly?: boolean;
   onChanged?: () => void;
 }) {
   const [open, setOpen] = useState(autoOpen),
@@ -133,6 +136,7 @@ export function WarmupApprovalHistory({
     action: 'cancel' | 'submit' | 'recover' | 'receipt',
   ) {
     if (
+      viewOnly ||
       busy ||
       row.planId !== plan.id ||
       (action === 'submit' && accepted !== row.id)
@@ -262,7 +266,11 @@ export function WarmupApprovalHistory({
     }
   }
   return (
-    <section aria-label="Warmup approval recovery">
+    <section
+      aria-label={
+        viewOnly ? 'Saved warmup approvals' : 'Warmup approval recovery'
+      }
+    >
       <Button
         variant="outline"
         disabled={busy}
@@ -277,21 +285,27 @@ export function WarmupApprovalHistory({
           }
         }}
       >
-        {open ? 'Close approval recovery' : 'Open approval recovery'}
+        {viewOnly
+          ? open
+            ? 'Close saved approvals'
+            : 'View saved approvals'
+          : open
+            ? 'Close approval recovery'
+            : 'Open approval recovery'}
       </Button>
       {open && (
         <>
           <p>
-            Resume saved approvals after a reload, including older plan
-            revisions and archives. Nothing is signed or submitted
-            automatically. Submitted or uncertain outcomes require receipt
-            recovery.
+            {viewOnly
+              ? 'Saved approval history only. Open warmup in My wallets for cancellation, submission or receipt recovery. Reloading this Activity view cannot submit a transaction.'
+              : 'Resume saved approvals after a reload, including older plan revisions and archives. Nothing is signed or submitted automatically. Submitted or uncertain outcomes require receipt recovery.'}
           </p>
           <Button variant="outline" disabled={busy} onClick={() => void read()}>
             Refresh approvals
           </Button>
           {rows.map((row) => {
             const canSubmit =
+              !viewOnly &&
               row.state === 'signed' &&
               !unconfirmed.has(row.id) &&
               !!row.signature &&
@@ -361,7 +375,7 @@ export function WarmupApprovalHistory({
                     </a>
                   </p>
                 )}
-                {row.state === 'awaiting_signature' && (
+                {!viewOnly && row.state === 'awaiting_signature' && (
                   <Button
                     variant="outline"
                     disabled={busy}
@@ -399,7 +413,7 @@ export function WarmupApprovalHistory({
                     </Button>
                   </>
                 )}
-                {row.state === 'signed' && !canSubmit && (
+                {!viewOnly && row.state === 'signed' && !canSubmit && (
                   <p>
                     {unconfirmed.has(row.id)
                       ? 'Submission is uncertain. Check the original signature before another action.'
@@ -410,7 +424,17 @@ export function WarmupApprovalHistory({
                           : 'The signed packet expired or its registration is incomplete. Recover the original signature before preparing another transaction.'}
                   </p>
                 )}
-                {row.signature &&
+                {viewOnly &&
+                  row.signature &&
+                  ['signed', 'submitted', 'failed'].includes(row.state) && (
+                    <p>
+                      Keep this original signature for recovery in My wallets. A
+                      saved approval does not prove finality. No automatic retry
+                      or replacement.
+                    </p>
+                  )}
+                {!viewOnly &&
+                  row.signature &&
                   ['signed', 'submitted'].includes(row.state) && (
                     <>
                       <Button
@@ -451,7 +475,7 @@ export function WarmupApprovalHistory({
                 {row.state === 'failed' && (
                   <>
                     <SwapFailureEvidence receipt={row.failureReceipt} />
-                    {!row.failureReceipt && row.signature && (
+                    {!viewOnly && !row.failureReceipt && row.signature && (
                       <Button
                         variant="outline"
                         disabled={busy}

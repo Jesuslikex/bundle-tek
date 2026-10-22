@@ -1,0 +1,140 @@
+{
+  "format": "bundle-warmup-saved-details-evidence-v1",
+  "sourceBaseCommit": "7fdc5701aa1053cbf1c58465d9f884584b583370",
+  "files": {
+    "components/warmup-activity-details.tsx": "53417931dd08998b014dff7c530cf65daf3ea155acfd55ac5dd6bbf3f4a17141",
+    "components/warmup-approval-history.tsx": "b5adafe285e35fb31dce7a7532b5eae6d0488521acc4edd3c21632f3b589b8b1",
+    "components/warmup-activity-details.test.tsx": "5395fbbbad2cb11802570735557310330474903754091aacbd06cbef010318a6",
+    "lib/warmup-saved-plan-display.ts": "e306e2e41f354ee807b09971f99c85268ad99b486270c0c3c8eca279f4cf478d",
+    "lib/warmup-saved-plan-display.test.ts": "5035b019ccc7f6f2539ac4a4119c14bde55f851822104021d8ac6861bf100f6d",
+    "test/warmup-saved-plan-display-fixture.ts": "e4a10ceef27fd32b96a2a76d202dca51bde14b16a28d057fb29bc896d74ad29b"
+  },
+  "tests": {
+    "passed": 77,
+    "failed": 0,
+    "skipped": 0,
+    "files": 8,
+    "report": "work/release-qa/warmup-saved-details-final-20261022.json"
+  },
+  "checks": {
+    "plainTypeScript": "passed",
+    "typedLintSixFiles": "passed",
+    "formatSixFiles": "passed",
+    "productionBuild": "not run",
+    "fullSuite": "not run"
+  },
+  "reviewers": [
+    {
+      "startedAt": "2026-10-22T17:29:21.982Z",
+      "finishedAt": "2026-10-22T17:31:19.583Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "7fdc5701aa1053cbf1c58465d9f884584b583370",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.49593980000000004,
+      "sourceUnchanged": true,
+      "changed": [],
+      "reviewPath": "work/release-qa/opus-warmup-saved-details-20261022",
+      "copiedFileCount": 16,
+      "currentSourceDiffersFromReviewedCopy": [
+        "components/warmup-activity-details.test.tsx",
+        "components/warmup-activity-details.tsx",
+        "components/warmup-approval-history.tsx",
+        "lib/warmup-saved-plan-display.test.ts",
+        "lib/warmup-saved-plan-display.ts"
+      ]
+    },
+    {
+      "startedAt": "2026-10-22T17:35:24.869Z",
+      "finishedAt": "2026-10-22T17:36:40.912Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "7fdc5701aa1053cbf1c58465d9f884584b583370",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.4227326,
+      "sourceUnchanged": true,
+      "changed": [],
+      "reviewPath": "work/release-qa/opus-warmup-saved-details-final-20261022",
+      "copiedFileCount": 20,
+      "currentSourceDiffersFromReviewedCopy": [
+        "components/warmup-activity-details.test.tsx",
+        "components/warmup-activity-details.tsx",
+        "components/warmup-approval-history.tsx",
+        "lib/warmup-saved-plan-display.test.ts",
+        "lib/warmup-saved-plan-display.ts"
+      ]
+    }
+  ],
+  "browser": {
+    "scope": "actual components and CSS, isolated Vite, synthetic GET transport; not authenticated Bundle/API/RPC",
+    "observations": {
+      "synthetic": true,
+      "noRealApiOrProvider": true,
+      "viewOnly320": {
+        "approvalNotice": "Close saved approvalsSaved approval history only. Open warmup in My wallets for cancellation, submission or receipt recovery. Reloading this Activity view cannot submit a transaction.Refresh approvalsBuy \u00b7 Cycle 1 \u00b7 Signed, not sentSolana mainnet. Wallet 11111111111111111111111111111111. Plan revision 4. Created 2026-01-02T12:00:00.000Z. Approval expires 2026-10-22T17:45:41.044Z.Spend 1000000 atomic units of So11111111111111111111111111111111111111112; minimum output 900000 atomic units of EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v. Network fee 5000 lamports.Maximum new-account rent 2039280 lamports; maximum upfront SOL debit 3044280 lamports. Wrap 1000000 lamports. Wrapped SOL returns to this wallet after the route.Approval aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa. Preparation aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa. Exact packet aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.Registered signature SYNTHETIC_SIGNATURE_ONLY. View transactionKeep this original signature for recovery in My wallets. A saved approval does not prove finality. No automatic retry or replacement.",
+        "buttons": ["Close saved approvals", "Refresh approvals"],
+        "client": 305,
+        "scroll": 305,
+        "width": 320
+      },
+      "checkedWidths": [320, 375, 1440],
+      "scenarios": [
+        "HTML failure / fixed error / manual retry",
+        "cancel / late response remains cancelled",
+        "historical archived plan / native units",
+        "saved signed approval / no write controls"
+      ],
+      "viewportReset": true
+    },
+    "screenshots": {
+      "work/warmup-saved-details-browser-20261022/cancelled-375.jpg": "62654b33070641a3eaa33474f69eeb96a63e0ee4a50a957911c3a7c67258469a",
+      "work/warmup-saved-details-browser-20261022/cancelled-late-reply-desktop.jpg": "6e00ee8e3c037ea213f10c607273c4d4f406148a0d5ba108d6b58dcea9b436d4",
+      "work/warmup-saved-details-browser-20261022/html-retry-desktop.jpg": "04a56d22dfa85cee686066e9ee0a3dc9b19543795a87d5d972790c6b230ff4b5",
+      "work/warmup-saved-details-browser-20261022/valid-375.jpg": "809d31215f3d1b851070fb03e20d70580122df97c3df949410588750e2bd1b45",
+      "work/warmup-saved-details-browser-20261022/view-only-1440.jpg": "68801d9ece984677aea69dfe93f2c274055b1a16660ad79931f6b70439190e72",
+      "work/warmup-saved-details-browser-20261022/view-only-320.jpg": "492d3d79b1b89675aeed3a009683e72815ba44a519d8ca915b11f5df7e13201e",
+      "work/warmup-saved-details-browser-20261022/view-only-375.jpg": "4884efe2f260ab8c2a29b4b0d1d6b0a27e5d99f1891d0898fffcb96cbcb628db"
+    },
+    "qaServerStopped": true,
+    "finalQaTabClosed": true,
+    "interruptedQaTabsRemaining": ["1751430734", "1751430737"],
+    "cleanupLimit": "Two older QA tabs could not be closed: debugger unattached. They point only to the stopped local harness. Original user tabs preserved."
+  },
+  "boundaries": {
+    "deployed": false,
+    "applicationOrHostedSql": false,
+    "providerCredentialCronChange": false,
+    "realWalletAction": false,
+    "newExecutionAuthority": false,
+    "protectedClaudeFilesChanged": false
+  },
+  "remaining": [
+    "Full warmup execution consent/root/durable storage/shared holds/receipt reconciliation/runtime qualification",
+    "Actual signed-in Bundle HTTP/browser integration",
+    "Default My wallets recovery lifecycle and uncertainty need separate qualification",
+    "Plan history and optional run timeline retain their original reader/error behavior",
+    "Full Proxima parity and funded proof are not established"
+  ]
+}
