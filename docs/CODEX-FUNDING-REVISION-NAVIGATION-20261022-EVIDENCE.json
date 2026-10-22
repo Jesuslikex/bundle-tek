@@ -1,0 +1,96 @@
+{
+  "baseCommit": "0d9394265988b893428bb0d9cc43b4476f39735b",
+  "sourceHashes": {
+    "components/launch/mainnet-funding-history.tsx": "9e695b9cc9d92d787ed735d9bd64ad3f2d652e4ec17ed12e84ebc0cb7cc810f6",
+    "components/launch/mainnet-funding-history.test.tsx": "179029a9659758286ab0cc97c8f66b40364e39820654ddcb1f34b4dea2aa28b5",
+    "lib/mainnet-funding-route-history.test.ts": "66caaeccbb0d4607c4a0ec9963bd208c525874a7a8391e6369ac242505bc6452",
+    "app/api/funding/mainnet-history/route.test.ts": "fc8940e841238d72da171f40739387f82fddf28e2ed77bff39b5a8ee08bcce48"
+  },
+  "regression": {
+    "baseline": "0d93942",
+    "isolatedSourceOnly": true,
+    "expectedFailedTests": 1,
+    "unselectedTests": 30,
+    "reason": "Current-revision reply drops the discovered revision1 option; picker contains only all/2.",
+    "canonicalSourceChangedByBaselineRun": false
+  },
+  "tests": {
+    "distinctPassed": 87,
+    "failedFinal": 0,
+    "skippedFinal": 0,
+    "finalPanel": 31,
+    "unchangedModel": 31,
+    "unchangedApi": 25,
+    "initialCombined": "86/87; panel journey selected before asynchronous hash decode completed.",
+    "intermediateHarnessCorrection": "CSS.escape unavailable in jsdom; use document.getElementById for the linked disclosure assertion.",
+    "finalPanelOutcome": "All31 pass after visible-state waiting and accessible-label correction."
+  },
+  "checks": {
+    "plainTypeScript": "passed",
+    "typedLintFiles": 4,
+    "formatFiles": 4,
+    "isolatedBuild": {
+      "base": "0d9394265988b893428bb0d9cc43b4476f39735b",
+      "overlays": [
+        "components/launch/mainnet-funding-history.tsx",
+        "components/launch/mainnet-funding-history.test.tsx",
+        "lib/mainnet-funding-route-history.test.ts",
+        "app/api/funding/mainnet-history/route.test.ts"
+      ],
+      "hashes": {
+        "components/launch/mainnet-funding-history.tsx": "9e695b9cc9d92d787ed735d9bd64ad3f2d652e4ec17ed12e84ebc0cb7cc810f6",
+        "components/launch/mainnet-funding-history.test.tsx": "179029a9659758286ab0cc97c8f66b40364e39820654ddcb1f34b4dea2aa28b5",
+        "lib/mainnet-funding-route-history.test.ts": "66caaeccbb0d4607c4a0ec9963bd208c525874a7a8391e6369ac242505bc6452",
+        "app/api/funding/mainnet-history/route.test.ts": "fc8940e841238d72da171f40739387f82fddf28e2ed77bff39b5a8ee08bcce48"
+      },
+      "exitCode": 0,
+      "unchanged": true,
+      "passed": true,
+      "envFilesCopied": false,
+      "deployed": false
+    },
+    "sourceFreeze": {
+      "files": 2382,
+      "unchanged": true,
+      "sha256": "4156499ea6a9e3a94c74a0d1c929e5bd3642d3197a7c39d123424431fc045b70"
+    }
+  },
+  "opusReview": {
+    "model": "claude-opus-5-5",
+    "exitCode": 0,
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "finding": "No correctness or cross-plan cache issue; three low findings and optional coverage notes. Reviewer ran no tests.",
+    "resolvedIndependentlyAfterReview": [
+      "Explicit disclosure that newly loaded older revisions replace cached choices.",
+      "Link discovery-limit disclosure to select with aria-describedby; mark current option.",
+      "Test oldest-loaded versus highest revision policy, await real asynchronous panel state."
+    ],
+    "postReviewDelta": [
+      "components/launch/mainnet-funding-history.test.tsx",
+      "components/launch/mainnet-funding-history.tsx"
+    ],
+    "completeReadAndCacheUpdateMatchesReview": true,
+    "completeReadSha256": "0d4ad49e5faecbdda0dede500bf21ec95a1c9a0eddd3330cb3eb613fe12878b4",
+    "notRereviewed": true
+  },
+  "authority": {
+    "financialHandlersChanged": false,
+    "signingChanged": false,
+    "schemaChanged": false,
+    "protectedClaudeUiChanged": false,
+    "providerChanged": false,
+    "applicationDatabaseModified": false,
+    "hostedSql": false,
+    "deployed": false,
+    "fundedTest": false
+  },
+  "limits": [
+    "87 distinct tests across final panel and unchanged model/API results, not a fresh full-suite or final combined rerun.",
+    "No fresh rendered, signed-in, live-provider, screen-reader or completed Proxima launch evidence.",
+    "Existing event decoder does not reject revision above server current; no new hardening claim.",
+    "Cancellation during asynchronous route decode not newly forced by this test.",
+    "Loaded transition pages still have no overall accumulated history cap;100 limit applies only to discovered revision choices.",
+    "No project/funding binding, current funds, cumulative ledger, cross-revision repeated-funding control or execution readiness."
+  ]
+}

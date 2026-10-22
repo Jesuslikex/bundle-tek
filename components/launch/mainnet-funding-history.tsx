@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -184,12 +185,14 @@ function FundingHistory({
   currentRevision: number;
   name: string;
 }) {
+  const revisionHelpId = useId();
   const [revision, setRevision] = useState<number | null>(null),
     [page, setPage] = useState<MainnetFundingHistory | null>(null),
     [busy, setBusy] = useState(true),
     [error, setError] = useState('');
   const [noticeRole, setNoticeRole] = useState<'status' | 'alert'>('alert');
   const [routes, setRoutes] = useState<FundingRouteHistory | null>(null);
+  const [knownRevisions, setKnownRevisions] = useState<number[]>([]);
   const [progressPage, setProgressPage] = useState(0);
   const pageStatus = useRef<HTMLOutputElement>(null);
   const reloadButton = useRef<HTMLButtonElement>(null);
@@ -266,6 +269,14 @@ function FundingHistory({
           next,
         ).catch(() => null);
         if (controller.signal.aborted || pending.current !== controller) return;
+        setKnownRevisions((prior) =>
+          [
+            ...new Set([
+              ...next.events.map((event) => event.funding.revision),
+              ...prior,
+            ]),
+          ].slice(0, 100),
+        );
         setPage((prior) =>
           after && prior
             ? {
@@ -318,7 +329,7 @@ function FundingHistory({
       currentRevision,
       page?.currentRevision ?? currentRevision,
       ...(revision === null ? [] : [revision]),
-      ...(page?.events.map((event) => event.funding.revision) ?? []),
+      ...knownRevisions,
     ]),
   ].sort((a, b) => b - a);
   const records = page?.progress.records ?? [];
@@ -347,6 +358,7 @@ function FundingHistory({
         Funding revision{' '}
         <select
           className="min-h-11"
+          aria-describedby={revisionHelpId}
           value={revision ?? 'all'}
           onChange={(event) => {
             pending.current?.abort();
@@ -366,10 +378,19 @@ function FundingHistory({
           {revisions.map((value) => (
             <option key={value} value={value}>
               Revision {value}
+              {value === (page?.currentRevision ?? currentRevision)
+                ? ' (current)'
+                : ''}
             </option>
           ))}
         </select>
       </label>
+      <p id={revisionHelpId}>
+        Choices include the current and selected revisions plus up to 100
+        revisions from the most recently loaded history. Loading older
+        transitions in All revisions can replace earlier choices. This is not a
+        complete revision list.
+      </p>
       <Button
         ref={reloadButton}
         type="button"

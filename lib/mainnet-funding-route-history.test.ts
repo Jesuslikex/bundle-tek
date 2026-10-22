@@ -188,6 +188,20 @@ it('recovers older routes only from whole-term hash-matched original captures wh
   expect(view.executionAllowed).toBe(false);
 });
 
+it('refuses v2 for the current revision even when every page and source binding agrees', async () => {
+  const { source, page } = await fundingRouteFixture();
+  expect(page.revision).toBe(1);
+  expect(page.currentRevision).toBe(1);
+  const candidate = {
+    ...source,
+    format: 'funding-route-source-v2',
+    sourceRevision: 1,
+  };
+  await expect(decodeFundingRouteHistory(candidate, page)).rejects.toThrow(
+    'Exact saved funding route unavailable.',
+  );
+});
+
 it.each([
   'empty',
   'changed',

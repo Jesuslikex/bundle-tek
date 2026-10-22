@@ -1010,11 +1010,75 @@ it('recovers the original receipted route after a real archive without attributi
     ).json()) as { plan: SavedFunding }
   ).plan;
   expect(view.updatedAt).toBe(current.updatedAt);
-  expect(view.routes[0].steps[0].record?.createdAt).toBe(
-    history.events[0].createdAt,
-  );
+  const stored = await context.db
+    .prepare(
+      'SELECT created_at AS createdAt FROM native_withdrawal_events WHERE owner_id=? AND sequence=?',
+    )
+    .bind('alice', history.events[0].sequence)
+    .first<{ createdAt: string }>();
+  expect(view.routes[0].steps[0].record?.createdAt).toBe(stored!.createdAt);
   expect(fetch).not.toHaveBeenCalled();
 });
+
+it.each(['identical', 'changed-and-restored'] as const)(
+  'replays original captures after real %s saves without crediting them to the current revision',
+  async (kind) => {
+    const saved = await plan();
+    const review = await insert(1, saved);
+    await finalized(review);
+    const original = await read({ revision: '1' });
+    const write = async (
+      expectedRevision: number,
+      document: SavedFunding['document'],
+    ) => {
+      const response = await saveFunding(
+        new Request('http://localhost/api/funding', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'http://localhost',
+          },
+          body: JSON.stringify({
+            id: saved.id,
+            action: 'save',
+            expectedRevision,
+            document,
+          }),
+        }),
+      );
+      expect(response.status).toBe(200);
+    };
+    let currentRevision = 2;
+    if (kind === 'changed-and-restored') {
+      await write(1, { ...saved.document, name: 'Changed saved terms' });
+      const changed = await read({ revision: '1' });
+      expect(changed.routeSource).toBeNull();
+      expect(changed.events).toEqual(original.events);
+      await write(2, saved.document);
+      currentRevision = 3;
+    } else await write(1, saved.document);
+    const historical = await read({ revision: '1' });
+    expect(historical.events).toEqual(original.events);
+    const routes = await decodeFundingRouteHistory(
+      historical.routeSource,
+      historical,
+    );
+    expect(routes).toMatchObject({
+      revision: 1,
+      sourceRevision: currentRevision,
+      executionAllowed: false,
+    });
+    expect(routes.routes[0].steps[0].receiptMatches).toBe(true);
+    const current = await read({ revision: String(currentRevision) });
+    expect(current.progress.records).toEqual([]);
+    expect(
+      (await decodeFundingRouteHistory(current.routeSource, current)).routes[0]
+        .steps[0].record,
+    ).toBeNull();
+    expect(context.rpc).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);
 
 it('does not invent an unattempted older route from the current saved document', async () => {
   await plan();

@@ -3,6 +3,8 @@ import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MainnetFundingHistoryPanel } from './mainnet-funding-history';
+import { fundingRouteFixture } from '../../test/mainnet-funding-route-fixture';
+import { createFundingRouteSource } from '@/lib/mainnet-funding-route-history';
 import {
   decodeMainnetFundingHistory,
   mainnetFundingHistoryCursor,
@@ -666,4 +668,137 @@ it('issues exactly one on-open request under StrictMode', async () => {
   expect(requests).toHaveLength(1);
   await respond(0, page([]));
   expect(requests).toHaveLength(1);
+});
+
+async function selectRevision(value: string) {
+  await act(async () => {
+    const select = container.querySelector('select')!;
+    select.value = value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+async function waitForPanelText(value: string) {
+  await vi.waitFor(async () => {
+    await act(async () => Promise.resolve());
+    expect(container.textContent).toContain(value);
+  });
+}
+
+it('keeps a discovered older revision selectable after opening the current revision', async () => {
+  await click('Open mainnet');
+  await respond(0, page([record(1, 1)]));
+  await selectRevision('2');
+  await respond(1, page([], 2));
+  expect(
+    [...container.querySelectorAll('option')].map((o) => o.value),
+  ).toContain('1');
+  await selectRevision('1');
+  expect(
+    new URL(requests[2].url, 'http://test').searchParams.get('revision'),
+  ).toBe('1');
+  await respond(2, page([record(1, 1)], 1));
+  expect(container.querySelector('select')!.value).toBe('1');
+  expect(container.textContent).toContain('not a complete revision list');
+  const picker = container.querySelector('select')!;
+  expect(
+    document.getElementById(picker.getAttribute('aria-describedby')!)
+      ?.textContent,
+  ).toContain('can replace earlier choices');
+  expect(picker.querySelector('option[value="2"]')!.textContent).toContain(
+    '(current)',
+  );
+});
+
+it('bounds discovered revision choices and never learns from a late cancelled reply', async () => {
+  await act(async () =>
+    root.render(
+      <MainnetFundingHistoryPanel
+        id={id}
+        revision={200}
+        name="Saved funding"
+      />,
+    ),
+  );
+  await click('Open mainnet');
+  for (let batch = 0; batch < 3; batch++) {
+    const events = Array.from({ length: 50 }, (_, n) =>
+      record(batch * 50 + n + 1, 150 - batch * 50 - n),
+    );
+    const next = {
+      ...page(events),
+      currentRevision: 200,
+      progress: { revision: 200, records: [] },
+      nextCursor: mainnetFundingHistoryCursor(
+        id,
+        null,
+        events.at(-1)!.sequence,
+      ),
+    };
+    await respond(batch, next);
+    if (batch < 2) await click('Load older');
+  }
+  const options = [...container.querySelectorAll('option')].map((o) => o.value);
+  expect(options).toHaveLength(102); // all + current +100 discovered
+  expect(options).toContain('1');
+  expect(options).not.toContain('150');
+  await click('Load older');
+  await click('Cancel history');
+  await respond(3, {
+    ...page([record(999, 199)]),
+    currentRevision: 200,
+    progress: { revision: 200, records: [] },
+  });
+  expect(
+    [...container.querySelectorAll('option')].map((o) => o.value),
+  ).not.toContain('199');
+});
+
+it('admits older hash-matched routes through the actual panel and clears their provenance on selection change', async () => {
+  const f = await fundingRouteFixture();
+  const currentPlan = { ...f.plan, revision: 2 };
+  await click('Open mainnet');
+  await respond(0, {
+    ...f.page,
+    revision: null,
+    currentRevision: 2,
+    events: f.page.progress.records,
+    progress: { revision: 2, records: [] },
+    routeSource: await createFundingRouteSource(currentPlan),
+  });
+  await waitForPanelText('Saved funding routes · revision 2');
+  await selectRevision('1');
+  await respond(1, {
+    ...f.page,
+    currentRevision: 2,
+    routeSource: await createFundingRouteSource(currentPlan, 1),
+  });
+  await waitForPanelText('Historical funding revision 1');
+  expect(container.textContent).toContain(
+    'Historical funding revision 1 is reconstructed from saved source revision 2',
+  );
+  expect(container.textContent).toContain(
+    'These receipts are not credited to the current revision',
+  );
+  expect(
+    container.querySelectorAll(
+      '[aria-label="Planned funding recipients"] > li',
+    ),
+  ).toHaveLength(2);
+  await selectRevision('2');
+  expect(container.textContent).not.toContain('Historical funding revision');
+  expect(
+    container.querySelector('[aria-label="Planned funding recipients"]'),
+  ).toBeNull();
+  await respond(2, {
+    ...f.page,
+    revision: 2,
+    currentRevision: 2,
+    events: [],
+    progress: { revision: 2, records: [] },
+    routeSource: await createFundingRouteSource(currentPlan),
+  });
+  await waitForPanelText('Saved funding routes · revision 2');
+  expect(container.textContent).toContain('Saved funding routes · revision 2');
+  expect(container.textContent).not.toContain('Historical funding revision');
 });
