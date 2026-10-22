@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { AutoSell } from './auto-sell-modal';
+import { installAutoSellBrowserLocks } from '../test/auto-sell-browser-lock-fixture';
 import {
   autoSellOutcomePage,
   autoSellOutcomeReference as ref,
@@ -27,6 +28,7 @@ vi.mock('@/lib/auto-sell-execute', () => ({
   createAutoSellExecutor: () => mocks.sell,
 }));
 it('keeps an open original-outcome lookup mounted when the actual modal appends a Pause log entry', async () => {
+  const restoreLocks = installAutoSellBrowserLocks();
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-10-21T00:00:00Z'));
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -165,6 +167,7 @@ it('keeps an open original-outcome lookup mounted when the actual modal appends 
     expect(host.textContent).toContain('Accounted tokens5');
   } finally {
     await act(async () => root.unmount());
+    restoreLocks();
     host.remove();
     localStorage.removeItem('synthetic-outcome-modal-no-vault');
     vi.unstubAllGlobals();

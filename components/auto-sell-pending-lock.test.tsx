@@ -53,6 +53,7 @@ let finish: (value: {
 }) => void;
 let refuse: (error: Error) => void;
 let held: Set<string>, releases: string[];
+let lockRequest: ReturnType<typeof vi.fn>;
 const priorLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
 beforeEach(() => {
   vi.useFakeTimers();
@@ -78,26 +79,25 @@ beforeEach(() => {
   );
   held = new Set();
   releases = [];
+  lockRequest = vi.fn(
+    async (
+      name: string,
+      _options: unknown,
+      callback: (lock: object | null) => unknown,
+    ) => {
+      if (held.has(name)) return callback(null);
+      held.add(name);
+      try {
+        return await callback({ name });
+      } finally {
+        held.delete(name);
+        releases.push(name);
+      }
+    },
+  );
   Object.defineProperty(navigator, 'locks', {
     configurable: true,
-    value: {
-      request: vi.fn(
-        async (
-          name: string,
-          _options: unknown,
-          callback: (lock: object | null) => unknown,
-        ) => {
-          if (held.has(name)) return callback(null);
-          held.add(name);
-          try {
-            return await callback({ name });
-          } finally {
-            held.delete(name);
-            releases.push(name);
-          }
-        },
-      ),
-    },
+    value: { request: lockRequest },
   });
   localStorage.setItem('synthetic-pending-lock-no-keys', 'NO VAULT');
   host = document.createElement('div');
@@ -164,6 +164,81 @@ async function pendingSell(durationSeconds?: string) {
   expect(mocks.sell).toHaveBeenCalledOnce();
   expect(held.size).toBe(1);
 }
+it.each([undefined, null, {}, { request: null }])(
+  'refuses unavailable browser locks before vault unlock or execution: %j',
+  async (locks) => {
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: locks,
+    });
+    await act(async () =>
+      root!.render(
+        <AutoSell project={project} wallets={wallets} locked={false} />,
+      ),
+    );
+    await configure();
+    await click('Run 1 Strategy');
+    expect(host.textContent).toContain('cannot protect Auto Sell across tabs');
+    const runButton = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent?.trim() === 'Run 1 Strategy',
+    )!;
+    expect(
+      document.getElementById(runButton.getAttribute('aria-describedby')!)
+        ?.textContent,
+    ).toContain('cannot protect Auto Sell across tabs');
+    expect(mocks.unlock).not.toHaveBeenCalled();
+    expect(mocks.sell).not.toHaveBeenCalled();
+    expect(held.size).toBe(0);
+  },
+);
+
+it.each(['throw', 'reject'] as const)(
+  'refuses %s lock errors with safe guidance before vault unlock',
+  async (mode) => {
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: vi.fn(() => {
+          const error = Error('PRIVATE browser diagnostic');
+          if (mode === 'throw') throw error;
+          return Promise.reject(error);
+        }),
+      },
+    });
+    await act(async () =>
+      root!.render(
+        <AutoSell project={project} wallets={wallets} locked={false} />,
+      ),
+    );
+    await configure();
+    await click('Run 1 Strategy');
+    expect(host.textContent).toContain('could not obtain cross-tab protection');
+    expect(host.textContent).not.toContain('PRIVATE browser diagnostic');
+    expect(mocks.unlock).not.toHaveBeenCalled();
+    expect(mocks.sell).not.toHaveBeenCalled();
+  },
+);
+
+it('refuses an unavailable lease before vault unlock and can retry only after an explicit click', async () => {
+  const request = lockRequest;
+  request.mockImplementationOnce(async (_name, _options, callback) =>
+    callback(null),
+  );
+  await act(async () =>
+    root!.render(
+      <AutoSell project={project} wallets={wallets} locked={false} />,
+    ),
+  );
+  await configure();
+  await click('Run 1 Strategy');
+  expect(host.textContent).toContain('active or still settling');
+  expect(mocks.unlock).not.toHaveBeenCalled();
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(request).toHaveBeenCalledOnce();
+  await click('Run 1 Strategy');
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(mocks.unlock).toHaveBeenCalledOnce();
+});
 it.each(['project', 'wallet', 'locked', 'unmount'] as const)(
   'retains the old run lock across %s teardown until its original pending operation settles',
   async (change) => {
@@ -315,5 +390,124 @@ it('does not release a paused live session when its pending operation settles', 
   expect(releases).toEqual([]);
   expect(host.textContent).toContain('Paused. Resume continues queued amounts');
   await click('Stop');
+  expect(releases).toHaveLength(1);
+});
+
+it.each(['getter', 'non-promise'] as const)(
+  'safely refuses a %s browser API before unlock',
+  async (mode) => {
+    if (mode === 'getter')
+      Object.defineProperty(navigator, 'locks', {
+        configurable: true,
+        get() {
+          throw Error('PRIVATE lock getter');
+        },
+      });
+    else
+      Object.defineProperty(navigator, 'locks', {
+        configurable: true,
+        value: { request: () => undefined },
+      });
+    await act(async () =>
+      root!.render(
+        <AutoSell project={project} wallets={wallets} locked={false} />,
+      ),
+    );
+    await configure();
+    await click('Run 1 Strategy');
+    expect(host.textContent).toContain('could not obtain cross-tab protection');
+    expect(host.textContent).not.toContain('PRIVATE lock getter');
+    expect(mocks.unlock).not.toHaveBeenCalled();
+    expect(mocks.sell).not.toHaveBeenCalled();
+    expect(held.size).toBe(0);
+    expect(releases).toEqual([]);
+  },
+);
+
+it('handles delayed lock rejection and requires explicit retry after access is restored', async () => {
+  let rejectLock!: (reason: Error) => void;
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: {
+      request: () =>
+        new Promise((_resolve, reject) => {
+          rejectLock = reject;
+        }),
+    },
+  });
+  await act(async () =>
+    root!.render(
+      <AutoSell project={project} wallets={wallets} locked={false} />,
+    ),
+  );
+  await configure();
+  await click('Run 1 Strategy');
+  expect(mocks.unlock).not.toHaveBeenCalled();
+  await act(async () => rejectLock(Error('PRIVATE delayed refusal')));
+  expect(host.textContent).toContain('could not obtain cross-tab protection');
+  expect(host.textContent).not.toContain('PRIVATE delayed refusal');
+  expect(held.size).toBe(0);
+  expect(releases).toEqual([]);
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: { request: lockRequest },
+  });
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(lockRequest).not.toHaveBeenCalled();
+  expect(mocks.unlock).not.toHaveBeenCalled();
+  await click('Run 1 Strategy');
+  expect(mocks.unlock).toHaveBeenCalledOnce();
+  expect(held.size).toBe(1);
+});
+
+it('keeps the current disabled reason visible beside an earlier lock refusal', async () => {
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: undefined,
+  });
+  await act(async () =>
+    root!.render(
+      <AutoSell project={project} wallets={wallets} locked={false} />,
+    ),
+  );
+  await configure();
+  await click('Run 1 Strategy');
+  await fill('input[type="password"]', '');
+  const runButton = [...host.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === 'Run 1 Strategy',
+  )!;
+  expect(runButton.disabled).toBe(true);
+  const hint = document.getElementById(
+    runButton.getAttribute('aria-describedby')!,
+  )!.textContent;
+  expect(hint).toContain('cannot protect Auto Sell across tabs');
+  expect(hint).toContain('Enter your vault password');
+  expect(mocks.unlock).not.toHaveBeenCalled();
+});
+
+it('does not release a detached pending run when a new mount refuses missing locks', async () => {
+  await pendingSell();
+  await act(async () => root!.unmount());
+  root = createRoot(host);
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: undefined,
+  });
+  await act(async () =>
+    root!.render(
+      <AutoSell project={project} wallets={wallets} locked={false} />,
+    ),
+  );
+  await configure();
+  await click('Run 1 Strategy');
+  expect(host.textContent).toContain('cannot protect Auto Sell across tabs');
+  expect(mocks.unlock).toHaveBeenCalledOnce();
+  expect(mocks.sell).toHaveBeenCalledOnce();
+  expect(held.size).toBe(1);
+  expect(releases).toEqual([]);
+  await act(async () =>
+    finish({ soldRaw: 5000000n, wallet, signature: 'SYNTHETIC-FINAL-REPORT' }),
+  );
+  expect(held.size).toBe(0);
   expect(releases).toHaveLength(1);
 });

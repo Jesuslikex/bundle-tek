@@ -100,18 +100,37 @@ function optionalDuration(parts: DurationParts) {
  * null when another tab already holds it.
  */
 function acquireRunLock(name: string): Promise<(() => void) | null> {
-  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
-  if (!locks) return Promise.resolve(() => {});
+  const lockFailure = () =>
+    new Error(
+      'Auto Sell could not obtain cross-tab protection. Check browser access and try again. No vault was unlocked or strategy started.',
+    );
+  let locks: LockManager | undefined;
+  try {
+    locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    if (!locks || typeof locks.request !== 'function')
+      return Promise.reject(
+        new Error(
+          'This browser cannot protect Auto Sell across tabs. Use an up-to-date browser on the secure app URL, then try again.',
+        ),
+      );
+  } catch {
+    return Promise.reject(lockFailure());
+  }
   return new Promise((resolve, reject) => {
-    locks
-      .request(name, { ifAvailable: true }, (lock) => {
-        if (!lock) {
-          resolve(null);
-          return undefined;
-        }
-        return new Promise<void>((release) => resolve(() => release()));
-      })
-      .catch(reject);
+    const denied = () => reject(lockFailure());
+    try {
+      void locks
+        .request(name, { ifAvailable: true }, (lock) => {
+          if (!lock) {
+            resolve(null);
+            return undefined;
+          }
+          return new Promise<void>((release) => resolve(() => release()));
+        })
+        .catch(denied);
+    } catch {
+      denied();
+    }
   });
 }
 
@@ -1092,7 +1111,7 @@ function AutoSellContext({
                   {strategies.length === 1 ? 'strategy' : 'strategies'}
                 </strong>
                 <p>
-                  {startBlockReason ||
+                  {[error, startBlockReason].filter(Boolean).join(' ') ||
                     'Local settings are complete. Starting still requires the existing vault and server checks.'}
                 </p>
                 {solanaWallets.length > 0 && !sellWallets.length && (

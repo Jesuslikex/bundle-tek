@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AutoSell } from './auto-sell-modal';
+import { installAutoSellBrowserLocks } from '../test/auto-sell-browser-lock-fixture';
 import { AutoSellRunner } from '@/lib/auto-sell-runner';
 import { unlockVault, type VaultSession } from '@/lib/browser-wallet-vault';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
@@ -46,7 +47,9 @@ const wallets = [
   },
 ] as WorkspaceWallet[];
 let host: HTMLDivElement, root: Root | null;
+let restoreLocks: () => void;
 beforeEach(() => {
+  restoreLocks = installAutoSellBrowserLocks();
   vi.mocked(unlockVault).mockReset();
   feed.read.mockReset().mockResolvedValue([]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -57,6 +60,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   if (root) await act(async () => root!.unmount());
+  restoreLocks();
   host.remove();
   localStorage.clear();
   vi.restoreAllMocks();

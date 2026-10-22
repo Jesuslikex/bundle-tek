@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { AutoSell } from './auto-sell-modal';
+import { installAutoSellBrowserLocks } from '../test/auto-sell-browser-lock-fixture';
 import { AutoSellReviewRecoveryError } from '@/lib/auto-sell-review-recovery';
 import {
   autoSellReviewReference,
@@ -29,6 +30,7 @@ vi.mock('@/lib/auto-sell-execute', () => ({
   createAutoSellExecutor: () => mocks.sell,
 }));
 it('mounts original-review recovery in the actual stopped modal and does not resume after manual cancellation', async () => {
+  const restoreLocks = installAutoSellBrowserLocks();
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-10-21T00:00:00Z'));
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -202,6 +204,7 @@ it('mounts original-review recovery in the actual stopped modal and does not res
     expect(fetcher).toHaveBeenCalledTimes(3);
   } finally {
     await act(async () => root.unmount());
+    restoreLocks();
     host.remove();
     localStorage.removeItem('synthetic-review-recovery-modal-no-vault');
     vi.unstubAllGlobals();
