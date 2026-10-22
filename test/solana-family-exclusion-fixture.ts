@@ -8,7 +8,9 @@ const clocks = new WeakMap<DatabaseSync, { now: number }>();
 
 /** Unchanged full production schema; SQL-valid storage parents only.
  * No HTTP admission, valid packet/signature, provider or financial proof. */
-export function solanaFamilyExclusionFixture(maxMigration = 137) {
+export function solanaFamilyExclusionFixture(
+  maxMigration = Number.MAX_SAFE_INTEGER,
+) {
   const db = new DatabaseSync(':memory:');
   const clock = { now: Date.now() };
   clocks.set(db, clock);
@@ -35,6 +37,15 @@ export function solanaFamilyExclusionFixture(maxMigration = 137) {
     if (idx <= maxMigration)
       db.exec(readFileSync(`drizzle/${tag}.sql`, 'utf8'));
   return db;
+}
+
+export function advanceFamilyExclusionClock(
+  db: DatabaseSync,
+  milliseconds: number,
+) {
+  if (!Number.isSafeInteger(milliseconds) || milliseconds < 0)
+    throw Error('Invalid synthetic clock advance');
+  clocks.get(db)!.now += milliseconds;
 }
 
 /** Minimal async D1 facade for exercising the actual read/prepare HTTP handler. */

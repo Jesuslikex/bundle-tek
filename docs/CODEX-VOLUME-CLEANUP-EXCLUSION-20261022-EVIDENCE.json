@@ -1,0 +1,86 @@
+{
+  "sourceBase": "8069c051cff74345082733087a7cd7ede67821d5",
+  "localOnly": true,
+  "deploy": false,
+  "realWalletActions": false,
+  "distinctFocusedTests": 186,
+  "sourceHashes": {
+    "drizzle/0138_volume_bundle_cleanup_exclusion.sql": "5a32c468ba5d08329d3d93c8528bbd36e0a97a6e018786cc508732ae7173a05c",
+    "drizzle/meta/_journal.json": "e9ae6edc8f3f5c5ecaa2d4ea570a90d0357a844d37d0a5af79c6961753bdb936",
+    "test/solana-family-exclusion-fixture.ts": "87cefec3674ba0e65f8c1e52d728d7cfebe1f2bc19165a2bdc539380b76b7896",
+    "test/volume-cleanup-exclusion-fixture.ts": "33037acf7bde30e235806683dcedeab2b9a3b4d8fb1c8ac95d3fce6b68a89caa",
+    "test/volume-cleanup-exclusion.test.ts": "6705aeab8f06087411fceacae2b773e55d716d0688910ad06b38d256d6fcdee0",
+    "app/api/wallet-workspace/cleanup/volume-bundle-exclusion.test.ts": "09dd2eac1c17002add047238c9a01d1d13ceaccee7f408d9ecc36f62250f648c"
+  },
+  "integrated": {
+    "numTotalTests": 184,
+    "numPassedTests": 184,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "files": [
+      "test/volume-cleanup-exclusion.test.ts",
+      "test/warmup-shared-family-exclusion.test.ts",
+      "test/warmup-shared-ledger-contract.test.ts",
+      "lib/volume-bundle-recovery.test.ts",
+      "lib/volume-bundle-reservations.test.ts",
+      "app/api/wallet-workspace/cleanup/volume-bundle-exclusion.test.ts",
+      "app/api/wallet-workspace/supply-actions/family-exclusion.test.ts"
+    ]
+  },
+  "followup": {
+    "numTotalTests": 21,
+    "numPassedTests": 21,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "files": [
+      "test/volume-cleanup-exclusion.test.ts",
+      "app/api/wallet-workspace/cleanup/volume-bundle-exclusion.test.ts"
+    ]
+  },
+  "localLedger": {
+    "localOnly": true,
+    "checksumsMatched": 139,
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "foreignKeys": []
+  },
+  "opus": {
+    "startedAt": "2026-10-22T18:32:36.459Z",
+    "finishedAt": "2026-10-22T18:34:46.449Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "8069c051cff74345082733087a7cd7ede67821d5",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.7767764000000001,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "wholeFileD1": {
+    "migrationCount": 139,
+    "appliedCount": 139,
+    "passed": true,
+    "currentSourceHashesMatched": 139
+  }
+}

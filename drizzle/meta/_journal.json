@@ -967,6 +967,13 @@
       "when": 1794844800006,
       "tag": "0137_solana_wallet_family_exclusion",
       "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "6",
+      "when": 1794844800007,
+      "tag": "0138_volume_bundle_cleanup_exclusion",
+      "breakpoints": true
     }
   ]
 }
