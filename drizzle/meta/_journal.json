@@ -960,6 +960,13 @@
       "when": 1794844800005,
       "tag": "0136_auto_buy_budget_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 137,
+      "version": "6",
+      "when": 1794844800006,
+      "tag": "0137_solana_wallet_family_exclusion",
+      "breakpoints": true
     }
   ]
 }
