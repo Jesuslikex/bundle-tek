@@ -77,6 +77,46 @@ export type SwapToken2022Evidence = SwapMintEvidence & {
 };
 type Pair = { inputMint: string; outputMint: string };
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
+/** Decode one raw account for a caller-bound mint address. Slot/network/ownership
+ * admission belongs to its server reader; this function grants no authority. */
+export async function inspectSwapMintAccount(
+  raw: unknown,
+  mintAddress: string,
+) {
+  // RPC envelope/encoding failures are availability errors, not decoded
+  // token-policy decisions. Validate these outside the typed policy catch.
+  swapTokenWireBytes(raw, true);
+  let decoded: ReturnType<typeof swapTokenBytes>;
+  try {
+    decoded = swapTokenBytes(raw, true);
+  } catch {
+    throw new SwapMintIdentityError();
+  }
+  const { bytes, program } = decoded,
+    view = new DataView(bytes.buffer);
+  if (
+    bytes[45] !== 1 ||
+    bytes[44] > 18 ||
+    view.getUint32(0, true) > 1 ||
+    view.getUint32(46, true) > 1 ||
+    (mintAddress === SWAP_WRAPPED_SOL &&
+      (program !== SWAP_TOKEN || bytes[44] !== 9))
+  )
+    throw new SwapMintIdentityError();
+  // Supply changes do not change transfer policy. Keep program, precision,
+  // authorities and every extension byte bound while allowing routine mint/burns.
+  const policy = Uint8Array.from(bytes);
+  policy.fill(0, 36, 44);
+  const digest = await crypto.subtle.digest('SHA-256', policy.buffer);
+  return {
+    address: mintAddress,
+    program,
+    decimals: bytes[44],
+    policySha256: Array.from(new Uint8Array(digest), (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join(''),
+  };
+}
 export async function readSwapMintEvidence(
   order: Pair,
   minContextSlot: number,
@@ -104,41 +144,9 @@ export async function readSwapMintEvidence(
   )
     throw new Error('Inconsistent swap mint observation.');
   const mints = await Promise.all(
-    result.value.map(async (raw, index) => {
-      // RPC envelope/encoding failures are availability errors, not decoded
-      // token-policy decisions. Validate these outside the typed policy catch.
-      swapTokenWireBytes(raw, true);
-      let decoded: ReturnType<typeof swapTokenBytes>;
-      try {
-        decoded = swapTokenBytes(raw, true);
-      } catch {
-        throw new SwapMintIdentityError();
-      }
-      const { bytes, program } = decoded,
-        view = new DataView(bytes.buffer);
-      if (
-        bytes[45] !== 1 ||
-        bytes[44] > 18 ||
-        view.getUint32(0, true) > 1 ||
-        view.getUint32(46, true) > 1 ||
-        (addresses[index] === SWAP_WRAPPED_SOL &&
-          (program !== SWAP_TOKEN || bytes[44] !== 9))
-      )
-        throw new SwapMintIdentityError();
-      // Supply changes do not change transfer policy. Keep program, precision,
-      // authorities and every extension byte bound while allowing routine mint/burns.
-      const policy = Uint8Array.from(bytes);
-      policy.fill(0, 36, 44);
-      const digest = await crypto.subtle.digest('SHA-256', policy.buffer);
-      return {
-        address: addresses[index],
-        program,
-        decimals: bytes[44],
-        policySha256: Array.from(new Uint8Array(digest), (b) =>
-          b.toString(16).padStart(2, '0'),
-        ).join(''),
-      };
-    }),
+    result.value.map((raw, index) =>
+      inspectSwapMintAccount(raw, addresses[index]),
+    ),
   );
   return { slot: Number(result.context.slot), mints };
 }
