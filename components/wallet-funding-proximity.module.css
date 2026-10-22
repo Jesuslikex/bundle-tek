@@ -1,0 +1,75 @@
+.panel {
+  border: 1px solid var(--border, #303039);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.panel small {
+  display: block;
+  color: var(--muted-foreground, #aaa8b9);
+  line-height: 1.5;
+}
+.warning,
+.recorded,
+.unknown {
+  margin-top: 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.toolbar button {
+  border: 1px solid var(--border, #303039);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.toolbar button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.warning {
+  color: #ff929b;
+}
+.recorded,
+.unknown {
+  color: var(--muted-foreground, #aaa8b9);
+}
+.warning summary,
+.recorded summary,
+.unknown {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.warning summary,
+.recorded summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.warning summary:focus-visible,
+.recorded summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+.warning p,
+.recorded p {
+  max-width: 32rem;
+  white-space: normal;
+  margin: 6px 0;
+}
+.warning small,
+.recorded small {
+  display: block;
+  max-width: 32rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

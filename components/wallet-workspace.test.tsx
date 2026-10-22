@@ -3,6 +3,7 @@ import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WalletWorkspace } from './wallet-workspace';
+import bs58 from 'bs58';
 import type { BrowserWalletVault } from './browser-wallet-vault';
 const state = vi.hoisted(() => ({
   vault: null as ComponentProps<typeof BrowserWalletVault> | null,
@@ -62,6 +63,59 @@ const workspace = {
   ],
 };
 let host: HTMLDivElement, root: Root;
+it('mounts the selected-wallet funding check and exact gap badges in the real wallet table', async () => {
+  const second = bs58.encode(new Uint8Array(32).fill(2));
+  const wallets = [
+    workspace.wallets[0],
+    { ...workspace.wallets[0], address: second },
+  ];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      if (!url.endsWith('/funding-times'))
+        return Response.json({ ...workspace, wallets });
+      return Response.json({
+        format: 'wallet-funding-times-v1',
+        network: 'mainnet',
+        scope: 'most-recently-saved-native-transfer',
+        capturedAt: '2026-10-22T00:00:00.000Z',
+        executionAllowed: false,
+        wallets: wallets.map((w, i) => ({
+          address: w.address,
+          revision: w.revision,
+          reason: null,
+          funding: {
+            signature: bs58.encode(new Uint8Array(64).fill(i + 1)),
+            slot: 1,
+            blockTime: 100000 + i * 1474,
+          },
+        })),
+      });
+    }),
+  );
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(host.querySelectorAll('tbody [data-wallet-selection]')).toHaveLength(
+    2,
+  );
+  for (const checkbox of host.querySelectorAll<HTMLInputElement>(
+    'tbody [data-wallet-selection]',
+  ))
+    await act(async () => checkbox.click());
+  expect(host.textContent).toContain('2 selected across pages');
+  const check = [...host.querySelectorAll('button')].find(
+    (b) => b.textContent === 'Check recorded funding times',
+  )!;
+  expect(check).toBeTruthy();
+  await act(async () => check.click());
+  expect(
+    [...host.querySelectorAll('tbody summary')].filter(
+      (s) => s.textContent === '24m 34s apart',
+    ),
+  ).toHaveLength(2);
+});
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(

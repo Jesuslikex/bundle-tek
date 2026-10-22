@@ -1,0 +1,60 @@
+{
+  "base": "7052a7c04dfb8d6c7a6a22852309034957d20ac7",
+  "scope": "selected-wallet most-recently-saved native SOL funding timestamps",
+  "tests": {
+    "passed": 64,
+    "failed": 0,
+    "skipped": 0,
+    "files": 7
+  },
+  "typecheck": true,
+  "typedLint": true,
+  "scopedFormatting": true,
+  "isolatedBuildPassed": true,
+  "buildOverlayUnchanged": true,
+  "frozenSourceFiles": 2396,
+  "frozenSourceChanged": [],
+  "sourceSha256": {
+    "lib/wallet-funding-time.ts": "fb4ade476dfe44fa458e6f89d9b45a727ca681821b35a88666c03ecee3159e56",
+    "lib/wallet-funding-time.test.ts": "fbb7082d88c3614cade0b5b2c71d274df43a03f8451a3166dbc2a580f1b8f4be",
+    "lib/wallet-funding-time-server.ts": "a290bc8ff7f729bf3344fb457e1bb15346bc52f5b16987b258ec5988d51803ed",
+    "lib/wallet-funding-time-server.test.ts": "39cabc373089fa54a659cbc1ee6f89d669a6c437e331c6ea9dba2139e9298d28",
+    "components/wallet-funding-proximity.tsx": "f01dc5d0df5798245bc9d99ec51efcc0963becfb2b019dc87302bda9c9e13056",
+    "components/wallet-funding-proximity.test.tsx": "7122cf93db0da88d8197ab5a9a3d1525aaee8c70623afca5ac142e2ea4614d19",
+    "components/wallet-funding-proximity.module.css": "c1007dd50b841861fc51dc29b5e1d9f706fa9fcec275ec49670f5ffe3718bb69",
+    "components/wallet-workspace.tsx": "2b901b53b77b407e43517dd93552480498abde84770b553e8843dab63d43ea93",
+    "components/wallet-workspace.test.tsx": "13830170a704975bb764340fe7696fddf29d263dbe0909cbc8f87c2669f0c842",
+    "app/api/wallet-workspace/funding-times/route.ts": "0a81d0a88346e493903bece8c90e9e2556439c1c9e98698b72ff8743a178af7f",
+    "app/api/wallet-workspace/funding-times/route.test.ts": "cebcdd9136984a72b951447cd4427de12b4e196156b73ca6d157d9ac2ea429bf",
+    "test/wallet-funding-time-fixture.ts": "70a3868dd0ba1c53343c8b9eb613bb34d81fc28ab27052c2c395bac3e5ab7927"
+  },
+  "reviews": [
+    {
+      "model": [
+        "claude-opus-5-5"
+      ],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "finishedAt": "2026-10-22T02:09:14.919Z",
+      "testsRunByReviewer": false
+    },
+    {
+      "model": [
+        "claude-opus-5-5"
+      ],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "finishedAt": "2026-10-22T02:14:36.257Z",
+      "testsRunByReviewer": false
+    }
+  ],
+  "currentRuntimeMatchesFollowup": true,
+  "renderedBrowserVerified": false,
+  "schemaChanged": false,
+  "providerCallsAdded": false,
+  "databaseWritesAdded": false,
+  "firstFundingCoverage": false,
+  "completeExternalFundingHistory": false,
+  "deployed": false,
+  "fundedActions": false
+}

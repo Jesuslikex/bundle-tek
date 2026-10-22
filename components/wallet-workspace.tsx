@@ -5,6 +5,11 @@ import { readWorkspaceResponse } from '@/lib/workspace-response';
 import { saveWalletPublicAddresses } from '@/lib/wallet-public-save';
 import rosterStyles from './wallet-roster-navigation.module.css';
 import {
+  useWalletFundingProximity,
+  WalletFundingProximityPanel,
+  WalletFundingProximityBadge,
+} from './wallet-funding-proximity';
+import {
   sortWalletRoster,
   WALLET_ROSTER_PAGE_SIZE,
   type WalletRosterSort,
@@ -315,6 +320,11 @@ export function WalletWorkspace({
   );
 
   const picks = rows.filter((w) => selected.includes(w.address));
+  const fundingProximity = useWalletFundingProximity(
+    chain === 'Solana' && !archived
+      ? picks.map(({ address, revision }) => ({ address, revision }))
+      : [],
+  );
 
   const orderedRows = sortWalletRoster(rows, data.balances ?? [], rosterSort);
   const pageScope = JSON.stringify([
@@ -1435,6 +1445,12 @@ export function WalletWorkspace({
               Next wallet page
             </Button>
           </nav>
+          {chain === 'Solana' && !archived && picks.length > 0 && (
+            <WalletFundingProximityPanel
+              check={fundingProximity}
+              count={picks.length}
+            />
+          )}
           <div className="wallet-roster-table">
             <table className="project-table">
               <thead>
@@ -1510,6 +1526,10 @@ export function WalletWorkspace({
                     </td>
                     <td>
                       <strong>{w.label || 'Unnamed wallet'}</strong>
+                      <WalletFundingProximityBadge
+                        check={fundingProximity}
+                        address={w.address}
+                      />
                       {!!w.tags?.length && (
                         <div aria-label="Wallet tags">
                           {w.tags.map((tag) => (
