@@ -42,6 +42,7 @@ const iso = z.iso.datetime().refine((v) => {
   const ms = Date.parse(v);
   return Number.isFinite(ms) && new Date(ms).toISOString() === v;
 });
+export const warmupExecutionTimestamp = iso;
 const baseAction = z.object({
   id: z.string().min(1).max(256),
   wallet: address,
@@ -135,11 +136,24 @@ const schema = z
   .strict();
 export type WarmupExecutionManifest = z.infer<typeof schema>;
 export type WarmupExecutionAction = WarmupExecutionManifest['actions'][number];
+const intentSchema = schema
+  .omit({ format: true, consentSha256: true })
+  .extend({ format: z.literal('wallet-warmup-execution-intent-v1') })
+  .strict();
+export type WarmupExecutionIntent = z.infer<typeof intentSchema>;
 
 /** Shape/economics contract only. Hashes bind content; they are not evidence of
  * consent, wallet ownership, runtime checks, receipt validity or permission. */
 export function parseWarmupExecutionManifest(value: unknown) {
-  const m = schema.parse(value);
+  return checkExecutionBody(schema.parse(value));
+}
+/** Complete pre-consent semantics in a distinct domain. No placeholder hash. */
+export function parseWarmupExecutionIntent(value: unknown) {
+  return checkExecutionBody(intentSchema.parse(value));
+}
+function checkExecutionBody<
+  T extends Omit<WarmupExecutionManifest, 'format' | 'consentSha256'>,
+>(m: T) {
   const fail = (): never => {
     throw Error('Execution manifest dependencies or budgets differ.');
   };
