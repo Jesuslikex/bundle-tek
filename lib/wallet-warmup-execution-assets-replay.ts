@@ -95,7 +95,8 @@ const observation = z
       .max(13),
   })
   .strict();
-const evidenceSchema = z
+/** Shape capture only; decoding/integrity still requires replay and owned selectors. */
+export const warmupExecutionAssetEvidenceSchema = z
   .object({
     format: z.literal('wallet-warmup-execution-assets-v1'),
     ownerId: owner,
@@ -128,7 +129,10 @@ const evidenceSchema = z
   })
   .strict();
 const packet = z
-  .object({ evidence: evidenceSchema, evidenceSha256: hash })
+  .object({
+    evidence: warmupExecutionAssetEvidenceSchema,
+    evidenceSha256: hash,
+  })
   .strict();
 const expectedSchema = z
   .object({
@@ -158,7 +162,8 @@ const fail = (): never => {
 };
 
 /** Historical decoder/integrity replay only. Expected fields must come from
- * independently admitted owned records, never from this packet/request itself.
+ * independently admitted owned records or content already pinned through that
+ * record's root hash, never from an unbound packet/request itself.
  * The fresh server collector can self-check its result, which is not durable
  * admission or an independent proof of provider truth.
  * No Date.now, provider, database or expiry renewal. Raw projections cannot

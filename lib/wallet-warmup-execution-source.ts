@@ -115,6 +115,66 @@ const fail = (): never => {
   throw new WarmupExecutionSourceError();
 };
 
+async function readExecutionReviewRow(
+  db: D1Database,
+  owner: string,
+  input: { reviewId: string },
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted();
+  const row = await db
+    .prepare(`SELECT owner_id,id,plan_id,plan_revision,review_sha256,source_sha256,
+       document,source,reviewed_at,review_expires_at,created_at FROM wallet_warmup_session_reviews WHERE owner_id=? AND id=?`)
+    .bind(owner, input.reviewId)
+    .first();
+  signal.throwIfAborted();
+  const parsed = rowSchema.parse(row);
+  const documentBytes = new TextEncoder().encode(parsed.document).byteLength;
+  const sourceBytes = new TextEncoder().encode(parsed.source).byteLength;
+  if (
+    documentBytes > WARMUP_SESSION_DOCUMENT_BYTES ||
+    sourceBytes > WARMUP_SESSION_SOURCE_BYTES ||
+    documentBytes + sourceBytes > WARMUP_SESSION_ROW_BYTES
+  )
+    fail();
+  return parsed;
+}
+
+async function verifyRetainedMaterial(
+  before: z.infer<typeof rowSchema>,
+  retained: Awaited<ReturnType<typeof readWalletWarmupSessionReview>>,
+) {
+  if (!retained) return fail();
+  if (
+    retained.id !== before.id ||
+    retained.planId !== before.plan_id ||
+    retained.planRevision !== before.plan_revision ||
+    retained.reviewSha256 !== before.review_sha256 ||
+    retained.reviewedAt !== before.reviewed_at ||
+    retained.reviewExpiresAt !== before.review_expires_at ||
+    retained.createdAt !== before.created_at ||
+    !retained.document.actions.length
+  )
+    fail();
+  if (
+    (await digest(before.source)) !== before.source_sha256 ||
+    before.document !==
+      canonical({
+        format: WARMUP_SESSION_REVIEW_FORMAT,
+        contextSha256: before.review_sha256,
+        sourceSha256: before.source_sha256,
+        ...retained.document,
+      })
+  )
+    fail();
+  const documentSha256 = await digest(before.document);
+  const snapshotSha256 = await digest(
+    canonical({ format: snapshotFormat, record: before }),
+  );
+
+  return { retained, documentSha256, snapshotSha256 };
+}
+
 /** Server-internal currentness snapshot only. Owner must come from a verified
  * session. Retained receipt replay is not a fresh chain proof, asset/rent
  * evidence, a budget allocation, reservation or execution authorization. */
@@ -129,27 +189,7 @@ export async function readWarmupExecutionSource(
     if (typeof owner !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(owner))
       fail();
     const input = selection.parse(value);
-    const read = async () => {
-      signal.throwIfAborted();
-      const row = await db
-        .prepare(`SELECT owner_id,id,plan_id,plan_revision,review_sha256,source_sha256,
-       document,source,reviewed_at,review_expires_at,created_at FROM wallet_warmup_session_reviews WHERE owner_id=? AND id=?`)
-        .bind(owner, input.reviewId)
-        .first();
-      signal.throwIfAborted();
-      const parsed = rowSchema.parse(row);
-      const documentBytes = new TextEncoder().encode(
-        parsed.document,
-      ).byteLength;
-      const sourceBytes = new TextEncoder().encode(parsed.source).byteLength;
-      if (
-        documentBytes > WARMUP_SESSION_DOCUMENT_BYTES ||
-        sourceBytes > WARMUP_SESSION_SOURCE_BYTES ||
-        documentBytes + sourceBytes > WARMUP_SESSION_ROW_BYTES
-      )
-        fail();
-      return parsed;
-    };
+    const read = () => readExecutionReviewRow(db, owner, input, signal);
     const before = await read();
     const fresh = () => {
       signal.throwIfAborted();
@@ -176,33 +216,7 @@ export async function readWarmupExecutionSource(
       input.reviewId,
     );
     fresh();
-    if (!retained) return fail();
-    if (
-      retained.id !== before.id ||
-      retained.planId !== before.plan_id ||
-      retained.planRevision !== before.plan_revision ||
-      retained.reviewSha256 !== before.review_sha256 ||
-      retained.reviewedAt !== before.reviewed_at ||
-      retained.reviewExpiresAt !== before.review_expires_at ||
-      retained.createdAt !== before.created_at ||
-      !retained.document.actions.length
-    )
-      fail();
-    if (
-      (await digest(before.source)) !== before.source_sha256 ||
-      before.document !==
-        canonical({
-          format: WARMUP_SESSION_REVIEW_FORMAT,
-          contextSha256: before.review_sha256,
-          sourceSha256: before.source_sha256,
-          ...retained.document,
-        })
-    )
-      fail();
-    const documentSha256 = await digest(before.document);
-    const snapshotSha256 = await digest(
-      canonical({ format: snapshotFormat, record: before }),
-    );
+    const material = await verifyRetainedMaterial(before, retained);
     fresh();
     const current = await db
       .prepare(`SELECT (${WARMUP_EXECUTION_SOURCE_CURRENT_SQL}) AS current
@@ -216,12 +230,12 @@ export async function readWarmupExecutionSource(
     return {
       format: snapshotFormat,
       ownerId: owner,
-      retainedReview: retained,
+      retainedReview: material.retained,
       reviewDocument: before.document,
-      reviewDocumentSha256: documentSha256,
+      reviewDocumentSha256: material.documentSha256,
       sourceDocument: before.source,
       sourceSha256: before.source_sha256,
-      sourceSnapshotSha256: snapshotSha256,
+      sourceSnapshotSha256: material.snapshotSha256,
       checkedAt,
       scope: 'retained-source-currentness-only' as const,
       signingAllowed: false as const,
@@ -231,5 +245,64 @@ export async function readWarmupExecutionSource(
   } catch {
     signal.throwIfAborted();
     return fail();
+  }
+}
+
+export class WarmupRetainedSourceError extends Error {
+  constructor() {
+    super('Retained original warmup review is unavailable or changed.');
+    this.name = 'WarmupRetainedSourceError';
+  }
+}
+/** Historical original-source integrity only. Owner must be authenticated by
+ * the caller. Current plan/wallet/lot/reservation state and the wall clock are
+ * deliberately not consulted: a metadata recovery read never renews authority. */
+export async function readRetainedWarmupExecutionSource(
+  db: D1Database,
+  owner: string,
+  value: unknown,
+  signal: AbortSignal,
+) {
+  try {
+    if (typeof owner !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(owner))
+      return fail();
+    const input = selection.parse(value);
+    const before = await readExecutionReviewRow(db, owner, input, signal);
+    if (
+      before.owner_id !== owner ||
+      before.id !== input.reviewId ||
+      before.review_sha256 !== input.reviewSha256 ||
+      Date.parse(before.created_at) < Date.parse(before.reviewed_at) ||
+      Date.parse(before.created_at) >= Date.parse(before.review_expires_at)
+    )
+      return fail();
+    const kept = await readWalletWarmupSessionReview(db, owner, input.reviewId);
+    signal.throwIfAborted();
+    const material = await verifyRetainedMaterial(before, kept);
+    signal.throwIfAborted();
+    if (
+      canonical(await readExecutionReviewRow(db, owner, input, signal)) !==
+      canonical(before)
+    )
+      return fail();
+    signal.throwIfAborted();
+    return {
+      format: snapshotFormat,
+      ownerId: owner,
+      retainedReview: material.retained,
+      reviewDocument: before.document,
+      reviewDocumentSha256: material.documentSha256,
+      sourceDocument: before.source,
+      sourceSha256: before.source_sha256,
+      sourceSnapshotSha256: material.snapshotSha256,
+      scope: 'retained-original-source-integrity-only' as const,
+      currentSourceVerified: false as const,
+      signingAllowed: false as const,
+      executionAllowed: false as const,
+      automaticExecutionAllowed: false as const,
+    };
+  } catch {
+    signal.throwIfAborted();
+    throw new WarmupRetainedSourceError();
   }
 }

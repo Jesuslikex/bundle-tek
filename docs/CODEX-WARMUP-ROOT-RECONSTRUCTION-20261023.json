@@ -1,0 +1,69 @@
+{
+  "sourceBaseCommit": "e143dbec1ec451d28eb584bbbd473c5f5b148503",
+  "scope": "Historical owned-parent and full-term/budget reconstruction only; no root storage/admission or human proof",
+  "checks": {
+    "passedTests": 334,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "files": 9,
+    "nativeHarnessPassed": 8,
+    "typecheckPassed": true,
+    "typedLintPassed": true,
+    "frozenSourceFiles": 2379,
+    "frozenSourceUnchanged": true,
+    "reviewedOwnedSourceUnchanged": true
+  },
+  "ownedSourceHashes": {
+    "lib/wallet-warmup-execution-source.ts": "ebfe2fccab78287b058d7e11220456e74b6693d6c5c997dbb0e2517aa0edb9fe",
+    "lib/wallet-warmup-execution-budget-review.ts": "dd4d06e25c954e8cafd11323bbb5898751e0497ae6a58d5964b569b391b6677c",
+    "lib/wallet-warmup-execution-assets-replay.ts": "882cbcc166ed54b060126d30a43384f89481177f3624e23d0803776757af2ff6",
+    "lib/wallet-warmup-execution-root-reconstruction.test.ts": "139872699d5150dabdbaf7b72ea885791ab71bb62ca08c8c4a93846e176211a0",
+    "test/warmup-reconstruction-fixture.ts": "924612fd7ae663e10983a62fa8e208c294b4c1f60454dbc97c74d9cbd027c6eb"
+  },
+  "extractionProof": {
+    "rowReaderStatementsUnchanged": true,
+    "retainedVerificationStatementsUnchanged": true,
+    "currentSourcePredicateUnchanged": true,
+    "rowStatementsSha256": "acac1682c374f7aab7dbdc30c79a5465329385d89e2e88b09cec982d1f121ed9",
+    "verificationStatementsSha256": "313b7ea436835beff3287781573414b5a2dddcc0b6a1b3939796ec8ea17ac937",
+    "completeBudgetObjectFieldsUnchanged": true
+  },
+  "reviews": [
+    {
+      "report": "opus-warmup-root-reconstruction-20261022",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "resultSubtype": "success",
+      "isError": false
+    },
+    {
+      "report": "opus-warmup-root-reconstruction-final-20261023",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "resultSubtype": "success",
+      "isError": false
+    }
+  ],
+  "liveProviderRequests": 0,
+  "hostedSqlWrites": 0,
+  "humanApprovalVerified": false,
+  "currentSourceVerified": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "automaticExecutionAllowed": false,
+  "deployment": false
+}
