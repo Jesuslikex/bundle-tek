@@ -1,0 +1,135 @@
+{
+  "base": "c5f1e70bfe371ae4eaa27305396ff65a638e63ba",
+  "sourceHashes": {
+    "components/wallet-funding-proximity.tsx": "730107bf01c51cd632525380f352788c001585fd3f95a62417046072fc491701",
+    "components/wallet-funding-proximity.module.css": "c95b6cae0c4eaba07a835520530bee89b8396338f541707bee3b4f1e9517d77d",
+    "components/wallet-funding-proximity.test.tsx": "0c5081beda6e4be19d0f0d22365833fd3dcc28b2ff5d7e18801f87d5094f89dc"
+  },
+  "rendered": {
+    "syntheticOnly": true,
+    "noRealProviderOrKeys": true,
+    "widths": [
+      {
+        "requested": 375,
+        "client": 360,
+        "scroll": 360,
+        "summaryHeight": 44,
+        "pagerButtonHeights": [
+          44,
+          44
+        ]
+      },
+      {
+        "requested": 320,
+        "client": 305,
+        "scroll": 305
+      },
+      {
+        "requested": 1440,
+        "client": 1440,
+        "scroll": 1440
+      }
+    ],
+    "pairPages": {
+      "first": [
+        1,
+        20,
+        21
+      ],
+      "last": [
+        21,
+        21,
+        21
+      ],
+      "rows": [
+        20,
+        1
+      ],
+      "keyboardBoundaryFocus": "current page output",
+      "requestsAfterPaging": 1,
+      "selectionChangeClearsPairs": true
+    },
+    "cleanup": {
+      "ownedTabsClosed": true,
+      "viewportReset": true,
+      "ownedPid36000Absent": true,
+      "listener64542Absent": true
+    }
+  },
+  "screenshotSha256": "b621dfcef324cbae252c5e51ce64a7f59962f224aa2773dfc9bd7d979c3430dd",
+  "noDeploy": true,
+  "fundedActions": 0,
+  "initialReview": {
+    "startedAt": "2026-10-22T18:45:30.741Z",
+    "finishedAt": "2026-10-22T18:46:25.406Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "c5f1e70bfe371ae4eaa27305396ff65a638e63ba",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.24287340000000002,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "followupReview": {
+    "startedAt": "2026-10-22T18:49:49.564Z",
+    "finishedAt": "2026-10-22T18:50:43.256Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "c5f1e70bfe371ae4eaa27305396ff65a638e63ba",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.23238140000000002,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "tests": {
+    "numTotalTests": 35,
+    "numPassedTests": 35,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "testFiles": [
+    "components/wallet-funding-proximity.test.tsx",
+    "components/wallet-workspace.test.tsx",
+    "lib/wallet-funding-origin-client.test.ts",
+    "lib/wallet-funding-time.test.ts"
+  ],
+  "runtimeMatchesFinalReview": true
+}

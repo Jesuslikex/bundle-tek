@@ -4,6 +4,73 @@
   padding: 12px;
   margin: 12px 0;
 }
+.pairReview {
+  margin-top: 12px;
+  border-top: 1px solid var(--border, #303039);
+  padding-top: 8px;
+}
+.pairReview summary {
+  display: list-item;
+  min-height: 44px;
+  color: #ff929b;
+  cursor: pointer;
+}
+.pairReview summary svg {
+  display: inline;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.pairReview summary:focus-visible,
+.pairReview button:focus-visible,
+.pairReview output:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.pairReview p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.pairReview ol {
+  padding-left: 24px;
+  margin: 12px 0;
+}
+.pairReview li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, #303039);
+}
+.pairReview strong,
+.pairReview span {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.pairReview strong {
+  color: #ff929b;
+  margin-bottom: 4px;
+}
+.pairReview nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+.pairReview button {
+  min-height: 44px;
+  border: 1px solid var(--border, #303039);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.pairReview button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 .toolbar {
   display: flex;
   align-items: center;

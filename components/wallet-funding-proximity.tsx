@@ -258,8 +258,88 @@ export function WalletFundingProximityPanel({
           Timing similarity alone does not prove shared control.
         </small>
       )}
+      {check.result && check.pairs.length > 0 && (
+        <FundingPairReview
+          key={check.key}
+          pairs={check.pairs}
+          source={check.source}
+        />
+      )}
       {check.error && <p role="alert">{check.error}</p>}
     </section>
+  );
+}
+const FUNDING_PAIRS_PER_PAGE = 20;
+function FundingPairReview({
+  pairs,
+  source,
+}: {
+  pairs: Check['pairs'];
+  source: Check['source'];
+}) {
+  const [page, setPage] = useState(0);
+  const pageStatus = useRef<HTMLOutputElement | null>(null);
+  const focusStatus = useRef(false);
+  const start = page * FUNDING_PAIRS_PER_PAGE;
+  useLayoutEffect(() => {
+    if (focusStatus.current) {
+      focusStatus.current = false;
+      pageStatus.current?.focus();
+    }
+  }, [page]);
+  return (
+    <details className={styles.pairReview}>
+      <summary>
+        <Clock3 aria-hidden="true" size={14} />
+        Review {pairs.length} close funding{' '}
+        {pairs.length === 1 ? 'pair' : 'pairs'}
+      </summary>
+      <p>
+        All flagged pairs in this checked selection, including wallets on other
+        table pages. Closest times first. These are{' '}
+        {source === 'provider' ? 'provider-reported' : 'saved-receipt'} events;
+        timing similarity alone does not prove shared control.
+      </p>
+      <ol start={start + 1} aria-label="Close funding pairs">
+        {pairs.slice(start, start + FUNDING_PAIRS_PER_PAGE).map((pair) => (
+          <li key={`${pair.a}:${pair.b}`}>
+            <strong>{fundingGapLabel(pair.seconds)} apart</strong>
+            <span>Wallet 1: {pair.a}</span>
+            <span>Wallet 2: {pair.b}</span>
+          </li>
+        ))}
+      </ol>
+      <nav aria-label="Funding pair pages">
+        <button
+          type="button"
+          disabled={page === 0}
+          onClick={(event) => {
+            focusStatus.current =
+              page === 1 && document.activeElement === event.currentTarget;
+            setPage((value) => value - 1);
+          }}
+        >
+          Previous pairs
+        </button>
+        <output ref={pageStatus} tabIndex={-1} aria-live="polite">
+          Pairs {start + 1} to{' '}
+          {Math.min(start + FUNDING_PAIRS_PER_PAGE, pairs.length)} of{' '}
+          {pairs.length}
+        </output>
+        <button
+          type="button"
+          disabled={start + FUNDING_PAIRS_PER_PAGE >= pairs.length}
+          onClick={(event) => {
+            focusStatus.current =
+              start + 2 * FUNDING_PAIRS_PER_PAGE >= pairs.length &&
+              document.activeElement === event.currentTarget;
+            setPage((value) => value + 1);
+          }}
+        >
+          Next pairs
+        </button>
+      </nav>
+    </details>
   );
 }
 export function WalletFundingProximityBadge({

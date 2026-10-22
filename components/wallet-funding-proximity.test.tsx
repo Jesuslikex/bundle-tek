@@ -83,10 +83,139 @@ it('loads only on explicit request and shows exact gap details without claiming 
   expect(fetcher).toHaveBeenCalledOnce();
   expect(
     [...host.querySelectorAll('summary')].map((n) => n.textContent),
-  ).toEqual(['24m 34s apart', '24m 34s apart']);
+  ).toEqual(['Review 1 close funding pair', '24m 34s apart', '24m 34s apart']);
   expect(host.textContent).toContain('1 pair under 30 minutes');
   expect(host.textContent).toContain('not first-funding history');
   expect(host.textContent).not.toContain('Unlinked');
+});
+it('reviews every checked close pair in bounded pages without another read, and clears on selection changes', async () => {
+  const wallets = Array.from({ length: 7 }, (_, i) => ({
+    address: bs58.encode(new Uint8Array(32).fill(i + 1)),
+    revision: 1,
+  }));
+  const fetcher = vi.fn(async () =>
+    Response.json({
+      ...reply(),
+      wallets: wallets.map((w, i) => ({
+        ...w,
+        reason: null,
+        funding: {
+          signature: bs58.encode(new Uint8Array(64).fill(i + 1)),
+          slot: i + 1,
+          blockTime: 100000 + i,
+        },
+      })),
+    }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await render(wallets);
+  expect(host.querySelector('ol')).toBeNull();
+  await click('Check recorded funding times');
+  const disclosure = host.querySelector('details')!;
+  expect(disclosure.open).toBe(false);
+  expect(disclosure.querySelector('summary')?.textContent).toBe(
+    'Review 21 close funding pairs',
+  );
+  expect(host.querySelectorAll('ol li')).toHaveLength(20);
+  expect(button('Previous pairs').disabled).toBe(true);
+  expect(button('Next pairs').disabled).toBe(false);
+  expect(host.textContent).toContain('Pairs 1 to 20 of 21');
+  const firstPage = [...host.querySelectorAll('ol li')].map(
+    (n) => n.textContent,
+  );
+  expect(disclosure.textContent).toContain('saved-receipt events');
+  button('Next pairs').focus();
+  await click('Next pairs');
+  expect(document.activeElement).toBe(host.querySelector('nav output'));
+  expect(host.querySelectorAll('ol li')).toHaveLength(1);
+  expect(host.querySelector('ol')?.start).toBe(21);
+  expect(host.textContent).toContain('Pairs 21 to 21 of 21');
+  expect(host.querySelector('ol')?.textContent).toContain(wallets[0].address);
+  expect(host.querySelector('ol')?.textContent).toContain(wallets[6].address);
+  expect(button('Next pairs').disabled).toBe(true);
+  button('Previous pairs').focus();
+  await click('Previous pairs');
+  expect(document.activeElement).toBe(host.querySelector('nav output'));
+  expect([...host.querySelectorAll('ol li')].map((n) => n.textContent)).toEqual(
+    firstPage,
+  );
+  expect(fetcher).toHaveBeenCalledOnce();
+  await click('Next pairs');
+  await click('Check recorded funding times');
+  expect(host.querySelectorAll('ol li')).toHaveLength(20);
+  expect(host.textContent).toContain('Pairs 1 to 20 of 21');
+  expect(host.querySelector('details')?.open).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  await render(wallets.map((w) => ({ ...w, revision: 2 })));
+  expect(host.querySelector('ol')).toBeNull();
+  await render(wallets);
+  expect(host.querySelector('ol')).toBeNull();
+});
+it('keeps exactly twenty pairs on one page and excludes the thirty-minute boundary', async () => {
+  const wallets = Array.from({ length: 7 }, (_, i) => ({
+    address: bs58.encode(new Uint8Array(32).fill(i + 1)),
+    revision: 1,
+  }));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json({
+        ...reply(),
+        wallets: wallets.map((w, i) => ({
+          ...w,
+          reason: null,
+          funding: {
+            signature: bs58.encode(new Uint8Array(64).fill(i + 1)),
+            slot: i + 1,
+            blockTime: 100000 + (i === 6 ? 1800 : i * 100),
+          },
+        })),
+      }),
+    ),
+  );
+  await render(wallets);
+  await click('Check recorded funding times');
+  expect(host.querySelectorAll('ol li')).toHaveLength(20);
+  expect(host.textContent).toContain('Pairs 1 to 20 of 20');
+  expect(button('Previous pairs').disabled).toBe(true);
+  expect(button('Next pairs').disabled).toBe(true);
+  expect(host.querySelector('ol')?.textContent).not.toContain('30m 00s apart');
+});
+it('keeps keyboard focus on an enabled middle-page control', async () => {
+  const wallets = Array.from({ length: 10 }, (_, i) => ({
+    address: bs58.encode(new Uint8Array(32).fill(i + 1)),
+    revision: 1,
+  }));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json({
+        ...reply(),
+        wallets: wallets.map((w, i) => ({
+          ...w,
+          reason: null,
+          funding: {
+            signature: bs58.encode(new Uint8Array(64).fill(i + 1)),
+            slot: i + 1,
+            blockTime: 100000 + i,
+          },
+        })),
+      }),
+    ),
+  );
+  await render(wallets);
+  await click('Check recorded funding times');
+  button('Next pairs').focus();
+  await click('Next pairs');
+  expect(document.activeElement).toBe(button('Next pairs'));
+  expect(host.textContent).toContain('Pairs 21 to 40 of 45');
+  await click('Next pairs');
+  expect(document.activeElement).toBe(host.querySelector('nav output'));
+  expect(host.querySelectorAll('ol li')).toHaveLength(5);
+  button('Previous pairs').focus();
+  await click('Previous pairs');
+  expect(document.activeElement).toBe(button('Previous pairs'));
+  expect(host.textContent).toContain('Pairs 21 to 40 of 45');
 });
 it('keeps missing funding time unknown instead of displaying a safe or green result', async () => {
   const result = reply();
@@ -242,9 +371,12 @@ it('checks provider history only on its explicit action and labels its source an
   await click('Check provider funding history');
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(host.textContent).toContain('2 of 2 provider-reported times');
+  expect(host.querySelector('details p')?.textContent).toContain(
+    'provider-reported events',
+  );
   expect(
     [...host.querySelectorAll('summary')].map((n) => n.textContent),
-  ).toEqual(['24m 34s apart', '24m 34s apart']);
+  ).toEqual(['Review 1 close funding pair', '24m 34s apart', '24m 34s apart']);
   expect(host.textContent).toContain('Provider-reported funding events');
   expect(host.textContent).toContain('Funding sources:');
 });
