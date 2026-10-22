@@ -1,0 +1,194 @@
+{
+  "baseCommit": "5f3186b9bd8160eef261d1d11ba50ac76af2dfca",
+  "sourceFiles": [
+    "lib/wallet-funding-origin.ts",
+    "lib/wallet-funding-origin.test.ts",
+    "lib/wallet-funding-origin-view.ts",
+    "lib/wallet-funding-origin-server.ts",
+    "lib/wallet-funding-origin-server.test.ts",
+    "lib/wallet-funding-origin-rpc.ts",
+    "lib/wallet-funding-origin-http.test.ts",
+    "lib/wallet-funding-origin-client.ts",
+    "lib/wallet-funding-origin-client.test.ts",
+    "lib/wallet-funding-time.ts",
+    "components/wallet-funding-proximity.tsx",
+    "components/wallet-funding-proximity.test.tsx",
+    "components/wallet-funding-proximity.module.css",
+    "test/wallet-funding-origin-fixture.ts",
+    "test/wallet-funding-origin-api-fixture.ts",
+    "app/api/wallet-workspace/funding-origins/route.ts",
+    "app/api/wallet-workspace/funding-origins/route.test.ts"
+  ],
+  "sourceSha256": {
+    "lib/wallet-funding-origin.ts": "4143e5c946ac124bb99a49da0004de1a23d1db0663b8a24c68fe5e8068453d38",
+    "lib/wallet-funding-origin.test.ts": "a775504d0389d3f5bf77ff447c315127b46c31e72ab44aaaf8374abdb0234fd3",
+    "lib/wallet-funding-origin-view.ts": "b185f243f4153f5f35be5dddecbbf44758fe3501c9e0c9932e6273b7ced82fef",
+    "lib/wallet-funding-origin-server.ts": "caa0402a7cf38797000d4544dd92737f84b0be3ed9bd0b96c810c97cb655a123",
+    "lib/wallet-funding-origin-server.test.ts": "167223a3aa437851e36b026a444397d594a783ee7b000f1c6114eac2371d7790",
+    "lib/wallet-funding-origin-rpc.ts": "701d3207014fee4a1f3425f66982721b09e79ae6f7a01a46b707d921817d3612",
+    "lib/wallet-funding-origin-http.test.ts": "7dbd9b2fd8856366dbd8ddc1e99fc21d90e57c2ce8bb09b77262229eb48e87e3",
+    "lib/wallet-funding-origin-client.ts": "4877cd041d0f4b23f0db3f83104c73c9d235fe666a77327ce725363f4e9cfdc4",
+    "lib/wallet-funding-origin-client.test.ts": "b8548757217af61cef48e0bdce210e92cce906bc125328daa37c0f8d32e502d3",
+    "lib/wallet-funding-time.ts": "4df5b0ab5f8f82859850187de1edce6949fe27fe9b12f13f7e187be663cf3fc1",
+    "components/wallet-funding-proximity.tsx": "2f71c42dcfe7d507f46528072128a0098d315cd76b226bec6136e7dc687aa950",
+    "components/wallet-funding-proximity.test.tsx": "ac3ac7968b7d1ac6c3832811f18ba18fa7aec0d478dba9e49602df2d6c5e69d5",
+    "components/wallet-funding-proximity.module.css": "e9db73cbee8cda4fdcebd171db3ab427a2811c0cc555f473e48055807858da10",
+    "test/wallet-funding-origin-fixture.ts": "18638446b83a150d188ca2e1d720ce89ce69ad7605acf22a734f51b820d8f206",
+    "test/wallet-funding-origin-api-fixture.ts": "278f4d693dce4c839039f32ace497cedda2da856b4d1cf66744567394c1b743b",
+    "app/api/wallet-workspace/funding-origins/route.ts": "de2e377415729d09a841967baeeee463bfc36cd02f746bf87e5bb12ed1b5abc8",
+    "app/api/wallet-workspace/funding-origins/route.test.ts": "39ca6b362a33f034a6862d67fd0d7b4daf63d9e3de0c95ade0dc0f243bcfacd4"
+  },
+  "tests": {
+    "files": 19,
+    "passed": 204,
+    "failed": 0,
+    "skipped": 0,
+    "success": true
+  },
+  "plainTypeScript": true,
+  "typedLintFiles": 16,
+  "formattedFiles": 17,
+  "opusSourceReviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "sourceUnchanged": true,
+      "sourceCopies": 21
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "sourceUnchanged": true,
+      "sourceCopies": 27
+    }
+  ],
+  "finalReviewCorrectionsIndependentlyTestedNotRereviewed": true,
+  "readOnlyRpc": {
+    "additionalCalls": 4,
+    "httpStatuses": [
+      200,
+      200,
+      200,
+      200
+    ],
+    "methods": [
+      "getGenesisHash",
+      "getTransactionsForAddress",
+      "getGenesisHash",
+      "getSignatureStatuses"
+    ],
+    "fixedHistoricalPacketMatchesRetained": true,
+    "statusFinalizedAndSlotMatching": true,
+    "additionalRpcForOfflineDecoderTest": 0
+  },
+  "bounds": {
+    "selectedWallets": 100,
+    "walletsPerGroup": 10,
+    "maximumRpcPerGroup": 12,
+    "serverBudgetMs": 45000,
+    "clientGroupBudgetMs": 50000,
+    "clientCampaignBudgetMs": 700000,
+    "postResponseGroupWaitMs": 17000,
+    "serverPostCompletionCooldownMs": 15000,
+    "ownerLeaseMs": 60000,
+    "perFetchBudgetAfterPacingMs": 8000,
+    "requestBytes": 12000,
+    "providerResponseBytes": 524288,
+    "clientResponseBytes": 1048576,
+    "redGapExclusiveSeconds": 1800
+  },
+  "authority": {
+    "historyComplete": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "browserVerified": false,
+  "deployed": false,
+  "fundedExecutionTest": false,
+  "providerSettingsChanged": false,
+  "applicationDatabaseExecuted": false,
+  "hostedSqlExecuted": false,
+  "schemaChanged": false,
+  "isolatedBuild": {
+    "base": "5f3186b9bd8160eef261d1d11ba50ac76af2dfca",
+    "overlays": [
+      "lib/wallet-funding-origin.ts",
+      "lib/wallet-funding-origin.test.ts",
+      "lib/wallet-funding-origin-view.ts",
+      "lib/wallet-funding-origin-server.ts",
+      "lib/wallet-funding-origin-server.test.ts",
+      "lib/wallet-funding-origin-rpc.ts",
+      "lib/wallet-funding-origin-http.test.ts",
+      "lib/wallet-funding-origin-client.ts",
+      "lib/wallet-funding-origin-client.test.ts",
+      "lib/wallet-funding-time.ts",
+      "components/wallet-funding-proximity.tsx",
+      "components/wallet-funding-proximity.test.tsx",
+      "components/wallet-funding-proximity.module.css",
+      "test/wallet-funding-origin-fixture.ts",
+      "test/wallet-funding-origin-api-fixture.ts",
+      "app/api/wallet-workspace/funding-origins/route.ts",
+      "app/api/wallet-workspace/funding-origins/route.test.ts"
+    ],
+    "hashes": {
+      "lib/wallet-funding-origin.ts": "4143e5c946ac124bb99a49da0004de1a23d1db0663b8a24c68fe5e8068453d38",
+      "lib/wallet-funding-origin.test.ts": "a775504d0389d3f5bf77ff447c315127b46c31e72ab44aaaf8374abdb0234fd3",
+      "lib/wallet-funding-origin-view.ts": "b185f243f4153f5f35be5dddecbbf44758fe3501c9e0c9932e6273b7ced82fef",
+      "lib/wallet-funding-origin-server.ts": "caa0402a7cf38797000d4544dd92737f84b0be3ed9bd0b96c810c97cb655a123",
+      "lib/wallet-funding-origin-server.test.ts": "167223a3aa437851e36b026a444397d594a783ee7b000f1c6114eac2371d7790",
+      "lib/wallet-funding-origin-rpc.ts": "701d3207014fee4a1f3425f66982721b09e79ae6f7a01a46b707d921817d3612",
+      "lib/wallet-funding-origin-http.test.ts": "7dbd9b2fd8856366dbd8ddc1e99fc21d90e57c2ce8bb09b77262229eb48e87e3",
+      "lib/wallet-funding-origin-client.ts": "4877cd041d0f4b23f0db3f83104c73c9d235fe666a77327ce725363f4e9cfdc4",
+      "lib/wallet-funding-origin-client.test.ts": "b8548757217af61cef48e0bdce210e92cce906bc125328daa37c0f8d32e502d3",
+      "lib/wallet-funding-time.ts": "4df5b0ab5f8f82859850187de1edce6949fe27fe9b12f13f7e187be663cf3fc1",
+      "components/wallet-funding-proximity.tsx": "2f71c42dcfe7d507f46528072128a0098d315cd76b226bec6136e7dc687aa950",
+      "components/wallet-funding-proximity.test.tsx": "ac3ac7968b7d1ac6c3832811f18ba18fa7aec0d478dba9e49602df2d6c5e69d5",
+      "components/wallet-funding-proximity.module.css": "e9db73cbee8cda4fdcebd171db3ab427a2811c0cc555f473e48055807858da10",
+      "test/wallet-funding-origin-fixture.ts": "18638446b83a150d188ca2e1d720ce89ce69ad7605acf22a734f51b820d8f206",
+      "test/wallet-funding-origin-api-fixture.ts": "278f4d693dce4c839039f32ace497cedda2da856b4d1cf66744567394c1b743b",
+      "app/api/wallet-workspace/funding-origins/route.ts": "de2e377415729d09a841967baeeee463bfc36cd02f746bf87e5bb12ed1b5abc8",
+      "app/api/wallet-workspace/funding-origins/route.test.ts": "39ca6b362a33f034a6862d67fd0d7b4daf63d9e3de0c95ade0dc0f243bcfacd4"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  }
+}

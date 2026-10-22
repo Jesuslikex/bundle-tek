@@ -112,13 +112,35 @@ export function walletFundingProximity(
   gapSeconds = 1800,
 ) {
   const result = walletFundingTimes.parse(value);
+  return compareFundingEventTimes(result.wallets, gapSeconds);
+}
+/** Metadata-neutral comparison; each caller must first admit its own source protocol. */
+export function compareFundingEventTimes(
+  wallets: readonly {
+    address: string;
+    funding: { blockTime: number } | null;
+  }[],
+  gapSeconds = 1800,
+) {
+  if (
+    wallets.length > 100 ||
+    new Set(wallets.map((w) => w.address)).size !== wallets.length ||
+    wallets.some(
+      (w) =>
+        w.funding &&
+        (!Number.isSafeInteger(w.funding.blockTime) ||
+          w.funding.blockTime < 0 ||
+          w.funding.blockTime > 8640000000000),
+    )
+  )
+    throw Error('Invalid funding observations.');
   if (!Number.isSafeInteger(gapSeconds) || gapSeconds < 0 || gapSeconds > 86400)
     throw Error('Choose a valid funding gap.');
   const pairs: { a: string; b: string; seconds: number }[] = [];
-  for (let i = 0; i < result.wallets.length; i++) {
-    const a = result.wallets[i];
+  for (let i = 0; i < wallets.length; i++) {
+    const a = wallets[i];
     if (!a.funding) continue;
-    for (const b of result.wallets.slice(i + 1)) {
+    for (const b of wallets.slice(i + 1)) {
       if (!b.funding) continue;
       const seconds = Math.abs(a.funding.blockTime - b.funding.blockTime);
       if (seconds < gapSeconds)

@@ -63,6 +63,44 @@ export type WalletFundingOrigin = {
   reason: FundingOriginReason | null;
   ledgerMetadata: 'provider-reported';
 };
+export function inspectFundingOriginHistory(history: unknown, now: number) {
+  try {
+    const page = object(history);
+    if (
+      !Array.isArray(page.data) ||
+      page.data.length > 1 ||
+      !(
+        page.paginationToken === null ||
+        page.paginationToken === undefined ||
+        (typeof page.paginationToken === 'string' &&
+          page.paginationToken.length <= 4096)
+      )
+    )
+      throw Error();
+    if (!page.data.length)
+      return { record: null, reason: 'no-returned-history' as const };
+    const first = object(page.data[0]);
+    if (
+      first.err !== null ||
+      first.confirmationStatus !== 'finalized' ||
+      typeof first.signature !== 'string' ||
+      first.signature.length > 90 ||
+      bs58.decode(first.signature).length !== 64
+    )
+      throw Error();
+    const signature = first.signature;
+    const slot = integer(first.slot);
+    const transactionIndex = integer(first.transactionIndex);
+    const blockTime = integer(first.blockTime);
+    if (blockTime * 1000 > now) throw Error();
+    return {
+      record: { signature, slot, transactionIndex, blockTime },
+      reason: null,
+    };
+  } catch {
+    return { record: null, reason: 'unavailable-oldest-evidence' as const };
+  }
+}
 /** Provider-reported history metadata plus locally authenticated native bytes.
  * No first-ever funding, archive completeness or independent finality proof.
  * Caller must establish mainnet and issue the unfiltered ascending limit-one read,
@@ -103,39 +141,11 @@ export function decodeWalletFundingOrigin(
     funding: null,
     reason,
   });
-  let signature: string,
-    slot: number,
-    transactionIndex: number,
-    blockTime: number;
+  const candidate = inspectFundingOriginHistory(history, now);
+  if (!candidate.record) return unknown(candidate.reason);
+  const { signature, slot, transactionIndex, blockTime } = candidate.record;
   let raw: Row, meta: Row;
   try {
-    const page = object(history);
-    if (
-      !Array.isArray(page.data) ||
-      page.data.length > 1 ||
-      !(
-        page.paginationToken === null ||
-        page.paginationToken === undefined ||
-        (typeof page.paginationToken === 'string' &&
-          page.paginationToken.length <= 4096)
-      )
-    )
-      throw Error();
-    if (!page.data.length) return unknown('no-returned-history');
-    const first = object(page.data[0]);
-    if (
-      first.err !== null ||
-      first.confirmationStatus !== 'finalized' ||
-      typeof first.signature !== 'string' ||
-      first.signature.length > 90 ||
-      bs58.decode(first.signature).length !== 64
-    )
-      throw Error();
-    signature = first.signature;
-    slot = integer(first.slot);
-    transactionIndex = integer(first.transactionIndex);
-    blockTime = integer(first.blockTime);
-    if (blockTime * 1000 > now) throw Error();
     raw = object(receipt);
     meta = object(raw.meta);
     if (
@@ -364,5 +374,109 @@ export function decodeWalletFundingOrigin(
     };
   } catch {
     return unknown('unavailable-oldest-evidence');
+  }
+}
+
+/** Full history and a separate exact signature-status observation, never inferred finality. */
+export function inspectFullFundingOriginHistory(history: unknown, now: number) {
+  try {
+    const page = object(history);
+    if (
+      !Array.isArray(page.data) ||
+      page.data.length > 1 ||
+      !(
+        page.paginationToken === undefined ||
+        page.paginationToken === null ||
+        (typeof page.paginationToken === 'string' &&
+          page.paginationToken.length <= 4096)
+      )
+    )
+      throw Error();
+    if (!page.data.length)
+      return { record: null, reason: 'no-returned-history' as const };
+    const receipt = object(page.data[0]),
+      meta = object(receipt.meta);
+    if (
+      meta.err !== null ||
+      !Array.isArray(receipt.transaction) ||
+      receipt.transaction.length !== 2 ||
+      receipt.transaction[1] !== 'base64' ||
+      typeof receipt.transaction[0] !== 'string' ||
+      receipt.transaction[0].length > 1644 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+        receipt.transaction[0],
+      )
+    )
+      throw Error();
+    const bytes = Uint8Array.from(atob(receipt.transaction[0]), (c) =>
+      c.charCodeAt(0),
+    );
+    if (
+      bytes.length > 1232 ||
+      btoa(String.fromCharCode(...bytes)) !== receipt.transaction[0]
+    )
+      throw Error();
+    const transaction = getTransactionDecoder().decode(bytes),
+      message = getCompiledTransactionMessageDecoder().decode(
+        transaction.messageBytes,
+      );
+    const first = transaction.signatures[message.staticAccounts[0]];
+    if (!first) throw Error();
+    const signature = bs58.encode(Uint8Array.from(first)),
+      slot = integer(receipt.slot),
+      blockTime = integer(receipt.blockTime),
+      transactionIndex = integer(receipt.transactionIndex);
+    if (blockTime * 1000 > now) throw Error();
+    return {
+      record: { signature, slot, blockTime, transactionIndex, receipt },
+      reason: null,
+    };
+  } catch {
+    return { record: null, reason: 'unavailable-oldest-evidence' as const };
+  }
+}
+export function decodeFullWalletFundingOrigin(
+  wallet: string,
+  history: unknown,
+  status: unknown,
+  contextSlot: unknown,
+  now = Date.now(),
+): WalletFundingOrigin {
+  const candidate = inspectFullFundingOriginHistory(history, now);
+  const unavailable = (reason: FundingOriginReason): WalletFundingOrigin => ({
+    ...decodeWalletFundingOrigin(wallet, { data: [] }, null, now),
+    reason,
+  });
+  if (!candidate.record) return unavailable(candidate.reason);
+  try {
+    const current = object(status),
+      record = candidate.record;
+    if (
+      current.confirmationStatus !== 'finalized' ||
+      current.err !== null ||
+      current.confirmations !== null ||
+      integer(current.slot) !== record.slot ||
+      integer(contextSlot) < record.slot
+    )
+      throw Error();
+    return decodeWalletFundingOrigin(
+      wallet,
+      {
+        data: [
+          {
+            signature: record.signature,
+            slot: record.slot,
+            blockTime: record.blockTime,
+            transactionIndex: record.transactionIndex,
+            confirmationStatus: current.confirmationStatus,
+            err: current.err,
+          },
+        ],
+      },
+      record.receipt,
+      now,
+    );
+  } catch {
+    return unavailable('unavailable-oldest-evidence');
   }
 }

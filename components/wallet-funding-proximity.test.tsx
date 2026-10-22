@@ -106,7 +106,11 @@ it('keeps missing funding time unknown instead of displaying a safe or green res
   await render();
   await click('Check recorded funding times');
   expect(host.textContent).toContain('2 unknown');
-  expect(host.querySelector('details')).toBeNull();
+  expect(
+    [...host.querySelectorAll('details > summary')].every((n) =>
+      n.textContent?.includes('Funding time unknown'),
+    ),
+  ).toBe(true);
   expect(host.textContent).toContain('Funding time unknown');
 });
 it('does not resurrect a saved result after leaving and returning to the original selection', async () => {
@@ -148,6 +152,10 @@ it('clears old indicators when selection/revision changes and ignores a late res
   await render();
   await click('Check recorded funding times');
   await render(selection.map((w) => ({ ...w, revision: 2 })));
+  expect(host.textContent).toContain(
+    'cancelled because the source or selected wallets changed',
+  );
+  expect(host.textContent).toContain('no partial result was kept');
   await act(async () => {
     release(Response.json(reply()));
     await flush();
@@ -191,3 +199,202 @@ it('allows cancelling a read without a retry or late result and hides raw HTML e
   expect(host.textContent).toContain('could not be checked');
   expect(host.textContent).not.toContain('private details');
 });
+
+const providerReply = () => ({
+  context: selection,
+  format: 'wallet-funding-origins-v1',
+  network: 'mainnet',
+  scope: 'oldest-provider-reported-transaction',
+  ledgerMetadata: 'provider-reported',
+  historyComplete: false,
+  signingAllowed: false,
+  executionAllowed: false,
+  capturedAt: '2026-10-22T00:00:00.000Z',
+  wallets: reply().wallets.map((w) => ({
+    ...w,
+    funding: {
+      ...w.funding,
+      transactionIndex: 0,
+      recipientChangeRaw: '1000',
+      funders: [selection[1].address],
+    },
+  })),
+});
+async function source(value: 'saved' | 'provider') {
+  await act(async () => {
+    const inputs = [
+      ...host.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
+    ];
+    inputs[value === 'saved' ? 0 : 1].click();
+    await flush();
+  });
+}
+it('checks provider history only on its explicit action and labels its source and funding gaps', async () => {
+  const fetcher = vi.fn(async (url: string) => {
+    expect(url).toBe('/api/wallet-workspace/funding-origins');
+    return Response.json(providerReply());
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await render();
+  await source('provider');
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('uses provider quota');
+  await click('Check provider funding history');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(host.textContent).toContain('2 of 2 provider-reported times');
+  expect(
+    [...host.querySelectorAll('summary')].map((n) => n.textContent),
+  ).toEqual(['24m 34s apart', '24m 34s apart']);
+  expect(host.textContent).toContain('Provider-reported funding events');
+  expect(host.textContent).toContain('Funding sources:');
+});
+it('keeps source protocols separate and clears saved results when changing sources and returning', async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json(reply()))
+    .mockResolvedValueOnce(Response.json(reply()));
+  vi.stubGlobal('fetch', fetcher);
+  await render();
+  await click('Check recorded funding times');
+  expect(host.textContent).toContain('1 pair under 30 minutes');
+  await source('provider');
+  expect(host.querySelector('details')).toBeNull();
+  await click('Check provider funding history');
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  expect(host.querySelector('details')).toBeNull();
+  await source('saved');
+  expect(host.querySelector('details')).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('aborts provider reads on source change and ignores late results on return', async () => {
+  let resolve!: (r: Response) => void;
+  let signal: AbortSignal | undefined;
+  const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+    signal = init.signal as AbortSignal;
+    return new Promise<Response>((r) => {
+      resolve = r;
+    });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await render();
+  await source('provider');
+  await click('Check provider funding history');
+  await source('saved');
+  expect(signal?.aborted).toBe(true);
+  await source('provider');
+  await act(async () => {
+    resolve(Response.json(providerReply()));
+    await flush();
+  });
+  expect(host.querySelector('details')).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('shows provider unknown reasons in keyboard-accessible details without treating them as no funding', async () => {
+  const body = providerReply();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json({
+        ...body,
+        wallets: body.wallets.map((w) => ({
+          ...w,
+          funding: null,
+          reason: 'unavailable-oldest-evidence',
+        })),
+      }),
+    ),
+  );
+  await render();
+  await source('provider');
+  await click('Check provider funding history');
+  expect(host.textContent).toContain('2 unknown');
+  expect(host.querySelector('details summary')?.textContent).toContain(
+    'Funding time unknown',
+  );
+  expect(host.textContent).toContain(
+    'oldest returned evidence could not be validated',
+  );
+  expect(host.textContent).not.toContain('Recorded funding events');
+});
+
+it('does not revive provider results across selection A-to-B-to-A changes', async () => {
+  let release!: (r: Response) => void;
+  let signal: AbortSignal | undefined;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: RequestInit) => {
+      signal = init.signal as AbortSignal;
+      return new Promise<Response>((r) => {
+        release = r;
+      });
+    }),
+  );
+  await render();
+  await source('provider');
+  await click('Check provider funding history');
+  await render([{ ...selection[0], revision: 2 }]);
+  expect(signal?.aborted).toBe(true);
+  await render();
+  await act(async () => {
+    release(Response.json(providerReply()));
+    await flush();
+  });
+  expect(host.querySelector('details')).toBeNull();
+  expect(host.textContent).toContain(
+    'No funding-time check for this selection',
+  );
+});
+it('returns keyboard focus after cancelling a provider check', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async (_url: string, init: RequestInit) =>
+        new Promise<Response>((_, reject) =>
+          init.signal!.addEventListener(
+            'abort',
+            () => reject(init.signal!.reason),
+            { once: true },
+          ),
+        ),
+    ),
+  );
+  await render();
+  await source('provider');
+  await click('Check provider funding history');
+  button('Cancel funding-time check').focus();
+  await click('Cancel funding-time check');
+  expect(document.activeElement).toBe(button('Check provider funding history'));
+});
+
+it.each([true, false])(
+  'returns keyboard focus when a provider check finishes (success=%s)',
+  async (success) => {
+    let release!: (response: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            release = resolve;
+          }),
+      ),
+    );
+    await render();
+    await source('provider');
+    await click('Check provider funding history');
+    await act(async () => {
+      button('Cancel funding-time check').focus();
+    });
+    await act(async () => {
+      release(
+        success
+          ? Response.json(providerReply())
+          : new Response(null, { status: 429 }),
+      );
+      await flush();
+    });
+    expect(document.activeElement).toBe(
+      button('Check provider funding history'),
+    );
+  },
+);
