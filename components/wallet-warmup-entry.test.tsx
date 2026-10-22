@@ -93,8 +93,85 @@ it.each([{ loading: true }, { busy: true }])(
   async (patch) => {
     const props = await mount({ ...patch, archived: true });
     expect(button('Wallet warmup').disabled).toBe(true);
+    expect(button('Wallet warmup').getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('output')?.textContent).toContain(
+      'loading' in patch
+        ? 'Loading wallets'
+        : 'A wallet request is in progress',
+    );
+    expect(
+      document.getElementById(
+        button('Wallet warmup').getAttribute('aria-describedby')!,
+      ),
+    ).toBe(host.querySelector('output'));
     expect(host.querySelectorAll('button')).toHaveLength(1);
     await act(async () => button('Wallet warmup').click());
+    expect(props.onOpen).not.toHaveBeenCalled();
+  },
+);
+
+it('replaces pending guidance with the current selection reason without opening or clearing anything', async () => {
+  const loading = await mount({
+    loading: true,
+    busy: true,
+    visibleCount: 30,
+    selectedCount: 21,
+  });
+  const status = host.querySelector('output');
+  expect(status?.textContent).toContain('Loading wallets');
+  const busy = await mount({ busy: true, visibleCount: 30, selectedCount: 21 });
+  expect(host.querySelector('output')).toBe(status);
+  expect(status?.textContent).toContain('A wallet request is in progress');
+  expect(host.querySelectorAll('button')).toHaveLength(1);
+  const excessive = await mount({ visibleCount: 30, selectedCount: 21 });
+  expect(button('Wallet warmup').getAttribute('aria-busy')).toBe('false');
+  expect(status?.textContent).toContain('up to 20');
+  expect(button('Clear selection').disabled).toBe(false);
+  for (const props of [loading, busy, excessive]) {
+    expect(props.onOpen).not.toHaveBeenCalled();
+    expect(props.onClearSelection).not.toHaveBeenCalled();
+    expect(props.onShowActive).not.toHaveBeenCalled();
+  }
+});
+
+it('clears the persistent pending status when ready and still requires an explicit click', async () => {
+  await mount({ loading: true });
+  const status = host.querySelector('output');
+  const props = await mount();
+  expect(host.querySelector('output')).toBe(status);
+  expect(status?.textContent).toBe('');
+  expect(button('Wallet warmup').disabled).toBe(false);
+  expect(button('Wallet warmup').getAttribute('aria-busy')).toBe('false');
+  expect(button('Wallet warmup').getAttribute('aria-describedby')).toBeNull();
+  expect(props.onOpen).not.toHaveBeenCalled();
+  await act(async () => button('Wallet warmup').click());
+  expect(props.onOpen).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  {
+    archived: true,
+    action: 'Show active wallets',
+    message: 'Warmup uses active wallets',
+  },
+  {
+    visibleCount: 0,
+    filtered: true,
+    action: 'Show all wallets',
+    message: 'No wallets match this view',
+  },
+])(
+  'restores the existing view-only escape after busy work: $action',
+  async ({ action, message, ...patch }) => {
+    await mount({ ...patch, busy: true });
+    expect(host.querySelectorAll('button')).toHaveLength(1);
+    expect(host.querySelector('output')?.textContent).toContain(
+      'Warmup options will update',
+    );
+    const props = await mount(patch);
+    expect(host.querySelector('output')?.textContent).toContain(message);
+    await act(async () => button(action).click());
+    expect(props.onShowActive).toHaveBeenCalledTimes(1);
     expect(props.onOpen).not.toHaveBeenCalled();
   },
 );

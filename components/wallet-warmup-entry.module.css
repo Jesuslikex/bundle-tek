@@ -5,11 +5,19 @@
   min-width: 0;
   max-width: 280px;
 }
-.entry small {
+.entry output {
   color: #a7a7b8;
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+.entry output:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .entry button {
   min-height: 44px;

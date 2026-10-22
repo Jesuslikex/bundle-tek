@@ -1,0 +1,21 @@
+# Warmup entry pending-state recovery
+
+22 October 2026. Source base `9a3ef860437fd85b09a21066f54713f658e202a4`. Only the Codex-owned entry component, its CSS and tests change. Protected shell/layout files are untouched.
+
+## Fresh reference and product gap
+
+The existing signed-in Chrome Proxima tab was inspected through computer use, navigating from Account to My Wallets and opening Generate Activity. Its visible completion view showed elapsed time and per-wallet transaction/volume rows. This is current rendered UI evidence, not independent receipt verification, REA network evidence or proof of its execution architecture. The header close restored the wallet table without pressing Done, Start or any financial control. The tab was returned to its original Account page. No private addresses, account values or screenshots are published here. Retained REA evidence remains historical; its previously unavailable debugging prerequisite was not bypassed or relabeled as restored.
+
+Bundle's entry already explained archived, empty, filtered, unselected and excessive selections. It silently disabled during loading/busy requests. It now displays distinct pending reasons and associates them with the disabled button. Loading takes priority while the list is unresolved; after completion the current selection reason or ready state replaces it. No state change opens warmup or invokes any callback.
+
+Native `output` supplies the status semantics with atomic updates. The empty element stays mounted and visually clipped rather than display:none, so it does not lose its accessibility-tree eligibility before a later message. `aria-busy` is on the button, not the live output or its parent. The original disabled conditions, selection limit, view-only escape gating and callbacks are unchanged. Native disabled focus behavior is also unchanged; no new focus or wallet-selection behavior is introduced.
+
+## Verification and review
+
+- Final18 tests/two physical files pass, zero failures/skips: entry and actual wallet-workspace integration. Includes pending priority, stable status identity, described-by binding, no automatic callbacks, transition to ready/excessive/archived/filtered states and explicit view-only recovery. Ignored report: `work/release-qa/warmup-entry-pending-final-20261022.json`.
+- Plain TypeScript, two-file typed lint, three-file formatting and git diff --check pass. Initial lint correctly rejected a small with an explicit status role; the final native output corrects it.
+- Actual `claude-opus-5-5` reviewed five unchanged copied files with Read/Glob/Grep only, zero denials. It found the empty display:none announcement risk. The final version accepts its accessible clipping and neutral busy-message recommendations; Codex independently tested these followups. The reviewer did not run tests or review the final followup snapshot. Its suggestion that unavailable guards were new is contradicted by the committed original source: those guards were already present and remain unchanged.
+- Isolated production Vite fixture renders the actual component, Base UI button and CSS with synthetic states, no account/API/provider/SQL/wallet. Chrome verified desktop1920, phone375 and narrow320 client/scroll equality,44px warmup button, readable busy guidance and exact explicit-open counter0 until one click changed it to1. Empty output computed display:block, position:absolute, visibility:visible. This is CSS/DOM evidence, not proof of spoken screen-reader announcements. Screenshot: ignored `work/warmup-entry-pending-browser-20261022/busy-375.png`.
+- The first fixture build scanned too broadly and was intentionally stopped while its known process was active. The final fixture limits Tailwind source generation to its actual components; a temporary import-order warning was corrected before browser verification. This fixture is not a full Next build. Owned tab/server were closed and viewport override reset. User tabs remain open.
+
+No deployment, real provider check, application/hosted SQL, migration, setting/credential/cron change, wallet unlock/sign/send, strategy or funded test occurred. Git deployment remains disabled. Existing archive handoff dirt is preserved. Complete warmup execution, current gross spending evidence and full Proxima parity remain unfinished.
