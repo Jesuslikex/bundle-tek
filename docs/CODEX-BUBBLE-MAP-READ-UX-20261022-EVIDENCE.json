@@ -1,0 +1,148 @@
+{
+  "sourceBase": "b5d3c773d26e265760b37e26894b06163b4edf43",
+  "files": {
+    "lib/bubble-map-client.ts": "cbcb52cca7cf37014e4f8b710206066ddd1134c11d1f1ef2f928bdd02c73e168",
+    "lib/bubble-map-client.test.ts": "4989e3f96e212097289a50d744669aa6903b47d6c6fbed0db27053746f3b49ce",
+    "components/bubble-map-panel.tsx": "60ac5e1b8df0f71a4caeea76574c0adc48751676f3907ad296435c56017b847b",
+    "components/bubble-map-panel.test.tsx": "33efa0c5dfcef2cab78004960fe2b621c4f19176a7ef73c0a9ac9d8a18b4e875",
+    "components/bubble-map-panel.module.css": "71f0ac1923e97e469c245a538c2e427d817c7fb1c11f0d564548908e506f851c",
+    "app/api/supply/bubble-map/route.test.ts": "e1a1e7f1f5fae5ab6db3b499eeee694b488ef7d7bd3b1b2c0135ad48bd4757aa"
+  },
+  "tests": {
+    "passed": 79,
+    "failed": 0,
+    "skipped": 0,
+    "files": 11
+  },
+  "typecheck": "passed after test-only appendChild correction",
+  "typedLint": "passed, five files",
+  "format": "passed, six files",
+  "initialReview": {
+    "startedAt": "2026-10-22T02:56:27.143Z",
+    "finishedAt": "2026-10-22T02:58:11.208Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "b5d3c773d26e265760b37e26894b06163b4edf43",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.3898186,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "renderedBrowserQa": {
+    "verified": false,
+    "reason": "existing Chrome control getState timed out after 30 seconds; no alternative browser launched"
+  },
+  "liveProviderRequests": 0,
+  "deployed": false,
+  "funded": false,
+  "signedOrSubmitted": false,
+  "productionRouteChanged": false,
+  "schemaChanged": false,
+  "providerSettingsChanged": false,
+  "followupReview": {
+    "startedAt": "2026-10-22T03:06:27.343Z",
+    "finishedAt": "2026-10-22T03:07:26.037Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "b5d3c773d26e265760b37e26894b06163b4edf43",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.25842339999999997,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "postReviewLowCorrections": "cooldown copy and positive supply preflight; independently verified, not rereviewed",
+  "earlierBuild": {
+    "failedTestOnlyDomTyping": true,
+    "sourceResultKept": "bubble-map-read-ux-build-20261022/result.json"
+  },
+  "preGuardBuild": {
+    "base": "b5d3c773d26e265760b37e26894b06163b4edf43",
+    "overlays": [
+      "lib/bubble-map-client.ts",
+      "lib/bubble-map-client.test.ts",
+      "components/bubble-map-panel.tsx",
+      "components/bubble-map-panel.test.tsx",
+      "components/bubble-map-panel.module.css",
+      "app/api/supply/bubble-map/route.test.ts"
+    ],
+    "hashes": {
+      "lib/bubble-map-client.ts": "c7a5ecc153afd4e04d6bef20fd3da0fd64494ead3cfdeb2e331eaa4f4c8b1d9a",
+      "lib/bubble-map-client.test.ts": "4989e3f96e212097289a50d744669aa6903b47d6c6fbed0db27053746f3b49ce",
+      "components/bubble-map-panel.tsx": "42ed918f9290b221e13f1a1c3bc16cae66e4262b40b4a43ac9aeb5407c80f0b4",
+      "components/bubble-map-panel.test.tsx": "fb2fa3c5620a27d06c1f6228765da9f37cf624188d6f33070ed37450133cb802",
+      "components/bubble-map-panel.module.css": "71f0ac1923e97e469c245a538c2e427d817c7fb1c11f0d564548908e506f851c",
+      "app/api/supply/bubble-map/route.test.ts": "e1a1e7f1f5fae5ab6db3b499eeee694b488ef7d7bd3b1b2c0135ad48bd4757aa"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "finalBuild": {
+    "base": "b5d3c773d26e265760b37e26894b06163b4edf43",
+    "overlays": [
+      "lib/bubble-map-client.ts",
+      "lib/bubble-map-client.test.ts",
+      "components/bubble-map-panel.tsx",
+      "components/bubble-map-panel.test.tsx",
+      "components/bubble-map-panel.module.css",
+      "app/api/supply/bubble-map/route.test.ts"
+    ],
+    "hashes": {
+      "lib/bubble-map-client.ts": "cbcb52cca7cf37014e4f8b710206066ddd1134c11d1f1ef2f928bdd02c73e168",
+      "lib/bubble-map-client.test.ts": "4989e3f96e212097289a50d744669aa6903b47d6c6fbed0db27053746f3b49ce",
+      "components/bubble-map-panel.tsx": "60ac5e1b8df0f71a4caeea76574c0adc48751676f3907ad296435c56017b847b",
+      "components/bubble-map-panel.test.tsx": "33efa0c5dfcef2cab78004960fe2b621c4f19176a7ef73c0a9ac9d8a18b4e875",
+      "components/bubble-map-panel.module.css": "71f0ac1923e97e469c245a538c2e427d817c7fb1c11f0d564548908e506f851c",
+      "app/api/supply/bubble-map/route.test.ts": "e1a1e7f1f5fae5ab6db3b499eeee694b488ef7d7bd3b1b2c0135ad48bd4757aa"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "publicReferencesChecked": [
+    "https://docs.proxima.tools/live-settings/overview/",
+    "https://docs.proxima.tools/wallets/marketplace/"
+  ]
+}

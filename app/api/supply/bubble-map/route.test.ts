@@ -26,6 +26,8 @@ vi.mock('@/lib/solana-rpc', () => ({
     mocks.rpc(method, params),
 }));
 import { POST } from './route';
+import { readBubbleMapFunding } from '@/lib/bubble-map-client';
+import bs58 from 'bs58';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 
 const origin = 'https://bundle.test';
@@ -98,4 +100,40 @@ it('returns a static 502 for malformed provider history without leaking provider
   const response = await post({ addresses: [A] });
   expect(response.status).toBe(502);
   expect(await response.text()).not.toContain('private-provider-text');
+});
+
+it('completes all 32 client wallets through the real route and unchanged ten-second gate', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-10-22T12:00:00Z'));
+  const selection = Array.from({ length: 32 }, (_, i) =>
+    bs58.encode(new Uint8Array(32).fill(i + 1)),
+  );
+  const fetchMock = vi.fn(async (_: string, init: RequestInit) =>
+    POST(
+      new Request(origin + '/api/supply/bubble-map', {
+        ...init,
+        headers: new Headers([
+          ['content-type', 'application/json'],
+          ['origin', origin],
+        ]),
+      }),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  try {
+    const pending = readBubbleMapFunding(
+      selection,
+      new AbortController().signal,
+      () => {},
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(Object.keys(await pending)).toEqual(selection);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(mocks.rpc).toHaveBeenCalledTimes(34);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
 });
