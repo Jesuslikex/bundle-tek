@@ -1,0 +1,67 @@
+{
+  "sourceBase": "f82beabc88df36f197cf67df2503c48679740482",
+  "status": "design-only; execution remains unmounted",
+  "nextUnclaimedMigration": 139,
+  "review": {
+    "startedAt": "2026-10-22T18:57:51.779Z",
+    "finishedAt": "2026-10-22T19:00:26.589Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "f82beabc88df36f197cf67df2503c48679740482",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.8477896,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "reviewSourceHashes": {
+    "app/api/wallet-workspace/warmup/sell-receipts/route.ts": "b5f1e7ac51b5d761f9aec80735254d911b2122f0d36f2c402fc85b8ac5786621",
+    "docs/CODEX-WARMUP-EXECUTION-CONTRACT-20261022.md": "d3c6bc9f244efa11d20116a6f720ee8a649fb8da05d328eab0d17b2818df2708",
+    "docs/CODEX-WARMUP-EXECUTION-LIFECYCLE-20261022.md": "788a8ff7fbc95a677fd0044fa4bc8aca5183e7fc3e06c327406e826ea16eda6c",
+    "docs/CODEX-WARMUP-SHARED-LEDGER-CONTRACT-20261022.md": "a29056b701fdff9fc1deb5b1df663c70b0108934b22aa5f25b49e4ce98551324",
+    "lib/wallet-warmup-execution-ledger.ts": "a5c06d178ca3786875c373993ba4efde7541d106955baf094366d5a3080ec8ba",
+    "lib/wallet-warmup-execution-manifest.ts": "ecafbae77b24585adc8bc20b387583c5b45012882e5ee5778634b69f18b65463",
+    "lib/wallet-warmup-execution-pacing.ts": "6c2e3fa1e4d507be4a201ab07045fb351e23b11ab5a0ee8f4cf8a5463a744b9f",
+    "lib/wallet-warmup-session-consent.ts": "dce30340c27b0b8a63c10e8f475fada846934fc611c863aca0b6e80592f56b16",
+    "lib/wallet-warmup-session-review.ts": "711200d67ae7678f7d397671f56dfcd7aaf56a4d3ed758aefc3821d26e3055ca",
+    "lib/wallet-warmup-session-storage.ts": "5f1a4e1fdb85f9761d707ff884d9f6bd21e376050d347ceada4b5bf176ea67f5",
+    "lib/wallet-warmup-session-v2-consent.ts": "b4058e80348f7b72843ab793b2468bb3882896c24ef2d3cddab7015ef980d55d",
+    "lib/warmup-buy-receipt.ts": "eaee03a4d989458346a2ea5f3e3e2bcc55688e16658d65fdfbfa3c1fca8bc656",
+    "lib/warmup-sell-receipt.ts": "d9da7cd7ddf1a23868f55b742b1dd1a46a94a97232a836de4bf52add0e86f9a7"
+  },
+  "fullSuite": {
+    "source": "f82beabc88df36f197cf67df2503c48679740482",
+    "physicalFiles": 797,
+    "status": "running; not a pass",
+    "execSession": 99836,
+    "testPid": 4272,
+    "reportDirectory": "work/release-qa/full-release-f82beab-20261022"
+  },
+  "nativeScripts": {
+    "passed": 46,
+    "failed": 0,
+    "separateFromFrozenRun": true
+  },
+  "appEdits": false,
+  "migrationOrHostedSql": false,
+  "deploy": false,
+  "realWalletActions": false
+}
