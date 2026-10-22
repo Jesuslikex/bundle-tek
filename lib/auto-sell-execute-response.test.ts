@@ -1,3 +1,4 @@
+import { AutoSellReviewRecoveryError } from './auto-sell-review-recovery';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createAutoSellExecutor,
@@ -409,4 +410,55 @@ it('bounds a stalled submit body by its own deadline after Stop', async () => {
   expect(error).toBeInstanceOf(AutoSellUncertainError);
   expect(error.outcome).toEqual(ref);
   expect(f.stages).toEqual(['prepare', 'review', 'register', 'submit']);
+});
+
+it.each(['network', 'invalid', '503'] as const)(
+  'retains original pre-sign review after %s and never tries another wallet',
+  async (kind) => {
+    const f = fixture((stage, normal) => {
+      if (stage !== 'review') return normal;
+      if (kind === 'network') throw Error('private diagnostic');
+      return kind === '503'
+        ? response({ error: 'unavailable' }, 503)
+        : response({ review: {} });
+    });
+    const error = await f
+      .sell(BigInt(ref.inputRaw), new AbortController().signal)
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(AutoSellReviewRecoveryError);
+    expect(error.reference).toMatchObject({
+      preparationId: ref.preparationId,
+      projectId: ref.projectId,
+      inputRaw: ref.inputRaw,
+      preparationSha256: ref.preparationSha256,
+    });
+    expect(error.message).not.toContain('private diagnostic');
+    expect(f.stages).toEqual(['prepare', 'review']);
+    expect(f.sign).not.toHaveBeenCalled();
+  },
+);
+it('retains the existing review when local signing refuses without a returned packet', async () => {
+  const f = fixture((_stage, normal) => normal);
+  f.sign.mockRejectedValueOnce(Error('vault no longer available'));
+  const error = await f
+    .sell(BigInt(ref.inputRaw), new AbortController().signal)
+    .catch((e) => e);
+  expect(error).toBeInstanceOf(AutoSellReviewRecoveryError);
+  expect(error.reference.preparationId).toBe(ref.preparationId);
+  expect(f.stages).toEqual(['prepare', 'review']);
+  expect(f.sign).toHaveBeenCalledOnce();
+});
+
+it('distinguishes a definite review409 from an unreadable saved-review outcome', async () => {
+  const f = fixture((stage, normal) =>
+    stage === 'review'
+      ? response({ error: 'Recover existing approval' }, 409)
+      : normal,
+  );
+  const error = await f
+    .sell(BigInt(ref.inputRaw), new AbortController().signal)
+    .catch((e) => e);
+  expect(error).toBeInstanceOf(AutoSellReviewRecoveryError);
+  expect(error.conflict).toBe(true);
+  expect(f.stages).toEqual(['prepare', 'review']);
 });

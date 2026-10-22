@@ -1,4 +1,8 @@
 import {
+  AutoSellReviewRecoveryError,
+  type AutoSellReviewReference,
+} from './auto-sell-review-recovery';
+import {
   applyAutoSellTrade,
   checkAutoSellEnd,
   endCapRaw,
@@ -57,6 +61,8 @@ export type AutoSellSnapshot = {
   /** Bounded lookup metadata, independent of the rolling activity log. */
   outcomes?: AutoSellOutcomeReminder[];
   outcomeOverflow?: boolean;
+  reviewRecovery?: AutoSellReviewReference | null;
+  reviewRecoveryConflict?: boolean;
 };
 
 export type AutoSellRunnerDeps = {
@@ -131,6 +137,8 @@ export class AutoSellRunner {
   private log: AutoSellLogEntry[] = [];
   private outcomes = new Map<string, AutoSellOutcomeReminder>();
   private outcomeOverflow = false;
+  private reviewRecovery: AutoSellReviewReference | null = null;
+  private reviewRecoveryConflict = false;
   private timer: unknown = null;
   private controller = new AbortController();
   private polling = false;
@@ -489,6 +497,8 @@ export class AutoSellRunner {
       selling: this.selling,
       outcomes: [...this.outcomes.values()],
       outcomeOverflow: this.outcomeOverflow,
+      reviewRecovery: this.reviewRecovery,
+      reviewRecoveryConflict: this.reviewRecoveryConflict,
     };
   }
 
@@ -811,6 +821,17 @@ export class AutoSellRunner {
                 : current.bufferedRaw,
           });
           this.sellBlockedUntil = this.deps.now() + this.deps.retryMs;
+          if (error instanceof AutoSellReviewRecoveryError) {
+            if (!this.reviewRecovery) {
+              this.reviewRecovery = error.reference;
+              this.reviewRecoveryConflict = error.conflict;
+            }
+            this.note(s.id, 'error', error.message);
+            this.stop(
+              'Review response unavailable. Recover the original saved approval before starting again.',
+            );
+            return;
+          }
           if (this.controller.signal.aborted) return;
           this.failures++;
           const detail = error instanceof Error ? error.message : '';

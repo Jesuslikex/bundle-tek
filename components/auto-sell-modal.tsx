@@ -1,4 +1,9 @@
 'use client';
+import { AutoSellReviewRecovery } from './auto-sell-review-recovery';
+import {
+  validatedAutoSellReviewReference,
+  type AutoSellReviewReference,
+} from '@/lib/auto-sell-review-recovery';
 
 import {
   useCallback,
@@ -231,6 +236,16 @@ function AutoSellContext({
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reviewReminders, setReviewReminders] = useState<
+    { reference: AutoSellReviewReference; conflict: boolean }[]
+  >([]);
+  const cancellationGuards = useRef(new Set<string>());
+  const [cancellationCount, setCancellationCount] = useState(0);
+  function trackCancellation(key: string, blocked: boolean) {
+    if (blocked) cancellationGuards.current.add(key);
+    else cancellationGuards.current.delete(key);
+    setCancellationCount(cancellationGuards.current.size);
+  }
   const [previewCap, setPreviewCap] = useState<number | null>(null);
   const [sessionDelay, setSessionDelay] =
     useState<DurationParts>(emptyDuration);
@@ -450,25 +465,28 @@ function AutoSellContext({
 
   const errors = strategies.map(autoSellStrategyError);
   const firstStrategyError = errors.findIndex(Boolean);
-  const startBlockReason = locked
-    ? 'Wait for the current workspace operation to finish.'
-    : project.archived
-      ? 'This project is archived. Restore it before starting Auto Sell.'
-      : token.chain !== 'Solana'
-        ? 'Auto Sell supports Solana tokens.'
-        : snapshot?.selling
-          ? 'Wait for the pending sell to finish before starting another session.'
-          : firstStrategyError >= 0
-            ? `${strategies[firstStrategyError].name}: ${errors[firstStrategyError]}`
-            : sessionError
-              ? `Session settings: ${sessionError}`
-              : !solanaWallets.length
-                ? 'Add a Solana wallet in My wallets before starting Auto Sell.'
-                : !sellWallets.length
-                  ? 'Choose at least one sell wallet in Advanced Options.'
-                  : !password
-                    ? 'Enter your vault password before starting these strategies.'
-                    : '';
+  const startBlockReason =
+    cancellationCount > 0
+      ? 'Check the original saved approval status before starting a new Auto Sell run.'
+      : locked
+        ? 'Wait for the current workspace operation to finish.'
+        : project.archived
+          ? 'This project is archived. Restore it before starting Auto Sell.'
+          : token.chain !== 'Solana'
+            ? 'Auto Sell supports Solana tokens.'
+            : snapshot?.selling
+              ? 'Wait for the pending sell to finish before starting another session.'
+              : firstStrategyError >= 0
+                ? `${strategies[firstStrategyError].name}: ${errors[firstStrategyError]}`
+                : sessionError
+                  ? `Session settings: ${sessionError}`
+                  : !solanaWallets.length
+                    ? 'Add a Solana wallet in My wallets before starting Auto Sell.'
+                    : !sellWallets.length
+                      ? 'Choose at least one sell wallet in Advanced Options.'
+                      : !password
+                        ? 'Enter your vault password before starting these strategies.'
+                        : '';
   const marketCap = running ? (snapshot?.marketCapUsd ?? null) : previewCap;
 
   function update(id: string, patch: Partial<AutoSellStrategy>) {
@@ -486,6 +504,7 @@ function AutoSellContext({
     if (
       locked ||
       project.archived ||
+      cancellationGuards.current.size > 0 ||
       busy ||
       running ||
       snapshot?.selling ||
@@ -575,6 +594,32 @@ function AutoSellContext({
           // A previous run finishing its last sell must not touch this one.
           if (!mounted.current || runner.current !== instance) return;
           setSnapshot(next);
+          if (next.reviewRecovery) {
+            try {
+              const reference = validatedAutoSellReviewReference(
+                next.reviewRecovery,
+              );
+              setReviewReminders((previous) => {
+                const index = previous.findIndex(
+                  (entry) =>
+                    entry.reference.preparationId === reference.preparationId,
+                );
+                if (index >= 0)
+                  return next.reviewRecoveryConflict &&
+                    !previous[index].conflict
+                    ? previous.map((entry, i) =>
+                        i === index ? { ...entry, conflict: true } : entry,
+                      )
+                    : previous;
+                return [
+                  ...previous,
+                  { reference, conflict: next.reviewRecoveryConflict === true },
+                ].slice(-100);
+              });
+            } catch {
+              /* Invalid metadata never becomes a lookup context. */
+            }
+          }
           if (!next.running && !next.selling) {
             if (originalConfiguration.current) {
               loadConfiguration(instance.configuration());
@@ -947,7 +992,48 @@ function AutoSellContext({
                 </ol>
               </details>
             )}
+            {!!reviewReminders.length && (
+              <section aria-label="Interrupted review reminders">
+                <p>
+                  The latest 100 original review references are kept across runs
+                  in this view. Older references can be replaced at this limit.
+                  This local list resets when the view remounts; use saved
+                  approvals after that. New runs stay blocked during
+                  cancellation recovery.
+                </p>
+                {reviewReminders.map((entry) => (
+                  <AutoSellReviewRecovery
+                    key={entry.reference.preparationId}
+                    reference={entry.reference}
+                    conflict={entry.conflict}
+                    projectId={project.id}
+                    mint={token.address}
+                    allowCancellation={
+                      !running &&
+                      !snapshot?.settling &&
+                      !busy &&
+                      cancellationCount === 0
+                    }
+                    onCancellationBlocked={(blocked) =>
+                      trackCancellation(
+                        `review:${entry.reference.preparationId}`,
+                        blocked,
+                      )
+                    }
+                  />
+                ))}
+              </section>
+            )}
             <AutoSellSavedOutcomes
+              allowCancellation={
+                !running &&
+                !snapshot?.settling &&
+                !busy &&
+                cancellationCount === 0
+              }
+              onCancellationBlocked={(id, blocked) =>
+                trackCancellation(`history:${id}`, blocked)
+              }
               projectId={project.id}
               mint={token.address}
             />

@@ -1,5 +1,9 @@
 import { rawToDecimal } from './auto-sell';
 import { readBoundedPanelJson } from './read-bounded-panel-json';
+import {
+  AutoSellReviewRecoveryError,
+  validatedAutoSellReviewReference,
+} from './auto-sell-review-recovery';
 import type { VaultSession } from './browser-wallet-vault';
 import type { AutoSellOutcomeReference } from './auto-sell-outcome-reference';
 import {
@@ -57,6 +61,15 @@ export class AutoSellUncertainError extends Error {
   }
 }
 
+class AutoSellRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 class RetryLater extends Error {
   constructor(
     message: string,
@@ -106,7 +119,8 @@ async function postJson(
     );
   }
   if (!response.ok)
-    throw new Error(
+    throw new AutoSellRequestError(
+      response.status,
       typeof data.error === 'string' ? data.error : `HTTP ${response.status}`,
     );
   return data;
@@ -193,41 +207,65 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
         ? Math.min(15000, Math.max(0, prepared.reviewWaitMs))
         : 0;
     if (wait) await sleep(wait + 100, signal);
-    const reviewed = await withRateRetry(
-      () =>
-        postJson(
-          fetcher,
-          '/api/imported-projects/signing',
-          {
-            action: 'review',
-            preparationId: history.id,
-            transaction: order.preparation!.transaction,
-          },
-          signal,
-        ),
-      sleep,
-      signal,
-    );
-    const review = reviewed.review as WarmupSigningReview | undefined;
-    if (
-      !review ||
-      review.preparationId !== history.id ||
-      review.wallet !== wallet.address ||
-      review.sha256 !== order.preparation.sha256 ||
-      review.transaction !== order.preparation.transaction ||
-      review.inputRaw !== amountRaw.toString() ||
-      review.inputMint !== deps.mint ||
-      review.outputMint !== SOL ||
-      review.network !== 'mainnet'
-    )
-      throw new Error('Approval review differs from the prepared sell.');
-    const session = deps.session();
-    if (!session) throw new Error('Wallet vault is locked.');
-    const assertCurrent = () => {
-      if (signal.aborted || deps.session() !== session)
-        throw new Error('Auto Sell stopped.');
-    };
-    const packet = await sign(session, review, assertCurrent);
+    const reviewReference = validatedAutoSellReviewReference({
+      projectId: deps.projectId,
+      projectRevision: deps.projectRevision,
+      walletRevision: wallet.revision,
+      preparationId: history.id,
+      wallet: wallet.address,
+      mint: deps.mint,
+      inputRaw: amountRaw.toString(),
+      preparationSha256: order.preparation.sha256,
+    });
+    let review: WarmupSigningReview;
+    try {
+      const reviewed = await withRateRetry(
+        () =>
+          postJson(
+            fetcher,
+            '/api/imported-projects/signing',
+            {
+              action: 'review',
+              preparationId: history.id,
+              transaction: order.preparation!.transaction,
+            },
+            signal,
+          ),
+        sleep,
+        signal,
+      );
+      const candidate = reviewed.review as WarmupSigningReview | undefined;
+      if (
+        !candidate ||
+        candidate.preparationId !== history.id ||
+        candidate.wallet !== wallet.address ||
+        candidate.sha256 !== order.preparation.sha256 ||
+        candidate.transaction !== order.preparation.transaction ||
+        candidate.inputRaw !== amountRaw.toString() ||
+        candidate.inputMint !== deps.mint ||
+        candidate.outputMint !== SOL ||
+        candidate.network !== 'mainnet'
+      )
+        throw new Error('Approval review differs from the prepared sell.');
+      review = candidate;
+    } catch (error) {
+      throw new AutoSellReviewRecoveryError(
+        reviewReference,
+        error instanceof AutoSellRequestError && error.status === 409,
+      );
+    }
+    let packet: Awaited<ReturnType<typeof sign>>;
+    try {
+      const session = deps.session();
+      if (!session) throw new Error('Wallet vault is locked.');
+      const assertCurrent = () => {
+        if (signal.aborted || deps.session() !== session)
+          throw new Error('Auto Sell stopped.');
+      };
+      packet = await sign(session, review, assertCurrent);
+    } catch {
+      throw new AutoSellReviewRecoveryError(reviewReference);
+    }
     const outcome: AutoSellOutcomeReference = Object.freeze({
       projectId: deps.projectId,
       projectRevision: deps.projectRevision,
@@ -298,7 +336,8 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
         next = (next + i + 1) % deps.wallets.length;
         return result;
       } catch (error) {
-        if (signal.aborted) throw error;
+        if (signal.aborted || error instanceof AutoSellReviewRecoveryError)
+          throw error;
         const message = error instanceof Error ? error.message : 'failed';
         errors.push(`${wallet.address.slice(0, 4)}…: ${message}`);
         // Signed sells are never retried on another wallet.

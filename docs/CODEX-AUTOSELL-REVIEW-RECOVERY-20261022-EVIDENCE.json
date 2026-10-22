@@ -1,0 +1,225 @@
+{
+  "sourceBase": "106c1f8d40ca3815c8ce5eeef3c2b1e8c668cb53",
+  "sourceFiles": [
+    "lib/auto-sell-review-recovery.ts",
+    "lib/auto-sell-review-recovery.test.ts",
+    "lib/auto-sell-review-runner.test.ts",
+    "lib/auto-sell-execute.ts",
+    "lib/auto-sell-execute-response.test.ts",
+    "lib/auto-sell-runner.ts",
+    "lib/auto-sell-outcome-route.test.ts",
+    "components/auto-sell-review-recovery.tsx",
+    "components/auto-sell-review-recovery.test.tsx",
+    "components/auto-sell-unsigned-cancel.tsx",
+    "components/auto-sell-modal.tsx",
+    "components/auto-sell-saved-outcomes.tsx",
+    "components/auto-sell-saved-outcomes.module.css",
+    "test/auto-sell-review-fixture.ts",
+    "app/api/imported-projects/signing/route.ts",
+    "components/auto-sell-review-recovery-modal.test.tsx",
+    "components/auto-sell-saved-outcomes.test.tsx",
+    "components/use-recovery-read-focus.ts"
+  ],
+  "sourceHashes": {
+    "lib/auto-sell-review-recovery.ts": "56ef442394ee01cddd1bcb0baa73deea721662ba59a5227ec95f01f32c40f78b",
+    "lib/auto-sell-review-recovery.test.ts": "156046d3c8d9e58be8b7a2cef39215361ef9f0bfcd546bc250b69cbdb67ae170",
+    "lib/auto-sell-review-runner.test.ts": "128544249d286e6def969a695d758329e1a61a8978d8d0734edbc19fc65ea36b",
+    "lib/auto-sell-execute.ts": "f06317be3eb53ee61313ef26ed9270bc26072641da90641afdf6fd8b69e32fc8",
+    "lib/auto-sell-execute-response.test.ts": "1b519c1f0c94ee868d55b41a97d78f2af715a11e9ae406a175b6dd10bde50896",
+    "lib/auto-sell-runner.ts": "01cfdac5cc38a5407b3c0f61c9ea352dd29ecc459d8908608b21818ab962fe38",
+    "lib/auto-sell-outcome-route.test.ts": "fa37824e0ab86c31ba183a5de7a6c88826bf29a8cb2057fb123eeefe8d24d9d6",
+    "components/auto-sell-review-recovery.tsx": "1197cd30a02fce612a26e4bbd8b1bcbc083a8e0b43b87ef3fa010724f938711c",
+    "components/auto-sell-review-recovery.test.tsx": "609ab6a317e3ee0f3bb8bd05becdd5db767e192ceb4e5c0034e44e8090bdaa2f",
+    "components/auto-sell-unsigned-cancel.tsx": "b061344de9c18b3fad240a3de643ae3047ad0e3bcaa3c885fbacccb2f94beaaf",
+    "components/auto-sell-modal.tsx": "35e30e7f0fd4cd25b39fe82d33140ef9e8b9082fddeb821526ae2f18ace3d0c3",
+    "components/auto-sell-saved-outcomes.tsx": "95c3e899c8b36d4e6d7b395bfeb084aed288af17580c74015956f3385312811c",
+    "components/auto-sell-saved-outcomes.module.css": "e6dad0bc78c3fdcb673aa1c24a8db7a625e889055378f1816ea7b7990dca4234",
+    "test/auto-sell-review-fixture.ts": "85bfb6a00ef6f301b01c9a032563d9bb4f3744c4dd45d7f53cbccfae248927c6",
+    "app/api/imported-projects/signing/route.ts": "838818764b5daf7f45d792e46d5620bb65b012d30b32b826a83bab9a3ad10280",
+    "components/auto-sell-review-recovery-modal.test.tsx": "d6f5a1b03bd47dadf11495ce485d19747656162862f0413823443b2d54cbb562",
+    "components/auto-sell-saved-outcomes.test.tsx": "a13e723dd812c5820255df6b7276eff74934ce73e89e3ca8fa0f9b5476ab71b6",
+    "components/use-recovery-read-focus.ts": "ef8f173e9f62ef95edba9c8c95b195cf4bade8e7e217de58c64cf1e30a04b56f"
+  },
+  "tests": {
+    "passed": 360,
+    "failed": 0,
+    "skipped": 0,
+    "files": 32
+  },
+  "reproducedReviewRegressions": {
+    "failedOnCandidate": [
+      "blocks parent rereads while cancellation is pending or needs its own status read",
+      "does not steal focus after a pointer click on non-focusable content outside the panel",
+      "clears unsigned cancellation consent on a fresh history read"
+    ],
+    "allPassOnCorrectedSource": true
+  },
+  "plainTypeScript": true,
+  "typedLintFiles": 17,
+  "formatFiles": 18,
+  "isolatedBuild": {
+    "base": "106c1f8d40ca3815c8ce5eeef3c2b1e8c668cb53",
+    "overlays": [
+      "lib/auto-sell-review-recovery.ts",
+      "lib/auto-sell-review-recovery.test.ts",
+      "lib/auto-sell-review-runner.test.ts",
+      "lib/auto-sell-execute.ts",
+      "lib/auto-sell-execute-response.test.ts",
+      "lib/auto-sell-runner.ts",
+      "lib/auto-sell-outcome-route.test.ts",
+      "components/auto-sell-review-recovery.tsx",
+      "components/auto-sell-review-recovery.test.tsx",
+      "components/auto-sell-unsigned-cancel.tsx",
+      "components/auto-sell-modal.tsx",
+      "components/auto-sell-saved-outcomes.tsx",
+      "components/auto-sell-saved-outcomes.module.css",
+      "test/auto-sell-review-fixture.ts",
+      "app/api/imported-projects/signing/route.ts",
+      "components/auto-sell-review-recovery-modal.test.tsx",
+      "components/auto-sell-saved-outcomes.test.tsx",
+      "components/use-recovery-read-focus.ts"
+    ],
+    "hashes": {
+      "lib/auto-sell-review-recovery.ts": "56ef442394ee01cddd1bcb0baa73deea721662ba59a5227ec95f01f32c40f78b",
+      "lib/auto-sell-review-recovery.test.ts": "156046d3c8d9e58be8b7a2cef39215361ef9f0bfcd546bc250b69cbdb67ae170",
+      "lib/auto-sell-review-runner.test.ts": "128544249d286e6def969a695d758329e1a61a8978d8d0734edbc19fc65ea36b",
+      "lib/auto-sell-execute.ts": "f06317be3eb53ee61313ef26ed9270bc26072641da90641afdf6fd8b69e32fc8",
+      "lib/auto-sell-execute-response.test.ts": "1b519c1f0c94ee868d55b41a97d78f2af715a11e9ae406a175b6dd10bde50896",
+      "lib/auto-sell-runner.ts": "01cfdac5cc38a5407b3c0f61c9ea352dd29ecc459d8908608b21818ab962fe38",
+      "lib/auto-sell-outcome-route.test.ts": "fa37824e0ab86c31ba183a5de7a6c88826bf29a8cb2057fb123eeefe8d24d9d6",
+      "components/auto-sell-review-recovery.tsx": "1197cd30a02fce612a26e4bbd8b1bcbc083a8e0b43b87ef3fa010724f938711c",
+      "components/auto-sell-review-recovery.test.tsx": "609ab6a317e3ee0f3bb8bd05becdd5db767e192ceb4e5c0034e44e8090bdaa2f",
+      "components/auto-sell-unsigned-cancel.tsx": "b061344de9c18b3fad240a3de643ae3047ad0e3bcaa3c885fbacccb2f94beaaf",
+      "components/auto-sell-modal.tsx": "35e30e7f0fd4cd25b39fe82d33140ef9e8b9082fddeb821526ae2f18ace3d0c3",
+      "components/auto-sell-saved-outcomes.tsx": "95c3e899c8b36d4e6d7b395bfeb084aed288af17580c74015956f3385312811c",
+      "components/auto-sell-saved-outcomes.module.css": "e6dad0bc78c3fdcb673aa1c24a8db7a625e889055378f1816ea7b7990dca4234",
+      "test/auto-sell-review-fixture.ts": "85bfb6a00ef6f301b01c9a032563d9bb4f3744c4dd45d7f53cbccfae248927c6",
+      "app/api/imported-projects/signing/route.ts": "838818764b5daf7f45d792e46d5620bb65b012d30b32b826a83bab9a3ad10280",
+      "components/auto-sell-review-recovery-modal.test.tsx": "d6f5a1b03bd47dadf11495ce485d19747656162862f0413823443b2d54cbb562",
+      "components/auto-sell-saved-outcomes.test.tsx": "a13e723dd812c5820255df6b7276eff74934ce73e89e3ca8fa0f9b5476ab71b6",
+      "components/use-recovery-read-focus.ts": "ef8f173e9f62ef95edba9c8c95b195cf4bade8e7e217de58c64cf1e30a04b56f"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "signingPostIdentity": {
+    "base": "106c1f8d40ca3815c8ce5eeef3c2b1e8c668cb53",
+    "postIdentical": true,
+    "postSha256": "fb686cae715a8cca2c2291b933374b934e30112d553b46afe6100653aa2ddc52"
+  },
+  "opusReviews": [
+    {
+      "startedAt": "2026-10-22T05:30:49.499Z",
+      "finishedAt": "2026-10-22T05:35:33.672Z",
+      "sourceBaseCommit": "106c1f8d40ca3815c8ce5eeef3c2b1e8c668cb53",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "sourceUnchanged": true,
+      "sourceCopies": 30
+    },
+    {
+      "startedAt": "2026-10-22T05:46:35.305Z",
+      "finishedAt": "2026-10-22T05:47:52.307Z",
+      "sourceBaseCommit": "106c1f8d40ca3815c8ce5eeef3c2b1e8c668cb53",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5",
+        "<synthetic>"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 1,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": true,
+      "sourceUnchanged": true,
+      "sourceCopies": 30
+    },
+    {
+      "startedAt": "2026-10-22T06:00:05.015Z",
+      "finishedAt": "2026-10-22T06:01:48.790Z",
+      "sourceBaseCommit": "106c1f8d40ca3815c8ce5eeef3c2b1e8c668cb53",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "sourceUnchanged": true,
+      "sourceCopies": 30
+    }
+  ],
+  "followUpCompleted": true,
+  "nativeFixtureScope": "Disposable read-side tables and existing cancel CAS; no full migration triggers/reservations-table execution, so release/ledger correctness is not proven",
+  "browserInventory": "Timed out; no alternate profile or rendered claim",
+  "limits": {
+    "localPinnedReviewReferences": 100,
+    "explicitReadTimeoutMs": 15000,
+    "jsonResponseBytes": 1048576
+  },
+  "automaticRetryOfCancellation": false,
+  "automaticResume": false,
+  "newSigningAuthority": false,
+  "financialRulesChanged": false,
+  "schemaChanged": false,
+  "applicationOrHostedSqlExecuted": false,
+  "providerCredentialsCronChanged": false,
+  "realWalletAction": false,
+  "fundedRun": false,
+  "deployed": false,
+  "fullParity": false,
+  "followUpFailureHistorical": "Weekly usage limit; CLI reports reset7am Europe/London. Synthetic model marker is the CLI limit response, not a fallback model.",
+  "finalNarrowGateCorrectionsIndependentlyVerifiedAfterReview": true,
+  "rejectedSpeculativeFinding": "Multiple accepted rows for one preparation: parser rejects >1 and committed owner/preparation index is unique",
+  "modalWideCancellationRunGate": true,
+  "globalOrDurableCancellationIntentService": false,
+  "nativeFixtureProvesReservationRelease": false,
+  "newRunsBlockedBeforeVaultWhileCancellationUnresolved": true,
+  "pendingCancellationCannotBeEvictedByNewRun": true,
+  "parentLabelsIdentifyHistoricalSnapshot": true
+}

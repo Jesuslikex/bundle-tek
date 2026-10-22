@@ -84,3 +84,17 @@
   align-items: center;
   font-size: 12px;
 }
+
+.panel .consent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.panel .consent input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex-shrink: 0;
+}

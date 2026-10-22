@@ -320,3 +320,18 @@ it('reports timeout rather than leaving the read permanently busy', async () => 
   expect(host.textContent).not.toContain('Reading saved approvals');
   expect(host.textContent).not.toContain('PRIVATE abort text');
 });
+
+it('clears unsigned cancellation consent on a fresh history read', async () => {
+  const body = autoSellOutcomePage();
+  body.intents[0].state = 'awaiting_signature';
+  body.intents[0].signature = null;
+  fetcher.mockImplementation(async () => Response.json(body));
+  await click('Read latest saved approvals');
+  const box = host.querySelector<HTMLInputElement>('input[type=checkbox]')!;
+  await act(async () => box.click());
+  expect(box.checked).toBe(true);
+  await click('Read latest saved approvals');
+  expect(
+    host.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+});

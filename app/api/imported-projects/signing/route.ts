@@ -78,12 +78,15 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams,
     projectId = params.get('projectId'),
     cursor = params.get('cursor'),
-    intentId = params.get('intentId');
+    intentId = params.get('intentId'),
+    preparationId = params.get('preparationId');
   if (
     !projectId ||
     !UUID.test(projectId) ||
     (cursor !== null && !UUID.test(cursor)) ||
-    (intentId !== null && (!UUID.test(intentId) || cursor !== null))
+    (intentId !== null && (!UUID.test(intentId) || cursor !== null)) ||
+    (preparationId !== null &&
+      (!UUID.test(preparationId) || cursor !== null || intentId !== null))
   )
     return json(
       { error: 'Choose an imported project and approval cursor.' },
@@ -112,13 +115,15 @@ export async function GET(request: Request) {
       return json({ error: 'Approval cursor unavailable.' }, 400);
     const rows = await db
       .prepare(
-        `SELECT ${columns},s.project_id AS projectId,s.project_revision AS projectRevision,s.wallet_revision AS walletRevision,json_extract(s.document,'$.side') AS side FROM imported_swap_signing_intents i JOIN imported_swap_preparations s ON s.owner_id=i.owner_id AND s.id=i.preparation_id WHERE i.owner_id=? AND s.project_id=? AND (? IS NULL OR i.id=?) AND (? IS NULL OR i.created_at<? OR (i.created_at=? AND i.id<?)) ORDER BY i.created_at DESC,i.id DESC LIMIT 51`,
+        `SELECT ${columns},s.project_id AS projectId,s.project_revision AS projectRevision,s.wallet_revision AS walletRevision,json_extract(s.document,'$.side') AS side FROM imported_swap_signing_intents i JOIN imported_swap_preparations s ON s.owner_id=i.owner_id AND s.id=i.preparation_id WHERE i.owner_id=? AND s.project_id=? AND (? IS NULL OR i.id=?) AND (? IS NULL OR i.preparation_id=?) AND (? IS NULL OR i.created_at<? OR (i.created_at=? AND i.id<?)) ORDER BY i.created_at DESC,i.id DESC LIMIT 51`,
       )
       .bind(
         user.userId,
         projectId,
         intentId,
         intentId,
+        preparationId,
+        preparationId,
         anchor?.createdAt ?? null,
         anchor?.createdAt ?? '',
         anchor?.createdAt ?? '',

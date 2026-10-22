@@ -14,17 +14,20 @@ vi.mock('@/app/chatgpt-auth', () => ({
   getChatGPTUser: async () => mocks.user,
 }));
 vi.mock('@/db', () => ({ getD1: () => mocks.db }));
-import { GET } from '../app/api/imported-projects/signing/route';
+import { GET, POST } from '../app/api/imported-projects/signing/route';
 let sqlite: DatabaseSync;
 const statements: string[] = [];
+let allowCancelWrite = false;
 beforeEach(() => {
   mocks.user = { userId: 'alice' };
   statements.length = 0;
+  allowCancelWrite = false;
   sqlite = new DatabaseSync(':memory:');
   // Read-side projections only. This does not exercise financial write guards.
   sqlite.exec(`CREATE TABLE imported_token_projects(owner_id TEXT,id TEXT,revision INTEGER,archived INTEGER);
   CREATE TABLE imported_swap_preparations(id TEXT,owner_id TEXT,project_id TEXT,project_revision INTEGER,wallet_revision INTEGER,document TEXT);
-  CREATE TABLE imported_swap_signing_intents(id TEXT,owner_id TEXT,preparation_id TEXT,wallet_address TEXT,document TEXT,state TEXT,signature TEXT,failure_receipt TEXT,created_at TEXT,updated_at TEXT);`);
+  CREATE TABLE imported_swap_signing_intents(id TEXT,owner_id TEXT,preparation_id TEXT,wallet_address TEXT,document TEXT,state TEXT,signature TEXT,failure_receipt TEXT,created_at TEXT,updated_at TEXT);
+  CREATE TABLE jito_bundle_packets(owner_id TEXT,intent_id TEXT);`);
   const row = autoSellOutcomePage().intents[0];
   sqlite
     .prepare('INSERT INTO imported_token_projects VALUES(?,?,8,1)')
@@ -57,7 +60,16 @@ beforeEach(() => {
     );
   mocks.db = {
     prepare(sql: string) {
-      if (!/^\s*SELECT\b/i.test(sql)) throw Error('Only saved reads allowed');
+      if (
+        !/^\s*SELECT\b/i.test(sql) &&
+        !(
+          allowCancelWrite &&
+          sql.startsWith(
+            "UPDATE imported_swap_signing_intents SET state='cancelled'",
+          )
+        )
+      )
+        throw Error('Only scoped reads/cancel CAS allowed');
       statements.push(sql);
       let values: (string | number | null)[] = [];
       return {
@@ -70,6 +82,13 @@ beforeEach(() => {
         },
         async all() {
           return { results: sqlite.prepare(sql).all(...values) };
+        },
+        async run() {
+          return {
+            meta: {
+              changes: Number(sqlite.prepare(sql).run(...values).changes),
+            },
+          };
         },
       };
     },
@@ -215,4 +234,124 @@ it('composes real cursor pagination through a page with zero Sell matches, witho
       .all(),
   ).toEqual(before);
   expect(statements.every((s) => /^\s*SELECT\b/i.test(s))).toBe(true);
+});
+
+it('finds the original approval by exact preparation without scanning newer pages or changing rows', async () => {
+  const before = sqlite
+    .prepare('SELECT * FROM imported_swap_signing_intents')
+    .all();
+  const response = await GET(
+    new Request(
+      `http://local/api/imported-projects/signing?projectId=${ref.projectId}&preparationId=${ref.preparationId}`,
+    ),
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as {
+    intents: { id: string; state: string }[];
+    nextCursor: string | null;
+  };
+  expect(body.intents.map((row: { id: string }) => row.id)).toEqual([
+    ref.intentId,
+  ]);
+  expect(body.nextCursor).toBeNull();
+  expect(
+    sqlite.prepare('SELECT * FROM imported_swap_signing_intents').all(),
+  ).toEqual(before);
+  expect(statements.every((s) => /^\s*SELECT\b/i.test(s))).toBe(true);
+});
+it.each(['cursor', 'intentId'])(
+  'refuses mixing preparation lookup with %s before DB access',
+  async (key) => {
+    const response = await GET(
+      new Request(
+        `http://local/api/imported-projects/signing?projectId=${ref.projectId}&preparationId=${ref.preparationId}&${key}=${ref.intentId}`,
+      ),
+    );
+    expect(response.status).toBe(400);
+    expect(statements).toHaveLength(0);
+  },
+);
+it('keeps a missing/foreign preparation separate from the newest owned approval', async () => {
+  const response = await GET(
+    new Request(
+      `http://local/api/imported-projects/signing?projectId=${ref.projectId}&preparationId=44444444-4444-4444-8444-444444444444`,
+    ),
+  );
+  expect(response.status).toBe(200);
+  expect(((await response.json()) as { intents: unknown[] }).intents).toEqual(
+    [],
+  );
+  mocks.user = { userId: 'bob' };
+  expect(
+    (
+      await GET(
+        new Request(
+          `http://local/api/imported-projects/signing?projectId=${ref.projectId}&preparationId=${ref.preparationId}`,
+        ),
+      )
+    ).status,
+  ).toBe(404);
+});
+
+const cancel = () =>
+  POST(
+    new Request('http://local/api/imported-projects/signing', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://local' },
+      body: JSON.stringify({ action: 'cancel', id: ref.intentId }),
+    }),
+  );
+it('composes manual unsigned cancellation and exact saved GET through the unchanged owner/state CAS', async () => {
+  allowCancelWrite = true;
+  sqlite
+    .prepare(
+      "UPDATE imported_swap_signing_intents SET state='awaiting_signature',signature=NULL",
+    )
+    .run();
+  const response = await cancel();
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ state: 'cancelled' });
+  const saved = await read();
+  expect(saved.status).toBe(200);
+  expect(
+    ((await saved.json()) as { intents: { state: string }[] }).intents[0].state,
+  ).toBe('cancelled');
+  expect((await cancel()).status).toBe(409);
+  expect(
+    sqlite.prepare('SELECT state FROM imported_swap_signing_intents').get(),
+  ).toEqual({ state: 'cancelled' });
+});
+it.each(['signed', 'submitted', 'finalized', 'failed'])(
+  'refuses cancellation of saved %s, without any signing or provider action',
+  async (state) => {
+    allowCancelWrite = true;
+    sqlite
+      .prepare('UPDATE imported_swap_signing_intents SET state=?')
+      .run(state);
+    expect((await cancel()).status).toBe(409);
+    expect(
+      sqlite.prepare('SELECT state FROM imported_swap_signing_intents').get(),
+    ).toEqual({ state });
+  },
+);
+it('refuses a signature-bearing or bundle-bound unsigned record and another owner', async () => {
+  allowCancelWrite = true;
+  sqlite
+    .prepare(
+      "UPDATE imported_swap_signing_intents SET state='awaiting_signature'",
+    )
+    .run();
+  expect((await cancel()).status).toBe(409);
+  sqlite
+    .prepare('UPDATE imported_swap_signing_intents SET signature=NULL')
+    .run();
+  sqlite
+    .prepare('INSERT INTO jito_bundle_packets VALUES(?,?)')
+    .run('alice', ref.intentId);
+  expect((await cancel()).status).toBe(409);
+  mocks.user = { userId: 'bob' };
+  expect((await cancel()).status).toBe(404);
+  expect(
+    sqlite.prepare('SELECT state FROM imported_swap_signing_intents').get(),
+  ).toEqual({ state: 'awaiting_signature' });
 });

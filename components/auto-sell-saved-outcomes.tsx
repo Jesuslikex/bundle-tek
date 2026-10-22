@@ -6,6 +6,7 @@ import {
   readAutoSellSavedResponse,
 } from '@/lib/auto-sell-saved-outcomes';
 import { Button } from './ui/button';
+import { AutoSellUnsignedCancel } from './auto-sell-unsigned-cancel';
 import { Input } from './ui/input';
 import { UUID } from '@/lib/wallet-operation';
 import styles from './auto-sell-saved-outcomes.module.css';
@@ -20,6 +21,8 @@ const labels: Record<string, string> = {
 export function AutoSellSavedOutcomes(props: {
   projectId: string;
   mint: string;
+  allowCancellation?: boolean;
+  onCancellationBlocked?: (intentId: string, blocked: boolean) => void;
 }) {
   return (
     <SavedOutcomes
@@ -31,9 +34,13 @@ export function AutoSellSavedOutcomes(props: {
 function SavedOutcomes({
   projectId,
   mint,
+  allowCancellation = true,
+  onCancellationBlocked,
 }: {
   projectId: string;
   mint: string;
+  allowCancellation?: boolean;
+  onCancellationBlocked?: (intentId: string, blocked: boolean) => void;
 }) {
   const [id, setId] = useState('');
   const [page, setPage] = useState<ReturnType<
@@ -50,6 +57,15 @@ function SavedOutcomes({
   const resultsHeading = useRef<HTMLHeadingElement>(null);
   const nextFocus = useRef<'read' | 'results' | null>(null);
   const field = useId();
+  const cancellations = useRef(new Set<string>());
+  const [blockedCancellations, setBlockedCancellations] = useState(0);
+  function trackCancellation(id: string, blocked: boolean) {
+    if (blocked) cancellations.current.add(id);
+    else cancellations.current.delete(id);
+    setBlockedCancellations(cancellations.current.size);
+    onCancellationBlocked?.(id, blocked);
+  }
+
   useEffect(() => () => pending.current?.abort(), []);
   useEffect(() => {
     if (busy) cancelButton.current?.focus();
@@ -69,7 +85,7 @@ function SavedOutcomes({
       nextFocus.current = target;
   }
   async function read(older: boolean) {
-    if (busy) return;
+    if (busy || cancellations.current.size) return;
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
@@ -125,6 +141,9 @@ function SavedOutcomes({
       if (pending.current === controller && !controller.signal.aborted) {
         focusAfterRead('results');
         setPage(saved);
+        saved.rows.forEach((row) =>
+          onCancellationBlocked?.(row.intentId, false),
+        );
         setLoadedAt(new Date().toISOString());
         setNotice(
           `Loaded ${saved.scanned} approval record${saved.scanned === 1 ? '' : 's'}; ${saved.rows.length} matching Sell approval${saved.rows.length === 1 ? '' : 's'} on this page.`,
@@ -150,9 +169,10 @@ function SavedOutcomes({
         records are not classified as Auto Sell.
       </p>
       <p>
-        This reads saved status only. It does not check the chain, verify a
-        receipt, restore session counters, sign or resend. Nothing is loaded
-        until you request it.
+        History reads saved status only. It does not check the chain, verify a
+        receipt, restore session counters, sign or resend. Unsigned records have
+        a separately approved cancellation below. Nothing is loaded until you
+        request it.
       </p>
       <label htmlFor={field}>
         Approval ID (optional)
@@ -160,9 +180,10 @@ function SavedOutcomes({
           id={field}
           value={id}
           maxLength={64}
-          disabled={busy}
+          disabled={busy || blockedCancellations > 0}
           placeholder="Leave blank to browse"
           onChange={(event) => {
+            if (cancellations.current.size) return;
             setId(event.target.value);
             setPage(null);
             setLoadedAt(null);
@@ -176,7 +197,7 @@ function SavedOutcomes({
         <Button
           ref={readButton}
           variant="outline"
-          disabled={busy}
+          disabled={busy || blockedCancellations > 0}
           onClick={() => void read(false)}
         >
           {busy
@@ -188,7 +209,7 @@ function SavedOutcomes({
         {page?.nextCursor && (
           <Button
             variant="outline"
-            disabled={busy}
+            disabled={busy || blockedCancellations > 0}
             onClick={() => void read(true)}
           >
             Read older approvals
@@ -236,7 +257,7 @@ function SavedOutcomes({
           <ol className={styles.rows}>
             {page.rows.map((row) => (
               <li key={row.intentId}>
-                <strong>{labels[row.state]}</strong>
+                <strong>Page snapshot: {labels[row.state]}</strong>
                 <dl>
                   <div>
                     <dt>Approval</dt>
@@ -275,6 +296,19 @@ function SavedOutcomes({
                     </dd>
                   </div>
                 </dl>
+                {!busy &&
+                  row.state === 'awaiting_signature' &&
+                  row.signature === null && (
+                    <AutoSellUnsignedCancel
+                      projectId={projectId}
+                      mint={mint}
+                      row={row}
+                      disabled={!allowCancellation}
+                      onBlockedChange={(blocked) =>
+                        trackCancellation(row.intentId, blocked)
+                      }
+                    />
+                  )}
                 {row.signature && (
                   <a
                     href={`https://solscan.io/tx/${row.signature}`}
