@@ -1,0 +1,61 @@
+{
+  "sourceBaseCommit": "7b05e8b6d7d582a7f5d5b2c2e9dfba742b0104cc",
+  "scope": "Unadmitted current-source and independently bounded warmup spending proposal only",
+  "sourceHashes": {
+    "lib/wallet-warmup-execution-budget-review.ts": "1db927626caee4f53967c7c4f0b3c600be9f16e876193fc19621521176dc273b",
+    "lib/wallet-warmup-execution-budget-review.test.ts": "f51510f0318ae507a06fc4509d248e5139397c0a0c52d10995f7f6874cc2d465",
+    "lib/wallet-warmup-execution-assets.ts": "797682610bb3ce688455e075d9faf422c5abade8147ef4aace460466a01596ff",
+    "lib/wallet-warmup-execution-source.ts": "f3fa2c6d493d920c63f37acd2b01086a7d9008785e10770bda81bdd21238db74",
+    "lib/wallet-warmup-execution-terms.ts": "396d56c884935478ff60aa8d3b77b6f135b3381c88b9417b3072f6ed8981ed9f",
+    "lib/wallet-warmup-execution-manifest.ts": "119eb4caa653f21a7954c5e41aa3985c2b0b44f9a70f01623e9e887d09182f41",
+    "lib/wallet-warmup-execution-pacing.ts": "6c2e3fa1e4d507be4a201ab07045fb351e23b11ab5a0ee8f4cf8a5463a744b9f"
+  },
+  "sourceUnchanged": true,
+  "tests": {
+    "passed": 218,
+    "failed": 0,
+    "skipped": 0,
+    "files": 5,
+    "report": "work/release-qa/warmup-execution-budget-final-frozen-20261022.json",
+    "sha256": "db4ab74b43903fe1ed69c10ce556ce193bcee26a28883577f1f895a7556bb94a"
+  },
+  "typecheckPassed": true,
+  "scopedTypedLintPassed": true,
+  "scopedFormattingPassed": true,
+  "reviews": [
+    {
+      "report": "opus-warmup-fresh-budget-20261022",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "resultSubtype": "success",
+      "isError": false
+    },
+    {
+      "report": "opus-warmup-fresh-budget-final-20261022",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "sourceUnchanged": true,
+      "resultSubtype": "success",
+      "isError": false
+    }
+  ],
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "automaticExecutionAllowed": false,
+  "liveProviderRequests": 0,
+  "hostedSqlWrites": 0,
+  "deployment": false
+}
