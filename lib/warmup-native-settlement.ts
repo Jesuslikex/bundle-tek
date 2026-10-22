@@ -87,6 +87,13 @@ export function warmupRentChange(
   const pre = warmupAccountTokens(keys, wallet, preTokens, programs),
     post = warmupAccountTokens(keys, wallet, postTokens, programs);
   let rentChange = 0n;
+  // Observed wallet-owned token-account reserve deltas only, not gross
+  // transaction spending. Foreign-owned/non-token accounts are outside this
+  // scope. Accounts can be created and closed between snapshots. These sums
+  // preserve opposing visible movements without claiming to recover that
+  // hidden activity or allowing refunds to replenish execution authority.
+  let observedWalletTokenReserveIncreases = 0n;
+  let observedWalletTokenReserveDecreases = 0n;
   for (const index of new Set([...pre.keys(), ...post.keys()])) {
     const first = pre.get(index),
       last = post.get(index),
@@ -110,9 +117,18 @@ export function warmupRentChange(
     const lastRent = end - (mint === WARMUP_NATIVE ? (last?.amount ?? 0n) : 0n);
     if (firstRent < 0n || lastRent < 0n)
       throw new Error('Signing requires valid native token reserves.');
-    rentChange += lastRent - firstRent;
+    const change = lastRent - firstRent;
+    rentChange += change;
+    if (change > 0n) observedWalletTokenReserveIncreases += change;
+    else observedWalletTokenReserveDecreases -= change;
   }
-  return { pre, post, rentChange };
+  return {
+    pre,
+    post,
+    rentChange,
+    observedWalletTokenReserveIncreases,
+    observedWalletTokenReserveDecreases,
+  };
 }
 function postToken(
   raw: unknown,
