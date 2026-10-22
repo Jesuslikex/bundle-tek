@@ -70,7 +70,10 @@ function server(
       return ok({ error: 'send unknown' }, 502);
     if (body.action === 'register' && opts.registerFails)
       return ok({ error: 'registration unknown' }, 502);
-    return ok({ signature: retained.signature, state: 'submitted' });
+    return ok({
+      signature: retained.signature,
+      state: body.action === 'register' ? 'signed' : 'submitted',
+    });
   });
   return { calls, fetcher: fetcher as unknown as typeof fetch };
 }
@@ -168,8 +171,8 @@ describe('auto sell executor', () => {
       })),
     });
     const error = await sell(1_500_000n, controller.signal).catch((e) => e);
-    expect(error).not.toBeInstanceOf(AutoSellUncertainError);
-    expect(error.message).toMatch(/before sending/);
+    expect(error).toBeInstanceOf(AutoSellUncertainError);
+    expect(error.outcome?.signature).toBe(retained.signature);
     expect(s.calls.some((c) => c.body.action === 'submit')).toBe(false);
   });
   it('retains the original lookup context after a registration-stage refusal without another wallet or send', async () => {

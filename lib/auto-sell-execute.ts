@@ -1,4 +1,5 @@
 import { rawToDecimal } from './auto-sell';
+import { readBoundedPanelJson } from './read-bounded-panel-json';
 import type { VaultSession } from './browser-wallet-vault';
 import type { AutoSellOutcomeReference } from './auto-sell-outcome-reference';
 import {
@@ -56,13 +57,6 @@ export class AutoSellUncertainError extends Error {
   }
 }
 
-/** Stopped after registration but before the send started. */
-class AutoSellNotSentError extends Error {
-  constructor() {
-    super('Auto Sell stopped before sending.');
-  }
-}
-
 class RetryLater extends Error {
   constructor(
     message: string,
@@ -78,18 +72,28 @@ async function postJson(
   body: unknown,
   signal: AbortSignal,
 ) {
+  signal.throwIfAborted();
+  const current = AbortSignal.any([signal, AbortSignal.timeout(40000)]);
   const response = await fetcher(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.any([signal, AbortSignal.timeout(40000)]),
+    signal: current,
+    cache: 'no-store',
+    redirect: 'error',
   });
   let data: Record<string, unknown> = {};
   try {
-    data = (await response.json()) as Record<string, unknown>;
+    const value = await readBoundedPanelJson(response, current);
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error();
+    data = value as Record<string, unknown>;
   } catch {
-    // Non-JSON error bodies fall through to the status check.
+    if (current.aborted) throw current.reason;
+    if (response.ok) throw new Error('Auto Sell server response unavailable.');
+    // An unavailable error body never exposes raw parser or HTML diagnostics.
   }
+  current.throwIfAborted();
   if (response.status === 429) {
     const wait =
       typeof data.reviewWaitMs === 'number' &&
@@ -245,9 +249,13 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
       );
       if (registered.signature !== packet.signature)
         throw new Error('Registered signature mismatch.');
-      // Stop pressed while registering: never start the send. The registered
-      // packet is left unsent and expires with its blockhash.
-      if (signal.aborted) throw new AutoSellNotSentError();
+      if (registered.state !== 'signed')
+        throw new Error(
+          'Registration is not ready for a new send. Recover the original approval.',
+        );
+      // Stop still prevents a new send. Once signed, keep the original
+      // exposure/recovery reference even if no acknowledgement was readable.
+      signal.throwIfAborted();
       // Once the send has started it is not aborted: the server sends it once
       // and never resends, so the outcome must be awaited and recorded.
       const submitted = await postJson(
@@ -258,8 +266,11 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
       );
       if (submitted.signature !== packet.signature)
         throw new Error('Submitted signature mismatch.');
+      if (submitted.state !== 'submitted')
+        throw new Error(
+          'Submission acknowledgement differs. Recover the original approval.',
+        );
     } catch (error) {
-      if (error instanceof AutoSellNotSentError) throw error;
       // A signed packet may already be on chain. Never resell this amount.
       throw new AutoSellUncertainError(
         `${error instanceof Error ? error.message : 'Submission unknown'}. Check signature ${packet.signature} in preparation history.`,

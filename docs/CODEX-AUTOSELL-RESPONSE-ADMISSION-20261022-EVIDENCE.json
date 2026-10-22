@@ -1,0 +1,133 @@
+{
+  "sourceBaseCommit": "ee84038273455a2401d0e250fe2d3226c4ebd5b4",
+  "tests": {
+    "passed": 300,
+    "failed": 0,
+    "skipped": 0,
+    "files": 27,
+    "source": "Focused Auto Sell, bounded reader and actual signer cohort; synthetic transports and wallets, no real funded execution"
+  },
+  "plainTypeScript": true,
+  "typedLintFiles": 3,
+  "formatFiles": 3,
+  "isolatedBuild": {
+    "base": "ee84038273455a2401d0e250fe2d3226c4ebd5b4",
+    "overlays": [
+      "lib/auto-sell-execute.ts",
+      "lib/auto-sell-execute.test.ts",
+      "lib/auto-sell-execute-response.test.ts"
+    ],
+    "hashes": {
+      "lib/auto-sell-execute.ts": "4463565cb271d7898e0669cc3ac5bf7d6ff90c8577a3316795e82cbab110b71d",
+      "lib/auto-sell-execute.test.ts": "6bb97460821eb7afd5e17ef425c4ded0128116652b24993032f7dd696af71b07",
+      "lib/auto-sell-execute-response.test.ts": "4298a88bbb05621d0d4a6bd68e6d3aaa9b488dcea223f9ac2aa8d3075df802d6"
+    },
+    "exitCode": 0,
+    "unchanged": true,
+    "passed": true,
+    "envFilesCopied": false,
+    "deployed": false
+  },
+  "opusSourceReviews": [
+    {
+      "startedAt": "2026-10-22T05:04:13.495Z",
+      "finishedAt": "2026-10-22T05:06:07.093Z",
+      "sourceBaseCommit": "ee84038273455a2401d0e250fe2d3226c4ebd5b4",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "sourceUnchanged": true,
+      "copiedFiles": 14
+    },
+    {
+      "startedAt": "2026-10-22T05:09:16.586Z",
+      "finishedAt": "2026-10-22T05:11:07.914Z",
+      "sourceBaseCommit": "ee84038273455a2401d0e250fe2d3226c4ebd5b4",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "sourceUnchanged": true,
+      "copiedFiles": 16
+    }
+  ],
+  "initialBaseline": {
+    "cases": 15,
+    "passed": 0,
+    "failed": 15,
+    "scope": "Initial response cases against unchanged executor; injected responses, not observed mainnet incident"
+  },
+  "retainedEarlierRuns": {
+    "firstCorrectedAssertionsPassed": 20,
+    "firstCorrectedExitCode": 1,
+    "reason": "Delayed test producer enqueued after cancellation; fixture fixed and final exit0"
+  },
+  "rea": {
+    "targetListEvidence": "ev_43f7b46179fe8cbec9c07368ec4e5e58dbc48af6ce2d1bbd713c253693057faa",
+    "passivePageEvidence": "ev_b948ccfb090963133922201e0c2723845fd9e487727059754028f9c9870b381b",
+    "privateBundleBytes": 3451497,
+    "privateBundleSha256": "087727829e5c5f0ebc5af867886dff922753f076ddf69d9e012a7c7757b1cf55",
+    "retainedBundleRecords": 8,
+    "newSelectedObservations": 2,
+    "interactions": 0,
+    "temporaryRelayStopped": true,
+    "chromePreserved": true,
+    "privateValuesPublished": false
+  },
+  "publicReferencesRefreshed": [
+    "https://docs.proxima.tools/live-settings/auto-buy/",
+    "https://docs.proxima.tools/wallets/generate-activity/"
+  ],
+  "authorityUnchanged": true,
+  "serverAndSigningRulesChanged": false,
+  "uiChanged": false,
+  "schemaChanged": false,
+  "providerSettingsChanged": false,
+  "applicationOrHostedSqlExecuted": false,
+  "realWalletAction": false,
+  "fundedExecution": false,
+  "deployed": false,
+  "renderedQa": false,
+  "fullParity": false,
+  "remaining": [
+    "Pre-sign saved-review reservation recovery",
+    "Rendered signed-in flow qualification",
+    "Warmup execution lifecycle/reservations/settlement",
+    "Durable orchestration/finalized accounting",
+    "Provider/funded qualification",
+    "Remaining full-product UI/feature audit"
+  ]
+}
