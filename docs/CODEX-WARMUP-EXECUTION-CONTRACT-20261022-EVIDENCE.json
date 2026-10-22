@@ -1,0 +1,50 @@
+{
+  "base": "6c5099ab5a0f0125dcf487ad905ad9f627caf7e4",
+  "scope": "unmounted necessary schedule bound; execution contract audit",
+  "sourceSha256": {
+    "lib/wallet-warmup-execution-pacing.ts": "6c2e3fa1e4d507be4a201ab07045fb351e23b11ab5a0ee8f4cf8a5463a744b9f",
+    "lib/wallet-warmup-execution-pacing.test.ts": "cf7039b82269d94392e59391b6b88fc64fd013aedbfdb843e206fc93250a5083"
+  },
+  "tests": {
+    "passed": 75,
+    "failed": 0,
+    "skipped": 0,
+    "files": 3
+  },
+  "typecheck": true,
+  "typedLint": true,
+  "format": true,
+  "designReview": {
+    "model": [
+      "claude-opus-5-5"
+    ],
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "finishedAt": "2026-10-22T01:40:28.577Z",
+    "scope": "source-only design critique; no tests"
+  },
+  "helperReview": {
+    "model": [
+      "claude-opus-5-5"
+    ],
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "finishedAt": "2026-10-22T01:46:03.650Z",
+    "scope": "five-file source-only review; no tests",
+    "postReviewFiniteDateGuardAndTestsIndependentlyVerified": true
+  },
+  "dateErrorBaseline": {
+    "failed": 1,
+    "unselected": 13
+  },
+  "mountedCaller": false,
+  "runtimeQualification": false,
+  "executionEnabled": false,
+  "schemaChanged": false,
+  "providerSettingsChanged": false,
+  "deployed": false,
+  "fundedActions": false,
+  "fullSuiteRun": false,
+  "productionBuildRun": false,
+  "renderedQaRun": false
+}
