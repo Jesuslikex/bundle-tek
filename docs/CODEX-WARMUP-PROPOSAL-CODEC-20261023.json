@@ -1,0 +1,56 @@
+{
+  "sourceBaseCommit": "d72e272d78edbbaf97e0f0b4d0f64c3943db933e",
+  "scope": "Unmounted complete pre-approval proposal BLOB transport; no durable publication/approval/admission/signing",
+  "checks": {
+    "passedTests": 374,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "files": 9,
+    "codecTests": 42,
+    "typecheckPassed": true,
+    "typedLintPassed": true,
+    "formatPassed": true,
+    "frozenSourceFiles": 2376,
+    "frozenSourceUnchanged": true
+  },
+  "ownedSourceHashes": {
+    "lib/wallet-warmup-execution-proposal-codec.ts": "24d3ca705b10b0f5523456e3840d3c4a9283c6c25deca407bd7c8650c569a90c",
+    "lib/wallet-warmup-execution-proposal-codec.test.ts": "ca8c0ab386d3ccca26eb86fc0864dab0d1fbd5117bb0c4a54cf1934243af3b36",
+    "lib/wallet-warmup-execution-budget-review.ts": "ea09400ebbfd8bf066abdb0fdbcc31562e543c7c13d0f905cf6c0848f38113ea"
+  },
+  "extractionProof": {
+    "allExistingFunctionsPrinterIdentical": true,
+    "functionCount": 3,
+    "verifierSchemaPrinterIdentical": true
+  },
+  "reviews": [
+    {
+      "directory": "work/release-qa/opus-warmup-proposal-codec-20261023",
+      "copiedFiles": 15,
+      "unchanged": true,
+      "model": "claude-opus-5-5",
+      "permissionDenials": 0
+    },
+    {
+      "directory": "work/release-qa/opus-warmup-proposal-codec-final-20261023",
+      "copiedFiles": 12,
+      "unchanged": true,
+      "model": "claude-opus-5-5",
+      "permissionDenials": 0
+    }
+  ],
+  "postReviewChanges": "Codex independently verified intrinsic byteLength .call, intrinsic typed-array tag, index-loop snapshot and caller method/type regression tests; not rereviewed.",
+  "resourcePolicy": {
+    "chunkBytes": 196608,
+    "inputBytesCeiling": 67108864,
+    "peakMemoryMayBeSeveralTimesInput": true,
+    "universalMaximumOrHostedCapacityProven": false
+  },
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "automaticExecutionAllowed": false,
+  "deployed": false,
+  "hostedSqlRun": false,
+  "applicationSqlRun": false,
+  "nextMigrationUnclaimed": "0139"
+}

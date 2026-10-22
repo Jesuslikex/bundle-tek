@@ -459,19 +459,21 @@ async function deriveBudgetTerms(
   };
 }
 
+/** Shape capture only. Never substitutes for owned source/economics replay. */
+export const warmupExecutionReviewEvidenceSchema = z
+  .object({
+    format: z.literal('wallet-warmup-execution-review-evidence-v1'),
+    assets: warmupExecutionAssetEvidenceSchema,
+    assetEvidenceSha256: hash,
+    freshBudget: freshBudgetSchema,
+    freshBudgetSha256: hash,
+  })
+  .strict();
 const rootRecordSchema = z
   .object({
     root: z.unknown(),
     approval: z.unknown(),
-    verifierEvidence: z
-      .object({
-        format: z.literal('wallet-warmup-execution-review-evidence-v1'),
-        assets: warmupExecutionAssetEvidenceSchema,
-        assetEvidenceSha256: hash,
-        freshBudget: freshBudgetSchema,
-        freshBudgetSha256: hash,
-      })
-      .strict(),
+    verifierEvidence: warmupExecutionReviewEvidenceSchema,
   })
   .strict();
 const rootExpected = z
