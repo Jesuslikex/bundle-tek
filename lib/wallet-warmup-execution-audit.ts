@@ -261,13 +261,14 @@ async function next(
  * The returned checkpoint is a non-resumable summary, not reducer/CAS state.
  * A real caller-owned AbortSignal is required; cancellation retains its reason.
  * No database, provider, signer, timer or send callback is invoked. */
-export async function auditSavedWarmupExecutionPrefix(
+async function replayOwnedPrefix(
   rawRoot: unknown,
   rawApproval: unknown,
   selector: Selector,
   rawHead: unknown,
   stream: AsyncIterable<unknown> | Iterable<unknown>,
   signal: AbortSignal,
+  controlOnly: boolean,
 ) {
   let iterator: AsyncIterator<unknown> | Iterator<unknown> | undefined,
     finished = false;
@@ -306,6 +307,11 @@ export async function auditSavedWarmupExecutionPrefix(
         { sha256, ...rest } = entrySchema.parse(raw),
         entry = body(rest);
       if (
+        controlOnly &&
+        !['pause', 'resume', 'stop'].includes(entry.event.operation)
+      )
+        fail();
+      if (
         canonical({ ...entry, sha256 }) !== wire ||
         entry.rootId !== rootId ||
         entry.rootSha256 !== rootSha256 ||
@@ -335,13 +341,21 @@ export async function auditSavedWarmupExecutionPrefix(
     if (sha256 !== head.checkpointSha256) fail();
     bounded(canonical(view), WARMUP_EXECUTION_PROJECTION_BYTES);
     return {
-      head,
-      checkpoint: checkpoint(view),
-      projection: view,
-      replayedEvents: count,
-      wireBytes: bytes,
-      scope: 'bookkeeping-prefix-audit-only' as const,
-      ...authority,
+      // The complete reducer remains private. Its summary is never used to
+      // restore hidden uniqueness, custody or lot state for a later transition.
+      ledger,
+      lots,
+      receipts,
+      context,
+      result: {
+        head,
+        checkpoint: checkpoint(view),
+        projection: view,
+        replayedEvents: count,
+        wireBytes: bytes,
+        scope: 'bookkeeping-prefix-audit-only' as const,
+        ...authority,
+      },
     };
   } catch {
     signal.throwIfAborted();
@@ -355,5 +369,125 @@ export async function auditSavedWarmupExecutionPrefix(
         .then(() => ownedIterator.return?.())
         .catch(() => {});
     }
+  }
+}
+
+/** Full-prefix audit with the original public result and stream semantics.
+ * Neither the reconstructed reducer nor a resumable checkpoint is exported. */
+export async function auditSavedWarmupExecutionPrefix(
+  rawRoot: unknown,
+  rawApproval: unknown,
+  selector: Selector,
+  rawHead: unknown,
+  stream: AsyncIterable<unknown> | Iterable<unknown>,
+  signal: AbortSignal,
+) {
+  return (
+    await replayOwnedPrefix(
+      rawRoot,
+      rawApproval,
+      selector,
+      rawHead,
+      stream,
+      signal,
+      false,
+    )
+  ).result;
+}
+
+const controlSchema = z
+  .object({
+    operation: z.enum(['pause', 'resume', 'stop']),
+    now: z
+      .number()
+      .int()
+      .min(0)
+      .max(8640000000000000 - 60000),
+  })
+  .strict();
+
+/** Derive ONE unsigned control from the complete independently selected prefix.
+ * Control time must come from retained server SQL evidence in a future writer,
+ * not a client clock. No storage, current-head CAS, worker control or release is
+ * performed here. Both proposed and historical financial events are refused.
+ * All evidence, source, reservation, signing and execution authority stays false. */
+export async function deriveWarmupExecutionControlAppend(
+  rawRoot: unknown,
+  rawApproval: unknown,
+  selector: Selector,
+  rawHead: unknown,
+  stream: AsyncIterable<unknown> | Iterable<unknown>,
+  value: unknown,
+  signal: AbortSignal,
+) {
+  try {
+    signal.throwIfAborted();
+    // Capture the caller's operation/time before the asynchronous replay begins.
+    const control = controlSchema.parse(value);
+    const replay = await replayOwnedPrefix(
+      rawRoot,
+      rawApproval,
+      selector,
+      rawHead,
+      stream,
+      signal,
+      true,
+    );
+    signal.throwIfAborted();
+    const previousHead = replay.result.head;
+    // A version-zero replay has not applied an event to the reducer. Its
+    // private clock can predate the independently retained audit/lease time.
+    if (control.now < replay.result.projection.modelTime) fail();
+    const event = parseWarmupExecutionLedgerEvent({
+      ...control,
+      expectedRootSha256: previousHead.manifestSha256,
+      expectedVersion: previousHead.version,
+    });
+    replay.ledger.apply(event);
+    const bound = await bindWarmupExecutionAuditEvent({
+      format: eventFormat,
+      rootId: previousHead.rootId,
+      rootSha256: previousHead.rootSha256,
+      manifestSha256: previousHead.manifestSha256,
+      sequence: previousHead.version + 1,
+      previousSha256: previousHead.eventSha256,
+      event,
+    });
+    signal.throwIfAborted();
+    if (
+      replay.result.wireBytes +
+        boundedSize(bound.wire, WARMUP_EXECUTION_EVENT_BYTES) >
+      WARMUP_EXECUTION_AUDIT_BYTES
+    )
+      fail();
+    const view = projection(
+      replay.context,
+      replay.ledger,
+      replay.lots,
+      replay.receipts,
+      control.now,
+    );
+    bounded(canonical(view), WARMUP_EXECUTION_PROJECTION_BYTES);
+    const head: Head = {
+      ...previousHead,
+      version: previousHead.version + 1,
+      eventSha256: bound.sha256,
+      checkpointSha256: await checkpointHash(view),
+    };
+    signal.throwIfAborted();
+    return {
+      wire: bound.wire,
+      head,
+      checkpoint: checkpoint(view),
+      projection: view,
+      previousHead,
+      replayedEvents: replay.result.replayedEvents,
+      wireBytes: replay.result.wireBytes,
+      scope: 'control-append-derivation-only' as const,
+      ...authority,
+    };
+  } catch {
+    signal.throwIfAborted();
+    return fail();
   }
 }
