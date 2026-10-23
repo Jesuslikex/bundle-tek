@@ -18,6 +18,7 @@ export type AutoSellEditReview = {
   queuedRaw: string;
   cancelledQueuedRaw: string;
   reactivatedStrategies: string[];
+  endingStrategies: { id: string; name: string; reason: string }[];
   endsSession: boolean;
 };
 

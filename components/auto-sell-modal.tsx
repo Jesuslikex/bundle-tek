@@ -924,7 +924,7 @@ function AutoSellContext({
                         toRaw(currentReview.queuedRaw),
                         token.decimals,
                       )}{' '}
-                      tokens. Removed unsent queue:{' '}
+                      tokens. Cancelled unsent queue:{' '}
                       {rawToDecimal(
                         toRaw(currentReview.cancelledQueuedRaw),
                         token.decimals,
@@ -938,10 +938,21 @@ function AutoSellContext({
                         Processed targets stay processed.
                       </p>
                     )}
+                    {currentReview.endingStrategies.length > 0 && (
+                      <>
+                        <p>Strategies that will end:</p>
+                        <ul aria-label="Strategies that will end">
+                          {currentReview.endingStrategies.map((strategy) => (
+                            <li key={strategy.id}>
+                              {strategy.name}: {strategy.reason}.
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
                     {currentReview.endsSession && (
                       <output>
-                        These limits have already been reached. Applying will
-                        end this session.
+                        Applying these changes will end this session.
                       </output>
                     )}
                     <label className={styles.check} data-edit-approval>

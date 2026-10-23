@@ -356,15 +356,27 @@ export function endCapRaw(s: AutoSellStrategy, totalSupplyRaw: bigint) {
     : null;
 }
 
+/** The configured Counter minimum, in the same integer units as its cap. */
+export function minimumAutoSellRaw(
+  s: AutoSellStrategy,
+  totalSupplyRaw: bigint,
+) {
+  return s.mode === 'counter' && s.minSupplyPercentPerSell
+    ? percentOfRaw(totalSupplyRaw, s.minSupplyPercentPerSell)
+    : 0n;
+}
+
 /**
- * Checks this strategy's own end conditions. Only this strategy ends; the
- * caller keeps the others running.
+ * Checks strategy end conditions and optional stable shared budget room.
+ * Only this strategy ends; the caller keeps the others running.
  */
 export function checkAutoSellEnd(
   s: AutoSellStrategy,
   state: AutoSellStrategyState,
   now: number,
   totalSupplyRaw: bigint,
+  // Omit shared room while any other sell can still release its reservation.
+  sessionRemainingRaw: bigint | null = null,
 ): AutoSellStrategyState {
   if (state.status !== 'running') return state;
   if (
@@ -383,6 +395,29 @@ export function checkAutoSellEnd(
       ...state,
       status: 'ended',
       endedReason: 'Max amount sold',
+      bufferedRaw: 0n,
+    };
+  if (
+    cap !== null &&
+    state.inFlightRaw === 0n &&
+    cap - state.soldRaw < minimumAutoSellRaw(s, totalSupplyRaw)
+  )
+    return {
+      ...state,
+      status: 'ended',
+      endedReason: 'Remaining strategy cap is below the minimum sell',
+      bufferedRaw: 0n,
+    };
+  if (
+    state.inFlightRaw === 0n &&
+    sessionRemainingRaw !== null &&
+    minimumAutoSellRaw(s, totalSupplyRaw) > 0n &&
+    sessionRemainingRaw < minimumAutoSellRaw(s, totalSupplyRaw)
+  )
+    return {
+      ...state,
+      status: 'ended',
+      endedReason: 'Remaining session cap is below the minimum sell',
       bufferedRaw: 0n,
     };
   if (
@@ -588,10 +623,7 @@ export function readyToSellRaw(
   totalSupplyRaw: bigint,
 ) {
   if (state.status !== 'running' || state.bufferedRaw <= 0n) return 0n;
-  const minimum =
-    s.mode === 'counter' && s.minSupplyPercentPerSell
-      ? percentOfRaw(totalSupplyRaw, s.minSupplyPercentPerSell)
-      : 0n;
+  const minimum = minimumAutoSellRaw(s, totalSupplyRaw);
   return state.bufferedRaw >= minimum ? state.bufferedRaw : 0n;
 }
 

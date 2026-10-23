@@ -554,3 +554,30 @@ it.each(['Cancel edits', 'Close'])(
     await click('Stop');
   },
 );
+
+it('shows the strategies and whole session an approved minimum-cap edit will end', async () => {
+  const instance = await startEditable();
+  const minimumLabel = [
+    ...host.querySelectorAll<HTMLLabelElement>('label'),
+  ].find((label) => label.textContent?.includes('Min. % Supply per Sell'))!;
+  await editSession(`input[id="${minimumLabel.htmlFor}"]`, '0.5');
+  await editSession('input[id$="-session-max"]', '0.4');
+  await click('Review changes');
+  expect(
+    host.querySelector('ul[aria-label="Strategies that will end"]')
+      ?.textContent,
+  ).toContain('minimum sell');
+  expect(host.textContent).toContain(
+    'Applying these changes will end this session.',
+  );
+  const approval = host.querySelector<HTMLInputElement>(
+    '[data-edit-approval] input',
+  )!;
+  expect(approval.checked).toBe(false);
+  await click('Apply approved changes');
+  expect(instance.isRunning()).toBe(true);
+  await act(async () => approval.click());
+  await click('Apply approved changes');
+  expect(instance.isRunning()).toBe(false);
+  expect(unlockVault).toHaveBeenCalledTimes(1);
+});

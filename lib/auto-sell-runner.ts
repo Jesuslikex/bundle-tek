@@ -8,6 +8,7 @@ import {
   endCapRaw,
   initialAutoSellState,
   marketCapInRange,
+  minimumAutoSellRaw,
   rawToDecimal,
   readyToSellRaw,
   scheduleAutoSell,
@@ -288,6 +289,72 @@ export class AutoSellRunner {
     });
   }
 
+  private projectEdit(configuration: AutoSellConfiguration, now: number) {
+    const cap = autoSellSessionCap(
+      configuration.session,
+      this.deps.totalSupplyRaw,
+    );
+    const remaining = cap === null ? null : cap - this.sessionUsed(false);
+    const sessionCapChanged =
+      configuration.session.endMaxSupplyPercent !==
+      this.configuration().session.endMaxSupplyPercent;
+    const states = new Map<string, AutoSellStrategyState>();
+    const reactivatedStrategies: string[] = [];
+    const endingStrategies: AutoSellEditReview['endingStrategies'] = [];
+    for (const strategy of configuration.strategies) {
+      const old = this.deps.strategies.find((item) => item.id === strategy.id);
+      const existing = this.states.get(strategy.id);
+      let state = existing
+        ? structuredClone(existing)
+        : initialAutoSellState(Math.max(now, this.activeAt));
+      if (
+        state.status === 'ended' &&
+        old &&
+        (JSON.stringify(old) !== JSON.stringify(strategy) || sessionCapChanged)
+      )
+        state = { ...state, status: 'running', endedReason: null };
+      state = checkAutoSellEnd(
+        strategy,
+        state,
+        now,
+        this.deps.totalSupplyRaw,
+        remaining,
+      );
+      if (existing && strategy.mode === 'dca' && state.status === 'running')
+        state = {
+          ...state,
+          nextDcaAt: Math.max(
+            state.nextDcaAt,
+            now + strategy.dcaIntervalSeconds * 1000,
+          ),
+        };
+      states.set(strategy.id, state);
+      if (existing?.status === 'ended' && state.status === 'running')
+        reactivatedStrategies.push(strategy.name);
+      if (existing?.status !== 'ended' && state.status === 'ended')
+        endingStrategies.push({
+          id: strategy.id,
+          name: strategy.name,
+          reason: state.endedReason!,
+        });
+    }
+    return {
+      cap,
+      states,
+      summary: {
+        reactivatedStrategies,
+        endingStrategies,
+        endsSession:
+          (cap !== null && this.sessionUsed(false) >= cap) ||
+          (configuration.session.endDurationSeconds > 0 &&
+            now >=
+              this.activeAt +
+                configuration.session.endDurationSeconds * 1000) ||
+          [...states.values()].every((state) => state.status !== 'running'),
+      },
+    };
+  }
+
   reviewEdit(configuration: AutoSellConfiguration): AutoSellEditReview {
     this.requireEditable();
     this.pendingEdit = null;
@@ -301,7 +368,6 @@ export class AutoSellRunner {
       throw new Error(
         'The original start delay cannot be restarted by editing.',
       );
-    const cap = autoSellSessionCap(after.session, this.deps.totalSupplyRaw);
     for (const strategy of after.strategies) {
       if (this.retiredIds.has(strategy.id))
         throw new Error(
@@ -322,8 +388,8 @@ export class AutoSellRunner {
           `${old.name} has queued trades. Resume to settle them, or remove the strategy to cancel its unsent queue before changing its mode or limit rows.`,
         );
     }
-    const kept = new Set(after.strategies.map((strategy) => strategy.id));
     const evidence = this.editEvidence();
+    const projected = this.projectEdit(after, this.deps.now());
     const review: AutoSellEditReview = {
       revision: this.configurationRevision,
       reviewKey: JSON.stringify([evidence, after]),
@@ -335,32 +401,14 @@ export class AutoSellRunner {
         .toString(),
       cancelledQueuedRaw: [...this.states]
         .reduce(
-          (sum, [id, state]) => sum + (kept.has(id) ? 0n : state.bufferedRaw),
+          (sum, [id, state]) =>
+            sum +
+            state.bufferedRaw -
+            (projected.states.get(id)?.bufferedRaw ?? 0n),
           0n,
         )
         .toString(),
-      reactivatedStrategies: after.strategies
-        .filter((strategy) => {
-          const old = before.strategies.find((item) => item.id === strategy.id);
-          const state = this.states.get(strategy.id);
-          return (
-            old &&
-            state?.status === 'ended' &&
-            JSON.stringify(old) !== JSON.stringify(strategy) &&
-            checkAutoSellEnd(
-              strategy,
-              { ...state, status: 'running', endedReason: null },
-              this.deps.now(),
-              this.deps.totalSupplyRaw,
-            ).status === 'running'
-          );
-        })
-        .map((strategy) => strategy.name),
-      endsSession:
-        (cap !== null && this.sessionUsed(false) >= cap) ||
-        (after.session.endDurationSeconds > 0 &&
-          this.deps.now() >=
-            this.activeAt + after.session.endDurationSeconds * 1000),
+      ...projected.summary,
     };
     this.pendingEdit = { review: structuredClone(review), evidence };
     return structuredClone(review);
@@ -385,11 +433,22 @@ export class AutoSellRunner {
         'The reviewed settings or session state changed. Review and approve the exact changes again.',
       );
     const configuration = structuredClone(pending.review.after);
-    const previous = this.configuration();
+    const now = this.deps.now();
+    const projected = this.projectEdit(configuration, now);
+    if (
+      JSON.stringify(projected.summary) !==
+      JSON.stringify({
+        reactivatedStrategies: pending.review.reactivatedStrategies,
+        endingStrategies: pending.review.endingStrategies,
+        endsSession: pending.review.endsSession,
+      })
+    )
+      throw new Error(
+        'Ending conditions changed. Review and approve the exact changes again.',
+      );
     const kept = new Set(
       configuration.strategies.map((strategy) => strategy.id),
     );
-    const now = this.deps.now();
     for (const [id, state] of this.states) {
       if (!kept.has(id)) {
         this.retiredAccountedRaw += state.soldRaw + state.inFlightRaw;
@@ -397,42 +456,10 @@ export class AutoSellRunner {
         this.states.delete(id);
       }
     }
-    for (const strategy of configuration.strategies) {
-      let state = this.states.get(strategy.id);
-      const old = previous.strategies.find((item) => item.id === strategy.id);
-      if (
-        state?.status === 'ended' &&
-        old &&
-        JSON.stringify(old) !== JSON.stringify(strategy)
-      ) {
-        state = checkAutoSellEnd(
-          strategy,
-          { ...state, status: 'running', endedReason: null },
-          now,
-          this.deps.totalSupplyRaw,
-        );
-        this.states.set(strategy.id, state);
-      }
-      if (!state)
-        this.states.set(
-          strategy.id,
-          initialAutoSellState(Math.max(now, this.activeAt)),
-        );
-      else if (strategy.mode === 'dca' && state.status === 'running')
-        this.states.set(strategy.id, {
-          ...state,
-          nextDcaAt: Math.max(
-            state.nextDcaAt,
-            now + strategy.dcaIntervalSeconds * 1000,
-          ),
-        });
-    }
+    this.states = projected.states;
     this.deps.strategies = configuration.strategies;
     this.deps.session = configuration.session;
-    this.sessionCap = autoSellSessionCap(
-      configuration.session,
-      this.deps.totalSupplyRaw,
-    );
+    this.sessionCap = projected.cap;
     this.configurationRevision += 1;
     this.pendingEdit = null;
     if (this.endTimer !== null) this.deps.clearTimer(this.endTimer);
@@ -442,7 +469,7 @@ export class AutoSellRunner {
       'info',
       'Applied explicitly approved settings. Session progress and original clocks are retained; the session remains paused.',
     );
-    this.checkEnds();
+    this.checkEnds(now);
     if (this.running && configuration.session.endDurationSeconds)
       this.endTimer = this.deps.setTimer(
         () => this.stop('Session duration reached.'),
@@ -683,8 +710,7 @@ export class AutoSellRunner {
     }
   }
 
-  private checkEnds() {
-    const now = this.deps.now();
+  private checkEnds(now = this.deps.now()) {
     if (
       this.deps.session?.endDurationSeconds &&
       now >= this.activeAt + this.deps.session.endDurationSeconds * 1000
@@ -701,7 +727,15 @@ export class AutoSellRunner {
     }
     for (const s of this.deps.strategies) {
       const before = this.states.get(s.id)!;
-      const after = checkAutoSellEnd(s, before, now, this.deps.totalSupplyRaw);
+      const after = checkAutoSellEnd(
+        s,
+        before,
+        now,
+        this.deps.totalSupplyRaw,
+        this.selling || this.sessionCap === null
+          ? null
+          : this.sessionCap - this.sessionUsed(),
+      );
       if (after !== before) {
         this.states.set(s.id, after);
         this.note(
@@ -735,8 +769,10 @@ export class AutoSellRunner {
     this.expireMarketCap();
     for (const s of this.deps.strategies) {
       const state = this.states.get(s.id)!;
+      if (state.status !== 'running') continue;
       if (!marketCapInRange(s, this.marketCapUsd)) continue;
       let amount = readyToSellRaw(s, state, this.deps.totalSupplyRaw);
+      let capRemaining: bigint | null = null;
       const strategyCap = endCapRaw(s, this.deps.totalSupplyRaw);
       if (strategyCap !== null) {
         const remaining = strategyCap - state.soldRaw - state.inFlightRaw;
@@ -744,6 +780,7 @@ export class AutoSellRunner {
           this.checkEnds();
           continue;
         }
+        capRemaining = remaining;
         if (amount > remaining) amount = remaining;
       }
       if (this.sessionCap !== null) {
@@ -752,7 +789,17 @@ export class AutoSellRunner {
           this.stop('Session maximum amount reached.');
           return;
         }
+        if (capRemaining === null || remaining < capRemaining)
+          capRemaining = remaining;
         if (amount > remaining) amount = remaining;
+      }
+      if (
+        capRemaining !== null &&
+        capRemaining < minimumAutoSellRaw(s, this.deps.totalSupplyRaw)
+      ) {
+        // Fail closed before dispatch even if a future caller omits checkEnds.
+        this.checkEnds();
+        continue;
       }
       if (amount <= 0n) continue;
       this.states.set(s.id, {
