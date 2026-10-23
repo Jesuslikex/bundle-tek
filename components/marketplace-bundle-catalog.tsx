@@ -1,60 +1,30 @@
 'use client';
-import { useContext, useEffect, useId, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { MarketplaceReservationContext } from './marketplace-reservation-context';
 import Link from 'next/link';
 import {
   admitBundleCatalog,
   type BundleCatalog,
 } from '@/lib/marketplace-publication';
-import { marketplaceLamports, marketplaceSol } from '@/lib/marketplace-catalog';
+import { marketplaceSol } from '@/lib/marketplace-catalog';
+import {
+  filterBundleCatalog,
+  EMPTY_BUNDLE_CATALOG_FILTERS,
+  type BundleCatalogFilters,
+  type BundleCatalogSort,
+} from '@/lib/marketplace-bundle-catalog-view';
 import { readPanelJson } from './read-panel-json';
 import styles from './marketplace-owned-wallets.module.css';
 import cartStyles from './marketplace-cart.module.css';
 import { MarketplaceCartReview } from './marketplace-cart-review';
 import { CART_MAX_WALLETS } from '@/lib/marketplace-cart';
-function filtered(
-  catalog: BundleCatalog | null,
-  age: string,
-  price: string,
-  sort: string,
-) {
-  if (!catalog) return { listings: [], valid: true };
-  if (!/^(0|[1-9]\d{0,4})$/.test(age) || Number(age) > 36500)
-    return { listings: [], valid: false };
-  let cap: bigint | null = null;
-  try {
-    if (price) cap = BigInt(marketplaceLamports(price));
-  } catch {
-    return { listings: [], valid: false };
-  }
-  const at = Date.parse(catalog.observedAt),
-    days = Number(age);
-  const listings = catalog.listings.filter(
-    (e) =>
-      (days === 0 ||
-        (e.listing.oldestRecordedActivityAt !== null &&
-          at - Date.parse(e.listing.oldestRecordedActivityAt) >=
-            days * 86400000)) &&
-      (cap === null || BigInt(e.listing.priceLamports) <= cap),
-  );
-  listings.sort((a, b) => {
-    if (sort === 'activity') {
-      const av = a.listing.oldestRecordedActivityAt,
-        bv = b.listing.oldestRecordedActivityAt;
-      return av === bv
-        ? a.id.localeCompare(b.id)
-        : av === null
-          ? 1
-          : bv === null
-            ? -1
-            : av.localeCompare(bv);
-    }
-    const av = BigInt(a.listing.priceLamports),
-      bv = BigInt(b.listing.priceLamports);
-    return av === bv ? a.id.localeCompare(b.id) : av < bv ? -1 : 1;
-  });
-  return { listings, valid: true };
-}
 export function MarketplaceBundleCatalog() {
   const viewName = useId();
   const [view, setView] = useState<'compact' | 'cards'>('compact');
@@ -67,9 +37,10 @@ export function MarketplaceBundleCatalog() {
     [error, setError] = useState(''),
     [expired, setExpired] = useState(false),
     [signIn, setSignIn] = useState(false),
-    [age, setAge] = useState('0'),
-    [price, setPrice] = useState(''),
-    [sort, setSort] = useState('price'),
+    [filters, setFilters] = useState<BundleCatalogFilters>({
+      ...EMPTY_BUNDLE_CATALOG_FILTERS,
+    }),
+    [sort, setSort] = useState<BundleCatalogSort>('price'),
     [page, setPage] = useState(0),
     [ids, setIds] = useState<string[]>([]),
     [requestedCount, setRequestedCount] = useState('25'),
@@ -152,16 +123,27 @@ export function MarketplaceBundleCatalog() {
       }
     }
   }
-  const selected = filtered(catalog, age, price, sort),
+  function updateFilter(key: keyof BundleCatalogFilters, value: string) {
+    setFilters((previous) => ({ ...previous, [key]: value }));
+    setPage(0);
+    setSelectionMessage('');
+  }
+  const selected = filterBundleCatalog(catalog, filters, sort),
     start = page * 20,
     visible = selected.listings.slice(start, start + 20);
   const countValid =
     /^[1-9]\d{0,2}$/.test(requestedCount) &&
     Number(requestedCount) <= CART_MAX_WALLETS;
   const matchingIds = new Set(selected.listings.map((e) => e.id));
-  function chooseMatching() {
-    if (!countValid || !selected.valid || unavailable) return;
-    const chosen = selected.listings
+  const handleChooseMatching = useCallback(() => {
+    if (!catalog) return;
+    if (Date.now() >= Date.parse(catalog.expiresAt)) {
+      setExpired(true);
+      return;
+    }
+    const current = filterBundleCatalog(catalog, filters, sort);
+    if (unavailable || !countValid || !current.valid) return;
+    const chosen = current.listings
       .slice(0, Number(requestedCount))
       .map((e) => e.id);
     setIds(chosen);
@@ -170,9 +152,11 @@ export function MarketplaceBundleCatalog() {
         ? `Only ${chosen.length} ${chosen.length === 1 ? 'wallet matches' : 'wallets match'}; selected ${chosen.length} of the requested ${requestedCount}.`
         : `Selected ${chosen.length} matching wallets. Previous selection was replaced.`,
     );
-  }
-  function toggle(id: string) {
-    if (unavailable) return;
+  }, [catalog, filters, sort, unavailable, countValid, requestedCount]);
+  function toggle(id: string, now: number) {
+    const stale = !catalog || now >= Date.parse(catalog.expiresAt);
+    if (stale && catalog) setExpired(true);
+    if ((stale || unavailable) && !ids.includes(id)) return;
     setSelectionMessage('');
     setIds((previous) =>
       previous.includes(id)
@@ -229,22 +213,16 @@ export function MarketplaceBundleCatalog() {
               Minimum recorded activity age (days)
               <input
                 inputMode="numeric"
-                value={age}
-                onChange={(e) => {
-                  setAge(e.target.value);
-                  setPage(0);
-                }}
+                value={filters.minimumAge}
+                onChange={(e) => updateFilter('minimumAge', e.target.value)}
               />
             </label>
             <label>
               Maximum asking price (SOL)
               <input
                 inputMode="decimal"
-                value={price}
-                onChange={(e) => {
-                  setPrice(e.target.value);
-                  setPage(0);
-                }}
+                value={filters.maximumPrice}
+                onChange={(e) => updateFilter('maximumPrice', e.target.value)}
               />
             </label>
             <label>
@@ -252,14 +230,92 @@ export function MarketplaceBundleCatalog() {
               <select
                 value={sort}
                 onChange={(e) => {
-                  setSort(e.target.value);
+                  setSort(e.target.value as BundleCatalogSort);
                   setPage(0);
                 }}
               >
                 <option value="price">Asking price</option>
                 <option value="activity">Oldest recorded activity</option>
+                <option value="balance-high">
+                  Historical balance: highest first
+                </option>
+                <option value="balance-low">
+                  Historical balance: lowest first
+                </option>
               </select>
             </label>
+          </div>
+          <label>
+            Exact wallet address
+            <input
+              type="search"
+              maxLength={44}
+              autoCapitalize="none"
+              spellCheck={false}
+              value={filters.address}
+              onChange={(e) => updateFilter('address', e.target.value)}
+            />
+          </label>
+          <details>
+            <summary>Advanced recorded-history filters</summary>
+            <p>
+              These filters apply only to this loaded catalog, not all wallets
+              on chain. Unknown activity dates or historical balances do not
+              match a requested bound. Activity age is measured at the catalog
+              snapshot; balances keep their own observation times. Saved checks
+              and warmup signatures are recorded evidence counts, not total
+              transactions or organic activity.
+            </p>
+            <div className={styles.filters}>
+              {(
+                [
+                  [
+                    'maximumAge',
+                    'Maximum recorded activity age (days)',
+                    'numeric',
+                  ],
+                  [
+                    'minimumBalance',
+                    'Minimum historical balance (SOL)',
+                    'decimal',
+                  ],
+                  [
+                    'maximumBalance',
+                    'Maximum historical balance (SOL)',
+                    'decimal',
+                  ],
+                  ['minimumChecks', 'Minimum saved history checks', 'numeric'],
+                  [
+                    'minimumSignatures',
+                    'Minimum recorded warmup signatures',
+                    'numeric',
+                  ],
+                ] as const
+              ).map(([key, label, inputMode]) => (
+                <label key={key}>
+                  {label}
+                  <input
+                    inputMode={inputMode}
+                    value={filters[key]}
+                    onChange={(e) => updateFilter(key, e.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+          </details>
+          <div className={styles.controls}>
+            <button
+              onClick={() => {
+                setFilters({ ...EMPTY_BUNDLE_CATALOG_FILTERS });
+                setSort('price');
+                setPage(0);
+                setSelectionMessage(
+                  'Filters cleared. Your wallet selection was retained.',
+                );
+              }}
+            >
+              Clear catalog filters
+            </button>
           </div>
           <div className={styles.filters}>
             <label>
@@ -308,7 +364,7 @@ export function MarketplaceBundleCatalog() {
                 selected.listings.length === 0 ||
                 unavailable
               }
-              onClick={chooseMatching}
+              onClick={handleChooseMatching}
             >
               Select matching wallets
             </button>
@@ -343,8 +399,10 @@ export function MarketplaceBundleCatalog() {
           )}
           {!selected.valid ? (
             <p role="alert">
-              Choose a whole activity age from 0 to 36500 days and a valid SOL
-              price.
+              Use whole activity ages from 0 to 36500 days, whole evidence
+              counts, an address up to 44 characters and non-negative SOL
+              amounts with up to 9 decimal places. Maximum bounds must be at
+              least their minimums.
             </p>
           ) : (
             <>
@@ -380,11 +438,11 @@ export function MarketplaceBundleCatalog() {
                         aria-label={`Select ${e.listing.address}`}
                         checked={ids.includes(e.id)}
                         disabled={
-                          unavailable ||
+                          (unavailable && !ids.includes(e.id)) ||
                           (ids.length >= CART_MAX_WALLETS &&
                             !ids.includes(e.id))
                         }
-                        onChange={() => toggle(e.id)}
+                        onChange={() => toggle(e.id, Date.now())}
                       />
                       <span>Select wallet</span>
                     </label>

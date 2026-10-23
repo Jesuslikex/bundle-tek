@@ -157,3 +157,228 @@ it('shows a sign-in link and distinguishes empty inventory from unavailable stor
   await click('Refresh Bundle inventory');
   expect(host.textContent).toContain('No published Bundle wallets');
 });
+
+it('filters published history locally and retains selected wallets outside the new filters', async () => {
+  const original = f.catalog.listings[0];
+  f.catalog.listings.push({
+    ...original,
+    id: randomUUID(),
+    listing: {
+      ...original.listing,
+      address: f.source.b,
+      historicalBalance: null,
+      oldestRecordedActivityAt: null,
+      savedHistoryChecks: 0,
+      warmupUniqueSignatures: 0,
+    },
+  });
+  const fetcher = vi.fn(async () => Response.json(f.catalog));
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Refresh Bundle inventory');
+  const selectedAddress = original.listing.address;
+  await act(async () =>
+    (
+      host.querySelector(
+        `input[aria-label="Select ${selectedAddress}"]`,
+      ) as HTMLInputElement
+    ).click(),
+  );
+  await field('Exact wallet address', f.source.b);
+  expect(host.querySelectorAll('ul[data-view] > li')).toHaveLength(1);
+  expect(host.textContent).toContain('outside the current filters');
+  expect(
+    host.querySelector('section[aria-label="Selected wallet cart"] h2')
+      ?.textContent,
+  ).toMatch(/Selected wallets.*1$/);
+  await field('Minimum historical balance', '0');
+  expect(host.querySelectorAll('ul[data-view] > li')).toHaveLength(0);
+  await click('Clear catalog filters');
+  expect(
+    (
+      host.querySelector(
+        `input[aria-label="Select ${selectedAddress}"]`,
+      ) as HTMLInputElement
+    ).checked,
+  ).toBe(true);
+  expect(host.querySelectorAll('ul[data-view] > li')).toHaveLength(2);
+  await field('Maximum recorded activity age', '0');
+  expect(host.querySelectorAll('ul[data-view] > li')).toHaveLength(0);
+  await click('Clear catalog filters');
+  await field(
+    'Minimum saved history checks',
+    String(original.listing.savedHistoryChecks + 1),
+  );
+  expect(host.querySelectorAll('ul[data-view] > li')).toHaveLength(0);
+  await click('Clear catalog filters');
+  await field(
+    'Minimum recorded warmup signatures',
+    String(original.listing.warmupUniqueSignatures + 1),
+  );
+  expect(host.querySelectorAll('ul[data-view] > li')).toHaveLength(0);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(host.textContent).toContain('not total transactions');
+});
+
+it('resets local pagination on search and shows invalid range reasons without losing selection', async () => {
+  for (let i = 2; i < 24; i++)
+    f.catalog.listings.push({
+      ...f.catalog.listings[0],
+      id: randomUUID(),
+      listing: {
+        ...f.catalog.listings[0].listing,
+        address: bs58.encode(new Uint8Array(32).fill(i)),
+      },
+    });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json(f.catalog)),
+  );
+  await mount();
+  await click('Refresh Bundle inventory');
+  await click('Next catalog page');
+  await field('Exact wallet address', f.catalog.listings[0].listing.address);
+  expect(host.querySelectorAll('ul[data-view] > li')).toHaveLength(1);
+  expect(host.textContent).toContain('1 to 1 of 1');
+  await field('Minimum historical balance', '2');
+  await field('Maximum historical balance', '1');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'Maximum bounds',
+  );
+  expect(
+    [...host.querySelectorAll('button')].find(
+      (e) => e.textContent === 'Select matching wallets',
+    )?.disabled,
+  ).toBe(true);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it('replaces a hidden selection only through explicit matching selection and refuses it after expiry', async () => {
+  const original = f.catalog.listings[0];
+  f.catalog.listings.push({
+    ...original,
+    id: randomUUID(),
+    listing: { ...original.listing, address: f.source.b },
+  });
+  const fetcher = vi.fn(async () => Response.json(f.catalog));
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Refresh Bundle inventory');
+  await act(async () =>
+    (
+      host.querySelector(
+        `input[aria-label="Select ${original.listing.address}"]`,
+      ) as HTMLInputElement
+    ).click(),
+  );
+  await field('Exact wallet address', f.source.b);
+  await field('Wallet count', '2');
+  expect(host.textContent).toContain('outside the current filters');
+  await click('Select matching wallets');
+  expect(host.textContent).toContain(
+    'Only 1 wallet matches; selected 1 of the requested 2.',
+  );
+  expect(host.textContent).not.toContain('outside the current filters');
+  expect(
+    (
+      host.querySelector(
+        `input[aria-label="Select ${f.source.b}"]`,
+      ) as HTMLInputElement
+    ).checked,
+  ).toBe(true);
+  await act(async () => vi.advanceTimersByTime(60000));
+  await field('Minimum historical balance', '0');
+  const choose = [...host.querySelectorAll('button')].find(
+    (e) => e.textContent === 'Select matching wallets',
+  )!;
+  expect(choose.disabled).toBe(true);
+  expect(host.textContent).toContain(
+    'Selection retained as an unverified draft',
+  );
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it.each(['replace', 'add'] as const)(
+  'refuses an expired %s selection when the browser expiry timer has not fired',
+  async (action) => {
+    const original = f.catalog.listings[0];
+    f.catalog.listings.push({
+      ...original,
+      id: randomUUID(),
+      listing: { ...original.listing, address: f.source.b },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(f.catalog)),
+    );
+    await mount();
+    await click('Refresh Bundle inventory');
+    const checkbox = (address: string) =>
+      host.querySelector(
+        `input[aria-label="Select ${address}"]`,
+      ) as HTMLInputElement;
+    await act(async () => checkbox(original.listing.address).click());
+    vi.setSystemTime(now + 60001); // No timer advancement: the rendered controls still look enabled.
+    if (action === 'replace') await click('Select matching wallets');
+    else await act(async () => checkbox(f.source.b).click());
+    expect(checkbox(original.listing.address).checked).toBe(true);
+    expect(checkbox(f.source.b).checked).toBe(false);
+    expect(host.textContent).toContain('Catalog view expired');
+    expect(checkbox(original.listing.address).disabled).toBe(false);
+    await act(async () => checkbox(original.listing.address).click());
+    expect(
+      host.querySelector('[aria-label="Selected wallet cart"]'),
+    ).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('keeps selection across pagination and historical-balance sort changes', async () => {
+  for (let i = 2; i < 24; i++)
+    f.catalog.listings.push({
+      ...f.catalog.listings[0],
+      id: randomUUID(),
+      listing: {
+        ...f.catalog.listings[0].listing,
+        address: bs58.encode(new Uint8Array(32).fill(i)),
+        historicalBalance: {
+          observedAt: f.catalog.observedAt,
+          balanceLamports: String(i),
+          sampleCount: 1,
+          successfulSampleCount: 1,
+        },
+      },
+    });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json(f.catalog)),
+  );
+  await mount();
+  await click('Refresh Bundle inventory');
+  const selected = host.querySelector(
+    'ul[data-view] input[type="checkbox"]',
+  ) as HTMLInputElement;
+  const label = selected.getAttribute('aria-label');
+  await act(async () => selected.click());
+  await click('Next catalog page');
+  expect(host.textContent).toContain('21 to 23 of 23');
+  const sort = host.querySelector('select')!;
+  await act(async () => {
+    sort.value = 'balance-high';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(host.textContent).toContain('1 to 20 of 23');
+  await click('Next catalog page');
+  await act(async () => {
+    sort.value = 'balance-low';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(host.textContent).toContain('1 to 20 of 23');
+  const selectedCheckbox = () =>
+    host.querySelector(
+      `input[aria-label="${label}"]`,
+    ) as HTMLInputElement | null;
+  if (!selectedCheckbox()) await click('Next catalog page');
+  expect(selectedCheckbox()?.checked).toBe(true);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
