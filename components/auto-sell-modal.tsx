@@ -35,6 +35,7 @@ import {
 } from '@/lib/auto-sell';
 import { AutoSellRunner, type AutoSellSnapshot } from '@/lib/auto-sell-runner';
 import { autoSellSessionCap } from '@/lib/auto-sell-session';
+import { autoSellStartCapError } from '@/lib/auto-sell-start-cap';
 import {
   parseDurationParts,
   splitDurationSeconds,
@@ -287,9 +288,10 @@ function AutoSellContext({
       : {}),
   };
   let sessionError = delay.error || duration.error;
+  let startingSessionCap: bigint | null = null;
   if (!sessionError) {
     try {
-      autoSellSessionCap(
+      startingSessionCap = autoSellSessionCap(
         sessionRules,
         toRaw(token.totalSupplyRaw),
         token.decimals,
@@ -507,7 +509,14 @@ function AutoSellContext({
     if (error) return error;
     try {
       endCapRaw(strategy, toRaw(token.totalSupplyRaw), token.decimals);
-      return null;
+      return !running && !editing
+        ? autoSellStartCapError(
+            strategy,
+            toRaw(token.totalSupplyRaw),
+            token.decimals,
+            startingSessionCap,
+          )
+        : null;
     } catch (cause) {
       return cause instanceof Error ? cause.message : 'Invalid maximum amount.';
     }
@@ -884,8 +893,9 @@ function AutoSellContext({
                   each.
                 </p>
                 <p className={styles.hint}>
-                  Slippage uses the existing reviewed quote and protected
-                  minimum. Custom session slippage is not connected.
+                  Slippage is fixed at 0.5%. Every sell still checks the
+                  prepared transaction and its protected minimum output. Custom
+                  session slippage is not connected.
                 </p>
                 {sessionError && <p role="alert">{sessionError}</p>}
               </fieldset>

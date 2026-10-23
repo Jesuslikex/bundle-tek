@@ -98,6 +98,57 @@ async function validCounter() {
   )!;
   await field(document.getElementById(label.htmlFor) as HTMLInputElement, '10');
 }
+
+it.each(['strategy supply', 'strategy tokens', 'session tokens'])(
+  'explains an impossible %s maximum before any unlock or preparation',
+  async (kind) => {
+    await act(async () =>
+      root.render(
+        <AutoSell project={project} wallets={[testWallet]} locked={false} />,
+      ),
+    );
+    await click('Auto Sell');
+    await validCounter();
+    const inputFor = (text: string) => {
+      const label = [...host.querySelectorAll<HTMLLabelElement>('label')].find(
+        (l) => l.textContent?.includes(text),
+      )!;
+      return document.getElementById(label.htmlFor) as HTMLInputElement;
+    };
+    await field(inputFor('Min. % Supply per Sell'), '0.5');
+    const minimum = '5000000';
+    if (kind.startsWith('strategy')) await click('End Conditions—');
+    if (kind.endsWith('tokens')) {
+      const group = host.querySelector(
+        `[aria-label="${kind.startsWith('session') ? 'Session' : 'Strategy'} maximum unit"]`,
+      )!;
+      await act(async () =>
+        [...group.querySelectorAll('button')]
+          .find((b) => b.textContent?.trim() === 'Token amount')!
+          .click(),
+      );
+    }
+    await field(
+      inputFor(kind.startsWith('session') ? 'Session maximum' : 'Max Amount'),
+      kind.endsWith('tokens') ? '4000000' : '0.4',
+    );
+    expect(hint().textContent).toContain(`Minimum sell is ${minimum} tokens`);
+    expect(hint().textContent).toContain(
+      `${kind.startsWith('session') ? 'session' : 'strategy'} maximum is 4000000 tokens`,
+    );
+    expect(button('Run 1 Strategy').disabled).toBe(true);
+    const requests = vi.mocked(fetch).mock.calls.length;
+    await click('Run 1 Strategy');
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(requests);
+    expect(host.textContent).toContain('Slippage is fixed at 0.5%');
+    await field(
+      inputFor(kind.startsWith('session') ? 'Session maximum' : 'Max Amount'),
+      kind.endsWith('tokens') ? minimum : '0.5',
+    );
+    expect(hint().textContent).not.toContain('Increase that maximum');
+    expect(hint().textContent).toContain('Choose at least one sell wallet');
+  },
+);
 it('names the invalid strategy beside Run and explains missing wallets after its settings are valid', async () => {
   await act(async () =>
     root.render(<AutoSell project={project} wallets={[]} locked={false} />),
