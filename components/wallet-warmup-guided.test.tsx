@@ -274,3 +274,65 @@ it('reviews and saves Proxima-style range amounts with a seconds delay', async (
     expect(Number(a)).toBeLessThanOrEqual(0.002);
   }
 });
+
+it('compares funding inside the real dialog without changing draft fields or saving approval', async () => {
+  const requestUrl = (input: RequestInfo | URL) =>
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+  const originalFetcher = fixture.fetcher;
+  const fetcher = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (requestUrl(input) !== '/api/wallet-workspace/funding-times')
+        return originalFetcher(input, init);
+      return Response.json({
+        format: 'wallet-funding-times-v1',
+        network: 'mainnet',
+        scope: 'most-recently-saved-native-transfer',
+        capturedAt: '2026-10-18T12:00:00.000Z',
+        executionAllowed: false,
+        wallets: [
+          {
+            address: fixture.wallet,
+            revision: 1,
+            funding: null,
+            reason: 'no-retained-receipt',
+          },
+        ],
+      });
+    },
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  const fields = () =>
+    [
+      ...host.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+        'input,textarea',
+      ),
+    ].map((el) => ({
+      id: el.id,
+      value: el.value,
+      checked: 'checked' in el ? el.checked : null,
+    }));
+  const before = fields();
+  expect(
+    fetcher.mock.calls.some(([url]) => requestUrl(url).includes('funding-')),
+  ).toBe(false);
+  await click('Check recorded funding times');
+  expect(host.textContent).toContain('1 unknown');
+  expect(host.textContent).toContain(
+    'No retained successful native SOL receipt was found.',
+  );
+  expect(fields()).toEqual(before);
+  const posts = fetcher.mock.calls.filter(
+    ([, init]) => init?.method === 'POST',
+  );
+  expect(posts).toHaveLength(1);
+  expect(requestUrl(posts[0][0])).toBe('/api/wallet-workspace/funding-times');
+  expect(JSON.parse(posts[0][1]!.body as string)).toEqual({
+    wallets: [{ address: fixture.wallet, revision: 1 }],
+  });
+  expect(fixture.calls.every((call) => call.method === 'GET')).toBe(true);
+});

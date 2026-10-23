@@ -530,3 +530,30 @@ it.each([true, false])(
     );
   },
 );
+
+it.each(['saved', 'provider'] as const)(
+  'keeps cancellation guidance tied to the original %s read after a source switch',
+  async (from) => {
+    let captured: AbortSignal | undefined;
+    const fetcher = vi.fn((_url: string, init: RequestInit) => {
+      captured = init.signal as AbortSignal;
+      return new Promise<Response>(() => {});
+    });
+    vi.stubGlobal('fetch', fetcher);
+    await render();
+    await source(from);
+    await click(
+      from === 'saved'
+        ? 'Check recorded funding times'
+        : 'Check provider funding history',
+    );
+    await source(from === 'saved' ? 'provider' : 'saved');
+    expect(captured!.aborted).toBe(true);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(host.textContent?.includes('Wait at least 15 seconds')).toBe(
+      from === 'provider',
+    );
+    if (from === 'saved')
+      expect(host.textContent).not.toContain('0 wallets were read');
+  },
+);

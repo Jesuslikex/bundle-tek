@@ -115,6 +115,18 @@ it('mounts the selected-wallet funding check and exact gap badges in the real wa
       (s) => s.textContent === '24m 34s apart',
     ),
   ).toHaveLength(2);
+  const fundingCalls = vi.mocked(fetch).mock.calls.length;
+  for (const summary of host.querySelectorAll<HTMLElement>('tbody summary'))
+    await act(async () => summary.click());
+  expect(host.textContent).toContain('2 selected across pages');
+  expect(
+    [
+      ...host.querySelectorAll<HTMLInputElement>(
+        'tbody [data-wallet-selection]',
+      ),
+    ].every((input) => input.checked),
+  ).toBe(true);
+  expect(vi.mocked(fetch).mock.calls).toHaveLength(fundingCalls);
 });
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

@@ -37,7 +37,9 @@ export function useWalletFundingProximity(selection: WalletFundingSelection) {
       busy: false,
       result: null,
       error: view.busy
-        ? `Funding check cancelled because the source or selected wallets changed. ${view.progress?.completed ?? 0} wallets were read; no partial result was kept. Wait at least 15 seconds before a new provider check; already-received reads may finish.`
+        ? JSON.parse(view.key).source === 'provider'
+          ? `Funding check cancelled because the source or selected wallets changed. ${view.progress?.completed ?? 0} wallets were read; no partial result was kept. Wait at least 15 seconds before a new provider check; already-received reads may finish.`
+          : 'Funding check cancelled because the source or selected wallets changed; no partial result was kept. No provider check was started.'
         : '',
     });
   useLayoutEffect(
@@ -147,9 +149,11 @@ type Check = ReturnType<typeof useWalletFundingProximity>;
 export function WalletFundingProximityPanel({
   check,
   count,
+  context = 'table',
 }: {
   check: Check;
   count: number;
+  context?: 'table' | 'warmup';
 }) {
   const sourceGroup = useId();
   const startButton = useRef<HTMLButtonElement | null>(null);
@@ -263,6 +267,7 @@ export function WalletFundingProximityPanel({
           key={check.key}
           pairs={check.pairs}
           source={check.source}
+          context={context}
         />
       )}
       {check.error && <p role="alert">{check.error}</p>}
@@ -273,9 +278,11 @@ const FUNDING_PAIRS_PER_PAGE = 20;
 function FundingPairReview({
   pairs,
   source,
+  context,
 }: {
   pairs: Check['pairs'];
   source: Check['source'];
+  context: 'table' | 'warmup';
 }) {
   const [page, setPage] = useState(0);
   const pageStatus = useRef<HTMLOutputElement | null>(null);
@@ -295,8 +302,10 @@ function FundingPairReview({
         {pairs.length === 1 ? 'pair' : 'pairs'}
       </summary>
       <p>
-        All flagged pairs in this checked selection, including wallets on other
-        table pages. Closest times first. These are{' '}
+        {context === 'table'
+          ? 'All flagged pairs in this checked selection, including wallets on other table pages.'
+          : 'All flagged pairs in these checked warmup wallets.'}{' '}
+        Closest times first. These are{' '}
         {source === 'provider' ? 'provider-reported' : 'saved-receipt'} events;
         timing similarity alone does not prove shared control.
       </p>

@@ -20,6 +20,7 @@ import { WalletWarmupPlans } from '@/components/wallet-warmup-plans';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { WarmupPlanSummary } from './warmup-plan-summary';
 import { readPanelJson } from './read-panel-json';
+import { WarmupFundingTimes } from './warmup-funding-times';
 import styles from './wallet-warmup.module.css';
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
@@ -240,6 +241,12 @@ export function WalletWarmup({
       </p>
       <details className={styles.options}>
         <summary>Wallet history · read only</summary>
+        {chain === 'Solana' && (
+          <WarmupFundingTimes
+            addresses={addresses}
+            walletRevisions={walletRevisions}
+          />
+        )}
         <Button variant="outline" disabled={busy} onClick={inspect}>
           {busy ? 'Checking activity…' : 'Check wallet history'}
         </Button>
