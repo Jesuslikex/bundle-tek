@@ -90,6 +90,10 @@ const event = z.discriminatedUnion('operation', [
     .strict(),
 ]);
 type Event = z.infer<typeof event>;
+/** Shared strict event admission for saved bookkeeping audits, not authority. */
+export function parseWarmupExecutionLedgerEvent(value: unknown) {
+  return event.parse(value);
+}
 type Outcome = Extract<Event, { operation: 'settle' }> & {
   actionId: string;
   wallet: string;
