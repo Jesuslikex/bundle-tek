@@ -131,6 +131,7 @@ export function removeLiquidityCall(input: {
 }
 
 export const erc20Abi = parseAbi([
+  'function decimals() view returns (uint8)',
   'function approve(address,uint256) returns (bool)',
   'function allowance(address,address) view returns (uint256)',
   'function balanceOf(address) view returns (uint256)',

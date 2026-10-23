@@ -30,6 +30,8 @@ let host: HTMLDivElement, root: Root;
 let request: ReturnType<typeof vi.fn>;
 let accounts: string[], network: string, noPair: boolean, allowance: bigint;
 let events: Map<string, () => void>;
+let decimals: unknown;
+let decimalsUnavailable: boolean;
 beforeEach(() => {
   vi.stubGlobal('React', React);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -37,12 +39,18 @@ beforeEach(() => {
   network = '0x1';
   noPair = false;
   allowance = 1000n;
+  decimals = 0;
+  decimalsUnavailable = false;
   events = new Map();
   mock.chain.mockReset().mockResolvedValue(1);
   mock.read
     .mockReset()
     .mockImplementation(async ({ functionName }: { functionName: string }) => {
       switch (functionName) {
+        case 'decimals':
+          if (decimalsUnavailable)
+            throw Error('Synthetic unavailable metadata');
+          return decimals;
         case 'factory':
           return UNISWAP_V2.Ethereum.factory;
         case 'WETH':
@@ -472,4 +480,147 @@ it('refuses recovery on a different RPC network without a wallet request', async
   expect(mock.receipt).not.toHaveBeenCalled();
   expect(sendCount()).toBe(1);
   expect(text()).toContain('Outcome unknown');
+});
+
+it.each([undefined, null, '0', 0.5, -1, 256, 0n])(
+  'refuses malformed token decimals %s for new pool creation',
+  async (value) => {
+    decimals = value;
+    noPair = true;
+    await act(async () =>
+      root.render(<LiquidityPoolPanel tokenDecimals={0} />),
+    );
+    await input('Token contract address', TOKEN);
+    await click('Review pool');
+    expect(text()).toContain('Token decimals are malformed');
+    expect(text()).not.toContain('Create pool');
+    expect(sendCount()).toBe(0);
+  },
+);
+it.each([undefined, null, '0', 0.5, -1, 256, 0n, 6])(
+  'preserves raw LP exit when token precision is unverified: %s',
+  async (value) => {
+    decimals = value;
+    allowance = 0n;
+    await setup();
+    expect(text()).toContain('1000 raw token units');
+    expect(text()).not.toContain('Create pool');
+    expect(text()).toContain('Creating a pool requires');
+    await click('Remove all liquidity');
+    expect(sendCount()).toBe(2);
+    expect(text()).toContain('Liquidity removed in');
+  },
+);
+it.each([false, true])(
+  'refuses unavailable decimals for new pool and preserves existing raw exit (new=%s)',
+  async (newPool) => {
+    decimalsUnavailable = true;
+    noPair = newPool;
+    await act(async () =>
+      root.render(<LiquidityPoolPanel tokenDecimals={0} />),
+    );
+    await input('Token contract address', TOKEN);
+    await click('Review pool');
+    expect(text()).toContain('Token decimals are unavailable');
+    expect(text()).not.toContain('Create pool');
+    if (newPool) expect(text()).not.toContain('Remove all liquidity');
+    else {
+      expect(text()).toContain('1000 raw token units');
+      await checkLast();
+      await click('Remove all liquidity');
+      expect(sendCount()).toBe(1);
+    }
+  },
+);
+it('refuses a six-decimal token under zero-decimal precision for new pool creation', async () => {
+  decimals = 6;
+  noPair = true;
+  await act(async () => root.render(<LiquidityPoolPanel tokenDecimals={0} />));
+  await input('Token contract address', TOKEN);
+  await click('Review pool');
+  expect(text()).toContain(
+    "Token decimals (6) differ from this panel's configured precision (0)",
+  );
+  expect(text()).not.toContain('Create pool');
+  expect(sendCount()).toBe(0);
+});
+it('reads matching decimals for exact token before create approval and follow-on send', async () => {
+  noPair = true;
+  allowance = 0n;
+  await setup();
+  await input('Token amount', '1');
+  await input('ETH amount', '0.1');
+  await checkLast();
+  await click('Create pool');
+  const metadata = mock.read.mock.calls.filter(
+    ([arg]) => arg.functionName === 'decimals',
+  );
+  expect(metadata).toHaveLength(4); // Review, token approval, create, existing post-success refresh.
+  expect(metadata.every(([arg]) => arg.address === TOKEN)).toBe(true);
+  expect(sendCount()).toBe(2);
+  expect(text()).toContain('Pool created in');
+});
+it.each(['changed', 'unavailable'] as const)(
+  'refuses %s decimals before create wallet request',
+  async (kind) => {
+    noPair = true;
+    await setup();
+    await input('Token amount', '1');
+    await input('ETH amount', '0.1');
+    await checkLast();
+    if (kind === 'changed') decimals = 6;
+    else decimalsUnavailable = true;
+    await click('Create pool');
+    expect(sendCount()).toBe(0);
+    expect(text()).not.toContain('Pool created in');
+    expect(text()).not.toContain('Create pool');
+  },
+);
+it.each(['changed', 'unavailable'] as const)(
+  'refuses %s decimals after create approval without follow-on send',
+  async (kind) => {
+    noPair = true;
+    allowance = 0n;
+    await setup();
+    await input('Token amount', '1');
+    await input('ETH amount', '0.1');
+    await checkLast();
+    mock.wait.mockImplementation(async () => {
+      if (kind === 'changed') decimals = 6;
+      else decimalsUnavailable = true;
+      return { transactionHash: HASH, status: 'success' };
+    });
+    await click('Create pool');
+    expect(sendCount()).toBe(1);
+    expect(text()).not.toContain('Pool created in');
+    expect(text()).toContain('Original transaction receipt reports success');
+    expect(text()).not.toContain('Outcome unknown');
+  },
+);
+it('burns exact raw LP without requiring optional decimals', async () => {
+  decimalsUnavailable = true;
+  await setup(true);
+  await click('Burn all LP');
+  expect(sendCount()).toBe(1);
+  expect(text()).toContain('LP burned in');
+  expect(
+    mock.read.mock.calls.filter(([arg]) => arg.functionName === 'decimals'),
+  ).toHaveLength(2); // Review and post-success refresh only.
+});
+
+it('refuses unverified precision for an existing but empty pool', async () => {
+  decimals = 6;
+  const ordinaryRead = mock.read.getMockImplementation()!;
+  mock.read.mockImplementation(async (arg) =>
+    arg.functionName === 'totalSupply' ? 0n : ordinaryRead(arg),
+  );
+  await act(async () => root.render(<LiquidityPoolPanel tokenDecimals={0} />));
+  await input('Token contract address', TOKEN);
+  await click('Review pool');
+  expect(text()).toContain(
+    "Token decimals (6) differ from this panel's configured precision (0)",
+  );
+  expect(text()).not.toContain('Create pool');
+  expect(text()).not.toContain('Remove all liquidity');
+  expect(sendCount()).toBe(0);
 });

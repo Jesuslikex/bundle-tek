@@ -218,6 +218,7 @@ function LiquidityPoolContext({
   const [account, setAccount] = useState<Address | null>(null);
   const [position, setPosition] = useState<LpPosition | null>(null);
   const [noPair, setNoPair] = useState(false);
+  const [precisionNotice, setPrecisionNotice] = useState('');
   const [action, setAction] = useState<'remove' | 'burn'>('remove');
   const [ack, setAck] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -325,7 +326,7 @@ function LiquidityPoolContext({
     const { factory, weth, router } = UNISWAP_V2[CHAIN];
     // Confirm the pinned router really points at the pinned factory and WETH
     // before anything is read or sent.
-    const [routerFactory, routerWeth] = await Promise.all([
+    const [routerFactory, routerWeth, precision] = await Promise.all([
       client.readContract({
         address: router,
         abi: routerAbi,
@@ -336,6 +337,7 @@ function LiquidityPoolContext({
         abi: routerAbi,
         functionName: 'WETH',
       }),
+      observeTokenDecimals(run, wallet),
     ]);
     assertCurrent(run, wallet);
     if ((await client.getChainId()) !== EVM_NETWORKS[CHAIN].id)
@@ -356,6 +358,8 @@ function LiquidityPoolContext({
     });
     assertCurrent(run, wallet);
     if (pair === ZERO) {
+      if (!precision.verified) throw new Error(precision.notice);
+      setPrecisionNotice('');
       await checkWallet(run, wallet, address);
       setAccount(address);
       setPosition(null);
@@ -386,7 +390,10 @@ function LiquidityPoolContext({
         args: [address],
       }),
     ]);
+    if (totalSupply === 0n && !precision.verified)
+      throw new Error(precision.notice);
     await checkWallet(run, wallet, address);
+    setPrecisionNotice(precision.notice);
     setAccount(address);
     setPosition(
       lpPosition({
@@ -398,6 +405,49 @@ function LiquidityPoolContext({
         lpBalance,
       }),
     );
+  }
+  async function observeTokenDecimals(run: number, wallet: Provider) {
+    assertCurrent(run, wallet);
+    let precision: unknown;
+    let unavailable = false;
+    try {
+      precision = await client.readContract({
+        address: getAddress(token),
+        abi: erc20Abi,
+        functionName: 'decimals',
+      });
+    } catch {
+      unavailable = true;
+    }
+    // Optional metadata never excuses a changed wallet/token context.
+    assertCurrent(run, wallet);
+    if (unavailable)
+      return {
+        verified: false,
+        notice:
+          'Token decimals are unavailable. Creating a pool requires verified token precision.',
+      };
+    if (
+      typeof precision !== 'number' ||
+      !Number.isInteger(precision) ||
+      precision < 0 ||
+      precision > 255
+    )
+      return {
+        verified: false,
+        notice:
+          'Token decimals are malformed. Creating a pool requires verified token precision.',
+      };
+    if (precision !== tokenDecimals)
+      return {
+        verified: false,
+        notice: `Token decimals (${precision}) differ from this panel's configured precision (${tokenDecimals}). Creating a pool requires matching verified precision; amounts were not reinterpreted.`,
+      };
+    return { verified: true, notice: '' };
+  }
+  async function requireTokenDecimals(run: number, wallet: Provider) {
+    const precision = await observeTokenDecimals(run, wallet);
+    if (!precision.verified) throw new Error(precision.notice);
   }
   async function checkWallet(run: number, wallet: Provider, address: Address) {
     assertCurrent(run, wallet);
@@ -419,6 +469,7 @@ function LiquidityPoolContext({
     to: Address,
     data: Hex,
     value = 0n,
+    options: { requireTokenPrecision?: boolean } = {},
   ) {
     const wallet = reviewedProvider.current;
     if (!wallet || !account)
@@ -428,6 +479,9 @@ function LiquidityPoolContext({
       wallet.request({ method: 'eth_chainId' }),
       wallet.request({ method: 'eth_accounts' }),
       client.getChainId(),
+      options.requireTokenPrecision
+        ? requireTokenDecimals(run, wallet)
+        : Promise.resolve(),
     ]);
     assertCurrent(run, wallet);
     providerChain(network, CHAIN);
@@ -541,9 +595,13 @@ function LiquidityPoolContext({
         'Token approval',
         tokenAddress,
         approveTokenCall(CHAIN, tokenAmount),
+        0n,
+        { requireTokenPrecision: true },
       );
     }
-    const hash = await send(run, 'Create pool', router, data, ethAmount);
+    const hash = await send(run, 'Create pool', router, data, ethAmount, {
+      requireTokenPrecision: true,
+    });
     setNote(`Pool created in ${hash}.`);
     setSeedAck(false);
     await review(run);
@@ -680,12 +738,21 @@ function LiquidityPoolContext({
       )}
       {position && position.totalSupply > 0n && (
         <>
+          {precisionNotice && (
+            <p role="alert">
+              {precisionNotice} Token estimates below are raw token units. LP
+              exit amounts use the original raw on-chain balances.
+            </p>
+          )}
           <div className="dashboard-stats">
             <article>
               <span>Total liquidity</span>
               <strong>{formatEther(position.wethReserve)} ETH</strong>
               <small>
-                {formatUnits(position.tokenReserve, tokenDecimals)} tokens
+                {precisionNotice
+                  ? position.tokenReserve.toString()
+                  : formatUnits(position.tokenReserve, tokenDecimals)}{' '}
+                {precisionNotice ? 'raw token units' : 'tokens'}
               </small>
             </article>
             <article>
@@ -697,7 +764,10 @@ function LiquidityPoolContext({
               <span>Redeemable (estimate)</span>
               <strong>{formatEther(position.redeemableEth)} ETH</strong>
               <small>
-                {formatUnits(position.redeemableToken, tokenDecimals)} tokens
+                {precisionNotice
+                  ? position.redeemableToken.toString()
+                  : formatUnits(position.redeemableToken, tokenDecimals)}{' '}
+                {precisionNotice ? 'raw token units' : 'tokens'}
               </small>
             </article>
           </div>
