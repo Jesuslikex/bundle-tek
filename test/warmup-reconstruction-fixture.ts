@@ -137,6 +137,7 @@ export async function warmupReconstructionFixture(
         rootSha256: bound.rootSha256,
       },
       providerCalls: () => calls,
+      fetcher,
     };
   } catch (e) {
     dispose();

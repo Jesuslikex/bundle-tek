@@ -1,0 +1,124 @@
+/** Token normalization preserves quoted literals and punctuation. Whitespace
+ * outside literals is not an integrity distinction in sqlite_master SQL. */
+export function warmupProposalSqlTokens(sql: string) {
+  const tokens =
+    sql.match(
+      /'(?:''|[^'])*'|"(?:""|[^"])*"|[a-zA-Z_][a-zA-Z_0-9]*|[0-9]+(?:\.[0-9]+)?|[^\s]/g,
+    ) ?? [];
+  if (tokens.at(-1) === ';') tokens.pop();
+  return tokens.join('\n');
+}
+
+// Generated from complete disposable SQLite SQL; freeze at0139 commit.
+export const WARMUP_PROPOSAL_SOURCE_SQL_SHA256 =
+  '5685f65f9098c104540975c23241a222f56aef0023de2ed51ab18dba1c2c279f';
+export const WARMUP_PROPOSAL_SCHEMA_SHA256: Readonly<Record<string, string>> = {
+  wallet_warmup_execution_proposal_chunks:
+    'e811c3d647593311d2c16979bc537783f6b4bf08fcea329c45d802593ab0289a',
+  wallet_warmup_execution_proposal_publications:
+    'f3abb2db44b3ee210a6cdfd87d000d611b4d5f928ded9b3b0e632736412481da',
+  wallet_warmup_execution_proposal_stages:
+    '4913eb75704f8afd73e4fe5d08b46e7e041c0a6835e983f16054401aece3e7f8',
+  warmup_proposal_chunk_insert:
+    '7237dcbc7f5802fd5b6d483c5ea0f94c62baa4cef11383e26f7786b53b658a6f',
+  warmup_proposal_chunk_no_delete:
+    '584b06f3ec3a5ba0239bda8c9493dca88c212000485b8c87068f638ce3e6f030',
+  warmup_proposal_chunk_no_update:
+    '7fd96c84bf58368f61b2b11abddde42878e72e901a51712a6f9aa33385e47d05',
+  warmup_proposal_legacy_isolation:
+    'ce6a7297ef8d22e4c9ff0acefbc5c43df493a8f5c5f64eb590c7218f949e5cde',
+  warmup_proposal_publication_current_0:
+    'c5ac61ac8794d44a876b2eae92e85e0762bb11a00a8e19dafbe5a84f5f6c6c55',
+  warmup_proposal_publication_current_1:
+    '282e57b985c7d9b359ed789556f7f7575659ca967b07e9368e435efbb0bc0dcd',
+  warmup_proposal_publication_current_2:
+    '7b8ab30cf1a9c5e191002b7b0d2801366151ecd7f576f0884aaa4fdf45be5384',
+  warmup_proposal_publication_current_3:
+    '437a78d0762111bbf150494606ac2c2d23e75f1ed12b5d081812d28dfc420822',
+  warmup_proposal_publication_current_4:
+    '16bab0b1a943f998a4e63a62eabac13971e6cec411c3943216ce88c45c4d1df0',
+  warmup_proposal_publication_current_5_busy_0:
+    '465fadac0e504e30d49e82600293ca18505dc98673e586e540d05ec57632dd7d',
+  warmup_proposal_publication_current_5_busy_1:
+    '5ca46635cca7d355f20bc39c22799a7ae2ecd0dfe029c1b381e56cd83ec3fb50',
+  warmup_proposal_publication_current_5_busy_10:
+    'ce75884347beddb6401fe6da68275cdf7c8c6156159f4c3a7d229397ffaad01c',
+  warmup_proposal_publication_current_5_busy_2:
+    'e78a0451afc4d219807e0700fa2042220ba4e0c403ceb77b6698e6d4cb582354',
+  warmup_proposal_publication_current_5_busy_3:
+    '9f409e3de19f1fa642d1b59ea5f209938a79c27e240b5f8dda231f3ce8a06179',
+  warmup_proposal_publication_current_5_busy_4:
+    '6d882798da5b3cce29a6cb58082afe170863e359b3be51d54bf453b8f6ad9c6c',
+  warmup_proposal_publication_current_5_busy_5:
+    '6aafa21a11061c65bed892af467d08a466885312026c0df8927cd8ca16428bd9',
+  warmup_proposal_publication_current_5_busy_6:
+    '31202752bc10f0fa2725d4610e26d44278498b676c07c18508a7c98aaa3ec18e',
+  warmup_proposal_publication_current_5_busy_7:
+    '7765988e5b7ae86e34e5b4c47d5894654dfa496383deeb365daf8c863d60a03b',
+  warmup_proposal_publication_current_5_busy_8:
+    '1b4cad9f64e46ae33994aac567bbd494350169bd93415956f3b9451a2772f9e5',
+  warmup_proposal_publication_current_5_busy_9:
+    'c15c856787a37fe7566d86628678f9ecc8b506e67326d1b98f999a250c6d162b',
+  warmup_proposal_publication_current_6:
+    'b21e2e6fd1b9a7f9772d2d74840b800c8b80ac86a1669863db2bc7764931d403',
+  warmup_proposal_publication_current_7:
+    '5845c974768cf364f30ce0d0c64af9fe9d0c07e4358f3895ce0d3e064bb227b6',
+  warmup_proposal_publication_current_8:
+    'c4cd3cf28b75636f975abc079fb920ecdb8100e37645a9c1df51f5b09d806165',
+  warmup_proposal_publication_current_9:
+    '35d1131cd87aae0f34fdb5094965b6b7de3b4ba6c9b2e8995533cc3aa9ea2e23',
+  warmup_proposal_publication_insert:
+    'd22169404e01e11f474f8b6ac9e5edaf9a6d05797ae2f9721a65d799d18910bc',
+  warmup_proposal_publication_no_delete:
+    '6946ea8703cc4c6aaf67a517f811c5bcc8e4eb19ebdafaf27b2a08fad9c80a85',
+  warmup_proposal_publication_no_update:
+    '54e9eba6f535a710b4bc809f6acc32dfabb7108fcce5f4f3294d61b0dda90658',
+  warmup_proposal_stage_current_0:
+    'ad3d19d0ba1f3a348a82f51af73ae78edb1e6e6159e71352f21337996d80cbd7',
+  warmup_proposal_stage_current_1:
+    'cee282c36f170e541d319f79b41f8e9ef740cef1958354e978ae28a3f5ae8900',
+  warmup_proposal_stage_current_2:
+    '8a70a8faca5219e38d3f0bf90afe88f73cf245709a7cb08a455e7219f61fb8cc',
+  warmup_proposal_stage_current_3:
+    '5374cc0b7250aab4e2b6824fa42069544fc786e8bb972aedd1a709d9cec15406',
+  warmup_proposal_stage_current_4:
+    '056942672e6b0ac00a03da44d77f338427c8ec47a0737ec624f2933d9b1c4ac5',
+  warmup_proposal_stage_current_5_busy_0:
+    '80a8b429b4a3d80259ce43bc99d44d448e5b257ab2b2813bf6592d9be30f45be',
+  warmup_proposal_stage_current_5_busy_1:
+    '2187de4348d5db79858b8d93e22be514fb9a5a2d26a104cfd2b399809d6c6865',
+  warmup_proposal_stage_current_5_busy_10:
+    '78ca3a6504c4b986807d57e5446f29347ffc5c5bc194463e3615ea5a0f4a2607',
+  warmup_proposal_stage_current_5_busy_2:
+    '4708b23930b21aa0d2543a72cc6b04c49afc5ef30ebed6b669e35a6402c23907',
+  warmup_proposal_stage_current_5_busy_3:
+    'dcf60c5779f234552258ce9a6c881f5badb5f4b9a337d196c2023a62fad8f4e7',
+  warmup_proposal_stage_current_5_busy_4:
+    'bfd4d8b286ab7ebd40247abec9f578c7e85f35b97e5fe1524f27e758f27060dd',
+  warmup_proposal_stage_current_5_busy_5:
+    'f914f610c933f33de31caf784cf3143c2fc17bb32773251fdbfba662c3ae2bd4',
+  warmup_proposal_stage_current_5_busy_6:
+    'd74137abee0237d3fe778152143ce4f72580cfbec0ba237872b3ea59a006ec63',
+  warmup_proposal_stage_current_5_busy_7:
+    'e6a3060da10506e3ad381e4df953ca23db1bc9e72df2e6ecea4f1d44221a3199',
+  warmup_proposal_stage_current_5_busy_8:
+    'c4a0d591a8b920757f0a6783ee8539fa55be2796ed5c900e01ec21d5e3c8383d',
+  warmup_proposal_stage_current_5_busy_9:
+    'b69a5ba0f9dfede1543a9d3945ba6cc33d41ac555ffddb4e9421ad9c93c64bca',
+  warmup_proposal_stage_current_6:
+    '3d3885a11aa7a409f7211e44bb4a09481c7085ecb0a0b0b27682190c5cf3995f',
+  warmup_proposal_stage_current_7:
+    '23ada2623e69d8773346192a7965b636ed08cfd133eece65d472baa039ec0a4a',
+  warmup_proposal_stage_current_8:
+    '02f3b24b8b4ef50a5d2eac33faf503f131d3f66e249e2eb0eef54e31a3b9ba2d',
+  warmup_proposal_stage_current_9:
+    '45d3d7fd30ef20c9cd96dbaca2e09976523dd6a3fab072c90d6a0da6b6a1816c',
+  warmup_proposal_stage_insert:
+    '0adfa1e49fdfddefe02d50e2f0528773005c26f48bc8d7b96481dec3e0c39a7c',
+  warmup_proposal_stage_no_delete:
+    'c193bc88619a4840e5595b9734347958c6385a2cc38aef172ac98990f4bcfcf3',
+  warmup_proposal_stage_no_update:
+    '955244db0f9607909686d45b46ba50e471c64584091d9474932652f10855b7fe',
+  warmup_proposal_v2_isolation:
+    '3de98fb84f2d24517c4d38c6bfd91d222454ea20f4ee6537c46c88134e9d1ece',
+};

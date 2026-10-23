@@ -1,0 +1,92 @@
+{
+  "sourceBaseCommit": "8c3bef887fbeb2cf7cb09cc5b07b1e2f01b9aa2f",
+  "scope": "Private complete pre-approval proposal persistence and original recovery; no mounted HTTP/UI/root/human/signing authority",
+  "checks": {
+    "passedTests": 417,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "files": 10,
+    "storageTests": 43,
+    "nativeHarnessPassed": 8,
+    "typecheckPassed": true,
+    "typedLintPassed": true,
+    "formatPassed": true,
+    "frozenSourceFiles": 2380,
+    "frozenSourceUnchanged": true
+  },
+  "ownedSourceHashes": {
+    "lib/wallet-warmup-execution-proposal-storage.ts": "f2c00475da60f83949ae28b426b3433386311ecc9e55597dbd9287cb391d5bd2",
+    "lib/wallet-warmup-execution-proposal-storage.test.ts": "2a2ec140e7594d7396a6538c858167330e0f96b93a88ac9a9ea6a962b46c2df2",
+    "lib/wallet-warmup-execution-proposal-schema.ts": "98987c5f7b8a6f0e4e0a7c074f14b013e57a4c134a1ef005df4b001d5c0616b7",
+    "lib/wallet-warmup-execution-proposal-codec.ts": "f1dd1afb0bb3c9fbd7622f21e3f1f4a926a023a3b877553208c6138c4b5253eb",
+    "lib/wallet-warmup-execution-budget-review.ts": "741a9ed68703b3f0e109dac34d72b6079b79b441ef8457d51e080254c9a0fc22",
+    "test/warmup-reconstruction-fixture.ts": "eadff754233b1df4174ae04618ea9c0ef7b98fc10491ad3a5c07ce3ec47fe907",
+    "drizzle/0139_wallet_warmup_execution_proposals.sql": "520ad5f4812839e390f6f85e2f054a4b35471c601e33d5b7c0eff54f7b1ec409",
+    "drizzle/meta/_journal.json": "8cd935f6ccf8965f0f563cfd0c5616dd0d8496f1d793e71cf4fff1c9879a14a6"
+  },
+  "reviews": [
+    {
+      "directory": "work/release-qa/opus-warmup-proposal-storage-20261023",
+      "model": "claude-opus-5-5",
+      "copiedFiles": 18,
+      "unchanged": true,
+      "permissionDenials": 0,
+      "reviewerRanTests": false
+    },
+    {
+      "directory": "work/release-qa/opus-warmup-proposal-storage-final-20261023",
+      "model": "claude-opus-5-5",
+      "copiedFiles": 24,
+      "unchanged": true,
+      "permissionDenials": 0,
+      "reviewerRanTests": false
+    }
+  ],
+  "postReviewFollowups": "Exact source/busy wrapper assertions, original-writer publication race recovery and its regression, publication ps alias and regenerated fingerprints, stage OR REPLACE assertion, explicit older-parent dependency docs. Independently Codex verified; not rereviewed.",
+  "sqlGuardContracts": {
+    "newFingerprintedObjects": 54,
+    "originalSourceConjuncts": 10,
+    "unchangedBusyFamilies": 11,
+    "currentChecksPerInsertPhase": 20,
+    "phases": 2,
+    "sameStatementSnapshot": true,
+    "sharedSourceAndBusyFilesUnchanged": true,
+    "parentSchemaFullyFingerprintCovered": false
+  },
+  "localMigrations": {
+    "newTag": "0139_wallet_warmup_execution_proposals",
+    "checksumRunnerFreshFiles": 140,
+    "wholeFileWranglerLocalFiles": 140,
+    "upgrade": {
+      "mode": "disposable-memory-only",
+      "baselineChecksums": 139,
+      "applied": 1,
+      "finalMatchingChecksums": 140,
+      "pending": 0,
+      "originalLedgerUnchanged": true,
+      "originalWalletMetadataUnchanged": true,
+      "originalSchemaUnchanged": true,
+      "addedObjects": 54,
+      "foreignKeysClean": true,
+      "integrityCheck": "ok",
+      "sameChecksumHelperAsRunner": true,
+      "fullRunnerRetryNotClaimed": true,
+      "migrationSha256": "520ad5f4812839e390f6f85e2f054a4b35471c601e33d5b7c0eff54f7b1ec409",
+      "passed": true
+    },
+    "nextUnclaimed": "0140",
+    "applicationOrHostedApplied": false
+  },
+  "limits": [
+    "No browser or full-suite verification claimed",
+    "No actual provider request, wallet unlock, signing, send, funded test or deployment",
+    "No authentication/HTTP/approval/root/retention/runtime/UI caller mounted",
+    "128-record lifetime cap and256MiB declared-payload reservation remain pending retention management; headers/DB overhead extra",
+    "Hosted schema/PRAGMA support not freshly qualified"
+  ],
+  "humanApprovalVerified": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "automaticExecutionAllowed": false,
+  "deployed": false
+}

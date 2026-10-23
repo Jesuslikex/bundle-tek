@@ -50,6 +50,8 @@ const request = z
   })
   .strict();
 
+export const warmupExecutionBudgetRequestSchema = request;
+
 // Historical totals can sum multiple25-digit receipt values. They are not u64 spend authority.
 const originalUnits = z.string().regex(/^(0|[1-9]\d{0,28})$/);
 const signedOriginal = z.string().regex(/^(0|-?[1-9]\d{0,28})$/);
@@ -508,44 +510,12 @@ export async function reconstructWarmupExecutionRoot(
       { ...expected, ownerId: owner },
     );
     signal.throwIfAborted();
-    const source = await readRetainedWarmupExecutionSource(
+    const { source, asset, rebuilt } = await reconstructProposalTerms(
       db,
       owner,
-      {
-        reviewId: expected.reviewId,
-        reviewSha256: bound.root.terms.review.sha256,
-      },
-      signal,
-    );
-    if (
-      (await digest(canonical(input.verifierEvidence))) !==
-      bound.root.terms.verifierEvidenceSha256
-    )
-      return fail();
-    signal.throwIfAborted();
-    // Independent admitted root hash -> verifier hash -> original packet
-    // fields. These are pinned recorded values, not a current configured host
-    // or fresh RPC-provenance assertion. Never move this alias before the pin.
-    const pinnedVerifier = input.verifierEvidence;
-    const asset = await replayWarmupExecutionAssets(
-      {
-        evidence: pinnedVerifier.assets,
-        evidenceSha256: pinnedVerifier.assetEvidenceSha256,
-      },
-      {
-        ownerId: owner,
-        reviewId: source.retainedReview.id,
-        reviewSha256: source.retainedReview.reviewSha256,
-        sourceSnapshotSha256: source.sourceSnapshotSha256,
-        evidenceSha256: pinnedVerifier.assetEvidenceSha256,
-        provider: pinnedVerifier.assets.provider,
-        mints: [
-          ...new Set(source.retainedReview.document.actions.map((a) => a.mint)),
-        ],
-        reviewedAt: source.retainedReview.reviewedAt,
-        reviewExpiresAt: source.retainedReview.reviewExpiresAt,
-        expiresAt: pinnedVerifier.assets.expiresAt,
-      },
+      bound.root.terms,
+      bound.root.termsSha256,
+      input.verifierEvidence,
       signal,
     );
     const approved = Date.parse(bound.approval.approvedAt);
@@ -555,38 +525,6 @@ export async function reconstructWarmupExecutionRoot(
       approved < Date.parse(asset.evidence.checkedAt) ||
       approved >= Date.parse(asset.evidence.expiresAt)
     )
-      return fail();
-    const intent = bound.root.terms.intent;
-    const proposed = request.parse({
-      reviewId: source.retainedReview.id,
-      reviewSha256: source.retainedReview.reviewSha256,
-      rootId: intent.id,
-      consentId: intent.consentId,
-      sessionExpiresAt: intent.expiresAt,
-      feeRentLimits: intent.actions.map((a) => ({
-        actionId: a.id,
-        maximumLamports: a.maximumFeeRentLamports,
-      })),
-    });
-    const rebuilt = await deriveBudgetTerms(source, asset, proposed, signal);
-    if (
-      canonical(rebuilt.terms) !== canonical(bound.root.terms) ||
-      rebuilt.termsSha256 !== bound.root.termsSha256 ||
-      canonical(rebuilt.verifierEvidence) !==
-        canonical(input.verifierEvidence) ||
-      rebuilt.verifierEvidenceSha256 !== bound.root.terms.verifierEvidenceSha256
-    )
-      return fail();
-    const after = await readRetainedWarmupExecutionSource(
-      db,
-      owner,
-      {
-        reviewId: expected.reviewId,
-        reviewSha256: source.retainedReview.reviewSha256,
-      },
-      signal,
-    );
-    if (after.sourceSnapshotSha256 !== source.sourceSnapshotSha256)
       return fail();
     signal.throwIfAborted();
     return {
@@ -600,6 +538,145 @@ export async function reconstructWarmupExecutionRoot(
       humanApprovalVerified: false as const,
       currentSourceVerified: false as const,
       networkObservationReverified: false as const,
+      signingAllowed: false as const,
+      executionAllowed: false as const,
+      automaticExecutionAllowed: false as const,
+    };
+  } catch {
+    signal.throwIfAborted();
+    throw new WarmupExecutionReconstructionError();
+  }
+}
+
+async function reconstructProposalTerms(
+  db: D1Database,
+  owner: string,
+  terms: Awaited<ReturnType<typeof bindWarmupExecutionTerms>>['terms'],
+  termsSha256: string,
+  verifierEvidence: z.infer<typeof warmupExecutionReviewEvidenceSchema>,
+  signal: AbortSignal,
+) {
+  const source = await readRetainedWarmupExecutionSource(
+    db,
+    owner,
+    {
+      reviewId: terms.review.id,
+      reviewSha256: terms.review.sha256,
+    },
+    signal,
+  );
+  if (
+    (await digest(canonical(verifierEvidence))) !== terms.verifierEvidenceSha256
+  )
+    return fail();
+  signal.throwIfAborted();
+  // Independently pinned terms hash -> verifier hash -> original packet
+  // fields. These are pinned recorded values, not a current configured host
+  // or fresh RPC-provenance assertion. Never move this alias before the pin.
+  const pinnedVerifier = verifierEvidence;
+  const asset = await replayWarmupExecutionAssets(
+    {
+      evidence: pinnedVerifier.assets,
+      evidenceSha256: pinnedVerifier.assetEvidenceSha256,
+    },
+    {
+      ownerId: owner,
+      reviewId: source.retainedReview.id,
+      reviewSha256: source.retainedReview.reviewSha256,
+      sourceSnapshotSha256: source.sourceSnapshotSha256,
+      evidenceSha256: pinnedVerifier.assetEvidenceSha256,
+      provider: pinnedVerifier.assets.provider,
+      mints: [
+        ...new Set(source.retainedReview.document.actions.map((a) => a.mint)),
+      ],
+      reviewedAt: source.retainedReview.reviewedAt,
+      reviewExpiresAt: source.retainedReview.reviewExpiresAt,
+      expiresAt: pinnedVerifier.assets.expiresAt,
+    },
+    signal,
+  );
+  const intent = terms.intent;
+  const proposed = request.parse({
+    reviewId: source.retainedReview.id,
+    reviewSha256: source.retainedReview.reviewSha256,
+    rootId: intent.id,
+    consentId: intent.consentId,
+    sessionExpiresAt: intent.expiresAt,
+    feeRentLimits: intent.actions.map((a) => ({
+      actionId: a.id,
+      maximumLamports: a.maximumFeeRentLamports,
+    })),
+  });
+  const rebuilt = await deriveBudgetTerms(source, asset, proposed, signal);
+  if (
+    canonical(rebuilt.terms) !== canonical(terms) ||
+    rebuilt.termsSha256 !== termsSha256 ||
+    canonical(rebuilt.verifierEvidence) !== canonical(verifierEvidence) ||
+    rebuilt.verifierEvidenceSha256 !== terms.verifierEvidenceSha256
+  )
+    return fail();
+  const after = await readRetainedWarmupExecutionSource(
+    db,
+    owner,
+    {
+      reviewId: terms.review.id,
+      reviewSha256: source.retainedReview.reviewSha256,
+    },
+    signal,
+  );
+  if (after.sourceSnapshotSha256 !== source.sourceSnapshotSha256) return fail();
+  signal.throwIfAborted();
+  return { source, asset, rebuilt };
+}
+
+/** Historical owned pre-approval proposal replay. Expected identity/terms digest
+ * comes from independent owned storage, never from an incoming packet. No
+ * synthetic approval, currentness/provider read, clock or deadline renewal. */
+export async function reconstructWarmupExecutionProposal(
+  db: D1Database,
+  owner: string,
+  value: unknown,
+  rawExpected: unknown,
+  signal: AbortSignal,
+) {
+  try {
+    signal.throwIfAborted();
+    const input = z
+      .object({
+        terms: z.unknown(),
+        verifierEvidence: warmupExecutionReviewEvidenceSchema,
+      })
+      .strict()
+      .parse(value);
+    const expected = rootExpected
+      .omit({ rootSha256: true })
+      .extend({ termsSha256: hash })
+      .strict()
+      .parse(rawExpected);
+    const bound = await bindWarmupExecutionTerms(input.terms);
+    if (
+      bound.termsSha256 !== expected.termsSha256 ||
+      bound.terms.intent.ownerId !== owner ||
+      bound.terms.intent.id !== expected.id ||
+      bound.terms.intent.consentId !== expected.consentId ||
+      bound.terms.review.id !== expected.reviewId
+    )
+      return fail();
+    const { source, rebuilt } = await reconstructProposalTerms(
+      db,
+      owner,
+      bound.terms,
+      bound.termsSha256,
+      input.verifierEvidence,
+      signal,
+    );
+    return {
+      ...rebuilt,
+      sourceSnapshotSha256: source.sourceSnapshotSha256,
+      scope: 'historical-owned-proposal-reconstruction-only' as const,
+      humanApprovalVerified: false as const,
+      currentSourceVerified: false as const,
+      networkVerified: false as const,
       signingAllowed: false as const,
       executionAllowed: false as const,
       automaticExecutionAllowed: false as const,

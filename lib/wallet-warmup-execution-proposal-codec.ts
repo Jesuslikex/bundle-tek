@@ -89,7 +89,8 @@ const typedArrayTagDescriptor = Object.getOwnPropertyDescriptor(
   Symbol.toStringTag,
 )!;
 
-function parseHeader(value: unknown) {
+/** Shape only; an independent owned header digest is still mandatory. */
+export function parseWarmupExecutionProposalHeader(value: unknown) {
   const h = headerSchema.parse(value);
   if (
     h.chunks.length !== Math.ceil(h.bytes / WARMUP_PROPOSAL_CHUNK_BYTES) ||
@@ -170,7 +171,7 @@ export async function packWarmupExecutionProposal(
       descriptors.push({ index, bytes: data.length, sha256: await sha(data) });
     }
     const { terms, verifierEvidence } = envelope;
-    const header = parseHeader({
+    const header = parseWarmupExecutionProposalHeader({
       format: 'wallet-warmup-execution-proposal-blobs-v1',
       id: terms.intent.id,
       ownerId: terms.intent.ownerId,
@@ -203,7 +204,7 @@ export async function unpackWarmupExecutionProposal(
 ) {
   try {
     signal.throwIfAborted();
-    const h = parseHeader(rawHeader),
+    const h = parseWarmupExecutionProposalHeader(rawHeader),
       expected = expectedSchema.parse(rawExpected);
     if (
       h.id !== expected.id ||
