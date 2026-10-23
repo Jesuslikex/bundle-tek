@@ -14,6 +14,7 @@ import { JitoBundleTimeline } from './jito-bundle-timeline';
 import { requireJitoFinalization } from '@/lib/jito-finalization';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 
 async function checkedRecord(
   value: JitoBundleRecord,
@@ -54,15 +55,19 @@ async function checkedRecord(
   }
   return value;
 }
-export function JitoAtomicBundle({
-  projectId,
-  session,
-  locked,
-}: {
+type JitoAtomicBundleProps = {
   projectId: string;
   session: TradeSession;
   locked: boolean;
-}) {
+};
+export function JitoAtomicBundle(props: JitoAtomicBundleProps) {
+  return <JitoAtomicBundleForContext key={JSON.stringify(props)} {...props} />;
+}
+function JitoAtomicBundleForContext({
+  projectId,
+  session,
+  locked,
+}: JitoAtomicBundleProps) {
   const tipId = useId();
   const [eligible, setEligible] = useState<WarmupSigningReview[]>([]),
     [selected, setSelected] = useState<string[]>([]),
@@ -86,8 +91,14 @@ export function JitoAtomicBundle({
     };
   }, []);
   async function request(body?: object) {
+    if (!mounted.current)
+      throw new Error('Bundle context changed. Reload saved history.');
     const controller = new AbortController();
     abort.current = controller;
+    const signal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(60000),
+    ]);
     const response = await fetch(
       body
         ? '/api/imported-projects/jito-bundles'
@@ -100,13 +111,27 @@ export function JitoAtomicBundle({
               body: JSON.stringify(body),
             }
           : {}),
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(60000),
-        ]),
+        cache: 'no-store',
+        signal,
       },
     );
-    const data = (await response.json()) as {
+    if (response.status === 401) {
+      void response.body?.cancel().catch(() => {});
+      throw new Error('Sign in to recover saved bundles.');
+    }
+    let value: unknown;
+    try {
+      value = await readBoundedPanelJson(response, signal);
+    } catch {
+      throw new Error(
+        'Bundle response unavailable. Reload saved history before another action.',
+      );
+    }
+    if (!mounted.current || signal.aborted)
+      throw new Error('Bundle context changed. Reload saved history.');
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error('Bundle response unavailable. Reload saved history.');
+    const data = value as {
       error?: string;
       bundle?: JitoBundleRecord;
       bundles?: JitoBundleRecord[];
@@ -119,11 +144,23 @@ export function JitoAtomicBundle({
     return data;
   }
   async function action(body?: object) {
+    if (!mounted.current)
+      throw new Error('Bundle context changed. Reload saved history.');
     if (running.current)
       throw new Error('Wait for the current bundle operation.');
     running.current = true;
     setBusy(true);
     setError('');
+    setAcceptedSubmit(null);
+    const submission = body as { action?: unknown; id?: unknown } | undefined;
+    if (submission?.action === 'submit')
+      setBundles((prior) =>
+        prior.map((bundle) =>
+          bundle.manifest.id === submission.id
+            ? { ...bundle, state: 'submitting' }
+            : bundle,
+        ),
+      );
     try {
       const data = await request(body);
       if (data.bundle) {

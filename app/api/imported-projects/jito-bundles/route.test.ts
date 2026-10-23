@@ -92,6 +92,51 @@ it('bounds payloads and does not expose a raw arbitrary relay method', async () 
   ).toBe(413);
   expect(mocks.submit).not.toHaveBeenCalled();
 });
+it('counts UTF-8 request bytes and stops a stream at the limit before database access', async () => {
+  let pulls = 0;
+  const cancel = vi.fn();
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(c) {
+        pulls++;
+        c.enqueue(new TextEncoder().encode('"' + '€'.repeat(1400)));
+      },
+      cancel,
+    },
+    { highWaterMark: 0 },
+  );
+  const result = await POST(
+    new Request('http://localhost/api/imported-projects/jito-bundles', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      duplex: 'half',
+    } as RequestInit),
+  );
+  expect(result.status).toBe(413);
+  expect(pulls).toBe(1);
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(mocks.database).not.toHaveBeenCalled();
+  expect(mocks.submit).not.toHaveBeenCalled();
+});
+it('cancels a stalled request body without provider or database work', async () => {
+  const controller = new AbortController(),
+    cancel = vi.fn();
+  const pending = POST(
+    new Request('http://localhost/api/imported-projects/jito-bundles', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: new ReadableStream({ cancel }),
+      signal: controller.signal,
+      duplex: 'half',
+    } as RequestInit),
+  );
+  await Promise.resolve();
+  controller.abort();
+  expect((await pending).status).toBe(408);
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(mocks.database).not.toHaveBeenCalled();
+});
 it('scopes history and mutations to the signed-in owner and saved session', async () => {
   expect(
     (

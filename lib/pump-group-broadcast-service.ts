@@ -399,7 +399,7 @@ export async function submitOwnedPumpGroupBroadcast(
   };
   deadline.throwIfAborted();
   try {
-    await db
+    const attempt = await db
       .prepare(
         'INSERT INTO pump_group_broadcast_attempts(review_id,broadcast_id,owner_id,consent,evidence,created_at) VALUES(?,?,?,?,?,?)',
       )
@@ -412,6 +412,21 @@ export async function submitOwnedPumpGroupBroadcast(
         new Date().toISOString(),
       )
       .run();
+    if ((attempt.success as boolean) === false || attempt.meta?.changes !== 1)
+      throw new Error('Broadcast attempt was not acknowledged.');
+    const retained = await db
+      .prepare(
+        'SELECT consent,evidence,broadcast_id FROM pump_group_broadcast_attempts WHERE owner_id=? AND review_id=?',
+      )
+      .bind(owner, id)
+      .first<{ consent: string; evidence: string; broadcast_id: string }>();
+    if (
+      !retained ||
+      retained.broadcast_id !== saved.review.id ||
+      retained.consent !== canonicalPumpHolderJson(consent) ||
+      retained.evidence !== canonicalPumpHolderJson(evidence)
+    )
+      throw new Error('Broadcast attempt is not durably acknowledged.');
   } catch {
     const raced = await readOwnedPumpGroupBroadcast(db, owner, id);
     if (raced?.attempted) return raced;
@@ -422,6 +437,7 @@ export async function submitOwnedPumpGroupBroadcast(
   let bundleId: string | null = null;
   try {
     deadline.throwIfAborted();
+    await requirePumpGroupBroadcastReview(saved.review, group.review);
     const result = await new Promise<unknown>((resolve, reject) => {
       const abort = () => reject(new Error('Broadcast result is uncertain.'));
       deadline.addEventListener('abort', abort, { once: true });

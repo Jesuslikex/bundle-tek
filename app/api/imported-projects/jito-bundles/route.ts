@@ -11,6 +11,7 @@ import {
 } from '@/lib/jito-bundle-server';
 import { POST as recoverImportedApproval } from '../signing/route';
 import { prepareJitoBundle } from '@/lib/jito-bundle-preparation';
+import { JitoJsonError, readJitoJson } from '@/lib/jito-json';
 export const dynamic = 'force-dynamic';
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
@@ -93,9 +94,11 @@ export async function POST(request: Request) {
     approved?: boolean;
   };
   try {
-    const text = await request.text();
-    if (text.length > 4096) return json({ error: 'Request too large.' }, 413);
-    body = JSON.parse(text);
+    body = (await readJitoJson(
+      request.body,
+      AbortSignal.any([request.signal, AbortSignal.timeout(10000)]),
+      4096,
+    )) as typeof body;
     if (
       !body ||
       ![
@@ -122,7 +125,9 @@ export async function POST(request: Request) {
       (!/^[a-f0-9]{64}$/.test(body.sha256) || body.approved !== true)
     )
       throw new Error();
-  } catch {
+  } catch (error) {
+    if (error instanceof JitoJsonError)
+      return json({ error: error.message }, error.status);
     return json({ error: 'Invalid Jito bundle request.' }, 400);
   }
   try {

@@ -232,6 +232,39 @@ async function setup() {
   }
   return { ...f, group, rpc, jito, sends, reads, control, prepare, ready };
 }
+for (const changes of [0, 1])
+  it(`refuses a failed attempt-write envelope with ${changes} changes before sending`, async () => {
+    const f = await setup();
+    const { consent } = await f.ready();
+    const prepare = f.db.prepare.bind(f.db);
+    vi.spyOn(f.db, 'prepare').mockImplementation((sql) => {
+      const statement = prepare(sql);
+      if (sql.startsWith('INSERT INTO pump_group_broadcast_attempts')) {
+        const bind = statement.bind.bind(statement);
+        statement.bind = (...values) => {
+          const bound = bind(...values);
+          vi.spyOn(bound, 'run').mockResolvedValue({
+            success: false,
+            meta: { changes },
+          } as never);
+          return bound;
+        };
+      }
+      return statement;
+    });
+    await expect(
+      submitOwnedPumpGroupBroadcast(
+        f.db,
+        'alice',
+        f.group.review.id,
+        consent,
+        signal(),
+        f.rpc,
+        f.jito,
+      ),
+    ).rejects.toThrow();
+    expect(f.sends).toHaveLength(0);
+  }, 120000);
 it('projects owner-only saved launch costs through real SQL and receipt parsers without a write or provider read', async () => {
   const f = await setup();
   await expect(

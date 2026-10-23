@@ -1,31 +1,31 @@
 import {
   currentImportedPreparation,
   verifyExactSwapSignature,
-} from "./imported-swap-approval";
+} from './imported-swap-approval';
 import {
   createJitoFinalization,
   requireJitoFinalization,
   type JitoFinalization,
-} from "./jito-finalization";
-import { matchingJitoSwapReceipt } from "./jito-swap-receipt";
-import { currentTradeSession } from "./imported-trade-session-server";
-import { currentImportedAcquisition } from "./imported-acquisition-server";
+} from './jito-finalization';
+import { matchingJitoSwapReceipt } from './jito-swap-receipt';
+import { currentTradeSession } from './imported-trade-session-server';
+import { currentImportedAcquisition } from './imported-acquisition-server';
 import {
   restoreSavedSwapOrder,
   requireWarmupSigningReview,
   type WarmupSigningReview,
-} from "./warmup-signing";
-import { simulateImportedSwap } from "./imported-swap-simulation";
+} from './warmup-signing';
+import { simulateImportedSwap } from './imported-swap-simulation';
 import {
   prepareNativeWithdrawal,
   recheckNativeWithdrawal,
   decodeNativeWithdrawalReceipt,
-} from "./native-withdrawal-server";
-import { inspectNativeWithdrawal, withdrawalInput } from "./native-withdrawal";
-import { formatNativeBalance } from "./wallet-balance-format";
-import { getSolanaRpcEndpoint } from "./solana-rpc";
-import { balanceRpc, SOLANA_MAINNET_GENESIS } from "./wallet-balances";
-import { getJitoTipAccounts, jitoRpc } from "./jito-provider";
+} from './native-withdrawal-server';
+import { inspectNativeWithdrawal, withdrawalInput } from './native-withdrawal';
+import { formatNativeBalance } from './wallet-balance-format';
+import { getSolanaRpcEndpoint } from './solana-rpc';
+import { balanceRpc, SOLANA_MAINNET_GENESIS } from './wallet-balances';
+import { getJitoTipAccounts, jitoRpc } from './jito-provider';
 import {
   bundleFingerprint,
   requireJitoManifest,
@@ -36,8 +36,8 @@ import {
   type JitoBundleManifest,
   type JitoBundleRecord,
   type JitoBundleState,
-} from "./jito-bundle";
-import type { SavedSwapPreparation } from "./imported-swap-preparation-history";
+} from './jito-bundle';
+import type { SavedSwapPreparation } from './imported-swap-preparation-history';
 
 type BundleRow = {
   document: string;
@@ -51,6 +51,7 @@ type PacketRow = {
   transaction: string | null;
   signature: string | null;
 };
+const JITO_EXPIRY_MARGIN_BLOCKS = 32n;
 export async function readJitoBundle(
   db: D1Database,
   owner: string,
@@ -58,15 +59,15 @@ export async function readJitoBundle(
 ) {
   const row = await db
     .prepare(
-      "SELECT document,state,bundle_id AS bundleId,updated_at AS updatedAt FROM jito_bundles WHERE owner_id=? AND id=?",
+      'SELECT document,state,bundle_id AS bundleId,updated_at AS updatedAt FROM jito_bundles WHERE owner_id=? AND id=?',
     )
     .bind(owner, id)
     .first<BundleRow>();
-  if (!row) throw new Error("Owned bundle unavailable.");
+  if (!row) throw new Error('Owned bundle unavailable.');
   const manifest = await requireJitoManifest(JSON.parse(row.document), false);
   const { results: packets } = await db
     .prepare(
-      "SELECT packet,intent_id AS intentId,`transaction`,signature FROM jito_bundle_packets WHERE owner_id=? AND bundle_id=? ORDER BY packet",
+      'SELECT packet,intent_id AS intentId,`transaction`,signature FROM jito_bundle_packets WHERE owner_id=? AND bundle_id=? ORDER BY packet',
     )
     .bind(owner, id)
     .all<PacketRow>();
@@ -79,10 +80,10 @@ export async function readJitoBundle(
         Boolean(p.signature) !== Boolean(p.transaction),
     )
   )
-    throw new Error("Bundle packet history differs.");
+    throw new Error('Bundle packet history differs.');
   const proofRow = await db
     .prepare(
-      "SELECT document FROM jito_bundle_finalizations WHERE owner_id=? AND bundle_id=?",
+      'SELECT document FROM jito_bundle_finalizations WHERE owner_id=? AND bundle_id=?',
     )
     .bind(owner, id)
     .first<{ document: string }>();
@@ -93,8 +94,8 @@ export async function readJitoBundle(
         packets.map((p) => p.signature),
       )
     : null;
-  if (finalization && row.state !== "finalized")
-    throw new Error("Finalization state differs.");
+  if (finalization && row.state !== 'finalized')
+    throw new Error('Finalization state differs.');
   return {
     row,
     manifest,
@@ -121,7 +122,7 @@ async function currentSwap(
     review.preparationId,
   );
   if (!captured)
-    throw new Error("Project or wallet changed. Recover the bundle.");
+    throw new Error('Project or wallet changed. Recover the bundle.');
   const saved: SavedSwapPreparation = {
     ...captured,
     document: JSON.parse(captured.document),
@@ -131,7 +132,7 @@ async function currentSwap(
     !review.session ||
     JSON.stringify(saved.document.session) !== JSON.stringify(review.session)
   )
-    throw new Error("Choose ordinary session entries for a Jito bundle.");
+    throw new Error('Choose ordinary session entries for a Jito bundle.');
   await currentTradeSession(db, owner, saved, review.id);
   if (review.acquisition)
     await currentImportedAcquisition(db, owner, review.acquisition, true);
@@ -142,45 +143,45 @@ async function currentSwap(
     JSON.stringify(settlement) !== JSON.stringify(review.settlement) ||
     simulation.networkFeeLamports !== review.maximumFeeLamports
   )
-    throw new Error("Approved swap fees, rent or settlement changed.");
+    throw new Error('Approved swap fees, rent or settlement changed.');
   const again = await currentImportedPreparation(
     db,
     owner,
     review.preparationId,
   );
   if (!again || again.document !== captured.document)
-    throw new Error("Preparation changed during review.");
+    throw new Error('Preparation changed during review.');
   return saved;
 }
 async function rpcForBundle(signal: AbortSignal) {
-  const endpoint = getSolanaRpcEndpoint("mainnet");
+  const endpoint = getSolanaRpcEndpoint('mainnet');
   const rpc = (method: string, params: unknown[]) =>
     balanceRpc(endpoint, method, params, signal, fetch);
-  if ((await rpc("getGenesisHash", [])) !== SOLANA_MAINNET_GENESIS)
-    throw new Error("Bundle RPC network differs.");
+  if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+    throw new Error('Bundle RPC network differs.');
   return rpc;
 }
 async function combinedTipBalance(
-  manifest: Pick<JitoBundleManifest, "swaps" | "tip">,
+  manifest: Pick<JitoBundleManifest, 'swaps' | 'tip'>,
   signal: AbortSignal,
 ) {
   const rpc = await rpcForBundle(signal);
-  const balance = (await rpc("getBalance", [
+  const balance = (await rpc('getBalance', [
     manifest.tip.wallet,
-    { commitment: "finalized", minContextSlot: manifest.tip.slot },
+    { commitment: 'finalized', minContextSlot: manifest.tip.slot },
   ])) as { value: string };
   if (
     !manifest.swaps[0].settlement ||
     !/^(0|[1-9]\d{0,19})$/.test(balance?.value)
   )
-    throw new Error("Tip payer balance unavailable.");
+    throw new Error('Tip payer balance unavailable.');
   const needed =
     BigInt(manifest.tip.maximumDebitRaw) +
     BigInt(manifest.tip.reserveLamports) +
     BigInt(manifest.swaps[0].settlement.maximumNativeDebitLamports);
   if (BigInt(balance.value) < needed)
     throw new Error(
-      "Tip payer must cover its swap, tip, both fees and reserve without relying on earlier bundle proceeds.",
+      'Tip payer must cover its swap, tip, both fees and reserve without relying on earlier bundle proceeds.',
     );
 }
 export async function createJitoBundle(
@@ -200,12 +201,12 @@ export async function createJitoBundle(
   const tipLamports = jitoTipLamports(input.tipLamports);
   const retained = await db
     .prepare(
-      "SELECT count(*) AS count FROM jito_bundles WHERE owner_id=? AND project_id=?",
+      'SELECT count(*) AS count FROM jito_bundles WHERE owner_id=? AND project_id=?',
     )
     .bind(owner, input.projectId)
     .first<{ count: number }>();
   if (!retained || retained.count >= 20)
-    throw new Error("Bundle history capacity reached for this project.");
+    throw new Error('Bundle history capacity reached for this project.');
   const reviews: WarmupSigningReview[] = [];
   for (const id of input.intentIds) {
     const row = await db
@@ -216,7 +217,7 @@ export async function createJitoBundle(
       .first<{ document: string }>();
     if (!row)
       throw new Error(
-        "Choose current unsigned approvals that are not already bundled.",
+        'Choose current unsigned approvals that are not already bundled.',
       );
     const review = JSON.parse(row.document) as WarmupSigningReview;
     if (
@@ -224,7 +225,7 @@ export async function createJitoBundle(
       review.session?.sessionId !== input.sessionId ||
       review.session?.sessionRevision !== input.sessionRevision
     )
-      throw new Error("Approval belongs to another session revision.");
+      throw new Error('Approval belongs to another session revision.');
     reviews.push(review);
   }
   reviews.sort((a, b) => a.session!.entry - b.session!.entry);
@@ -237,7 +238,7 @@ export async function createJitoBundle(
         r.preparationId,
       );
       if (!captured)
-        throw new Error("Project or wallet changed during preparation.");
+        throw new Error('Project or wallet changed during preparation.');
       return {
         ...captured,
         document: JSON.parse(captured.document),
@@ -248,7 +249,7 @@ export async function createJitoBundle(
     new Set(saved.map((s) => s.document.side)).size !== 1 ||
     new Set(saved.map((s) => s.projectRevision)).size !== 1
   )
-    throw new Error("Bundle must have one side and project revision.");
+    throw new Error('Bundle must have one side and project revision.');
   const tips = await getJitoTipAccounts(signal);
   const random = crypto.getRandomValues(new Uint32Array(1))[0] % tips.length;
   const tip = await prepareNativeWithdrawal(
@@ -268,10 +269,10 @@ export async function createJitoBundle(
   ).toISOString();
   if (Date.parse(expiresAt) - Date.now() < 15000)
     throw new Error(
-      "Bundle has less than 15 seconds left. Cancel unsigned approvals and prepare fresh packets.",
+      'Bundle has less than 15 seconds left. Cancel unsigned approvals and prepare fresh packets.',
     );
   const terms = {
-    format: "jito-atomic-bundle-v1" as const,
+    format: 'jito-atomic-bundle-v1' as const,
     id: crypto.randomUUID(),
     projectId: input.projectId,
     sessionId: input.sessionId,
@@ -304,7 +305,7 @@ export async function createJitoBundle(
       ),
     ...[...reviews.map((r) => r.id), null].map((id, i) =>
       db
-        .prepare("INSERT INTO jito_bundle_packets VALUES(?,?,?,?,NULL,NULL)")
+        .prepare('INSERT INTO jito_bundle_packets VALUES(?,?,?,?,NULL,NULL)')
         .bind(owner, manifest.id, i, id),
     ),
   ]);
@@ -322,12 +323,12 @@ export async function registerJitoPacket(
   await requireJitoManifest(bundle.manifest, false);
   if (
     bundle.manifest.sha256 !== digest ||
-    bundle.row.state !== "reviewed" ||
+    bundle.row.state !== 'reviewed' ||
     !Number.isInteger(packet) ||
     packet < 0 ||
     packet > bundle.manifest.swaps.length
   )
-    throw new Error("Current complete bundle approval required.");
+    throw new Error('Current complete bundle approval required.');
   const review = bundle.manifest.swaps[packet];
   const signature = review
     ? verifyExactSwapSignature(review, transaction)
@@ -339,7 +340,7 @@ export async function registerJitoPacket(
       existing.signature !== signature ||
       existing.transaction !== transaction
     )
-      throw new Error("Registered bundle packet differs.");
+      throw new Error('Registered bundle packet differs.');
     return bundle.record;
   }
   const now = new Date().toISOString();
@@ -355,7 +356,7 @@ export async function registerJitoPacket(
       : []),
     db
       .prepare(
-        "UPDATE jito_bundle_packets SET `transaction`=?,signature=? WHERE owner_id=? AND bundle_id=? AND packet=? AND signature IS NULL",
+        'UPDATE jito_bundle_packets SET `transaction`=?,signature=? WHERE owner_id=? AND bundle_id=? AND packet=? AND signature IS NULL',
       )
       .bind(transaction, signature, owner, id, packet),
   ]);
@@ -372,11 +373,11 @@ export async function submitJitoBundle(
   await requireJitoManifest(bundle.manifest);
   if (
     bundle.manifest.sha256 !== digest ||
-    bundle.row.state !== "reviewed" ||
+    bundle.row.state !== 'reviewed' ||
     bundle.packets.some((p) => !p.transaction || !p.signature)
   )
     throw new Error(
-      "Sign every exact packet, then approve one bundle submission.",
+      'Sign every exact packet, then approve one bundle submission.',
     );
   requireJitoSignatures(bundle.packets.map((p) => p.signature!));
   for (let i = 0; i < bundle.manifest.swaps.length; i++) {
@@ -386,7 +387,7 @@ export async function submitJitoBundle(
         bundle.packets[i].transaction!,
       ) !== bundle.packets[i].signature
     )
-      throw new Error("Stored bundle packet differs.");
+      throw new Error('Stored bundle packet differs.');
   }
   await inspectNativeWithdrawal(
     bundle.manifest.tip,
@@ -400,7 +401,7 @@ export async function submitJitoBundle(
   );
   const tips = await getJitoTipAccounts(signal);
   if (!tips.includes(bundle.manifest.tip.recipient))
-    throw new Error("Reviewed tip recipient is no longer reported by Jito.");
+    throw new Error('Reviewed tip recipient is no longer reported by Jito.');
   await recheckNativeWithdrawal(bundle.manifest.tip, signal);
   await combinedTipBalance(bundle.manifest, signal);
   signal.throwIfAborted();
@@ -410,16 +411,31 @@ export async function submitJitoBundle(
     )
     .bind(new Date().toISOString(), owner, id, bundle.row.document)
     .run();
-  if (!claim.meta.changes)
-    throw new Error("Bundle submission already started or context changed.");
+  if ((claim.success as boolean) === false || claim.meta?.changes !== 1)
+    throw new Error('Bundle submission already started or context changed.');
+  const retained = await readJitoBundle(db, owner, id);
+  if (
+    retained.row.state !== 'submitting' ||
+    retained.row.document !== bundle.row.document ||
+    retained.packets.some(
+      (p, index) =>
+        p.transaction !== bundle.packets[index].transaction ||
+        p.signature !== bundle.packets[index].signature,
+    )
+  )
+    throw new Error(
+      'Bundle send marker is not durably acknowledged. Recover, do not resend.',
+    );
+  signal.throwIfAborted();
+  await requireJitoManifest(bundle.manifest);
   // Exactly one transport attempt. Timeouts and malformed acknowledgements retain submitting.
   try {
     const bundleId = await jitoRpc(
-      "sendBundle",
-      [bundle.packets.map((p) => p.transaction!), { encoding: "base64" }],
+      'sendBundle',
+      [bundle.packets.map((p) => p.transaction!), { encoding: 'base64' }],
       signal,
     );
-    if (typeof bundleId !== "string" || !/^[a-f0-9]{64}$/.test(bundleId))
+    if (typeof bundleId !== 'string' || !/^[a-f0-9]{64}$/.test(bundleId))
       throw new Error();
     await db
       .prepare(
@@ -445,7 +461,7 @@ export async function cancelJitoBundle(
     .run();
   if (!result.meta.changes)
     throw new Error(
-      "Only entirely unsigned bundles can be cancelled. Signed packets require recovery.",
+      'Only entirely unsigned bundles can be cancelled. Signed packets require recovery.',
     );
   return (await readJitoBundle(db, owner, id)).record;
 }
@@ -457,14 +473,14 @@ export async function observeJitoBundle(
   recoverSwap: (id: string) => Promise<unknown>,
 ) {
   const bundle = await readJitoBundle(db, owner, id);
-  if (["cancelled", "expired", "finalized"].includes(bundle.row.state))
+  if (['cancelled', 'expired', 'finalized'].includes(bundle.row.state))
     return bundle.record;
   const rpc = await rpcForBundle(signal);
   const signatures = bundle.packets
     .filter((p) => p.signature)
     .map((p) => p.signature!);
   if (!signatures.length) return bundle.record;
-  const raw = (await rpc("getSignatureStatuses", [
+  const raw = (await rpc('getSignatureStatuses', [
     signatures,
     { searchTransactionHistory: true },
   ])) as {
@@ -475,13 +491,13 @@ export async function observeJitoBundle(
     }>;
   };
   if (!Array.isArray(raw?.value) || raw.value.length !== signatures.length)
-    throw new Error("Signature recovery unavailable. Reservations retained.");
+    throw new Error('Signature recovery unavailable. Reservations retained.');
   const all = signatures.length === bundle.packets.length;
   const finalized =
     all &&
     raw.value.every(
       (s) =>
-        s?.confirmationStatus === "finalized" &&
+        s?.confirmationStatus === 'finalized' &&
         s.err === null &&
         /^\d+$/.test(s.slot),
     ) &&
@@ -489,23 +505,23 @@ export async function observeJitoBundle(
   if (finalized) {
     const slot = Number(raw.value[0]!.slot);
     if (!Number.isSafeInteger(slot) || slot < 1)
-      throw new Error("Finalized slot unavailable.");
+      throw new Error('Finalized slot unavailable.');
     if (bundle.row.bundleId) {
       const status = decodeJitoStatus(
-        await jitoRpc("getBundleStatuses", [[bundle.row.bundleId]], signal),
+        await jitoRpc('getBundleStatuses', [[bundle.row.bundleId]], signal),
         bundle.row.bundleId,
         signatures,
       );
       if (status && status.slot !== slot)
         throw new Error(
-          "Jito and chain slot evidence differ. Reservations retained.",
+          'Jito and chain slot evidence differ. Reservations retained.',
         );
     }
-    const tipRaw = (await rpc("getTransaction", [
+    const tipRaw = (await rpc('getTransaction', [
       signatures.at(-1),
       {
-        encoding: "base64",
-        commitment: "finalized",
+        encoding: 'base64',
+        commitment: 'finalized',
         maxSupportedTransactionVersion: 0,
       },
     ])) as {
@@ -517,7 +533,7 @@ export async function observeJitoBundle(
       !tipRaw ||
       Number(tipRaw.slot) !== slot ||
       tipRaw.meta?.err !== null ||
-      tipRaw.transaction?.[1] !== "base64" ||
+      tipRaw.transaction?.[1] !== 'base64' ||
       (
         await inspectNativeWithdrawal(
           bundle.manifest.tip,
@@ -526,14 +542,14 @@ export async function observeJitoBundle(
         )
       ).signature !== signatures.at(-1)
     )
-      throw new Error("Finalized tip packet differs.");
+      throw new Error('Finalized tip packet differs.');
     const tipReceipt = await decodeNativeWithdrawalReceipt(
       tipRaw,
       bundle.manifest.tip,
       signatures.at(-1)!,
     );
-    if (!("amountRaw" in tipReceipt) || tipReceipt.slot !== slot)
-      throw new Error("Finalized tip settlement differs.");
+    if (!('amountRaw' in tipReceipt) || tipReceipt.slot !== slot)
+      throw new Error('Finalized tip settlement differs.');
     for (const [index, review] of bundle.manifest.swaps.entries())
       if (
         !matchingJitoSwapReceipt(
@@ -545,11 +561,11 @@ export async function observeJitoBundle(
         )
       )
         throw new Error(
-          "Exact finalized swap receipt still unavailable. Retry recovery, not submission.",
+          'Exact finalized swap receipt still unavailable. Retry recovery, not submission.',
         );
-    if (!["submitted", "submitting"].includes(bundle.row.state))
+    if (!['submitted', 'submitting'].includes(bundle.row.state))
       throw new Error(
-        "Packets landed outside this app’s bundle submission. Review the chain evidence.",
+        'Packets landed outside this app’s bundle submission. Review the chain evidence.',
       );
     const finalization = await createJitoFinalization(
       bundle.manifest,
@@ -558,10 +574,15 @@ export async function observeJitoBundle(
       new Date().toISOString(),
       tipReceipt,
     );
+    if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+      throw new Error(
+        'Bundle recovery network changed. Reservations retained.',
+      );
+    signal.throwIfAborted();
     await db.batch([
       db
         .prepare(
-          "INSERT INTO jito_bundle_finalizations(owner_id,bundle_id,document,observed_at) VALUES(?,?,?,?)",
+          'INSERT INTO jito_bundle_finalizations(owner_id,bundle_id,document,observed_at) VALUES(?,?,?,?)',
         )
         .bind(owner, id, JSON.stringify(finalization), finalization.observedAt),
       db
@@ -571,28 +592,37 @@ export async function observeJitoBundle(
         .bind(finalization.observedAt, owner, id),
     ]);
   } else if (raw.value.every((s) => s === null)) {
-    const height = (await rpc("getBlockHeight", [
-      { commitment: "finalized" },
+    const height = (await rpc('getBlockHeight', [
+      { commitment: 'finalized', minContextSlot: bundle.manifest.tip.slot },
     ])) as string;
     const maximum = [
       bundle.manifest.tip.lastValidBlockHeight,
       ...bundle.manifest.swaps.map((s) => s.lastValidBlockHeight),
     ].reduce((a, b) => (BigInt(a) > BigInt(b) ? a : b));
-    if (/^\d+$/.test(height) && BigInt(height) > BigInt(maximum)) {
+    // Keep the same conservative block-height margin as launch recovery.
+    if (
+      /^\d+$/.test(height) &&
+      BigInt(height) > BigInt(maximum) + JITO_EXPIRY_MARGIN_BLOCKS
+    ) {
       for (const signature of signatures)
         if (
-          (await rpc("getTransaction", [
+          (await rpc('getTransaction', [
             signature,
             {
-              commitment: "finalized",
-              encoding: "base64",
+              commitment: 'finalized',
+              encoding: 'base64',
               maxSupportedTransactionVersion: 0,
             },
           ])) !== null
         )
           throw new Error(
-            "Historical transaction found. Keep recovery active.",
+            'Historical transaction found. Keep recovery active.',
           );
+      if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+        throw new Error(
+          'Bundle recovery network changed. Reservations retained.',
+        );
+      signal.throwIfAborted();
       await db
         .prepare(
           "UPDATE jito_bundles SET state='expired',updated_at=? WHERE owner_id=? AND id=? AND state IN ('reviewed','submitting','submitted')",

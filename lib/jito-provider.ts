@@ -1,5 +1,6 @@
 import { JITO_ENDPOINT } from './jito-bundle';
 import { walletAddress } from './wallet-workspace';
+import { readJitoJson } from './jito-json';
 
 export async function jitoRpc(
   method: 'getTipAccounts' | 'sendBundle' | 'getBundleStatuses',
@@ -7,6 +8,7 @@ export async function jitoRpc(
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
 ) {
+  signal.throwIfAborted();
   const response = await fetcher(JITO_ENDPOINT, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -14,12 +16,18 @@ export async function jitoRpc(
     redirect: 'error',
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
-  if (!response.ok)
+  if (!response.ok) {
+    void response.body?.cancel().catch(() => {});
     throw new Error(`Jito request failed (${response.status}).`);
-  const text = await response.text();
-  if (text.length > 32768) throw new Error('Jito response exceeds its bound.');
-  const data = JSON.parse(text);
+  }
+  const data = (await readJitoJson(response.body, signal, 32768)) as Record<
+    string,
+    unknown
+  >;
   if (
+    !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data) ||
     data.jsonrpc !== '2.0' ||
     data.id !== 1 ||
     data.error ||
