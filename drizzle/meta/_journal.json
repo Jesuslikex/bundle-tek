@@ -1002,6 +1002,13 @@
       "when": 1794860000003,
       "tag": "0142_wallet_warmup_execution_geneses",
       "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "6",
+      "when": 1794860000004,
+      "tag": "0143_wallet_warmup_execution_controls",
+      "breakpoints": true
     }
   ]
 }
