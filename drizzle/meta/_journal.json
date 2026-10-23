@@ -995,6 +995,13 @@
       "when": 1794860000002,
       "tag": "0141_wallet_warmup_execution_wallet_leases",
       "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "6",
+      "when": 1794860000003,
+      "tag": "0142_wallet_warmup_execution_geneses",
+      "breakpoints": true
     }
   ]
 }
