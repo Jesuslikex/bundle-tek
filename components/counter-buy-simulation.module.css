@@ -18,10 +18,31 @@
   width: 100%;
   min-width: 0;
 }
+.panel button,
+.fields input,
+.fields select {
+  min-height: 44px;
+}
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
+}
+.runtime {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #30323d);
+  border-radius: 0.5rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.runtime h5 {
+  margin-top: 0;
+}
+.runtime summary {
+  min-height: 44px;
+  padding-block: 0.75rem;
+  cursor: pointer;
 }
 .summary dt {
   color: var(--muted-foreground, #a2a6b4);

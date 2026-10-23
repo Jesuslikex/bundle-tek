@@ -15,6 +15,11 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import styles from './counter-buy-simulation.module.css';
 import { CounterBuyBudgetSetup } from './counter-buy-budget-setup';
+import {
+  counterRuntimeView,
+  type CounterRuntimeEvidenceView,
+} from '@/lib/counter-runtime-view';
+import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 
 export function CounterBuySimulation({
   plan,
@@ -37,6 +42,7 @@ export function CounterBuySimulation({
     [preview, setPreview] = useState<{
       key: string;
       value: CounterPreviewView;
+      runtime?: CounterRuntimeEvidenceView;
     } | null>(null),
     [now, setNow] = useState(() => Date.now());
   const key = JSON.stringify([
@@ -92,7 +98,12 @@ export function CounterBuySimulation({
                 ? 'Enter positive SOL input and fee/rent limits.'
                 : '';
   const current = preview?.key === key ? preview.value : null,
-    expired = current !== null && Date.parse(current.expiresAt) <= now;
+    expired =
+      current !== null &&
+      Math.min(
+        Date.parse(current.expiresAt),
+        Date.parse(preview?.runtime?.expiresAt ?? current.expiresAt),
+      ) <= now;
   useLayoutEffect(() => {
     liveKey.current = key;
     pending.current?.abort();
@@ -104,12 +115,12 @@ export function CounterBuySimulation({
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [current, expired]);
-  async function run(kind: 'wallets' | 'preview') {
+  async function run(kind: 'wallets' | 'preview' | 'runtime') {
     if (
       pending.current ||
       locked ||
       plan.state !== 'active' ||
-      (kind === 'preview' && reason)
+      (kind !== 'wallets' && reason)
     )
       return;
     const captured = key,
@@ -119,8 +130,12 @@ export function CounterBuySimulation({
     setError(null);
     setPreview(null);
     try {
+      const signal = AbortSignal.any([
+        c.signal,
+        AbortSignal.timeout(kind === 'wallets' ? 15000 : 45000),
+      ]);
       const request: CounterPreviewRequest | null =
-        kind === 'preview' && wallet && limits
+        kind !== 'wallets' && wallet && limits
           ? {
               projectId: plan.projectId,
               projectRevision: plan.ledger.scope.revision,
@@ -136,23 +151,28 @@ export function CounterBuySimulation({
       const response = await fetch(
         kind === 'wallets'
           ? '/api/wallet-workspace'
-          : '/api/imported-projects/counter-previews',
+          : kind === 'runtime'
+            ? '/api/imported-projects/counter-runtime-previews'
+            : '/api/imported-projects/counter-previews',
         request
           ? {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify(request),
-              signal: AbortSignal.any([c.signal, AbortSignal.timeout(45000)]),
+              signal,
             }
           : {
               cache: 'no-store',
-              signal: AbortSignal.any([c.signal, AbortSignal.timeout(15000)]),
+              signal,
             },
       );
-      const data = await readPanelJson(
-        response,
-        'Counter preview unavailable. Reload saved history before retrying.',
-      );
+      const data =
+        kind === 'runtime'
+          ? await readBoundedPanelJson(response, signal)
+          : await readPanelJson(
+              response,
+              'Counter preview unavailable. Reload saved history before retrying.',
+            );
       if (!response.ok)
         throw Error(
           (data as { error?: string })?.error || 'Counter preview unavailable.',
@@ -167,9 +187,21 @@ export function CounterBuySimulation({
         setWallets(counterPreviewWallets(data, plan));
         setSelected('');
       } else if (request) {
+        const runtimeResult =
+          kind === 'runtime'
+            ? await counterRuntimeView(data, plan, request)
+            : null;
+        if (
+          c.signal.aborted ||
+          pending.current !== c ||
+          liveKey.current !== captured
+        )
+          return;
         setPreview({
           key: captured,
-          value: counterPreviewView(data, plan, request),
+          value:
+            runtimeResult?.preview ?? counterPreviewView(data, plan, request),
+          ...(runtimeResult ? { runtime: runtimeResult.runtime } : {}),
         });
         setNow(Date.now());
       }
@@ -178,7 +210,11 @@ export function CounterBuySimulation({
         setError({
           key: captured,
           message:
-            e instanceof Error ? e.message : 'Counter preview unavailable.',
+            kind === 'runtime'
+              ? 'Counter runtime evidence unavailable or changed. Request a fresh read-only check; nothing was signed or retried.'
+              : e instanceof Error
+                ? e.message
+                : 'Counter preview unavailable.',
         });
     } finally {
       if (pending.current === c) {
@@ -245,6 +281,14 @@ export function CounterBuySimulation({
         >
           Preview settlement
         </Button>
+        <Button
+          type="button"
+          disabled={busy || !!reason}
+          aria-describedby={`${id}-reason`}
+          onClick={() => void run('runtime')}
+        >
+          Check runtime evidence
+        </Button>
         {busy && (
           <Button
             type="button"
@@ -263,7 +307,11 @@ export function CounterBuySimulation({
         {error?.key === key && <p role="alert">{error.message}</p>}
         {current &&
           (expired ? (
-            <p>Settlement preview expired. Request a fresh preview.</p>
+            <p>
+              {preview?.runtime
+                ? 'Runtime evidence expired. Request a fresh read-only check.'
+                : 'Settlement preview expired. Request a fresh preview.'}
+            </p>
           ) : (
             <>
               <dl className={styles.summary}>
@@ -321,6 +369,53 @@ export function CounterBuySimulation({
               </p>
             </>
           ))}
+        {current && !expired && preview?.runtime && (
+          <section
+            className={styles.runtime}
+            aria-label="Counter runtime evidence"
+          >
+            <h5>Code identity observed · signing unavailable</h5>
+            <p>
+              {preview.runtime.programs.length} program identities · two
+              matching full code scans ·{' '}
+              {preview.runtime.maximumSlot - preview.runtime.minimumSlot} of 32
+              slots.
+            </p>
+            <p>
+              Clock account and response slots matched. Simulation slot{' '}
+              {preview.runtime.simulationSlot}. Expires{' '}
+              {new Date(
+                Math.min(
+                  Date.parse(current.expiresAt),
+                  Date.parse(preview.runtime.expiresAt),
+                ),
+              ).toISOString()}{' '}
+              (UTC).
+            </p>
+            <p>
+              Provider observation, not code or inner-instruction approval.{' '}
+              {preview.runtime.rawInstructionCoverageComplete
+                ? 'Raw instruction coverage recorded.'
+                : 'Some instruction coverage relies on provider-parsed observations.'}
+            </p>
+            <p>
+              Matching code bytes do not establish a semantic audit, trusted
+              program policy or verified inner-instruction policy. This check
+              does not approve a signature or trade.
+            </p>
+            <details>
+              <summary>Runtime receipt details</summary>
+              <p>Receipt hash: {preview.runtime.sha256}</p>
+              <p>Trace hash: {preview.runtime.traceSha256}</p>
+              {preview.runtime.programs.map((program) => (
+                <p key={program.address}>
+                  {program.address} · {program.identityKind} ·{' '}
+                  {program.codeBytes} observed bytes · {program.codeSha256}
+                </p>
+              ))}
+            </details>
+          </section>
+        )}
       </div>
       <CounterBuyBudgetSetup
         plan={plan}

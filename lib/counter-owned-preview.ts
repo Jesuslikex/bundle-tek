@@ -20,6 +20,7 @@ import {
   CounterSourceReviewError,
 } from './counter-source-review';
 import { observePoolTradeMovement } from './pool-trade-movement-server';
+import { collectCounterBuyRuntimeEvidence } from './counter-buy-runtime';
 
 export type CounterPreviewRequest = {
   projectId: string;
@@ -113,6 +114,7 @@ async function collectOwnedCounterBuyEvidence(
   beforeProvider?: (
     plan: ReturnType<typeof decodeCounterPlan>,
   ) => Promise<void>,
+  runtimeSimulation?: Dependencies['simulate'],
 ) {
   const input = counterPreviewRequest(value);
   signal = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
@@ -264,7 +266,7 @@ async function collectOwnedCounterBuyEvidence(
         'Prepared Counter packet differs from the owned proposal.',
       );
     await unchanged();
-    const simulation = await provider.simulate(
+    const simulation = await (runtimeSimulation ?? provider.simulate)(
       prepared,
       input.maximumFeeAndRentRaw,
       signal,
@@ -380,6 +382,65 @@ export async function previewOwnedCounterBuy(
   return (
     await collectOwnedCounterBuyEvidence(db, owner, value, signal, supplied)
   ).preview;
+}
+
+/** Fresh unsigned identity evidence for the original ExactOut packet. It uses
+ * the same owned/source/gross-settlement admission as the ordinary preview;
+ * neither observed code identity nor a successful simulation grants authority.
+ */
+export async function previewOwnedCounterBuyRuntime(
+  db: D1Database,
+  owner: string,
+  value: CounterPreviewRequest,
+  signal: AbortSignal,
+  supplied?: Dependencies & {
+    runtime: typeof collectCounterBuyRuntimeEvidence;
+  },
+) {
+  let runtime:
+    | Awaited<ReturnType<typeof collectCounterBuyRuntimeEvidence>>['runtime']
+    | undefined;
+  const facts = await collectOwnedCounterBuyEvidence(
+    db,
+    owner,
+    value,
+    signal,
+    supplied,
+    undefined,
+    async (prepared, fee, scope) => {
+      const result = await (
+        supplied?.runtime ?? collectCounterBuyRuntimeEvidence
+      )(prepared, fee, scope);
+      runtime = result.runtime;
+      return result.simulation;
+    },
+  );
+  signal.throwIfAborted();
+  if (
+    !runtime ||
+    runtime.packetSha256 !== facts.preview.packetSha256 ||
+    runtime.simulationSlot !== facts.simulation.simulationSlot ||
+    runtime.codeScanCount !== 2 ||
+    runtime.codeIdentityObserved !== true ||
+    runtime.ordinaryClockVerified !== true ||
+    runtime.programCodeAttested !== false ||
+    runtime.semanticAuditEstablished !== false ||
+    runtime.trustedProgramPolicyEstablished !== false ||
+    runtime.innerInstructionPolicyVerified !== false ||
+    runtime.signingAllowed !== false ||
+    runtime.executionAllowed !== false ||
+    !Number.isSafeInteger(runtime.minimumSlot) ||
+    !Number.isSafeInteger(runtime.maximumSlot) ||
+    runtime.minimumSlot < 0 ||
+    runtime.maximumSlot < runtime.minimumSlot ||
+    runtime.maximumSlot - runtime.minimumSlot > 32 ||
+    !Number.isFinite(Date.parse(runtime.expiresAt)) ||
+    Date.parse(runtime.expiresAt) <= Date.now()
+  )
+    throw new CounterPreviewError(
+      'Counter runtime identity differs or expired. No approval was created.',
+    );
+  return { preview: facts.preview, runtime };
 }
 export type CounterBudgetPreviewRequest = CounterPreviewRequest & {
   budgetId: string;
