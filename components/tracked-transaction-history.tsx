@@ -14,9 +14,11 @@ import {
 import {
   trackedHistoryView,
   trackedHistoryTimeLabel,
+  trackedHistoryRelativeLabel,
   TRACKED_HISTORY_FILTERS,
   type TrackedHistoryFilters,
 } from '@/lib/tracked-history-view';
+import { useTrackedHistoryClock } from './use-tracked-history-clock';
 export function TrackedTransactionHistory({
   wallet,
   onOpen,
@@ -28,6 +30,7 @@ export function TrackedTransactionHistory({
   onClose: () => void;
   refreshVersion?: number;
 }) {
+  const displayTime = useTrackedHistoryClock();
   const [items, setItems] = useState<TrackedTransactionSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
@@ -205,6 +208,19 @@ export function TrackedTransactionHistory({
           setDisplayPage(0);
         }}
       />
+      <Button
+        variant="outline"
+        onClick={() => displayTime.setRelative(!displayTime.relative)}
+      >
+        {displayTime.relative
+          ? 'Show full UTC observation time'
+          : 'Show relative observation time'}
+      </Button>
+      <p>
+        Relative values describe saved observation timestamps, not transaction
+        block time or wallet age. Exact UTC remains available in each time
+        tooltip and the full-time view.
+      </p>
       <p>
         Dates filter the recorded observation time in UTC, not transaction block
         time. Signature search is case-sensitive. Filters cover only the{' '}
@@ -226,7 +242,10 @@ export function TrackedTransactionHistory({
         >
           <thead>
             <tr>
-              <th>Signature / observed (UTC)</th>
+              <th>
+                Signature / observed{' '}
+                {displayTime.relative ? '(relative)' : '(UTC)'}
+              </th>
               <th>Status / SOL change</th>
               <th>Token records</th>
               <th>Actions</th>
@@ -239,9 +258,18 @@ export function TrackedTransactionHistory({
                   <code>
                     {item.signature.slice(0, 8)}…{item.signature.slice(-8)}
                   </code>
-                  <small>
-                    {trackedHistoryTimeLabel(Date.parse(item.observedAt))} ·
-                    slot {item.slot}
+                  <small
+                    title={trackedHistoryTimeLabel(Date.parse(item.observedAt))}
+                  >
+                    {displayTime.relative
+                      ? trackedHistoryRelativeLabel(
+                          Date.parse(item.observedAt),
+                          displayTime.now,
+                        )
+                      : trackedHistoryTimeLabel(
+                          Date.parse(item.observedAt),
+                        )}{' '}
+                    · slot {item.slot}
                   </small>
                   {item.stale && (
                     <small>Saved before latest tracker change</small>

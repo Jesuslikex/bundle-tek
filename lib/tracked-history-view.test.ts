@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   trackedHistoryView,
   trackedHistoryTimeLabel,
+  trackedHistoryRelativeLabel,
   TRACKED_HISTORY_FILTERS as defaults,
 } from './tracked-history-view';
 const rows = [
@@ -26,6 +27,31 @@ const rows = [
   },
 ];
 const time = (row: (typeof rows)[number]) => row.time;
+it.each([
+  [0, 'Just now'],
+  [1000, '1s ago'],
+  [61000, '1m 1s ago'],
+  [3660000, '1h 1m ago'],
+  [90000000, '1d 1h ago'],
+  [-500, 'In less than 1s (future timestamp)'],
+  [-61000, 'In 1m 1s (future timestamp)'],
+])(
+  'formats relative record times without inventing past age: %s',
+  (delta, label) => {
+    expect(trackedHistoryRelativeLabel(100000000, 100000000 + delta)).toBe(
+      label,
+    );
+  },
+);
+it('keeps unknown timestamps unknown and exact UTC available before a display clock exists', () => {
+  expect(trackedHistoryRelativeLabel(null, 1000)).toBe('Time unavailable');
+  expect(trackedHistoryRelativeLabel(Number.NaN, 1000)).toBe(
+    'Time unavailable',
+  );
+  expect(trackedHistoryRelativeLabel(0, null)).toBe(
+    '1970-01-01 00:00:00.000 UTC',
+  );
+});
 it('labels UTC evidence consistently and refuses missing or malformed timestamps', () => {
   expect(trackedHistoryTimeLabel(Date.parse('2026-10-23T23:59:59.999Z'))).toBe(
     '2026-10-23 23:59:59.999 UTC',

@@ -22,6 +22,33 @@ export function trackedHistoryTimeLabel(time: number | null) {
     return 'Time unavailable';
   }
 }
+/** Relative record time is a presentation, never wallet age or refreshed evidence. */
+export function trackedHistoryRelativeLabel(
+  time: number | null,
+  now: number | null,
+) {
+  const full = trackedHistoryTimeLabel(time);
+  if (
+    full === 'Time unavailable' ||
+    time === null ||
+    now === null ||
+    !Number.isFinite(now)
+  )
+    return full;
+  const delta = now - time;
+  const seconds = Math.floor(Math.abs(delta) / 1000);
+  if (seconds === 0)
+    return delta < 0 ? 'In less than 1s (future timestamp)' : 'Just now';
+  const amount =
+    seconds < 60
+      ? `${seconds}s`
+      : seconds < 3600
+        ? `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+        : seconds < 86400
+          ? `${Math.floor(seconds / 3600)}h ${Math.floor(seconds / 60) % 60}m`
+          : `${Math.floor(seconds / 86400)}d ${Math.floor(seconds / 3600) % 24}h`;
+  return delta < 0 ? `In ${amount} (future timestamp)` : `${amount} ago`;
+}
 function utcDay(value: string) {
   if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value) || value.startsWith('0000'))
     throw Error();

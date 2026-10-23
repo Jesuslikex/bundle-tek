@@ -67,6 +67,8 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 async function click(text: string) {
   const button = [...host.querySelectorAll('button')].find(
@@ -377,5 +379,110 @@ it('labels UTC rows and unknown saved timestamps without displaying Invalid Date
   expect(
     table('Saved transaction observations').querySelectorAll('tbody tr'),
   ).toHaveLength(1);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it('toggles each history to relative record time, ticks locally and keeps full UTC and exact filtering available', async () => {
+  vi.useFakeTimers();
+  const intervals = vi.spyOn(globalThis, 'setInterval'),
+    clears = vi.spyOn(globalThis, 'clearInterval');
+  vi.setSystemTime(new Date('2026-10-23T00:00:02.000Z'));
+  const fixture = page(3),
+    items = saved(2);
+  const fetcher = vi.fn(async (url: string) =>
+    url.includes('/transactions?')
+      ? Response.json({ items, nextCursor: null })
+      : Response.json({ page: fixture, stale: false, executionAllowed: false }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () =>
+    root.render(
+      <TrackedTransactionHistory
+        wallet={wallet}
+        onOpen={() => {}}
+        onClose={() => {}}
+      />,
+    ),
+  );
+  expect(intervals).not.toHaveBeenCalled();
+  expect(table('Saved transaction observations').textContent).toContain(
+    '2026-10-23 00:00:01.000 UTC',
+  );
+  await click('Show relative observation time');
+  expect(intervals).toHaveBeenCalledTimes(1);
+  expect(table('Saved transaction observations').textContent).toContain(
+    '1s ago',
+  );
+  expect(
+    table('Saved transaction observations').querySelector('small')?.title,
+  ).toBe('2026-10-23 00:00:01.000 UTC');
+  await click('Browse public activity');
+  await click('Show relative public block time');
+  expect(intervals).toHaveBeenCalledTimes(2);
+  expect(table('Public finalized signatures').textContent).toContain(
+    'Time unavailable',
+  );
+  const reads = fetcher.mock.calls.length;
+  await act(async () => vi.advanceTimersByTime(2000));
+  expect(table('Saved transaction observations').textContent).toContain(
+    '3s ago',
+  );
+  expect(table('Public finalized signatures').textContent).toContain('3s ago');
+  expect(
+    table('Public finalized signatures').querySelector('small')?.title,
+  ).toBe('2026-10-23 00:00:01.000 UTC');
+  await field('Public activity from date', '2026-10-23');
+  expect(
+    table('Public finalized signatures').querySelectorAll('tbody tr'),
+  ).toHaveLength(2);
+  expect(table('Public finalized signatures').textContent).not.toContain(
+    'Time unavailable',
+  );
+  expect(fetcher).toHaveBeenCalledTimes(reads);
+  await click('Show full UTC observation time');
+  expect(
+    clears.mock.calls.some(
+      ([timer]) => timer === intervals.mock.results[0].value,
+    ),
+  ).toBe(true);
+  expect(table('Saved transaction observations').textContent).toContain(
+    '2026-10-23 00:00:01.000 UTC',
+  );
+  await click('Close public activity');
+  expect(
+    clears.mock.calls.some(
+      ([timer]) => timer === intervals.mock.results[1].value,
+    ),
+  ).toBe(true);
+});
+
+it('labels future record timestamps as future and removes its display clock on unmount', async () => {
+  vi.useFakeTimers();
+  const intervals = vi.spyOn(globalThis, 'setInterval'),
+    clears = vi.spyOn(globalThis, 'clearInterval');
+  vi.setSystemTime(new Date('2026-10-22T23:59:59.000Z'));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ items: saved(1), nextCursor: null })),
+  );
+  await act(async () =>
+    root.render(
+      <TrackedTransactionHistory
+        wallet={wallet}
+        onOpen={() => {}}
+        onClose={() => {}}
+      />,
+    ),
+  );
+  await click('Show relative observation time');
+  expect(table('Saved transaction observations').textContent).toContain(
+    'In 1s (future timestamp)',
+  );
+  expect(table('Saved transaction observations').textContent).not.toContain(
+    'ago',
+  );
+  expect(intervals).toHaveBeenCalledTimes(1);
+  await act(async () => root.render(null));
+  expect(clears).toHaveBeenCalledWith(intervals.mock.results[0].value);
   expect(fetch).toHaveBeenCalledTimes(1);
 });

@@ -6,10 +6,12 @@ import type { SignaturePage } from '@/lib/tracked-signatures';
 import {
   trackedHistoryView,
   trackedHistoryTimeLabel,
+  trackedHistoryRelativeLabel,
   TRACKED_HISTORY_FILTERS,
   type TrackedHistoryFilters,
 } from '@/lib/tracked-history-view';
 import viewStyles from './tracked-history-view.module.css';
+import { useTrackedHistoryClock } from './use-tracked-history-clock';
 export function TrackedSignatureBrowser({
   wallet,
   onOpen,
@@ -40,6 +42,7 @@ function Browser({
   wallet: TrackedWallet;
   onOpen: (signature: string, saved: boolean) => void;
 }) {
+  const displayTime = useTrackedHistoryClock();
   const [page, setPage] = useState<SignaturePage | null>(null),
     [busy, setBusy] = useState(true),
     [error, setError] = useState(''),
@@ -195,6 +198,18 @@ function Browser({
               setDisplayPage(0);
             }}
           />
+          <Button
+            variant="outline"
+            onClick={() => displayTime.setRelative(!displayTime.relative)}
+          >
+            {displayTime.relative
+              ? 'Show full UTC public block time'
+              : 'Show relative public block time'}
+          </Button>
+          <p>
+            Relative values describe public block timestamps, not wallet age.
+            Exact UTC is available in each time tooltip and the full-time view.
+          </p>
           <p className={viewStyles.note}>
             Dates filter public block time in UTC, not the time this page was
             saved. Records with unavailable block time stay visible unless a
@@ -224,7 +239,10 @@ function Browser({
                 <tr>
                   <th>Signature</th>
                   <th>Finalized slot</th>
-                  <th>Status / block time (UTC)</th>
+                  <th>
+                    Status / block time{' '}
+                    {displayTime.relative ? '(relative)' : '(UTC)'}
+                  </th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -241,10 +259,23 @@ function Browser({
                       <strong>
                         {row.failed ? 'Failed' : 'No recorded error'}
                       </strong>
-                      <small>
-                        {trackedHistoryTimeLabel(
+                      <small
+                        title={trackedHistoryTimeLabel(
                           row.blockTime === null ? null : row.blockTime * 1000,
                         )}
+                      >
+                        {displayTime.relative
+                          ? trackedHistoryRelativeLabel(
+                              row.blockTime === null
+                                ? null
+                                : row.blockTime * 1000,
+                              displayTime.now,
+                            )
+                          : trackedHistoryTimeLabel(
+                              row.blockTime === null
+                                ? null
+                                : row.blockTime * 1000,
+                            )}
                       </small>
                     </td>
                     <td>
