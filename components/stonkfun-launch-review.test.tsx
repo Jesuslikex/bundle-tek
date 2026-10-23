@@ -31,7 +31,9 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   localStorage.clear();
-  fetcher.mockReset();
+  fetcher
+    .mockReset()
+    .mockImplementation(async () => Response.json({ launches: [] }));
   vi.stubGlobal('fetch', fetcher);
 });
 afterEach(() => {
@@ -41,7 +43,7 @@ afterEach(() => {
 });
 const buttons = () => [...container.querySelectorAll('button')];
 
-it('converts quote amounts exactly', () => {
+it('converts quote amounts exactly', async () => {
   expect(toRaw('0.5', 8)).toBe('50000000');
   expect(toRaw('12', 6)).toBe('12000000');
   expect(toRaw('0', 8)).toBe('0');
@@ -52,8 +54,8 @@ it('converts quote amounts exactly', () => {
   expect(fromRaw('0', 6)).toBe('0');
 });
 
-it('asks for published metadata and a mint key before any request', () => {
-  act(() =>
+it('asks for published metadata and a mint key before any mutating request', async () => {
+  await act(async () =>
     root.render(
       <StonkfunLaunchReview project={project} plan={plan} releaseId="" />,
     ),
@@ -68,10 +70,10 @@ it('asks for published metadata and a mint key before any request', () => {
   expect(
     buttons().some((b) => b.textContent === 'Generate encrypted mint key'),
   ).toBe(true);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
 
-it('loads the project mint key without generating or fetching anything', () => {
+it('loads the project mint key without generating or requesting a quote', async () => {
   localStorage.setItem(
     pumpMintStorageKey(project.id),
     JSON.stringify({
@@ -81,7 +83,7 @@ it('loads the project mint key without generating or fetching anything', () => {
       encrypted: 'x',
     }),
   );
-  act(() =>
+  await act(async () =>
     root.render(
       <StonkfunLaunchReview
         project={project}
@@ -92,5 +94,5 @@ it('loads the project mint key without generating or fetching anything', () => {
   );
   // The stub ciphertext is not a valid vault envelope, so the key is refused, not replaced.
   expect(container.textContent).toContain('could not be read');
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });

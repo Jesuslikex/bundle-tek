@@ -23,7 +23,9 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   localStorage.clear();
-  fetcher.mockReset();
+  fetcher
+    .mockReset()
+    .mockImplementation(async () => Response.json({ launches: [] }));
   vi.stubGlobal('fetch', fetcher);
 });
 afterEach(() => {
@@ -37,8 +39,8 @@ const plan = (currency: string) => ({
   currency,
 });
 
-it('renders the Meteora DBC panel without any request and asks for a DBC config', () => {
-  act(() =>
+it('renders the Meteora DBC panel without a mutating request and asks for a DBC config', async () => {
+  await act(async () =>
     root.render(
       <MeteoraDbcLaunchReview
         project={project}
@@ -57,11 +59,11 @@ it('renders the Meteora DBC panel without any request and asks for a DBC config'
     (b) => b.textContent === 'Prepare and simulate launch',
   )!;
   expect(prepare.disabled).toBe(true);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
 
-it('asks for SOL or USDC when another quote is saved', () => {
-  act(() =>
+it('asks for SOL or USDC when another quote is saved', async () => {
+  await act(async () =>
     root.render(
       <MeteoraDbcLaunchReview
         project={project}

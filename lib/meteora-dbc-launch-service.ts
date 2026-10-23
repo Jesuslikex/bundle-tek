@@ -303,6 +303,7 @@ async function simulate(
 }
 
 export type MeteoraDbcReview = {
+  minimumSlot?: number;
   format: 'meteora-dbc-launch-review-v1';
   terms: Omit<MeteoraDbcTerms, 'origin'>;
   input: MeteoraDbcInput;
@@ -441,6 +442,7 @@ export async function prepareMeteoraDbcLaunch(
   await selection.assertUnchanged();
   return {
     format: 'meteora-dbc-launch-review-v1',
+    minimumSlot: chain.slot,
     terms: {
       projectId: t.projectId,
       updatedAt: t.updatedAt,

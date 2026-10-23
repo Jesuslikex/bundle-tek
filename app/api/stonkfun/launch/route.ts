@@ -3,12 +3,16 @@ import { getD1 } from '@/db';
 import { address, isOffCurveAddress } from '@solana/kit';
 import {
   StonkLaunchError,
-  prepareStonkLaunch,
   stonkLaunchStatus,
-  submitStonkLaunch,
   type StonkLaunchTerms,
 } from '@/lib/stonkfun-launch-service';
-import type { StonkLaunchInput } from '@/lib/stonkfun-launch';
+import {
+  actVenueLaunchRecovery,
+  listVenueLaunchRecoveries,
+  prepareVenueLaunchRecovery,
+  readVenueLaunchRecovery,
+  VenueLaunchRecoveryError,
+} from '@/lib/venue-launch-recovery';
 
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) =>
@@ -96,6 +100,25 @@ export async function GET(request: Request) {
   if (!user) return json({ error: 'Sign in to check a launch.' }, 401);
   const signature = new URL(request.url).searchParams.get('signature') ?? '';
   try {
+    const params = new URL(request.url).searchParams;
+    if (params.has('id'))
+      return json(
+        await readVenueLaunchRecovery(
+          getD1(),
+          user.userId,
+          'stonkfun',
+          params.get('id')!,
+        ),
+      );
+    if (params.has('projectId'))
+      return json(
+        await listVenueLaunchRecoveries(
+          getD1(),
+          user.userId,
+          'stonkfun',
+          params.get('projectId')!,
+        ),
+      );
     return json(
       await stonkLaunchStatus(
         signature,
@@ -103,7 +126,10 @@ export async function GET(request: Request) {
       ),
     );
   } catch (error) {
-    if (error instanceof StonkLaunchError)
+    if (
+      error instanceof StonkLaunchError ||
+      error instanceof VenueLaunchRecoveryError
+    )
       return json({ error: error.message }, error.status);
     return json({ error: 'Launch status is unavailable.' }, 503);
   }
@@ -123,6 +149,32 @@ export async function POST(request: Request) {
   const b = await readBody(request);
   if (b === 'too-large') return json({ error: 'Request too large.' }, 413);
   if (!b) return json({ error: 'Invalid launch request.' }, 400);
+  if (b.action !== 'prepare') {
+    try {
+      return json(
+        await actVenueLaunchRecovery(
+          getD1(),
+          user.userId,
+          'stonkfun',
+          b,
+          AbortSignal.any([request.signal, AbortSignal.timeout(25000)]),
+        ),
+      );
+    } catch (error) {
+      if (
+        error instanceof VenueLaunchRecoveryError ||
+        error instanceof StonkLaunchError
+      )
+        return json({ error: error.message }, error.status);
+      return json(
+        {
+          error:
+            'Saved launch action did not complete. Recover the original launch ID before trying again.',
+        },
+        502,
+      );
+    }
+  }
   const t = terms(b.terms, origin);
   if (!t)
     return json(
@@ -135,32 +187,26 @@ export async function POST(request: Request) {
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(25000)]);
   try {
     if (b.action === 'prepare' && Object.keys(b).length === 2)
-      return json(await prepareStonkLaunch(getD1(), user.userId, t, signal));
-    if (
-      b.action === 'submit' &&
-      Object.keys(b).sort().join(',') === 'action,input,terms,transaction' &&
-      b.input &&
-      typeof b.input === 'object' &&
-      typeof b.transaction === 'string'
-    )
       return json(
-        await submitStonkLaunch(
+        await prepareVenueLaunchRecovery(
           getD1(),
           user.userId,
+          'stonkfun',
           t,
-          b.input as StonkLaunchInput,
-          b.transaction,
           signal,
         ),
       );
     return json({ error: 'Invalid launch action.' }, 400);
   } catch (error) {
-    if (error instanceof StonkLaunchError)
+    if (
+      error instanceof StonkLaunchError ||
+      error instanceof VenueLaunchRecoveryError
+    )
       return json({ error: error.message }, error.status);
     return json(
       {
         error:
-          'Launch action did not complete. Check the mint on Solscan before trying again.',
+          'Launch response is uncertain. Reload saved launch history and recover the original ID before another action.',
       },
       502,
     );

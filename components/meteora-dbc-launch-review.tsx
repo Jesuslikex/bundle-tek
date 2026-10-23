@@ -3,7 +3,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { readPanelJson } from '@/components/read-panel-json';
+import {
+  useVenueLaunchRecovery,
+  VenueLaunchRecoveryHistory,
+} from './venue-launch-recovery';
 import styles from '@/components/launch/pump-launch-ui.module.css';
 import {
   VAULT_MIN_PASSWORD_LENGTH,
@@ -39,18 +42,20 @@ type Props = {
   plan: LaunchPlanInput;
   releaseId: string;
 };
-type Sent = {
-  state: 'sent' | 'unknown';
-  signature: string;
-  mint: string;
-  pool: string;
-};
 
 /**
  * Meteora DBC launch from an existing DBC config key, signed in this browser.
  * Like Proxima, the user enters the config; Bundle reads and checks it on-chain.
  */
-export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
+export function MeteoraDbcLaunchReview(props: Props) {
+  return (
+    <MeteoraDbcLaunchReviewInner
+      key={JSON.stringify([props.project, props.plan, props.releaseId])}
+      {...props}
+    />
+  );
+}
+function MeteoraDbcLaunchReviewInner({ project, plan, releaseId }: Props) {
   const id = useId();
   const alive = useRef(true);
   const [saved] = useState(() => {
@@ -80,8 +85,18 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(saved.error);
-  const [sent, setSent] = useState<Sent | null>(null);
-  const [status, setStatus] = useState('');
+  const recovery = useVenueLaunchRecovery<MeteoraDbcReview>(
+    'meteora-dbc',
+    project.id,
+  );
+  const [broadcastApproved, setBroadcastApproved] = useState(false);
+  const sent =
+    recovery.record &&
+    ['signed', 'submitting', 'submitted', 'finalized'].includes(
+      recovery.record.state,
+    )
+      ? recovery.record
+      : null;
   const [now, setNow] = useState(() => Date.now());
   const quote = quoteCatalog('Solana', METEORA_DBC_VENUE).assets.find(
     (q) =>
@@ -116,26 +131,10 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
       solLimitLamports: toRaw(solLimit, 9),
     };
   };
-  async function api(body: unknown) {
-    const response = await fetch('/api/meteora-dbc/launch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const value = (await readPanelJson(
-      response,
-      'Launch response could not be read. Check the mint before retrying.',
-    )) as Record<string, unknown>;
-    if (!response.ok)
-      throw new Error(
-        typeof value?.error === 'string'
-          ? value.error
-          : 'Launch request failed.',
-      );
-    return value;
-  }
+  const running = useRef(false);
   async function run(task: () => Promise<void>) {
-    if (busy) return;
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
     setError('');
     try {
@@ -144,9 +143,40 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
       if (alive.current)
         setError(e instanceof Error ? e.message : 'Launch step failed.');
     } finally {
+      running.current = false;
       if (alive.current) setBusy(false);
     }
   }
+  const [displayedRecord, setDisplayedRecord] = useState(recovery.record);
+  if (displayedRecord !== recovery.record) {
+    setDisplayedRecord(recovery.record);
+    const row = recovery.record;
+    setApproved(false);
+    setBroadcastApproved(false);
+    setPayerPass('');
+    setMintPass('');
+    if (row) {
+      setReview(row.review);
+      setDevBuy(
+        fromRaw(row.review.terms.devBuyRaw, row.review.summary.quoteDecimals),
+      );
+      setSolLimit(fromRaw(row.review.terms.solLimitLamports, 9));
+      setConfig(row.review.terms.config);
+      setNow(recovery.recordReadAt);
+    }
+  }
+  const matchesContext =
+    !!review &&
+    review.terms.projectId === project.id &&
+    review.terms.updatedAt === project.updatedAt &&
+    review.terms.releaseId === releaseId &&
+    review.terms.payer === project.payer?.address &&
+    review.terms.payerRevision === project.payer?.revision &&
+    review.terms.mint === backup?.mint &&
+    review.input.quoteMint === quote?.address &&
+    review.summary.quoteDecimals === quote?.decimals &&
+    review.input.name === plan.tokenName &&
+    review.input.symbol === plan.ticker;
   const expired = review ? Date.parse(review.expiresAt) <= now : false;
   const configValid = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(config.trim());
   const ready = !!project.payer && !!releaseId && !!quote && configValid;
@@ -158,7 +188,7 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
         Launches a Meteora Dynamic Bonding Curve pool from the DBC config you
         enter, paired with <strong>{plan.currency}</strong>, with an optional
         creator buy in the same transaction. Your keys stay in this browser and
-        nothing is sent until you approve and sign.
+        signing does not send. Broadcasting requires a separate approval.
       </p>
       {!quote && (
         <p>Choose SOL or USDC as the quote token and save the project.</p>
@@ -172,6 +202,11 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
       {!releaseId && (
         <p>Publish the reviewed image and metadata above first.</p>
       )}
+      <VenueLaunchRecoveryHistory
+        recovery={recovery}
+        busy={busy}
+        onTask={(task) => void run(task)}
+      />
       {!sent && (
         <>
           {!backup ? (
@@ -261,15 +296,12 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
           <Button
             type="button"
             variant="outline"
-            disabled={busy || !ready || !backup}
+            disabled={busy || !ready || !backup || recovery.blocked}
             onClick={() =>
               void run(async () => {
                 setReview(null);
                 setApproved(false);
-                const value = (await api({
-                  action: 'prepare',
-                  terms: terms(),
-                })) as unknown as MeteoraDbcReview;
+                const value = await recovery.prepare(terms());
                 if (alive.current) {
                   setReview(value);
                   setNow(Date.now());
@@ -283,7 +315,7 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
           </Button>
         </>
       )}
-      {review && !sent && quote && (
+      {review && !sent && (
         <div className={styles.review}>
           <table className={styles.table}>
             <tbody>
@@ -314,7 +346,7 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
                 <td>
                   {fromRaw(
                     review.summary.migrationThresholdRaw,
-                    quote.decimals,
+                    review.summary.quoteDecimals,
                   )}{' '}
                   {review.summary.quoteSymbol}
                 </td>
@@ -326,7 +358,10 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
               <tr>
                 <th scope="row">Creator buy</th>
                 <td>
-                  {fromRaw(review.summary.devBuyRaw, quote.decimals)}{' '}
+                  {fromRaw(
+                    review.summary.devBuyRaw,
+                    review.summary.quoteDecimals,
+                  )}{' '}
                   {review.summary.quoteSymbol}
                 </td>
               </tr>
@@ -360,7 +395,7 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
           </table>
           <p>
             {expired
-              ? 'This review expired. Prepare it again for a fresh blockhash.'
+              ? 'This original review expired. Cancel the unsigned saved launch before preparing another.'
               : `Review valid for ${Math.max(0, Math.ceil((Date.parse(review.expiresAt) - now) / 1000))}s.`}
           </p>
           <label>
@@ -396,12 +431,27 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
           </label>
           <Button
             type="button"
-            disabled={busy || !approved || expired || !payerPass || !mintPass}
+            disabled={
+              busy ||
+              !approved ||
+              expired ||
+              !matchesContext ||
+              recovery.uncertain ||
+              !recovery.record ||
+              !['review', 'approved'].includes(recovery.record.state) ||
+              !payerPass ||
+              !mintPass
+            }
             onClick={() =>
               void run(async () => {
                 const reviewed = review;
                 const check = () => {
                   if (!alive.current) throw new Error('Launch view closed.');
+                  recovery.current();
+                  if (Date.now() >= Date.parse(reviewed.expiresAt))
+                    throw new Error(
+                      'Original launch review expired. Recover or cancel it.',
+                    );
                 };
                 let payer: VaultSession | undefined,
                   mint: VaultSession | undefined;
@@ -410,28 +460,47 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
                 setPayerPass('');
                 setMintPass('');
                 try {
+                  check();
+                  if (!matchesContext)
+                    throw new Error(
+                      'Saved launch differs from this project setup.',
+                    );
+                  const approvedRow = await recovery.write('approve', {
+                    sha256: reviewed.sha256,
+                    approved: true,
+                  });
+                  check();
+                  if (
+                    approvedRow.state !== 'approved' ||
+                    approvedRow.review.sha256 !== reviewed.sha256
+                  )
+                    throw new Error('Original approval could not be verified.');
                   const vault = localStorage.getItem(VAULT_STORAGE_KEY);
                   if (!vault)
                     throw new Error(
                       'Import the deployer into your browser wallet vault first.',
                     );
                   payer = await unlockVault(vault, p);
+                  check();
                   mint = await unlockPumpMint(backup!, m);
+                  check();
                   const signed = await signMeteoraDbcLaunch(
                     payer,
                     mint,
                     reviewed,
                     check,
                   );
-                  const result = (await api({
-                    action: 'submit',
-                    terms: reviewed.terms,
-                    input: reviewed.input,
+                  check();
+                  const result = await recovery.write('register', {
                     transaction: signed.transaction,
-                  })) as unknown as Sent;
+                  });
                   if (alive.current) {
-                    setSent(result);
                     setApproved(false);
+                    setBroadcastApproved(false);
+                    if (result.state !== 'signed')
+                      throw new Error(
+                        'Signed launch registration needs recovery.',
+                      );
                   }
                 } finally {
                   if (payer) clearMintSession(payer);
@@ -440,56 +509,79 @@ export function MeteoraDbcLaunchReview({ project, plan, releaseId }: Props) {
               })
             }
           >
-            {busy ? 'Signing and sending…' : 'Sign and launch'}
+            {busy ? 'Saving approval and signing…' : 'Approve and sign only'}
           </Button>
         </div>
+      )}
+      {review && !matchesContext && (
+        <p>
+          Saved review belongs to its original project revision, payer, mint and
+          metadata. It is available for recovery; signing from changed setup is
+          disabled.
+        </p>
       )}
       {sent && (
         <div aria-live="polite" className={styles.wrap}>
           <p>
-            {sent.state === 'sent'
-              ? 'Launch sent once. It is not resent automatically.'
-              : 'The network did not confirm receipt. It may still land; check before doing anything else.'}
+            Original saved launch: {sent.state}. Recovery never resends a
+            transaction.
           </p>
-          <p>
-            <a
-              href={`https://solscan.io/tx/${sent.signature}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View transaction
-            </a>
-            {' · '}
-            <a
-              href={`https://solscan.io/token/${sent.mint}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View token
-            </a>
-          </p>
+          {sent.state === 'signed' && (
+            <>
+              <p>
+                {expired
+                  ? 'The original broadcast window expired. Recover this signed record; it cannot be renewed or sent here.'
+                  : 'The signed transaction is saved. Nothing has been broadcast by signing.'}
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={broadcastApproved}
+                  disabled={
+                    busy || expired || recovery.uncertain || !matchesContext
+                  }
+                  onChange={(e) => setBroadcastApproved(e.target.checked)}
+                />{' '}
+                I approve broadcasting this exact saved signed launch once.
+              </label>
+              <Button
+                type="button"
+                disabled={
+                  busy ||
+                  expired ||
+                  !broadcastApproved ||
+                  recovery.uncertain ||
+                  !matchesContext
+                }
+                onClick={() =>
+                  void run(async () => {
+                    if (Date.now() >= Date.parse(sent.review.expiresAt))
+                      throw Error('Original launch broadcast window expired.');
+                    setBroadcastApproved(false);
+                    await recovery.write('submit', {
+                      sha256: sent.review.sha256,
+                      approved: true,
+                    });
+                  })
+                }
+              >
+                Broadcast saved launch once
+              </Button>
+            </>
+          )}
           <Button
             type="button"
             variant="outline"
             disabled={busy}
             onClick={() =>
               void run(async () => {
-                const response = await fetch(
-                  `/api/meteora-dbc/launch?signature=${sent.signature}`,
-                );
-                const value = (await readPanelJson(
-                  response,
-                  'Status unavailable.',
-                )) as { state?: string; error?: string };
-                if (!response.ok)
-                  throw new Error(value?.error ?? 'Status unavailable.');
-                if (alive.current) setStatus(String(value.state));
+                setBroadcastApproved(false);
+                await recovery.recover(sent.id);
               })
             }
           >
-            Check status
+            Recover saved launch status
           </Button>
-          {status && <p>Status: {status}</p>}
         </div>
       )}
       {error && (

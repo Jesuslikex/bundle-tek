@@ -326,6 +326,7 @@ async function simulate(
 }
 
 export type StonkLaunchReview = {
+  minimumSlot?: number;
   format: 'stonkfun-launch-review-v1';
   terms: Omit<StonkLaunchTerms, 'origin'>;
   input: StonkLaunchInput;
@@ -485,6 +486,7 @@ export async function prepareStonkLaunch(
   await selection.assertUnchanged();
   return {
     format: 'stonkfun-launch-review-v1',
+    minimumSlot: chain.slot,
     terms: {
       projectId: t.projectId,
       updatedAt: t.updatedAt,

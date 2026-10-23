@@ -47,7 +47,10 @@ vi.mock('@/lib/meteora-dbc-launch-service', async (original) => {
     submitMeteoraDbcLaunch: (
       ...a: Parameters<typeof actual.submitMeteoraDbcLaunch>
     ) =>
-      actual.submitMeteoraDbcLaunch(a[0], a[1], a[2], a[3], a[4], a[5], deps()),
+      actual.submitMeteoraDbcLaunch(a[0], a[1], a[2], a[3], a[4], a[5], {
+        ...deps(),
+        rpc: a[6]?.rpc ?? mocks.rpc,
+      }),
   };
 });
 vi.mock('@/lib/stonkfun-launch-service', async (original) => {
@@ -57,6 +60,24 @@ vi.mock('@/lib/stonkfun-launch-service', async (original) => {
     ...actual,
     stonkLaunchStatus: (signature: string, signal: AbortSignal) =>
       actual.stonkLaunchStatus(signature, signal, { rpc: mocks.rpc }),
+  };
+});
+vi.mock('@/lib/venue-launch-recovery', async (original) => {
+  const actual = await original<typeof import('@/lib/venue-launch-recovery')>();
+  return {
+    ...actual,
+    prepareVenueLaunchRecovery: (
+      ...a: Parameters<typeof actual.prepareVenueLaunchRecovery>
+    ) =>
+      actual.prepareVenueLaunchRecovery(a[0], a[1], a[2], a[3], a[4], {
+        rpc: mocks.rpc,
+      }),
+    actVenueLaunchRecovery: (
+      ...a: Parameters<typeof actual.actVenueLaunchRecovery>
+    ) =>
+      actual.actVenueLaunchRecovery(a[0], a[1], a[2], a[3], a[4], {
+        rpc: mocks.rpc,
+      }),
   };
 });
 import { GET, POST } from './route';
@@ -115,6 +136,7 @@ let state: {
   simErr: unknown;
   sent: string[];
   sendFails: boolean;
+  sendAttempts: number;
   configOwner: string;
   configQuote: string;
   tokenType: number;
@@ -185,6 +207,7 @@ function rpc(): MeteoraDbcRpc {
       };
     }
     if (method === 'sendTransaction') {
+      state.sendAttempts++;
       if (state.sendFails) throw new Error('network');
       const tx = getTransactionDecoder().decode(
         Uint8Array.from(Buffer.from(params[0] as string, 'base64')),
@@ -273,6 +296,20 @@ afterAll(async () => {
 
 let n = 0;
 beforeEach(async () => {
+  await mocks.db
+    .prepare('DROP TRIGGER IF EXISTS pump_launch_venue_recovery_exclusion')
+    .run();
+  await mocks.db.prepare('DROP TABLE IF EXISTS venue_launch_recoveries').run();
+  for (const sql of readFileSync(
+    new URL(
+      '../../../../drizzle/0145_venue_launch_recoveries.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  )
+    .split('--> statement-breakpoint')
+    .filter((s) => s.trim()))
+    await mocks.db.prepare(sql).run();
   mocks.user = { userId: 'alice' };
   state = {
     quoteBalance: 1_000_000_000n,
@@ -280,6 +317,7 @@ beforeEach(async () => {
     simErr: null,
     sent: [],
     sendFails: false,
+    sendAttempts: 0,
     configOwner: DBC_PROGRAM,
     configQuote: WRAPPED_SOL,
     tokenType: 0,
@@ -366,7 +404,9 @@ beforeEach(async () => {
 it('prepares, signs in the browser and relays a Meteora DBC launch with a creator buy once', async () => {
   const prepared = await send({ action: 'prepare', terms });
   expect(prepared.status).toBe(200);
-  const review = (await prepared.json()) as MeteoraDbcReview;
+  const review = (await prepared.json()) as MeteoraDbcReview & {
+    recoveryId: string;
+  };
   expect(review.input.minTokensOutRaw).toBe(TOKENS_OUT.toString());
   expect(review.input.config).toBe(CONFIG);
   expect(review.input.baseTokenType).toBe(0);
@@ -388,17 +428,35 @@ it('prepares, signs in the browser and relays a Meteora DBC launch with a creato
     review,
     () => {},
   );
+  expect(
+    (
+      await send({
+        action: 'approve',
+        id: review.recoveryId,
+        sha256: review.sha256,
+        approved: true,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await send({
+        action: 'register',
+        id: review.recoveryId,
+        transaction: signed.transaction,
+      })
+    ).status,
+  ).toBe(200);
   const submitted = await send({
     action: 'submit',
-    terms,
-    input: review.input,
-    transaction: signed.transaction,
+    id: review.recoveryId,
+    sha256: review.sha256,
+    approved: true,
   });
   expect(submitted.status).toBe(200);
   expect(await submitted.json()).toMatchObject({
-    state: 'sent',
+    state: 'submitted',
     signature: signed.signature,
-    mint,
   });
   expect(state.sent).toEqual([signed.signature]);
   const status = await GET(
@@ -415,7 +473,9 @@ it('prepares a create-only Token-2022 launch', async () => {
     action: 'prepare',
     terms: { ...terms, devBuyRaw: '0' },
   });
-  const review = (await prepared.json()) as MeteoraDbcReview;
+  const review = (await prepared.json()) as MeteoraDbcReview & {
+    recoveryId: string;
+  };
   expect(prepared.status).toBe(200);
   expect(review.input.baseTokenType).toBe(1);
   expect(review.input.minTokensOutRaw).toBe('0');
@@ -426,7 +486,7 @@ it('prepares a create-only Token-2022 launch', async () => {
 it('refuses tampered signed packets, edited reviews and wrong keys', async () => {
   const review = (await (
     await send({ action: 'prepare', terms })
-  ).json()) as MeteoraDbcReview;
+  ).json()) as MeteoraDbcReview & { recoveryId: string };
   const signed = await signMeteoraDbcLaunch(
     session(7, payer),
     session(9, mint),
@@ -439,7 +499,7 @@ it('refuses tampered signed packets, edited reviews and wrong keys', async () =>
     input: { ...review.input, minTokensOutRaw: '1' },
     transaction: signed.transaction,
   });
-  expect(changed.status).toBe(409);
+  expect(changed.status).toBe(400); // Stateless submit bypass is refused.
   await expect(
     signMeteoraDbcLaunch(
       session(7, payer),
@@ -457,19 +517,38 @@ it('refuses tampered signed packets, edited reviews and wrong keys', async () =>
 it('refuses to send when the config changed after review', async () => {
   const review = (await (
     await send({ action: 'prepare', terms })
-  ).json()) as MeteoraDbcReview;
+  ).json()) as MeteoraDbcReview & { recoveryId: string };
   const signed = await signMeteoraDbcLaunch(
     session(7, payer),
     session(9, mint),
     review,
     () => {},
   );
+  expect(
+    (
+      await send({
+        action: 'approve',
+        id: review.recoveryId,
+        sha256: review.sha256,
+        approved: true,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await send({
+        action: 'register',
+        id: review.recoveryId,
+        transaction: signed.transaction,
+      })
+    ).status,
+  ).toBe(200);
   state.tokenType = 1;
   const res = await send({
     action: 'submit',
-    terms,
-    input: review.input,
-    transaction: signed.transaction,
+    id: review.recoveryId,
+    sha256: review.sha256,
+    approved: true,
   });
   expect(res.status).toBe(409);
   expect(state.sent).toEqual([]);
@@ -478,24 +557,57 @@ it('refuses to send when the config changed after review', async () => {
 it('never resends when the send response is lost', async () => {
   const review = (await (
     await send({ action: 'prepare', terms })
-  ).json()) as MeteoraDbcReview;
+  ).json()) as MeteoraDbcReview & { recoveryId: string };
   const signed = await signMeteoraDbcLaunch(
     session(7, payer),
     session(9, mint),
     review,
     () => {},
   );
+  expect(
+    (
+      await send({
+        action: 'approve',
+        id: review.recoveryId,
+        sha256: review.sha256,
+        approved: true,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await send({
+        action: 'register',
+        id: review.recoveryId,
+        transaction: signed.transaction,
+      })
+    ).status,
+  ).toBe(200);
   state.sendFails = true;
   const res = await send({
     action: 'submit',
-    terms,
-    input: review.input,
-    transaction: signed.transaction,
+    id: review.recoveryId,
+    sha256: review.sha256,
+    approved: true,
   });
   expect(await res.json()).toMatchObject({
-    state: 'unknown',
+    state: 'submitting',
     signature: signed.signature,
   });
+  const again = await send({
+    action: 'submit',
+    id: review.recoveryId,
+    sha256: review.sha256,
+    approved: true,
+  });
+  expect(again.status).toBe(200);
+  expect(state.sendAttempts).toBe(1);
+  const saved = await GET(
+    new Request(origin + '/api/meteora-dbc/launch?id=' + review.recoveryId),
+  );
+  const record = (await saved.json()) as Record<string, unknown>;
+  expect(record.state).toBe('submitting');
+  expect(record).not.toHaveProperty('signed');
 });
 
 it('refuses missing, mismatched or retired configs and existing mints before simulation', async () => {
