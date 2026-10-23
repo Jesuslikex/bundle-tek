@@ -25,6 +25,7 @@ import styles from './pump-layer-planner.module.css';
 import { LaunchLayerHistory } from './launch-layer-history';
 import { LaunchLayerNativeCoverage } from './launch-layer-native-coverage';
 import { LaunchLayerSetupSummary } from './launch-layer-setup-summary';
+import { LaunchWalletFundingTimes } from './launch-wallet-funding-times';
 import {
   createLaunchLayerSetup,
   type LaunchLayerSetup,
@@ -115,6 +116,7 @@ export function LayerBudgetReview({
         contextLabel={contextLabel}
         setup={setup}
       />
+      <LaunchWalletFundingTimes envelope={envelope} />
       <p>
         These are your maximum planning amounts. They are not verified costs,
         current balances or funding requirements.

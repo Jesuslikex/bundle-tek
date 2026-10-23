@@ -43,7 +43,7 @@ it('pages the full declared wallet set, filters roles/addresses and preserves ev
     expect(host.textContent).toContain('56 of 62 wallets');
     expect(host.textContent).toContain('page 1 of 3');
     expect(rows()[0].textContent).toContain('Front buyer 1');
-    const input = host.querySelector('input')!;
+    const input = host.querySelector<HTMLInputElement>('input[id$="-search"]')!;
     const search = async (value: string) =>
       act(async () => {
         Object.getOwnPropertyDescriptor(

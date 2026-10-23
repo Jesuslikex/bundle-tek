@@ -1,0 +1,73 @@
+.panel {
+  border: 1px solid #303039;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.panel p,
+.panel li {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.panel code,
+.panel li span,
+.panel li strong {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.panel li {
+  margin: 10px 0;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  border: 0;
+  padding: 0;
+  margin: 12px 0;
+  min-width: 0;
+}
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.controls button {
+  min-height: 44px;
+  max-width: 100%;
+  border: 1px solid #45455a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.controls button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.warning {
+  color: #ff929b;
+}
+.panel button:focus-visible,
+.panel summary:focus-visible,
+.panel input:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}

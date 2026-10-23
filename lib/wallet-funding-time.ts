@@ -121,9 +121,11 @@ export function compareFundingEventTimes(
     funding: { blockTime: number } | null;
   }[],
   gapSeconds = 1800,
+  maximumWallets: 100 | 500 = 100,
 ) {
   if (
-    wallets.length > 100 ||
+    (maximumWallets !== 100 && maximumWallets !== 500) ||
+    wallets.length > maximumWallets ||
     new Set(wallets.map((w) => w.address)).size !== wallets.length ||
     wallets.some(
       (w) =>
