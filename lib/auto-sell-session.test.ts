@@ -70,9 +70,11 @@ it('does not replay buys from the delay or its boundary baseline', async () => {
     tokenAmount: string;
     quoteAmount: string;
     priceUsd: string;
+    timestamp: string;
   }> = [];
   const buy = (id: string) => ({
     id,
+    timestamp: new Date(now).toISOString(),
     side: 'Buy' as const,
     sender: 'OUTSIDE',
     tokenAmount: '100',

@@ -34,6 +34,7 @@ import {
   type AutoSellStrategy,
 } from '@/lib/auto-sell';
 import { AutoSellRunner, type AutoSellSnapshot } from '@/lib/auto-sell-runner';
+import { AUTO_SELL_COUNTER_MAX_AGE_MS } from '@/lib/auto-sell-counter-time';
 import { autoSellSessionCap } from '@/lib/auto-sell-session';
 import { autoSellStartCapError } from '@/lib/auto-sell-start-cap';
 import {
@@ -72,7 +73,7 @@ const MODES: { mode: AutoSellMode; label: string; hint: string }[] = [
   {
     mode: 'counter',
     label: '↺ Counter Trading',
-    hint: 'Counter Trade will sell tokens every time someone buys the token.',
+    hint: `Queues token sales in response to eligible outside buys. Original trade times must be within ${AUTO_SELL_COUNTER_MAX_AGE_MS / 1000} seconds and at or after this run starts or resumes. Delayed history is skipped.`,
   },
   {
     mode: 'dca',

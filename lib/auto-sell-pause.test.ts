@@ -14,6 +14,7 @@ function deferred<T>() {
 }
 const buy = (id: string): AutoSellObservedTrade => ({
   id,
+  timestamp: new Date(0).toISOString(),
   sender: 'OUTSIDE',
   side: 'Buy',
   tokenAmount: '100',

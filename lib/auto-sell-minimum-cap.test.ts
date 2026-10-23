@@ -338,6 +338,7 @@ it('reviews every strategy ended by new limits and warns when the whole session 
     trades = [
       {
         id: 'queued',
+        timestamp: new Date(0).toISOString(),
         sender: 'OUTSIDE',
         side: 'Buy',
         tokenAmount: '40',

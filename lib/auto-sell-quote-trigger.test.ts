@@ -25,6 +25,7 @@ const context = {
 };
 const trade = {
   id: 'synthetic',
+  timestamp: new Date(0).toISOString(),
   sender: 'outside',
   side: 'Buy' as const,
   tokenAmount: '10',

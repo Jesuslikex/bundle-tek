@@ -33,6 +33,7 @@ import {
   validatedAutoSellOutcomeReference,
   type AutoSellOutcomeReference,
 } from './auto-sell-outcome-reference';
+import { autoSellCounterEventTime } from './auto-sell-counter-time';
 
 export type AutoSellLogEntry = {
   at: number;
@@ -144,6 +145,7 @@ export class AutoSellRunner {
   private controller = new AbortController();
   private polling = false;
   private activeAt = 0;
+  private counterNotBefore = 0;
   private endTimer: unknown = null;
   private sessionCap: bigint | null = null;
   private configurationRevision = 1;
@@ -182,6 +184,7 @@ export class AutoSellRunner {
     this.running = true;
     const now = this.deps.now();
     this.activeAt = now + (this.deps.session?.startDelaySeconds ?? 0) * 1000;
+    this.counterNotBefore = this.activeAt;
     for (const s of this.deps.strategies)
       this.states.set(s.id, initialAutoSellState(this.activeAt));
     if (this.deps.session?.endDurationSeconds)
@@ -247,6 +250,7 @@ export class AutoSellRunner {
     this.marketCapUsd = null;
     this.marketCapAt = 0;
     const now = this.deps.now();
+    this.counterNotBefore = Math.max(this.counterNotBefore, this.activeAt, now);
     for (const strategy of this.deps.strategies) {
       const state = this.states.get(strategy.id)!;
       if (strategy.mode === 'dca' && state.status === 'running')
@@ -615,9 +619,10 @@ export class AutoSellRunner {
 
   private observe(trades: AutoSellObservedTrade[]) {
     this.expireMarketCap();
+    const now = this.deps.now();
     const observation = autoSellMarketObservation(
       trades,
-      this.deps.now(),
+      now,
       this.deps.marketCapMaxAgeMs,
     );
     if (observation && observation.at >= this.marketCapAt) {
@@ -630,7 +635,7 @@ export class AutoSellRunner {
     // The first read only marks history; Auto Sell reacts to buys after Run.
     const fresh = trades.filter((t) => !this.seen.has(t.id)).reverse();
     for (const t of trades) this.seen.add(t.id);
-    if (this.deps.now() < this.activeAt) {
+    if (now < this.activeAt) {
       // Do not accumulate pre-start buys for a later counter sell.
       this.seen.clear();
       this.seeded = false;
@@ -643,7 +648,19 @@ export class AutoSellRunner {
       this.emit();
       return;
     }
+    let expiredTriggers = 0;
     for (const trade of fresh) {
+      if (
+        trade.side === 'Buy' &&
+        autoSellCounterEventTime(
+          trade.timestamp,
+          now,
+          this.counterNotBefore,
+        ) === null
+      ) {
+        expiredTriggers++;
+        continue;
+      }
       for (const s of this.deps.strategies) {
         if (!this.running || this.paused) return;
         const state = this.states.get(s.id)!;
@@ -675,6 +692,12 @@ export class AutoSellRunner {
           );
       }
     }
+    if (expiredTriggers > 0)
+      this.note(
+        null,
+        'info',
+        `Skipped ${expiredTriggers} newly listed buy ${expiredTriggers === 1 ? 'event' : 'events'} with missing, stale, future or pre-start/resume timestamps. No new Counter amount was queued from them.`,
+      );
     this.emit();
   }
 
