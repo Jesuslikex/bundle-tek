@@ -92,7 +92,9 @@ it('requires explicit verified-wallet loading and sends only the exact selected 
   expect(container.textContent).toContain('Simulated swap input');
   expect(container.textContent).toContain('Signing is unavailable here');
   expect(container.textContent).toContain('0.000000999 SOL');
-  expect(container.querySelectorAll('button')).toHaveLength(2);
+  expect(container.querySelectorAll('button')).toHaveLength(3);
+  expect(button('Review accounting limits').disabled).toBe(true);
+  expect(calls).toHaveLength(2);
 });
 it('cancels and refuses a late response when the input context changes', async () => {
   await configure();

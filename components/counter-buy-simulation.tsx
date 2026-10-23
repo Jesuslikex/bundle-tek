@@ -14,6 +14,7 @@ import { readPanelJson } from './read-panel-json';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import styles from './counter-buy-simulation.module.css';
+import { CounterBuyBudgetSetup } from './counter-buy-budget-setup';
 
 export function CounterBuySimulation({
   plan,
@@ -321,6 +322,14 @@ export function CounterBuySimulation({
             </>
           ))}
       </div>
+      <CounterBuyBudgetSetup
+        plan={plan}
+        decisionIdentity={decisionIdentity}
+        wallet={wallet ?? null}
+        maximumSolInputRaw={limits?.input ?? null}
+        maximumFeeAndRentRaw={limits?.fee ?? null}
+        locked={locked || busy}
+      />
     </section>
   );
 }
