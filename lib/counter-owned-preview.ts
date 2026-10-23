@@ -1,3 +1,10 @@
+import { readAutoBuyBudget } from './auto-buy-budget-store';
+import { AutoBuyBudgetError } from './auto-buy-budget';
+import {
+  bindCounterAutoBuyAccountingCandidate,
+  counterAutoBuyCandidateIdentity,
+  AutoBuyCounterCandidateError,
+} from './auto-buy-counter-candidate';
 import { env } from './server-env';
 import { UUID } from './wallet-operation';
 import { walletAddress } from './wallet-workspace';
@@ -97,12 +104,15 @@ type Dependencies = {
   settle: typeof reviewCounterBuySettlement;
 };
 /** Read-only owned diagnostic. No retained packet, reservation, approval or signing authority. */
-export async function previewOwnedCounterBuy(
+async function collectOwnedCounterBuyEvidence(
   db: D1Database,
   owner: string,
   value: CounterPreviewRequest,
   signal: AbortSignal,
   supplied?: Dependencies,
+  beforeProvider?: (
+    plan: ReturnType<typeof decodeCounterPlan>,
+  ) => Promise<void>,
 ) {
   const input = counterPreviewRequest(value);
   signal = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
@@ -179,6 +189,7 @@ export async function previewOwnedCounterBuy(
       );
     signal.throwIfAborted();
   };
+  if (beforeProvider) await beforeProvider(plan);
   if (
     !supplied &&
     (!env.JUPITER_API_KEY?.trim() ||
@@ -299,7 +310,7 @@ export async function previewOwnedCounterBuy(
       throw new CounterPreviewError(
         'Counter packet preview expired during source verification. Request a fresh preview.',
       );
-    return {
+    const preview = {
       format: 'owned-counter-buy-preview-v1' as const,
       ...input,
       mint: context.mint,
@@ -329,6 +340,23 @@ export async function previewOwnedCounterBuy(
       limitations:
         'Read-only preview with contributing source trades rechecked. Durable packet/budget storage, reservations, code admission and separate approval/signing/recovery remain required.',
     };
+    return {
+      preview,
+      input,
+      plan,
+      prepared,
+      simulation,
+      settlement,
+      sourceReview,
+      unchanged,
+      recheckSource: () =>
+        reviewCounterBuySources(
+          plan,
+          input.decisionIdentity,
+          signal,
+          provider.observeSource,
+        ),
+    };
   } catch (error) {
     signal.throwIfAborted();
     if (error instanceof CounterSourceReviewError)
@@ -340,3 +368,254 @@ export async function previewOwnedCounterBuy(
     );
   }
 }
+
+/** Original public DTO and owned query ordering are preserved. Raw evidence stays private. */
+export async function previewOwnedCounterBuy(
+  db: D1Database,
+  owner: string,
+  value: CounterPreviewRequest,
+  signal: AbortSignal,
+  supplied?: Dependencies,
+) {
+  return (
+    await collectOwnedCounterBuyEvidence(db, owner, value, signal, supplied)
+  ).preview;
+}
+export type CounterBudgetPreviewRequest = CounterPreviewRequest & {
+  budgetId: string;
+  budgetRevision: number;
+  strategyId: string;
+};
+export function counterBudgetPreviewRequest(
+  value: unknown,
+): CounterBudgetPreviewRequest {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new CounterPreviewError(
+      'Choose an existing owned Auto Buy budget.',
+      400,
+    );
+  const { budgetId, budgetRevision, strategyId, ...base } =
+    value as CounterBudgetPreviewRequest;
+  if (
+    [budgetId, strategyId].some(
+      (v) => typeof v !== 'string' || !UUID.test(v),
+    ) ||
+    !Number.isSafeInteger(budgetRevision) ||
+    budgetRevision < 0 ||
+    budgetRevision > 1e9
+  )
+    throw new CounterPreviewError(
+      'Choose exact existing Auto Buy budget revisions.',
+      400,
+    );
+  return {
+    ...counterPreviewRequest(base),
+    budgetId,
+    budgetRevision,
+    strategyId,
+  };
+}
+/** Mounted read-only accounting composition. It creates neither budgets nor claims.
+ * The original plan is reobserved after simulation; all raw packet/evidence stays
+ * module-private. The final rereads are optimistic admission, NOT an atomic hold.
+ */
+export async function previewOwnedCounterBuyBudget(
+  db: D1Database,
+  owner: string,
+  value: CounterBudgetPreviewRequest,
+  signal: AbortSignal,
+  supplied?: Dependencies,
+) {
+  const input = counterBudgetPreviewRequest(value);
+  signal = AbortSignal.any([signal, AbortSignal.timeout(45000)]);
+  try {
+    signal.throwIfAborted();
+    const budget = await readAutoBuyBudget(db, owner, input.budgetId);
+    signal.throwIfAborted();
+    if (!budget)
+      throw new CounterPreviewError(
+        'Owned Auto Buy budget not found. No budget was created.',
+        404,
+      );
+    const terms = budget.terms,
+      wallet = terms.wallets.find(
+        (w) =>
+          w.address === input.wallet && w.revision === input.walletRevision,
+      ),
+      strategy = terms.strategies.find(
+        (s) => s.id === input.strategyId && s.kind === 'Counter',
+      ),
+      fits = (limit: {
+        maximumInputLamports: string;
+        maximumFeeAndRentLamports: string;
+      }) =>
+        BigInt(input.maximumSolInputRaw) <=
+          BigInt(limit.maximumInputLamports) &&
+        BigInt(input.maximumFeeAndRentRaw) <=
+          BigInt(limit.maximumFeeAndRentLamports);
+    if (
+      budget.state !== 'open' ||
+      budget.revision !== input.budgetRevision ||
+      terms.projectId !== input.projectId ||
+      terms.projectRevision !== input.projectRevision ||
+      Date.parse(terms.expiresAt) <= Date.now() ||
+      !wallet ||
+      !strategy ||
+      !fits(terms) ||
+      !fits(wallet) ||
+      !fits(strategy) ||
+      BigInt(input.maximumSolInputRaw) >
+        BigInt(budget.remainingInputLamports) ||
+      BigInt(input.maximumFeeAndRentRaw) >
+        BigInt(budget.remainingFeeAndRentLamports)
+    )
+      throw new CounterPreviewError(
+        'Owned Auto Buy budget, capacity or revisions changed. Request a fresh preview.',
+      );
+    const {
+      budgetId: _budgetId,
+      budgetRevision: _budgetRevision,
+      strategyId: _strategyId,
+      ...base
+    } = input;
+    const evidence = await collectOwnedCounterBuyEvidence(
+      db,
+      owner,
+      base,
+      signal,
+      supplied,
+      async (plan) => {
+        if (
+          terms.mint !== plan.ledger.scope.mint ||
+          terms.tokenDecimals !== plan.ledger.scope.decimals ||
+          strategy.sourceSha256 !==
+            (
+              await counterAutoBuyCandidateIdentity(
+                plan,
+                input.decisionIdentity,
+              )
+            ).sourceSha256
+        )
+          throw new CounterPreviewError(
+            'The owned Counter strategy differs from this Auto Buy budget.',
+          );
+        signal.throwIfAborted();
+        if (
+          JSON.stringify(await readAutoBuyBudget(db, owner, input.budgetId)) !==
+          JSON.stringify(budget)
+        )
+          throw new CounterPreviewError(
+            'Auto Buy budget changed before provider preparation.',
+          );
+        signal.throwIfAborted();
+      },
+    );
+    const candidate = await bindCounterAutoBuyAccountingCandidate(
+      {
+        plan: evidence.plan,
+        prepared: evidence.prepared,
+        simulation: evidence.simulation,
+        settlement: evidence.settlement,
+        sourceReview: evidence.sourceReview,
+        budget,
+        selection: {
+          // Ephemeral validator input, never a retained claim or public identifier.
+          claimId: crypto.randomUUID(),
+          budgetId: input.budgetId,
+          budgetRevision: input.budgetRevision,
+          strategyId: input.strategyId,
+          wallet: input.wallet,
+          walletRevision: input.walletRevision,
+          now: Date.now(),
+        },
+      },
+      signal,
+    );
+    const finalSource = await evidence.recheckSource();
+    await evidence.unchanged();
+    const current = await readAutoBuyBudget(db, owner, input.budgetId);
+    signal.throwIfAborted();
+    await evidence.unchanged();
+    if (
+      JSON.stringify(current) !== JSON.stringify(budget) ||
+      finalSource.sourceTradeCount !== evidence.sourceReview.sourceTradeCount ||
+      Date.parse(finalSource.sourceValidUntil) <
+        Date.parse(candidate.claim.expiresAt) ||
+      Date.parse(candidate.claim.expiresAt) <= Date.now()
+    )
+      throw new CounterPreviewError(
+        'Auto Buy budget, held accounting or source expiry changed during preview. Request a fresh preview.',
+      );
+    return {
+      format: 'owned-counter-buy-budget-preview-v1' as const,
+      scope: 'read-only-nonreservable-preview' as const,
+      budgetId: input.budgetId,
+      budgetRevision: input.budgetRevision,
+      strategyId: input.strategyId,
+      projectId: input.projectId,
+      projectRevision: input.projectRevision,
+      planId: input.planId,
+      planRevision: input.planRevision,
+      decisionIdentity: input.decisionIdentity,
+      wallet: input.wallet,
+      walletRevision: input.walletRevision,
+      mint: terms.mint,
+      tokenDecimals: terms.tokenDecimals,
+      inputMint: budget.inputMint,
+      packetSha256: evidence.prepared.preparation.sha256,
+      outputTargetRaw: evidence.prepared.quote.outputTargetRaw,
+      requiredSolInputRaw: evidence.prepared.quote.requiredSolInputRaw,
+      maximumQuoteInputRaw: evidence.prepared.quote.maximumSolInputRaw,
+      maximumSolInputRaw: input.maximumSolInputRaw,
+      maximumFeeAndRentRaw: input.maximumFeeAndRentRaw,
+      actualSimulatedInputRaw: evidence.settlement.actualInputRaw,
+      networkFeeLamports: evidence.simulation.networkFeeLamports,
+      heldInputLamports: budget.heldInputLamports,
+      heldFeeAndRentLamports: budget.heldFeeAndRentLamports,
+      remainingInputLamports: budget.remainingInputLamports,
+      remainingFeeAndRentLamports: budget.remainingFeeAndRentLamports,
+      observedAt: evidence.simulation.observedAt,
+      sourceTradeCount: finalSource.sourceTradeCount,
+      sourceRecheckedAt: finalSource.sourceRecheckedAt,
+      sourceValidUntil: finalSource.sourceValidUntil,
+      expiresAt: candidate.claim.expiresAt,
+      ownerContext: 'rechecked-advisory-only' as const,
+      ownershipContextRechecked: true as const,
+      budgetContextRechecked: true as const,
+      sourceRevalidated: true as const,
+      ownerContextVerified: false as const,
+      claimStorageEligibilityVerified: false as const,
+      accountingCapacityReserved: false as const,
+      crossBudgetReplayProtectionVerified: false as const,
+      proposalUseReservationVerified: false as const,
+      programCodeAttested: false as const,
+      reservationCreated: false as const,
+      approvalAllowed: false as const,
+      signingAllowed: false as const,
+      executionAllowed: false as const,
+      automaticExecutionAllowed: false as const,
+      sourceVerified: false as const,
+      instructionsVerified: false as const,
+      walletFundsReserved: false as const,
+      limitations:
+        'Read-only nonreservable preview. Owned context and held totals were rechecked, not locked. No active-claim capacity, cross-budget or global proposal-use reservation, claim-storage eligibility, code admission or execution authority is established. This response cannot be retained as a claim.',
+    };
+  } catch (error) {
+    signal.throwIfAborted();
+    if (error instanceof CounterPreviewError) throw error;
+    if (error instanceof AutoBuyBudgetError)
+      throw new CounterPreviewError(error.message, error.status);
+    if (error instanceof CounterSourceReviewError)
+      throw new CounterPreviewError(error.message);
+    if (error instanceof AutoBuyCounterCandidateError)
+      throw new CounterPreviewError(error.message);
+    throw new CounterPreviewError(
+      'Counter budget preview unavailable. No budget claim or approval was created.',
+      502,
+    );
+  }
+}
+
+export type CounterBudgetPreview = Awaited<
+  ReturnType<typeof previewOwnedCounterBuyBudget>
+>;
