@@ -308,17 +308,20 @@ export function warmupUiFixture() {
           {
             address: wallet,
             observation: {
+              address: wallet,
+              chain: 'Solana',
               nativeBalance: '0.02',
               currency: 'SOL',
               outgoingTransactions: null,
               sampleCount: 2,
               successfulSampleCount: 2,
               oldestObservedAt: null,
+              latestObservedAt: null,
               coverage:
                 'Synthetic bounded history sample; no real wallet observation.',
               observedAt: new Date().toISOString(),
-              block: 100,
-              source: 'Fixture only',
+              block: '100',
+              source: 'fixture.test',
             },
           },
         ],

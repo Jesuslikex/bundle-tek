@@ -12,15 +12,13 @@ import {
   WARMUP_MIN_DELAY_SECONDS,
   WarmupPlanInputError,
   type WarmupPlanField,
-  type WarmupHistory,
   type WarmupPlan,
 } from '@/lib/wallet-warmup';
 import type { LaunchChain } from '@/lib/launch-plan';
 import { WalletWarmupPlans } from '@/components/wallet-warmup-plans';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { WarmupPlanSummary } from './warmup-plan-summary';
-import { readPanelJson } from './read-panel-json';
-import { WarmupFundingTimes } from './warmup-funding-times';
+import { WarmupWalletHistory } from './warmup-wallet-history';
 import styles from './wallet-warmup.module.css';
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
@@ -32,11 +30,6 @@ function revealOptions(element: HTMLElement | null) {
   }
 }
 
-type HistoryResult = {
-  address: string;
-  observation?: WarmupHistory;
-  error?: string;
-};
 export function WalletWarmup({
   chain,
   addresses,
@@ -106,67 +99,12 @@ export function WalletWarmup({
     'aria-describedby':
       invalidField === field && error ? `${id}-error` : undefined,
   });
-  const [history, setHistory] = useState<HistoryResult[]>([]);
-  const [busy, setBusy] = useState(false);
-  const abort = useRef<AbortController | null>(null);
-  useEffect(() => () => abort.current?.abort(), []);
   const edit = (change: () => void) => {
     change();
     setPlan(null);
     setError('');
     setInvalidField(null);
   };
-  async function inspect() {
-    abort.current?.abort();
-    const controller = new AbortController();
-    abort.current = controller;
-    setBusy(true);
-    setError('');
-    setHistory([]);
-    const timeout = setTimeout(() => {
-      if (controller.signal.aborted) return;
-      controller.abort();
-      setBusy(false);
-      setError(
-        'Wallet history took too long. Check your connection and try again.',
-      );
-    }, 30_000);
-    try {
-      const response = await fetch('/api/wallet-workspace/warmup', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({ chain, addresses }),
-      });
-      const data = (await readPanelJson(
-        response,
-        'Wallet history unavailable. Try checking again.',
-      )) as {
-        error?: string;
-        chain?: string;
-        results?: HistoryResult[];
-      };
-      if (!data || typeof data !== 'object')
-        throw new Error('Wallet history unavailable. Try checking again.');
-      if (!response.ok) throw new Error(data.error || 'History unavailable.');
-      if (
-        data.chain !== chain ||
-        !Array.isArray(data.results) ||
-        data.results.length !== addresses.length ||
-        data.results.some(
-          (r: HistoryResult, i: number) => r.address !== addresses[i],
-        )
-      )
-        throw new Error('History selection mismatch.');
-      if (!controller.signal.aborted) setHistory(data.results);
-    } catch (e) {
-      if (!controller.signal.aborted)
-        setError(e instanceof Error ? e.message : 'History unavailable.');
-    } finally {
-      clearTimeout(timeout);
-      if (!controller.signal.aborted) setBusy(false);
-    }
-  }
   function drawRangeAmounts(cycleCount: number) {
     try {
       return drawWarmupAmounts(
@@ -239,100 +177,11 @@ export function WalletWarmup({
         {addresses.length === 1 ? 'wallet' : 'wallets'} selected. Plan repeated
         buy and sell loops. Review each transaction before signing.
       </p>
-      <details className={styles.options}>
-        <summary>Wallet history · read only</summary>
-        {chain === 'Solana' && (
-          <WarmupFundingTimes
-            addresses={addresses}
-            walletRevisions={walletRevisions}
-          />
-        )}
-        <Button variant="outline" disabled={busy} onClick={inspect}>
-          {busy ? 'Checking activity…' : 'Check wallet history'}
-        </Button>
-        {busy && (
-          <>
-            <output aria-live="polite">
-              Reading public wallet activity. This does not start warmup or
-              request a signature.
-            </output>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                abort.current?.abort();
-                setBusy(false);
-                setError(
-                  'History check cancelled. You can check again when ready.',
-                );
-              }}
-            >
-              Cancel history check
-            </Button>
-          </>
-        )}
-        {history.length > 0 && (
-          <div className="warmup-history" aria-live="polite">
-            {history.map((r) => (
-              <article key={r.address}>
-                {r.error ? (
-                  <output>
-                    {r.address.slice(0, 4)}…{r.address.slice(-4)}: {r.error}
-                  </output>
-                ) : (
-                  r.observation && (
-                    <>
-                      <p className={styles.historyBalance}>
-                        {history.length > 1 && (
-                          <span>
-                            {r.address.slice(0, 4)}…{r.address.slice(-4)} ·{' '}
-                          </span>
-                        )}
-                        {r.observation.nativeBalance} {r.observation.currency}
-                      </p>
-                      {r.observation.nativeBalance === '0' && (
-                        <p className={styles.help}>
-                          Your wallet is unfunded. You can still save and check
-                          a draft.
-                        </p>
-                      )}
-                      <details className={styles.technical}>
-                        <summary>Wallet activity details</summary>
-                        <p className="warmup-address">{r.address}</p>
-                        <p>
-                          {r.observation.nativeBalance} {r.observation.currency}{' '}
-                          ·{' '}
-                          {r.observation.outgoingTransactions === null
-                            ? `${r.observation.sampleCount} sampled signatures, ${r.observation.successfulSampleCount} successful`
-                            : `${r.observation.outgoingTransactions} account nonce`}
-                        </p>
-                        <p>
-                          Oldest sampled activity:{' '}
-                          {r.observation.oldestObservedAt
-                            ? new Date(
-                                r.observation.oldestObservedAt,
-                              ).toLocaleString()
-                            : 'Unknown'}
-                          . Wallet age: unknown.
-                        </p>
-                        <small>
-                          {r.observation.coverage} Observed{' '}
-                          {new Date(r.observation.observedAt).toLocaleString()}{' '}
-                          at block/slot {r.observation.block}. Source:{' '}
-                          {r.observation.source}.
-                        </small>
-                        <p>
-                          Activity does not prove wallet age or launch
-                          eligibility. Every swap needs separate approval.
-                        </p>
-                      </details>
-                    </>
-                  )
-                )}
-              </article>
-            ))}
-          </div>
-        )}
-      </details>
+      <WarmupWalletHistory
+        chain={chain}
+        addresses={addresses}
+        walletRevisions={walletRevisions}
+      />
       <form
         ref={form}
         tabIndex={-1}

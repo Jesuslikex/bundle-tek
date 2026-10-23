@@ -1,0 +1,17 @@
+.history > button,
+.history > a {
+  min-height: 44px;
+}
+.history > a {
+  display: inline-flex;
+  align-items: center;
+}
+.history > summary {
+  min-height: 44px;
+  padding-block: 12px;
+}
+.status {
+  display: block;
+  margin-block: 12px;
+  line-height: 1.5;
+}
