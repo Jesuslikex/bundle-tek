@@ -1,5 +1,5 @@
 'use client';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { MarketplaceReservationContext } from './marketplace-reservation-context';
 import Link from 'next/link';
 import {
@@ -56,6 +56,8 @@ function filtered(
   return { listings, valid: true };
 }
 export function MarketplaceBundleCatalog() {
+  const countHelpId = useId(),
+    countErrorId = useId();
   const version = useContext(MarketplaceReservationContext)?.version ?? 0;
   const pending = useRef<AbortController | null>(null);
   const [catalog, setCatalog] = useState<BundleCatalog | null>(null),
@@ -263,14 +265,38 @@ export function MarketplaceBundleCatalog() {
               <input
                 inputMode="numeric"
                 maxLength={3}
+                aria-invalid={!countValid}
+                aria-describedby={
+                  countValid ? countHelpId : `${countHelpId} ${countErrorId}`
+                }
                 value={requestedCount}
-                onChange={(e) => setRequestedCount(e.target.value)}
+                onChange={(e) => {
+                  setRequestedCount(e.target.value);
+                  setSelectionMessage('');
+                }}
               />
             </label>
           </div>
-          <p>
+          <fieldset className={`${styles.controls} ${styles.countPresets}`}>
+            <legend>Wallet count presets</legend>
+            {[25, 50, 100, 200].map((count) => (
+              <button
+                key={count}
+                type="button"
+                aria-pressed={requestedCount === String(count)}
+                onClick={() => {
+                  setRequestedCount(String(count));
+                  setSelectionMessage('');
+                }}
+              >
+                {count}
+              </button>
+            ))}
+          </fieldset>
+          <p id={countHelpId}>
             Select up to this many matching wallets in the displayed sort order.
-            This replaces the current selection.
+            Choosing a count does not select or reserve wallets. Select matching
+            wallets to replace the current selection.
           </p>
           <div className={styles.controls}>
             <button
@@ -286,7 +312,9 @@ export function MarketplaceBundleCatalog() {
             </button>
           </div>
           {!countValid && (
-            <p role="alert">Choose a wallet count from 1 to 200.</p>
+            <p role="alert" id={countErrorId}>
+              Choose a wallet count from 1 to 200.
+            </p>
           )}
           {selectionMessage && <output>{selectionMessage}</output>}
           {ids.length === CART_MAX_WALLETS && (

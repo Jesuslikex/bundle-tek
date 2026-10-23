@@ -300,10 +300,65 @@ it('caps selected wallets at 200 across pages and explains invalid count choices
   await click('Refresh Bundle inventory');
   await field('Wallet count', '201');
   expect(button('Select matching wallets').disabled).toBe(true);
-  await field('Wallet count', '200');
+  const countInput = [...host.querySelectorAll('label')]
+    .find((l) => l.textContent?.startsWith('Wallet count'))!
+    .querySelector('input')!;
+  expect(countInput.getAttribute('aria-invalid')).toBe('true');
+  expect(
+    countInput
+      .getAttribute('aria-describedby')
+      ?.split(' ')
+      .map((id) => document.getElementById(id)?.textContent)
+      .join(' '),
+  ).toContain('Choose a wallet count from 1 to 200');
+  await click('200');
+  expect(countInput.getAttribute('aria-invalid')).toBe('false');
   await click('Select matching wallets');
   expect(host.textContent).toContain('Selected wallets · 200');
   expect(host.textContent).toContain('Maximum 200 wallets selected');
   await click('Next catalog page');
   expect(host.textContent).toContain('Selected wallets · 200');
+});
+
+it.each([25, 50, 100, 200])(
+  'sets the %s-wallet preset locally and selects only after the explicit action',
+  async (count) => {
+    const fetcher = server();
+    vi.stubGlobal('fetch', fetcher);
+    await mount();
+    await click('Refresh Bundle inventory');
+    await click(String(count));
+    expect(button(String(count)).getAttribute('aria-pressed')).toBe('true');
+    expect(host.textContent).not.toContain('Selected wallets ·');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await click('Select matching wallets');
+    expect(host.textContent).toContain(
+      `Only 2 wallets match; selected 2 of the requested ${count}`,
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('input[type="password"]')).toBeNull();
+  },
+);
+
+it('keeps the exact reviewed selection when changing the desired count and supports a custom value afterwards', async () => {
+  const fetcher = server();
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Refresh Bundle inventory');
+  await click('Select matching wallets');
+  await click('Review selected wallets');
+  await click('100');
+  expect(host.textContent).toContain('Selected wallets · 2');
+  expect(host.textContent).not.toContain(
+    'Only 2 wallets match; selected 2 of the requested 25',
+  );
+  expect(host.textContent).toContain('Selection checked · not reserved');
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  await field('Wallet count', '1');
+  for (const count of [25, 50, 100, 200])
+    expect(button(String(count)).getAttribute('aria-pressed')).toBe('false');
+  await click('Select matching wallets');
+  expect(host.textContent).toContain('Selected wallets · 1');
+  expect(host.textContent).not.toContain('Selection checked · not reserved');
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });

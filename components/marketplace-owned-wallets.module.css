@@ -58,6 +58,27 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+.countPresets {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.countPresets legend {
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: #b9b9c8;
+}
+.countPresets button[aria-pressed='true'] {
+  border-color: #9985ff;
+  background: #25213d;
+  font-weight: 700;
+}
+@media (forced-colors: active) {
+  .countPresets button[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
 .filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
