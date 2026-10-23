@@ -12,6 +12,7 @@ import {
   prepareVenueLaunchRecovery,
   readVenueLaunchRecovery,
   VenueLaunchRecoveryError,
+  VenueLaunchPreparationNotSavedError,
 } from '@/lib/venue-launch-recovery';
 
 export const dynamic = 'force-dynamic';
@@ -137,18 +138,36 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const user = await getChatGPTUser();
-  if (!user) return json({ error: 'Sign in to review a launch.' }, 401);
+  if (!user)
+    return json(
+      { error: 'Sign in to review a launch.', preparationNotSaved: true },
+      401,
+    );
   const origin = new URL(request.url).origin;
   if (request.headers.get('origin') !== origin)
-    return json({ error: 'Use this site to review the launch.' }, 403);
+    return json(
+      {
+        error: 'Use this site to review the launch.',
+        preparationNotSaved: true,
+      },
+      403,
+    );
   if (
     request.headers.get('content-type')?.split(';')[0].trim() !==
     'application/json'
   )
-    return json({ error: 'JSON required.' }, 415);
+    return json({ error: 'JSON required.', preparationNotSaved: true }, 415);
   const b = await readBody(request);
-  if (b === 'too-large') return json({ error: 'Request too large.' }, 413);
-  if (!b) return json({ error: 'Invalid launch request.' }, 400);
+  if (b === 'too-large')
+    return json(
+      { error: 'Request too large.', preparationNotSaved: true },
+      413,
+    );
+  if (!b)
+    return json(
+      { error: 'Invalid launch request.', preparationNotSaved: true },
+      400,
+    );
   if (b.action !== 'prepare') {
     try {
       return json(
@@ -181,6 +200,7 @@ export async function POST(request: Request) {
       {
         error:
           'Review the exact saved project, release, payer, mint, creator buy and SOL limit.',
+        preparationNotSaved: true,
       },
       400,
     );
@@ -196,13 +216,25 @@ export async function POST(request: Request) {
           signal,
         ),
       );
-    return json({ error: 'Invalid launch action.' }, 400);
+    return json(
+      { error: 'Invalid launch action.', preparationNotSaved: true },
+      400,
+    );
   } catch (error) {
     if (
       error instanceof StonkLaunchError ||
       error instanceof VenueLaunchRecoveryError
     )
-      return json({ error: error.message }, error.status);
+      return json(
+        {
+          error: error.message,
+          ...(error instanceof StonkLaunchError ||
+          error instanceof VenueLaunchPreparationNotSavedError
+            ? { preparationNotSaved: true }
+            : {}),
+        },
+        error.status,
+      );
     return json(
       {
         error:

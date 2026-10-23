@@ -523,7 +523,7 @@ for (const venue of ['meteora-dbc', 'stonkfun']) {
     await click('Prepare and simulate');
     await click('cancelled · Fixture coin');
     const key = `bundle-venue-launch-recovery:${venue}:${project.id}`;
-    expect(JSON.parse(localStorage.getItem(key)!)).toEqual({
+    expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({
       id: '',
       stage: 'prepare',
     });
@@ -557,7 +557,7 @@ for (const venue of ['meteora-dbc', 'stonkfun']) {
     if (venue === 'meteora-dbc') await input('DBC config', mint);
     await click('Prepare and simulate');
     const key = `bundle-venue-launch-recovery:${venue}:${project.id}`;
-    expect(JSON.parse(localStorage.getItem(key)!)).toEqual({
+    expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({
       id: '',
       stage: 'prepare',
     });

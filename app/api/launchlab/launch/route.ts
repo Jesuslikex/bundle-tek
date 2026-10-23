@@ -3,18 +3,21 @@ import { getD1 } from '@/db';
 import { address, isOffCurveAddress } from '@solana/kit';
 import {
   LaunchLabError,
-  prepareLaunchLabLaunch,
-  submitLaunchLabLaunch,
   type LaunchLabTerms,
 } from '@/lib/launchlab-launch-service';
 import {
   StonkLaunchError,
   stonkLaunchStatus,
 } from '@/lib/stonkfun-launch-service';
+import { isLaunchLabVenue } from '@/lib/launchlab-platform-launch';
 import {
-  isLaunchLabVenue,
-  type LaunchLabInput,
-} from '@/lib/launchlab-platform-launch';
+  actVenueLaunchRecovery,
+  listVenueLaunchRecoveries,
+  prepareVenueLaunchRecovery,
+  readVenueLaunchRecovery,
+  VenueLaunchRecoveryError,
+  VenueLaunchPreparationNotSavedError,
+} from '@/lib/venue-launch-recovery';
 
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) =>
@@ -104,6 +107,25 @@ export async function GET(request: Request) {
   if (!user) return json({ error: 'Sign in to check a launch.' }, 401);
   const signature = new URL(request.url).searchParams.get('signature') ?? '';
   try {
+    const params = new URL(request.url).searchParams;
+    if (params.has('id'))
+      return json(
+        await readVenueLaunchRecovery(
+          getD1(),
+          user.userId,
+          'launchlab',
+          params.get('id')!,
+        ),
+      );
+    if (params.has('projectId'))
+      return json(
+        await listVenueLaunchRecoveries(
+          getD1(),
+          user.userId,
+          'launchlab',
+          params.get('projectId')!,
+        ),
+      );
     return json(
       await stonkLaunchStatus(
         signature,
@@ -112,7 +134,10 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     // The confirmation lookup is venue-independent and shared with StonkFun.
-    if (error instanceof StonkLaunchError)
+    if (
+      error instanceof StonkLaunchError ||
+      error instanceof VenueLaunchRecoveryError
+    )
       return json({ error: error.message }, error.status);
     return json({ error: 'Launch status is unavailable.' }, 503);
   }
@@ -120,24 +145,69 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const user = await getChatGPTUser();
-  if (!user) return json({ error: 'Sign in to review a launch.' }, 401);
+  if (!user)
+    return json(
+      { error: 'Sign in to review a launch.', preparationNotSaved: true },
+      401,
+    );
   const origin = new URL(request.url).origin;
   if (request.headers.get('origin') !== origin)
-    return json({ error: 'Use this site to review the launch.' }, 403);
+    return json(
+      {
+        error: 'Use this site to review the launch.',
+        preparationNotSaved: true,
+      },
+      403,
+    );
   if (
     request.headers.get('content-type')?.split(';')[0].trim() !==
     'application/json'
   )
-    return json({ error: 'JSON required.' }, 415);
+    return json({ error: 'JSON required.', preparationNotSaved: true }, 415);
   const b = await readBody(request);
-  if (b === 'too-large') return json({ error: 'Request too large.' }, 413);
-  if (!b) return json({ error: 'Invalid launch request.' }, 400);
+  if (b === 'too-large')
+    return json(
+      { error: 'Request too large.', preparationNotSaved: true },
+      413,
+    );
+  if (!b)
+    return json(
+      { error: 'Invalid launch request.', preparationNotSaved: true },
+      400,
+    );
+  if (b.action !== 'prepare') {
+    try {
+      return json(
+        await actVenueLaunchRecovery(
+          getD1(),
+          user.userId,
+          'launchlab',
+          b,
+          AbortSignal.any([request.signal, AbortSignal.timeout(25000)]),
+        ),
+      );
+    } catch (error) {
+      if (
+        error instanceof LaunchLabError ||
+        error instanceof VenueLaunchRecoveryError
+      )
+        return json({ error: error.message }, error.status);
+      return json(
+        {
+          error:
+            'Saved launch action did not complete. Recover the original launch ID before trying again.',
+        },
+        502,
+      );
+    }
+  }
   const t = terms(b.terms, origin);
   if (!t)
     return json(
       {
         error:
           'Review the exact saved project, release, payer, mint, creator buy and SOL limit.',
+        preparationNotSaved: true,
       },
       400,
     );
@@ -145,33 +215,37 @@ export async function POST(request: Request) {
   try {
     if (b.action === 'prepare' && Object.keys(b).length === 2)
       return json(
-        await prepareLaunchLabLaunch(getD1(), user.userId, t, signal),
-      );
-    if (
-      b.action === 'submit' &&
-      Object.keys(b).sort().join(',') === 'action,input,terms,transaction' &&
-      b.input &&
-      typeof b.input === 'object' &&
-      typeof b.transaction === 'string'
-    )
-      return json(
-        await submitLaunchLabLaunch(
+        await prepareVenueLaunchRecovery(
           getD1(),
           user.userId,
+          'launchlab',
           t,
-          b.input as LaunchLabInput,
-          b.transaction,
           signal,
         ),
       );
-    return json({ error: 'Invalid launch action.' }, 400);
+    return json(
+      { error: 'Invalid launch action.', preparationNotSaved: true },
+      400,
+    );
   } catch (error) {
-    if (error instanceof LaunchLabError)
-      return json({ error: error.message }, error.status);
+    if (
+      error instanceof LaunchLabError ||
+      error instanceof VenueLaunchRecoveryError
+    )
+      return json(
+        {
+          error: error.message,
+          ...(error instanceof LaunchLabError ||
+          error instanceof VenueLaunchPreparationNotSavedError
+            ? { preparationNotSaved: true }
+            : {}),
+        },
+        error.status,
+      );
     return json(
       {
         error:
-          'Launch action did not complete. Check the mint on Solscan before trying again.',
+          'Launch response is uncertain. Reload saved launch history and recover the original ID before another action.',
       },
       502,
     );

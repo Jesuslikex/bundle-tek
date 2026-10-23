@@ -23,9 +23,17 @@ import {
   type StonkLaunchInput,
 } from './stonkfun-launch';
 import type { StonkLaunchReview } from './stonkfun-launch-service';
+import {
+  buildLaunchLabMessage,
+  LAUNCHLAB_CURVES,
+  LAUNCHLAB_PLATFORMS,
+  USD1,
+  type LaunchLabInput,
+} from './launchlab-platform-launch';
+import type { LaunchLabReview } from './launchlab-launch-service';
 import { verifyVenueLaunchSignedPacket } from './venue-launch-signed-packet';
 
-type Review = MeteoraDbcReview | StonkLaunchReview;
+type Review = MeteoraDbcReview | StonkLaunchReview | LaunchLabReview;
 const payer = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(1));
 const mint = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(2));
 const other = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(3));
@@ -84,7 +92,16 @@ const commonSummary = {
   solLimitLamports: terms.solLimitLamports,
   unitsConsumed: 100000,
 };
-const reviews = {} as Record<'dbc' | 'stonk', Review>;
+const reviewNames = [
+  'dbc',
+  'stonk',
+  'LetsBonk SOL',
+  'LetsBonk USD1',
+  'Surge SOL',
+  'Surge USD1',
+] as const;
+const reviews = {} as Record<(typeof reviewNames)[number], Review>;
+const launchlabReviews: LaunchLabReview[] = [];
 beforeAll(async () => {
   const dbcInput: MeteoraDbcInput = {
     ...commonInput,
@@ -143,126 +160,166 @@ beforeAll(async () => {
       pricingObservedAt: '2000-01-01T00:00:00.000Z',
     },
   };
+  for (const venue of ['LetsBonk', 'Surge'] as const)
+    for (const quoteMint of [WRAPPED_SOL, USD1]) {
+      const curve = LAUNCHLAB_CURVES[quoteMint];
+      const input: LaunchLabInput = {
+        ...commonInput,
+        venue,
+        quoteMint,
+        platformId: LAUNCHLAB_PLATFORMS[venue],
+        configId: curve.configId,
+        supply: curve.supply,
+        totalSellA: curve.totalSellA,
+        totalFundRaisingB: curve.totalFundRaisingB,
+        allowConfig: true,
+        curveRule: true,
+        devBuyRaw: '50000000',
+        minTokensOutRaw: '123456789',
+      };
+      const built = await buildLaunchLabMessage(input);
+      launchlabReviews.push({
+        format: 'launchlab-launch-review-v1',
+        terms: { ...terms, venue, devBuyRaw: input.devBuyRaw },
+        input,
+        transaction: built.transaction,
+        sha256: built.packetSha256,
+        expiresAt: '2000-01-01T00:00:00.000Z',
+        summary: {
+          ...commonSummary,
+          venue,
+          platformName: venue,
+          pool: built.pool,
+          quoteSymbol: curve.symbol,
+          quoteDecimals: curve.decimals,
+          supplyRaw: curve.supply,
+          raiseRaw: curve.totalFundRaisingB,
+          devBuyRaw: input.devBuyRaw,
+          tokensOutRaw: '123456789',
+        },
+      });
+      reviews[`${venue} ${curve.symbol}` as (typeof reviewNames)[number]] =
+        launchlabReviews.at(-1)!;
+    }
 });
 
-describe.each(['dbc', 'stonk'] as const)(
-  '%s retained signed packets',
-  (venue) => {
-    it('authenticates both signatures of an expired real builder packet and returns the payer signature', async () => {
-      const review = reviews[venue];
-      const signed = sign(review.transaction);
-      await expect(verifyVenueLaunchSignedPacket(review, signed)).resolves.toBe(
-        bs58.encode(decode(signed).signatures[address(payerAddress)]!),
-      );
-    });
+describe.each(reviewNames)('%s retained signed packets', (venue) => {
+  it('authenticates both signatures of an expired real builder packet and returns the payer signature', async () => {
+    const review = reviews[venue];
+    const signed = sign(review.transaction);
+    await expect(verifyVenueLaunchSignedPacket(review, signed)).resolves.toBe(
+      bs58.encode(decode(signed).signatures[address(payerAddress)]!),
+    );
+  });
 
-    it('rejects unsigned, missing, corrupted and wrong-key signatures', async () => {
-      const review = reviews[venue];
-      const signed = sign(review.transaction);
-      const tx = decode(signed);
-      const damaged = Uint8Array.from(tx.signatures[address(mintAddress)]!);
-      damaged[10] ^= 1;
-      const packets = [
-        review.transaction,
-        sign(review.transaction, true),
-        encode({
-          ...tx,
-          signatures: { ...tx.signatures, [mintAddress]: null },
-        }),
-        encode({
-          ...tx,
-          signatures: {
-            ...tx.signatures,
-            [mintAddress]: damaged as SignatureBytes,
-          },
-        }),
-      ];
-      for (const packet of packets)
-        await expect(
-          verifyVenueLaunchSignedPacket(review, packet),
-        ).rejects.toThrow();
-    });
+  it('rejects unsigned, missing, corrupted and wrong-key signatures', async () => {
+    const review = reviews[venue];
+    const signed = sign(review.transaction);
+    const tx = decode(signed);
+    const damaged = Uint8Array.from(tx.signatures[address(mintAddress)]!);
+    damaged[10] ^= 1;
+    const packets = [
+      review.transaction,
+      sign(review.transaction, true),
+      encode({
+        ...tx,
+        signatures: { ...tx.signatures, [mintAddress]: null },
+      }),
+      encode({
+        ...tx,
+        signatures: {
+          ...tx.signatures,
+          [mintAddress]: damaged as SignatureBytes,
+        },
+      }),
+    ];
+    for (const packet of packets)
+      await expect(
+        verifyVenueLaunchSignedPacket(review, packet),
+      ).rejects.toThrow();
+  });
 
-    it('rejects a validly signed different message', async () => {
-      const review = reviews[venue];
-      const built =
-        review.format === 'meteora-dbc-launch-review-v1'
-          ? await buildMeteoraDbcMessage({ ...review.input, name: 'Different' })
+  it('rejects a validly signed different message', async () => {
+    const review = reviews[venue];
+    const built =
+      review.format === 'meteora-dbc-launch-review-v1'
+        ? await buildMeteoraDbcMessage({ ...review.input, name: 'Different' })
+        : review.format === 'launchlab-launch-review-v1'
+          ? await buildLaunchLabMessage({ ...review.input, name: 'Different' })
           : await buildStonkLaunchMessage({
               ...review.input,
               name: 'Different',
             });
+    await expect(
+      verifyVenueLaunchSignedPacket(review, sign(built.transaction)),
+    ).rejects.toThrow();
+  });
+
+  it('rejects changed input, unsigned packet, packet digest, pool and review terms', async () => {
+    const review = reviews[venue];
+    const signed = sign(review.transaction);
+    const changes = [
+      { input: { ...review.input, name: 'Different' } },
+      { transaction: signed },
+      { sha256: '0'.repeat(64) },
+      { summary: { ...review.summary, pool: payerAddress } },
+      { terms: { ...review.terms, payer: mintAddress } },
+      { terms: { ...review.terms, mint: payerAddress } },
+      { terms: { ...review.terms, devBuyRaw: '1' } },
+      { summary: { ...review.summary, devBuyRaw: '1' } },
+    ];
+    for (const change of changes)
       await expect(
-        verifyVenueLaunchSignedPacket(review, sign(built.transaction)),
+        verifyVenueLaunchSignedPacket(
+          { ...review, ...change } as Review,
+          signed,
+        ),
       ).rejects.toThrow();
-    });
+  });
 
-    it('rejects changed input, unsigned packet, packet digest, pool and review terms', async () => {
-      const review = reviews[venue];
-      const signed = sign(review.transaction);
-      const changes = [
-        { input: { ...review.input, name: 'Different' } },
-        { transaction: signed },
-        { sha256: '0'.repeat(64) },
-        { summary: { ...review.summary, pool: payerAddress } },
-        { terms: { ...review.terms, payer: mintAddress } },
-        { terms: { ...review.terms, mint: payerAddress } },
-        { terms: { ...review.terms, devBuyRaw: '1' } },
-        { summary: { ...review.summary, devBuyRaw: '1' } },
-      ];
-      for (const change of changes)
-        await expect(
-          verifyVenueLaunchSignedPacket(
-            { ...review, ...change } as Review,
-            signed,
-          ),
-        ).rejects.toThrow();
-    });
+  it('rejects noncanonical, oversized, truncated and trailing packet bytes', async () => {
+    const review = reviews[venue];
+    const signed = sign(review.transaction);
+    const raw = Buffer.from(signed, 'base64');
+    const packets = [
+      '',
+      'a'.repeat(1804),
+      '%%%',
+      signed + '\n',
+      signed.slice(0, -4),
+      Buffer.concat([raw, Uint8Array.of(1)]).toString('base64'),
+      // Required signatures are encoded in the first compact-u16 byte.
+      Buffer.concat([Uint8Array.of(1), raw.subarray(1)]).toString('base64'),
+      Buffer.concat([Uint8Array.of(3), raw.subarray(1)]).toString('base64'),
+    ];
+    for (const packet of packets)
+      await expect(
+        verifyVenueLaunchSignedPacket(review, packet),
+      ).rejects.toThrow();
+  });
 
-    it('rejects noncanonical, oversized, truncated and trailing packet bytes', async () => {
-      const review = reviews[venue];
-      const signed = sign(review.transaction);
-      const raw = Buffer.from(signed, 'base64');
-      const packets = [
-        '',
-        'a'.repeat(1804),
-        '%%%',
-        signed + '\n',
-        signed.slice(0, -4),
-        Buffer.concat([raw, Uint8Array.of(1)]).toString('base64'),
-        // Required signatures are encoded in the first compact-u16 byte.
-        Buffer.concat([Uint8Array.of(1), raw.subarray(1)]).toString('base64'),
-        Buffer.concat([Uint8Array.of(3), raw.subarray(1)]).toString('base64'),
-      ];
-      for (const packet of packets)
-        await expect(
-          verifyVenueLaunchSignedPacket(review, packet),
-        ).rejects.toThrow();
-    });
-
-    it('rejects malformed review envelopes, formats and signer keys', async () => {
-      const review = reviews[venue];
-      const signed = sign(review.transaction);
-      const malformed: unknown[] = [
-        null,
-        [],
-        {},
-        { ...review, format: 'other-launch-review-v1' },
-        { ...review, input: null },
-        { ...review, terms: [] },
-        { ...review, summary: null },
-        { ...review, sha256: null },
-        { ...review, transaction: 7 },
-        { ...review, input: { ...review.input, payer: 'invalid' } },
-        { ...review, input: { ...review.input, mint: payerAddress } },
-      ];
-      for (const value of malformed)
-        await expect(
-          verifyVenueLaunchSignedPacket(value as Review, signed),
-        ).rejects.toThrow();
-    });
-  },
-);
+  it('rejects malformed review envelopes, formats and signer keys', async () => {
+    const review = reviews[venue];
+    const signed = sign(review.transaction);
+    const malformed: unknown[] = [
+      null,
+      [],
+      {},
+      { ...review, format: 'other-launch-review-v1' },
+      { ...review, input: null },
+      { ...review, terms: [] },
+      { ...review, summary: null },
+      { ...review, sha256: null },
+      { ...review, transaction: 7 },
+      { ...review, input: { ...review.input, payer: 'invalid' } },
+      { ...review, input: { ...review.input, mint: payerAddress } },
+    ];
+    for (const value of malformed)
+      await expect(
+        verifyVenueLaunchSignedPacket(value as Review, signed),
+      ).rejects.toThrow();
+  });
+});
 
 it('rejects a DBC config that differs across retained input, terms or summary', async () => {
   const review = reviews.dbc;
@@ -274,4 +331,71 @@ it('rejects a DBC config that differs across retained input, terms or summary', 
     await expect(
       verifyVenueLaunchSignedPacket({ ...review, ...change } as Review, signed),
     ).rejects.toThrow();
+});
+
+describe.each([
+  'LetsBonk SOL',
+  'LetsBonk USD1',
+  'Surge SOL',
+  'Surge USD1',
+] as const)('%s venue identity and signer order', (name) => {
+  it('rejects mismatched or unsupported venue identities and platform substitution', async () => {
+    const review = reviews[name] as LaunchLabReview;
+    const signed = sign(review.transaction);
+    const otherVenue = review.input.venue === 'LetsBonk' ? 'Surge' : 'LetsBonk';
+    for (const change of [
+      { input: { ...review.input, venue: otherVenue } },
+      { input: { ...review.input, venue: 'StonkFun' } },
+      { terms: { ...review.terms, venue: otherVenue } },
+      { summary: { ...review.summary, venue: otherVenue } },
+      {
+        input: { ...review.input, platformId: LAUNCHLAB_PLATFORMS[otherVenue] },
+      },
+      { input: { ...review.input, configId: payerAddress } },
+    ])
+      await expect(
+        verifyVenueLaunchSignedPacket(
+          { ...review, ...change } as LaunchLabReview,
+          signed,
+        ),
+      ).rejects.toThrow();
+  });
+
+  it('rejects swapped signature bytes and a genuinely signed payer/mint reorder', async () => {
+    const review = reviews[name] as LaunchLabReview;
+    const tx = decode(sign(review.transaction));
+    const swapped = encode({
+      ...tx,
+      signatures: {
+        [payerAddress]: tx.signatures[address(mintAddress)]!,
+        [mintAddress]: tx.signatures[address(payerAddress)]!,
+      },
+    });
+    await expect(
+      verifyVenueLaunchSignedPacket(review, swapped),
+    ).rejects.toThrow();
+
+    const changed = await buildLaunchLabMessage({
+      ...review.input,
+      payer: mintAddress,
+      mint: payerAddress,
+    });
+    const reordered = decode(changed.transaction);
+    const signedReordered = encode({
+      ...reordered,
+      signatures: {
+        [mintAddress]: nacl.sign.detached(
+          Uint8Array.from(reordered.messageBytes),
+          mint.secretKey,
+        ) as SignatureBytes,
+        [payerAddress]: nacl.sign.detached(
+          Uint8Array.from(reordered.messageBytes),
+          payer.secretKey,
+        ) as SignatureBytes,
+      },
+    });
+    await expect(
+      verifyVenueLaunchSignedPacket(review, signedReordered),
+    ).rejects.toThrow();
+  });
 });

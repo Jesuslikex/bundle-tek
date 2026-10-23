@@ -15,10 +15,16 @@ import { observePumpLaunchRecovery } from './pump-launch-recovery';
 import { verifyVenueLaunchSignedPacket } from './venue-launch-signed-packet';
 import { getSolanaRpcEndpoint, rpcCall } from './solana-rpc';
 import { PumpPreflightError } from './owned-pump-preflight';
+import {
+  prepareLaunchLabLaunch,
+  submitLaunchLabLaunch,
+  type LaunchLabReview,
+  type LaunchLabTerms,
+} from './launchlab-launch-service';
 
-export type LaunchRecoveryVenue = 'meteora-dbc' | 'stonkfun';
-type Review = MeteoraDbcReview | StonkLaunchReview;
-type Terms = MeteoraDbcTerms | StonkLaunchTerms;
+export type LaunchRecoveryVenue = 'meteora-dbc' | 'stonkfun' | 'launchlab';
+type Review = MeteoraDbcReview | StonkLaunchReview | LaunchLabReview;
+type Terms = MeteoraDbcTerms | StonkLaunchTerms | LaunchLabTerms;
 type Rpc = (
   method: string,
   params: unknown[],
@@ -59,9 +65,17 @@ export class VenueLaunchRecoveryError extends Error {
     super(message);
   }
 }
+/** Only for checks before the first recovery INSERT is attempted. */
+export class VenueLaunchPreparationNotSavedError extends VenueLaunchRecoveryError {}
 const fail = (message: string, status = 409): never => {
   throw new VenueLaunchRecoveryError(message, status);
 };
+function tableForVenue(venue: LaunchRecoveryVenue) {
+  if (venue === 'launchlab') return 'launchlab_launch_recoveries';
+  if (venue === 'meteora-dbc' || venue === 'stonkfun')
+    return 'venue_launch_recoveries';
+  return fail('Unsupported saved launch venue.', 400);
+}
 async function verifyPacket(review: Review, packet: string, status = 409) {
   try {
     return await verifyVenueLaunchSignedPacket(review, packet);
@@ -113,7 +127,7 @@ async function getRow(
     return fail('Saved launch ID required.', 400);
   const row = await db
     .prepare(
-      'SELECT * FROM venue_launch_recoveries WHERE owner_id=? AND venue=? AND id=?',
+      `SELECT * FROM ${tableForVenue(venue)} WHERE owner_id=? AND venue=? AND id=?`,
     )
     .bind(owner, venue, id)
     .first<Row>();
@@ -131,7 +145,9 @@ async function getRow(
     review.format !==
       (venue === 'meteora-dbc'
         ? 'meteora-dbc-launch-review-v1'
-        : 'stonkfun-launch-review-v1')
+        : venue === 'stonkfun'
+          ? 'stonkfun-launch-review-v1'
+          : 'launchlab-launch-review-v1')
   )
     return fail('Saved launch binding differs.');
   return row;
@@ -154,7 +170,7 @@ export async function listVenueLaunchRecoveries(
     return fail('Project ID required.', 400);
   const rows = await db
     .prepare(
-      'SELECT * FROM venue_launch_recoveries WHERE owner_id=? AND venue=? AND project_id=? ORDER BY created_at DESC,id DESC LIMIT 20',
+      `SELECT * FROM ${tableForVenue(venue)} WHERE owner_id=? AND venue=? AND project_id=? ORDER BY created_at DESC,id DESC LIMIT 20`,
     )
     .bind(owner, venue, projectId)
     .all<Row>();
@@ -172,6 +188,8 @@ type Deps = {
   prepareStonk?: typeof prepareStonkLaunch;
   submitDbc?: typeof submitMeteoraDbcLaunch;
   submitStonk?: typeof submitStonkLaunch;
+  prepareLaunchLab?: typeof prepareLaunchLabLaunch;
+  submitLaunchLab?: typeof submitLaunchLabLaunch;
 };
 export async function prepareVenueLaunchRecovery(
   db: D1Database,
@@ -184,7 +202,7 @@ export async function prepareVenueLaunchRecovery(
   signal.throwIfAborted();
   const existing = await db
     .prepare(
-      "SELECT * FROM venue_launch_recoveries WHERE owner_id=? AND project_id=? AND state NOT IN ('finalized','failed','cancelled')",
+      `SELECT * FROM ${tableForVenue(venue)} WHERE owner_id=? AND project_id=? AND state NOT IN ('finalized','failed','cancelled')`,
     )
     .bind(owner, terms.projectId)
     .first<Row>();
@@ -214,16 +232,26 @@ export async function prepareVenueLaunchRecovery(
           signal,
           { rpc: deps.rpc },
         )
-      : await (deps.prepareStonk ?? prepareStonkLaunch)(
-          db,
-          owner,
-          terms,
-          signal,
-          { rpc: deps.rpc },
-        );
+      : venue === 'stonkfun'
+        ? await (deps.prepareStonk ?? prepareStonkLaunch)(
+            db,
+            owner,
+            terms,
+            signal,
+            { rpc: deps.rpc },
+          )
+        : await (deps.prepareLaunchLab ?? prepareLaunchLabLaunch)(
+            db,
+            owner,
+            terms as LaunchLabTerms,
+            signal,
+            { rpc: deps.rpc },
+          );
   signal.throwIfAborted();
   if (!Number.isSafeInteger(review.minimumSlot) || review.minimumSlot! < 0)
-    return fail('Original launch observation slot is unavailable.');
+    throw new VenueLaunchPreparationNotSavedError(
+      'Original launch observation slot is unavailable.',
+    );
   const project = await db
     .prepare(
       'SELECT document,updated_at,archived FROM workspace_projects WHERE owner_id=? AND id=?',
@@ -243,12 +271,12 @@ export async function prepareVenueLaunchRecovery(
     review.terms.projectId !== terms.projectId ||
     termsKey(review.terms) !== termsKey(terms, true)
   )
-    return fail('Launch source changed.');
+    throw new VenueLaunchPreparationNotSavedError('Launch source changed.');
   const id = crypto.randomUUID();
   try {
     await db
       .prepare(
-        "INSERT INTO venue_launch_recoveries(id,owner_id,venue,project_id,payer,mint,project_document,terms,review,sha256,minimum_slot,state,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'review',?)",
+        `INSERT INTO ${tableForVenue(venue)}(id,owner_id,venue,project_id,payer,mint,project_document,terms,review,sha256,minimum_slot,state,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'review',?)`,
       )
       .bind(
         id,
@@ -327,7 +355,7 @@ export async function actVenueLaunchRecovery(
     signal.throwIfAborted();
     const result = await db
       .prepare(
-        `UPDATE venue_launch_recoveries SET state=?${extra} WHERE owner_id=? AND venue=? AND id=? AND state=? AND review=? AND signed IS ? AND signature IS ?`,
+        `UPDATE ${tableForVenue(venue)} SET state=?${extra} WHERE owner_id=? AND venue=? AND id=? AND state=? AND review=? AND signed IS ? AND signature IS ?`,
       )
       .bind(
         state,
@@ -380,6 +408,18 @@ export async function actVenueLaunchRecovery(
     let claimed = false;
     const guardedRpc: Rpc = async (method, params, readSignal) => {
       readSignal.throwIfAborted();
+      if (
+        ![
+          'getMultipleAccounts',
+          'getBalance',
+          'getLatestBlockhash',
+          'simulateTransaction',
+          'sendTransaction',
+        ].includes(method)
+      )
+        return fail(
+          'Unsupported launch submission transport. Recover the original ID.',
+        );
       if (method === 'sendTransaction') {
         if (claimed || params[0] !== row.signed)
           return fail('Saved launch send differs.');
@@ -401,15 +441,25 @@ export async function actVenueLaunchRecovery(
             signal,
             { rpc: guardedRpc },
           )
-        : await (deps.submitStonk ?? submitStonkLaunch)(
-            db,
-            owner,
-            terms,
-            review.input as StonkLaunchReview['input'],
-            row.signed,
-            signal,
-            { rpc: guardedRpc },
-          );
+        : venue === 'stonkfun'
+          ? await (deps.submitStonk ?? submitStonkLaunch)(
+              db,
+              owner,
+              terms,
+              review.input as StonkLaunchReview['input'],
+              row.signed,
+              signal,
+              { rpc: guardedRpc },
+            )
+          : await (deps.submitLaunchLab ?? submitLaunchLabLaunch)(
+              db,
+              owner,
+              terms as LaunchLabTerms,
+              review.input as LaunchLabReview['input'],
+              row.signed,
+              signal,
+              { rpc: guardedRpc },
+            );
     if (!claimed)
       return fail('Submission did not reach the saved send marker.');
     if (outcome.state === 'sent' && outcome.signature === row.signature) {

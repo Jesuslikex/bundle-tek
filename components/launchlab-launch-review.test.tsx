@@ -23,7 +23,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   localStorage.clear();
-  fetcher.mockReset();
+  fetcher.mockReset().mockResolvedValue(Response.json({ launches: [] }));
   vi.stubGlobal('fetch', fetcher);
 });
 afterEach(() => {
@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 for (const venue of ['LetsBonk', 'Surge'] as const)
-  it(`renders the ${venue} panel without any request`, () => {
+  it(`renders the ${venue} panel without signing or mutation`, () => {
     act(() =>
       root.render(
         <LaunchLabLaunchReview
@@ -52,7 +52,7 @@ for (const venue of ['LetsBonk', 'Surge'] as const)
       (b) => b.textContent === 'Prepare and simulate launch',
     )!;
     expect(prepare.disabled).toBe(true);
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
   });
 
 it('asks for SOL or USD1 when another quote is saved', () => {

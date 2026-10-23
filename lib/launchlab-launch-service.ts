@@ -326,6 +326,7 @@ async function simulate(
 }
 
 export type LaunchLabReview = {
+  minimumSlot?: number;
   format: 'launchlab-launch-review-v1';
   terms: Omit<LaunchLabTerms, 'origin'>;
   input: LaunchLabInput;
@@ -468,6 +469,7 @@ export async function prepareLaunchLabLaunch(
   await selection.assertUnchanged();
   return {
     format: 'launchlab-launch-review-v1',
+    minimumSlot: chain.slot,
     terms: {
       venue: t.venue,
       projectId: t.projectId,

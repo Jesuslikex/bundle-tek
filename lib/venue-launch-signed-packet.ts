@@ -9,6 +9,11 @@ import { buildMeteoraDbcMessage } from './meteora-dbc-launch';
 import type { MeteoraDbcReview } from './meteora-dbc-launch-service';
 import { buildStonkLaunchMessage } from './stonkfun-launch';
 import type { StonkLaunchReview } from './stonkfun-launch-service';
+import {
+  buildLaunchLabMessage,
+  isLaunchLabVenue,
+} from './launchlab-platform-launch';
+import type { LaunchLabReview } from './launchlab-launch-service';
 import { verifySolanaSignature } from './solana-signature';
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -39,14 +44,16 @@ function canonicalPacket(value: unknown): value is string {
 
 /** Pure authentication of retained packets. Expiry and current authorization belong to callers. */
 export async function verifyVenueLaunchSignedPacket(
-  review: MeteoraDbcReview | StonkLaunchReview,
+  review: MeteoraDbcReview | StonkLaunchReview | LaunchLabReview,
   signed: string,
 ): Promise<string> {
   if (
     !record(review) ||
-    !['meteora-dbc-launch-review-v1', 'stonkfun-launch-review-v1'].includes(
-      review.format,
-    ) ||
+    ![
+      'meteora-dbc-launch-review-v1',
+      'stonkfun-launch-review-v1',
+      'launchlab-launch-review-v1',
+    ].includes(review.format) ||
     !record(review.input) ||
     !record(review.terms) ||
     !record(review.summary) ||
@@ -74,10 +81,19 @@ export async function verifyVenueLaunchSignedPacket(
       review.summary.config !== review.input.config)
   )
     return fail();
+  if (
+    review.format === 'launchlab-launch-review-v1' &&
+    (!isLaunchLabVenue(review.input.venue) ||
+      review.terms.venue !== review.input.venue ||
+      review.summary.venue !== review.input.venue)
+  )
+    return fail();
   const built =
     review.format === 'meteora-dbc-launch-review-v1'
       ? await buildMeteoraDbcMessage(review.input)
-      : await buildStonkLaunchMessage(review.input);
+      : review.format === 'launchlab-launch-review-v1'
+        ? await buildLaunchLabMessage(review.input)
+        : await buildStonkLaunchMessage(review.input);
   if (
     built.transaction !== review.transaction ||
     built.packetSha256 !== review.sha256 ||

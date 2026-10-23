@@ -4,11 +4,15 @@ import { Button } from '@/components/ui/button';
 import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 import type { MeteoraDbcReview } from '@/lib/meteora-dbc-launch-service';
 import type { StonkLaunchReview } from '@/lib/stonkfun-launch-service';
-export type VenueReview = MeteoraDbcReview | StonkLaunchReview;
+import type { LaunchLabReview } from '@/lib/launchlab-launch-service';
+export type VenueReview =
+  | MeteoraDbcReview
+  | StonkLaunchReview
+  | LaunchLabReview;
 export type VenueLaunchRecovery<R extends VenueReview = VenueReview> = {
   format: 'venue-launch-recovery-v1';
   id: string;
-  venue: 'meteora-dbc' | 'stonkfun';
+  venue: 'meteora-dbc' | 'stonkfun' | 'launchlab';
   projectId: string;
   review: R;
   state:
@@ -24,6 +28,14 @@ export type VenueLaunchRecovery<R extends VenueReview = VenueReview> = {
   receipt: Record<string, unknown> | null;
   createdAt: string;
 };
+class PreparationNotSavedError extends Error {}
+const activeStates = [
+  'review',
+  'approved',
+  'signed',
+  'submitting',
+  'submitted',
+];
 const states = [
   'review',
   'approved',
@@ -80,7 +92,9 @@ function admit<R extends VenueReview>(
     r.review.format !==
       (venue === 'meteora-dbc'
         ? 'meteora-dbc-launch-review-v1'
-        : 'stonkfun-launch-review-v1') ||
+        : venue === 'stonkfun'
+          ? 'stonkfun-launch-review-v1'
+          : 'launchlab-launch-review-v1') ||
     !/^[a-f0-9]{64}$/.test(r.review.sha256) ||
     !Number.isFinite(Date.parse(r.review.expiresAt)) ||
     r.review.terms?.projectId !== projectId ||
@@ -122,6 +136,14 @@ function admit<R extends VenueReview>(
       throw Error('Saved DBC summary could not be verified.');
   } else if (!raw(r.review.summary.raiseRaw))
     throw Error('Saved launch summary could not be verified.');
+  if (
+    r.review.format === 'launchlab-launch-review-v1' &&
+    (!['LetsBonk', 'Surge'].includes(r.review.terms.venue) ||
+      r.review.input.venue !== r.review.terms.venue ||
+      r.review.summary.venue !== r.review.terms.venue ||
+      !raw(r.review.summary.supplyRaw))
+  )
+    throw Error('Saved LaunchLab venue could not be verified.');
   return r;
 }
 /** Only unsigned public review/history is held in React. Signed bytes go once
@@ -145,25 +167,33 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
     if (!alive.current)
       throw Error('Launch view changed. Recover the original saved launch.');
   }
-  function marker(id: string, stage: string) {
+  function marker(id: string, stage: string, expected?: string | null) {
     current();
-    const existing = JSON.parse(localStorage.getItem(key) || 'null');
+    const retained = localStorage.getItem(key);
+    if (expected !== undefined && retained !== expected)
+      throw Error(
+        'The recovery reminder changed in another tab. Reload saved launches.',
+      );
+    const existing = JSON.parse(retained || 'null');
     if (existing?.id && existing.id !== id)
       throw Error('Another original launch ID still needs recovery.');
-    const text = JSON.stringify({ id, stage });
+    const text = JSON.stringify({ id, stage, attempt: crypto.randomUUID() });
     localStorage.setItem(key, text);
     if (localStorage.getItem(key) !== text)
       throw Error(
         'The recovery ID could not be retained. No new request was made.',
       );
     setOriginalId(id);
+    return text;
   }
   function clearMarker(id: string, explicitSelection = false) {
     try {
       const m = JSON.parse(localStorage.getItem(key) || 'null');
       if (
         m?.id === id ||
-        (explicitSelection && m?.id === '' && m?.stage === 'prepare')
+        (explicitSelection &&
+          m?.id === '' &&
+          ['prepare', 'prepare-rejected'].includes(m?.stage))
       )
         localStorage.removeItem(key);
     } catch {
@@ -180,7 +210,11 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
     clearMarker(row.id, explicitSelection);
     return row;
   }
-  async function request(url: string, body?: unknown) {
+  async function request(
+    url: string,
+    body?: unknown,
+    admitPrepareRejection = false,
+  ) {
     current();
     active.current?.abort();
     const c = new AbortController();
@@ -199,7 +233,7 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
         signal,
       });
       current();
-      if (response.status === 401) {
+      if (response.status === 401 && !admitPrepareRejection) {
         void response.body?.cancel().catch(() => {});
         throw Error('Sign in to recover your saved launches.');
       }
@@ -214,20 +248,33 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
       current();
       if (c.signal.aborted)
         throw Error('Launch request interrupted. Recover the original ID.');
-      if (!response.ok)
-        throw Error(
-          response.status === 401
-            ? 'Sign in to recover your saved launches.'
-            : typeof (value as { error?: unknown })?.error === 'string'
-              ? String((value as { error: string }).error).slice(0, 400)
-              : 'Launch request unavailable. Recover the original ID.',
-        );
+      if (!response.ok) {
+        const error = value as {
+          error?: unknown;
+          preparationNotSaved?: unknown;
+        };
+        const message =
+          typeof error?.error === 'string'
+            ? error.error.slice(0, 400)
+            : 'Launch request unavailable. Recover the original ID.';
+        if (
+          admitPrepareRejection &&
+          value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          Object.keys(value).sort().join(',') === 'error,preparationNotSaved' &&
+          typeof error.error === 'string' &&
+          error.preparationNotSaved === true
+        )
+          throw new PreparationNotSavedError(message);
+        throw Error(message);
+      }
       return value;
     } finally {
       if (active.current === c) active.current = null;
     }
   }
-  async function load() {
+  async function load(reconcileRejected = false) {
     setLoading(true);
     setError('');
     try {
@@ -247,6 +294,22 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
         throw Error(
           'The saved recovery reminder could not be read. Keep the original launch ID.',
         );
+      }
+      if (
+        reconcileRejected &&
+        saved?.id === '' &&
+        saved.stage === 'prepare-rejected' &&
+        !rows.some((r) => activeStates.includes(r.state))
+      ) {
+        // A definite pre-save refusal still requires this explicit fresh read.
+        const retained = localStorage.getItem(key);
+        if (retained !== JSON.stringify(saved))
+          throw Error('The recovery reminder changed. Reload saved launches.');
+        localStorage.removeItem(key);
+        if (localStorage.getItem(key) !== null)
+          throw Error('The recovery reminder could not be cleared.');
+        saved = null;
+        setOriginalId('');
       }
       if (saved) {
         setOriginalId(typeof saved.id === 'string' ? saved.id : '');
@@ -289,18 +352,22 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
       throw Error(
         'Recover or finish the existing saved launch before preparing another.',
       );
-    marker('', 'prepare');
+    const preparationMarker = marker('', 'prepare', null);
     setUncertain(true);
     try {
-      const value = (await request(endpoint, {
-        action: 'prepare',
-        terms,
-      })) as R & { recoveryId: string };
+      const value = (await request(
+        endpoint,
+        {
+          action: 'prepare',
+          terms,
+        },
+        true,
+      )) as R & { recoveryId: string };
       if (typeof value.recoveryId !== 'string' || !value.recoveryId)
         throw Error(
           'The saved review ID is unavailable. Reload saved launches.',
         );
-      marker(value.recoveryId, 'review');
+      marker(value.recoveryId, 'review', preparationMarker);
       const row = admit<R>(
         await request(`${endpoint}?id=${encodeURIComponent(value.recoveryId)}`),
         venue,
@@ -311,6 +378,8 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
       return accept(row).review;
     } catch (e) {
       current();
+      if (e instanceof PreparationNotSavedError)
+        marker('', 'prepare-rejected', preparationMarker);
       setUncertain(true);
       throw e;
     }
@@ -356,7 +425,10 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
     if (uncertain && originalId && id !== originalId)
       throw Error('Recover the original unresolved launch ID first.');
     const reminder = JSON.parse(localStorage.getItem(key) || 'null');
-    if (reminder?.id === '' && reminder?.stage === 'prepare') {
+    if (
+      reminder?.id === '' &&
+      ['prepare', 'prepare-rejected'].includes(reminder?.stage)
+    ) {
       // A lost prepare may have saved a row after the displayed history loaded.
       // Never resolve that uncertainty using a stale terminal selection.
       const fresh = (await request(
@@ -367,7 +439,7 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
       const rows = fresh.launches.map((r) => admit<R>(r, venue, projectId));
       setHistory(rows);
       if (
-        !rows.some((r) => r.id === id) ||
+        !rows.some((r) => r.id === id && activeStates.includes(r.state)) ||
         rows.some(
           (r) =>
             r.id !== id &&
@@ -387,6 +459,14 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
     const value = await request(`${endpoint}?id=${encodeURIComponent(id)}`);
     const row = admit<R>(value, venue, projectId);
     if (row.id !== id) throw Error('History returned another launch.');
+    if (
+      reminder?.id === '' &&
+      ['prepare', 'prepare-rejected'].includes(reminder?.stage) &&
+      !activeStates.includes(row.state)
+    )
+      throw Error(
+        'Select the original active launch from the refreshed history.',
+      );
     return accept(row, true);
   }
   return {
@@ -401,7 +481,7 @@ export function useVenueLaunchRecovery<R extends VenueReview>(
     write,
     recover,
     select,
-    load,
+    load: () => load(true),
     current,
     blocked:
       loading ||

@@ -30,8 +30,15 @@ import {
   type StonkLaunchInput,
 } from '../lib/stonkfun-launch';
 import type { StonkLaunchReview } from '../lib/stonkfun-launch-service';
+import {
+  buildLaunchLabMessage,
+  LAUNCHLAB_CURVES,
+  LAUNCHLAB_PLATFORMS,
+  type LaunchLabVenue,
+} from '../lib/launchlab-platform-launch';
+import type { LaunchLabReview } from '../lib/launchlab-launch-service';
 
-type Review = MeteoraDbcReview | StonkLaunchReview;
+type Review = MeteoraDbcReview | StonkLaunchReview | LaunchLabReview;
 const payer = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(1));
 const mint = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(2));
 const other = nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(3));
@@ -94,7 +101,7 @@ const commonSummary = {
   solLimitLamports: terms.solLimitLamports,
   unitsConsumed: 100000,
 };
-const reviews = {} as Record<'dbc' | 'stonk', Review>;
+const reviews = {} as Record<'dbc' | 'stonk' | LaunchLabVenue, Review>;
 async function buildReviews() {
   const dbcInput: MeteoraDbcInput = {
     ...commonInput,
@@ -153,14 +160,53 @@ async function buildReviews() {
       pricingObservedAt: '2000-01-01T00:00:00.000Z',
     },
   };
+  for (const venue of ['LetsBonk', 'Surge'] as const) {
+    const curve = LAUNCHLAB_CURVES[WRAPPED_SOL];
+    const input = {
+      ...commonInput,
+      venue,
+      platformId: LAUNCHLAB_PLATFORMS[venue],
+      configId: curve.configId,
+      supply: curve.supply,
+      totalSellA: curve.totalSellA,
+      totalFundRaisingB: curve.totalFundRaisingB,
+      allowConfig: true,
+      curveRule: true,
+    };
+    const built = await buildLaunchLabMessage(input);
+    reviews[venue] = {
+      format: 'launchlab-launch-review-v1',
+      terms: { ...reviewTerms, venue },
+      input,
+      transaction: built.transaction,
+      sha256: built.packetSha256,
+      expiresAt: '2000-01-01T00:00:00.000Z',
+      summary: {
+        ...commonSummary,
+        venue,
+        platformName: 'Synthetic ' + venue,
+        pool: built.pool,
+        raiseRaw: curve.totalFundRaisingB,
+      },
+    };
+  }
 }
 
 /** Minimal explicit parent projections, with genuine 0145 table/triggers.
  * Packets use real builders and synthetic keypairs; no real funds or providers. */
-export async function venueRecoveryFixture(venue: LaunchRecoveryVenue) {
+export async function venueRecoveryFixture(
+  venue: LaunchRecoveryVenue,
+  labVenue: LaunchLabVenue = 'LetsBonk',
+) {
   await buildReviews();
   const review = structuredClone(
-    reviews[venue === 'meteora-dbc' ? 'dbc' : 'stonk'],
+    reviews[
+      venue === 'meteora-dbc'
+        ? 'dbc'
+        : venue === 'stonkfun'
+          ? 'stonk'
+          : labVenue
+    ],
   );
   review.minimumSlot = 100;
   review.expiresAt = new Date(Date.now() + 60000).toISOString();
@@ -173,14 +219,19 @@ export async function venueRecoveryFixture(venue: LaunchRecoveryVenue) {
     CREATE TABLE workspace_projects(owner_id TEXT,id TEXT,document TEXT,updated_at TEXT,archived INTEGER);
     CREATE TABLE workspace_wallets(owner_id TEXT,address TEXT,chain TEXT,revision INTEGER,archived INTEGER);
     CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT);
-    CREATE TABLE pump_launch_reviews(owner_id TEXT,payer TEXT,state TEXT);`);
+    CREATE TABLE pump_launch_reviews(owner_id TEXT,payer TEXT,state TEXT,project_id TEXT,mint TEXT);`);
   sqlite.exec(readFileSync('drizzle/0145_venue_launch_recoveries.sql', 'utf8'));
+  sqlite.exec(
+    readFileSync('drizzle/0146_launchlab_launch_recoveries.sql', 'utf8'),
+  );
   sqlite
     .prepare('INSERT INTO workspace_projects VALUES(?,?,?,?,0)')
     .run(
       'owner',
       review.terms.projectId,
-      '{"synthetic":true}',
+      venue === 'launchlab'
+        ? JSON.stringify({ plan: { chain: 'Solana', launchpad: labVenue } })
+        : '{"synthetic":true}',
       review.terms.updatedAt,
     );
   sqlite
@@ -286,6 +337,10 @@ export async function venueRecoveryFixture(venue: LaunchRecoveryVenue) {
     ),
     submitDbc: submit,
     submitStonk: submit,
+    prepareLaunchLab: vi.fn(async () =>
+      structuredClone(review as LaunchLabReview),
+    ),
+    submitLaunchLab: submit,
   };
   return {
     db,

@@ -49,7 +49,27 @@ vi.mock('@/lib/launchlab-launch-service', async (original) => {
     submitLaunchLabLaunch: (
       ...a: Parameters<typeof actual.submitLaunchLabLaunch>
     ) =>
-      actual.submitLaunchLabLaunch(a[0], a[1], a[2], a[3], a[4], a[5], deps()),
+      actual.submitLaunchLabLaunch(a[0], a[1], a[2], a[3], a[4], a[5], {
+        rpc: a[6]?.rpc ?? mocks.rpc,
+      }),
+  };
+});
+vi.mock('@/lib/venue-launch-recovery', async (original) => {
+  const actual = await original<typeof import('@/lib/venue-launch-recovery')>();
+  return {
+    ...actual,
+    prepareVenueLaunchRecovery: (
+      ...a: Parameters<typeof actual.prepareVenueLaunchRecovery>
+    ) =>
+      actual.prepareVenueLaunchRecovery(a[0], a[1], a[2], a[3], a[4], {
+        rpc: mocks.rpc,
+      }),
+    actVenueLaunchRecovery: (
+      ...a: Parameters<typeof actual.actVenueLaunchRecovery>
+    ) =>
+      actual.actVenueLaunchRecovery(a[0], a[1], a[2], a[3], a[4], {
+        rpc: mocks.rpc,
+      }),
   };
 });
 vi.mock('@/lib/stonkfun-launch-service', async (original) => {
@@ -91,6 +111,7 @@ let state: {
   simErr: unknown;
   sent: string[];
   sendFails: boolean;
+  sendAttempts: number;
   ruleRequired: boolean;
   platformOwner: string;
 };
@@ -172,6 +193,7 @@ function rpc(): LaunchLabRpc {
       };
     }
     if (method === 'sendTransaction') {
+      state.sendAttempts++;
       if (state.sendFails) throw new Error('network');
       const tx = getTransactionDecoder().decode(
         Uint8Array.from(Buffer.from(params[0] as string, 'base64')),
@@ -187,6 +209,7 @@ function rpc(): LaunchLabRpc {
 }
 
 let mf: Miniflare, terms: Record<string, unknown>;
+type SavedReview = LaunchLabReview & { recoveryId: string };
 const send = (value: unknown, headers: Record<string, string> = {}) =>
   POST(
     new Request(origin + '/api/launchlab/launch', {
@@ -207,6 +230,29 @@ const session = (seed: number, address: string) =>
       ],
     },
   }) as unknown as VaultSession;
+async function register(review: SavedReview, transaction: string) {
+  expect(
+    (
+      await send({
+        action: 'approve',
+        id: review.recoveryId,
+        sha256: review.sha256,
+        approved: true,
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (await send({ action: 'register', id: review.recoveryId, transaction }))
+      .status,
+  ).toBe(200);
+}
+const submitSaved = (review: SavedReview) =>
+  send({
+    action: 'submit',
+    id: review.recoveryId,
+    sha256: review.sha256,
+    approved: true,
+  });
 
 beforeAll(async () => {
   mf = new Miniflare({
@@ -260,6 +306,30 @@ afterAll(async () => {
 
 let n = 0;
 beforeEach(async () => {
+  for (const trigger of [
+    'pump_launch_venue_recovery_exclusion',
+    'pump_launch_launchlab_recovery_exclusion',
+    'launchlab_other_venue_recovery_exclusion',
+    'pump_other_venue_recovery_identity_exclusion',
+    'venue_pump_recovery_identity_exclusion',
+  ])
+    await mocks.db.prepare('DROP TRIGGER IF EXISTS ' + trigger).run();
+  for (const table of [
+    'launchlab_launch_recoveries',
+    'venue_launch_recoveries',
+  ])
+    await mocks.db.prepare('DROP TABLE IF EXISTS ' + table).run();
+  for (const file of [
+    '0145_venue_launch_recoveries.sql',
+    '0146_launchlab_launch_recoveries.sql',
+  ])
+    for (const sql of readFileSync(
+      new URL('../../../../drizzle/' + file, import.meta.url),
+      'utf8',
+    )
+      .split('--> statement-breakpoint')
+      .filter((s) => s.trim()))
+      await mocks.db.prepare(sql).run();
   mocks.user = { userId: 'alice' };
   state = {
     quoteBalance: 1_000_000_000n,
@@ -267,6 +337,7 @@ beforeEach(async () => {
     simErr: null,
     sent: [],
     sendFails: false,
+    sendAttempts: 0,
     ruleRequired: false,
     platformOwner: LAUNCHLAB_PROGRAM,
   };
@@ -351,7 +422,7 @@ beforeEach(async () => {
 it('prepares, signs in the browser and relays a LetsBonk launch with a creator buy once', async () => {
   const prepared = await send({ action: 'prepare', terms });
   expect(prepared.status).toBe(200);
-  const review = (await prepared.json()) as LaunchLabReview;
+  const review = (await prepared.json()) as SavedReview;
   expect(review.input.minTokensOutRaw).toBe(TOKENS_OUT.toString());
   expect(review.input.curveRule).toBe(false);
   expect(review.input.platformId).toBe(LAUNCHLAB_PLATFORMS.LetsBonk);
@@ -368,17 +439,20 @@ it('prepares, signs in the browser and relays a LetsBonk launch with a creator b
     review,
     () => {},
   );
-  const submitted = await send({
-    action: 'submit',
-    terms,
-    input: review.input,
-    transaction: signed.transaction,
-  });
+  await register(review, signed.transaction);
+  const submitted = await submitSaved(review);
   expect(submitted.status).toBe(200);
   expect(await submitted.json()).toMatchObject({
-    state: 'sent',
+    state: 'submitted',
     signature: signed.signature,
-    mint,
+  });
+  const saved = await GET(
+    new Request(origin + '/api/launchlab/launch?id=' + review.recoveryId),
+  );
+  expect(await saved.json()).toMatchObject({
+    id: review.recoveryId,
+    state: 'submitted',
+    signature: signed.signature,
   });
   expect(state.sent).toEqual([signed.signature]);
   const status = await GET(
@@ -414,7 +488,7 @@ it('refuses tampered signed packets, missing signatures and edited reviews', asy
     input: { ...review.input, minTokensOutRaw: '1' },
     transaction: signed.transaction,
   });
-  expect(changed.status).toBe(409);
+  expect(changed.status).toBe(400);
   await expect(
     signLaunchLabLaunch(
       session(7, payer),
@@ -432,7 +506,7 @@ it('refuses tampered signed packets, missing signatures and edited reviews', asy
 it('never resends when the send response is lost', async () => {
   const review = (await (
     await send({ action: 'prepare', terms })
-  ).json()) as LaunchLabReview;
+  ).json()) as SavedReview;
   const signed = await signLaunchLabLaunch(
     session(7, payer),
     session(9, mint),
@@ -440,16 +514,14 @@ it('never resends when the send response is lost', async () => {
     () => {},
   );
   state.sendFails = true;
-  const res = await send({
-    action: 'submit',
-    terms,
-    input: review.input,
-    transaction: signed.transaction,
-  });
+  await register(review, signed.transaction);
+  const res = await submitSaved(review);
   expect(await res.json()).toMatchObject({
-    state: 'unknown',
+    state: 'submitting',
     signature: signed.signature,
   });
+  expect((await submitSaved(review)).status).toBe(200);
+  expect(state.sendAttempts).toBe(1);
 });
 
 it('refuses before simulation when the platform is missing or the mint exists', async () => {
@@ -490,7 +562,11 @@ it('refuses a saved plan for another venue', async () => {
 
 it('refuses too little quote balance, failed simulation, foreign projects and bad requests', async () => {
   state.quoteBalance = 1n;
-  expect((await send({ action: 'prepare', terms })).status).toBe(409);
+  const insufficient = await send({ action: 'prepare', terms });
+  expect(insufficient.status).toBe(409);
+  expect(await insufficient.json()).toMatchObject({
+    preparationNotSaved: true,
+  });
   state.quoteBalance = 1_000_000_000n;
   state.simErr = { InstructionError: [1, 'Custom'] };
   const failed = await send({ action: 'prepare', terms });
@@ -519,4 +595,42 @@ it('refuses too little quote balance, failed simulation, foreign projects and ba
       })
     ).status,
   ).toBe(400);
+});
+it('does not call a lost save acknowledgement a definite pre-save rejection', async () => {
+  const database = mocks.db;
+  let committed = false;
+  mocks.db = {
+    prepare(sql: string) {
+      const statement = database.prepare(sql);
+      if (!sql.startsWith('INSERT INTO launchlab_launch_recoveries'))
+        return statement;
+      return {
+        bind(...values: unknown[]) {
+          const bound = statement.bind(...values);
+          return {
+            async run() {
+              await bound.run();
+              committed = true;
+              throw Error('Lost committed save reply');
+            },
+          };
+        },
+      };
+    },
+  } as D1Database;
+  let result: Response;
+  try {
+    result = await send({ action: 'prepare', terms });
+  } finally {
+    mocks.db = database;
+  }
+  expect(committed).toBe(true);
+  expect(result.status).toBe(409);
+  expect(await result.json()).not.toHaveProperty('preparationNotSaved');
+  const history = await GET(
+    new Request(origin + '/api/launchlab/launch?projectId=' + terms.projectId),
+  );
+  const saved = (await history.json()) as { launches: { state: string }[] };
+  expect(saved.launches).toHaveLength(1);
+  expect(saved.launches[0].state).toBe('review');
 });
