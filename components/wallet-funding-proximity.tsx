@@ -256,7 +256,7 @@ export function WalletFundingProximityPanel({
 }: {
   check: Check;
   count: number;
-  context?: 'table' | 'warmup';
+  context?: 'table' | 'warmup' | 'roster';
 }) {
   const sourceGroup = useId();
   const startButton = useRef<HTMLButtonElement | null>(null);
@@ -270,7 +270,11 @@ export function WalletFundingProximityPanel({
   return (
     <section
       className={styles.panel}
-      aria-label="Selected wallet funding times"
+      aria-label={
+        context === 'roster'
+          ? 'Matching wallet funding times'
+          : 'Selected wallet funding times'
+      }
     >
       <fieldset className={styles.sources}>
         <legend>Funding evidence source</legend>
@@ -336,7 +340,9 @@ export function WalletFundingProximityPanel({
                 : 'Starting provider history check…'
             : check.result
               ? `${check.result.wallets.filter((w) => w.funding).length} of ${check.result.wallets.length} ${check.source === 'saved' ? 'recorded' : 'provider-reported'} times · ${check.pairs.length} ${check.pairs.length === 1 ? 'pair' : 'pairs'} under 30 minutes · ${check.result.wallets.filter((w) => !w.funding).length} unknown`
-              : 'No funding-time check for this selection'}
+              : context === 'roster'
+                ? 'No funding-time check for these matching wallets'
+                : 'No funding-time check for this selection'}
         </output>
       </div>
       {check.providerWait > 0 && (
@@ -347,8 +353,8 @@ export function WalletFundingProximityPanel({
       )}
       {count > check.maximumWallets && (
         <p>
-          Select up to {check.maximumWallets} wallets for one funding-time
-          check.
+          {context === 'roster' ? 'Narrow the folder or search to' : 'Select'}{' '}
+          up to {check.maximumWallets} wallets for one funding-time check.
         </p>
       )}
       {!check.capacityValid && (
@@ -359,7 +365,7 @@ export function WalletFundingProximityPanel({
       {check.source === 'provider' ? (
         <small>
           Reads the oldest transaction returned by the configured provider for
-          each selected wallet. Plain native SOL funding is supported; other or
+          each checked wallet. Plain native SOL funding is supported; other or
           incomplete evidence stays unknown. Earlier history may be missing.
           This uses provider quota, in groups of ten with no automatic retry.
           {check.maximumWallets === 500 && (
@@ -376,7 +382,7 @@ export function WalletFundingProximityPanel({
           {' '}
           <small>
             Compares the most recently saved finalized native SOL transfer to
-            each selected wallet. Uses its block timestamp, not wallet creation
+            each checked wallet. Uses its block timestamp, not wallet creation
             time. Earlier and external funding may be missing; this is not
             first-funding history or proof of wallet ownership.
           </small>
@@ -390,8 +396,8 @@ export function WalletFundingProximityPanel({
           <p>
             These batches were read separately. They are not one atomic or
             current-state qualification. Timing alone does not establish shared
-            ownership. Ranges follow checked-selection order, which can differ
-            from the sorted table. Provider batches contain several reads; their
+            ownership. Ranges follow checked-wallet order, which can differ from
+            the sorted table. Provider batches contain several reads; their
             displayed time is the latest reported check time.
           </p>
           <ol>
@@ -440,7 +446,7 @@ function FundingPairReview({
 }: {
   pairs: Check['pairs'];
   source: Check['source'];
-  context: 'table' | 'warmup';
+  context: 'table' | 'warmup' | 'roster';
 }) {
   const [page, setPage] = useState(0);
   const pageStatus = useRef<HTMLOutputElement | null>(null);
@@ -460,9 +466,11 @@ function FundingPairReview({
         {pairs.length === 1 ? 'pair' : 'pairs'}
       </summary>
       <p>
-        {context === 'table'
-          ? 'All flagged pairs in this checked selection, including wallets on other table pages.'
-          : 'All flagged pairs in these checked warmup wallets.'}{' '}
+        {context === 'roster'
+          ? 'All flagged pairs among these checked matching wallets, including wallets on other table pages. Wallet selection is unchanged.'
+          : context === 'table'
+            ? 'All flagged pairs in this checked selection, including wallets on other table pages.'
+            : 'All flagged pairs in these checked warmup wallets.'}{' '}
         Closest times first. These are{' '}
         {source === 'provider' ? 'provider-reported' : 'saved-receipt'} events;
         timing similarity alone does not prove shared control.

@@ -37,6 +37,21 @@
 .next {
   grid-area: next;
 }
+.fundingScope {
+  display: grid;
+  gap: 6px;
+  margin-block: 16px;
+  min-width: 0;
+}
+.fundingScope select {
+  min-height: 44px;
+  max-width: 100%;
+  width: min(100%, 24rem);
+}
+.fundingScope small {
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
 @media (max-width: 600px) {
   .navigation {
     grid-template-columns: repeat(2, minmax(0, 1fr));

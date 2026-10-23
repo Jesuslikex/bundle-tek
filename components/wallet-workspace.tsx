@@ -111,6 +111,10 @@ export function WalletWorkspace({
   const [query, setQuery] = useState('');
   const [rosterSort, setRosterSort] = useState<WalletRosterSort>('saved');
   const [rosterPage, setRosterPage] = useState({ scope: '', index: 0 });
+  const [fundingScope, setFundingScope] = useState<'selected' | 'matching'>(
+    'selected',
+  );
+  const fundingScopeDescription = useId();
 
   const [holdingsAddress, setHoldingsAddress] = useState<string | null>(null);
   const [withdrawalChoice, setWithdrawalChoice] = useState<{
@@ -321,9 +325,10 @@ export function WalletWorkspace({
   );
 
   const picks = rows.filter((w) => selected.includes(w.address));
+  const fundingRows = fundingScope === 'matching' ? rows : picks;
   const fundingProximity = useWalletFundingProximity(
     chain === 'Solana' && !archived
-      ? picks.map(({ address, revision }) => ({ address, revision }))
+      ? fundingRows.map(({ address, revision }) => ({ address, revision }))
       : [],
     500,
   );
@@ -1455,12 +1460,37 @@ export function WalletWorkspace({
               Next wallet page
             </Button>
           </nav>
-          {chain === 'Solana' && !archived && picks.length > 0 && (
-            <WalletFundingProximityPanel
-              check={fundingProximity}
-              count={picks.length}
-            />
+          {chain === 'Solana' && !archived && (
+            <label className={rosterStyles.fundingScope}>
+              Funding time comparison
+              <select
+                aria-label="Funding time comparison"
+                aria-describedby={fundingScopeDescription}
+                value={fundingScope}
+                onChange={(e) =>
+                  setFundingScope(e.target.value as 'selected' | 'matching')
+                }
+              >
+                <option value="selected">Selected wallets</option>
+                <option value="matching">All matching wallets</option>
+              </select>
+              <small id={fundingScopeDescription}>
+                {fundingRows.length} wallet{fundingRows.length === 1 ? '' : 's'}{' '}
+                in this comparison, across all pages. Folder and search filters
+                apply. Choose a source and check explicitly; switching scope
+                does not select wallets or start funding.
+              </small>
+            </label>
           )}
+          {chain === 'Solana' &&
+            !archived &&
+            (fundingRows.length > 0 || fundingScope === 'matching') && (
+              <WalletFundingProximityPanel
+                check={fundingProximity}
+                count={fundingRows.length}
+                context={fundingScope === 'matching' ? 'roster' : 'table'}
+              />
+            )}
           <div className="wallet-roster-table">
             <table className="project-table">
               <thead>

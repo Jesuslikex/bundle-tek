@@ -63,6 +63,179 @@ const workspace = {
   ],
 };
 let host: HTMLDivElement, root: Root;
+it('compares all matching wallets across pages without selecting them or reading automatically', async () => {
+  const wallets = Array.from({ length: 52 }, (_, i) => ({
+    ...workspace.wallets[0],
+    address: bs58.encode(new Uint8Array(32).fill(i + 1)),
+    label: `Comparison ${i}`,
+  }));
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (!url.endsWith('/funding-times'))
+      return Response.json({ ...workspace, wallets });
+    const requested = JSON.parse(init!.body as string).wallets as Array<{
+      address: string;
+      revision: number;
+    }>;
+    expect(requested).toEqual(
+      wallets.map(({ address, revision }) => ({ address, revision })),
+    );
+    return Response.json({
+      format: 'wallet-funding-times-v1',
+      network: 'mainnet',
+      scope: 'most-recently-saved-native-transfer',
+      capturedAt: '2026-10-23T00:00:00.000Z',
+      executionAllowed: false,
+      wallets: requested.map((w, i) => ({
+        ...w,
+        funding:
+          i === 0 || i === 51
+            ? {
+                signature: bs58.encode(new Uint8Array(64).fill(i + 1)),
+                slot: i + 1,
+                blockTime: 1700000000 + (i === 51 ? 1474 : 0),
+              }
+            : null,
+        reason: i === 0 || i === 51 ? null : 'no-retained-receipt',
+      })),
+    });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  const scope = [...host.querySelectorAll('select')].find((s) =>
+    [...s.options].some((o) => o.value === 'matching'),
+  )!;
+  const choose = async (value: string) =>
+    act(async () => {
+      scope.value = value;
+      scope.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  const click = async (text: string) =>
+    act(async () => {
+      [...host.querySelectorAll('button')]
+        .find((b) => b.textContent === text)!
+        .click();
+    });
+  await choose('matching');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(host.textContent).toContain('52 wallets in this comparison');
+  await click('Check recorded funding times');
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(host.querySelector('tbody summary')?.textContent).toBe(
+    '24m 34s apart',
+  );
+  await click('Next wallet page');
+  expect(
+    [...host.querySelectorAll('tbody summary')].some(
+      (e) => e.textContent === '24m 34s apart',
+    ),
+  ).toBe(true);
+  expect(
+    [
+      ...host.querySelectorAll<HTMLInputElement>('[data-wallet-selection]'),
+    ].every((e) => !e.checked),
+  ).toBe(true);
+  expect(host.textContent).not.toContain('selected across pages');
+  await choose('selected');
+  await choose('matching');
+  expect(host.querySelector('tbody summary')).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it('clears whole-roster funding evidence when the search changes, without altering the selection', async () => {
+  const wallets = [
+    workspace.wallets[0],
+    {
+      ...workspace.wallets[0],
+      address: bs58.encode(new Uint8Array(32).fill(2)),
+      label: 'Second comparison',
+    },
+  ];
+  const fetcher = vi.fn(async (url: string) => {
+    if (!url.endsWith('/funding-times'))
+      return Response.json({ ...workspace, wallets });
+    return Response.json({
+      format: 'wallet-funding-times-v1',
+      network: 'mainnet',
+      scope: 'most-recently-saved-native-transfer',
+      capturedAt: '2026-10-23T00:00:00.000Z',
+      executionAllowed: false,
+      wallets: wallets.map((w, i) => ({
+        address: w.address,
+        revision: w.revision,
+        reason: null,
+        funding: {
+          signature: bs58.encode(new Uint8Array(64).fill(i + 1)),
+          slot: i + 1,
+          blockTime: 1700000000 + i * 1474,
+        },
+      })),
+    });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  const scope = [...host.querySelectorAll('select')].find((s) =>
+    [...s.options].some((o) => o.value === 'matching'),
+  )!;
+  await act(async () => {
+    scope.value = 'matching';
+    scope.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await act(async () =>
+    [...host.querySelectorAll('button')]
+      .find((b) => b.textContent === 'Check recorded funding times')!
+      .click(),
+  );
+  expect(host.querySelectorAll('tbody summary')).toHaveLength(2);
+  const search = host.querySelector<HTMLInputElement>(
+    '[aria-label="Search workspace wallets"]',
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(search, 'Second comparison');
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(host.textContent).toContain('1 wallet in this comparison');
+  expect(host.querySelector('tbody summary')).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(
+    host.querySelector<HTMLInputElement>('tbody [data-wallet-selection]')!
+      .checked,
+  ).toBe(false);
+});
+
+it('keeps the 500-wallet funding-read cap for an oversized matching roster', async () => {
+  const wallets = Array.from({ length: 501 }, (_, i) => ({
+    ...workspace.wallets[0],
+    address: bs58.encode(
+      Uint8Array.from({ length: 32 }, (_, j) =>
+        j === 0 ? i % 256 : j === 1 ? Math.floor(i / 256) : 7,
+      ),
+    ),
+  }));
+  const fetcher = vi.fn(async () => Response.json({ ...workspace, wallets }));
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  const scope = [...host.querySelectorAll('select')].find(
+    (element) =>
+      element.getAttribute('aria-label') === 'Funding time comparison',
+  )!;
+  await act(async () => {
+    scope.value = 'matching';
+    scope.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(
+    [...host.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Check recorded funding times',
+    )!.disabled,
+  ).toBe(true);
+  expect(host.textContent).toContain(
+    'Narrow the folder or search to up to 500',
+  );
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
 it('mounts the selected-wallet funding check and exact gap badges in the real wallet table', async () => {
   const second = bs58.encode(new Uint8Array(32).fill(2));
   const wallets = [
