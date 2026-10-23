@@ -1,5 +1,5 @@
 import { canonicalPumpHolderJson as canonical } from './pump-holder-review';
-import { WARMUP_RUNTIME_WALLET_BUSY_SQL } from './wallet-warmup-runtime-wallet-busy';
+import { WARMUP_RUNTIME_EFFECTIVE_WALLET_BUSY_SQL } from './wallet-warmup-runtime-wallet-busy';
 import {
   createWalletWarmupSessionProviderCore,
   type WarmupSessionProviderDependencies,
@@ -32,7 +32,7 @@ export function createWalletWarmupV2Provider(
     )
       return null;
     const row = await db
-      .prepare(`SELECT c.plan_document,c.action_document,c.review_document${runtimeWalletAvailability ? `,${WARMUP_RUNTIME_WALLET_BUSY_SQL} AS runtime_busy` : ''}
+      .prepare(`SELECT c.plan_document,c.action_document,c.review_document${runtimeWalletAvailability ? `,${WARMUP_RUNTIME_EFFECTIVE_WALLET_BUSY_SQL} AS runtime_busy` : ''}
  FROM wallet_warmup_session_v2_attempt_context c JOIN wallet_warmup_session_v2_attempts a ON a.owner_id=c.owner_id AND a.journal_id=c.journal_id
  WHERE a.owner_id=? AND a.id=? AND a.review_version=c.version AND a.review_sha256=c.head_sha256 AND a.terms_sha256=c.terms_sha256
  AND a.action_id=c.action_id AND a.created_at=? AND a.expires_at=? AND strftime('%Y-%m-%dT%H:%M:%fZ','now')<a.expires_at

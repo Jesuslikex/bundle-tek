@@ -1,4 +1,5 @@
 import { WalletWarmupV2AttemptError } from './wallet-warmup-session-v2-attempt-types';
+import { WARMUP_RUNTIME_UNRESOLVED_WALLETS_SQL } from './wallet-warmup-runtime-unresolved-wallets';
 /** Read-only advisory checks over the original owned context alias c.
  * These do not reserve funds or close an authorization/broadcast race.
  * The context view already excludes shared swap/execution reservations. These
@@ -39,6 +40,15 @@ export const WARMUP_RUNTIME_WALLET_BUSY_SQL = `CASE WHEN EXISTS (
   AND (x.approval_id IS NOT NULL OR x.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')))
 ) THEN 1 ELSE 0 END`;
 
+/** Additive runtime guard. Keep the original predicate unchanged because
+ * committed proposal/approval migrations retain its exact historical meaning.
+ * Actual unresolved transaction wallets must also be checked independently of
+ * legacy parent-roster discrepancies. Current roster/member guards stay in
+ * place. This remains a snapshot, not a
+ * whole-run wallet hold or evidence that a terminal signature cannot land. */
+export const WARMUP_RUNTIME_EFFECTIVE_WALLET_BUSY_SQL = `CASE WHEN (${WARMUP_RUNTIME_WALLET_BUSY_SQL}) IS NOT 0
+ OR (${WARMUP_RUNTIME_UNRESOLVED_WALLETS_SQL}) IS NOT 0 THEN 1 ELSE 0 END`;
+
 /** Friendly preflight; the lease INSERT repeats the same expression atomically. */
 export async function requireWarmupRuntimeWalletAvailability(
   db: D1Database,
@@ -50,7 +60,7 @@ export async function requireWarmupRuntimeWalletAvailability(
   let row: { busy: number } | null;
   try {
     row = await db
-      .prepare(`SELECT ${WARMUP_RUNTIME_WALLET_BUSY_SQL} AS busy FROM wallet_warmup_session_v2_attempt_context c
+      .prepare(`SELECT ${WARMUP_RUNTIME_EFFECTIVE_WALLET_BUSY_SQL} AS busy FROM wallet_warmup_session_v2_attempt_context c
    WHERE c.owner_id=? AND c.journal_id=? AND c.version=? AND c.head_sha256=?`)
       .bind(owner, input.journalId, input.version, input.headSha256)
       .first<{ busy: number }>();

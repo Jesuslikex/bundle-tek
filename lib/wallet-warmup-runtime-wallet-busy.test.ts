@@ -393,7 +393,7 @@ it.each([
       );
       if (kind.endsWith('inflight'))
         db.exec(
-          "INSERT INTO volume_bot_batches VALUES('batch','session'); INSERT INTO volume_bot_trades VALUES('batch','submitted')",
+          "INSERT INTO volume_bot_batches(id,session_id) VALUES('batch','session'); INSERT INTO volume_bot_trades(batch_id,state) VALUES('batch','submitted')",
         );
     }
     if (kind.startsWith('bundle-'))
@@ -412,7 +412,7 @@ it.each([
       );
       if (kind.endsWith('inflight'))
         db.exec(
-          "INSERT INTO pump_organic_batches VALUES('batch','sequence'); INSERT INTO pump_organic_buys VALUES('batch','submitted')",
+          "INSERT INTO pump_organic_batches(id,sequence_id) VALUES('batch','sequence'); INSERT INTO pump_organic_buys(batch_id,state) VALUES('batch','submitted')",
         );
     }
     if (kind.startsWith('cleanup-') || kind.startsWith('supply-'))
