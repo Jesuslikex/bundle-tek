@@ -56,6 +56,8 @@ function filtered(
   return { listings, valid: true };
 }
 export function MarketplaceBundleCatalog() {
+  const viewName = useId();
+  const [view, setView] = useState<'compact' | 'cards'>('compact');
   const countHelpId = useId(),
     countErrorId = useId();
   const version = useContext(MarketplaceReservationContext)?.version ?? 0;
@@ -346,12 +348,30 @@ export function MarketplaceBundleCatalog() {
             </p>
           ) : (
             <>
+              <fieldset className={styles.viewOptions}>
+                <legend>Listing view</legend>
+                {(['compact', 'cards'] as const).map((value) => (
+                  <label key={value}>
+                    <input
+                      type="radio"
+                      name={viewName}
+                      value={value}
+                      checked={view === value}
+                      onChange={() => setView(value)}
+                    />
+                    {value === 'compact' ? 'Compact rows' : 'Detailed cards'}
+                  </label>
+                ))}
+              </fieldset>
               <p>
                 {selected.listings.length === 0
                   ? 'No published Bundle wallets match these filters.'
                   : `${start + 1} to ${Math.min(start + 20, selected.listings.length)} of ${selected.listings.length} published listings.`}
               </p>
-              <ul className={styles.wallets}>
+              <ul
+                className={`${styles.wallets} ${view === 'compact' ? styles.compact : ''}`}
+                data-view={view}
+              >
                 {visible.map((e) => (
                   <li key={e.id}>
                     <label className={cartStyles.choice}>
@@ -368,7 +388,9 @@ export function MarketplaceBundleCatalog() {
                       />
                       <span>Select wallet</span>
                     </label>
-                    <h2>Bundle wallet</h2>
+                    <h2 aria-label={`Bundle wallet ${e.listing.address}`}>
+                      Bundle wallet
+                    </h2>
                     <code>{e.listing.address}</code>
                     <dl>
                       <div>

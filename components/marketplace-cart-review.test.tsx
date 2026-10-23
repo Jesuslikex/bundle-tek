@@ -362,3 +362,49 @@ it('keeps the exact reviewed selection when changing the desired count and suppo
   expect(host.textContent).not.toContain('Selection checked · not reserved');
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
+
+it('switches listing views locally without changing selected wallets, the cart review or evidence disclosures', async () => {
+  const fetcher = server();
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Refresh Bundle inventory');
+  await click('Select matching wallets');
+  await click('Review selected wallets');
+  expect(host.querySelector('ul[data-view="compact"]')).not.toBeNull();
+  const disclosure = host.querySelector<HTMLDetailsElement>(
+    'ul[data-view] details',
+  )!;
+  await act(async () => disclosure.querySelector('summary')!.click());
+  expect(disclosure.open).toBe(true);
+  expect(
+    host.querySelector('ul[data-view] h2')!.getAttribute('aria-label'),
+  ).toMatch(/^Bundle wallet /);
+  const ids = [
+    ...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+  ].map((input) => [input.getAttribute('aria-label'), input.checked]);
+  await act(async () =>
+    host
+      .querySelector<HTMLInputElement>('input[type="radio"][value="cards"]')!
+      .click(),
+  );
+  expect(host.querySelector('ul[data-view="cards"]')).not.toBeNull();
+  expect(host.querySelector('ul[data-view] details')).toBe(disclosure);
+  expect(disclosure.open).toBe(true);
+  expect(host.textContent).toContain('Selection checked · not reserved');
+  expect(
+    [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].map(
+      (input) => [input.getAttribute('aria-label'), input.checked],
+    ),
+  ).toEqual(ids);
+  expect(host.textContent).toContain('Evidence and custody disclosure');
+  expect(host.textContent).toContain('Historical balance');
+  await act(async () =>
+    host
+      .querySelector<HTMLInputElement>('input[type="radio"][value="compact"]')!
+      .click(),
+  );
+  expect(host.querySelector('ul[data-view="compact"]')).not.toBeNull();
+  expect(host.textContent).toContain('Selected wallets · 2');
+  expect(disclosure.open).toBe(true);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
