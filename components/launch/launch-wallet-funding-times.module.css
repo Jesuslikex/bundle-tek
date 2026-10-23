@@ -65,6 +65,12 @@
 .warning {
   color: #ff929b;
 }
+.provenance {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .panel button:focus-visible,
 .panel summary:focus-visible,
 .panel input:focus-visible {

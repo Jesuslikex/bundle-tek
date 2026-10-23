@@ -7,7 +7,10 @@ import { largeLayerReviewFixture } from '../../test/launch-layer-review-fixture'
 import { LaunchWalletFundingTimes } from './launch-wallet-funding-times';
 import { launchFundingRoster } from '@/lib/launch-wallet-funding';
 import type { LaunchLayerEnvelope } from '@/lib/launch-layer-terms';
-import type { WalletFundingSelection } from '@/lib/wallet-funding-time';
+import {
+  walletFundingTimes,
+  type WalletFundingSelection,
+} from '@/lib/wallet-funding-time';
 
 let host: HTMLDivElement, root: Root, envelope: LaunchLayerEnvelope;
 // Each provider test advances its own monotonic epoch, independent of shuffle order.
@@ -104,9 +107,17 @@ it('shows a red-gap comparison across response batches, pages all observations a
     [wallets[99].address, 1700000000],
     [wallets[100].address, 1700001474],
   ]);
-  const fetcher = vi.fn(async (_u: RequestInfo | URL, init?: RequestInit) =>
-    reply(JSON.parse(init!.body as string).wallets, known),
-  );
+  const fetcher = vi.fn(async (_u: RequestInfo | URL, init?: RequestInit) => {
+    const requested = JSON.parse(init!.body as string).wallets;
+    const response = walletFundingTimes.parse(
+      await reply(requested, known).json(),
+    );
+    response.capturedAt =
+      requested[0].address === wallets[0].address
+        ? '2026-10-23T00:00:00.000Z'
+        : '2026-10-23T00:01:00.000Z';
+    return Response.json(response);
+  });
   vi.stubGlobal('fetch', fetcher);
   await mount();
   await open();
@@ -121,9 +132,137 @@ it('shows a red-gap comparison across response batches, pages all observations a
   ).toHaveLength(25);
   await click('Next funding observations');
   expect(host.textContent).toContain('Wallets 26');
+  for (let page = 0; page < 3; page++) await click('Next funding observations');
+  const secondGroupRow = host.querySelector(
+    'ul[aria-label="Launch funding observations"] li',
+  )!;
+  expect(secondGroupRow.textContent).toContain('Funding check group 2');
+  expect(secondGroupRow.querySelector('time')?.dateTime).toBe(
+    '2026-10-23T00:01:00.000Z',
+  );
+  expect(secondGroupRow.textContent).toContain('24m 34s apart');
   expect(JSON.stringify(envelope)).toBe(before);
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
+it('explains missing and unusable saved receipts without treating unknown wallets as unfunded', async () => {
+  const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+    const response = walletFundingTimes.parse(
+      await reply(JSON.parse(init!.body as string).wallets).json(),
+    );
+    response.wallets[1].reason = 'unavailable-evidence';
+    return Response.json(response);
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await open();
+  await click('Check recorded launch funding times');
+  const rows = host.querySelectorAll(
+    'ul[aria-label="Launch funding observations"] li',
+  );
+  expect(rows[0].textContent).toContain(
+    'No retained successful native SOL receipt was found.',
+  );
+  expect(rows[1].textContent).toContain(
+    'The most recently saved receipt could not establish a usable funding time.',
+  );
+  expect(rows[0].textContent).toContain(
+    'Other funding not captured in saved receipts may exist; this is not proof that the wallet was never funded.',
+  );
+  expect(rows[0].textContent).toContain('Saved-record check');
+  expect(rows[0].querySelector('time')?.dateTime).toBe(
+    '2026-10-23T00:00:00.000Z',
+  );
+  expect(rows[0].textContent).toContain('not the funding block time');
+  expect(rows[0].getAttribute('title')).toBeNull();
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it('explains all provider unknown reasons and labels aggregate capture time without claiming exact per-wallet reads', async () => {
+  envelope.terms.roles.front = envelope.terms.roles.front.slice(0, 6);
+  expect(launchFundingRoster(envelope).wallets.length).toBeGreaterThan(10);
+  expect(launchFundingRoster(envelope).wallets.length).toBeLessThanOrEqual(20);
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const reasons = [
+    'no-returned-history',
+    'unavailable-oldest-evidence',
+    'unsupported-native-transaction',
+    'not-zero-to-positive-funding',
+    'unsupported-address',
+  ];
+  let now = (providerTestEpoch += 1000000),
+    calls = 0;
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+    const request = JSON.parse(init!.body as string);
+    return Response.json({
+      format: 'wallet-funding-origins-v1',
+      network: 'mainnet',
+      scope: 'oldest-provider-reported-transaction',
+      ledgerMetadata: 'provider-reported',
+      historyComplete: false,
+      signingAllowed: false,
+      executionAllowed: false,
+      context: request.context,
+      capturedAt:
+        ++calls === 1 ? '2026-10-23T00:00:00.000Z' : '2026-10-23T00:01:00.000Z',
+      wallets: request.wallets.map(
+        (wallet: WalletFundingSelection[number], i: number) => ({
+          ...wallet,
+          funding: null,
+          reason: reasons[i % reasons.length],
+        }),
+      ),
+    });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    await mount();
+    await open();
+    await act(async () =>
+      [...host.querySelectorAll('label')]
+        .find((label) => label.textContent?.includes('Provider history'))!
+        .querySelector('input')!
+        .click(),
+    );
+    await click('Check provider launch funding times');
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(
+      host.querySelector('ul[aria-label="Launch funding observations"]'),
+    ).toBeNull();
+    now += 17000;
+    await act(async () => vi.advanceTimersByTimeAsync(17000));
+    const rows = host.querySelectorAll(
+      'ul[aria-label="Launch funding observations"] li',
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(5);
+    for (const text of [
+      'The provider returned no transaction history.',
+      'The oldest returned evidence could not be validated.',
+      'The oldest returned transaction type is not supported by the funding history check.',
+      'The oldest returned transaction does not establish an initial SOL deposit. Later transactions were not checked.',
+      'Provider history is not available for this wallet type.',
+    ])
+      expect(host.textContent).toContain(text);
+    expect(rows[0].textContent).toContain(
+      'Latest provider capture in this group',
+    );
+    expect(rows[0].textContent).toContain(
+      'Individual wallet reads may be earlier.',
+    );
+    expect(rows[0].textContent).toContain(
+      'not proof that the wallet was never funded',
+    );
+    expect(rows[0].querySelector('time')?.dateTime).toBe(
+      '2026-10-23T00:01:00.000Z',
+    );
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.clearAllTimers();
+    clock.mockRestore();
+    vi.useRealTimers();
+  }
+});
+
 it('cancels a pending read without retaining a late result or starting another request', async () => {
   let resolve!: (response: Response) => void,
     requested!: WalletFundingSelection,
