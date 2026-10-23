@@ -6,7 +6,17 @@ import type { TrackedWallet } from '@/lib/tracked-wallet';
 import type { TrackedTransactionSummary } from '@/lib/tracked-transaction-history';
 import { signedBalanceAmount } from '@/lib/wallet-balance-format';
 import bs58 from 'bs58';
-import { TrackedSignatureBrowser } from './tracked-signature-browser';
+import {
+  TrackedSignatureBrowser,
+  TrackedHistoryControls,
+  TrackedHistoryPagination,
+} from './tracked-signature-browser';
+import {
+  trackedHistoryView,
+  trackedHistoryTimeLabel,
+  TRACKED_HISTORY_FILTERS,
+  type TrackedHistoryFilters,
+} from '@/lib/tracked-history-view';
 export function TrackedTransactionHistory({
   wallet,
   onOpen,
@@ -26,6 +36,13 @@ export function TrackedTransactionHistory({
   const [signatureError, setSignatureError] = useState('');
   const request = useRef<AbortController | null>(null);
   const heading = useRef<HTMLHeadingElement | null>(null);
+  const [filters, setFilters] = useState<TrackedHistoryFilters>({
+    ...TRACKED_HISTORY_FILTERS,
+  });
+  const [displayPage, setDisplayPage] = useState(0);
+  const view = trackedHistoryView(items, filters, displayPage, (row) =>
+    Date.parse(row.observedAt),
+  );
   useEffect(() => {
     heading.current?.focus();
   }, []);
@@ -43,8 +60,18 @@ export function TrackedTransactionHistory({
   useEffect(() => {
     const controller = new AbortController();
     request.current = controller;
-    void fetch(query(null), { cache: 'no-store', signal: controller.signal })
+    void Promise.resolve()
+      .then(() => {
+        if (controller.signal.aborted) return null;
+        setBusy(true);
+        setError('');
+        return fetch(query(null), {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+      })
       .then(async (response) => {
+        if (!response || controller.signal.aborted) return;
         const data = (await response.json()) as {
           items?: TrackedTransactionSummary[];
           nextCursor?: string | null;
@@ -55,6 +82,8 @@ export function TrackedTransactionHistory({
         if (!controller.signal.aborted) {
           setItems(data.items);
           setCursor(data.nextCursor ?? null);
+          setError('');
+          setDisplayPage(0);
         }
       })
       .catch((e) => {
@@ -99,6 +128,7 @@ export function TrackedTransactionHistory({
             : data.items!,
         );
         setCursor(data.nextCursor ?? null);
+        if (!older) setDisplayPage(0);
       }
     } catch (e) {
       if (!controller.signal.aborted)
@@ -167,26 +197,51 @@ export function TrackedTransactionHistory({
       </Button>
       {error && <p role="alert">{error}</p>}
       {busy && <output>Loading saved transactions…</output>}
+      <TrackedHistoryControls
+        kind="Saved observations"
+        filters={filters}
+        onChange={(next) => {
+          setFilters(next);
+          setDisplayPage(0);
+        }}
+      />
+      <p>
+        Dates filter the recorded observation time in UTC, not transaction block
+        time. Signature search is case-sensitive. Filters cover only the{' '}
+        {items.length} loaded saved observations; load older saved transactions
+        for more retained records.
+      </p>
+      {!view.valid && (
+        <p role="alert">
+          Choose valid UTC dates with the end date on or after the start date.
+        </p>
+      )}
+      {view.valid && items.length > 0 && view.matching === 0 && (
+        <p>No loaded saved observations match these filters.</p>
+      )}
       <div className="wallet-roster-table">
-        <table className="project-table">
+        <table
+          className="project-table"
+          aria-label="Saved transaction observations"
+        >
           <thead>
             <tr>
-              <th>Signature / saved</th>
+              <th>Signature / observed (UTC)</th>
               <th>Status / SOL change</th>
               <th>Token records</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
+            {view.rows.map((item) => (
               <tr key={item.signature}>
                 <td>
                   <code>
                     {item.signature.slice(0, 8)}…{item.signature.slice(-8)}
                   </code>
                   <small>
-                    {new Date(item.observedAt).toLocaleString()} · slot{' '}
-                    {item.slot}
+                    {trackedHistoryTimeLabel(Date.parse(item.observedAt))} ·
+                    slot {item.slot}
                   </small>
                   {item.stale && (
                     <small>Saved before latest tracker change</small>
@@ -216,6 +271,11 @@ export function TrackedTransactionHistory({
           </tbody>
         </table>
       </div>
+      <TrackedHistoryPagination
+        kind="Saved observations"
+        view={view}
+        onPage={setDisplayPage}
+      />
       {!busy && !items.length && !error && (
         <p>
           No saved transaction observations yet. Inspect a signature to save its

@@ -3,6 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import type { TrackedWallet } from '@/lib/tracked-wallet';
 import type { SignaturePage } from '@/lib/tracked-signatures';
+import {
+  trackedHistoryView,
+  trackedHistoryTimeLabel,
+  TRACKED_HISTORY_FILTERS,
+  type TrackedHistoryFilters,
+} from '@/lib/tracked-history-view';
+import viewStyles from './tracked-history-view.module.css';
 export function TrackedSignatureBrowser({
   wallet,
   onOpen,
@@ -38,6 +45,16 @@ function Browser({
     [error, setError] = useState(''),
     [stale, setStale] = useState(false);
   const pending = useRef<AbortController | null>(null);
+  const [filters, setFilters] = useState<TrackedHistoryFilters>({
+    ...TRACKED_HISTORY_FILTERS,
+  });
+  const [displayPage, setDisplayPage] = useState(0);
+  const view = trackedHistoryView(
+    page?.signatures ?? [],
+    filters,
+    displayPage,
+    (row) => (row.blockTime === null ? null : row.blockTime * 1000),
+  );
   useEffect(() => {
     const c = new AbortController();
     pending.current = c;
@@ -127,6 +144,7 @@ function Browser({
       if (!c.signal.aborted && pending.current === c) {
         const incoming = data.page;
         setPage(incoming);
+        if (!older) setDisplayPage(0);
         setStale(false);
         setError('');
       }
@@ -140,12 +158,12 @@ function Browser({
   return (
     <>
       <p>
-        Public finalized signature records, 25 per page. Inspect a signature to
-        decode and save its transaction. This is provider-retained history,
-        without trade classification, automatic indexing or wallet creation age.
-        Empty or short pages may reflect provider retention. Loaded pages are
-        retained here and reopen without RPC. Reloading latest activity replaces
-        this retained view.
+        Public finalized signature records, displayed 25 at a time. Inspect a
+        signature to decode and save its transaction. This is provider-retained
+        history, without trade classification, automatic indexing or wallet
+        creation age. Empty or short pages may reflect provider retention.
+        Loaded pages are retained here and reopen without RPC. Reloading latest
+        activity replaces this retained view.
       </p>
       <Button
         variant="outline"
@@ -166,9 +184,37 @@ function Browser({
         <>
           <p>
             {page.source} · anchor slot {page.anchor} · last read{' '}
-            {new Date(page.observedAt).toLocaleString()} ·{' '}
+            {trackedHistoryTimeLabel(Date.parse(page.observedAt))} ·{' '}
             {page.signatures.length} loaded
           </p>
+          <TrackedHistoryControls
+            kind="Public activity"
+            filters={filters}
+            onChange={(next) => {
+              setFilters(next);
+              setDisplayPage(0);
+            }}
+          />
+          <p className={viewStyles.note}>
+            Dates filter public block time in UTC, not the time this page was
+            saved. Records with unavailable block time stay visible unless a
+            date bound is set. Search is case-sensitive and matches part of a
+            signature. Filters apply only to the {page.signatures.length} loaded
+            records.
+          </p>
+          {!view.valid && (
+            <p role="alert">
+              Choose valid UTC dates with the end date on or after the start
+              date.
+            </p>
+          )}
+          {view.valid && view.matching === 0 && (
+            <p>
+              {page.signatures.length
+                ? 'No loaded public records match these filters.'
+                : 'No public records were retained in this view.'}
+            </p>
+          )}
           <div className="project-table-wrap">
             <table
               className="project-table"
@@ -178,12 +224,12 @@ function Browser({
                 <tr>
                   <th>Signature</th>
                   <th>Finalized slot</th>
-                  <th>Status / recorded</th>
+                  <th>Status / block time (UTC)</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {page.signatures.map((row) => (
+                {view.rows.map((row) => (
                   <tr key={row.signature}>
                     <td>
                       <code title={row.signature}>
@@ -196,9 +242,9 @@ function Browser({
                         {row.failed ? 'Failed' : 'No recorded error'}
                       </strong>
                       <small>
-                        {row.blockTime === null
-                          ? 'Time unavailable'
-                          : new Date(row.blockTime * 1000).toLocaleString()}
+                        {trackedHistoryTimeLabel(
+                          row.blockTime === null ? null : row.blockTime * 1000,
+                        )}
                       </small>
                     </td>
                     <td>
@@ -214,6 +260,11 @@ function Browser({
               </tbody>
             </table>
           </div>
+          <TrackedHistoryPagination
+            kind="Public activity"
+            view={view}
+            onPage={setDisplayPage}
+          />
           {page.nextCursor ? (
             <Button
               variant="outline"
@@ -234,5 +285,127 @@ function Browser({
         </>
       )}
     </>
+  );
+}
+
+export function TrackedHistoryControls({
+  kind,
+  filters,
+  onChange,
+}: {
+  kind: 'Public activity' | 'Saved observations';
+  filters: TrackedHistoryFilters;
+  onChange: (next: TrackedHistoryFilters) => void;
+}) {
+  return (
+    <fieldset className={viewStyles.controls}>
+      <legend>{kind} filters</legend>
+      <div className={viewStyles.filters}>
+        <label>
+          {kind} signature search
+          <input
+            type="search"
+            maxLength={88}
+            autoCapitalize="none"
+            spellCheck={false}
+            value={filters.search}
+            onChange={(e) => onChange({ ...filters, search: e.target.value })}
+          />
+        </label>
+        <label>
+          {kind} status
+          <select
+            value={filters.status}
+            onChange={(e) =>
+              onChange({
+                ...filters,
+                status: e.target.value as TrackedHistoryFilters['status'],
+              })
+            }
+          >
+            <option value="all">All statuses</option>
+            <option value="failed">Failed</option>
+            <option value="no-error">No recorded error</option>
+          </select>
+        </label>
+        <label>
+          {kind} from date (UTC)
+          <input
+            type="date"
+            value={filters.from}
+            onChange={(e) => onChange({ ...filters, from: e.target.value })}
+          />
+        </label>
+        <label>
+          {kind} through date (UTC)
+          <input
+            type="date"
+            value={filters.to}
+            onChange={(e) => onChange({ ...filters, to: e.target.value })}
+          />
+        </label>
+        <label>
+          {kind} time order
+          <select
+            value={filters.order}
+            onChange={(e) =>
+              onChange({
+                ...filters,
+                order: e.target.value as TrackedHistoryFilters['order'],
+              })
+            }
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </label>
+      </div>
+      <Button
+        variant="outline"
+        onClick={() => onChange({ ...TRACKED_HISTORY_FILTERS })}
+      >
+        Clear {kind.toLowerCase()} filters
+      </Button>
+    </fieldset>
+  );
+}
+export function TrackedHistoryPagination({
+  kind,
+  view,
+  onPage,
+}: {
+  kind: 'Public activity' | 'Saved observations';
+  view: {
+    valid: boolean;
+    matching: number;
+    loaded: number;
+    page: number;
+    pageCount: number;
+  };
+  onPage: (next: number) => void;
+}) {
+  return (
+    <fieldset className={viewStyles.pages}>
+      <legend>{kind} display pages</legend>
+      <output>
+        {view.valid
+          ? `${view.matching} matching of ${view.loaded} loaded records. Display page ${view.page + 1} of ${view.pageCount}.`
+          : 'Invalid date range. Loaded records are retained.'}
+      </output>
+      <Button
+        variant="outline"
+        disabled={!view.valid || view.page === 0}
+        onClick={() => onPage(view.page - 1)}
+      >
+        Previous {kind.toLowerCase()} display page
+      </Button>
+      <Button
+        variant="outline"
+        disabled={!view.valid || view.page >= view.pageCount - 1}
+        onClick={() => onPage(view.page + 1)}
+      >
+        Next {kind.toLowerCase()} display page
+      </Button>
+    </fieldset>
   );
 }
