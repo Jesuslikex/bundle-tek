@@ -988,6 +988,13 @@
       "when": 1794860000001,
       "tag": "0140_wallet_warmup_execution_approvals",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "6",
+      "when": 1794860000002,
+      "tag": "0141_wallet_warmup_execution_wallet_leases",
+      "breakpoints": true
     }
   ]
 }
