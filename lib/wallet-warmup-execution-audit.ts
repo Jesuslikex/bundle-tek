@@ -347,6 +347,7 @@ async function replayOwnedPrefix(
       lots,
       receipts,
       context,
+      manifest: bound.manifest,
       result: {
         head,
         checkpoint: checkpoint(view),
@@ -484,6 +485,116 @@ export async function deriveWarmupExecutionControlAppend(
       replayedEvents: replay.result.replayedEvents,
       wireBytes: replay.result.wireBytes,
       scope: 'control-append-derivation-only' as const,
+      ...authority,
+    };
+  } catch {
+    signal.throwIfAborted();
+    return fail();
+  }
+}
+
+const reservationTime = controlSchema.pick({ now: true }).strict();
+
+/** Derive the next action's reservation from the complete original reducer.
+ * This does not record a financial hold or permit a provider read. A durable
+ * writer must independently load the owned selector/head, retain server time,
+ * and atomically fence the current source, lease and execution/control heads.
+ * Historical receipt/evidence hashes are bookkeeping inputs, not proof of a
+ * finalized acquisition. In particular, a Sell needs fresh receipt/inventory
+ * verification before its derived amount can reach the runtime collector. */
+export async function deriveWarmupExecutionActionReservation(
+  rawRoot: unknown,
+  rawApproval: unknown,
+  selector: Selector,
+  rawHead: unknown,
+  stream: AsyncIterable<unknown> | Iterable<unknown>,
+  value: unknown,
+  signal: AbortSignal,
+) {
+  try {
+    signal.throwIfAborted();
+    const { now } = reservationTime.parse(value);
+    const replay = await replayOwnedPrefix(
+      rawRoot,
+      rawApproval,
+      selector,
+      rawHead,
+      stream,
+      signal,
+      false,
+    );
+    signal.throwIfAborted();
+    if (now < replay.result.projection.modelTime) fail();
+    const before = replay.ledger.snapshot(now),
+      actionIndex = before.completedActions,
+      action = replay.manifest.actions[actionIndex];
+    if (!action) fail();
+    const wallet = replay.manifest.wallets.find(
+      (w) => w.wallet === action.wallet,
+    );
+    if (!wallet) fail();
+    const previousHead = replay.result.head;
+    const event = parseWarmupExecutionLedgerEvent({
+      operation: 'reserve',
+      now,
+      expectedRootSha256: previousHead.manifestSha256,
+      expectedVersion: previousHead.version,
+    });
+    // The actual reducer checks schedule, session, prior action/lot state,
+    // attempts and gross wallet limits. No summary is restored into a reducer.
+    replay.ledger.apply(event);
+    const pending = replay.ledger.snapshot(now).pending;
+    if (!pending || pending.actionId !== action.id) fail();
+    const bound = await bindWarmupExecutionAuditEvent({
+      format: eventFormat,
+      rootId: previousHead.rootId,
+      rootSha256: previousHead.rootSha256,
+      manifestSha256: previousHead.manifestSha256,
+      sequence: previousHead.version + 1,
+      previousSha256: previousHead.eventSha256,
+      event,
+    });
+    signal.throwIfAborted();
+    if (
+      replay.result.wireBytes +
+        boundedSize(bound.wire, WARMUP_EXECUTION_EVENT_BYTES) >
+      WARMUP_EXECUTION_AUDIT_BYTES
+    )
+      fail();
+    const view = projection(
+      replay.context,
+      replay.ledger,
+      replay.lots,
+      replay.receipts,
+      now,
+    );
+    bounded(canonical(view), WARMUP_EXECUTION_PROJECTION_BYTES);
+    const head: Head = {
+      ...previousHead,
+      version: previousHead.version + 1,
+      eventSha256: bound.sha256,
+      checkpointSha256: await checkpointHash(view),
+    };
+    signal.throwIfAborted();
+    return {
+      wire: bound.wire,
+      head,
+      checkpoint: checkpoint(view),
+      projection: view,
+      previousHead,
+      replayedEvents: replay.result.replayedEvents,
+      wireBytes: replay.result.wireBytes,
+      action: structuredClone(action),
+      actionIndex,
+      wallet: structuredClone(wallet),
+      inputRaw: pending.inputRaw,
+      lotReceiptId: pending.lotReceiptId,
+      lot: pending.lotReceiptId
+        ? replay.ledger.lot(pending.lotReceiptId, now)
+        : null,
+      expiresAt: replay.manifest.expiresAt,
+      policy: structuredClone(replay.manifest.policy),
+      scope: 'action-reservation-derivation-only' as const,
       ...authority,
     };
   } catch {
