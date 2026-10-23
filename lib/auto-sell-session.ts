@@ -1,12 +1,20 @@
-import { percentOfRaw, percentUnits } from './auto-sell';
+import {
+  autoSellMaximumError,
+  autoSellTokenCapRaw,
+  percentOfRaw,
+  percentUnits,
+} from './auto-sell';
 
 export type AutoSellSessionRules = {
   startDelaySeconds: number;
   endDurationSeconds: number;
   endMaxSupplyPercent: string;
+  endMaxTokenAmount?: string;
 };
 
 export function autoSellSessionError(rules: AutoSellSessionRules) {
+  const maximum = autoSellMaximumError(rules);
+  if (maximum) return maximum;
   for (const [label, value] of [
     ['Start delay', rules.startDelaySeconds],
     ['Session duration', rules.endDurationSeconds],
@@ -28,9 +36,12 @@ export function autoSellSessionError(rules: AutoSellSessionRules) {
 export function autoSellSessionCap(
   rules: AutoSellSessionRules,
   supply: bigint,
+  decimals?: number,
 ) {
   const error = autoSellSessionError(rules);
   if (error) throw new Error(error);
+  const tokens = autoSellTokenCapRaw(rules, supply, decimals);
+  if (rules.endMaxTokenAmount !== undefined) return tokens;
   if (!rules.endMaxSupplyPercent) return null;
   const cap = percentOfRaw(supply, rules.endMaxSupplyPercent);
   if (cap <= 0n)

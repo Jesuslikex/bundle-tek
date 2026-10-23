@@ -171,7 +171,10 @@ export class AutoSellRunner {
       this.sessionCap = autoSellSessionCap(
         this.deps.session,
         deps.totalSupplyRaw,
+        deps.decimals,
       );
+    for (const strategy of this.deps.strategies)
+      endCapRaw(strategy, deps.totalSupplyRaw, deps.decimals);
   }
 
   start() {
@@ -293,11 +296,14 @@ export class AutoSellRunner {
     const cap = autoSellSessionCap(
       configuration.session,
       this.deps.totalSupplyRaw,
+      this.deps.decimals,
     );
     const remaining = cap === null ? null : cap - this.sessionUsed(false);
     const sessionCapChanged =
       configuration.session.endMaxSupplyPercent !==
-      this.configuration().session.endMaxSupplyPercent;
+        this.configuration().session.endMaxSupplyPercent ||
+      configuration.session.endMaxTokenAmount !==
+        this.configuration().session.endMaxTokenAmount;
     const states = new Map<string, AutoSellStrategyState>();
     const reactivatedStrategies: string[] = [];
     const endingStrategies: AutoSellEditReview['endingStrategies'] = [];
@@ -319,6 +325,7 @@ export class AutoSellRunner {
         now,
         this.deps.totalSupplyRaw,
         remaining,
+        this.deps.decimals,
       );
       if (existing && strategy.mode === 'dca' && state.status === 'running')
         state = {
@@ -735,6 +742,7 @@ export class AutoSellRunner {
         this.selling || this.sessionCap === null
           ? null
           : this.sessionCap - this.sessionUsed(),
+        this.deps.decimals,
       );
       if (after !== before) {
         this.states.set(s.id, after);
@@ -773,7 +781,11 @@ export class AutoSellRunner {
       if (!marketCapInRange(s, this.marketCapUsd)) continue;
       let amount = readyToSellRaw(s, state, this.deps.totalSupplyRaw);
       let capRemaining: bigint | null = null;
-      const strategyCap = endCapRaw(s, this.deps.totalSupplyRaw);
+      const strategyCap = endCapRaw(
+        s,
+        this.deps.totalSupplyRaw,
+        this.deps.decimals,
+      );
       if (strategyCap !== null) {
         const remaining = strategyCap - state.soldRaw - state.inFlightRaw;
         if (remaining <= 0n) {

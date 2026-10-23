@@ -1,5 +1,6 @@
 import {
   AUTO_SELL_MODE_NAMES,
+  autoSellMaximumLabel,
   formatDuration,
   marketCapLabel,
   type AutoSellStrategy,
@@ -20,9 +21,7 @@ function strategyFields(
     Name: strategy.name,
     Mode: AUTO_SELL_MODE_NAMES[strategy.mode],
     'Market cap range': marketCapLabel(strategy),
-    'Strategy maximum': strategy.endMaxSupplyPercent
-      ? `${strategy.endMaxSupplyPercent}% supply`
-      : 'No amount limit',
+    'Strategy maximum': autoSellMaximumLabel(strategy),
     'Strategy duration': strategy.endDurationSeconds
       ? formatDuration(strategy.endDurationSeconds)
       : 'No time limit',
@@ -69,12 +68,8 @@ export function autoSellEditChanges(
   };
   add(
     'Session maximum',
-    before.session.endMaxSupplyPercent
-      ? `${before.session.endMaxSupplyPercent}% supply`
-      : 'No amount limit',
-    after.session.endMaxSupplyPercent
-      ? `${after.session.endMaxSupplyPercent}% supply`
-      : 'No amount limit',
+    autoSellMaximumLabel(before.session),
+    autoSellMaximumLabel(after.session),
   );
   add(
     'Session duration',

@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   autoSellStrategyError,
+  autoSellMaximumLabel,
+  endCapRaw,
   durationSeconds,
   formatDuration,
   marketCapFromPrice,
@@ -271,17 +273,27 @@ function AutoSellContext({
   const [sessionDuration, setSessionDuration] =
     useState<DurationParts>(emptyDuration);
   const [sessionMaximum, setSessionMaximum] = useState('');
+  const [sessionMaximumUnit, setSessionMaximumUnit] = useState<
+    'supply' | 'tokens'
+  >('supply');
   const delay = optionalDuration(sessionDelay);
   const duration = optionalDuration(sessionDuration);
   const sessionRules = {
     startDelaySeconds: delay.seconds ?? 0,
     endDurationSeconds: duration.seconds ?? 0,
-    endMaxSupplyPercent: sessionMaximum,
+    endMaxSupplyPercent: sessionMaximumUnit === 'supply' ? sessionMaximum : '',
+    ...(sessionMaximumUnit === 'tokens'
+      ? { endMaxTokenAmount: sessionMaximum }
+      : {}),
   };
   let sessionError = delay.error || duration.error;
   if (!sessionError) {
     try {
-      autoSellSessionCap(sessionRules, toRaw(token.totalSupplyRaw));
+      autoSellSessionCap(
+        sessionRules,
+        toRaw(token.totalSupplyRaw),
+        token.decimals,
+      );
     } catch (cause) {
       sessionError =
         cause instanceof Error ? cause.message : 'Invalid session settings.';
@@ -310,7 +322,15 @@ function AutoSellContext({
     setSessionDuration(
       splitDurationSeconds(configuration.session.endDurationSeconds),
     );
-    setSessionMaximum(configuration.session.endMaxSupplyPercent);
+    setSessionMaximumUnit(
+      configuration.session.endMaxTokenAmount !== undefined
+        ? 'tokens'
+        : 'supply',
+    );
+    setSessionMaximum(
+      configuration.session.endMaxTokenAmount ??
+        configuration.session.endMaxSupplyPercent,
+    );
     setGeneration((value) => value + 1);
   }
 
@@ -482,7 +502,16 @@ function AutoSellContext({
     token.totalSupplyRaw,
   ]);
 
-  const errors = strategies.map(autoSellStrategyError);
+  const errors = strategies.map((strategy) => {
+    const error = autoSellStrategyError(strategy);
+    if (error) return error;
+    try {
+      endCapRaw(strategy, toRaw(token.totalSupplyRaw), token.decimals);
+      return null;
+    } catch (cause) {
+      return cause instanceof Error ? cause.message : 'Invalid maximum amount.';
+    }
+  });
   const firstStrategyError = errors.findIndex(Boolean);
   const startBlockReason =
     cancellationCount > 0
@@ -796,8 +825,39 @@ function AutoSellContext({
                   with a fresh history baseline afterwards.
                 </p>
                 <label htmlFor={`${ids}-session-max`}>
-                  Session maximum (% supply)
+                  Session maximum (
+                  {sessionMaximumUnit === 'supply' ? '% supply' : 'tokens'})
                 </label>
+                <fieldset
+                  className={styles.tiles2}
+                  aria-label="Session maximum unit"
+                >
+                  {(['supply', 'tokens'] as const).map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      aria-pressed={sessionMaximumUnit === unit}
+                      className={
+                        sessionMaximumUnit === unit
+                          ? styles.tileActive
+                          : styles.tile
+                      }
+                      onClick={() => {
+                        if (unit !== sessionMaximumUnit) {
+                          if (editing) {
+                            runner.current?.cancelEdit();
+                            setEditReview(null);
+                            setApprovedEdit('');
+                          }
+                          setSessionMaximumUnit(unit);
+                          setSessionMaximum('');
+                        }
+                      }}
+                    >
+                      {unit === 'supply' ? '% Supply' : 'Token amount'}
+                    </button>
+                  ))}
+                </fieldset>
                 <Input
                   id={`${ids}-session-max`}
                   inputMode="decimal"
@@ -807,6 +867,10 @@ function AutoSellContext({
                     setSessionMaximum(event.target.value.trim())
                   }
                 />
+                <p className={styles.hint}>
+                  Changing the maximum unit clears its amount. No conversion is
+                  assumed.
+                </p>
                 <SessionTime
                   label="Session duration"
                   value={sessionDuration}
@@ -1325,7 +1389,9 @@ function StrategyCard({
   const triggerValue = t.kind === 'rate' ? t.percent : t.amount;
   const endLabel =
     [
-      s.endMaxSupplyPercent ? `${s.endMaxSupplyPercent}%` : '',
+      s.endMaxSupplyPercent || s.endMaxTokenAmount
+        ? autoSellMaximumLabel(s)
+        : '',
       s.endDurationSeconds > 0 ? formatDuration(s.endDurationSeconds) : '',
     ]
       .filter(Boolean)
@@ -1810,18 +1876,59 @@ function StrategyCard({
                   <label htmlFor={`${id}-max`}>
                     Max Amount <small>(optional)</small>
                   </label>
+                  <fieldset
+                    className={styles.tiles2}
+                    aria-label="Strategy maximum unit"
+                  >
+                    {(['supply', 'tokens'] as const).map((unit) => {
+                      const selected =
+                        (s.endMaxTokenAmount !== undefined
+                          ? 'tokens'
+                          : 'supply') === unit;
+                      return (
+                        <button
+                          key={unit}
+                          type="button"
+                          aria-pressed={selected}
+                          className={selected ? styles.tileActive : styles.tile}
+                          onClick={() => {
+                            if (!selected)
+                              onChange({
+                                endMaxSupplyPercent: '',
+                                endMaxTokenAmount:
+                                  unit === 'tokens' ? '' : undefined,
+                              });
+                          }}
+                        >
+                          {unit === 'supply' ? '% Supply' : 'Token amount'}
+                        </button>
+                      );
+                    })}
+                  </fieldset>
                   <div className={styles.suffixed}>
                     <Input
                       id={`${id}-max`}
                       inputMode="decimal"
                       placeholder="1"
-                      value={s.endMaxSupplyPercent}
+                      value={s.endMaxTokenAmount ?? s.endMaxSupplyPercent}
                       onChange={(e) =>
-                        onChange({ endMaxSupplyPercent: e.target.value.trim() })
+                        onChange(
+                          s.endMaxTokenAmount !== undefined
+                            ? { endMaxTokenAmount: e.target.value.trim() }
+                            : { endMaxSupplyPercent: e.target.value.trim() },
+                        )
                       }
                     />
-                    <span>% Supply</span>
+                    <span>
+                      {s.endMaxTokenAmount !== undefined
+                        ? 'Tokens'
+                        : '% Supply'}
+                    </span>
                   </div>
+                  <p className={styles.hint}>
+                    Changing the maximum unit clears its amount. No conversion
+                    is assumed.
+                  </p>
                 </div>
                 <div className={styles.field}>
                   <span>

@@ -36,6 +36,8 @@ export type AutoSellStrategy = {
   marketCapMaxUsd: string;
   /** End conditions; empty means none. */
   endMaxSupplyPercent: string;
+  /** Optional exact token cap. When present, the percentage must be blank. */
+  endMaxTokenAmount?: string;
   endDurationSeconds: number;
   /** Buyers to ignore (never counter-sold). */
   whitelist: string[];
@@ -113,6 +115,66 @@ export function rawToDecimal(raw: bigint, decimals: number) {
 
 export function percentOfRaw(total: bigint, percent: string) {
   return (total * percentUnits(percent)) / HUNDRED;
+}
+
+export type AutoSellMaximum = {
+  endMaxSupplyPercent: string;
+  endMaxTokenAmount?: string;
+};
+
+/** Legacy settings without a token field retain their percentage meaning. */
+export function autoSellMaximumError(maximum: AutoSellMaximum) {
+  if (maximum.endMaxTokenAmount !== undefined) {
+    if (
+      typeof maximum.endMaxTokenAmount !== 'string' ||
+      maximum.endMaxSupplyPercent
+    )
+      return 'Choose one maximum amount unit.';
+    if (
+      maximum.endMaxTokenAmount &&
+      (!DECIMAL.test(maximum.endMaxTokenAmount) ||
+        !/[1-9]/.test(maximum.endMaxTokenAmount))
+    )
+      return 'Maximum must be a token amount above 0.';
+  }
+  return '';
+}
+
+export function autoSellMaximumLabel(maximum: AutoSellMaximum) {
+  return maximum.endMaxTokenAmount !== undefined
+    ? maximum.endMaxTokenAmount
+      ? `${maximum.endMaxTokenAmount} tokens`
+      : 'No amount limit'
+    : maximum.endMaxSupplyPercent
+      ? `${maximum.endMaxSupplyPercent}% supply`
+      : 'No amount limit';
+}
+
+/** Token caps must be exactly representable: never round an approved limit. */
+export function autoSellTokenCapRaw(
+  maximum: AutoSellMaximum,
+  supply: bigint,
+  decimals?: number,
+) {
+  const error = autoSellMaximumError(maximum);
+  if (error) throw new Error(error);
+  const amount = maximum.endMaxTokenAmount;
+  if (!amount) return null;
+  if (
+    decimals === undefined ||
+    !Number.isSafeInteger(decimals) ||
+    decimals < 0 ||
+    decimals > 255
+  )
+    throw new Error('Token precision is required for a token maximum.');
+  if (/[^0]/.test((amount.split('.')[1] ?? '').slice(decimals)))
+    throw new Error('Maximum has more precision than this token supports.');
+  const raw = decimalToRaw(amount, decimals);
+  if (raw <= 0n || raw > supply)
+    throw new Error(
+      'Token maximum must be above 0 and at most the total supply.',
+    );
+  return raw;
 }
 
 function newId(prefix: string) {
@@ -274,6 +336,8 @@ function modeError(s: AutoSellStrategy): string | null {
 export function autoSellStrategyError(s: AutoSellStrategy): string | null {
   const mode = modeError(s);
   if (mode) return mode;
+  const maximum = autoSellMaximumError(s);
+  if (maximum) return maximum;
   for (const v of [s.marketCapMinUsd, s.marketCapMaxUsd])
     if (v && !DECIMAL.test(v)) return 'Market cap must be a plain number';
   if (
@@ -350,7 +414,13 @@ export function initialAutoSellState(now: number): AutoSellStrategyState {
 }
 
 /** Raw cap from the Max Amount end condition, or null when none. */
-export function endCapRaw(s: AutoSellStrategy, totalSupplyRaw: bigint) {
+export function endCapRaw(
+  s: AutoSellStrategy,
+  totalSupplyRaw: bigint,
+  decimals?: number,
+) {
+  const tokens = autoSellTokenCapRaw(s, totalSupplyRaw, decimals);
+  if (s.endMaxTokenAmount !== undefined) return tokens;
   return s.endMaxSupplyPercent
     ? percentOfRaw(totalSupplyRaw, s.endMaxSupplyPercent)
     : null;
@@ -377,6 +447,7 @@ export function checkAutoSellEnd(
   totalSupplyRaw: bigint,
   // Omit shared room while any other sell can still release its reservation.
   sessionRemainingRaw: bigint | null = null,
+  decimals?: number,
 ): AutoSellStrategyState {
   if (state.status !== 'running') return state;
   if (
@@ -389,7 +460,7 @@ export function checkAutoSellEnd(
       endedReason: 'Duration reached',
       bufferedRaw: 0n,
     };
-  const cap = endCapRaw(s, totalSupplyRaw);
+  const cap = endCapRaw(s, totalSupplyRaw, decimals);
   if (cap !== null && state.soldRaw >= cap)
     return {
       ...state,
@@ -502,6 +573,7 @@ export function applyAutoSellTrade(
     state,
     percentOfRaw(tokenRaw, s.replicationPercent),
     ctx.totalSupplyRaw,
+    ctx.decimals,
   );
   return {
     state: {
@@ -520,8 +592,9 @@ function clampToEndCap(
   state: AutoSellStrategyState,
   amount: bigint,
   totalSupplyRaw: bigint,
+  decimals: number,
 ) {
-  const cap = endCapRaw(s, totalSupplyRaw);
+  const cap = endCapRaw(s, totalSupplyRaw, decimals);
   if (cap === null) return amount;
   const room = cap - state.soldRaw - state.inFlightRaw - state.bufferedRaw;
   return amount < room ? amount : room > 0n ? room : 0n;
@@ -578,6 +651,7 @@ export function scheduleAutoSell(
       state,
       dcaAmountRaw(s, ctx.totalSupplyRaw, ctx.decimals, ctx.random),
       ctx.totalSupplyRaw,
+      ctx.decimals,
     );
     return {
       state: {
@@ -603,6 +677,7 @@ export function scheduleAutoSell(
       next,
       amountToRaw(s, row.amount, ctx.totalSupplyRaw, ctx.decimals),
       ctx.totalSupplyRaw,
+      ctx.decimals,
     );
     next = {
       ...next,

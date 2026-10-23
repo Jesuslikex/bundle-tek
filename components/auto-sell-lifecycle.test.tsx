@@ -581,3 +581,76 @@ it('shows the strategies and whole session an approved minimum-cap edit will end
   expect(instance.isRunning()).toBe(false);
   expect(unlockVault).toHaveBeenCalledTimes(1);
 });
+
+it('reviews token caps explicitly, clears values when units switch and restores canceled edits', async () => {
+  const instance = await startEditable();
+  const chooseUnit = async (group: string, name: string) => {
+    const scope = host.querySelector(`[aria-label="${group}"]`)!;
+    const button = [...scope.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === name,
+    )!;
+    await act(async () => button.click());
+  };
+  await editSession('input[id$="-session-max"]', '2');
+  await chooseUnit('Session maximum unit', 'Token amount');
+  expect(
+    host.querySelector<HTMLInputElement>('input[id$="-session-max"]')!.value,
+  ).toBe('');
+  await editSession('input[id$="-session-max"]', '12.5');
+  await click('End Conditions—');
+  await chooseUnit('Strategy maximum unit', 'Token amount');
+  await editSession('input[id$="-max"]:not([id$="-session-max"])', '10.25');
+  await click('Review changes');
+  expect(host.textContent).toContain('After: 12.5 tokens');
+  expect(host.textContent).toContain('After: 10.25 tokens');
+  const approval = host.querySelector<HTMLInputElement>(
+    '[data-edit-approval] input',
+  )!;
+  expect(approval.checked).toBe(false);
+  await act(async () => approval.click());
+  await chooseUnit('Session maximum unit', '% Supply');
+  expect(host.querySelector('[data-edit-approval] input')).toBeNull();
+  expect(
+    host.querySelector<HTMLInputElement>('input[id$="-session-max"]')!.value,
+  ).toBe('');
+  await click('Cancel edits');
+  expect(instance.configuration().session.endMaxTokenAmount).toBeUndefined();
+  expect(
+    instance.configuration().strategies[0].endMaxTokenAmount,
+  ).toBeUndefined();
+  expect(instance.snapshot().paused).toBe(true);
+  expect(unlockVault).toHaveBeenCalledTimes(1);
+  await click('Stop');
+});
+
+it('never restores approved consent by switching a blank session maximum unit away and back', async () => {
+  const instance = await startEditable();
+  await editSession(replicationSelector(), '20');
+  await click('Review changes');
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('[data-edit-approval] input')!.click(),
+  );
+  const choose = async (name: string) => {
+    const group = host.querySelector('[aria-label="Session maximum unit"]')!;
+    await act(async () =>
+      [...group.querySelectorAll('button')]
+        .find((b) => b.textContent?.trim() === name)!
+        .click(),
+    );
+  };
+  await choose('Token amount');
+  await choose('% Supply');
+  expect(host.querySelector('[data-edit-approval] input')).toBeNull();
+  expect(
+    [...host.querySelectorAll('button')].some(
+      (button) => button.textContent?.trim() === 'Apply approved changes',
+    ),
+  ).toBe(false);
+  expect(instance.configuration().strategies[0].replicationPercent).toBe('10');
+  expect(instance.snapshot().paused).toBe(true);
+  await click('Review changes');
+  expect(
+    host.querySelector<HTMLInputElement>('[data-edit-approval] input')!.checked,
+  ).toBe(false);
+  await click('Stop');
+});
