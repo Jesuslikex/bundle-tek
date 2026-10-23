@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   createPublicClient,
   formatEther,
@@ -38,15 +38,32 @@ const FIELDS = [
   ['vaultDays', 'Vault lockup days', 'Lockup days (min 7)'],
 ] as const;
 
+type Props = {
+  name?: string;
+  symbol?: string;
+  venue?: ClankerInterface;
+};
+
 export function ClankerLaunchPanel({
   name = '',
   symbol = '',
   venue: initialVenue = 'Clanker',
-}: {
-  name?: string;
-  symbol?: string;
-  venue?: ClankerInterface;
-}) {
+}: Props) {
+  return (
+    <ClankerLaunchDraft
+      key={JSON.stringify([name, symbol, initialVenue])}
+      name={name}
+      symbol={symbol}
+      venue={initialVenue}
+    />
+  );
+}
+
+function ClankerLaunchDraft({
+  name,
+  symbol,
+  venue: initialVenue,
+}: Required<Props>) {
   const [draft, setDraft] = useState({
     name,
     symbol,
@@ -65,26 +82,80 @@ export function ClankerLaunchPanel({
   const [hash, setHash] = useState<Hex | null>(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [reviewedSymbol, setReviewedSymbol] = useState('');
+  const revision = useRef(0),
+    reviewedRevision = useRef<number | null>(null);
+  const reviewedProvider = useRef<Provider | null>(null);
+  const mounted = useRef(true),
+    running = useRef(false),
+    approved = useRef(false);
   const provider = () =>
     (globalThis as { ethereum?: Provider }).ethereum ?? null;
 
+  const invalidateReview = useCallback(() => {
+    revision.current++;
+    reviewedRevision.current = null;
+    reviewedProvider.current = null;
+    approved.current = false;
+    setCall(null);
+    setGas(null);
+    setAck(false);
+    setReviewedSymbol('');
+  }, []);
+
+  useLayoutEffect(() => {
+    mounted.current = true;
+    if (
+      reviewedRevision.current !== null &&
+      reviewedRevision.current !== revision.current
+    )
+      invalidateReview();
+    return () => {
+      mounted.current = false;
+      revision.current++;
+      approved.current = false;
+    };
+  }, [invalidateReview]);
+
+  function current(version: number, p: Provider) {
+    return mounted.current && revision.current === version && provider() === p;
+  }
+
   async function guarded(task: () => Promise<void>) {
+    if (running.current || !mounted.current) return;
+    running.current = true;
     setBusy(true);
     setError('');
+    let version = revision.current;
     try {
-      await task();
+      const pending = task();
+      version = revision.current;
+      await pending;
     } catch (e) {
-      setError(walletError(e));
+      if (mounted.current && revision.current === version)
+        setError(walletError(e));
     } finally {
-      setBusy(false);
+      running.current = false;
+      if (mounted.current) setBusy(false);
     }
   }
 
   async function prepare() {
+    invalidateReview();
+    const version = revision.current,
+      capturedDraft = { ...draft };
     const p = provider();
     if (!p) throw new Error('No browser wallet found.');
-    const account = (await connectEvmWallet(p as never, 'Base')) as Address;
-    const next = await clankerDeployCall({ ...draft, venue, admin: account });
+    const account = (await connectEvmWallet(p as never, 'Base', () =>
+      current(version, p),
+    )) as Address;
+    if (!current(version, p)) return;
+    const next = await clankerDeployCall({
+      ...capturedDraft,
+      venue,
+      admin: account,
+    });
+    if (!current(version, p)) return;
     // Simulate on Base before the wallet is ever asked to sign.
     await client().call({
       account: next.from,
@@ -92,31 +163,61 @@ export function ClankerLaunchPanel({
       data: next.data,
       value: next.value,
     });
-    setGas(
-      await client().estimateGas({
-        account: next.from,
-        to: next.to,
-        data: next.data,
-        value: next.value,
-      }),
-    );
+    if (!current(version, p)) return;
+    const estimate = await client().estimateGas({
+      account: next.from,
+      to: next.to,
+      data: next.data,
+      value: next.value,
+    });
+    if (!current(version, p)) return;
+    setGas(estimate);
+    reviewedRevision.current = version;
+    reviewedProvider.current = p;
+    setReviewedSymbol(capturedDraft.symbol.trim());
     setCall(next);
     setAck(false);
   }
 
   async function send() {
     const p = provider();
-    if (!p || !call) return;
-    await connectEvmWallet(p as never, 'Base').then((a) => {
-      if (a.toLowerCase() !== call.from.toLowerCase())
-        throw new Error('Wallet account changed. Simulate again.');
-    });
+    const version = revision.current;
+    if (
+      !p ||
+      !call ||
+      !approved.current ||
+      reviewedRevision.current !== version
+    )
+      return;
+    if (reviewedProvider.current !== p) {
+      invalidateReview();
+      throw new Error('Wallet provider changed. Simulate again.');
+    }
+    const account = await connectEvmWallet(p as never, 'Base', () =>
+      current(version, p),
+    );
+    if (
+      !current(version, p) ||
+      reviewedRevision.current !== version ||
+      !approved.current
+    )
+      return;
+    if (account.toLowerCase() !== call.from.toLowerCase()) {
+      invalidateReview();
+      setError('Wallet account changed. Simulate again.');
+      return;
+    }
+    // One wallet handoff per explicit acknowledgement, including rejected requests.
+    approved.current = false;
+    setAck(false);
     const sent = (await p.request({
       method: 'eth_sendTransaction',
       params: walletRequestParams(call),
     })) as Hex;
-    setHash(sent);
-    setStatus('pending');
+    if (mounted.current) {
+      setHash(sent);
+      setStatus('pending');
+    }
   }
 
   async function refresh() {
@@ -124,7 +225,7 @@ export function ClankerLaunchPanel({
     const r = await client()
       .getTransactionReceipt({ hash })
       .catch(() => null);
-    setStatus(r ? r.status : 'pending');
+    if (mounted.current) setStatus(r ? r.status : 'status unknown');
   }
 
   return (
@@ -148,8 +249,8 @@ export function ClankerLaunchPanel({
               value={v}
               checked={venue === v}
               onChange={() => {
+                invalidateReview();
                 setVenue(v);
-                setCall(null);
               }}
             />
             {v}
@@ -171,10 +272,10 @@ export function ClankerLaunchPanel({
                     : undefined
               }
               value={draft[key]}
-              disabled={Boolean(hash)}
+              disabled={busy || Boolean(hash)}
               onChange={(e) => {
+                invalidateReview();
                 setDraft({ ...draft, [key]: e.target.value });
-                setCall(null);
               }}
             />
           ),
@@ -191,7 +292,7 @@ export function ClankerLaunchPanel({
       {call && !hash && (
         <div className="space-y-2">
           <p>
-            Deploys {draft.symbol} from {call.from} with{' '}
+            Deploys {reviewedSymbol} from {call.from} with{' '}
             {formatEther(call.value)} ETH
             {call.summary.devBuyWei > 0n ? ' (dev buy to your wallet)' : ''}.
             Estimated gas {gas?.toString() ?? '—'} units.
@@ -216,7 +317,11 @@ export function ClankerLaunchPanel({
             <input
               type="checkbox"
               checked={ack}
-              onChange={(e) => setAck(e.target.checked)}
+              disabled={busy}
+              onChange={(e) => {
+                approved.current = e.target.checked;
+                setAck(e.target.checked);
+              }}
             />{' '}
             I reviewed this launch and want my wallet to send it.
           </label>

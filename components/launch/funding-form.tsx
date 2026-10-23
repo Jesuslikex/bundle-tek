@@ -108,8 +108,8 @@ export function FundingForm({
         <h1>Wallet &amp; funding</h1>
         <p>
           {plan.chain === 'Solana'
-            ? 'Verify your wallet on Solana devnet. Review each request before approving; no mainnet transactions are available.'
-            : `${plan.chain} is a planning profile only. Switch to Solana for devnet tools.`}
+            ? 'Devnet tools and individually reviewed mainnet funding are available below. Mainnet transfers need a saved plan and separate wallet approval; nothing is sent automatically.'
+            : `${plan.chain} funding is a planning profile on this screen. Supported wallet and launch actions have their own reviews in Operations.`}
         </p>
       </div>
       <div className="form-body">
@@ -120,8 +120,12 @@ export function FundingForm({
           <div className="boundary-card">
             <WalletCards />
             <span>
-              <strong>{plan.chain} wallet integration is planned</strong>
-              <small>Wallet verification is available on Solana devnet.</small>
+              <strong>{plan.chain} funding is planning-only here</strong>
+              <small>
+                Supported launch wallet actions have their own reviews in
+                Operations. This page&apos;s wallet verification tool uses
+                Solana devnet.
+              </small>
             </span>
           </div>
         )}
@@ -171,7 +175,7 @@ export function FundingForm({
             </div>
             <div className="safety-invariants">
               <span>
-                <i>✓</i> Mainnet execution disabled
+                <i>✓</i> Scenario limits do not authorize transactions
               </span>
               <span>
                 <i>✓</i> Artificial volume prohibited
@@ -194,9 +198,7 @@ export function FundingForm({
                   {role}
                 </span>
                 <b>{count}</b>
-                <em className="muted">
-                  {state}
-                </em>
+                <em className="muted">{state}</em>
               </div>
             ))}
           </div>

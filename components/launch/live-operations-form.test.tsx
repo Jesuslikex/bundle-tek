@@ -35,6 +35,11 @@ it('shows the Base launch panel with Bankr selected for a Base / Bankr plan', as
   await render({ chain: 'Base', launchpad: 'Bankr', currency: 'ETH' });
   expect(host.textContent).toContain('Launch on Bankr (Base)');
   expect(checked()).toBe('Bankr');
+  expect(host.textContent).toContain('Transactions require separate approval');
+  expect(host.textContent).toContain('wallet confirmation');
+  expect(host.textContent).not.toContain(
+    'no trade or launch order submitter exists',
+  );
 });
 
 it('shows the Base launch panel with Clanker selected for a Base / Clanker plan', async () => {
@@ -46,4 +51,5 @@ it('shows the Base launch panel with Clanker selected for a Base / Clanker plan'
 it('does not show the Base launch panel for other plans', async () => {
   await render({});
   expect(host.textContent).not.toContain('(Base)');
+  expect(host.textContent).toContain('Market preview only');
 });

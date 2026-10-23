@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { act } from 'react';
+import { act, Activity, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { decodeFunctionData, parseEther } from 'viem';
 import { Clanker } from 'clanker-sdk/v4';
 import { ClankerLaunchPanel } from './clanker-launch-panel';
+import { connectEvmWallet } from '@/lib/evm-wallet';
 
 const admin = '0x1111111111111111111111111111111111111111';
 vi.mock('@/lib/evm-wallet', () => ({
@@ -17,6 +18,7 @@ const sent: { to: string; data: `0x${string}`; value: string }[] = [];
 const rpcMethods: string[] = [];
 
 beforeEach(() => {
+  vi.mocked(connectEvmWallet).mockReset().mockResolvedValue(admin);
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -143,4 +145,209 @@ it('shows validation errors without asking the wallet to sign', async () => {
   );
   expect(sent).toHaveLength(0);
   expect(rpcMethods).toEqual([]);
+});
+
+it.each(['eth_call', 'eth_estimateGas'])(
+  'does not restore an old review after inputs change during %s',
+  async (method) => {
+    let release!: () => void,
+      waiting = false;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (...args: Parameters<typeof fetch>) => {
+        const body = JSON.parse((args[1] as RequestInit).body as string);
+        if (body.method === method) {
+          waiting = true;
+          await barrier;
+        }
+        return original(...args);
+      }),
+    );
+    await act(async () =>
+      root.render(<ClankerLaunchPanel name="Test" symbol="TST" />),
+    );
+    await act(async () => button('Simulate launch').click());
+    await vi.waitFor(() => expect(waiting).toBe(true));
+    await act(async () => type('Token symbol', 'NEW'));
+    await act(async () => release());
+    await vi.waitFor(() =>
+      expect(button('Simulate launch').disabled).toBe(false),
+    );
+    expect(button('Send with my wallet')).toBeUndefined();
+    expect(sent).toHaveLength(0);
+    await act(async () => button('Simulate launch').click());
+    expect(host.textContent).toContain('Deploys NEW');
+    expect(button('Send with my wallet').disabled).toBe(true);
+  },
+);
+
+it('invalidates an approved review before a new simulation, including when it fails', async () => {
+  await act(async () =>
+    root.render(<ClankerLaunchPanel name="Test" symbol="TST" />),
+  );
+  await act(async () => button('Simulate launch').click());
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(),
+  );
+  expect(button('Send with my wallet').disabled).toBe(false);
+  vi.mocked(connectEvmWallet).mockRejectedValueOnce(
+    new Error('Connection rejected'),
+  );
+  await act(async () => button('Simulate launch').click());
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'Connection rejected',
+  );
+  expect(button('Send with my wallet')).toBeUndefined();
+  expect(sent).toHaveLength(0);
+});
+
+it('refuses a pending send after the parent launch context changes', async () => {
+  await act(async () =>
+    root.render(<ClankerLaunchPanel name="Test" symbol="TST" />),
+  );
+  await act(async () => button('Simulate launch').click());
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(),
+  );
+  let release!: (value: typeof admin) => void;
+  vi.mocked(connectEvmWallet).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  await act(async () => button('Send with my wallet').click());
+  const isCurrent = vi.mocked(connectEvmWallet).mock.calls.at(-1)![2]!;
+  expect(isCurrent()).toBe(true);
+  await act(async () =>
+    root.render(<ClankerLaunchPanel name="Other" symbol="NEW" />),
+  );
+  expect(isCurrent()).toBe(false);
+  await act(async () => release(admin));
+  expect(sent).toHaveLength(0);
+  expect(button('Send with my wallet')).toBeUndefined();
+  expect(
+    host.querySelector<HTMLInputElement>('input[aria-label="Token symbol"]')
+      ?.value,
+  ).toBe('NEW');
+});
+
+it('does not carry a prepared review to a replacement wallet provider', async () => {
+  await act(async () =>
+    root.render(<ClankerLaunchPanel name="Test" symbol="TST" />),
+  );
+  await act(async () => button('Simulate launch').click());
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(),
+  );
+  const request = vi.fn();
+  (globalThis as { ethereum?: unknown }).ethereum = { request };
+  await act(async () => button('Send with my wallet').click());
+  expect(request).not.toHaveBeenCalled();
+  expect(button('Send with my wallet')).toBeUndefined();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'Wallet provider changed',
+  );
+  expect(sent).toHaveLength(0);
+});
+
+it('retains the account-change refusal before handing anything to the wallet', async () => {
+  await act(async () =>
+    root.render(<ClankerLaunchPanel name="Test" symbol="TST" />),
+  );
+  await act(async () => button('Simulate launch').click());
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(),
+  );
+  vi.mocked(connectEvmWallet).mockResolvedValueOnce(
+    '0x2222222222222222222222222222222222222222',
+  );
+  await act(async () => button('Send with my wallet').click());
+  expect(sent).toHaveLength(0);
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'Wallet account changed',
+  );
+  expect(button('Send with my wallet')).toBeUndefined();
+});
+
+it('allows only one wallet handoff for an acknowledgement, including a rejected request', async () => {
+  await act(async () =>
+    root.render(<ClankerLaunchPanel name="Test" symbol="TST" />),
+  );
+  await act(async () => button('Simulate launch').click());
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(),
+  );
+  const p = (
+    globalThis as {
+      ethereum?: { request: (args: unknown) => Promise<unknown> };
+    }
+  ).ethereum!;
+  let reject!: (error: Error) => void;
+  const request = vi.fn(
+    () =>
+      new Promise((_resolve, refuse) => {
+        reject = refuse;
+      }),
+  );
+  p.request = request;
+  const send = button('Send with my wallet');
+  await act(async () => {
+    send.click();
+    send.click();
+  });
+  expect(request).toHaveBeenCalledOnce();
+  expect(
+    host.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
+  ).toBe(false);
+  await act(async () => reject(new Error('Request declined')));
+  expect(send.disabled).toBe(true);
+  await act(async () => send.click());
+  expect(request).toHaveBeenCalledOnce();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'Request declined',
+  );
+});
+
+it('survives Strict Mode cleanup with explicit simulation and fresh unchecked consent', async () => {
+  await act(async () =>
+    root.render(
+      <StrictMode>
+        <ClankerLaunchPanel name="Test" symbol="TST" />
+      </StrictMode>,
+    ),
+  );
+  expect(rpcMethods).toEqual([]);
+  await act(async () => button('Simulate launch').click());
+  expect(rpcMethods).toEqual(['eth_call', 'eth_estimateGas']);
+  expect(host.textContent).toContain('Deploys TST');
+  expect(button('Send with my wallet').disabled).toBe(true);
+  expect(sent).toHaveLength(0);
+});
+
+it('clears a checked review when a hidden panel is restored', async () => {
+  const render = (mode: 'visible' | 'hidden') =>
+    act(async () =>
+      root.render(
+        <Activity mode={mode}>
+          <ClankerLaunchPanel name="Test" symbol="TST" />
+        </Activity>,
+      ),
+    );
+  await render('visible');
+  await act(async () => button('Simulate launch').click());
+  await act(async () =>
+    host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(),
+  );
+  expect(button('Send with my wallet').disabled).toBe(false);
+  await render('hidden');
+  await render('visible');
+  expect(button('Send with my wallet')).toBeUndefined();
+  expect(sent).toHaveLength(0);
+  await act(async () => button('Simulate launch').click());
+  expect(button('Send with my wallet').disabled).toBe(true);
 });
