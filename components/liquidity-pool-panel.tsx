@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createPublicClient,
   formatEther,
@@ -15,7 +15,12 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { EVM_NETWORKS } from '@/lib/evm-network';
-import { connectEvmWallet, walletError } from '@/lib/evm-wallet';
+import {
+  connectEvmWallet,
+  providerAccounts,
+  providerChain,
+  walletError,
+} from '@/lib/evm-wallet';
 import {
   UNISWAP_V2,
   approveRouterCall,
@@ -31,10 +36,35 @@ import {
   type LpPosition,
   type UniswapV2Chain,
 } from '@/lib/uniswap-v2-liquidity';
-
 type Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on?: (event: string, listener: () => void) => void;
+  removeListener?: (event: string, listener: () => void) => void;
 };
+type Outcome = {
+  id: string;
+  chain: UniswapV2Chain;
+  account: Address;
+  token: string;
+  purpose: string;
+  hash: Hex | null;
+  status: 'unknown' | 'success' | 'reverted' | 'declined';
+};
+function receiptStatus(value: unknown, hash: Hex): 'success' | 'reverted' {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('transactionHash' in value) ||
+    typeof value.transactionHash !== 'string' ||
+    value.transactionHash.toLowerCase() !== hash.toLowerCase() ||
+    !('status' in value) ||
+    (value.status !== 'success' && value.status !== 'reverted')
+  )
+    throw new Error(
+      'The original transaction outcome is unknown. Check its saved hash before another operation.',
+    );
+  return value.status as 'success' | 'reverted';
+}
 const ZERO = '0x0000000000000000000000000000000000000000';
 const clients = new Map<
   UniswapV2Chain,
@@ -49,13 +79,138 @@ const clientFor = (chain: UniswapV2Chain) => {
   return c;
 };
 const pct = (bps: number) => (bps / 100).toFixed(2) + '%';
-
 export function LiquidityPoolPanel({
   chain = 'Ethereum',
   tokenDecimals = 18,
 }: {
   chain?: UniswapV2Chain;
   tokenDecimals?: number;
+}) {
+  const [outcomes, setOutcomes] = useState<Outcome[]>([]);
+  const [checking, setChecking] = useState(false);
+  const [recoveryError, setRecoveryError] = useState('');
+  const recoveryPending = useRef(false);
+  const sending = useRef(false);
+  const unresolved = useRef(new Set<string>());
+  const [sendPending, setSendPending] = useState(false);
+  const acquireSend = useCallback(() => {
+    if (
+      sending.current ||
+      recoveryPending.current ||
+      unresolved.current.size > 0
+    )
+      return null;
+    sending.current = true;
+    setSendPending(true);
+    return () => {
+      sending.current = false;
+      setSendPending(false);
+    };
+  }, []);
+  const retain = useCallback((outcome: Outcome) => {
+    if (outcome.status === 'unknown') unresolved.current.add(outcome.id);
+    else unresolved.current.delete(outcome.id);
+    setOutcomes((rows) => [
+      ...rows.filter((row) => row.id !== outcome.id),
+      outcome,
+    ]);
+  }, []);
+  async function recover(row: Outcome) {
+    if (recoveryPending.current || sending.current || !row.hash) return;
+    recoveryPending.current = true;
+    setChecking(true);
+    setRecoveryError('');
+    try {
+      const client = clientFor(row.chain);
+      if ((await client.getChainId()) !== EVM_NETWORKS[row.chain].id)
+        throw new Error('Receipt provider network mismatch.');
+      const receipt = await client.getTransactionReceipt({ hash: row.hash });
+      if ((await client.getChainId()) !== EVM_NETWORKS[row.chain].id)
+        throw new Error('Receipt provider network mismatch.');
+      retain({ ...row, status: receiptStatus(receipt, row.hash) });
+    } catch {
+      setRecoveryError(
+        'The original transaction outcome is still unknown. No transaction was retried.',
+      );
+    } finally {
+      recoveryPending.current = false;
+      setChecking(false);
+    }
+  }
+  const blocked = outcomes.some((row) => row.status === 'unknown');
+  return (
+    <>
+      <LiquidityPoolContext
+        key={JSON.stringify([chain, tokenDecimals])}
+        chain={chain}
+        tokenDecimals={tokenDecimals}
+        retain={retain}
+        blocked={blocked || checking || sendPending}
+        acquireSend={acquireSend}
+      />
+      {outcomes.length > 0 && (
+        <section
+          aria-label="Liquidity transaction history"
+          className="min-w-0 break-words"
+        >
+          <p>
+            These transaction references last for this mounted workspace only.
+            Save the hash before leaving. Receipt status is not an independent
+            check of token transfers or finality.
+          </p>
+          {outcomes.map((row) => (
+            <article key={row.id}>
+              <p>
+                {row.purpose} · {row.chain} · {row.account} · token {row.token}
+              </p>
+              <p>
+                {row.status === 'unknown'
+                  ? 'Outcome unknown. New sends are blocked.'
+                  : row.status === 'reverted'
+                    ? 'Transaction reverted. Network fees may have been charged.'
+                    : row.status === 'declined'
+                      ? 'Wallet request declined; no transaction was submitted.'
+                      : 'Original transaction receipt reports success. Review the pool again before another action.'}
+              </p>
+              {row.hash ? (
+                <>
+                  <code className="break-all">{row.hash}</code>
+                  {row.status === 'unknown' && (
+                    <Button
+                      type="button"
+                      disabled={checking || sendPending}
+                      onClick={() => void recover(row)}
+                    >
+                      Check original receipt
+                    </Button>
+                  )}
+                </>
+              ) : row.status === 'unknown' ? (
+                <p>
+                  No valid transaction hash was returned. Check your wallet
+                  transaction history; this panel cannot safely retry.
+                </p>
+              ) : null}
+            </article>
+          ))}
+          {recoveryError && <p role="alert">{recoveryError}</p>}
+        </section>
+      )}
+    </>
+  );
+}
+function LiquidityPoolContext({
+  chain,
+  tokenDecimals,
+  retain,
+  blocked,
+  acquireSend,
+}: {
+  chain: UniswapV2Chain;
+  tokenDecimals: number;
+  retain: (outcome: Outcome) => void;
+  blocked: boolean;
+  acquireSend: () => (() => void) | null;
 }) {
   const CHAIN = chain;
   const client = clientFor(chain);
@@ -71,30 +226,101 @@ export function LiquidityPoolPanel({
   const [seedToken, setSeedToken] = useState('');
   const [seedEth, setSeedEth] = useState('');
   const [seedAck, setSeedAck] = useState(false);
+  const mounted = useRef(true);
+  const epoch = useRef(0);
+  const pending = useRef(false);
+  const reviewedProvider = useRef<Provider | null>(null);
   const provider = () =>
     (globalThis as { ethereum?: Provider }).ethereum ?? null;
-
-  async function guarded(task: () => Promise<void>) {
+  useEffect(() => {
+    mounted.current = true;
+    const wallet = provider();
+    const invalidate = () => {
+      epoch.current++;
+      setAccount(null);
+      setPosition(null);
+      setNoPair(false);
+      setAck(false);
+      setSeedAck(false);
+      setNote(
+        'Wallet context changed. Review the pool again. An existing transaction can still settle.',
+      );
+    };
+    wallet?.on?.('accountsChanged', invalidate);
+    wallet?.on?.('chainChanged', invalidate);
+    return () => {
+      mounted.current = false;
+      wallet?.removeListener?.('accountsChanged', invalidate);
+      wallet?.removeListener?.('chainChanged', invalidate);
+    };
+  }, []);
+  function current(run: number, wallet?: Provider) {
+    return (
+      mounted.current &&
+      epoch.current === run &&
+      (!wallet || provider() === wallet)
+    );
+  }
+  function assertCurrent(run: number, wallet?: Provider) {
+    if (!current(run, wallet))
+      throw new Error(
+        'Wallet or pool context changed. Review again; an existing transaction can still settle.',
+      );
+  }
+  async function guarded(
+    task: (run: number) => Promise<void>,
+    sending = false,
+  ) {
+    if (pending.current || (sending && blocked)) return;
+    const release = sending ? acquireSend() : null;
+    if (sending && !release) return;
+    pending.current = true;
+    const run = epoch.current;
     setBusy(true);
     setError('');
     setNote('');
     try {
-      await task();
+      await task(run);
     } catch (e) {
-      setError(walletError(e));
+      if (current(run)) {
+        if (sending) {
+          // An uncertain or failed request never revives its original consent after recovery.
+          setAccount(null);
+          setPosition(null);
+          setNoPair(false);
+          setAck(false);
+          setSeedAck(false);
+          reviewedProvider.current = null;
+        }
+        setError(walletError(e));
+      }
     } finally {
-      setBusy(false);
+      pending.current = false;
+      release?.();
+      if (mounted.current) setBusy(false);
     }
   }
-  async function review() {
+  async function review(run: number) {
+    setAck(false);
+    setSeedAck(false);
+    setAccount(null);
+    setPosition(null);
+    setNoPair(false);
     const wallet = provider();
     if (!wallet) throw new Error('No browser wallet found. Install one first.');
     if (!isAddress(token)) throw new Error('Enter the token contract address.');
     const address = getAddress(
-      await connectEvmWallet(wallet as never, CHAIN),
+      await connectEvmWallet(wallet as never, CHAIN, () =>
+        current(run, wallet),
+      ),
     ) as Address;
-    setAccount(address);
+    assertCurrent(run, wallet);
+    reviewedProvider.current = wallet;
+    setAccount(null);
+    setPosition(null);
+    setNoPair(false);
     setAck(false);
+    setSeedAck(false);
     const tokenAddress = getAddress(token);
     const { factory, weth, router } = UNISWAP_V2[CHAIN];
     // Confirm the pinned router really points at the pinned factory and WETH
@@ -111,6 +337,10 @@ export function LiquidityPoolPanel({
         functionName: 'WETH',
       }),
     ]);
+    assertCurrent(run, wallet);
+    if ((await client.getChainId()) !== EVM_NETWORKS[CHAIN].id)
+      throw new Error('Pool provider network mismatch.');
+    assertCurrent(run, wallet);
     if (
       getAddress(routerFactory) !== factory ||
       getAddress(routerWeth) !== weth
@@ -124,7 +354,10 @@ export function LiquidityPoolPanel({
       functionName: 'getPair',
       args: [tokenAddress, weth],
     });
+    assertCurrent(run, wallet);
     if (pair === ZERO) {
+      await checkWallet(run, wallet, address);
+      setAccount(address);
       setPosition(null);
       setNoPair(true);
       return;
@@ -153,6 +386,8 @@ export function LiquidityPoolPanel({
         args: [address],
       }),
     ]);
+    await checkWallet(run, wallet, address);
+    setAccount(address);
     setPosition(
       lpPosition({
         pair,
@@ -164,35 +399,113 @@ export function LiquidityPoolPanel({
       }),
     );
   }
-  // The browser wallet shows each transaction for the user to confirm.
-  async function send(to: Address, data: Hex, value = 0n) {
-    // The wallet may have switched network since review; never send elsewhere.
-    const chainId = await provider()!.request({ method: 'eth_chainId' });
+  async function checkWallet(run: number, wallet: Provider, address: Address) {
+    assertCurrent(run, wallet);
+    const [network, accounts] = await Promise.all([
+      wallet.request({ method: 'eth_chainId' }),
+      wallet.request({ method: 'eth_accounts' }),
+    ]);
+    assertCurrent(run, wallet);
+    providerChain(network, CHAIN);
     if (
-      typeof chainId !== 'string' ||
-      Number.parseInt(chainId, 16) !== EVM_NETWORKS[CHAIN].id
+      !providerAccounts(accounts, CHAIN).some((a) => getAddress(a) === address)
+    )
+      throw new Error('Wallet account changed. Review again.');
+  }
+  // Each request still requires the browser wallet's own explicit confirmation.
+  async function send(
+    run: number,
+    purpose: string,
+    to: Address,
+    data: Hex,
+    value = 0n,
+  ) {
+    const wallet = reviewedProvider.current;
+    if (!wallet || !account)
+      throw new Error('Review the wallet and pool first.');
+    assertCurrent(run, wallet);
+    const [network, accounts, rpcChain] = await Promise.all([
+      wallet.request({ method: 'eth_chainId' }),
+      wallet.request({ method: 'eth_accounts' }),
+      client.getChainId(),
+    ]);
+    assertCurrent(run, wallet);
+    providerChain(network, CHAIN);
+    if (
+      rpcChain !== EVM_NETWORKS[CHAIN].id ||
+      !providerAccounts(accounts, CHAIN).some((a) => getAddress(a) === account)
     )
       throw new Error(
-        `Switch your wallet back to ${CHAIN} and review again. Nothing was sent.`,
+        'Wallet account or provider network changed. Review again.',
       );
-    const hash = await provider()!.request({
-      method: 'eth_sendTransaction',
-      params: [
-        {
-          from: account,
-          to,
-          data,
-          ...(value > 0n ? { value: `0x${value.toString(16)}` } : {}),
-        },
-      ],
-    });
-    if (typeof hash !== 'string' || !/^0x[0-9a-f]{64}$/i.test(hash))
-      throw new Error('Wallet returned an unexpected transaction hash.');
-    await client.waitForTransactionReceipt({ hash: hash as Hex });
+    const original: Outcome = {
+      id: crypto.randomUUID(),
+      chain: CHAIN,
+      account,
+      token,
+      purpose,
+      hash: null,
+      status: 'unknown',
+    };
+    // Retain unknown BEFORE issuing the request: a lost wallet reply cannot prove no send.
+    retain(original);
+    let rawHash: unknown;
+    try {
+      rawHash = await wallet.request({
+        method: 'eth_sendTransaction',
+        params: [
+          {
+            from: account,
+            chainId: `0x${EVM_NETWORKS[CHAIN].id.toString(16)}`,
+            to,
+            data,
+            ...(value > 0n ? { value: `0x${value.toString(16)}` } : {}),
+          },
+        ],
+      });
+    } catch (cause) {
+      // Only the wallet's explicit user rejection proves this request was declined.
+      if (
+        cause &&
+        typeof cause === 'object' &&
+        'code' in cause &&
+        cause.code === 4001
+      )
+        retain({ ...original, status: 'declined' });
+      throw new Error(
+        'Wallet request did not return a confirmed outcome. Check the retained transaction reference.',
+      );
+    }
+    if (typeof rawHash !== 'string' || !/^0x[0-9a-f]{64}$/i.test(rawHash))
+      throw new Error(
+        'Wallet returned no valid transaction hash. The outcome is unknown; do not retry.',
+      );
+    const hash = rawHash as Hex;
+    const submitted = { ...original, hash };
+    retain(submitted);
+    // Preserve the hash even when context changes while the wallet prompt is open.
+    assertCurrent(run, wallet);
+    let status: 'success' | 'reverted';
+    try {
+      const receipt = await client.waitForTransactionReceipt({ hash });
+      if ((await client.getChainId()) !== EVM_NETWORKS[CHAIN].id)
+        throw new Error('Receipt provider network mismatch.');
+      status = receiptStatus(receipt, hash);
+    } catch {
+      throw new Error(
+        'The original wait did not establish an outcome. Consult the retained transaction status. No follow-on transaction was requested.',
+      );
+    }
+    retain({ ...submitted, status });
+    if (status !== 'success')
+      throw new Error(
+        'Transaction reverted. Network fees may have been charged. No follow-on transaction was requested.',
+      );
+    assertCurrent(run, wallet);
     return hash;
   }
-  async function createPool() {
-    if (!account) return;
+  async function createPool(run: number) {
+    if (!account || !seedAck) return;
     const tokenAddress = getAddress(token);
     const tokenAmount = parseUnits(seedToken, tokenDecimals);
     const ethAmount = parseEther(seedEth);
@@ -218,22 +531,33 @@ export function LiquidityPoolPanel({
         args: [account, router],
       }),
     ]);
+    assertCurrent(run, reviewedProvider.current ?? undefined);
     if (balance < tokenAmount)
       throw new Error('This wallet holds fewer tokens than that.');
     if (allowance < tokenAmount) {
       setNote('Approve the token for the router in your wallet first…');
-      await send(tokenAddress, approveTokenCall(CHAIN, tokenAmount));
+      await send(
+        run,
+        'Token approval',
+        tokenAddress,
+        approveTokenCall(CHAIN, tokenAmount),
+      );
     }
-    const hash = await send(router, data, ethAmount);
+    const hash = await send(run, 'Create pool', router, data, ethAmount);
     setNote(`Pool created in ${hash}.`);
     setSeedAck(false);
-    await review();
+    await review(run);
   }
-  async function confirm() {
-    if (!position || !account) return;
+  async function confirm(run: number) {
+    if (!position || !account || !ack) return;
     const { router } = UNISWAP_V2[CHAIN];
     if (action === 'burn') {
-      const hash = await send(position.pair, burnLpCall(position));
+      const hash = await send(
+        run,
+        'Burn LP',
+        position.pair,
+        burnLpCall(position),
+      );
       setNote(`LP burned in ${hash}.`);
     } else {
       const allowance = await client.readContract({
@@ -244,9 +568,16 @@ export function LiquidityPoolPanel({
       });
       if (allowance < position.lpBalance) {
         setNote('Approve the router in your wallet first…');
-        await send(position.pair, approveRouterCall(CHAIN, position.lpBalance));
+        await send(
+          run,
+          'LP approval',
+          position.pair,
+          approveRouterCall(CHAIN, position.lpBalance),
+        );
       }
       const hash = await send(
+        run,
+        'Remove liquidity',
         router,
         removeLiquidityCall({
           token: getAddress(token),
@@ -258,9 +589,8 @@ export function LiquidityPoolPanel({
       );
       setNote(`Liquidity removed in ${hash}.`);
     }
-    await review();
+    await review(run);
   }
-
   return (
     <section aria-label="Liquidity pool" className="min-w-0 space-y-2">
       <h3>Liquidity pool · Uniswap V2 on {chain}</h3>
@@ -274,7 +604,15 @@ export function LiquidityPoolPanel({
           aria-label="Token contract address"
           placeholder="0x… token address"
           value={token}
+          disabled={busy || blocked}
           onChange={(e) => {
+            if (pending.current) return;
+            epoch.current++;
+            setAccount(null);
+            setAck(false);
+            setSeedAck(false);
+            setError('');
+            setNote('');
             setToken(e.target.value.trim());
             setPosition(null);
             setNoPair(false);
@@ -291,7 +629,7 @@ export function LiquidityPoolPanel({
         </Button>
       </div>
       {account && (noPair || position?.totalSupply === 0n) && (
-        <fieldset className="space-y-2">
+        <fieldset disabled={busy || blocked} className="space-y-2">
           <legend>Create the pool</legend>
           <p>
             No liquidity exists for this token and WETH yet. Seeding it sets the
@@ -333,8 +671,8 @@ export function LiquidityPoolPanel({
           </label>
           <Button
             type="button"
-            disabled={busy || !seedAck || !seedToken || !seedEth}
-            onClick={() => void guarded(createPool)}
+            disabled={busy || blocked || !seedAck || !seedToken || !seedEth}
+            onClick={() => void guarded(createPool, true)}
           >
             Create pool
           </Button>
@@ -366,7 +704,7 @@ export function LiquidityPoolPanel({
           {position.lpBalance === 0n ? (
             <p>This wallet holds no LP tokens for this pool.</p>
           ) : (
-            <fieldset className="space-y-2">
+            <fieldset disabled={busy || blocked} className="space-y-2">
               <legend>Action</legend>
               <label className="mr-4">
                 <input
@@ -402,8 +740,8 @@ export function LiquidityPoolPanel({
               </label>
               <Button
                 type="button"
-                disabled={busy || !ack}
-                onClick={() => void guarded(confirm)}
+                disabled={busy || blocked || !ack}
+                onClick={() => void guarded(confirm, true)}
               >
                 {action === 'burn' ? 'Burn all LP' : 'Remove all liquidity'}
               </Button>
@@ -411,7 +749,13 @@ export function LiquidityPoolPanel({
           )}
         </>
       )}
-      {note && <output>{note}</output>}
+      {blocked && (
+        <output>
+          Check the original transaction outcome before any new send. Refreshing
+          the pool does not clear an unknown outcome.
+        </output>
+      )}
+      {note && <output className="block break-all">{note}</output>}
       {error && <p role="alert">{error}</p>}
     </section>
   );
