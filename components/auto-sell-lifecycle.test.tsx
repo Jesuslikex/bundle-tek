@@ -473,6 +473,121 @@ async function startEditable() {
   await click('Edit');
   return start.mock.instances[0] as AutoSellRunner;
 }
+it('compacts a running strategy without hiding its settings summary or changing the approved configuration', async () => {
+  vi.mocked(unlockVault).mockResolvedValueOnce({
+    payload: { wallets: [{ family: 'solana', address }] },
+  } as VaultSession);
+  const start = vi.spyOn(AutoSellRunner.prototype, 'start');
+  await startUnlock();
+  const instance = start.mock.instances[0] as AutoSellRunner;
+  const original = instance.configuration();
+  const toggle = () =>
+    host.querySelector<HTMLButtonElement>(
+      'article[aria-label="Counter strategy"] button[aria-controls]',
+    )!;
+  const panel = () =>
+    document.getElementById(toggle().getAttribute('aria-controls')!)!;
+  expect(toggle().getAttribute('aria-expanded')).toBe('false');
+  expect(toggle().getAttribute('aria-label')).toBe('Expand Counter settings');
+  expect(panel().hidden).toBe(true);
+  expect(host.textContent).toContain('10% of each eligible outside buy');
+  await act(async () => toggle().click());
+  expect(panel().hidden).toBe(false);
+  expect(panel().querySelector('fieldset')!.disabled).toBe(true);
+  await click('Pause');
+  expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  expect(instance.configuration()).toEqual(original);
+  await click('Edit');
+  expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  expect(panel().querySelector('fieldset')!.disabled).toBe(false);
+  expect(host.textContent).toContain('Draft settings: not applied to this run');
+  await click('Cancel edits');
+  expect(toggle().getAttribute('aria-expanded')).toBe('false');
+  expect(instance.configuration()).toEqual(original);
+  expect(host.textContent).not.toContain(
+    'Draft settings: not applied to this run',
+  );
+  await click('Stop');
+  expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  expect(vi.mocked(unlockVault)).toHaveBeenCalledOnce();
+});
+it('shows edited sizing as a draft without applying it or silently approving it', async () => {
+  const instance = await startEditable();
+  await editSession(replicationSelector(), '20');
+  expect(host.textContent).toContain('20% of each eligible outside buy');
+  expect(host.textContent).toContain('Draft settings: not applied to this run');
+  expect(instance.configuration().strategies[0].replicationPercent).toBe('10');
+  expect(host.querySelector('[data-edit-approval] input')).toBeNull();
+  await click('Review changes');
+  expect(
+    host.querySelector<HTMLInputElement>('[data-edit-approval] input')!.checked,
+  ).toBe(false);
+  expect(instance.configuration().strategies[0].replicationPercent).toBe('10');
+});
+it('retains keyboard focus and the same disclosure DOM when the session expires naturally', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-10-23T00:00:00.000Z'));
+  vi.mocked(unlockVault).mockResolvedValueOnce({
+    payload: { wallets: [{ family: 'solana', address }] },
+  } as VaultSession);
+  const start = vi.spyOn(AutoSellRunner.prototype, 'start');
+  await startUnlock(async () => {
+    await editSession('[aria-label="Session duration seconds"]', '1');
+  });
+  const instance = start.mock.instances[0] as AutoSellRunner;
+  const toggle = host.querySelector<HTMLButtonElement>(
+    'article button[aria-controls]',
+  )!;
+  const panel = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+  toggle.focus();
+  expect(document.activeElement).toBe(toggle);
+  await act(async () => vi.advanceTimersByTimeAsync(16000));
+  expect(instance.snapshot().running).toBe(false);
+  expect(host.querySelector('article button[aria-controls]')).toBe(toggle);
+  expect(document.activeElement).toBe(toggle);
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(panel.hidden).toBe(false);
+});
+it.each(['dca', 'limit'] as const)(
+  'keeps the %s recipe visible while running fields stay disabled',
+  async (mode) => {
+    vi.mocked(unlockVault).mockResolvedValueOnce({
+      payload: { wallets: [{ family: 'solana', address }] },
+    } as VaultSession);
+    await startUnlock(async () => {
+      await click(mode === 'dca' ? '◷ DCA' : '⇡ Limit Orders');
+      await editSession('[aria-label="Start delay minutes"]', '1');
+      if (mode === 'dca') {
+        await editSession('input[id$="-dcaamt"]', '0.1');
+        await editSession('[aria-label="Interval minutes"]', '1');
+      } else {
+        await editSession('[aria-label="Order 1 amount"]', '0.1');
+        await editSession('[aria-label="Order 1 market cap"]', '25000');
+      }
+      const run = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === 'Run 1 Strategy',
+      )!;
+      expect(run.disabled, host.textContent?.slice(-1800)).toBe(false);
+    });
+    const toggle = host.querySelector<HTMLButtonElement>(
+      'article button[aria-controls]',
+    )!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(
+      document
+        .getElementById(toggle.getAttribute('aria-controls')!)!
+        .querySelector('fieldset')!.disabled,
+    ).toBe(true);
+    const summary = host.querySelector('[aria-label$="settings summary"]')!;
+    expect(summary.textContent).toContain(
+      mode === 'dca' ? 'DCA:' : 'Limit Orders:',
+    );
+    expect(summary.textContent).toContain(
+      mode === 'dca' ? '0.1% of supply' : '$25000 market cap',
+    );
+    await click('Stop');
+  },
+);
 function replicationSelector() {
   const label = [...host.querySelectorAll('label')].find((item) =>
     item.textContent?.includes('Replication Factor'),
@@ -496,6 +611,12 @@ it('requires exact unchecked edit approval and stays paused without another unlo
   expect(instance.snapshot().configurationRevision).toBe(2);
   expect(unlockVault).toHaveBeenCalledTimes(1);
   expect(host.textContent).not.toContain('I approve these exact');
+  expect(host.textContent).not.toContain(
+    'Draft settings: not applied to this run',
+  );
+  expect(
+    host.querySelector('[aria-label$="settings summary"]')!.textContent,
+  ).toContain('20% of each eligible outside buy');
   await click('Stop');
 });
 it('invalidates approval on every draft edit including changing back to the reviewed value', async () => {

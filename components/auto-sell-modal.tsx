@@ -58,6 +58,7 @@ import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import styles from './auto-sell-modal.module.css';
 import { AutoSellSessionSummary } from './auto-sell-session-summary';
+import { AutoSellStrategySummary } from './auto-sell-strategy-summary';
 import { AutoSellOutcomeRead } from './auto-sell-outcome-read';
 import { AutoSellSavedOutcomes } from './auto-sell-saved-outcomes';
 import {
@@ -783,6 +784,8 @@ function AutoSellContext({
                 strategy={s}
                 error={errors[i]}
                 disabled={(running && !editing) || busy}
+                compact={running && !editing}
+                draft={editing}
                 inRange={marketCapInRange(s, marketCap)}
                 state={snapshot?.states[s.id]}
                 pct={pct}
@@ -1335,6 +1338,8 @@ function StrategyCard({
   strategy: s,
   error,
   disabled,
+  compact,
+  draft,
   inRange,
   state,
   pct,
@@ -1346,6 +1351,8 @@ function StrategyCard({
   strategy: AutoSellStrategy;
   error: string | null;
   disabled: boolean;
+  compact: boolean;
+  draft: boolean;
   inRange: boolean;
   state?: AutoSellSnapshot['states'][string];
   pct: (raw: bigint) => string;
@@ -1354,7 +1361,14 @@ function StrategyCard({
   onChange: (patch: Partial<AutoSellStrategy>) => void;
   onDelete: () => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [disclosure, setDisclosure] = useState({ compact, expanded: !compact });
+  // Reset only presentation when run/configure mode changes, preserving the
+  // card's DOM, keyboard focus and local fields across a natural session end.
+  if (disclosure.compact !== compact) {
+    setDisclosure({ compact, expanded: !compact });
+  }
+  const expanded =
+    disclosure.compact === compact ? disclosure.expanded : !compact;
   const id = useId();
   const [section, setSection] = useState<Section>(null);
   const initialDuration = s.endDurationSeconds
@@ -1444,13 +1458,24 @@ function StrategyCard({
           )}
           <button
             type="button"
-            aria-label={expanded ? 'Collapse' : 'Expand'}
-            onClick={() => setExpanded(!expanded)}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${s.name} settings`}
+            aria-expanded={expanded}
+            aria-controls={`${id}-settings`}
+            aria-describedby={
+              error && !expanded ? `${id}-collapsed-error` : undefined
+            }
+            onClick={() => setDisclosure({ compact, expanded: !expanded })}
           >
             {expanded ? '⌃' : '⌄'}
           </button>
         </div>
       </div>
+      <AutoSellStrategySummary strategy={s} draft={draft} />
+      {error && !expanded && (
+        <p className={styles.alert} id={`${id}-collapsed-error`}>
+          {error}
+        </p>
+      )}
       {state && (
         <p className={styles.stats}>
           Accounted {rawToDecimal(state.soldRaw, decimals)} (
@@ -1459,7 +1484,7 @@ function StrategyCard({
           {rawToDecimal(state.inFlightRaw, decimals)} · {stats}
         </p>
       )}
-      {expanded && (
+      <div id={`${id}-settings`} hidden={!expanded}>
         <fieldset disabled={disabled} className={styles.cardBody}>
           <legend className={styles.label}>Mode</legend>
           <div className={styles.tiles3} aria-label="Mode">
@@ -2009,7 +2034,7 @@ function StrategyCard({
             </p>
           )}
         </fieldset>
-      )}
+      </div>
     </article>
   );
 }
