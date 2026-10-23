@@ -15,7 +15,7 @@ import { decodeWarmupBuyReceipt } from '../lib/warmup-buy-receipt';
  * controlled receipt metadata only; no funded DEX, provider or execution proof. */
 export async function warmupExecutionSourceFixture(
   history: 'none' | 'buy' | 'sold' = 'none',
-  options: { acquiredRaw?: string } = {},
+  options: { acquiredRaw?: string; intervalSeconds?: number } = {},
 ) {
   const databaseAt = Date.now();
   const sqlite = solanaFamilyExclusionFixture();
@@ -48,7 +48,7 @@ export async function warmupExecutionSourceFixture(
       amount: '0.001',
       feeReserve: '0.01',
       cycles: 2,
-      intervalSeconds: 60,
+      intervalSeconds: options.intervalSeconds ?? 60,
       startAt: date,
     };
     const planId = packets.buy.preparation.planId;

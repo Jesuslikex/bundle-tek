@@ -981,6 +981,13 @@
       "when": 1794860000000,
       "tag": "0139_wallet_warmup_execution_proposals",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "6",
+      "when": 1794860000001,
+      "tag": "0140_wallet_warmup_execution_approvals",
+      "breakpoints": true
     }
   ]
 }

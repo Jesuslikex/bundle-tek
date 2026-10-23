@@ -1,0 +1,150 @@
+{
+  "sourceBaseCommit": "75c3d2868aae812c3e05d8e4e335b3b85e0b14e6",
+  "scope": "private exact approval/root metadata only; no mounted HTTP/UI/runtime",
+  "integration": {
+    "files": 11,
+    "passed": 454,
+    "failed": 0,
+    "skipped": 0,
+    "report": "work/release-qa/warmup-approval-final-integration-20261023.json"
+  },
+  "finalTestOnlyStrengthening": {
+    "allApprovalTestsRerun": 37,
+    "passed": 37,
+    "failed": 0,
+    "report": "work/release-qa/warmup-approval-final-37-20261023.json",
+    "applicationCodeUnchangedSinceIntegrationAndFinalOpusReview": true,
+    "twoFinalTestAssertionsNotRereviewed": true
+  },
+  "nativeHarnessTests": 8,
+  "sourceFreeze": {
+    "files": 2384,
+    "unchanged": true,
+    "report": "work/release-qa/warmup-approval-final-source-20261023.json"
+  },
+  "static": {
+    "plainTypeScript": true,
+    "typedLintFiles": 5,
+    "formatFiles": 5,
+    "diffCheck": true
+  },
+  "localFreshLedger": {
+    "mode": "read-existing-disposable-local-only",
+    "matchingChecksums": 141,
+    "pending": 0,
+    "integrity": "ok",
+    "foreignKeysClean": true,
+    "passed": true
+  },
+  "localUpgrade": {
+    "mode": "disposable-memory-only",
+    "baselineChecksums": 140,
+    "applied": 1,
+    "finalMatchingChecksums": 141,
+    "pending": 0,
+    "originalLedgerUnchanged": true,
+    "originalWalletMetadataUnchanged": true,
+    "originalSchemaUnchanged": true,
+    "addedObjects": 48,
+    "foreignKeysClean": true,
+    "integrityCheck": "ok",
+    "sameChecksumHelperAsRunner": true,
+    "fullRunnerRetryNotClaimed": true,
+    "migrationSha256": "7aff9da7cfcce20371fdba699a34f2e15947c7d2bc6b9b5a6aad598592c65ad7",
+    "passed": true
+  },
+  "wholeFileWrangler": {
+    "migrations": 141,
+    "passed": true,
+    "scratch": "bundle-wrangler-migrations-M8Wwrw",
+    "scope": "disposable local only"
+  },
+  "opus": {
+    "initial": {
+      "startedAt": "2026-10-23T00:40:53.656Z",
+      "finishedAt": "2026-10-23T00:45:22.795Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "75c3d2868aae812c3e05d8e4e335b3b85e0b14e6",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 1.606705,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    "followup": {
+      "startedAt": "2026-10-23T00:51:10.702Z",
+      "finishedAt": "2026-10-23T00:54:19.346Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "75c3d2868aae812c3e05d8e4e335b3b85e0b14e6",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 1.0139942,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    "finalVerdict": "No blockers or regressions found; source review only, no tests or browser run by reviewer"
+  },
+  "ownedSha256": {
+    "lib/wallet-warmup-execution-approval.ts": "95bdd03efda6df9e53ed60239c9fc4611353de99e97fdb08aae15a06ec16e8ac",
+    "lib/wallet-warmup-execution-approval-schema.ts": "95bc638f664b9e248df057aad5ae6a598d63a957d66f018abf4ea6afe3cbb893",
+    "lib/wallet-warmup-execution-approval.test.ts": "580088240960207a7dbee363426fa07b21ab7bc67d5381492ac16c9c9c90e270",
+    "test/warmup-execution-source-fixture.ts": "38a84bf3c8bb0a6aa2801030e701ddebbc7ddbe4668d6fd26b949599587a2704",
+    "test/warmup-reconstruction-fixture.ts": "26ffe59a53c56d8471bef3041c61bcf2b8f2426fd5360cf5205a616b3c0a2d2a",
+    "drizzle/0140_wallet_warmup_execution_approvals.sql": "7aff9da7cfcce20371fdba699a34f2e15947c7d2bc6b9b5a6aad598592c65ad7",
+    "drizzle/meta/_journal.json": "6ff3a167a8b6106e091a9b2c1ff1c8510956896c466aeabcae623f108b4ce8d9"
+  },
+  "authority": {
+    "humanApprovalVerified": false,
+    "currentSourceVerified": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "automaticExecutionAllowed": false
+  },
+  "limits": [
+    "No mounted authenticated controller or unchecked approval UI",
+    "No retention policy beyond existing lifetime caps",
+    "No cross-feature wallet/lot financial holds",
+    "No large-proposal latency/runtime qualification",
+    "No browser/live provider/funded/deployed proof",
+    "All original deadlines/current-source rules retained; expired interrupted approval can remain without root",
+    "Privileged incorrect direct SQL can poison an immutable ID; reads refuse it"
+  ]
+}

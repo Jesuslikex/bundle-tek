@@ -20,8 +20,11 @@ import { env } from '../lib/server-env';
 export async function warmupReconstructionFixture(
   history: 'none' | 'buy' | 'sold' = 'none',
   maximum = false,
+  options: { intervalSeconds?: number } = {},
 ) {
-  const actual = maximum ? null : await warmupExecutionSourceFixture(history);
+  const actual = maximum
+    ? null
+    : await warmupExecutionSourceFixture(history, options);
   const sourceFixture =
     actual ?? (await warmupPublicAssetReviewFixture('maximum-plan'));
   const prior = env.SOLANA_INDEXER_RPC_URL;
