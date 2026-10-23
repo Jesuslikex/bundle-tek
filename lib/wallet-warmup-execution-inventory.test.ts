@@ -23,6 +23,7 @@ import {
   warmupProposalSqlTokens,
 } from './wallet-warmup-execution-proposal-schema';
 import { WARMUP_EXECUTION_APPROVAL_SCHEMA_SHA256 } from './wallet-warmup-execution-approval-schema';
+import { admitWarmupExecutionInventory } from './wallet-warmup-execution-inventory-view';
 const disposals: (() => void)[] = [];
 afterEach(() => {
   for (const dispose of disposals.splice(0)) dispose();
@@ -183,6 +184,8 @@ it.each(['incomplete', 'staged', 'published', 'approval', 'root'] as const)(
       calls = f.providerCalls(),
       result = await read(f.readonly.db, f.owner, undefined, signal());
     expect(f.providerCalls()).toBe(calls);
+    // Actual populated native-SQL service output, not the browser UI fixture.
+    expect(admitWarmupExecutionInventory(result)).toEqual(result);
     expect(result.rows[0]).toMatchObject({
       id: f.expected.id,
       consentId: f.expected.consentId,
@@ -386,7 +389,7 @@ function transport(
     })();
   });
 }
-it('pages 25 metadata identities in stable descending keyset order without guessing newer rows into an older page', async () => {
+it('admits service-made canonical cursors for an injected 26-row snapshot in stable keyset order', async () => {
   const f = await fixture(),
     seed = (n: number) =>
       `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -410,12 +413,18 @@ it('pages 25 metadata identities in stable descending keyset order without guess
     s.declaredBytes = s.rows.length * Number(original.declaredBytes);
   });
   const first = await read(synthetic.db, f.owner, undefined, signal());
+  // The service computes these DTOs/cursors; only the SELECT transport's row
+  // expansion is injected. This is not evidence of 26 actual SQL stage writes.
+  expect(admitWarmupExecutionInventory(first)).toEqual(first);
   expect(first.rows).toHaveLength(25);
   expect(first.rows[0].id).toBe(seed(26));
   expect(first.rows.at(-1)?.id).toBe(seed(2));
   expect(first.nextCursor).not.toBeNull();
   insertNewer = true;
   const second = await read(synthetic.db, f.owner, first.nextCursor, signal());
+  expect(admitWarmupExecutionInventory(second, first.nextCursor!)).toEqual(
+    second,
+  );
   expect(second.rows.map((r) => r.id)).toEqual([seed(1)]);
   expect(second.nextCursor).toBeNull();
   expect(new Set([...first.rows, ...second.rows].map((r) => r.id)).size).toBe(

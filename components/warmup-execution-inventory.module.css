@@ -1,0 +1,65 @@
+.panel {
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-block: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel h4,
+.panel h5 {
+  margin-block: 0 0.75rem;
+}
+.panel p {
+  margin-block: 0.75rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.panel button {
+  min-height: 44px;
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+}
+.capacity {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.75rem;
+}
+.capacity > div,
+.records > li {
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  padding: 0.75rem;
+  min-width: 0;
+}
+.panel dt {
+  font-weight: 600;
+}
+.panel dd {
+  margin: 0.25rem 0 0.75rem;
+}
+.records {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.panel summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 0.5rem;
+}
+.panel code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.signIn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.5rem;
+}

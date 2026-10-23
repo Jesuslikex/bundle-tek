@@ -19,6 +19,7 @@ import { WalletWarmupPlans } from '@/components/wallet-warmup-plans';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { WarmupPlanSummary } from './warmup-plan-summary';
 import { WarmupWalletHistory } from './warmup-wallet-history';
+import { WarmupExecutionInventory } from './warmup-execution-inventory';
 import styles from './wallet-warmup.module.css';
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
@@ -532,6 +533,7 @@ export function WalletWarmup({
           }}
         />
       </details>
+      {chain === 'Solana' && <WarmupExecutionInventory />}
       {plan && (
         <details className={styles.technical} aria-label="Warmup plan review">
           <summary>Full schedule and export</summary>
