@@ -4,6 +4,16 @@
   padding: 12px;
   margin: 12px 0;
 }
+.captures > summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+}
+.captures p,
+.captures li {
+  font-size: 12px;
+  line-height: 1.5;
+}
 .pairReview {
   margin-top: 12px;
   border-top: 1px solid var(--border, #303039);
@@ -175,6 +185,12 @@
   min-height: 44px;
 }
 .unknown p {
+  max-width: 32rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.unknown small {
+  display: block;
   max-width: 32rem;
   white-space: normal;
   overflow-wrap: anywhere;

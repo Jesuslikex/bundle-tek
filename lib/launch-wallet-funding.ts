@@ -30,8 +30,8 @@ export class LaunchFundingReadError extends Error {
   constructor(
     readonly status: number,
     source: LaunchFundingSource,
-    completed: number,
-    total: number,
+    readonly completed: number,
+    readonly total: number,
   ) {
     const reason =
       status === 401
@@ -168,6 +168,7 @@ export async function readLaunchFundingTimes(
     for (let start = 0; start < wallets.length; start += 100) {
       signal.throwIfAborted();
       if (source === 'provider' && start) {
+        deps.onProviderRead?.();
         progress({ completed, total: wallets.length, phase: 'waiting' });
         await (deps.sleep ?? wait)(17000, signal);
       }
@@ -180,7 +181,8 @@ export async function readLaunchFundingTimes(
           requested,
           signal,
           (p) => {
-            if (p.phase === 'reading') deps.onProviderRead?.();
+            if (p.phase === 'reading' || p.phase === 'waiting')
+              deps.onProviderRead?.();
             completed = start + p.completed;
             progress({
               completed,

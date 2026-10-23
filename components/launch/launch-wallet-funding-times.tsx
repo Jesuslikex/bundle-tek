@@ -24,10 +24,14 @@ import {
 } from '@/lib/wallet-funding-time';
 import type { FundingOriginProgress } from '@/lib/wallet-funding-origin-client';
 import styles from './launch-wallet-funding-times.module.css';
+import {
+  fundingHistoryNotBefore,
+  noteFundingHistoryRead,
+} from '@/lib/funding-history-window';
 
 // UI-only monotonic cooldown survives keyed reviews and closing/reopening panels.
 // Existing server gates remain authoritative and also cover other consumers.
-let providerNotBefore = 0;
+
 function inputKey(value: unknown) {
   try {
     return JSON.stringify(value) ?? null;
@@ -76,7 +80,7 @@ function FundingRead({ wallets }: { wallets: WalletFundingSelection }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [signIn, setSignIn] = useState(false);
-  const [cooldownUntil, setCooldownUntil] = useState(providerNotBefore);
+  const [cooldownUntil, setCooldownUntil] = useState(fundingHistoryNotBefore);
   const [clock, setClock] = useState(() => performance.now());
   const providerWait = Math.max(0, Math.ceil((cooldownUntil - clock) / 1000));
   useEffect(() => {
@@ -135,8 +139,11 @@ function FundingRead({ wallets }: { wallets: WalletFundingSelection }) {
   }
   async function read() {
     if (active.current) return;
-    if (source === 'provider' && performance.now() < providerNotBefore) {
-      setCooldownUntil(providerNotBefore);
+    if (
+      source === 'provider' &&
+      performance.now() < fundingHistoryNotBefore()
+    ) {
+      setCooldownUntil(fundingHistoryNotBefore());
       setClock(performance.now());
       setMessage('Wait for the provider cooldown before starting a new check.');
       return;
@@ -160,9 +167,9 @@ function FundingRead({ wallets }: { wallets: WalletFundingSelection }) {
         },
         {
           onProviderRead: () => {
-            providerNotBefore = performance.now() + 17000;
+            noteFundingHistoryRead();
             if (active.current === controller) {
-              setCooldownUntil(providerNotBefore);
+              setCooldownUntil(fundingHistoryNotBefore());
               setClock(performance.now());
             }
           },

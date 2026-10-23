@@ -1,5 +1,5 @@
 'use client';
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Clock3 } from 'lucide-react';
 import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 import {
@@ -15,17 +15,72 @@ import {
   type FundingOriginProgress,
 } from '@/lib/wallet-funding-origin-client';
 import type { FundingOriginBatch } from '@/lib/wallet-funding-origin-view';
+import {
+  readLaunchFundingTimes,
+  LaunchFundingReadError,
+  type LaunchFundingComparison,
+} from '@/lib/launch-wallet-funding';
+import {
+  fundingHistoryNotBefore,
+  noteFundingHistoryRead,
+} from '@/lib/funding-history-window';
 import styles from './wallet-funding-proximity.module.css';
-export function useWalletFundingProximity(selection: WalletFundingSelection) {
+type BatchedResult = LaunchFundingComparison & {
+  wallets: LaunchFundingComparison['observations'];
+};
+function batchReadError(
+  error: LaunchFundingReadError,
+  source: 'saved' | 'provider',
+) {
+  const reason =
+    error.status === 401
+      ? 'Sign in before checking funding history.'
+      : error.status === 409
+        ? 'Wallet references changed. Refresh My wallets and check again.'
+        : error.status === 429
+          ? `${source === 'provider' ? 'Provider history' : 'Wallet read'} rate limited; wait at least 15 seconds before a new check.`
+          : error.status === 408
+            ? 'History check timed out. Wait before checking again.'
+            : error.status === 503
+              ? source === 'provider'
+                ? 'Provider history is unavailable. Try again later or choose Saved receipts.'
+                : 'Saved receipt storage is unavailable. Try again later.'
+              : 'Funding history could not be checked.';
+  return `Funding check stopped after ${error.completed} of ${error.total} wallets. No partial result was kept. ${reason} No automatic retry was made.`;
+}
+export function useWalletFundingProximity(
+  selection: WalletFundingSelection,
+  maximumWallets: 100 | 500 = 100,
+) {
   const [source, setSource] = useState<'saved' | 'provider'>('saved');
-  const key = JSON.stringify({ source, selection });
+  const capacityValid = maximumWallets === 100 || maximumWallets === 500;
+  const key = JSON.stringify({ source, selection, maximumWallets });
+  const [cooldownUntil, setCooldownUntil] = useState(fundingHistoryNotBefore);
+  const [clock, setClock] = useState(() => performance.now());
+  const providerWait =
+    maximumWallets === 500 && source === 'provider'
+      ? Math.max(0, Math.ceil((cooldownUntil - clock) / 1000))
+      : 0;
+  useEffect(() => {
+    if (maximumWallets !== 500) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const update = () => {
+      const now = performance.now(),
+        remaining = cooldownUntil - now;
+      if (remaining > 0)
+        timer = setTimeout(update, Math.max(25, Math.ceil(remaining)));
+      else setClock(now);
+    };
+    update();
+    return () => clearTimeout(timer);
+  }, [cooldownUntil, maximumWallets]);
   const active = useRef<{ key: string; controller: AbortController } | null>(
     null,
   );
   const [view, setView] = useState<{
     key: string;
     busy: boolean;
-    result: WalletFundingTimes | FundingOriginBatch | null;
+    result: WalletFundingTimes | FundingOriginBatch | BatchedResult | null;
     progress?: FundingOriginProgress;
     error: string;
   }>({ key, busy: false, result: null, error: '' });
@@ -54,16 +109,57 @@ export function useWalletFundingProximity(selection: WalletFundingSelection) {
   async function read() {
     if (
       !selection.length ||
-      selection.length > 100 ||
+      selection.length > maximumWallets ||
+      !capacityValid ||
       active.current?.key === key
     )
       return;
+    if (
+      maximumWallets === 500 &&
+      source === 'provider' &&
+      performance.now() < fundingHistoryNotBefore()
+    ) {
+      setCooldownUntil(fundingHistoryNotBefore());
+      setClock(performance.now());
+      return;
+    }
     active.current?.controller.abort();
     const controller = new AbortController();
     active.current = { key, controller };
     setView({ key, busy: true, result: null, error: '' });
     try {
       const captured: WalletFundingSelection = JSON.parse(key).selection;
+      if (maximumWallets === 500) {
+        const result = await readLaunchFundingTimes(
+          captured,
+          source,
+          controller.signal,
+          (progress) => {
+            if (active.current?.controller === controller)
+              setView({ key, busy: true, result: null, error: '', progress });
+          },
+          {
+            onProviderRead() {
+              const until = noteFundingHistoryRead();
+              if (active.current?.controller === controller) {
+                setCooldownUntil(until);
+                setClock(performance.now());
+              }
+            },
+          },
+        );
+        if (
+          active.current?.controller === controller &&
+          !controller.signal.aborted
+        )
+          setView({
+            key,
+            busy: false,
+            result: { ...result, wallets: result.observations },
+            error: '',
+          });
+        return;
+      }
       if (source === 'provider') {
         const result = await readProviderFundingOrigins(
           captured,
@@ -101,11 +197,13 @@ export function useWalletFundingProximity(selection: WalletFundingSelection) {
           busy: false,
           result: null,
           error:
-            source === 'provider'
-              ? error instanceof FundingOriginClientError
-                ? error.message
-                : 'Provider funding history could not be checked. No automatic retry was made.'
-              : 'Recorded funding times could not be checked. Keep the selection and retry this read.',
+            maximumWallets === 500 && error instanceof LaunchFundingReadError
+              ? batchReadError(error, source)
+              : source === 'provider'
+                ? error instanceof FundingOriginClientError
+                  ? error.message
+                  : 'Provider funding history could not be checked. No automatic retry was made.'
+                : 'Recorded funding times could not be checked. Keep the selection and retry this read.',
         });
     } finally {
       if (active.current?.controller === controller) active.current = null;
@@ -132,6 +230,9 @@ export function useWalletFundingProximity(selection: WalletFundingSelection) {
   return {
     ...current,
     source,
+    maximumWallets,
+    capacityValid,
+    providerWait,
     chooseSource(next: 'saved' | 'provider') {
       if (next === source) return;
       active.current?.controller.abort();
@@ -141,7 +242,9 @@ export function useWalletFundingProximity(selection: WalletFundingSelection) {
     read,
     cancel,
     pairs: current.result
-      ? compareFundingEventTimes(current.result.wallets)
+      ? 'pairs' in current.result
+        ? current.result.pairs
+        : compareFundingEventTimes(current.result.wallets)
       : [],
   };
 }
@@ -195,7 +298,13 @@ export function WalletFundingProximityPanel({
           type="button"
           ref={startButton}
           onClick={() => void check.read()}
-          disabled={check.busy || count < 1 || count > 100}
+          disabled={
+            check.busy ||
+            !check.capacityValid ||
+            count < 1 ||
+            count > check.maximumWallets ||
+            check.providerWait > 0
+          }
         >
           {check.source === 'saved'
             ? 'Check recorded funding times'
@@ -230,8 +339,22 @@ export function WalletFundingProximityPanel({
               : 'No funding-time check for this selection'}
         </output>
       </div>
-      {count > 100 && (
-        <p>Select up to 100 wallets for one funding-time check.</p>
+      {check.providerWait > 0 && (
+        <output>
+          Wait up to {check.providerWait}s before another provider history
+          check. Provider limits can last longer; no automatic retry.
+        </output>
+      )}
+      {count > check.maximumWallets && (
+        <p>
+          Select up to {check.maximumWallets} wallets for one funding-time
+          check.
+        </p>
+      )}
+      {!check.capacityValid && (
+        <p role="alert">
+          This check&apos;s wallet capacity is unavailable. Reopen My wallets.
+        </p>
       )}
       {check.source === 'provider' ? (
         <small>
@@ -239,6 +362,14 @@ export function WalletFundingProximityPanel({
           each selected wallet. Plain native SOL funding is supported; other or
           incomplete evidence stays unknown. Earlier history may be missing.
           This uses provider quota, in groups of ten with no automatic retry.
+          {check.maximumWallets === 500 && (
+            <>
+              {' '}
+              Up to {Math.ceil(count / 10)} request groups, with 17-second
+              spacing. Each group may perform multiple provider RPC reads. Large
+              selections can take many minutes.
+            </>
+          )}
         </small>
       ) : (
         <>
@@ -251,7 +382,34 @@ export function WalletFundingProximityPanel({
           </small>
         </>
       )}
-      {check.result && (
+      {check.result && 'batches' in check.result && (
+        <details className={styles.captures}>
+          <summary>
+            {check.result.batches.length} separate funding batches
+          </summary>
+          <p>
+            These batches were read separately. They are not one atomic or
+            current-state qualification. Timing alone does not establish shared
+            ownership. Ranges follow checked-selection order, which can differ
+            from the sorted table. Provider batches contain several reads; their
+            displayed time is the latest reported check time.
+          </p>
+          <ol>
+            {check.result.batches.map((batch, index) => (
+              <li key={index}>
+                Batch {index + 1}, checked wallets {index * 100 + 1} to{' '}
+                {index * 100 + batch.wallets.length}:{' '}
+                {new Date(batch.capturedAt).toLocaleString()}
+              </li>
+            ))}
+          </ol>
+          <p>
+            Click a wallet&apos;s clock for its checked gap. Missing history
+            stays unknown.
+          </p>
+        </details>
+      )}
+      {check.result && 'capturedAt' in check.result && (
         <small>
           {check.source === 'saved'
             ? 'Saved-record check:'
@@ -362,6 +520,24 @@ export function WalletFundingProximityBadge({
   if (!row) return null;
   const nearest = check.pairs.find((p) => p.a === address || p.b === address);
   const provider = check.source === 'provider';
+  const batchIndex =
+    check.result && 'batches' in check.result
+      ? check.result.batches.findIndex((batch) =>
+          batch.wallets.some((wallet) => wallet.address === address),
+        )
+      : -1;
+  const batch =
+    check.result && 'batches' in check.result && batchIndex >= 0
+      ? check.result.batches[batchIndex]
+      : null;
+  const provenance = batch && (
+    <small>
+      Funding batch {batchIndex + 1} ·{' '}
+      {provider ? 'latest provider-reported check' : 'saved-record check'}:{' '}
+      {new Date(batch.capturedAt).toLocaleString()}. This is not the funding
+      block time or an atomic current-state check.
+    </small>
+  );
   if (!row.funding) {
     const reasons: Record<string, string> = {
       'no-retained-receipt':
@@ -390,6 +566,7 @@ export function WalletFundingProximityBadge({
             ? 'Provider history can be incomplete.'
             : 'Earlier and external funding may be missing.'}
         </p>
+        {provenance}
       </details>
     );
   }
@@ -418,6 +595,7 @@ export function WalletFundingProximityBadge({
           <> · Funding sources: {row.funding.funders.join(', ')}</>
         )}
       </small>
+      {provenance}
     </details>
   );
 }

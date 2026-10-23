@@ -51,6 +51,7 @@ import { CHAINS, type LaunchChain } from '@/lib/launch-plan';
 import {
   WALLET_ROLES,
   DEFAULT_FOLDER_COLOR,
+  MAX_WORKSPACE_WALLETS,
   walletFolderIds,
   type WalletRole,
   type WalletFolder,
@@ -324,6 +325,7 @@ export function WalletWorkspace({
     chain === 'Solana' && !archived
       ? picks.map(({ address, revision }) => ({ address, revision }))
       : [],
+    500,
   );
 
   const orderedRows = sortWalletRoster(rows, data.balances ?? [], rosterSort);
@@ -1075,6 +1077,14 @@ export function WalletWorkspace({
           {picks.length > 0 && (
             <div className="wallet-bulk-actions">
               <span>{picks.length} selected across pages</span>
+              {picks.length > 100 && (
+                <small>
+                  Solana funding-time comparisons support up to 500 selected
+                  wallets. Folder changes, archive/restore and balance refresh
+                  still require 100 or fewer; warmup supports up to 20. Reduce
+                  the selection before using those actions.
+                </small>
+              )}
               <Button
                 variant="outline"
                 disabled={busy}
@@ -1420,7 +1430,7 @@ export function WalletWorkspace({
               {pageCount}. Showing {pageRows.length}.
             </output>
             <small>
-              Selection persists across pages, up to 100 wallets. Sorting uses
+              Selection persists across pages, up to 500 wallets. Sorting uses
               saved observations, not fresh balances. Public CSV exports the
               selection or all matching wallets.
             </small>
@@ -1466,7 +1476,8 @@ export function WalletWorkspace({
                         busy ||
                         loading ||
                         !pageRows.length ||
-                        (!pageSelected && pageSelectionSize > 100)
+                        (!pageSelected &&
+                          pageSelectionSize > MAX_WORKSPACE_WALLETS)
                       }
 
                       checked={pageSelected}
@@ -1509,7 +1520,7 @@ export function WalletWorkspace({
 
                         disabled={
                           busy ||
-                          (selected.length >= 100 &&
+                          (selected.length >= MAX_WORKSPACE_WALLETS &&
                             !selected.includes(w.address))
                         }
 

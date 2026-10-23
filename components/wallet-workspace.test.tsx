@@ -138,6 +138,112 @@ beforeEach(() => {
   document.body.appendChild(host);
   root = createRoot(host);
 });
+
+it('selects all 500 real roster rows across pages and keeps cross-batch clocks while other action limits stay intact', async () => {
+  const wallets = Array.from({ length: 500 }, (_, i) => ({
+    ...workspace.wallets[0],
+    label: `Wallet ${String(499 - i).padStart(3, '0')}`,
+    address: bs58.encode(
+      Uint8Array.from({ length: 32 }, (_, j) =>
+        j === 0 ? i % 256 : j === 1 ? Math.floor(i / 256) : 7,
+      ),
+    ),
+  }));
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (!url.endsWith('/funding-times'))
+      return Response.json({ ...workspace, wallets });
+    const requested = JSON.parse(init!.body as string).wallets as Array<{
+      address: string;
+      revision: number;
+    }>;
+    expect(requested.length).toBeLessThanOrEqual(100);
+    return Response.json({
+      format: 'wallet-funding-times-v1',
+      network: 'mainnet',
+      scope: 'most-recently-saved-native-transfer',
+      capturedAt: '2026-10-23T00:00:00.000Z',
+      executionAllowed: false,
+      wallets: requested.map((w) => {
+        const index = wallets.findIndex((v) => v.address === w.address),
+          known = index === 99 || index === 100;
+        return {
+          ...w,
+          funding: known
+            ? {
+                signature: bs58.encode(new Uint8Array(64).fill(index)),
+                slot: 100,
+                blockTime: 1700000000 + (index === 100 ? 1474 : 0),
+              }
+            : null,
+          reason: known ? null : 'no-retained-receipt',
+        };
+      }),
+    });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  const click = async (text: string) =>
+    act(async () => {
+      const button = [...host.querySelectorAll('button')].find(
+        (b) => b.textContent === text,
+      )!;
+      expect(button).toBeTruthy();
+      button.click();
+    });
+  for (let page = 0; page < 10; page++) {
+    await act(async () =>
+      host
+        .querySelector<HTMLInputElement>(
+          '[aria-label="Select visible wallets"]',
+        )!
+        .click(),
+    );
+    if (page < 9) await click('Next wallet page');
+  }
+  expect(host.textContent).toContain('500 selected across pages');
+  expect(
+    [...host.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Refresh selected balances',
+    )!.disabled,
+  ).toBe(true);
+  const before = fetcher.mock.calls.length;
+  await click('Check recorded funding times');
+  expect(fetcher.mock.calls.length - before).toBe(5);
+  expect(host.textContent).toContain('2 of 500 recorded times');
+  expect(host.textContent).toContain('5 separate funding batches');
+  for (let step = 0; step < 8; step++) await click('Previous wallet page');
+  const warnings = () =>
+    [...host.querySelectorAll('tbody summary')].filter(
+      (s) => s.textContent === '24m 34s apart',
+    );
+  expect(warnings()).toHaveLength(1);
+  await click('Next wallet page');
+  expect(warnings()).toHaveLength(1);
+  expect(fetcher.mock.calls.length - before).toBe(5);
+  expect(host.textContent).toContain('500 selected across pages');
+  await act(async () => {
+    const sort = [...host.querySelectorAll('select')].find(
+      (element) =>
+        element.getAttribute('aria-label') === 'Sort workspace wallets',
+    )!;
+    sort.value = 'name';
+    sort.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(host.querySelector('tbody tr')?.textContent).toContain('Wallet 000');
+  expect(host.querySelector('tbody tr')?.textContent).toContain(
+    'Funding batch 5',
+  );
+  expect(host.textContent).toContain('which can differ from the sorted table');
+  expect(fetcher.mock.calls.length - before).toBe(5);
+  expect(
+    fetcher.mock.calls.every(
+      ([url, init]) =>
+        !init?.method ||
+        init.method === 'GET' ||
+        url.endsWith('/funding-times'),
+    ),
+  ).toBe(true);
+});
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
@@ -247,10 +353,15 @@ it('pages a large roster while preserving explicit selections and the 100-wallet
     host.querySelector<HTMLInputElement>(
       '[aria-label="Select visible wallets"]',
     )!.disabled,
-  ).toBe(true);
+  ).toBe(false);
+  await selectPage();
+  expect(host.textContent).toContain('110 selected across pages');
+  expect(host.textContent).toContain(
+    'balance refresh still require 100 or fewer',
+  );
   await click('Previous wallet page');
   await selectPage();
-  expect(host.textContent).toContain('50 selected across pages');
+  expect(host.textContent).toContain('60 selected across pages');
   await click('Clear wallet selection');
   expect(host.textContent).not.toContain('selected across pages');
   expect(
