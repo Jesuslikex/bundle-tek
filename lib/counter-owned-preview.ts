@@ -416,9 +416,11 @@ export async function previewOwnedCounterBuyRuntime(
     },
   );
   signal.throwIfAborted();
+  const completedAt = Date.now();
   if (
     !runtime ||
     runtime.packetSha256 !== facts.preview.packetSha256 ||
+    runtime.expiresAt !== facts.prepared.expiresAt ||
     runtime.simulationSlot !== facts.simulation.simulationSlot ||
     runtime.codeScanCount !== 2 ||
     runtime.codeIdentityObserved !== true ||
@@ -431,11 +433,16 @@ export async function previewOwnedCounterBuyRuntime(
     runtime.executionAllowed !== false ||
     !Number.isSafeInteger(runtime.minimumSlot) ||
     !Number.isSafeInteger(runtime.maximumSlot) ||
+    !Number.isSafeInteger(runtime.simulationSlot) ||
     runtime.minimumSlot < 0 ||
     runtime.maximumSlot < runtime.minimumSlot ||
+    runtime.simulationSlot < runtime.minimumSlot ||
+    runtime.simulationSlot > runtime.maximumSlot ||
     runtime.maximumSlot - runtime.minimumSlot > 32 ||
+    !Number.isFinite(Date.parse(facts.preview.expiresAt)) ||
+    Date.parse(facts.preview.expiresAt) <= completedAt ||
     !Number.isFinite(Date.parse(runtime.expiresAt)) ||
-    Date.parse(runtime.expiresAt) <= Date.now()
+    Date.parse(runtime.expiresAt) <= completedAt
   )
     throw new CounterPreviewError(
       'Counter runtime identity differs or expired. No approval was created.',

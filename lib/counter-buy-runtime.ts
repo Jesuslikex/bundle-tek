@@ -463,12 +463,37 @@ export async function collectCounterBuyRuntimeEvidence(
     ) => {
       if (method !== 'simulateTransaction')
         return accountCall(method, params, readSignal);
-      if (++simulations !== 1 || params[0] !== envelope.transaction)
+      if (
+        ++simulations !== 1 ||
+        params.length !== 2 ||
+        params[0] !== envelope.transaction
+      )
         return fail();
       const original = structuredClone(params),
         settings = original[1] as Record<string, unknown>;
+      const accounts = settings?.accounts as
+        | Record<string, unknown>
+        | undefined;
       if (
         !settings ||
+        Array.isArray(settings) ||
+        Object.keys(settings).sort().join(',') !==
+          'accounts,commitment,encoding,innerInstructions,minContextSlot,replaceRecentBlockhash,sigVerify' ||
+        settings.encoding !== 'base64' ||
+        settings.commitment !== 'confirmed' ||
+        settings.innerInstructions !== false ||
+        !Number.isSafeInteger(settings.minContextSlot) ||
+        (settings.minContextSlot as number) < order.quote.contextSlot ||
+        !accounts ||
+        Array.isArray(accounts) ||
+        Object.keys(accounts).sort().join(',') !== 'addresses,encoding' ||
+        accounts.encoding !== 'base64' ||
+        !Array.isArray(accounts.addresses) ||
+        accounts.addresses.length !== keys.length ||
+        keys.some(
+          (address, i) => address !== (accounts.addresses as unknown[])[i],
+        ) ||
+        rentQuotes.length !== 1 ||
         settings.replaceRecentBlockhash !== false ||
         settings.sigVerify !== false
       )
@@ -549,6 +574,7 @@ export async function collectCounterBuyRuntimeEvidence(
     );
     if (
       simulations !== 1 ||
+      rentQuotes.length !== 1 ||
       !beforeCode ||
       !afterCode ||
       !trace ||

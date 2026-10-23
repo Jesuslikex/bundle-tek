@@ -260,6 +260,123 @@ it.each(['hash', 'slot', 'span', 'expired', 'authority'] as const)(
     await expect(f.run()).rejects.toMatchObject({ status: 409 });
   },
 );
+it('refuses a future runtime expiry that differs from the original prepared packet lifetime', async () => {
+  const f = runtimeFixture();
+  f.runtime.expiresAt = new Date(
+    Date.parse(f.prepared.expiresAt) + 1000,
+  ).toISOString();
+  expect(Date.parse(f.runtime.expiresAt)).toBeGreaterThan(Date.now());
+  expect(f.runtime.expiresAt).not.toBe(f.prepared.expiresAt);
+  await expect(f.run()).rejects.toMatchObject({
+    status: 409,
+    message:
+      'Counter runtime identity differs or expired. No approval was created.',
+  });
+  expect(f.collect).toHaveBeenCalledOnce();
+  expect(f.dependencies.simulate).not.toHaveBeenCalled();
+});
+
+it.each(['above-maximum', 'below-minimum'] as const)(
+  'refuses simulation slot 105 %s despite matching the runtime collector result',
+  async (kind) => {
+    const f = runtimeFixture();
+    if (kind === 'above-maximum') f.runtime.maximumSlot = 104;
+    else f.runtime.minimumSlot = 106;
+    expect(f.runtime.simulationSlot).toBe(105);
+    expect(f.simulation.simulationSlot).toBe(105);
+    expect(f.runtime.maximumSlot - f.runtime.minimumSlot).toBeLessThanOrEqual(
+      32,
+    );
+    await expect(f.run()).rejects.toMatchObject({
+      status: 409,
+      message:
+        'Counter runtime identity differs or expired. No approval was created.',
+    });
+    expect(f.collect).toHaveBeenCalledOnce();
+    expect(f.dependencies.simulate).not.toHaveBeenCalled();
+  },
+);
+
+function shortSourceRuntimeFixture() {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  const now = Date.parse('2026-10-23T20:00:00.000Z');
+  vi.setSystemTime(now);
+  const f = runtimeFixture();
+  // Retain an actually admissible source near its real five-minute bound.
+  // The owned source evaluator/reviewer are not mocked.
+  f.plan.createdAt = new Date(now - 301000).toISOString();
+  const source = f.plan.ledger.decisions[0]!.source!;
+  source.movement.blockTime = (now - 299000) / 1000;
+  source.movement.observedAt = new Date(now - 299000).toISOString();
+  f.sqlite
+    .prepare('UPDATE counter_trade_plans SET document=?')
+    .run(JSON.stringify(f.plan));
+  f.collect.mockImplementation(async () => {
+    vi.setSystemTime(now + 999);
+    return { simulation: f.simulation, runtime: f.runtime, codeScans: [] };
+  });
+  return { ...f, now, sourceExpiry: new Date(now + 1000).toISOString() };
+}
+
+it('preserves the original hashed runtime expiry when fresh owned source shortens the preview', async () => {
+  const f = shortSourceRuntimeFixture();
+  const original = structuredClone(f.runtime);
+  const result = await f.run();
+  expect(result.preview.expiresAt).toBe(f.sourceExpiry);
+  expect(Date.parse(result.preview.expiresAt)).toBe(Date.now() + 1);
+  expect(Date.parse(result.runtime.expiresAt)).toBeGreaterThan(
+    Date.parse(result.preview.expiresAt),
+  );
+  expect(result.runtime).toEqual(original);
+  expect(result.runtime.sha256).toBe(original.sha256);
+  expect(result.preview).toMatchObject({
+    approvalAllowed: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(f.dependencies.observeSource).toHaveBeenCalledTimes(2);
+});
+
+it('refuses when the admitted source preview expires at the final owned read while the original runtime remains live', async () => {
+  const f = shortSourceRuntimeFixture();
+  const original = structuredClone(f.runtime);
+  const prepare = f.db.prepare.bind(f.db);
+  let ownedReads = 0;
+  vi.spyOn(f.db, 'prepare').mockImplementation((sql: string) => {
+    const statement = prepare(sql);
+    if (!sql.startsWith('SELECT p.document AS project_document'))
+      return statement;
+    const bind = statement.bind.bind(statement);
+    statement.bind = (...values: unknown[]) => {
+      const bound = bind(...values);
+      const first = bound.first.bind(bound);
+      bound.first = (async (...args: Parameters<typeof first>) => {
+        const value = await first(...args);
+        ownedReads++;
+        // The sixth actual context read is after the final real source review.
+        // Advance only the controlled clock, preserving its returned snapshot.
+        if (ownedReads === 6) vi.setSystemTime(Date.parse(f.sourceExpiry));
+        return value;
+      }) as typeof bound.first;
+      return bound;
+    };
+    return statement;
+  });
+  await expect(f.run()).rejects.toMatchObject({
+    status: 409,
+    message:
+      'Counter runtime identity differs or expired. No approval was created.',
+  });
+  expect(ownedReads).toBe(6);
+  expect(f.dependencies.observeSource).toHaveBeenCalledTimes(2);
+  expect(f.dependencies.settle).toHaveBeenCalledOnce();
+  expect(Date.now()).toBe(Date.parse(f.sourceExpiry));
+  expect(Date.parse(f.runtime.expiresAt)).toBeGreaterThan(Date.now());
+  expect(f.runtime).toEqual(original);
+  expect(f.collect).toHaveBeenCalledOnce();
+  expect(f.dependencies.simulate).not.toHaveBeenCalled();
+});
+
 it('sanitizes provider failures without retrying or falling back to the basic collector', async () => {
   const f = runtimeFixture();
   f.collect.mockRejectedValueOnce(
@@ -366,6 +483,9 @@ it('composes owned source admission with actual ExactOut RPC evidence, gross set
     decisionIdentity: f.input.decisionIdentity,
   });
   let stageFailure: unknown;
+  let originalRuntime:
+    | Awaited<ReturnType<typeof collectCounterBuyRuntimeEvidence>>['runtime']
+    | undefined;
   const runtime = vi.fn(
     async (
       order: Parameters<typeof collectCounterBuyRuntimeEvidence>[0],
@@ -373,13 +493,15 @@ it('composes owned source admission with actual ExactOut RPC evidence, gross set
       scope: AbortSignal,
     ) => {
       try {
-        return await collectCounterBuyRuntimeEvidence(
+        const collected = await collectCounterBuyRuntimeEvidence(
           order,
           fee,
           scope,
           rpc,
           () => chain.clock.now,
         );
+        originalRuntime = structuredClone(collected.runtime);
+        return collected;
       } catch (error) {
         stageFailure = error;
         throw error;
@@ -413,6 +535,8 @@ it('composes owned source admission with actual ExactOut RPC evidence, gross set
   expect(runtime).toHaveBeenCalledOnce();
   expect(result.preview.outputTargetRaw).toBe(target);
   expect(result.preview.actualSimulatedInputRaw).toBe('1000000');
+  expect(result.runtime).toEqual(originalRuntime);
+  expect(result.runtime.expiresAt).toBe(chain.order.expiresAt);
   expect(result.runtime.programs.length).toBeGreaterThan(1);
   expect(result.runtime.codeScanCount).toBe(2);
   expect(result.preview.signingAllowed).toBe(false);
