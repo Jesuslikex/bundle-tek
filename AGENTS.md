@@ -10,7 +10,7 @@ Before taking the next task, inspect the latest commit and remaining working-tre
 
 ## OpenCode joins the coordination, 24 October 2026
 
-Julian explicitly authorized coordinating the existing OpenCode Bundle session alongside Claude. All three agents must read `docs/BUNDLE-THREE-AGENT-HANDOFF-20261024.md` and `docs/CODEX-CLAUDE-ACTIVE-SPLIT-20261024.md` before choosing work. Codex retains the active Jito claim below; Claude retains its current PR/claimed files. OpenCode currently has a read-only wallet/funding/launch UX audit, not an overlapping editing claim.
+Julian explicitly authorized coordinating the existing OpenCode Bundle session alongside Claude. All three agents must read `docs/BUNDLE-THREE-AGENT-HANDOFF-20261024.md` and `docs/CODEX-CLAUDE-ACTIVE-SPLIT-20261024.md` before choosing work. Codex retains the active Jito claim below; Claude retains its current PR/claimed files. OpenCode completed the source-only wallet/funding/launch UX audit. Its exact next editing claim is recorded in the three-agent handoff: only browser-wallet-vault.tsx and its component test, on a separate branch/worktree.
 
 For future OpenCode edits, claim exact disjoint paths first and use a separate branch/worktree from current origin/main through a PR. Do not change canonical main's branch/index or another agent's files, dependencies or dev server. Preserve original AGENTS dirt and frozen warmup drafts. Keep accurate wallet-history/funding/ownership labels; exclude artificial volume and deceptive history. No deploy, hosted SQL, credentials/provider/cron changes, real wallet signing/send or funded trades under this coordination.
 
