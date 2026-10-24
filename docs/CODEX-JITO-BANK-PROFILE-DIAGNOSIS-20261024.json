@@ -1,0 +1,266 @@
+{
+  "date": "2026-10-24",
+  "base": "464bb66",
+  "source": [
+    {
+      "file": "lib/jito-bundle-simulation-frames.ts",
+      "sha256": "02fee90697c38c2dd84ad0b2712f9f1b0f9357819799131ffa497078ed3f2c7a"
+    },
+    {
+      "file": "lib/jito-bundle-simulation-frames.test.ts",
+      "sha256": "41d2062f36488a242513619651bd3ad25625bda377a6d5299d9fa0f96667e571"
+    }
+  ],
+  "request": {
+    "explicitEncodingRequired": true,
+    "supportedEncodings": ["slot-object", "numeric-slot"],
+    "default": false,
+    "automaticFallback": false,
+    "returnedBankEqualityUnchanged": true
+  },
+  "verification": {
+    "tests": 188,
+    "files": 2,
+    "failed": 0,
+    "skipped": 0,
+    "projectTypeScript": true,
+    "typedLint": true,
+    "format": true,
+    "nonBuilderStatementsPrinterIdentical": true,
+    "newBuild": false,
+    "fullRepositorySuite": false
+  },
+  "review": {
+    "startedAt": "2026-10-24T01:38:24.211Z",
+    "finishedAt": "2026-10-24T01:39:17.209Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "464bb66",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": ["claude-opus-5-5"],
+    "modelsUsed": ["claude-opus-5-5"],
+    "tools": ["Glob", "Grep", "Read"],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.30340300000000003,
+    "sourceUnchanged": true,
+    "changed": [],
+    "record": "work/release-qa/opus-jito-bankprofiles-20261024-v1/status.json",
+    "sourceOnly": true,
+    "testsRun": false,
+    "currentCodeDifferences": []
+  },
+  "diagnosis": {
+    "startedAt": "2026-10-24T01:33:40.989Z",
+    "sourceBaseCommit": "464bb66",
+    "provider": "existing Alchemy holder endpoint",
+    "settingChanged": false,
+    "methods": [
+      {
+        "method": "getGenesisHash",
+        "requestSha256": "1d77c541d9af2923e55aa25a9fb8e11da9a4edbedcb99188181bb39ea2eb93eb",
+        "httpStatus": 200,
+        "responseBytes": 109,
+        "responseSha256": "eedbadc3dba7c53425a342e7788caa63279d16e6f129bb5ee6d342131b0dd7e4"
+      },
+      {
+        "method": "getLatestBlockhash",
+        "requestSha256": "5a18225b93df916d576faeef24a5826fb41c5a171186b00a46d976c77b3ca59d",
+        "httpStatus": 200,
+        "responseBytes": 216,
+        "responseSha256": "008411eaf14b6d3fe515062a3320106d8db23b9f676943229b4f1cd7d9a934c5"
+      },
+      {
+        "method": "getMultipleAccounts",
+        "requestSha256": "a7e1442cf0a77fa4cc9a9f63a232853e5dfd9b93ed628aa284d8e1c067ecdcd3",
+        "httpStatus": 200,
+        "responseBytes": 783,
+        "responseSha256": "7d711f3da3c9ed68c8a4c25da49c8da51c3892b09b3352bf68240ef13a53c597"
+      },
+      {
+        "method": "getFeeForMessage",
+        "requestSha256": "f56394a14ee6d34bbb87d48c470401e6f3d9f58e117b9c7c9d631e42261c9d86",
+        "httpStatus": 200,
+        "responseBytes": 127,
+        "responseSha256": "89bc513b30864f8ad08c26ff330e65561f6bcd0e5b6546fc14f5b1a9e7cf780f"
+      },
+      {
+        "method": "getFeeForMessage",
+        "requestSha256": "b29a860bf2004b2014d50146c6c5509925d21d916fb5babf149ee50c59880989",
+        "httpStatus": 200,
+        "responseBytes": 127,
+        "responseSha256": "89bc513b30864f8ad08c26ff330e65561f6bcd0e5b6546fc14f5b1a9e7cf780f"
+      },
+      {
+        "method": "simulateBundle",
+        "requestSha256": "c64d64a1a74b9466305677f9c6b55ac2b26be8d2f40418237ae625c8a0be2c68",
+        "httpStatus": 200,
+        "responseBytes": 3077,
+        "responseSha256": "65621bac7a6614a4b7d07ca49290e2a2235855cd0cc78223b3a00d7d2899a628"
+      },
+      {
+        "method": "simulateBundle",
+        "requestSha256": "ffdb369a00c2f6d52bdfcf105c3005315fa06baa6349196dfeae0ecb5d8bec43",
+        "httpStatus": 200,
+        "responseBytes": 164,
+        "responseSha256": "4364471f9a6a175cd23efc65170022195baeac4eda77a1121a302a2561f81e9a",
+        "message": "Invalid params: invalid type: integer `460665204`, expected string or map.",
+        "rpcCode": "-32602"
+      }
+    ],
+    "signaturesCreated": 0,
+    "broadcasts": 0,
+    "amountLamports": "0",
+    "providerQualified": false,
+    "economicQualified": false,
+    "feeObservations": [
+      {
+        "slot": "460665204",
+        "feeLamports": "5000"
+      },
+      {
+        "slot": "460665204",
+        "feeLamports": "5000"
+      }
+    ],
+    "requestedBank": 460665204,
+    "plannedProfiles": ["slot-object", "numeric-slot"],
+    "profiles": [
+      {
+        "encoding": "slot-object",
+        "requestedBank": 460665204,
+        "status": "observed",
+        "resultSlot": "460665204",
+        "bankMatches": true,
+        "summary": "succeeded",
+        "frameCount": 2,
+        "requestedFrames": 2,
+        "frames": [
+          {
+            "index": 0,
+            "fields": [
+              "err",
+              "fee",
+              "loadedAccountsDataSize",
+              "loadedAddresses",
+              "logs",
+              "postBalances",
+              "postExecutionAccounts",
+              "postTokenBalances",
+              "preBalances",
+              "preExecutionAccounts",
+              "preTokenBalances",
+              "replacementBlockhash",
+              "returnData",
+              "unitsConsumed"
+            ],
+            "errIsNull": true,
+            "errorType": "null",
+            "fee": "5000",
+            "feeMatches": true,
+            "unitsConsumed": "150",
+            "loadedAccountsDataSize": "221",
+            "loadedAddresses": {
+              "readonly": [],
+              "writable": []
+            },
+            "preCount": 3,
+            "postCount": 3,
+            "accountFieldNames": [
+              "data",
+              "executable",
+              "lamports",
+              "owner",
+              "rentEpoch",
+              "space"
+            ]
+          },
+          {
+            "index": 1,
+            "fields": [
+              "err",
+              "fee",
+              "loadedAccountsDataSize",
+              "loadedAddresses",
+              "logs",
+              "postBalances",
+              "postExecutionAccounts",
+              "postTokenBalances",
+              "preBalances",
+              "preExecutionAccounts",
+              "preTokenBalances",
+              "replacementBlockhash",
+              "returnData",
+              "unitsConsumed"
+            ],
+            "errIsNull": true,
+            "errorType": "null",
+            "fee": "5000",
+            "feeMatches": true,
+            "unitsConsumed": "150",
+            "loadedAccountsDataSize": "221",
+            "loadedAddresses": {
+              "readonly": [],
+              "writable": []
+            },
+            "preCount": 3,
+            "postCount": 3,
+            "accountFieldNames": [
+              "data",
+              "executable",
+              "lamports",
+              "owner",
+              "rentEpoch",
+              "space"
+            ]
+          }
+        ]
+      },
+      {
+        "encoding": "numeric-slot",
+        "requestedBank": 460665204,
+        "status": "refused",
+        "methodIndex": 6
+      }
+    ],
+    "status": "diagnosis-completed",
+    "finishedAt": "2026-10-24T01:33:42.141Z"
+  },
+  "interpretation": {
+    "objectSlotBasicUnsignedNativeSampleSucceeded": true,
+    "numericSlotRefusalCause": "invalid type integer; expected string or map",
+    "completeRawVectorsRetained": false,
+    "mathematicalFrameReplayProven": false,
+    "providerQualified": false,
+    "jupiterRouteQualified": false,
+    "altProvenanceQualified": false,
+    "signaturesQualified": false
+  },
+  "boundaries": {
+    "mounted": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "automaticExecutionAllowed": false,
+    "deployed": false,
+    "hostedSql": false,
+    "migrationsAdded": false,
+    "settingsChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletUnlocked": false,
+    "realSignaturesCreated": 0,
+    "broadcasts": 0,
+    "fundedTrades": false
+  },
+  "preserved": {
+    "agentsSha256": "8dcc60d3e1201d3df5dd5f3666fc85bb6a6864765304aac335caf61dfc9c1bea",
+    "excludedWarmupDraftFiles": 7,
+    "nextUnclaimedMigration": "0147 subject to recheck"
+  }
+}

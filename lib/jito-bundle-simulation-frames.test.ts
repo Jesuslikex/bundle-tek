@@ -464,49 +464,52 @@ it('tracks null-account continuity across later frames', async () => {
 });
 
 for (const verifySignatures of [true, false])
-  it(`builds exact ordered all-key request with explicit signature verification ${verifySignatures}`, async () => {
-    const f = fixture();
-    const before = structuredClone(f.packets);
-    const request = await buildJitoBundleSimulationRequest(f.packets, '101', {
-      verifySignatures,
+  for (const bankEncoding of ['slot-object', 'numeric-slot'] as const)
+    it(`builds exact ordered all-key request with explicit signature verification ${verifySignatures} and ${bankEncoding}`, async () => {
+      const f = fixture();
+      const before = structuredClone(f.packets);
+      const request = await buildJitoBundleSimulationRequest(f.packets, '101', {
+        verifySignatures,
+        bankEncoding,
+      });
+      expect(request.profile).toBe('jito-sequential-account-frames-v1');
+      expect(request.method).toBe('simulateBundle');
+      expect(request.params[0]).toEqual({
+        encodedTransactions: f.packets.map((p) => p.transaction),
+      });
+      expect(request.params[1]).toEqual({
+        transactionEncoding: 'base64',
+        simulationBank: bankEncoding === 'slot-object' ? { slot: 101 } : 101,
+        skipSigVerify: !verifySignatures,
+        replaceRecentBlockhash: false,
+        preExecutionAccountsConfigs: [
+          {
+            encoding: 'base64',
+            addresses: [payer, signer, SYSTEM, recipient, readonly],
+          },
+          { encoding: 'base64', addresses: [payer, tip, SYSTEM] },
+        ],
+        postExecutionAccountsConfigs: [
+          {
+            encoding: 'base64',
+            addresses: [payer, signer, SYSTEM, recipient, readonly],
+          },
+          { encoding: 'base64', addresses: [payer, tip, SYSTEM] },
+        ],
+      });
+      expect(f.packets).toEqual(before);
+      expect(request.bankEncoding).toBe(bankEncoding);
+      expect(request).toMatchObject({
+        providerQualified: false,
+        signingAllowed: false,
+        executionAllowed: false,
+        automaticExecutionAllowed: false,
+      });
+      f.packets.reverse();
+      expect(request.params[0].encodedTransactions).toEqual(
+        before.map((p) => p.transaction),
+      );
     });
-    expect(request.profile).toBe('jito-sequential-account-frames-v1');
-    expect(request.method).toBe('simulateBundle');
-    expect(request.params[0]).toEqual({
-      encodedTransactions: f.packets.map((p) => p.transaction),
-    });
-    expect(request.params[1]).toEqual({
-      transactionEncoding: 'base64',
-      simulationBank: 101,
-      skipSigVerify: !verifySignatures,
-      replaceRecentBlockhash: false,
-      preExecutionAccountsConfigs: [
-        {
-          encoding: 'base64',
-          addresses: [payer, signer, SYSTEM, recipient, readonly],
-        },
-        { encoding: 'base64', addresses: [payer, tip, SYSTEM] },
-      ],
-      postExecutionAccountsConfigs: [
-        {
-          encoding: 'base64',
-          addresses: [payer, signer, SYSTEM, recipient, readonly],
-        },
-        { encoding: 'base64', addresses: [payer, tip, SYSTEM] },
-      ],
-    });
-    expect(f.packets).toEqual(before);
-    expect(request).toMatchObject({
-      providerQualified: false,
-      signingAllowed: false,
-      executionAllowed: false,
-      automaticExecutionAllowed: false,
-    });
-    f.packets.reverse();
-    expect(request.params[0].encodedTransactions).toEqual(
-      before.map((p) => p.transaction),
-    );
-  });
 it('request builder shares packet refusal rules and never substitutes missing ALT or implicit modes', async () => {
   const f = fixture();
   for (const packets of [
@@ -523,6 +526,7 @@ it('request builder shares packet refusal rules and never substitutes missing AL
     await expect(
       buildJitoBundleSimulationRequest(packets, 100, {
         verifySignatures: false,
+        bankEncoding: 'slot-object',
       }),
     ).rejects.toThrow();
   for (const slot of [
@@ -539,12 +543,14 @@ it('request builder shares packet refusal rules and never substitutes missing AL
     await expect(
       buildJitoBundleSimulationRequest(f.packets, slot as number | string, {
         verifySignatures: false,
+        bankEncoding: 'slot-object',
       }),
     ).rejects.toThrow();
   await expect(
     buildJitoBundleSimulationRequest(f.packets, 100, {
       verifySignatures: 'false',
-    } as unknown as { verifySignatures: boolean }),
+      bankEncoding: 'slot-object',
+    } as unknown as Parameters<typeof buildJitoBundleSimulationRequest>[2]),
   ).rejects.toThrow();
 });
 it('preserves exact numeric bank boundaries on the wire without profile fallback', async () => {
@@ -552,6 +558,7 @@ it('preserves exact numeric bank boundaries on the wire without profile fallback
   for (const slot of [0, Number.MAX_SAFE_INTEGER]) {
     const request = await buildJitoBundleSimulationRequest(f.packets, slot, {
       verifySignatures: false,
+      bankEncoding: 'numeric-slot',
     });
     const wire = JSON.parse(JSON.stringify(request.params)) as [
       unknown,
@@ -563,6 +570,29 @@ it('preserves exact numeric bank boundaries on the wire without profile fallback
     expect(request.providerQualified).toBe(false);
   }
 });
+for (const bankEncoding of [
+  undefined,
+  null,
+  'tip',
+  'confirmed',
+  'automatic',
+  {},
+  1,
+])
+  it(`requires an explicit supported bank wire encoding: ${JSON.stringify(bankEncoding)}`, async () => {
+    const f = fixture();
+    const options = {
+      verifySignatures: false,
+      ...(bankEncoding === undefined ? {} : { bankEncoding }),
+    };
+    await expect(
+      buildJitoBundleSimulationRequest(
+        f.packets,
+        101,
+        options as Parameters<typeof buildJitoBundleSimulationRequest>[2],
+      ),
+    ).rejects.toThrow();
+  });
 it('admits exact optional transaction echoes and refuses a changed echoed order', async () => {
   const f = fixture();
   for (let i = 0; i < 2; i++)
@@ -616,6 +646,7 @@ for (const options of [
     await expect(
       buildJitoBundleSimulationRequest(f.packets, 101, {
         verifySignatures: false,
+        bankEncoding: 'slot-object',
       }),
     ).rejects.toThrow(reason);
   });
@@ -652,6 +683,7 @@ for (const fee of ['0', '10001', '010000'])
     await expect(
       buildJitoBundleSimulationRequest(f.packets, 101, {
         verifySignatures: false,
+        bankEncoding: 'slot-object',
       }),
     ).rejects.toThrow();
   });
@@ -675,6 +707,7 @@ it('reports requested privileges only and retains false runtime privilege author
     (
       await buildJitoBundleSimulationRequest(f.packets, 101, {
         verifySignatures: false,
+        bankEncoding: 'slot-object',
       })
     ).runtimePrivilegesVerified,
   ).toBe(false);

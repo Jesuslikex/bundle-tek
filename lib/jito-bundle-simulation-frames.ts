@@ -387,27 +387,36 @@ async function decodePackets(packets: unknown) {
 export async function buildJitoBundleSimulationRequest(
   packets: JitoBundleSimulationPacket[],
   simulationBankSlot: number | string,
-  options: { verifySignatures: boolean },
+  options: {
+    verifySignatures: boolean;
+    bankEncoding: 'slot-object' | 'numeric-slot';
+  },
 ) {
   const input = object(snapshot({ packets, simulationBankSlot, options }));
   const config = object(input.options);
-  exact(config, ['verifySignatures']);
+  exact(config, ['verifySignatures', 'bankEncoding']);
   if (typeof config.verifySignatures !== 'boolean')
     return fail('signature verification mode required');
+  if (
+    config.bankEncoding !== 'slot-object' &&
+    config.bankEncoding !== 'numeric-slot'
+  )
+    return fail('explicit bank wire encoding required');
   const slot = Number(
     integer(input.simulationBankSlot, BigInt(Number.MAX_SAFE_INTEGER)),
   );
   const decoded = await decodePackets(input.packets);
   return {
     profile: 'jito-sequential-account-frames-v1' as const,
+    bankEncoding: config.bankEncoding as 'slot-object' | 'numeric-slot',
     method: 'simulateBundle' as const,
     params: [
       { encodedTransactions: decoded.map((p) => p.transaction) },
       {
         transactionEncoding: 'base64' as const,
-        // Jito's SimulationSlotConfig uses a numeric Slot, not { slot }.
-        // A provider still has to return this exact bank; never fall back to tip.
-        simulationBank: slot,
+        // Pinned Rust enum and TypeScript SDK disagree on this wire encoding.
+        // Callers must choose explicitly; returned bank equality never changes.
+        simulationBank: config.bankEncoding === 'slot-object' ? { slot } : slot,
         skipSigVerify: !config.verifySignatures,
         replaceRecentBlockhash: false as const,
         preExecutionAccountsConfigs: decoded.map((p) => ({

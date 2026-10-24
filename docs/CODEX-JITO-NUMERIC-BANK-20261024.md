@@ -1,5 +1,7 @@
 # Exact-bank Jito request correction, 24 October 2026
 
+Historical checkpoint, superseded by `CODEX-JITO-BANK-PROFILE-DIAGNOSIS-20261024.md`. Numeric-only encoding was based on one SDK and was not universal. Current source requires explicit bank wire selection; the actual Alchemy endpoint accepted the slot-object form in the later fixed diagnosis. Original probe outcomes below remain unchanged.
+
 Base: `71cfd4f`. Scope: the existing unmounted sequential request builder and tests, plus this handoff. No mounted production call, signing safeguard, schema, settings or protected UI change.
 
 ## Correction
