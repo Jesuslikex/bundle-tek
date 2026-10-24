@@ -86,3 +86,9 @@ Two real distinct unsigned baseline capsules/ALT tables now cover local-floor ch
 Final993tests/52files, plain TypeScript, scoped typed lint/format/diff checks pass onNode24.19.0. Two actual Opus5.5 source-only reviews found no blocker, with final minor lifecycle/capability/disclosure/test refinements independently verified afterwards. Actual component synthetic Chrome desktop/375px frame checks are documented, not full signed-in production or live providers. All created QA tabs/owned harness servers were closed/stopped.
 
 Official docs now explicitly name Husher in CEX funding and detail server-enforced collaboration roles/walletscope/expiry. Those requirements remain beyond Bundle's read-only sharing. No fresh REA livecapture: approved9223endpoint was unreachable. No browser launch/security/provider/credential/cron changes, hostedSQL, deployment or realwallet/funded actions. ClaudePR57, OpenCode vault files, original four AGENTS additions and all seven frozen drafts remain preserved. Claim exact disjoint paths before another feature edit; pushing source is not deploying it.
+
+## Original saved-review inspection checkpoint
+
+Read CODEX-SAVED-LAUNCH-INSPECTION-20261024.md/.json. Original stored terms, hashes, intent and raw budgets are inspectable without a current project or the pending protected parent patch. Every authority flag remains false. This extends saved recovery discovery, not launch execution. Final source checks are recorded in the companion evidence. The bounded inspection claim is released; pending guarded navigation and Jito claims remain reserved.
+
+The existing OpenCode session rechecked its clean `97b8b03` vault worktree and canonical main `62fb422`, then hit its provider free usage limit before a final reply. Do not claim a new task was accepted or bypass that limit. No new OpenCode edits are active. Claude PR57 remains protected. No deployment, hosted SQL, provider changes or financial action occurred.

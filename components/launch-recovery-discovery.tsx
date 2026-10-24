@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RecoveryProjectOpenButton } from './recovery-project-navigation';
+import { LaunchRecoveryInspectionPanel } from './launch-recovery-inspection';
 import { Button } from '@/components/ui/button';
 import {
   LAUNCH_RECOVERY_PAGE_LIMIT,
@@ -83,6 +84,17 @@ function RecoveryRecord({ item }: { item: LaunchRecoveryItem }) {
         receipt: {item.hasReceipt ? 'present' : 'absent'}. Neither is verified
         here.
       </p>
+      <LaunchRecoveryInspectionPanel
+        reference={{
+          source: item.source,
+          reviewKind: item.reviewKind,
+          id: item.id,
+          projectId: item.projectId,
+          mint: item.mint,
+          createdAt: item.createdAt,
+          expiresAt: item.expiresAt,
+        }}
+      />
       <RecoveryProjectOpenButton projectId={item.projectId} />
       <details>
         <summary>Original recovery reference</summary>

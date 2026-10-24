@@ -249,6 +249,13 @@ it('retains a selectable full reference when copying fails and ignores stale cli
   await mount();
   fetchMock.mockResolvedValueOnce(Response.json(page));
   await click('Find saved launch recovery');
+  const originalReference = [...host.querySelectorAll('details')].find(
+    (d) =>
+      d.querySelector('summary')?.textContent === 'Original recovery reference',
+  )!;
+  await act(async () => {
+    originalReference.open = true;
+  });
   await click('Copy recovery reference');
   expect(host.textContent).toContain('copy it manually');
   expect(writeText.mock.calls[0][0]).toBe(
@@ -320,4 +327,74 @@ it('does not expose a project shortcut when the protected navigation wiring is a
     ),
   ).toBe(false);
   expect(fetchMock).toHaveBeenCalledOnce();
+});
+
+it('inspects the original saved row without a current project or navigation provider', async () => {
+  const reference = {
+    source: item.source,
+    reviewKind: item.reviewKind,
+    id: item.id,
+    projectId: item.projectId,
+    mint: item.mint,
+    createdAt: item.createdAt,
+    expiresAt: item.expiresAt,
+  };
+  const inspection = {
+    format: 'launch-recovery-inspection-v1',
+    reference,
+    inspectedAt: '2026-10-24T00:00:00.000Z',
+    recordedState: 'finalized',
+    name: 'Original retained token',
+    symbol: 'OLD',
+    payer: item.mint,
+    payerRevision: null,
+    projectUpdatedAt: null,
+    quoteMint: null,
+    hashes: [{ kind: 'packet', index: null, sha256: 'a'.repeat(64) }],
+    budgets: [
+      { kind: 'sol-spend-limit', address: null, raw: '123', units: 'lamports' },
+    ],
+    participants: [
+      { role: 'developer', address: item.mint, mode: 'unavailable' },
+    ],
+    signature: null,
+    signatureScope: 'single-transaction',
+    receiptPresent: true,
+    packetCount: 1,
+    signingAllowed: false,
+    executionAllowed: false,
+    receiptVerified: false,
+  };
+  fetchMock.mockImplementation(async (url, init) => {
+    expect(init?.method ?? 'GET').toBe('GET');
+    if (url === '/api/account-launch-recoveries') return Response.json(page);
+    if (typeof url === 'string' && url.includes('view=inspection'))
+      return Response.json(inspection);
+    throw Error('Unexpected lookup or workflow');
+  });
+  await mount();
+  await click('Find saved launch recovery');
+  const disclosure = [...host.querySelectorAll('details')].find(
+    (d) =>
+      d.querySelector('summary')?.textContent === 'Saved review inspection',
+  )!;
+  expect(disclosure).toBeTruthy();
+  await act(async () => {
+    disclosure.open = true;
+    disclosure.dispatchEvent(new Event('toggle', { bubbles: true }));
+  });
+  expect(fetchMock).toHaveBeenCalledOnce();
+  await click('Inspect saved review');
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(host.textContent).toContain('Original retained token');
+  expect(host.textContent).toContain(
+    'finalized (stored only; not fresh finality',
+  );
+  expect(host.textContent).toContain('Original recovery reference');
+  expect(
+    [...host.querySelectorAll('button')].some((b) =>
+      b.textContent?.includes('Approve'),
+    ),
+  ).toBe(false);
+  expect(host.querySelector('input[type="password"]')).toBeNull();
 });

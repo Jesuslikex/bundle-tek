@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-24",
+  "sourceBaseCommit": "62fb422d73b1fbfaf6fba0edb35b1ab6e413a1b0",
+  "scope": "saved-only original launch inspection",
+  "node": "24.19.0",
+  "tests": {
+    "files": 11,
+    "passed": 348,
+    "failed": 0,
+    "fullSuite": false
+  },
+  "typedLint": "passed scoped10TypeScriptFiles",
+  "format": "passed scoped11Files",
+  "typescript": "passed tsc --noEmit --incremental false",
+  "reviews": [
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "sourceUnchanged": true
+    },
+    {
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "sourceUnchanged": true
+    }
+  ],
+  "finalChangesAfterReview": "independently verified lint-equivalent character filter, test refinements and absent-developer consistency guard; no claim final exact snapshot rereviewed",
+  "browser": {
+    "mode": "synthetic local GET fixture only",
+    "desktop": true,
+    "phone": "375px iframe visually inspected, DOM width metric unavailable",
+    "observed": [
+      "passive disclosure",
+      "manual inspection only",
+      "expired original reference with missing current project",
+      "group first-packet signature scope",
+      "exact raw amounts and unavailable values",
+      "loaded-data pagination",
+      "focus boundary",
+      "401 clears prior data and offers manual sign-in"
+    ],
+    "liveProvider": false,
+    "signedInProduction": false,
+    "ownedTabAndServerClosed": true
+  },
+  "parentPatchApplied": false,
+  "protectedClaudeFilesChanged": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "receiptVerified": false,
+  "deploy": false,
+  "hostedSql": false,
+  "providerOrCredentialChange": false,
+  "walletSigningOrFundedAction": false,
+  "sourceSha256": {
+    "lib/launch-recovery-inspection.ts": "dc383b1759be4226846520c04e2971e3b88a0f837ec0681653cfac894ea9d2e3",
+    "lib/launch-recovery-inspection.test.ts": "e230c1a7872786eabb23e99ea5ade177bee7aad91c84bac0b1a9d2d1a6cca36e",
+    "lib/launch-recovery-inspection-server.ts": "820844799e4742be62a13cc29f2e1e07f2b4b3b3084119fadc912d3bdd70232e",
+    "lib/launch-recovery-inspection-server.test.ts": "02dadcfde454730099993e33d111311b0ebed892f72cd50f18541db18ed99bad",
+    "components/launch-recovery-inspection.tsx": "5615b649d09645bd469b4195bfa2fde01a87b5e12c9319619510424212fe0a78",
+    "components/launch-recovery-inspection.test.tsx": "802486b2f9e0cd479e41c34fba3fcadba69a5e50b6b8b8e504c1087a92fc6a7a",
+    "components/launch-recovery-inspection.module.css": "8e5a8f5a32481dbf857b9ff69e7a980df089ac1e4c0c7e9df19819afaa878651",
+    "components/launch-recovery-discovery.tsx": "44c385f4549dee0a3a65f4fe4bea7c383e29cff0449971de47b6ad881edda132",
+    "components/launch-recovery-discovery.test.tsx": "79bad2b52d7d7bcb16e50cef59095510ece3e751f261840d943283a85adc2f71",
+    "app/api/account-launch-recoveries/route.ts": "be14748a3751912c54546032d0cf7d1c4826e386f09abd41036e20a8cac3ebb8",
+    "app/api/account-launch-recoveries/route.test.ts": "01ba0684f05baf50ffccacc7bb943fba8620e768b74be82a494d524aa9f05a7a"
+  }
+}
