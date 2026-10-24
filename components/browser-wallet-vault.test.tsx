@@ -50,6 +50,38 @@ async function submit() {
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
   );
 }
+const guidedSteps = () =>
+  document.querySelector('.browser-vault-scope')?.textContent ?? '';
+/**
+ * The shared `beforeEach` has already rendered the default Solana + callback
+ * case, so replacing that root is the only way to vary the chain or callback
+ * without mounting two vaults into one document.
+ */
+async function renderGuided(options: {
+  chain: 'Solana' | 'Base';
+  withCallback: boolean;
+}) {
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <BrowserWalletVault
+        chain={options.chain}
+        savedAddresses={[]}
+        verifiedAddresses={[]}
+        onVerified={async () => {}}
+        onAddPublic={onAddPublic}
+        onOpenWarmup={options.withCallback ? onOpenWarmup : undefined}
+      />,
+    ),
+  );
+  await click('Create wallet');
+}
+async function createGuidedWallet() {
+  await input('Wallet password', 'synthetic-test-only');
+  await input('Confirm password', 'synthetic-test-only');
+  await submit();
+}
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
@@ -170,4 +202,38 @@ it('does not generate or publish a wallet after browser storage invalidates pend
   expect(vault.generateVaultWallets).not.toHaveBeenCalled();
   expect(vault.saveBrowserVault).not.toHaveBeenCalled();
   expect(onAddPublic).not.toHaveBeenCalled();
+});
+
+it('advertises the warmup handoff in the guided steps for Solana with a warmup host', async () => {
+  await renderGuided({ chain: 'Solana', withCallback: true });
+  await createGuidedWallet();
+  expect(guidedSteps()).toContain('3. Open warmup');
+  expect(textButton('Continue to warmup')).toBeTruthy();
+});
+
+it('ends the guided steps at Done when Solana custody has no warmup host', async () => {
+  await renderGuided({ chain: 'Solana', withCallback: false });
+  await createGuidedWallet();
+  expect(document.body.textContent).toContain('Your wallet is ready');
+  expect(guidedSteps()).toContain('3. Done');
+  expect(document.body.textContent).not.toContain('Open warmup');
+  await click('Done');
+  expect(onOpenWarmup).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('never promises warmup for EVM custody even when a warmup host is supplied', async () => {
+  await renderGuided({ chain: 'Base', withCallback: true });
+  await createGuidedWallet();
+  expect(vault.generateVaultWallets).toHaveBeenCalledWith(
+    { wallets: [] },
+    'evm',
+    1,
+  );
+  expect(document.body.textContent).toContain('Base wallet');
+  expect(guidedSteps()).toContain('3. Done');
+  expect(document.body.textContent).not.toContain('Open warmup');
+  await click('Done');
+  expect(onOpenWarmup).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
