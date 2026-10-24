@@ -17,7 +17,11 @@ export default defineConfig({
     // Native Node script tests run separately through npm run test:scripts.
     exclude: [...configDefaults.exclude, 'work/**', 'scripts/**/*.test.mjs'],
     environment: 'node',
-    setupFiles: [path.join(root, 'test/vercel-compat.ts')],
+    setupFiles: [
+      path.join(root, 'test/vercel-compat.ts'),
+      // Node 26 shadows jsdom's localStorage with an undefined stub.
+      path.join(root, 'test/jsdom-localstorage.ts'),
+    ],
     // Miniflare-backed route suites start local D1 and run many sequential
     // requests; under full-suite load they exceed Vitest's 5s/10s defaults.
     testTimeout: 120_000,

@@ -484,8 +484,14 @@ it('lets a stalled history read time out, then retries only on user request', as
     ),
   );
   await click('Check wallet history');
+  // The readiness panel above also exposes a polite live region, so target the
+  // history panel instead of whichever output happens to come first.
+  const historyPanel = [...container.querySelectorAll('details')].find(
+    (panel) =>
+      panel.querySelector('summary')?.textContent?.includes('Wallet history'),
+  );
   expect(
-    container.querySelector('output[aria-live=polite]')?.textContent,
+    historyPanel?.querySelector('output[aria-live=polite]')?.textContent,
   ).toContain('does not start warmup');
   await act(async () => vi.advanceTimersByTimeAsync(30_000));
   expect(container.textContent).toContain('Wallet history took too long');

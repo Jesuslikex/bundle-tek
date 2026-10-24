@@ -54,17 +54,17 @@ believe a trade was quoted tighter than it actually was.
 ## Outstanding blocker (pre-existing, not caused here)
 
 Four Auto Sell component suites — `auto-sell-lifecycle`, `auto-sell-pending-lock`,
-`auto-sell-outcome-modal`, `auto-sell-review-recovery-modal`, 57 tests — cannot run on
-`vitest.config.mjs` in this checkout. Node v26.4.0 installs an own-property
+`auto-sell-outcome-modal`, `auto-sell-review-recovery-modal`, 57 tests — could not run
+on `vitest.config.mjs` in this checkout. Node v26.4.0 installs an own-property
 `localStorage` global that is `undefined` without `--localstorage-file`, and it
-shadows jsdom's, so `window.localStorage` is `undefined` and `beforeEach` throws at
-`localStorage.setItem` before any component renders. `sessionStorage` is unaffected.
+shadows jsdom's, so `window.localStorage` was `undefined` and `beforeEach` threw at
+`localStorage.setItem` before any component rendered. `sessionStorage` was unaffected.
 
-Verified by running those four suites (plus the full Auto Sell surface) under a
-temporary config with a `Storage` shim: 57/57 and 456/456 pass. The shim, its config
-and an environment probe were deleted and are not part of this commit. Fixing this
-properly belongs in shared test configuration, not in an Auto Sell change, and is
-still open.
+That was verified here by running those four suites (plus the full Auto Sell surface)
+under a temporary config with a `Storage` shim: 57/57 and 456/456 passed. The defect
+turned out to be much wider than Auto Sell — 146 failures across 12 storage-touching
+jsdom suites — and is fixed in shared test configuration by the follow-up commit
+described in `docs/CLAUDE-JSDOM-STORAGE-20261024.md`. No shim from this change remains.
 
 ## Limits
 
