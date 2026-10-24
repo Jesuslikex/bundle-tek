@@ -477,7 +477,7 @@ for (const verifySignatures of [true, false])
     });
     expect(request.params[1]).toEqual({
       transactionEncoding: 'base64',
-      simulationBank: { slot: 101 },
+      simulationBank: 101,
       skipSigVerify: !verifySignatures,
       replaceRecentBlockhash: false,
       preExecutionAccountsConfigs: [
@@ -525,9 +525,19 @@ it('request builder shares packet refusal rules and never substitutes missing AL
         verifySignatures: false,
       }),
     ).rejects.toThrow();
-  for (const slot of [-1, NaN, Number.MAX_SAFE_INTEGER + 1, '0100'])
+  for (const slot of [
+    -1,
+    NaN,
+    Number.MAX_SAFE_INTEGER + 1,
+    '0100',
+    'tip',
+    'confirmed',
+    '1e2',
+    '101.0',
+    { slot: 101 },
+  ])
     await expect(
-      buildJitoBundleSimulationRequest(f.packets, slot, {
+      buildJitoBundleSimulationRequest(f.packets, slot as number | string, {
         verifySignatures: false,
       }),
     ).rejects.toThrow();
@@ -536,6 +546,22 @@ it('request builder shares packet refusal rules and never substitutes missing AL
       verifySignatures: 'false',
     } as unknown as { verifySignatures: boolean }),
   ).rejects.toThrow();
+});
+it('preserves exact numeric bank boundaries on the wire without profile fallback', async () => {
+  const f = fixture();
+  for (const slot of [0, Number.MAX_SAFE_INTEGER]) {
+    const request = await buildJitoBundleSimulationRequest(f.packets, slot, {
+      verifySignatures: false,
+    });
+    const wire = JSON.parse(JSON.stringify(request.params)) as [
+      unknown,
+      { simulationBank: unknown; replaceRecentBlockhash: boolean },
+    ];
+    expect(wire[1].simulationBank).toBe(slot);
+    expect(typeof wire[1].simulationBank).toBe('number');
+    expect(wire[1].replaceRecentBlockhash).toBe(false);
+    expect(request.providerQualified).toBe(false);
+  }
 });
 it('admits exact optional transaction echoes and refuses a changed echoed order', async () => {
   const f = fixture();

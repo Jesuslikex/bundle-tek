@@ -1,0 +1,147 @@
+{
+  "base": "71cfd4f",
+  "date": "2026-10-24",
+  "source": [
+    {
+      "file": "lib/jito-bundle-simulation-frames.ts",
+      "sha256": "a93a18f11f13c8e7cd12517a779e765475c437f94322e21ee296d8a8ec3b17ec"
+    },
+    {
+      "file": "lib/jito-bundle-simulation-frames.test.ts",
+      "sha256": "e5c595d2e6ce58210eb0b13474500a988fff2b8a85cc7425c19fd0de4df53b5e"
+    }
+  ],
+  "localVerification": {
+    "tests": 179,
+    "files": 2,
+    "failed": 0,
+    "skipped": 0,
+    "projectTypeScript": true,
+    "typedLint": true,
+    "format": true,
+    "newBuild": false
+  },
+  "probes": [
+    {
+      "startedAt": "2026-10-24T01:10:58.319Z",
+      "sourceBaseCommit": "71cfd4f",
+      "provider": "existing Alchemy holder endpoint",
+      "settingChanged": false,
+      "methods": [
+        {
+          "method": "getGenesisHash",
+          "requestSha256": "1d77c541d9af2923e55aa25a9fb8e11da9a4edbedcb99188181bb39ea2eb93eb",
+          "httpStatus": 200,
+          "responseBytes": 109,
+          "responseSha256": "eedbadc3dba7c53425a342e7788caa63279d16e6f129bb5ee6d342131b0dd7e4"
+        },
+        {
+          "method": "getLatestBlockhash",
+          "requestSha256": "5a18225b93df916d576faeef24a5826fb41c5a171186b00a46d976c77b3ca59d",
+          "httpStatus": 200,
+          "responseBytes": 216,
+          "responseSha256": "141447a4f60df2865ae9d4dc3e3766bab8c958caff49c1e84affac91691fda02"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "requestSha256": "322535189a169db261f7259239711ac1dbc534bbe05fc48ed21bfb0a5367110b",
+          "httpStatus": 200,
+          "responseBytes": 632,
+          "responseSha256": "ca1508b23546819a5b068b86d642f70260f3c61f91da158f01e0cf27afa0e004"
+        }
+      ],
+      "signaturesCreated": 0,
+      "broadcasts": 0,
+      "amountLamports": "0",
+      "providerQualified": false,
+      "economicQualified": false,
+      "status": "refused",
+      "stage": "getMultipleAccounts",
+      "reason": "no-ordinary-public-reference",
+      "finishedAt": "2026-10-24T01:10:58.976Z"
+    },
+    {
+      "startedAt": "2026-10-24T01:11:41.179Z",
+      "sourceBaseCommit": "71cfd4f",
+      "provider": "existing Alchemy holder endpoint",
+      "settingChanged": false,
+      "methods": [
+        {
+          "method": "getGenesisHash",
+          "requestSha256": "1d77c541d9af2923e55aa25a9fb8e11da9a4edbedcb99188181bb39ea2eb93eb",
+          "httpStatus": 200,
+          "responseBytes": 109,
+          "responseSha256": "eedbadc3dba7c53425a342e7788caa63279d16e6f129bb5ee6d342131b0dd7e4"
+        },
+        {
+          "method": "getLatestBlockhash",
+          "requestSha256": "5a18225b93df916d576faeef24a5826fb41c5a171186b00a46d976c77b3ca59d",
+          "httpStatus": 200,
+          "responseBytes": 216,
+          "responseSha256": "1b7d23be1b41d3c7629bc908afc60da4572f9b4a9bf17f5f9c5cb42a1a8cb4a8"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "requestSha256": "21a320bc9b500413233f036840cde0a0d77dd1896f947de12368982d0301b291",
+          "httpStatus": 200,
+          "responseBytes": 782,
+          "responseSha256": "4698fb5c0055ca1a204bdb166515c6880481ba523a957681a313aea4a8d99cae"
+        },
+        {
+          "method": "getFeeForMessage",
+          "requestSha256": "6d06ca03321f8d353650d3eea231d054174fd0d3f85f10fea20601b61c942449",
+          "httpStatus": 200,
+          "responseBytes": 127,
+          "responseSha256": "9d91d2e82294e94c43bdf41fc4121ec5efe98cc5b15c986e0440cda66c709e3d"
+        },
+        {
+          "method": "getFeeForMessage",
+          "requestSha256": "c17548ebe9b5512e6f11fccb5885e7b58f1515b1308922978b07982f11a6ee96",
+          "httpStatus": 200,
+          "responseBytes": 127,
+          "responseSha256": "9d91d2e82294e94c43bdf41fc4121ec5efe98cc5b15c986e0440cda66c709e3d"
+        },
+        {
+          "method": "simulateBundle",
+          "requestSha256": "266b260c83c595e363dc9375a63a39b4056ef2111392c8753942f68974034713",
+          "httpStatus": 200,
+          "responseBytes": 164,
+          "responseSha256": "300d675962b50f839d79b720f7f64708bd7ee3622b82142ca9229244585b71ea",
+          "rpcCode": "-32602"
+        }
+      ],
+      "signaturesCreated": 0,
+      "broadcasts": 0,
+      "amountLamports": "0",
+      "providerQualified": false,
+      "economicQualified": false,
+      "feeObservations": [
+        {
+          "slot": "460658980",
+          "feeLamports": "5000"
+        },
+        {
+          "slot": "460658980",
+          "feeLamports": "5000"
+        }
+      ],
+      "requestedBank": 460658980,
+      "status": "refused",
+      "stage": "simulateBundle",
+      "reason": "rpc-refused",
+      "finishedAt": "2026-10-24T01:11:42.034Z"
+    }
+  ],
+  "requestProfile": "exact numeric bank; no fallback",
+  "mounted": false,
+  "providerQualified": false,
+  "economicQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "deployed": false,
+  "settingsChanged": false,
+  "hostedSql": false,
+  "fundedTrades": false,
+  "realSignaturesCreated": 0,
+  "broadcasts": 0
+}

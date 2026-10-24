@@ -405,7 +405,9 @@ export async function buildJitoBundleSimulationRequest(
       { encodedTransactions: decoded.map((p) => p.transaction) },
       {
         transactionEncoding: 'base64' as const,
-        simulationBank: { slot },
+        // Jito's SimulationSlotConfig uses a numeric Slot, not { slot }.
+        // A provider still has to return this exact bank; never fall back to tip.
+        simulationBank: slot,
         skipSigVerify: !config.verifySignatures,
         replaceRecentBlockhash: false as const,
         preExecutionAccountsConfigs: decoded.map((p) => ({
