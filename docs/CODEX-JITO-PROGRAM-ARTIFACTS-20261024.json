@@ -1,0 +1,248 @@
+{
+  "format": "jito-public-program-artifacts-v1",
+  "extractedAt": "2026-10-24T18:33:25.697Z",
+  "sourceDirectory": "work/release-qa/jito-full-live-20261024-v2",
+  "originalFloor": 460722135,
+  "maximumCapturedContext": 460722167,
+  "checks": [
+    "request-response-id-and-key-index",
+    "canonical-base64",
+    "retained-context-floor",
+    "exact-declared-space-and-truncation",
+    "matching-program-links-and-programdata-headers",
+    "contiguous-code-only-slices-no-gap-or-overlap",
+    "exact-full-elf-byte-count-and-sha256"
+  ],
+  "limitations": [
+    "Historical provider-reported bytes, not fresh evidence.",
+    "Chunked observations are not an atomic snapshot.",
+    "Matching headers do not exclude same-slot code rewrites.",
+    "No independently reproduced on-chain verified build or security audit is established.",
+    "No policy admission, signatures, send, provider qualification, or execution authorization."
+  ],
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "artifacts": [
+    {
+      "file": "jupiter.so",
+      "program": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "declaredAccountBytes": 2892269,
+      "headerBytesExcluded": 45,
+      "codeBytes": 2892224,
+      "sha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+      "deploymentSlot": "459479624",
+      "upgradeAuthority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+      "headerEvidence": [
+        {
+          "requestFile": "18.request.json",
+          "requestSha256": "3b10b21f7e86ae65e620c376e63f8d235a84612dbe381055b23fb93603ea6dac",
+          "responseFile": "18.response.bin",
+          "responseSha256": "69600ef801e979cdb7379b57d9b98f9d6e22854db66a4ef89583ad0bbb2cebad",
+          "key": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+          "index": 2,
+          "contextSlot": 460722157
+        },
+        {
+          "requestFile": "19.request.json",
+          "requestSha256": "7728dbfda865953c52464f837b96eee648f0de582e1e0b28dff5661019f5a493",
+          "responseFile": "19.response.bin",
+          "responseSha256": "a5e3b836abb093a3e30b86b54de4680a3c4511de5e3655c6996edac0fd35ec25",
+          "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "index": 0,
+          "contextSlot": 460722158
+        },
+        {
+          "requestFile": "26.request.json",
+          "requestSha256": "1d3fd8ad564402f848da87d9d7bb2a9574062e64674e34b56ec2c4e96a24c9d9",
+          "responseFile": "26.response.bin",
+          "responseSha256": "f6d0ec8126f26c92603d0affad39239b953fa3b978cf5c81c0a21ed210eb0743",
+          "key": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+          "index": 2,
+          "contextSlot": 460722166
+        },
+        {
+          "requestFile": "27.request.json",
+          "requestSha256": "cd980c5f7fc72a1d65db03a67d82d2a9ba58b1b3c554e645683744402cd3049b",
+          "responseFile": "27.response.bin",
+          "responseSha256": "0e33211432b7e4224e272b2bfe5f4f590c5930d765f312490a5cba6100d0dfdb",
+          "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "index": 0,
+          "contextSlot": 460722167
+        }
+      ],
+      "chunks": [
+        {
+          "requestFile": "21.request.json",
+          "requestSha256": "768a91e96075f6748e95b753e5979627cd1ff6447c58723b8e711f670a753b1c",
+          "responseFile": "21.response.bin",
+          "responseSha256": "cb2cdd23cfb25324bb467837f8b308644d6a4d97f20fdc90d565c0fc85c77219",
+          "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "index": 0,
+          "absoluteOffset": 45,
+          "codeOffset": 0,
+          "length": 348160,
+          "requestedLength": 348160,
+          "contextSlot": 460722159
+        },
+        {
+          "requestFile": "22.request.json",
+          "requestSha256": "b5555d74e225eb63eb87c00126e02ca6d161294697970221ac3b7fd93e845976",
+          "responseFile": "22.response.bin",
+          "responseSha256": "3d6ade7b7a3e1a6939e93ebcd458870f9117e29a8c4e442de3c3861139b2e8bd",
+          "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "index": 0,
+          "absoluteOffset": 348205,
+          "codeOffset": 348160,
+          "length": 524288,
+          "requestedLength": 524288,
+          "contextSlot": 460722161
+        },
+        {
+          "requestFile": "23.request.json",
+          "requestSha256": "42b8347d44c7d81a13e7aa08d1e45b81ff1fb2da3044c16e02fc603c920cf509",
+          "responseFile": "23.response.bin",
+          "responseSha256": "66846d7a182f2d1c7fea644c63632f82763ef50b97451f359842f1a7bd465d39",
+          "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "index": 0,
+          "absoluteOffset": 872493,
+          "codeOffset": 872448,
+          "length": 737280,
+          "requestedLength": 737280,
+          "contextSlot": 460722163
+        },
+        {
+          "requestFile": "24.request.json",
+          "requestSha256": "d66c28d4ae9d551b0fcd2c6028d4b98dd22d988dbd87c11af944efd0bfcf6822",
+          "responseFile": "24.response.bin",
+          "responseSha256": "02aafaff269824bf17540d2831f8fabfbe4ff23b9fda0f06e596d4cdf0a0dd61",
+          "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "index": 0,
+          "absoluteOffset": 1609773,
+          "codeOffset": 1609728,
+          "length": 737280,
+          "requestedLength": 737280,
+          "contextSlot": 460722164
+        },
+        {
+          "requestFile": "25.request.json",
+          "requestSha256": "d65a09c8cb23364b75361d9bbb3c66667d46ae6c68bba9db50e13fae3983db02",
+          "responseFile": "25.response.bin",
+          "responseSha256": "bd351607d4fd1077990831e7074ed58faec826a358c0dad87a9b6f4b0c939f91",
+          "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+          "index": 0,
+          "absoluteOffset": 2347053,
+          "codeOffset": 2347008,
+          "length": 545216,
+          "requestedLength": 737280,
+          "contextSlot": 460722165
+        }
+      ]
+    },
+    {
+      "file": "tess.so",
+      "program": "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH",
+      "programData": "BzSXM6KLDpHQQChzr7Fdgbzwp8r8zRYWFFrHK2uZmDYV",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "declaredAccountBytes": 576977,
+      "headerBytesExcluded": 45,
+      "codeBytes": 576932,
+      "sha256": "82fd37995fcece47a253b1a00c1dd7e4c3fff706b2e42384110e2cbabf4201b3",
+      "deploymentSlot": "446053401",
+      "upgradeAuthority": "7bJ9xu9UGVZPtYzH1fMwdaKdvfhqeSJtoFc2eGrXBPhK",
+      "headerEvidence": [
+        {
+          "requestFile": "18.request.json",
+          "requestSha256": "3b10b21f7e86ae65e620c376e63f8d235a84612dbe381055b23fb93603ea6dac",
+          "responseFile": "18.response.bin",
+          "responseSha256": "69600ef801e979cdb7379b57d9b98f9d6e22854db66a4ef89583ad0bbb2cebad",
+          "key": "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH",
+          "index": 4,
+          "contextSlot": 460722157
+        },
+        {
+          "requestFile": "19.request.json",
+          "requestSha256": "7728dbfda865953c52464f837b96eee648f0de582e1e0b28dff5661019f5a493",
+          "responseFile": "19.response.bin",
+          "responseSha256": "a5e3b836abb093a3e30b86b54de4680a3c4511de5e3655c6996edac0fd35ec25",
+          "key": "BzSXM6KLDpHQQChzr7Fdgbzwp8r8zRYWFFrHK2uZmDYV",
+          "index": 2,
+          "contextSlot": 460722158
+        },
+        {
+          "requestFile": "26.request.json",
+          "requestSha256": "1d3fd8ad564402f848da87d9d7bb2a9574062e64674e34b56ec2c4e96a24c9d9",
+          "responseFile": "26.response.bin",
+          "responseSha256": "f6d0ec8126f26c92603d0affad39239b953fa3b978cf5c81c0a21ed210eb0743",
+          "key": "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH",
+          "index": 4,
+          "contextSlot": 460722166
+        },
+        {
+          "requestFile": "27.request.json",
+          "requestSha256": "cd980c5f7fc72a1d65db03a67d82d2a9ba58b1b3c554e645683744402cd3049b",
+          "responseFile": "27.response.bin",
+          "responseSha256": "0e33211432b7e4224e272b2bfe5f4f590c5930d765f312490a5cba6100d0dfdb",
+          "key": "BzSXM6KLDpHQQChzr7Fdgbzwp8r8zRYWFFrHK2uZmDYV",
+          "index": 2,
+          "contextSlot": 460722167
+        }
+      ],
+      "chunks": [
+        {
+          "requestFile": "21.request.json",
+          "requestSha256": "768a91e96075f6748e95b753e5979627cd1ff6447c58723b8e711f670a753b1c",
+          "responseFile": "21.response.bin",
+          "responseSha256": "cb2cdd23cfb25324bb467837f8b308644d6a4d97f20fdc90d565c0fc85c77219",
+          "key": "BzSXM6KLDpHQQChzr7Fdgbzwp8r8zRYWFFrHK2uZmDYV",
+          "index": 2,
+          "absoluteOffset": 45,
+          "codeOffset": 0,
+          "length": 348160,
+          "requestedLength": 348160,
+          "contextSlot": 460722159
+        },
+        {
+          "requestFile": "22.request.json",
+          "requestSha256": "b5555d74e225eb63eb87c00126e02ca6d161294697970221ac3b7fd93e845976",
+          "responseFile": "22.response.bin",
+          "responseSha256": "3d6ade7b7a3e1a6939e93ebcd458870f9117e29a8c4e442de3c3861139b2e8bd",
+          "key": "BzSXM6KLDpHQQChzr7Fdgbzwp8r8zRYWFFrHK2uZmDYV",
+          "index": 1,
+          "absoluteOffset": 348205,
+          "codeOffset": 348160,
+          "length": 228772,
+          "requestedLength": 524288,
+          "contextSlot": 460722161
+        }
+      ]
+    }
+  ],
+  "rea": {
+    "attemptedArtifacts": [
+      "jupiter.so",
+      "tess.so"
+    ],
+    "provider": "ghidra",
+    "result": "target_unavailable",
+    "reason": "unsupported ELF architecture",
+    "semanticAudit": false,
+    "targetExecuted": false,
+    "policyChanged": false,
+    "elfMachineNumbers": {
+      "jupiter.so": 263,
+      "tess.so": 247
+    }
+  },
+  "primaryReferences": [
+    {
+      "url": "https://developers.jup.ag/docs/api-reference/swap/order",
+      "finding": "order supports excludeDexes, positive dexes restriction requires build; no route changed"
+    },
+    {
+      "url": "https://github.com/jup-ag/jupiter-cpi",
+      "finding": "CPI client generated from IDL, not evidence of deployed-router source equivalence"
+    }
+  ]
+}

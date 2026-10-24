@@ -360,10 +360,16 @@ it('aborts a pending asset transport on initial scan refusal without a simulatio
   expect(x.methods).not.toContain('batch');
   expect(doubles.scans).toHaveBeenCalledTimes(1);
   const retained = JSON.stringify(result);
+  const retainedTiming = JSON.stringify(result.evidence.timing);
   finish(new Response('{}'));
   await Promise.resolve();
   await Promise.resolve();
   expect(JSON.stringify(result)).toBe(retained);
+  expect(JSON.stringify(result.evidence.timing)).toBe(retainedTiming);
+  expect(result.evidence.timing.events.at(-1)).toMatchObject({
+    phase: 'collector',
+    event: 'refused',
+  });
 });
 for (const parsed of [false, true])
   it(`aborts the initial runtime branch on ${parsed ? 'RPC' : 'HTTP'} 429 with no later phase`, async () => {
@@ -492,6 +498,12 @@ it('refuses an initial parallel branch beyond original F+32 before exact simulat
     minimumSlot: 100,
     maximumSlot: 133,
     signingAllowed: false,
+  });
+  expect(result.evidence.timing).toMatchObject({
+    diagnosticOnly: true,
+    originalMinimumSlot: 100,
+    maximumCapturedContextSlot: 133,
+    contextSlotsAdmitted: false,
   });
   expect(x.methods).not.toContain('batch');
   expect(doubles.scans).toHaveBeenCalledTimes(1);
@@ -978,3 +990,234 @@ for (const failure of ['stale-second', 'changed-second'] as const)
       x.methods.filter((method) => method === 'getGenesisHash'),
     ).toHaveLength(1);
   });
+it('records detached monotonic stage timing without extra requests or runtime authority', async () => {
+  const x = await fixture();
+  let now = 10000.125;
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => {
+    const value = now;
+    now += 0.25;
+    return value;
+  });
+  try {
+    const result = await collectJitoReadOnlyQualification(
+      x.e.manifest,
+      [x.capsule],
+      new AbortController().signal,
+      { fetcher: x.fetcher, pace: async () => {} },
+    );
+    expect(result.status).toBe('checks-passed');
+    expect(result).toMatchObject({
+      minimumSlot: 100,
+      fullProviderQualification: false,
+      sourceCurrent: false,
+      runtimePrivilegesVerified: false,
+      runtimeAttested: false,
+      signatureVerified: false,
+      signingAllowed: false,
+      executionAllowed: false,
+      receiptVerified: false,
+    });
+    const timing = result.evidence.timing;
+    expect(timing).toMatchObject({
+      clock: 'process-monotonic',
+      originMs: 10000.125,
+      diagnosticOnly: true,
+      originalMinimumSlot: 100,
+      maximumCapturedContextSlot: 102,
+      contextSlotsAdmitted: false,
+    });
+    expect(
+      timing.events.every(
+        (event, index, events) =>
+          Number.isFinite(event.atMs) &&
+          event.atMs >= 0 &&
+          (index === 0 || event.atMs >= events[index - 1].atMs),
+      ),
+    ).toBe(true);
+    expect(timing.events.some((event) => !Number.isInteger(event.atMs))).toBe(
+      true,
+    );
+    const position = (phase: string, event: string) => {
+      const index = timing.events.findIndex(
+        (value) => value.phase === phase && value.event === event,
+      );
+      expect(index).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    for (const phase of [
+      'collector',
+      'manifest-validation',
+      'baseline-replay',
+      'network',
+      'lookup-before',
+      'packet-scope',
+      'assets-before',
+      'runtime-before',
+      'exact-simulation',
+      'assets-after',
+      'lookup-after',
+      'runtime-after',
+      'final-genesis',
+      'asset-runtime-replay',
+      'economic-replay',
+    ])
+      expect(position(phase, 'finish')).toBeGreaterThan(
+        position(phase, 'begin'),
+      );
+    expect(position('baseline-replay', 'begin')).toBeGreaterThan(
+      position('manifest-validation', 'finish'),
+    );
+    expect(position('network', 'begin')).toBeGreaterThan(
+      position('baseline-replay', 'finish'),
+    );
+    expect(position('exact-simulation', 'begin')).toBeGreaterThan(
+      position('assets-before', 'finish'),
+    );
+    expect(position('exact-simulation', 'begin')).toBeGreaterThan(
+      position('runtime-before', 'finish'),
+    );
+    expect(position('runtime-after', 'begin')).toBeGreaterThan(
+      position('exact-simulation', 'finish'),
+    );
+    for (const phase of ['assets-after', 'lookup-after', 'runtime-after'])
+      expect(position('final-genesis', 'begin')).toBeGreaterThan(
+        position(phase, 'finish'),
+      );
+    expect(position('asset-runtime-replay', 'begin')).toBeGreaterThan(
+      position('final-genesis', 'finish'),
+    );
+    expect(position('economic-replay', 'begin')).toBeGreaterThan(
+      position('asset-runtime-replay', 'finish'),
+    );
+    expect(timing.events.at(-1)).toMatchObject({
+      phase: 'collector',
+      event: 'finish',
+    });
+    expect(x.methods).toEqual([
+      'getGenesisHash',
+      'getMultipleAccounts',
+      'simulateBundle',
+      'batch',
+      'getMultipleAccounts',
+      'getGenesisHash',
+    ]);
+    expect(doubles.scans).toHaveBeenCalledTimes(2);
+    expect(doubles.check).toHaveBeenCalledOnce();
+    for (const transport of result.evidence.transports) {
+      expect(transport.summary.timing.originMs).toBeGreaterThanOrEqual(
+        timing.originMs,
+      );
+      for (const capture of transport.captures)
+        expect(
+          transport.summary.timing.originMs + capture.timing.queuedAtMs,
+        ).toBeGreaterThanOrEqual(timing.originMs);
+    }
+  } finally {
+    clock.mockRestore();
+  }
+});
+it('retains failed-branch timing without starting simulation or a second scan', async () => {
+  const x = await fixture();
+  let now = 20000.125;
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now++);
+  doubles.scans.mockImplementationOnce(async () => {
+    now += 25;
+    throw Error('Controlled runtime refusal');
+  });
+  try {
+    const result = await collectJitoReadOnlyQualification(
+      x.e.manifest,
+      [x.capsule],
+      new AbortController().signal,
+      { fetcher: x.fetcher, pace: async () => {} },
+    );
+    expect(result).toMatchObject({
+      status: 'refused',
+      stage: 'runtime-before',
+      minimumSlot: 100,
+      fullProviderQualification: false,
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+    const timing = result.evidence.timing;
+    const begin = timing.events.find(
+      (e) => e.phase === 'runtime-before' && e.event === 'begin',
+    );
+    const refused = timing.events.find(
+      (e) => e.phase === 'runtime-before' && e.event === 'refused',
+    );
+    expect(begin).toBeDefined();
+    expect(refused).toBeDefined();
+    expect(refused!.atMs - begin!.atMs).toBeGreaterThanOrEqual(25);
+    expect(timing).toMatchObject({
+      originMs: 20000.125,
+      originalMinimumSlot: 100,
+      diagnosticOnly: true,
+      contextSlotsAdmitted: false,
+    });
+    expect(timing.events.at(-1)).toMatchObject({
+      phase: 'collector',
+      event: 'refused',
+    });
+    expect(
+      timing.events.some(
+        (e) =>
+          e.phase === 'exact-simulation' ||
+          e.phase === 'runtime-after' ||
+          e.phase === 'economic-replay',
+      ),
+    ).toBe(false);
+    expect(x.methods).not.toContain('batch');
+    expect(doubles.scans).toHaveBeenCalledOnce();
+    expect(doubles.check).not.toHaveBeenCalled();
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it.each(['final-genesis', 'asset-runtime-replay'] as const)(
+  'records the actual open timing phase on %s refusal',
+  async (phase) => {
+    const x = await fixture();
+    let genesisReads = 0;
+    if (phase === 'asset-runtime-replay')
+      doubles.check.mockRejectedValue(Error('Controlled replay refusal'));
+    const fetcher: typeof fetch = async (url, init) => {
+      const request = fixtureBody(init);
+      if (
+        request.method === 'getGenesisHash' &&
+        ++genesisReads === 2 &&
+        phase === 'final-genesis'
+      )
+        return Response.json({
+          jsonrpc: '2.0',
+          id: request.id,
+          result: 'wrong-genesis',
+        });
+      return x.fetcher(url, init);
+    };
+    const result = await collectJitoReadOnlyQualification(
+      x.e.manifest,
+      [x.capsule],
+      new AbortController().signal,
+      { fetcher, pace: async () => {} },
+    );
+    expect(result.status).toBe('refused');
+    expect(
+      result.evidence.timing.events
+        .filter((e) => e.phase === 'collector')
+        .map((e) => e.event),
+    ).toEqual(['begin', 'refused']);
+    expect(
+      result.evidence.timing.events
+        .filter((e) => e.phase === phase)
+        .map((e) => e.event),
+    ).toEqual(['begin', 'refused']);
+    expect(
+      result.evidence.timing.events.some((e) => e.phase === 'economic-replay'),
+    ).toBe(false);
+    expect(doubles.scans).toHaveBeenCalledTimes(2);
+    expect(result.signingAllowed).toBe(false);
+    expect(result.executionAllowed).toBe(false);
+  },
+);

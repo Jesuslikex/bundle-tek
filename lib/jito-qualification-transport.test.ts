@@ -246,3 +246,113 @@ it('keeps runtime/asset stages single-method and rejects noncanonical account ke
   }
   expect(fetcher).not.toHaveBeenCalled();
 });
+
+it('separates fractional monotonic pacing, observed headers and a deliberately delayed body without admission authority', async () => {
+  let now = 100.25;
+  let releaseBody!: () => void;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const t = createJitoQualificationTransport('bundle', 100, signal(), {
+    pace: async () => {
+      now = 110.375;
+    },
+    fetcher: async () => {
+      expect(now).toBe(110.375);
+      now = 120.5;
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            releaseBody = () => {
+              now = 130.75;
+              controller.enqueue(
+                new TextEncoder().encode(
+                  '{"jsonrpc":"2.0","id":"a","result":"mainnet"}',
+                ),
+              );
+              controller.close();
+            };
+          },
+        }),
+      );
+    },
+  });
+  const pending = t.request(body(), signal());
+  await vi.waitFor(() =>
+    expect(t.captures()[0]?.timing.headersAtMs).toBe(20.25),
+  );
+  expect(t.captures()[0].timing.capturedAtMs).toBeNull();
+  releaseBody();
+  await pending;
+  const capture = t.captures()[0];
+  expect(capture.timing).toEqual({
+    queuedAtMs: 0,
+    pacedAtMs: 10.125,
+    sentAtMs: 10.125,
+    headersAtMs: 20.25,
+    capturedAtMs: 30.5,
+    finishedAtMs: 30.5,
+  });
+  expect(t.summary().timing).toEqual({
+    clock: 'process-monotonic',
+    originMs: 100.25,
+    diagnosticOnly: true,
+  });
+  expect(t.summary()).toMatchObject({
+    httpReads: 1,
+    methodUnits: 1,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  capture.timing.finishedAtMs = 999;
+  expect(t.captures()[0].timing.finishedAtMs).toBe(30.5);
+  t.close();
+});
+it.each(['http', 'rpc'] as const)(
+  'retains completed refusal timing on %s429 without a retry',
+  async (kind) => {
+    const fetcher = vi.fn(async () =>
+      kind === 'http'
+        ? new Response(null, { status: 429 })
+        : new Response('{"jsonrpc":"2.0","id":null,"error":{"code":429}}'),
+    );
+    const t = createJitoQualificationTransport('bundle', 100, signal(), {
+      pace: async () => {},
+      fetcher,
+    });
+    if (kind === 'http')
+      expect((await t.request(body(), signal())).status).toBe(429);
+    else await expect(t.request(body(), signal())).rejects.toThrow();
+    const captured = t.captures()[0];
+    expect(captured.timing.finishedAtMs).not.toBeNull();
+    expect(captured.timing.headersAtMs).not.toBeNull();
+    expect(captured.timing.capturedAtMs === null).toBe(kind === 'http');
+    await expect(t.request(body('later'), signal())).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(t.captures()[0].timing).toEqual(captured.timing);
+  },
+);
+it('does not turn a late uncooperative response into successful timing evidence after cancellation', async () => {
+  const c = new AbortController();
+  let release!: (r: Response) => void;
+  const fetcher = vi.fn(
+    () =>
+      new Promise<Response>((r) => {
+        release = r;
+      }),
+  );
+  const t = createJitoQualificationTransport('runtime', 100, c.signal, {
+    pace: async () => {},
+    fetcher,
+  });
+  const pending = t.request(body(), signal());
+  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+  c.abort();
+  await expect(pending).rejects.toThrow();
+  const before = t.captures()[0].timing;
+  expect(before.headersAtMs).toBeNull();
+  expect(before.capturedAtMs).toBeNull();
+  expect(before.finishedAtMs).not.toBeNull();
+  const cancelled = vi.fn();
+  release(new Response(new ReadableStream({ cancel: cancelled })));
+  await vi.waitFor(() => expect(cancelled).toHaveBeenCalledOnce());
+  expect(t.captures()[0].timing).toEqual(before);
+});

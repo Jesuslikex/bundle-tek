@@ -55,6 +55,25 @@ export async function collectJitoReadOnlyQualification(
   signal: AbortSignal,
   dependencies: { fetcher?: typeof fetch; pace?: typeof paceWalletRpc } = {},
 ) {
+  const timingOriginMs = performance.now();
+  const timingEvents: {
+    phase: string;
+    event: 'begin' | 'finish' | 'refused';
+    atMs: number;
+  }[] = [];
+  let timingClosed = false;
+  const openTimingPhases = new Set<string>();
+  const mark = (phase: string, event: 'begin' | 'finish' | 'refused') => {
+    if (timingClosed) return;
+    timingEvents.push({
+      phase,
+      event,
+      atMs: Math.max(0, performance.now() - timingOriginMs),
+    });
+    if (event === 'begin') openTimingPhases.add(phase);
+    else openTimingPhases.delete(phase);
+  };
+  mark('collector', 'begin');
   const manifest = snapshotJitoEvidence(manifestInput);
   if (
     !Array.isArray(capsulesInput) ||
@@ -69,15 +88,19 @@ export async function collectJitoReadOnlyQualification(
     if (!d?.enumerable || !Object.hasOwn(d, 'value')) return fail();
     capsules.push(d.value);
   }
+  mark('manifest-validation', 'begin');
   await requireJitoManifest(manifest, false);
   if (
     capsules.length !== manifest.swaps.length ||
     Date.parse(manifest.expiresAt) <= Date.now()
   )
     return fail();
+  mark('manifest-validation', 'finish');
+  mark('baseline-replay', 'begin');
   const source = await Promise.all(
     capsules.map((c) => replayJitoSwapSimulation(c, signal)),
   );
+  mark('baseline-replay', 'finish');
   const slots = [
     manifest.tip.slot,
     ...source.flatMap((s) => [
@@ -154,18 +177,37 @@ export async function collectJitoReadOnlyQualification(
   let attempt: Awaited<
     ReturnType<typeof collectJitoCoherentSimulationAttempt>
   > | null = null;
-  const evidence = () => ({
-    baselineCaptures: capsules,
-    assetsBefore: beforeAssets,
-    assetsAfter: afterAssets,
-    runtimeBefore: beforeCode,
-    runtimeAfter: afterCode,
-    attempt,
-    transports: [bundle, assets, initialCode, finalCode].map((t) => ({
-      summary: t.summary(),
-      captures: t.captures(),
-    })),
-  });
+  const evidence = (terminal: 'finish' | 'refused') => {
+    mark('collector', terminal);
+    const timing = snapshotJitoEvidence({
+      clock: 'process-monotonic' as const,
+      originMs: timingOriginMs,
+      diagnosticOnly: true as const,
+      originalMinimumSlot: minimumSlot,
+      maximumCapturedContextSlot: Math.max(
+        ...slots,
+        ...[bundle, assets, initialCode, finalCode].map(
+          (t) => t.summary().maximumObservedSlot ?? minimumSlot,
+        ),
+      ),
+      contextSlotsAdmitted: false as const,
+      events: timingEvents,
+    });
+    timingClosed = true;
+    return {
+      timing,
+      baselineCaptures: capsules,
+      assetsBefore: beforeAssets,
+      assetsAfter: afterAssets,
+      runtimeBefore: beforeCode,
+      runtimeAfter: afterCode,
+      attempt,
+      transports: [bundle, assets, initialCode, finalCode].map((t) => ({
+        summary: t.summary(),
+        captures: t.captures(),
+      })),
+    };
+  };
   const rpc: typeof bundle.rpc = async (method, params, s) => {
     const result = await bundle.rpc(method, params, s);
     if (method === 'getMultipleAccounts') {
@@ -177,9 +219,12 @@ export async function collectJitoReadOnlyQualification(
     return result;
   };
   try {
+    mark('network', 'begin');
     if ((await rpc('getGenesisHash', [], control)) !== SOLANA_MAINNET_GENESIS)
       return fail();
+    mark('network', 'finish');
     stage = 'lookup-before';
+    mark('lookup-before', 'begin');
     const messages = source.map((s) =>
       getCompiledTransactionMessageDecoder().decode(
         getTransactionDecoder().decode(
@@ -208,6 +253,8 @@ export async function collectJitoReadOnlyQualification(
         return fail();
       lookups.push(lookup);
     }
+    mark('lookup-before', 'finish');
+    mark('packet-scope', 'begin');
     const packets = manifest.swaps.map((r, i) => ({
       transaction: r.transaction,
       loadedAddresses: lookups[i]
@@ -239,15 +286,20 @@ export async function collectJitoReadOnlyQualification(
         source.flatMap((s) => [s.order.inputMint, s.order.outputMint]),
       ),
     ];
+    mark('packet-scope', 'finish');
     // Independent pre-simulation reads share one admitted phase-start floor.
     // Neither result can renew F or start simulation before the other finishes.
     const beforeFloor = floor();
     stage = 'preflight';
     const failures: { stage: string; error: unknown }[] = [];
     const guardedRead = async <T>(name: string, read: () => Promise<T>) => {
+      mark(name, 'begin');
       try {
-        return await read();
+        const value = await read();
+        mark(name, 'finish');
+        return value;
       } catch (error) {
+        mark(name, 'refused');
         if (!failures.length) {
           failures.push({ stage: name, error });
           owner.abort();
@@ -301,6 +353,7 @@ export async function collectJitoReadOnlyQualification(
     if (!beforeAssets || !beforeCode) return fail();
     floor();
     stage = 'exact-simulation';
+    mark('exact-simulation', 'begin');
     attempt = await collectJitoCoherentSimulationAttempt({
       packets,
       minimumSlot,
@@ -311,6 +364,7 @@ export async function collectJitoReadOnlyQualification(
       signal: control,
       transport: ({ body, signal: s }) => bundle.request(body, s),
     });
+    mark('exact-simulation', 'finish');
     if (attempt.status !== 'captured') return fail();
     const bank = attempt.simulation.frames.slot;
     if (lookups.some((lookup) => lookup && lookup.observedSlot > bank))
@@ -381,9 +435,12 @@ export async function collectJitoReadOnlyQualification(
     control.throwIfAborted();
     if (!afterAssets || !afterCode) return fail();
     floor();
+    mark('final-genesis', 'begin');
     if ((await rpc('getGenesisHash', [], control)) !== SOLANA_MAINNET_GENESIS)
       return fail();
+    mark('final-genesis', 'finish');
     stage = 'replay';
+    mark('asset-runtime-replay', 'begin');
     const assetProof = await verifyJitoAssetBracket(
         beforeAssets,
         afterAssets,
@@ -396,6 +453,7 @@ export async function collectJitoReadOnlyQualification(
         attempt.simulation.frames,
         control,
       );
+    mark('asset-runtime-replay', 'finish');
     const observations = source.map((s) => ({
       ...s,
       mintAccounts: {
@@ -409,6 +467,7 @@ export async function collectJitoReadOnlyQualification(
         ),
       },
     }));
+    mark('economic-replay', 'begin');
     const economic = await verifyJitoBundleEconomicObservation({
       manifest,
       observations,
@@ -417,6 +476,7 @@ export async function collectJitoReadOnlyQualification(
       simulationBankSlot: bank,
       rentAccounts: assetProof.rentAccounts,
     });
+    mark('economic-replay', 'finish');
     control.throwIfAborted();
     if (Date.parse(manifest.expiresAt) <= Date.now()) return fail();
     return {
@@ -430,10 +490,21 @@ export async function collectJitoReadOnlyQualification(
       rawSimulationChecksPassed: true as const,
       readOnlyLocalChecksPassed: true as const,
       fullProviderQualification: false as const,
-      evidence: evidence(),
+      evidence: evidence('finish'),
       ...authority,
     };
   } catch (error) {
+    const unfinishedTimingPhases = [...openTimingPhases].filter(
+      (phase) => phase !== 'collector',
+    );
+    for (const phase of unfinishedTimingPhases) mark(phase, 'refused');
+    if (
+      !unfinishedTimingPhases.length &&
+      !timingEvents.some(
+        (event) => event.phase === stage && event.event === 'refused',
+      )
+    )
+      mark(stage, 'refused');
     return {
       status: 'refused' as const,
       diagnosis: jitoRuntimePolicyRefusal(error),
@@ -447,7 +518,7 @@ export async function collectJitoReadOnlyQualification(
       ),
       readOnlyLocalChecksPassed: false as const,
       fullProviderQualification: false as const,
-      evidence: evidence(),
+      evidence: evidence('refused'),
       ...authority,
     };
   } finally {

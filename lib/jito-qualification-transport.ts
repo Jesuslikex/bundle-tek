@@ -4,6 +4,14 @@ import { readJitoSimulationPayload } from './jito-simulation-json';
 import { snapshotJitoEvidence, jitoEvidenceSha256 } from './jito-evidence-json';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 import bs58 from 'bs58';
+type CaptureTiming = {
+  queuedAtMs: number;
+  pacedAtMs: number | null;
+  sentAtMs: number | null;
+  headersAtMs: number | null;
+  capturedAtMs: number | null;
+  finishedAtMs: number | null;
+};
 type Capture = {
   requestBody: string;
   requestSha256: string;
@@ -11,6 +19,7 @@ type Capture = {
   rawSha256: string;
   httpStatus: number;
   captureStatus: 'not-captured' | 'captured';
+  timing: CaptureTiming;
 };
 const fail = (): never => {
   throw Error('Jito qualification transport refused.');
@@ -65,6 +74,10 @@ export function createJitoQualificationTransport(
     url.port
   )
     return fail();
+  // Process-monotonic diagnostics only. Neither these timestamps nor their
+  // differences participate in bank, expiry, pacing or evidence admission.
+  const timingOriginMs = performance.now();
+  const elapsed = () => Math.max(0, performance.now() - timingOriginMs);
   const owner = new AbortController(),
     control = AbortSignal.any([
       signal,
@@ -188,6 +201,14 @@ export function createJitoQualificationTransport(
       rawSha256: '',
       httpStatus: 0,
       captureStatus: 'not-captured',
+      timing: {
+        queuedAtMs: elapsed(),
+        pacedAtMs: null,
+        sentAtMs: null,
+        headersAtMs: null,
+        capturedAtMs: null,
+        finishedAtMs: null,
+      },
     };
     records.push(record);
     let abort = () => {};
@@ -200,10 +221,12 @@ export function createJitoQualificationTransport(
       for (let i = 0; i < rows.length; i++) await pace(endpoint, active);
       active.throwIfAborted();
       if (terminal) return fail();
+      record.timing.pacedAtMs = elapsed();
       record.requestSha256 = await jitoEvidenceSha256(
         new TextEncoder().encode(body),
       );
       active.throwIfAborted();
+      record.timing.sentAtMs = elapsed();
       const response = await fetcher(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -217,6 +240,7 @@ export function createJitoQualificationTransport(
         cancel(response);
         return fail();
       }
+      record.timing.headersAtMs = elapsed();
       return response;
     });
     try {
@@ -242,6 +266,7 @@ export function createJitoQualificationTransport(
       record.rawBody = Uint8Array.from(raw.rawBody);
       record.rawSha256 = raw.rawSha256;
       record.captureStatus = 'captured';
+      record.timing.capturedAtMs = elapsed();
       const values = Array.isArray(raw.value) ? raw.value : [raw.value];
       for (const value of values) {
         const observed = (
@@ -274,6 +299,7 @@ export function createJitoQualificationTransport(
       close();
       return fail();
     } finally {
+      record.timing.finishedAtMs = elapsed();
       active.removeEventListener('abort', abort);
     }
   }
@@ -342,11 +368,20 @@ export function createJitoQualificationTransport(
       terminal,
       rateLimited,
       maximumObservedSlot,
+      timing: {
+        clock: 'process-monotonic' as const,
+        originMs: timingOriginMs,
+        diagnosticOnly: true as const,
+      },
       providerQualified: false as const,
       signingAllowed: false as const,
       executionAllowed: false as const,
     }),
     captures: () =>
-      records.map((r) => ({ ...r, rawBody: Uint8Array.from(r.rawBody) })),
+      records.map((r) => ({
+        ...r,
+        timing: { ...r.timing },
+        rawBody: Uint8Array.from(r.rawBody),
+      })),
   };
 }
