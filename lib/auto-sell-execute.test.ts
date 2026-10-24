@@ -78,7 +78,10 @@ function server(
   return { calls, fetcher: fetcher as unknown as typeof fetch };
 }
 
-const make = (s: ReturnType<typeof server>) =>
+const make = (
+  s: ReturnType<typeof server>,
+  patch: { maxSlippageBps?: number } = {},
+) =>
   createAutoSellExecutor({
     projectId: retained.projectId,
     projectRevision: 3,
@@ -89,6 +92,7 @@ const make = (s: ReturnType<typeof server>) =>
       { address: W2, revision: 1 },
     ],
     session: () => session,
+    ...patch,
     fetcher: s.fetcher,
     sleep: async () => {},
     sign: vi.fn(async () => ({
@@ -129,6 +133,21 @@ describe('auto sell executor', () => {
     const s = server({ failWallet: W1 });
     const result = await make(s)(1_500_000n, new AbortController().signal);
     expect(result.wallet).toBe(W2);
+  });
+
+  it('sends a tighter slippage ceiling with the preparation request', async () => {
+    const s = server();
+    await make(s, { maxSlippageBps: 10 })(
+      1_500_000n,
+      new AbortController().signal,
+    );
+    expect(s.calls[0].body.slippageBps).toBe(10);
+  });
+
+  it('leaves the request byte-identical when no tighter ceiling is chosen', async () => {
+    const s = server();
+    await make(s)(1_500_000n, new AbortController().signal);
+    expect(s.calls[0].body).not.toHaveProperty('slippageBps');
   });
 
   it('reports a signed but unconfirmed submission as uncertain', async () => {

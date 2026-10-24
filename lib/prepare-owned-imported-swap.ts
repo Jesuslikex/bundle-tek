@@ -11,7 +11,11 @@ import {
   importedTradeSettings,
   type ImportedTokenDocument,
 } from '@/lib/imported-token-project';
-import { prepareSolanaSwap, WRAPPED_SOL } from '@/lib/warmup-swap-quote';
+import {
+  prepareSolanaSwap,
+  swapSlippageBps,
+  WRAPPED_SOL,
+} from '@/lib/warmup-swap-quote';
 import { observeImportedSwapBalance } from '@/lib/imported-swap-balance';
 import { simulateImportedSwap } from '@/lib/imported-swap-simulation';
 import {
@@ -62,6 +66,7 @@ export async function prepareOwnedImportedSwap(
     buyAllocations?: unknown;
     conditional?: ConditionalLevelRequest;
     session?: TradeSessionRequest;
+    slippageBps?: number;
   };
   try {
     const text = await request.text();
@@ -102,6 +107,21 @@ export async function prepareOwnedImportedSwap(
       { error: 'Choose a current imported project and wallet.' },
       400,
     );
+  }
+  if (input.slippageBps !== undefined) {
+    // Tighten-only, and refused rather than clamped: a caller must never think
+    // a trade ran tighter than it did.
+    try {
+      input.slippageBps = swapSlippageBps(input.slippageBps);
+    } catch (cause) {
+      return json(
+        {
+          error:
+            cause instanceof Error ? cause.message : 'Invalid slippage limit.',
+        },
+        400,
+      );
+    }
   }
   try {
     const read = () =>
@@ -316,6 +336,9 @@ export async function prepareOwnedImportedSwap(
         side: input.side,
         amount: input.amount,
         wallet: input.wallet,
+        ...(input.slippageBps === undefined
+          ? {}
+          : { slippageBps: input.slippageBps }),
       },
       key,
       signal,

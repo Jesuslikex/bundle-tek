@@ -23,6 +23,30 @@ export class WarmupQuoteError extends Error {
     this.name = 'WarmupQuoteError';
   }
 }
+/**
+ * The slippage ceiling this app has always used and verified against.
+ *
+ * The quote validator refuses any route whose minimum output is looser than
+ * 50 bps below the quoted output, so 50 bps is a floor on protection rather
+ * than a preference. Callers may ask for a *tighter* limit; a looser request is
+ * refused outright instead of being silently clamped, because a clamp would let
+ * a caller believe a trade ran tighter than it did.
+ */
+export const MAX_SWAP_SLIPPAGE_BPS = 50;
+export function swapSlippageBps(value: unknown) {
+  if (value === undefined) return MAX_SWAP_SLIPPAGE_BPS;
+  if (
+    typeof value !== 'number' ||
+    !Number.isSafeInteger(value) ||
+    value < 1 ||
+    value > MAX_SWAP_SLIPPAGE_BPS
+  )
+    throw new WarmupQuoteError(
+      `Slippage must be a whole number from 1 to ${MAX_SWAP_SLIPPAGE_BPS} bps. This app never quotes above 0.5%.`,
+      'PARAMETER_MISMATCH',
+    );
+  return value;
+}
 export async function quoteWarmupBuy(
   document: SavedWarmup['document'],
   apiKey: string | undefined,
@@ -122,6 +146,8 @@ async function quoteSolanaSwap(
     taker?: string;
     quoteMint?: string;
     metisOnly?: true;
+    /** Tighten-only: 1..50 bps. Absent keeps the 50 bps bound. */
+    slippageBps?: number;
   },
   apiKey: string | undefined,
   signal: AbortSignal,
@@ -131,6 +157,7 @@ async function quoteSolanaSwap(
     chain: 'Solana',
     address: input.tokenMint,
   });
+  const slippage = swapSlippageBps(input.slippageBps);
   const quoteMint = validateTokenSource({
     chain: 'Solana',
     address: input.quoteMint ?? WRAPPED_SOL,
@@ -159,7 +186,7 @@ async function quoteSolanaSwap(
     outputMint: destinationMint,
     amount: amount.toString(),
     swapMode: 'ExactIn',
-    slippageBps: '50',
+    slippageBps: String(slippage),
     ...(input.taker || input.metisOnly
       ? { excludeRouters: 'jupiterz,dflow,okx' }
       : {}),
@@ -255,7 +282,7 @@ async function quoteSolanaSwap(
     data.outputMint !== destinationMint ||
     atoms(data.inAmount) !== amount ||
     data.swapMode !== 'ExactIn' ||
-    data.slippageBps !== 50
+    data.slippageBps !== slippage
   )
     throw new WarmupQuoteError(
       'Quote parameters do not match the requested swap.',
@@ -281,7 +308,10 @@ async function quoteSolanaSwap(
     platformFee = { bps: Number(fee.feeBps), mint: fee.feeMint };
   } else if (data.feeBps !== undefined && data.feeBps !== 0)
     throw new WarmupQuoteError('Missing quote platform fee metadata.');
-  if (minimum > output || minimum < (output * 9950n) / 10000n)
+  if (
+    minimum > output ||
+    minimum < (output * BigInt(10000 - slippage)) / 10000n
+  )
     throw new WarmupQuoteError(
       'Quote output protection failed validation. Request a fresh quote.',
       'OUTPUT_PROTECTION',
@@ -324,7 +354,7 @@ async function quoteSolanaSwap(
     inAmount: amount.toString(),
     outAmount: output.toString(),
     minimumOutAmount: minimum.toString(),
-    slippageBps: 50,
+    slippageBps: slippage,
     router: data.router,
     ...(input.taker && data.priceImpactPct !== undefined
       ? { priceImpactPct: validOrderPriceImpact(data.priceImpactPct) }
@@ -346,6 +376,8 @@ export async function prepareSolanaSwap(
     amount: string;
     decimals: number;
     wallet: string;
+    /** Tighten-only: 1..50 bps. Absent keeps the 50 bps bound. */
+    slippageBps?: number;
   },
   apiKey: string | undefined,
   signal: AbortSignal,
@@ -358,7 +390,14 @@ export async function prepareSolanaSwap(
       : solanaTokenAtoms(input.amount, input.decimals)
   ).toString();
   const order = await quoteSolanaSwap(
-    { tokenMint: input.tokenMint, side: input.side, amountRaw, taker },
+    {
+      tokenMint: input.tokenMint,
+      side: input.side,
+      amountRaw,
+      taker,
+      // Validate here so the caller's value is refused before any provider call.
+      slippageBps: swapSlippageBps(input.slippageBps),
+    },
     apiKey,
     signal,
     fetcher,
