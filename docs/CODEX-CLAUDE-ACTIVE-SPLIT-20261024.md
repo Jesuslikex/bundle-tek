@@ -6,6 +6,8 @@ Julian has now added OpenCode to the collaboration. Read `BUNDLE-THREE-AGENT-HAN
 
 ## Current authoritative state
 
+Latest shared-plan checkpoint: read CODEX-SHARED-PLAN-INSPECTION-20261024.md/.json, CODEX-JITO-MULTI-LOOKUP-20261024.md and the official-reference refresh.993tests/52files plus TypeScript/scoped typed lint pass. Read-only sharing is now inspectable; role/walletscope/expiry parity is not implemented. Jito multi-ALT coverage closes a test gap, not live qualification. Completed helper claim is released. No deploy or funded actions.
+
 Latest continuation: read CODEX-JITO-POSTFLIGHT-OVERLAP-20261024.md/.json for final independent asset/ALT/code overlap and CODEX-WALLET-FUNDING-GUIDANCE-20261024.md for the completed helper claim.913tests/45files plus19offline harness tests pass; one actual source-only Opus5.5 review found no blocker, with stated test limits. Full live Jito qualification is still open; no signing authority, deployment or funded action.
 
 Newest raw/runtime checkpoint: read `CODEX-JITO-RAW-RUNTIME-20261024.md/.json`. Complete raw swap capture/replay, independent mint/Rent brackets, separate bounded transports and both serial code scans are implemented as a private unmounted read-only diagnostic. A real unsigned public-reference SOL/USDC attempt captured the full baseline and asset-before data, then refused changed Jupiter code and unlisted Tess under the unchanged reviewed policy. The runtime trace already reached original F+32 before any bundle simulation. Full qualification is **not passed**; no pin, timing limit or signing gate was loosened. No deployment or funded action. Keep Jito disjoint from Claude's files and preserve the frozen warmup drafts.

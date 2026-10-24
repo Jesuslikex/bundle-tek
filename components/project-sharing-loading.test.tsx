@@ -33,7 +33,10 @@ it.each([false, true])(
       expect(fetcher.mock.calls[0]).toEqual(
         owner
           ? ['/api/projects/shares?projectId=p1', { cache: 'no-store' }]
-          : ['/api/projects/shares', { cache: 'no-store' }],
+          : [
+              '/api/projects/shares',
+              { cache: 'no-store', signal: expect.any(AbortSignal) },
+            ],
       );
     } finally {
       await act(async () => root.unmount());

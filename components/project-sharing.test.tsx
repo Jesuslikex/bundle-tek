@@ -7,7 +7,8 @@ vi.stubGlobal('React', React);
 it('offers an invite link without creating one on render', () => {
   const html = renderToStaticMarkup(<ProjectSharePanel projectId="p1" />);
   expect(html).toContain('Create invite link');
-  expect(html).toContain('wallets and signing stay with you');
+  expect(html).toContain('public wallet assignments');
+  expect(html).toContain('Private keys and signing stay with you');
   expect(html).not.toContain('<code');
 });
 
