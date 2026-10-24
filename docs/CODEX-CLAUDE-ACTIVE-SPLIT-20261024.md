@@ -2,6 +2,8 @@
 
 This is a coordination update, not a new parity-completion or release claim. User asked both agents to stay in touch and finish the legitimate remaining features. Preserve the standing no-deployment, no-hosted-SQL, no-funded-trade and no-real-wallet-unlock/sign/send boundaries.
 
+Julian has now added OpenCode to the collaboration. Read `BUNDLE-THREE-AGENT-HANDOFF-20261024.md` for its verified existing session, acknowledgement, reported completed work, current read-only audit and separate-branch rules. Do not infer completed audit findings or grant an overlapping edit claim from that acknowledgement.
+
 ## Current authoritative state
 
 Newest raw/runtime checkpoint: read `CODEX-JITO-RAW-RUNTIME-20261024.md/.json`. Complete raw swap capture/replay, independent mint/Rent brackets, separate bounded transports and both serial code scans are implemented as a private unmounted read-only diagnostic. A real unsigned public-reference SOL/USDC attempt captured the full baseline and asset-before data, then refused changed Jupiter code and unlisted Tess under the unchanged reviewed policy. The runtime trace already reached original F+32 before any bundle simulation. Full qualification is **not passed**; no pin, timing limit or signing gate was loosened. No deployment or funded action. Keep Jito disjoint from Claude's files and preserve the frozen warmup drafts.

@@ -8,6 +8,12 @@ Create a coherent local checkpoint before handing completed work back. Record wh
 
 Before taking the next task, inspect the latest commit and remaining working-tree changes. Uncommitted work may belong to the other agent; do not treat it as disposable or silently include it in your own commit.
 
+## OpenCode joins the coordination, 24 October 2026
+
+Julian explicitly authorized coordinating the existing OpenCode Bundle session alongside Claude. All three agents must read `docs/BUNDLE-THREE-AGENT-HANDOFF-20261024.md` and `docs/CODEX-CLAUDE-ACTIVE-SPLIT-20261024.md` before choosing work. Codex retains the active Jito claim below; Claude retains its current PR/claimed files. OpenCode currently has a read-only wallet/funding/launch UX audit, not an overlapping editing claim.
+
+For future OpenCode edits, claim exact disjoint paths first and use a separate branch/worktree from current origin/main through a PR. Do not change canonical main's branch/index or another agent's files, dependencies or dev server. Preserve original AGENTS dirt and frozen warmup drafts. Keep accurate wallet-history/funding/ownership labels; exclude artificial volume and deceptive history. No deploy, hosted SQL, credentials/provider/cron changes, real wallet signing/send or funded trades under this coordination.
+
 ## Claude and Codex coordination (both agents read this first)
 
 Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at `08ca7c2`, 79 commits ahead of `origin/main` (`ea0a120`), working tree clean apart from this file. Detailed history stays in `docs/CODEX-CLAUDE-SHARED-HANDOFF-20261018.md`.
