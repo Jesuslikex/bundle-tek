@@ -155,3 +155,13 @@ it('aborts the active read on unmount', async () => {
   expect(signal?.aborted).toBe(true);
   root = createRoot(host);
 });
+
+it('mounts passive cross-venue discovery without changing the Pump activity request', async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(activity));
+  await mount();
+  expect(
+    host.querySelector('[aria-label="Saved launch recovery"]'),
+  ).not.toBeNull();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls[0][0]).toBe('/api/account-launch-activity');
+});

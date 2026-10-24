@@ -6,6 +6,8 @@ Julian has now added OpenCode to the collaboration. Read `BUNDLE-THREE-AGENT-HAN
 
 ## Current authoritative state
 
+Read CODEX-LAUNCH-RECOVERY-DISCOVERY-20261024.md for the completed disjoint manual account discovery panel/API. Saved nonterminal references only, no signing/receipt authority or parent-layout change.66focused tests/7files plus TypeScript/scoped lint/format and synthetic Chrome checks; actual source-only Opus5.5 review with Codex-tested follow-ups. Original Pump group counts preserved; PR57 files untouched. Full recovery navigation/live qualification and parity remain open.
+
 Latest shared-plan checkpoint: read CODEX-SHARED-PLAN-INSPECTION-20261024.md/.json, CODEX-JITO-MULTI-LOOKUP-20261024.md and the official-reference refresh.993tests/52files plus TypeScript/scoped typed lint pass. Read-only sharing is now inspectable; role/walletscope/expiry parity is not implemented. Jito multi-ALT coverage closes a test gap, not live qualification. Completed helper claim is released. No deploy or funded actions.
 
 Latest continuation: read CODEX-JITO-POSTFLIGHT-OVERLAP-20261024.md/.json for final independent asset/ALT/code overlap and CODEX-WALLET-FUNDING-GUIDANCE-20261024.md for the completed helper claim.913tests/45files plus19offline harness tests pass; one actual source-only Opus5.5 review found no blocker, with stated test limits. Full live Jito qualification is still open; no signing authority, deployment or funded action.
