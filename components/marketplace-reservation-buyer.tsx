@@ -1,4 +1,5 @@
 'use client';
+import { MarketplaceCheckout } from './marketplace-checkout';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
@@ -491,7 +492,7 @@ export function MarketplaceReservationBuyer({
             <>
               <h3>
                 {state === 'held'
-                  ? 'Held · payment unavailable'
+                  ? 'Held'
                   : state === 'released'
                     ? 'Released'
                     : 'Expired'}
@@ -534,6 +535,10 @@ export function MarketplaceReservationBuyer({
                       Release this hold
                     </button>
                   </div>
+                  <MarketplaceCheckout
+                    key={receipt.record.id}
+                    reservation={receipt.record}
+                  />
                 </>
               )}
               <details>
