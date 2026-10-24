@@ -6,6 +6,8 @@ Julian has now added OpenCode to the collaboration. Read `BUNDLE-THREE-AGENT-HAN
 
 ## Current authoritative state
 
+Latest inspectable-funding checkpoint: read CODEX-FUNDING-EVIDENCE-REFERENCES-20261024.md. Both wallet badges and launch observations expose full loaded public evidence references and explicit explorer links, no new reads/actions.131tests/8files, TypeScript/scoped lint/format, synthetic Chrome and actual source-only Opus5.5 review; parent predicates/read controls preserved by normalized AST comparison. Claim released; PR57 and frozen drafts untouched.401sign-in UX and coordinated recovery navigation remain separate follow-ups.
+
 Read CODEX-LAUNCH-RECOVERY-DISCOVERY-20261024.md for the completed disjoint manual account discovery panel/API. Saved nonterminal references only, no signing/receipt authority or parent-layout change.66focused tests/7files plus TypeScript/scoped lint/format and synthetic Chrome checks; actual source-only Opus5.5 review with Codex-tested follow-ups. Original Pump group counts preserved; PR57 files untouched. Full recovery navigation/live qualification and parity remain open.
 
 Latest shared-plan checkpoint: read CODEX-SHARED-PLAN-INSPECTION-20261024.md/.json, CODEX-JITO-MULTI-LOOKUP-20261024.md and the official-reference refresh.993tests/52files plus TypeScript/scoped typed lint pass. Read-only sharing is now inspectable; role/walletscope/expiry parity is not implemented. Jito multi-ALT coverage closes a test gap, not live qualification. Completed helper claim is released. No deploy or funded actions.

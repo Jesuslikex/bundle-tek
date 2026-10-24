@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Clock3 } from 'lucide-react';
+import { FundingObservationReference } from './funding-observation-reference';
 import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 import {
   decodeWalletFundingTimes,
@@ -604,6 +605,12 @@ export function WalletFundingProximityBadge({
         )}
       </small>
       {provenance}
+      <FundingObservationReference
+        address={row.address}
+        revision={row.revision}
+        source={check.source}
+        funding={row.funding}
+      />
     </details>
   );
 }

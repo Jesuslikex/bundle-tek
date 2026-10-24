@@ -1,0 +1,51 @@
+.reference {
+  min-width: 0;
+  white-space: normal;
+  color: var(--foreground, #e7e7ef);
+  margin-block: 0.5rem;
+}
+.reference summary {
+  min-height: 44px;
+  padding-block: 0.75rem;
+  cursor: pointer;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.reference pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  font-size: 0.8rem;
+}
+.reference p,
+.reference a {
+  overflow-wrap: anywhere;
+}
+.reference button,
+.reference a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  white-space: normal;
+}
+.reference button {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  border: 1px solid var(--border, #303039);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+}
+.reference output {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.reference button:focus-visible,
+.reference a:focus-visible,
+.reference summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
