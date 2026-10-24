@@ -1,4 +1,5 @@
 'use client';
+import { OpenLaunchChartButton } from '@/components/open-launch-chart-button';
 import { useEffectEvent, useEffect, useId, useRef, useState } from 'react';
 import { PumpHolderLaunchReview } from './pump-holder-launch-review';
 import { PumpOrganicHolderBuys } from './pump-organic-holder-buys';
@@ -934,6 +935,11 @@ function PumpLaunchReviewContent({
                 : `${launch.receipt.succeeded ? 'Finalized coin creation' : 'Finalized transaction failure'} at slot ${launch.receipt.slot}.`}
             </p>
           )}
+          {launch.receipt &&
+            launch.receipt.kind !== 'expired-unobserved' &&
+            launch.receipt.succeeded && (
+              <OpenLaunchChartButton mint={creation(launch.review).mint} />
+            )}
           {!['finalized', 'failed', 'cancelled'].includes(launch.state) && (
             <Button
               type="button"

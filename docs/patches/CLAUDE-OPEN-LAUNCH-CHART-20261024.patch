@@ -1,0 +1,22 @@
+Proposed exact patch for the protected app/page.tsx (needs julian's approval;
+not applied). It lets the new "Open chart in Bundle" button on finished
+launches switch the app to that coin's imported chart and trading view.
+Without it the button still imports the coin, and it appears under Imports.
+
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ (imports)
++import { OPEN_IMPORTED_PROJECT_EVENT } from '@/lib/open-launch-chart';
+@@ const openImportedProject = (id: string) => {
+   const openImportedProject = (id: string) => {
+     setActivityImportId(id);
+     changeView('imports');
+   };
++  useEffect(() => {
++    const open = (event: Event) => {
++      const id = (event as CustomEvent<{ id?: unknown }>).detail?.id;
++      if (typeof id === 'string') openImportedProject(id);
++    };
++    window.addEventListener(OPEN_IMPORTED_PROJECT_EVENT, open);
++    return () => window.removeEventListener(OPEN_IMPORTED_PROJECT_EVENT, open);
++  });

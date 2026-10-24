@@ -1,4 +1,5 @@
 'use client';
+import { OpenLaunchChartButton } from '@/components/open-launch-chart-button';
 import dynamic from 'next/dynamic';
 import {
   pumpGroupMatchesCurrentPrepare,
@@ -1368,6 +1369,9 @@ function PumpHolderLaunchReviewContent({
                 ? 'Network fee remains unresolved.'
                 : ''}
             </p>
+          )}
+          {launch.receipt?.kind === 'finalized' && launch.receipt.succeeded && (
+            <OpenLaunchChartButton mint={launch.review.input.create.mint} />
           )}
           {launch.receipt?.kind === 'expired-unobserved' && (
             <p>

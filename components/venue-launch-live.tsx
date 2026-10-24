@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import styles from '@/components/launch/pump-launch-ui.module.css';
+import { OpenLaunchChartButton } from './open-launch-chart-button';
 import {
   SNIPER_GUARD_MAX_SECONDS,
   SNIPER_GUARD_WHITELIST_LIMIT,
@@ -146,6 +147,9 @@ export function VenueLaunchLive({
           </>
         )}
       </p>
+      {launch.state === 'finalized' && (
+        <OpenLaunchChartButton mint={launch.mint} />
+      )}
       <VenueSniperGuard launch={launch} />
     </section>
   );
