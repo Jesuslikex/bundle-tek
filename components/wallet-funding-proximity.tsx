@@ -26,6 +26,8 @@ import {
   noteFundingHistoryRead,
 } from '@/lib/funding-history-window';
 import styles from './wallet-funding-proximity.module.css';
+class SavedFundingSignInRequiredError extends Error {}
+
 type BatchedResult = LaunchFundingComparison & {
   wallets: LaunchFundingComparison['observations'];
 };
@@ -83,6 +85,7 @@ export function useWalletFundingProximity(
     busy: boolean;
     result: WalletFundingTimes | FundingOriginBatch | BatchedResult | null;
     progress?: FundingOriginProgress;
+    needsSignIn?: boolean;
     error: string;
   }>({ key, busy: false, result: null, error: '' });
   // Reset this component's state before painting a changed selection. Returning
@@ -185,6 +188,14 @@ export function useWalletFundingProximity(
         cache: 'no-store',
         signal,
       });
+      if (signal.aborted) {
+        void response.body?.cancel().catch(() => {});
+        signal.throwIfAborted();
+      }
+      if (response.status === 401) {
+        void response.body?.cancel().catch(() => {});
+        throw new SavedFundingSignInRequiredError();
+      }
       const body = await readBoundedPanelJson(response, signal);
       signal.throwIfAborted();
       if (!response.ok) throw Error();
@@ -192,19 +203,28 @@ export function useWalletFundingProximity(
       if (active.current?.controller === controller)
         setView({ key, busy: false, result, error: '' });
     } catch (error) {
+      const needsSignIn =
+        error instanceof SavedFundingSignInRequiredError ||
+        ((error instanceof FundingOriginClientError ||
+          error instanceof LaunchFundingReadError) &&
+          error.status === 401);
       if (active.current?.controller === controller)
         setView({
           key,
           busy: false,
           result: null,
+          needsSignIn,
           error:
-            maximumWallets === 500 && error instanceof LaunchFundingReadError
-              ? batchReadError(error, source)
-              : source === 'provider'
-                ? error instanceof FundingOriginClientError
-                  ? error.message
-                  : 'Provider funding history could not be checked. No automatic retry was made.'
-                : 'Recorded funding times could not be checked. Keep the selection and retry this read.',
+            error instanceof SavedFundingSignInRequiredError
+              ? 'Sign in before checking recorded funding times. No automatic retry was made.'
+              : maximumWallets === 500 &&
+                  error instanceof LaunchFundingReadError
+                ? batchReadError(error, source)
+                : source === 'provider'
+                  ? error instanceof FundingOriginClientError
+                    ? error.message
+                    : 'Provider funding history could not be checked. No automatic retry was made.'
+                  : 'Recorded funding times could not be checked. Keep the selection and retry this read.',
         });
     } finally {
       if (active.current?.controller === controller) active.current = null;
@@ -230,6 +250,7 @@ export function useWalletFundingProximity(
       : { key, busy: false, result: null, progress: undefined, error: '' };
   return {
     ...current,
+    needsSignIn: Boolean(current.needsSignIn),
     source,
     maximumWallets,
     capacityValid,
@@ -436,6 +457,20 @@ export function WalletFundingProximityPanel({
         />
       )}
       {check.error && <p role="alert">{check.error}</p>}
+      {check.needsSignIn && (
+        <p>
+          <a
+            href="/sign-in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-4"
+          >
+            Sign in to Bundle (opens a new tab)
+          </a>
+          . Return here, then run the funding check again. It will not restart
+          automatically.
+        </p>
+      )}
     </section>
   );
 }
