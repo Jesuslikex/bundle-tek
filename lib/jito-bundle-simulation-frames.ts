@@ -409,6 +409,17 @@ export async function buildJitoBundleSimulationRequest(
   return {
     profile: 'jito-sequential-account-frames-v1' as const,
     bankEncoding: config.bankEncoding as 'slot-object' | 'numeric-slot',
+    // Detached canonical bindings for a later raw-response adapter. These are
+    // caller-supplied fee/ALT expectations, not authenticated source evidence.
+    packetBindings: decoded.map((p) => ({
+      transaction: p.transaction,
+      maximumFeeLamports: p.maximumFeeLamports,
+      expectedFeeLamports: p.expectedFeeLamports,
+      loadedAddresses: {
+        writable: [...p.loadedAddresses.writable],
+        readonly: [...p.loadedAddresses.readonly],
+      },
+    })),
     method: 'simulateBundle' as const,
     params: [
       { encodedTransactions: decoded.map((p) => p.transaction) },

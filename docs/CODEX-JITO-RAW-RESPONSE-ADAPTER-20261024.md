@@ -1,0 +1,40 @@
+# Jito raw response adapter checkpoint, 24 October 2026
+
+Base: `a20abd0`. Scope is the existing JSON reader and request builder, their tests, new `lib/jito-simulation-response.ts`/test, synthetic `test/jito-raw-response-fixture.ts` and this handoff/JSON proof. No production mount, signing or send behavior changes. This bounded claim is released after commit.
+
+## What is implemented
+
+`readJitoSimulationPayload` retains exact privately copied UTF-8 response bytes, their SHA-256 and actual byte length, alongside parsed data. The existing integer-only reader/default payload behavior remains strict. An explicit payload-only option tokenizes decimal/exponent numbers into opaque private-membership objects; it never rounds them to Number, bigint or string. The adapter accepts those tokens only at the discarded `uiAmount` presentation position. Raw fee, slot, lamport, size, account-index and precision fields still require bigint integer tokens. Token raw amount still requires a canonical u64 **string**. A number cannot become an address/base64 string, and a display fraction cannot become an approved integer.
+
+That distinction is required by the [pinned Rust token metadata](https://github.com/jito-foundation/jito-solana/blob/a3f2fe92c1166c7ec9f21a3655b37877fe1279a3/account-decoder-client-types/src/token.rs), which has floating display values separate from exact raw amount strings. The [pinned account type](https://github.com/jito-foundation/jito-solana/blob/a3f2fe92c1166c7ec9f21a3655b37877fe1279a3/account-decoder-client-types/src/lib.rs) also supplies rentEpoch and optional space metadata. These sources describe shapes, not actual endpoint qualification.
+
+The new adapter generates an expected exact string-ID request and request hash, then reads a supplied body. It validates a strict Rust-shaped RPC envelope, exact chosen bank, complete ordered frames and account vectors, actual fee/loaded-data/address fields and known metadata before projection. The existing frame verifier then re-decodes canonical packets, checks original fee expectations/caps, exact bank/32-slot span, readonly/executable state, raw native conservation and cross-frame continuity. The builder exposes detached canonical packet bindings so later input mutation cannot change this replay. Its fee/ALT expectations remain caller-supplied and unauthenticated; all statements outside that request builder are unchanged.
+
+Ancillary checks include actual decoded account space, u64 rentEpoch, balance arrays matching the full raw account vector, and token indices/mint/owner/program/raw amounts matching observed token headers. Mint precision is only checked for consistency between metadata rows; independent mint/extension admission remains separate. Logs and return data are bounded. Unknown fields, missing core evidence, replacement blockhashes, altered echoes and partial results refuse. Display values are discarded and never become units, minimums, fees, prices or volume. Partial token-header checking is not full Token-2022/TLV/runtime admission.
+
+The adapter returns either admitted local frame integrity or a fixed safe refusal. Valid parsed refusal bodies retain the full capture; malformed/read failures have no invented partial digest. Invalid policy or pre-read cancellation throws before acquiring the body, leaving cleanup to the caller; once reading starts, the reader owns cleanup. Post-verifier cancellation prevents admission. Raw captures are **private evidence, not public DTOs**. Persist/replay original raw bytes and recheck their digest; the bigint/opaque parsed value is not JSON persistence data. Returned captures are caller-owned/mutable, not immutable owned storage. Generated request/hash alone does not prove that request was sent.
+
+All new signing, execution, automatic execution, provider, source authentication, signature, runtime privilege, ALT and economic-output flags remain false. `frameIntegrityVerified` proves only the listed local frame checks. The underlying normalized limits still apply, including its 20000-node/depth24 snapshot, 2MiB decoded data and 512KiB/account limits; transport bounds are not a universal maximum-route capacity or peak-memory claim.
+
+## Verification
+
+**436 tests across nine files pass**, zero failures/skips: 76 adapter, 110 reader, 88 frame/request, 100 economic, nine streamed-flow, six coherent lookup-fixture, 30 token decoder, 14 existing provider and three existing lookup-decoder cases. Plain project TypeScript and seven-file typed lint/format pass. The raw fixture covers all eight four-wallet Buy/Sell, SPL/Token-2022, ALT/static combinations through actual frame and economic verifiers, with bigint wire integers and fractional/exponent presentation metadata. These are synthetic code/route fixtures, not actual deployed program evidence. No new Webpack build, full repository suite or signed-in browser check is claimed.
+
+Actual authenticated Claude Opus5.5 completed a nine-file source-only review using Read/Glob/Grep, zero denials/edits/tests and unchanged copied sources. It found no concrete false acceptance in the money/frame path. Codex independently addressed its contract/type/test points: explicit opaque-token rejection at object positions, validated RPC error shape, documented early body ownership and persistence constraints, integer/object-position and late-cancellation tests. Those final adapter refinements were independently tested, not rereviewed by Opus. Code differences from the review copy are recorded in JSON. Root's real Vitest checks supersede the helper's unsuccessful standalone fixture-loader harness attempts; those were stopped, not claimed as passes.
+
+## Actual live attempt outcomes
+
+Two bounded unsigned attempts used the unchanged Alchemy holder setting, public reference payer and zero-value System packets. Both stopped **before simulateBundle** because independently observed fee contexts differed. Ten total read-only RPC calls, zero simulation calls in these two attempts, no 429, signature or broadcast. Every outcome is retained.
+
+| Attempt | Fee read schedule                      | Actual fee contexts                      | Outcome                                   |
+| ------- | -------------------------------------- | ---------------------------------------- | ----------------------------------------- |
+| First   | Sequential                             | 460673552 / 460673553, each5000 lamports | Same-bank refusal; no simulation/capture. |
+| Second  | Two concurrent reads, settled together | 460674811 / 460674812, each5000 lamports | Same-bank refusal; no simulation/capture. |
+
+There was no automatic retry/fallback or acceptance of equal fees from different banks. The second schedule was a single deliberate diagnostic change after retaining the first refusal. The earlier coarse slot-object native success remains separate; it did not retain complete account vectors. This checkpoint therefore makes **no new live full-response/adapter qualification claim**. Exact request/response byte retention is locally proven but no new live complete raw simulation body was produced.
+
+## Next requirements
+
+Collect packet-bound fees with one genuinely common actual bank, without relaxing equality or substituting quote fees. A bounded same-request batch is a candidate to investigate and qualify, not assumed supported or atomic. Then perform one retained native capture through this adapter. Full fee/ALT source admission, real Jupiter/ALT/profile qualification, program/runtime/genesis admission, owned immutable storage/authorization and exact signed final replay still precede integration before the existing send-once marker. No API or UI is mounted here; production still uses its existing individual simulations.
+
+No deployment, application/hosted SQL, migration, provider/credential/cron setting change, real wallet unlock/sign/send, strategy run or funded trade. Protected Claude UI, original AGENTS.md dirt and seven excluded warmup drafts remain intact. Current journal ends0146; next unclaimed0147 subject to recheck. Full legitimate product parity remains open.

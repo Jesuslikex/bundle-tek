@@ -1,5 +1,10 @@
 import { expect, it, vi } from 'vitest';
-import { readJitoSimulationJson } from './jito-simulation-json';
+import { createHash } from 'node:crypto';
+import {
+  readJitoSimulationJson,
+  readJitoSimulationPayload,
+  inspectJitoSimulationDecimal,
+} from './jito-simulation-json';
 const encoder = new TextEncoder();
 function body(text: string, chunkSize = 9999999) {
   const bytes = encoder.encode(text);
@@ -529,5 +534,310 @@ it('uses native signal state without invoking a caller-defined aborted getter', 
     });
   Object.defineProperty(signal, 'aborted', { get: getter });
   expect(await readJitoSimulationJson(body('{}'), signal)).toEqual({});
+  expect(getter).not.toHaveBeenCalled();
+});
+
+it('retains exact wire identity for different byte encodings of equivalent admitted values', async () => {
+  const left = ' {"a":"x","n":1}\n',
+    right = '{"\\u0061":"\\u0078","n":1}';
+  const a = await readJitoSimulationPayload(
+    body(left),
+    new AbortController().signal,
+  );
+  const b = await readJitoSimulationPayload(
+    body(right),
+    new AbortController().signal,
+  );
+  expect(a.value).toEqual(b.value);
+  expect(a.rawBody).toEqual(encoder.encode(left));
+  expect(b.rawBody).toEqual(encoder.encode(right));
+  expect(a.rawSha256).not.toBe(b.rawSha256);
+  for (const [payload, text] of [
+    [a, left],
+    [b, right],
+  ] as const) {
+    expect(payload.byteLength).toBe(encoder.encode(text).byteLength);
+    expect(payload.rawSha256).toBe(
+      createHash('sha256').update(encoder.encode(text)).digest('hex'),
+    );
+    expect(Object.keys(payload).sort()).toEqual([
+      'byteLength',
+      'rawBody',
+      'rawSha256',
+      'value',
+    ]);
+  }
+});
+it('captures split UTF-8 and empty chunks without altering the copied raw byte vector', async () => {
+  const text = '["€🙂",18446744073709551615]';
+  const payload = await readJitoSimulationPayload(
+    body(text, 1),
+    new AbortController().signal,
+  );
+  expect(payload.value).toEqual(['€🙂', 18446744073709551615n]);
+  expect(payload.rawBody).toEqual(encoder.encode(text));
+  expect(payload.rawSha256).toBe(
+    createHash('sha256').update(payload.rawBody).digest('hex'),
+  );
+});
+it('copies original chunks before subsequent producer mutation and ignores spoofed lengths', async () => {
+  const first = encoder.encode('{"a":'),
+    second = encoder.encode('1}');
+  let step = 0;
+  Object.defineProperties(first, {
+    byteLength: { value: 0 },
+    length: { value: 0 },
+    byteOffset: { value: 999999 },
+    buffer: { value: new ArrayBuffer(0) },
+  });
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      pull(c) {
+        if (step++ === 0) c.enqueue(first);
+        else if (step === 2) {
+          Uint8Array.prototype.fill.call(first, 120);
+          c.enqueue(second);
+        } else {
+          second.fill(120);
+          c.close();
+        }
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const payload = await readJitoSimulationPayload(
+    stream,
+    new AbortController().signal,
+  );
+  expect(payload.value).toEqual({ a: 1n });
+  expect(payload.rawBody).toEqual(encoder.encode('{"a":1}'));
+  expect(payload.byteLength).toBe(7);
+  expect(payload.rawSha256).toBe(
+    createHash('sha256').update('{"a":1}').digest('hex'),
+  );
+});
+it('returns fresh caller-owned byte arrays on each call without aliasing earlier retained identity', async () => {
+  const a = await readJitoSimulationPayload(
+    body('[1]'),
+    new AbortController().signal,
+  );
+  const b = await readJitoSimulationPayload(
+    body('[1]'),
+    new AbortController().signal,
+  );
+  expect(a.rawBody).not.toBe(b.rawBody);
+  expect(a.rawBody.buffer).not.toBe(b.rawBody.buffer);
+  const hash = b.rawSha256;
+  a.rawBody.fill(0);
+  expect(b.rawBody).toEqual(encoder.encode('[1]'));
+  expect(b.rawSha256).toBe(hash);
+  expect(a.value).toEqual([1n]);
+});
+for (const [name, text, limit, error] of [
+  ['bytes', '"xxxx"', 5, 'byte bound'],
+  ['depth', '['.repeat(33) + 'null' + ']'.repeat(33), 4194304, 'depth bound'],
+  ['duplicate', '{"a":1,"\\u0061":2}', 4194304, 'duplicate object key'],
+  ['number', '1.5', 4194304, 'noncanonical integer'],
+] as const)
+  it(`payload capture shares strict ${name} refusal and produces no partial success`, async () => {
+    const stream = body(text);
+    await expect(
+      readJitoSimulationPayload(stream, new AbortController().signal, limit),
+    ).rejects.toThrow(error);
+    expect(stream.locked).toBe(false);
+  });
+it('payload capture shares chunk bounds and promptly aborts a pending read', async () => {
+  const overflowing = new ReadableStream<Uint8Array>(
+    {
+      pull(c) {
+        c.enqueue(new Uint8Array());
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  await expect(
+    readJitoSimulationPayload(overflowing, new AbortController().signal),
+  ).rejects.toThrow('chunk bound');
+  expect(overflowing.locked).toBe(false);
+  const controller = new AbortController(),
+    cancel = vi.fn(() => new Promise<void>(() => {}));
+  const pending = new ReadableStream<Uint8Array>(
+    {
+      pull() {
+        return new Promise<void>(() => {});
+      },
+      cancel,
+    },
+    { highWaterMark: 0 },
+  );
+  const promise = readJitoSimulationPayload(pending, controller.signal);
+  controller.abort(Error('FAKE_PRIVATE_ABORT_REASON'));
+  await expect(promise).rejects.toThrow('interrupted');
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(pending.locked).toBe(false);
+});
+it('rechecks cancellation after the asynchronous raw digest before returning any payload', async () => {
+  const controller = new AbortController();
+  const nativeDigest = crypto.subtle.digest.bind(crypto.subtle);
+  const digest = vi
+    .spyOn(crypto.subtle, 'digest')
+    .mockImplementation(async (...args) => {
+      const result = await nativeDigest(...args);
+      controller.abort();
+      return result;
+    });
+  try {
+    const stream = body('{"a":1}');
+    await expect(
+      readJitoSimulationPayload(stream, controller.signal),
+    ).rejects.toThrow('interrupted');
+    expect(stream.locked).toBe(false);
+  } finally {
+    digest.mockRestore();
+  }
+});
+it('payload capture sanitizes stream failures and skips digesting invalid JSON', async () => {
+  const digest = vi.spyOn(crypto.subtle, 'digest');
+  try {
+    await expect(
+      readJitoSimulationPayload(body('{bad'), new AbortController().signal),
+    ).rejects.toThrow();
+    expect(digest).not.toHaveBeenCalled();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(c) {
+        c.error(Error('https://private.invalid/?key=FAKE_PAYLOAD_SECRET'));
+      },
+    });
+    await expect(
+      readJitoSimulationPayload(stream, new AbortController().signal),
+    ).rejects.toThrow('Jito simulation JSON: stream unavailable.');
+    expect(stream.locked).toBe(false);
+  } finally {
+    digest.mockRestore();
+  }
+});
+
+for (const token of [
+  '0.000001',
+  '1e-6',
+  '1.0',
+  '1E+06',
+  '-0.0',
+  '9007199254740991.1',
+  '1e99999999999999999999',
+])
+  it(`retains opted display decimal ${token} as opaque exact lexical data`, async () => {
+    const text = '{"uiAmount":' + token + ',"raw":1,"quoted":"' + token + '"}';
+    const payload = await readJitoSimulationPayload(
+      body(text, 1),
+      new AbortController().signal,
+      4194304,
+      { allowDecimalTokens: true },
+    );
+    const value = payload.value as Record<string, unknown>;
+    expect(typeof value.uiAmount).toBe('object');
+    expect(inspectJitoSimulationDecimal(value.uiAmount)).toBe(token);
+    expect(value.raw).toBe(1n);
+    expect(value.quoted).toBe(token);
+    expect(inspectJitoSimulationDecimal(value.raw)).toBeNull();
+    expect(inspectJitoSimulationDecimal(value.quoted)).toBeNull();
+    expect(payload.rawBody).toEqual(encoder.encode(text));
+    expect(payload.rawSha256).toBe(
+      createHash('sha256').update(text).digest('hex'),
+    );
+    await expect(
+      readJitoSimulationPayload(body(text), new AbortController().signal),
+    ).rejects.toThrow('noncanonical integer');
+    await expect(read(text)).rejects.toThrow('noncanonical integer');
+  });
+for (const token of [
+  '.1',
+  '1.',
+  '1e',
+  '1e+',
+  '1e--2',
+  '01.1',
+  '-01e2',
+  '+1.0',
+  '1..2',
+  '1e2e3',
+  '-0',
+  '1'.repeat(21),
+])
+  it(`refuses malformed decimal or invalid integer in opted payload ${token}`, async () => {
+    await expect(
+      readJitoSimulationPayload(
+        body(token),
+        new AbortController().signal,
+        4194304,
+        { allowDecimalTokens: true },
+      ),
+    ).rejects.toThrow();
+  });
+it('bounds decimal lexemes to128 characters without converting mantissas or exponents', async () => {
+  const token = '0.' + '1'.repeat(126);
+  const payload = await readJitoSimulationPayload(
+    body(token),
+    new AbortController().signal,
+    4194304,
+    { allowDecimalTokens: true },
+  );
+  expect(inspectJitoSimulationDecimal(payload.value)).toBe(token);
+  await expect(
+    readJitoSimulationPayload(
+      body(token + '1'),
+      new AbortController().signal,
+      4194304,
+      { allowDecimalTokens: true },
+    ),
+  ).rejects.toThrow('decimal token bound');
+});
+it('decimal inspection requires private membership and never coerces or reads forged tokens', async () => {
+  const forged = { toString: vi.fn(() => '1.2'), valueOf: vi.fn(() => 1.2) };
+  for (const value of [
+    forged,
+    Object.freeze(Object.create(null)),
+    null,
+    1.2,
+    1n,
+    '1.2',
+    () => 1.2,
+  ])
+    expect(inspectJitoSimulationDecimal(value)).toBeNull();
+  expect(forged.toString).not.toHaveBeenCalled();
+  expect(forged.valueOf).not.toHaveBeenCalled();
+  const payload = await readJitoSimulationPayload(
+    body('1.2'),
+    new AbortController().signal,
+    4194304,
+    { allowDecimalTokens: true },
+  );
+  expect(Object.isFrozen(payload.value)).toBe(true);
+  expect(
+    inspectJitoSimulationDecimal(structuredClone(payload.value)),
+  ).toBeNull();
+});
+it('refuses invalid decimal-mode options before taking ownership of the stream', async () => {
+  const getter = vi.fn(() => true);
+  for (const options of [
+    { allowDecimalTokens: false },
+    { allowDecimalTokens: 'true' },
+    { allowDecimalTokens: true, extra: true },
+    Object.defineProperty({}, 'allowDecimalTokens', {
+      get: getter,
+      enumerable: true,
+    }),
+  ]) {
+    const stream = body('1.2');
+    await expect(
+      readJitoSimulationPayload(
+        stream,
+        new AbortController().signal,
+        4194304,
+        options as { allowDecimalTokens: true },
+      ),
+    ).rejects.toThrow('invalid payload options');
+    expect(stream.locked).toBe(false);
+  }
   expect(getter).not.toHaveBeenCalled();
 });

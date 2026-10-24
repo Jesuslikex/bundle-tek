@@ -3,6 +3,13 @@ const MAX_DEPTH = 32;
 const MAX_NODES = 100000;
 const MAX_MEMBERS = 4096;
 const MAX_CHUNKS = 100000;
+const decimalSources = new WeakMap<object, string>();
+/** Membership-checked lexical token inspection only; no numeric conversion or authority. */
+export function inspectJitoSimulationDecimal(value: unknown): string | null {
+  return value !== null && typeof value === 'object'
+    ? (decimalSources.get(value) ?? null)
+    : null;
+}
 class JitoSimulationJsonError extends Error {}
 const ownErrors = new WeakMap<object, string>();
 function ownError(reason: string) {
@@ -31,7 +38,7 @@ const nativeBuffer = (value: Uint8Array) =>
  * Integer tokens have at most 20 decimal digits; field-specific ranges remain caller checks.
  * Escaped unpaired surrogates are refused, as are duplicate decoded object keys.
  * These are transport/data bounds only, not provider or execution qualification. */
-function parseStrictJson(text: string): unknown {
+function parseStrictJson(text: string, allowDecimalTokens = false): unknown {
   let at = 0,
     nodes = 0;
   const escapes: Record<string, string> = {
@@ -153,23 +160,48 @@ function parseStrictJson(text: string): unknown {
       const start = at;
       if (text[at] === '-') at++;
       const digitsStart = at;
-      if (text[at] === '0') at++;
-      else {
+      const advance = () => {
+        at++;
+        if (allowDecimalTokens ? at - start > 128 : at - digitsStart > 20)
+          return fail(
+            allowDecimalTokens ? 'decimal token bound' : 'integer digit bound',
+          );
+      };
+      if (text[at] === '0') {
+        advance();
+        if (text[at] >= '0' && text[at] <= '9') return fail('invalid integer');
+      } else {
         if (!(text[at] >= '1' && text[at] <= '9'))
           return fail('invalid integer');
-        while (text[at] >= '0' && text[at] <= '9') {
-          at++;
-          if (at - digitsStart > 20) return fail('integer digit bound');
+        while (text[at] >= '0' && text[at] <= '9') advance();
+      }
+      const integerDigits = at - digitsStart;
+      let decimal = false;
+      if (text[at] === '.' || text[at] === 'e' || text[at] === 'E') {
+        if (!allowDecimalTokens) return fail('noncanonical integer');
+        decimal = true;
+        if (text[at] === '.') {
+          advance();
+          if (!(text[at] >= '0' && text[at] <= '9'))
+            return fail('invalid decimal');
+          while (text[at] >= '0' && text[at] <= '9') advance();
+        }
+        if (text[at] === 'e' || text[at] === 'E') {
+          advance();
+          if (text[at] === '+' || text[at] === '-') advance();
+          if (!(text[at] >= '0' && text[at] <= '9'))
+            return fail('invalid decimal');
+          while (text[at] >= '0' && text[at] <= '9') advance();
         }
       }
       const token = text.slice(start, at);
-      if (
-        token === '-0' ||
-        text[at] === '.' ||
-        text[at] === 'e' ||
-        text[at] === 'E'
-      )
-        return fail('noncanonical integer');
+      if (decimal) {
+        const opaque: object = Object.freeze(Object.create(null));
+        decimalSources.set(opaque, token);
+        return opaque;
+      }
+      if (token === '-0') return fail('noncanonical integer');
+      if (integerDigits > 20) return fail('integer digit bound');
       return BigInt(token);
     }
     return fail('invalid value');
@@ -186,10 +218,85 @@ function parseStrictJson(text: string): unknown {
  * including empty chunks. A UTF-8 BOM is refused. Early option/signal refusal
  * leaves the body with its caller; after acquiring a reader this function cleans
  * it up. Caller-created stream methods are trusted code, not a sandbox. */
+export type JitoSimulationPayload = {
+  value: unknown;
+  rawBody: Uint8Array;
+  rawSha256: string;
+  byteLength: number;
+};
+
 export async function readJitoSimulationJson(
   stream: ReadableStream<Uint8Array> | null,
   signal: AbortSignal,
   limit = MAX_BYTES,
+): Promise<unknown> {
+  return readJitoSimulationBody(stream, signal, limit, false);
+}
+
+/** Retain exact copied wire bytes only after complete valid admission. Returned
+ * bytes belong to the caller; neither immutability nor source authentication is claimed.
+ * Explicit decimal mode retains bounded fractional/exponent lexemes as opaque tokens
+ * for caller-selected display fields only. No float or arithmetic conversion occurs. */
+export async function readJitoSimulationPayload(
+  stream: ReadableStream<Uint8Array> | null,
+  signal: AbortSignal,
+  limit = MAX_BYTES,
+  options?: { allowDecimalTokens: true },
+): Promise<JitoSimulationPayload> {
+  let allowDecimalTokens = false;
+  if (options !== undefined) {
+    try {
+      if (
+        !options ||
+        typeof options !== 'object' ||
+        ![Object.prototype, null].includes(Object.getPrototypeOf(options)) ||
+        Reflect.ownKeys(options).length !== 1
+      )
+        return fail('invalid payload options');
+      const descriptor = Object.getOwnPropertyDescriptor(
+        options,
+        'allowDecimalTokens',
+      );
+      if (
+        !descriptor?.enumerable ||
+        !Object.hasOwn(descriptor, 'value') ||
+        descriptor.value !== true
+      )
+        return fail('invalid payload options');
+      allowDecimalTokens = true;
+    } catch {
+      return fail('invalid payload options');
+    }
+  }
+  return readJitoSimulationBody(
+    stream,
+    signal,
+    limit,
+    true,
+    allowDecimalTokens,
+  );
+}
+
+async function readJitoSimulationBody(
+  stream: ReadableStream<Uint8Array> | null,
+  signal: AbortSignal,
+  limit: number,
+  captureRaw: true,
+  allowDecimalTokens?: boolean,
+): Promise<JitoSimulationPayload>;
+async function readJitoSimulationBody(
+  stream: ReadableStream<Uint8Array> | null,
+  signal: AbortSignal,
+  limit: number,
+  captureRaw: false,
+  allowDecimalTokens?: boolean,
+): Promise<unknown>;
+async function readJitoSimulationBody(
+  stream: ReadableStream<Uint8Array> | null,
+  signal: AbortSignal,
+  limit: number,
+  captureRaw: boolean,
+  allowDecimalTokens = false,
 ): Promise<unknown> {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_BYTES)
     return fail('invalid byte bound');
@@ -214,6 +321,7 @@ export async function readJitoSimulationJson(
     return fail('reader unavailable');
   }
   const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+  const rawChunks: Uint8Array[] | null = captureRaw ? [] : null;
   let finished = false,
     size = 0,
     chunks = 0,
@@ -255,6 +363,7 @@ export async function readJitoSimulationJson(
         return fail('non-private byte body');
       const bytes = new Uint8Array(length);
       bytes.set(new Uint8Array(buffer, nativeOffset(chunk), length));
+      if (rawChunks && length) rawChunks.push(bytes);
       try {
         text += decoder.decode(bytes, { stream: true });
       } catch {
@@ -272,7 +381,23 @@ export async function readJitoSimulationJson(
     // One abort reaction for the whole read, rather than one retained reaction per chunk.
     const text = await Promise.race([readBody(), interrupted]);
     if (aborted()) return fail('interrupted');
-    return parseStrictJson(text);
+    const value = parseStrictJson(text, captureRaw && allowDecimalTokens);
+    if (!rawChunks) return value;
+    const rawBody = new Uint8Array(size);
+    let offset = 0;
+    for (const bytes of rawChunks) {
+      rawBody.set(bytes, offset);
+      offset += bytes.length;
+    }
+    const digest = await Promise.race([
+      crypto.subtle.digest('SHA-256', rawBody.buffer),
+      interrupted,
+    ]);
+    if (aborted()) return fail('interrupted');
+    const rawSha256 = Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+    return { value, rawBody, rawSha256, byteLength: size };
   } catch (error) {
     // A private class alone is forgeable through a previously caught constructor.
     // Reconstruct only reasons created here, ignoring even a mutated own message.

@@ -1,0 +1,308 @@
+{
+  "date": "2026-10-24",
+  "sourceBaseCommit": "a20abd0",
+  "source": [
+    {
+      "file": "lib/jito-simulation-response.ts",
+      "sha256": "04de90de4fb1a80f81be8e57aa55b947b9689a194636632daa34f616810df524"
+    },
+    {
+      "file": "lib/jito-simulation-response.test.ts",
+      "sha256": "1e59b1533a8665025b9a700f63aff4c264a8a0d385df336edfb1f198dbb7b250"
+    },
+    {
+      "file": "lib/jito-simulation-json.ts",
+      "sha256": "0bdc889aeeaaade12066d3c6b0d1976bedd5d8921981710ee5f496b3547ab346"
+    },
+    {
+      "file": "lib/jito-simulation-json.test.ts",
+      "sha256": "def58cf142311d02c241735e54d5fbbf219dfb58e29c8626adec96c4c7363480"
+    },
+    {
+      "file": "lib/jito-bundle-simulation-frames.ts",
+      "sha256": "22ee282066b1c538f8e203113d2d09ba4c6adc744d19d754f7e732f196aa00b5"
+    },
+    {
+      "file": "lib/jito-bundle-simulation-frames.test.ts",
+      "sha256": "296a14c1e2b5fa6f6f604f1be30753b77c30598ae2a22b763abd979672fb14b3"
+    },
+    {
+      "file": "test/jito-raw-response-fixture.ts",
+      "sha256": "b4b253c4e627a783b92dc7b516d6f8de62312c52e8ef94f61af1fcfb1d92ba5a"
+    }
+  ],
+  "verification": {
+    "record": "work/release-qa/jito-raw-response-complete-final-20261024.json",
+    "passed": 436,
+    "failed": 0,
+    "skipped": 0,
+    "files": 9,
+    "perFile": [
+      {
+        "file": "jito-sequential-lookup-fixture.test.ts",
+        "passed": 6
+      },
+      {
+        "file": "jito-simulation-stream-flow.test.ts",
+        "passed": 9
+      },
+      {
+        "file": "jito-bundle-economics.test.ts",
+        "passed": 100
+      },
+      {
+        "file": "jito-bundle-simulation-frames.test.ts",
+        "passed": 88
+      },
+      {
+        "file": "jito-bundle-token-state.test.ts",
+        "passed": 30
+      },
+      {
+        "file": "jito-provider.test.ts",
+        "passed": 14
+      },
+      {
+        "file": "jito-simulation-json.test.ts",
+        "passed": 110
+      },
+      {
+        "file": "jito-simulation-response.test.ts",
+        "passed": 76
+      },
+      {
+        "file": "swap-lookup-accounts.test.ts",
+        "passed": 3
+      }
+    ],
+    "projectTypeScript": true,
+    "sevenFileTypedLint": true,
+    "sevenFileFormat": true,
+    "frameVerifierNonBuilderAstUnchanged": true,
+    "newWebpackBuild": false,
+    "wholeRepositorySuite": false,
+    "actualBrowser": false
+  },
+  "review": {
+    "startedAt": "2026-10-24T02:01:25.048Z",
+    "finishedAt": "2026-10-24T02:03:34.605Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "a20abd0",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": ["claude-opus-5-5"],
+    "modelsUsed": ["claude-opus-5-5"],
+    "tools": ["Glob", "Grep", "Read"],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.5419072,
+    "sourceUnchanged": true,
+    "changed": [],
+    "record": "work/release-qa/opus-jito-response-20261024-v1/status.json",
+    "sourceOnly": true,
+    "testsRun": false,
+    "currentSourceDifferences": [
+      "lib/jito-simulation-response.test.ts",
+      "lib/jito-simulation-response.ts"
+    ],
+    "postReviewCorrectionsIndependentlyVerifiedBy": "Codex; opaque-object/RPC-error checks, contracts and type/cancellation tests; no second Opus review"
+  },
+  "profile": {
+    "name": "jito-rust-raw-frames-v1",
+    "mounted": false,
+    "exactRawBytesAndHash": true,
+    "integerTokens": "bigint; raw token amount retains string type",
+    "displayDecimals": "opt-in opaque lexical tokens; schema allows only discarded uiAmount",
+    "requestHash": "expected generated request body; not proof sent",
+    "captureMutability": "caller owned; future storage must recheck raw bytes",
+    "providerQualified": false,
+    "sourceAuthenticated": false,
+    "signatureVerified": false,
+    "altStateVerified": false,
+    "runtimePrivilegesVerified": false,
+    "economicOutputVerified": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "automaticExecutionAllowed": false
+  },
+  "liveAttempts": [
+    {
+      "startedAt": "2026-10-24T02:03:10.000Z",
+      "sourceBaseCommit": "a20abd0",
+      "uncommittedOverlay": true,
+      "provider": "existing Alchemy holder endpoint",
+      "settingChanged": false,
+      "methods": [
+        {
+          "method": "getGenesisHash",
+          "requestSha256": "1d77c541d9af2923e55aa25a9fb8e11da9a4edbedcb99188181bb39ea2eb93eb",
+          "httpStatus": 200,
+          "responseBytes": 109,
+          "responseSha256": "eedbadc3dba7c53425a342e7788caa63279d16e6f129bb5ee6d342131b0dd7e4"
+        },
+        {
+          "method": "getLatestBlockhash",
+          "requestSha256": "5a18225b93df916d576faeef24a5826fb41c5a171186b00a46d976c77b3ca59d",
+          "httpStatus": 200,
+          "responseBytes": 216,
+          "responseSha256": "8ebf3a0246d008dc45e9fc1504a404cf78ea5c89b44d8bfee21c87699bd15e90"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "requestSha256": "33b7e46a93ce5908bc657b3ecd295bd2d7e84799872cfc95fe146e51778e563c",
+          "httpStatus": 200,
+          "responseBytes": 783,
+          "responseSha256": "8e01c6df1a05c0796c86725eeb5cfc1c9e2b3fb66fc84ba00afb3eab93d94e22"
+        },
+        {
+          "method": "getFeeForMessage",
+          "requestSha256": "911a3e2954286eded54b419b1de97f2aa390183fb90fe29f9f0af291ad5ea29c",
+          "httpStatus": 200,
+          "responseBytes": 127,
+          "responseSha256": "1cc0fadeb36a7a3a22df4c10cebb47a7053bc3bfa9343e9d6b4df35d39d3b3d8"
+        },
+        {
+          "method": "getFeeForMessage",
+          "requestSha256": "20df9a8704cd9f225a41436bb8dde4b10f12d1ff66322a5f2835f5dd4c2570ac",
+          "httpStatus": 200,
+          "responseBytes": 127,
+          "responseSha256": "c973cc7777f24a11b2e56708ffabfc8dee14b6c2db83772f3f9170861ffe45e6"
+        }
+      ],
+      "signaturesCreated": 0,
+      "broadcasts": 0,
+      "amountLamports": "0",
+      "providerQualified": false,
+      "economicQualified": false,
+      "runtimeSourceDigests": {
+        "lib/jito-simulation-response.ts": "b23669984fbe6bd81d4e31e1473a33ce3d3c9ad9661b15875d07e9ad0e71c159",
+        "lib/jito-simulation-json.ts": "0bdc889aeeaaade12066d3c6b0d1976bedd5d8921981710ee5f496b3547ab346",
+        "lib/jito-bundle-simulation-frames.ts": "22ee282066b1c538f8e203113d2d09ba4c6adc744d19d754f7e732f196aa00b5"
+      },
+      "feeObservations": [
+        {
+          "slot": "460673552",
+          "feeLamports": "5000"
+        },
+        {
+          "slot": "460673553",
+          "feeLamports": "5000"
+        }
+      ],
+      "status": "refused",
+      "stage": "getFeeForMessage",
+      "reason": "fee-bank-mismatch",
+      "finishedAt": "2026-10-24T02:03:10.940Z"
+    },
+    {
+      "startedAt": "2026-10-24T02:07:36.913Z",
+      "sourceBaseCommit": "a20abd0",
+      "uncommittedOverlay": true,
+      "provider": "existing Alchemy holder endpoint",
+      "settingChanged": false,
+      "methods": [
+        {
+          "method": "getGenesisHash",
+          "requestSha256": "1d77c541d9af2923e55aa25a9fb8e11da9a4edbedcb99188181bb39ea2eb93eb",
+          "httpStatus": 200,
+          "responseBytes": 109,
+          "responseSha256": "eedbadc3dba7c53425a342e7788caa63279d16e6f129bb5ee6d342131b0dd7e4"
+        },
+        {
+          "method": "getLatestBlockhash",
+          "requestSha256": "5a18225b93df916d576faeef24a5826fb41c5a171186b00a46d976c77b3ca59d",
+          "httpStatus": 200,
+          "responseBytes": 216,
+          "responseSha256": "89f96a41306a6c78bb224a2689d7686deeeac20e2ec0e3ac1eb7ed68cb3cf086"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "requestSha256": "153c249bf246302a63a45a8549342e23be9bf66e044e3e19c4b49b1be5ac9adb",
+          "httpStatus": 200,
+          "responseBytes": 783,
+          "responseSha256": "849e02d43ff0d5d71dbb6cbbc8252eaab83da700dc12698c4f8fc79b1cba722c"
+        },
+        {
+          "method": "getFeeForMessage",
+          "requestSha256": "d920d1f4ad67f4d654983b6e55d331be48c63a9f7f7f5f92133f5793e6bd885f",
+          "httpStatus": 200,
+          "responseBytes": 127,
+          "responseSha256": "a6edcc07f7fe73fdd0d327b0482f567391195adc3546bbacbb582039001ae817"
+        },
+        {
+          "method": "getFeeForMessage",
+          "requestSha256": "7fe501e6f5082ece2f9f952ebab1c72bfdbdeb376194a6b3cf7a4bd191854e80",
+          "httpStatus": 200,
+          "responseBytes": 127,
+          "responseSha256": "81485edced1a6efa081439fe1704ee8f678ac9d3249aaabc15215a12f7498f91"
+        }
+      ],
+      "signaturesCreated": 0,
+      "broadcasts": 0,
+      "amountLamports": "0",
+      "providerQualified": false,
+      "economicQualified": false,
+      "runtimeSourceDigests": {
+        "lib/jito-simulation-response.ts": "04de90de4fb1a80f81be8e57aa55b947b9689a194636632daa34f616810df524",
+        "lib/jito-simulation-json.ts": "0bdc889aeeaaade12066d3c6b0d1976bedd5d8921981710ee5f496b3547ab346",
+        "lib/jito-bundle-simulation-frames.ts": "22ee282066b1c538f8e203113d2d09ba4c6adc744d19d754f7e732f196aa00b5"
+      },
+      "feeReadSchedule": "two concurrent reads; one fixed attempt after retained sequential refusal",
+      "feeObservations": [
+        {
+          "slot": "460674811",
+          "feeLamports": "5000"
+        },
+        {
+          "slot": "460674812",
+          "feeLamports": "5000"
+        }
+      ],
+      "status": "refused",
+      "stage": "getFeeForMessage",
+      "reason": "fee-bank-mismatch",
+      "finishedAt": "2026-10-24T02:07:37.834Z"
+    }
+  ],
+  "liveSummary": {
+    "readOnlyRpcCalls": 10,
+    "simulationCalls": 0,
+    "successfulNewFullCaptures": 0,
+    "feeBankEqualityPreserved": true,
+    "automaticRetryOrFallback": false,
+    "signaturesCreated": 0,
+    "broadcasts": 0,
+    "providerQualificationAchieved": false
+  },
+  "boundaries": {
+    "deployed": false,
+    "hostedSql": false,
+    "migrationsAdded": false,
+    "settingsChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletUnlocked": false,
+    "realSignaturesCreated": 0,
+    "fundedTrades": false,
+    "protectedClaudeUiChanged": false
+  },
+  "remaining": [
+    "same actual bank fee collection",
+    "retained native live frame replay",
+    "packet-bound fee and raw ALT source admission",
+    "Jupiter/ALT/profile/runtime/code/genesis qualification",
+    "owned immutable review and authorization",
+    "exact signed final replay before send-once marker"
+  ],
+  "preserved": {
+    "agentsSha256": "8dcc60d3e1201d3df5dd5f3666fc85bb6a6864765304aac335caf61dfc9c1bea",
+    "excludedWarmupDraftFiles": 7,
+    "nextUnclaimedMigration": "0147 subject to recheck"
+  }
+}

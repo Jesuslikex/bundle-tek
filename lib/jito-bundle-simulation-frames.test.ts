@@ -499,6 +499,15 @@ for (const verifySignatures of [true, false])
       });
       expect(f.packets).toEqual(before);
       expect(request.bankEncoding).toBe(bankEncoding);
+      expect(request.packetBindings).toEqual(
+        before.map((packet) => ({
+          ...packet,
+          loadedAddresses: packet.loadedAddresses ?? {
+            writable: [],
+            readonly: [],
+          },
+        })),
+      );
       expect(request).toMatchObject({
         providerQualified: false,
         signingAllowed: false,
@@ -507,6 +516,9 @@ for (const verifySignatures of [true, false])
       });
       f.packets.reverse();
       expect(request.params[0].encodedTransactions).toEqual(
+        before.map((p) => p.transaction),
+      );
+      expect(request.packetBindings.map((p) => p.transaction)).toEqual(
         before.map((p) => p.transaction),
       );
     });
