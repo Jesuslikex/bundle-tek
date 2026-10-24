@@ -8,6 +8,7 @@ import {
   type JitoFinalization,
 } from './jito-finalization';
 import { matchingJitoSwapReceipt } from './jito-swap-receipt';
+import { matchingJitoSettlementPolicy } from './jito-settlement-policy';
 import { currentTradeSession } from './imported-trade-session-server';
 import { currentImportedAcquisition } from './imported-acquisition-server';
 import {
@@ -140,7 +141,7 @@ async function currentSwap(
   const simulation = await simulateImportedSwap(order, signal, fetch, true);
   const settlement = await requireWarmupSigningReview(order, simulation);
   if (
-    JSON.stringify(settlement) !== JSON.stringify(review.settlement) ||
+    !matchingJitoSettlementPolicy(review.settlement, settlement) ||
     simulation.networkFeeLamports !== review.maximumFeeLamports
   )
     throw new Error('Approved swap fees, rent or settlement changed.');

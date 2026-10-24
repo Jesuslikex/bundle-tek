@@ -5,8 +5,8 @@ import {
   requireWarmupSigningReview,
   type WarmupSigningReview,
 } from '../lib/warmup-signing';
-export async function jitoBundleFixture(wallets = 1) {
-  const swap = await nativeWarmupFixture({ v2: true }),
+export async function jitoBundleFixture(wallets = 1, token2022 = false) {
+  const swap = await nativeWarmupFixture({ v2: true, token2022 }),
     tip = await nativeWithdrawalFixture();
   const projectId = crypto.randomUUID(),
     sessionId = crypto.randomUUID(),
@@ -38,7 +38,11 @@ export async function jitoBundleFixture(wallets = 1) {
   const swaps = [swap];
   const reviews = [review];
   for (let i = 1; i < wallets; i++) {
-    const f = await nativeWarmupFixture({ v2: true, walletSeed: 7 + i });
+    const f = await nativeWarmupFixture({
+      v2: true,
+      token2022,
+      walletSeed: 7 + i,
+    });
     swaps.push(f);
     reviews.push({
       ...review,
