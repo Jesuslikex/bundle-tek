@@ -1,0 +1,170 @@
+{
+  "date": "2026-10-24",
+  "sourceBase": "ffc9c08",
+  "source": [
+    {
+      "file": "lib/jito-simulation-json.ts",
+      "sha256": "e38c0f8a5ecd0e881b444340b312cde15ddbf3150bfa556b07754d5bd848b8a1"
+    },
+    {
+      "file": "lib/jito-simulation-json.test.ts",
+      "sha256": "ded86185d387b5917422cd5222cf91a0f0360c19d82a588eca30d82237db8bea"
+    },
+    {
+      "file": "test/jito-simulation-stream-flow.test.ts",
+      "sha256": "15389be410a55c129a67e05927ff87064fee075811ee4028ff10839b175d0d33"
+    }
+  ],
+  "verification": {
+    "report": "work/release-qa/jito-stream-admission-frozen-final-20261024.json",
+    "passed": 309,
+    "failed": 0,
+    "skipped": 0,
+    "files": 6,
+    "perFile": [
+      {
+        "file": "jito-simulation-stream-flow.test.ts",
+        "passed": 9
+      },
+      {
+        "file": "jito-bundle-economics.test.ts",
+        "passed": 100
+      },
+      {
+        "file": "jito-bundle-simulation-frames.test.ts",
+        "passed": 79
+      },
+      {
+        "file": "jito-bundle-token-state.test.ts",
+        "passed": 30
+      },
+      {
+        "file": "jito-provider.test.ts",
+        "passed": 14
+      },
+      {
+        "file": "jito-simulation-json.test.ts",
+        "passed": 77
+      }
+    ],
+    "projectTypeScript": true,
+    "threeFileTypedLint": true,
+    "threeFileFormat": true,
+    "newWebpackBuild": false,
+    "wholeRepositorySuite": false,
+    "actualBrowser": false,
+    "providerRuntime": false
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-24T01:15:35.697Z",
+      "finishedAt": "2026-10-24T01:17:26.366Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "ffc9c08",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.42402579999999995,
+      "sourceUnchanged": true,
+      "changed": [],
+      "record": "work/release-qa/opus-jito-json-20261024-v1/status.json",
+      "sourceOnly": true,
+      "testsRun": false,
+      "currentSourceDifferences": [
+        "lib/jito-simulation-json.test.ts",
+        "lib/jito-simulation-json.ts",
+        "test/jito-simulation-stream-flow.test.ts"
+      ]
+    },
+    {
+      "startedAt": "2026-10-24T01:21:29.008Z",
+      "finishedAt": "2026-10-24T01:23:30.241Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "ffc9c08",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.43944839999999996,
+      "sourceUnchanged": true,
+      "changed": [],
+      "record": "work/release-qa/opus-jito-json-20261024-v2/status.json",
+      "sourceOnly": true,
+      "testsRun": false,
+      "currentSourceDifferences": [
+        "lib/jito-simulation-json.test.ts",
+        "lib/jito-simulation-json.ts"
+      ]
+    }
+  ],
+  "finalRefinements": {
+    "reviewedBy": "Codex with read-only helper resource audit",
+    "additionalOpusReview": false,
+    "changes": [
+      "100000 stream chunk bound including empty chunks",
+      "actual intrinsic byte-length/offset/buffer geometry and private buffer copy",
+      "shared backing refusal",
+      "private fixed error reasons instead of class-instance trust",
+      "post-body abort check",
+      "explicit early-refusal stream ownership contract"
+    ]
+  },
+  "profile": {
+    "maximumBytes": 4194304,
+    "maximumChunks": 100000,
+    "maximumDepth": 32,
+    "maximumValueNodes": 100000,
+    "maximumMembers": 4096,
+    "maximumIntegerDigits": 20,
+    "numericTokenType": "bigint distinct from JSON string",
+    "fractionExponentNegativeZero": false,
+    "duplicateDecodedKeys": false,
+    "normalizer": "test-only normalized fixture projection; no production vendor adapter"
+  },
+  "authority": {
+    "mounted": false,
+    "providerQualified": false,
+    "economicQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "receiptVerified": false
+  },
+  "boundaries": {
+    "providerCallsThisCheckpoint": 0,
+    "deployment": false,
+    "hostedSql": false,
+    "migration": false,
+    "settingsChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletUnlocked": false,
+    "realSignaturesCreated": 0,
+    "broadcasts": 0,
+    "fundedTrades": false,
+    "protectedClaudeUiChanged": false
+  },
+  "preserved": {
+    "agentsSha256": "8dcc60d3e1201d3df5dd5f3666fc85bb6a6864765304aac335caf61dfc9c1bea",
+    "excludedWarmupDraftFiles": 7,
+    "nextUnclaimedMigration": "0147 subject to recheck"
+  }
+}
