@@ -16,6 +16,7 @@ import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import { paceWalletRpc } from './wallet-rpc-pacing';
 import { readJitoSimulationPayload } from './jito-simulation-json';
 import { collectJitoSimulationAttempt } from './jito-simulation-attempt';
+import { collectJitoCoherentSimulationAttempt } from './jito-coherent-simulation-attempt';
 import {
   JITO_SEQUENTIAL_CHECK_AUTHORITY,
   requireJitoSequentialCheckResult,
@@ -222,6 +223,7 @@ export async function checkJitoBundleSequential(
     rateLimited = false;
   let attempt:
     | Awaited<ReturnType<typeof collectJitoSimulationAttempt>>
+    | Awaited<ReturnType<typeof collectJitoCoherentSimulationAttempt>>
     | undefined;
   const responses: Response[] = [];
   const cancel = (response: Response) => {
@@ -411,17 +413,30 @@ export async function checkJitoBundleSequential(
       maximumFeeLamports: before.bundle.manifest.tip.feeLamports,
       expectedFeeLamports: before.bundle.manifest.tip.feeLamports,
     });
-    attempt = await collectJitoSimulationAttempt({
+    const commonAttempt = {
       packets,
       minimumSlot,
       feeIdPrefix: `jito-check-fees:${id}`,
       simulationRpcId: `jito-check:${id}`,
-      bankEncoding: 'slot-object',
       verifySignatures: false,
       signal: control,
-      transport: ({ phase, body, signal }) =>
-        send(body, phase === 'fees' ? packets.length : 1, signal),
-    });
+    };
+    // Select the measured read-only profile before its first read. A refusal
+    // never retries, retargets the bank or falls back to another profile.
+    attempt =
+      url.hostname === 'solana-mainnet.g.alchemy.com' && !url.port
+        ? await collectJitoCoherentSimulationAttempt({
+            ...commonAttempt,
+            minimumReadSlot: Math.max(...seen),
+            transport: ({ body, signal, methodCount }) =>
+              send(body, methodCount, signal),
+          })
+        : await collectJitoSimulationAttempt({
+            ...commonAttempt,
+            bankEncoding: 'slot-object',
+            transport: ({ phase, body, signal }) =>
+              send(body, phase === 'fees' ? packets.length : 1, signal),
+          });
     reason =
       attempt.status === 'captured' ? 'frame-integrity-only' : attempt.reason;
     const feeReplies = attempt.fees?.rawResponse?.value;
@@ -431,9 +446,20 @@ export async function checkJitoBundleSequential(
       typeof v === 'object' &&
       !Array.isArray(v) &&
       (v as { error?: { code?: unknown } }).error?.code === 429n;
+    const rateLimitCaptures = [
+      feeReplies,
+      simulationReply,
+      ...('discovery' in attempt
+        ? [attempt.discovery?.value, attempt.batch?.rawResponse?.value]
+        : []),
+    ];
     if (
-      (Array.isArray(feeReplies) && feeReplies.some(rpcRateLimited)) ||
-      rpcRateLimited(simulationReply)
+      reason === 'rate-limited' ||
+      rateLimitCaptures.some((value) =>
+        Array.isArray(value)
+          ? value.some(rpcRateLimited)
+          : rpcRateLimited(value),
+      )
     ) {
       rateLimited = true;
       reason = 'rate-limited';
