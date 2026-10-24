@@ -1,3 +1,4 @@
+import { savedEvidenceAuthority } from '@/lib/marketplace-saved-evidence';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -324,4 +325,70 @@ it('switches between catalog and owned inventory without fetching until requeste
     host.querySelector('[aria-label="My saved wallet inventory"]'),
   ).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
+});
+
+it('offers only a passive independent saved-record browser after validated capacity, never a listing selection', async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json(
+        marketplaceInventoryCapacityBody(
+          new MarketplaceInventoryCapacityError('saved-history-run-limit'),
+        ),
+        { status: 409 },
+      ),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        format: 'marketplace-saved-evidence-page-v1',
+        chain: 'Solana',
+        view: 'wallets',
+        request: { view: 'wallets', cursor: null },
+        observedAt: new Date(now).toISOString(),
+        nextCursor: null,
+        wallets: [],
+        ...savedEvidenceAuthority,
+      }),
+    );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Load my inventory');
+  const browser = [...host.querySelectorAll('details')].find(
+    (d) =>
+      d.querySelector('summary')?.textContent ===
+      'Inspect saved wallet evidence',
+  );
+  expect(browser).toBeTruthy();
+  expect(fetcher).toHaveBeenCalledOnce();
+  await act(async () => {
+    browser!.open = true;
+    browser!.dispatchEvent(new Event('toggle'));
+  });
+  expect(fetcher).toHaveBeenCalledOnce();
+  await click('Load saved wallets');
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher.mock.calls[1][0]).toBe(
+    '/api/marketplace/saved-evidence?view=wallets',
+  );
+  expect(host.textContent).not.toContain('Asking price (SOL)');
+  expect(
+    fetcher.mock.calls.every((c) => (c[1]?.method ?? 'GET') === 'GET'),
+  ).toBe(true);
+});
+it('does not mount saved history from a generic error that copies the capacity message', async () => {
+  const fetcher = vi.fn(async () =>
+    Response.json(
+      { error: MARKETPLACE_INVENTORY_CAPACITY_MESSAGE },
+      { status: 503 },
+    ),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Load my inventory');
+  expect(
+    [...host.querySelectorAll('summary')].some(
+      (s) => s.textContent === 'Inspect saved wallet evidence',
+    ),
+  ).toBe(false);
+  expect(fetcher).toHaveBeenCalledOnce();
 });

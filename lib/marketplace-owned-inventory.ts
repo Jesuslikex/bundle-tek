@@ -73,6 +73,8 @@ const runDocument = z
       .max(20),
   })
   .strict();
+// Reuse the exact retained-run parser in saved-only inspection; no writer or inventory rule changes.
+export const marketplaceInventoryHistoryDocument = runDocument;
 const receiptCounts = z
   .object({ address, receiptCount: count, uniqueSignatures: count })
   .strict();
@@ -130,7 +132,7 @@ const fail = (): never => {
   );
 };
 export const MARKETPLACE_INVENTORY_CAPACITY_MESSAGE =
-  "Saved history exceeds this inventory inspector's bounded capacity (100 relevant saved history runs or 4 MiB of retained history). Inventory is not partially shown. Retrying alone will not fix this capacity limit; bounded history pagination is not yet supported. Keep your saved history.";
+  "Saved history exceeds this inventory inspector's bounded capacity (100 relevant saved history runs or 4 MiB of retained history). Inventory is not partially shown. Retrying alone will not fix this capacity limit; this full inventory view cannot combine paged history yet. Keep your saved history. You can inspect individual saved records below.";
 type InventoryCapacityCode =
   | 'saved-history-run-limit'
   | 'saved-history-byte-limit';

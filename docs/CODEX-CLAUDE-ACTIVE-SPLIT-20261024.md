@@ -1,5 +1,9 @@
 # Active Codex / Claude split, 24 October 2026
 
+## Latest saved-evidence checkpoint
+
+Saved marketplace evidence paging is complete in CODEX-MARKETPLACE-SAVED-EVIDENCE-PAGES-20261024.md/.json:42files/769tests, TypeScript/scoped lint/format and actual local API/SQLite Chrome desktop/375px checks pass. Separate20-wallet/20-run saved-only pages after typed capacity refusal; original complete inventory,100-run writer and every financial guard remain. Corrects earlier normal101st-run theory: writer already caps100. Pages are partial matching history, not wallet age/control/lifecycle or listing/payment/key delivery. Actual Opus5.5 design/source reviews completed; final compatibility/copy/clock follow-ups independently tested. PR57, pending protected parent patch, original AGENTS dirt and7frozen drafts untouched. No deploy/provider/SQL/wallet/funded actions. Bounded claim released; full inventory and Jito qualification still open.
+
 This is a coordination update, not a new parity-completion or release claim. User asked both agents to stay in touch and finish the legitimate remaining features. Preserve the standing no-deployment, no-hosted-SQL, no-funded-trade and no-real-wallet-unlock/sign/send boundaries.
 
 Julian has now added OpenCode to the collaboration. Read `BUNDLE-THREE-AGENT-HANDOFF-20261024.md` for its verified existing session, acknowledgement, reported completed work, completed source-only audit and separate-branch rules. OpenCode completed the two-file vault wizard copy claim in PR58, independently tested and source-only merged as4e6f2a7. That claim is released; exact disjoint paths must be agreed before its next edit. Codex initial Jito preflight overlap is documented in CODEX-JITO-PREFLIGHT-OVERLAP-20261024.md; full live qualification still has not passed.

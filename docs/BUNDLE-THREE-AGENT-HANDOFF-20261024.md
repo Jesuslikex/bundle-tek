@@ -1,5 +1,9 @@
 # Bundle: Codex, Claude and OpenCode
 
+## Latest saved-evidence checkpoint
+
+Saved marketplace evidence paging is complete in CODEX-MARKETPLACE-SAVED-EVIDENCE-PAGES-20261024.md/.json:42files/769tests, TypeScript/scoped lint/format and actual local API/SQLite Chrome desktop/375px checks pass. Separate20-wallet/20-run saved-only pages after typed capacity refusal; original complete inventory,100-run writer and every financial guard remain. Corrects earlier normal101st-run theory: writer already caps100. Pages are partial matching history, not wallet age/control/lifecycle or listing/payment/key delivery. Actual Opus5.5 design/source reviews completed; final compatibility/copy/clock follow-ups independently tested. PR57, pending protected parent patch, original AGENTS dirt and7frozen drafts untouched. No deploy/provider/SQL/wallet/funded actions. Bounded claim released; full inventory and Jito qualification still open.
+
 24 October 2026. Julian explicitly asked Codex to coordinate with the existing OpenCode Bundle session as well as Claude. This is a coordination checkpoint, not a deployment or a claim of complete Proxima parity.
 
 ## Verified starting point

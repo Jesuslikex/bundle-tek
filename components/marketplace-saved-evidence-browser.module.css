@@ -1,0 +1,81 @@
+.panel {
+  border-top: 1px solid var(--border, #303039);
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  min-width: 0;
+}
+.panel summary {
+  min-height: 44px;
+  padding-block: 0.75rem;
+  cursor: pointer;
+}
+.panel p,
+.panel code,
+.panel output,
+.panel time,
+.panel a {
+  overflow-wrap: anywhere;
+}
+.panel code {
+  display: block;
+  white-space: pre-wrap;
+  user-select: text;
+}
+.panel button,
+.panel a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  white-space: normal;
+  max-width: 100%;
+}
+.panel button {
+  border: 1px solid var(--border, #303039);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+}
+.panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.panel button[aria-pressed='true'] {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.wallets,
+.records {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.wallets li,
+.record,
+.target {
+  min-width: 0;
+  padding-block: 0.75rem;
+  border-top: 1px solid var(--border, #303039);
+}
+.notice {
+  display: block;
+  margin-block: 0.75rem;
+}
+.panel output:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+@media (max-width: 420px) {
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

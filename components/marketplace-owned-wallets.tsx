@@ -1,4 +1,5 @@
 'use client';
+import { MarketplaceSavedEvidenceBrowser } from './marketplace-saved-evidence-browser';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -22,6 +23,7 @@ export function MarketplaceOwnedWallets() {
     [minimumDays, setMinimumDays] = useState(''),
     [sort, setSort] = useState('age'),
     [page, setPage] = useState(0);
+  const [capacity, setCapacity] = useState(false);
   const pending = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -48,6 +50,7 @@ export function MarketplaceOwnedWallets() {
     const controller = new AbortController();
     pending.current = controller;
     setBusy(true);
+    setCapacity(false);
     setInventory(null);
     setMessage('');
     setError('');
@@ -74,6 +77,7 @@ export function MarketplaceOwnedWallets() {
       }
       if (!response.ok) {
         if (isMarketplaceInventoryCapacityResponse(response.status, data)) {
+          setCapacity(true);
           setError(MARKETPLACE_INVENTORY_CAPACITY_MESSAGE);
           return;
         }
@@ -164,6 +168,7 @@ export function MarketplaceOwnedWallets() {
         </output>
       )}
       {error && <p role="alert">{error}</p>}
+      {capacity && <MarketplaceSavedEvidenceBrowser />}
       {message && <output>{message}</output>}
       {signIn && <Link href="/sign-in">Sign in to Bundle</Link>}
       {inventory && (
