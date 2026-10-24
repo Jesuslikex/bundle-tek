@@ -1,0 +1,175 @@
+{
+  "passed": true,
+  "base": "449d920",
+  "policyCommit": "d0728dd",
+  "tests": 287,
+  "files": 27,
+  "failed": [],
+  "finalReports": [
+    "jito-policy-integration-20261024",
+    "jito-sequential-post-review-20261024",
+    "jito-frame-final-20261024",
+    "jito-sequential-final-20261024"
+  ],
+  "build": {
+    "code": 0,
+    "signal": null,
+    "changed": [],
+    "sourceFiles": 3765,
+    "node": "v24.19.0",
+    "finishedAt": "2026-10-24T00:05:31.514Z"
+  },
+  "changedSinceBuild": [
+    "lib/jito-bundle-simulation-frames.ts",
+    "lib/jito-bundle-simulation-frames.test.ts"
+  ],
+  "applicationSourceUnchanged": true,
+  "unmountedHardeningAfterBuild": true,
+  "finalProjectTypeScriptPassed": true,
+  "broaderRegression": {
+    "session": 33405,
+    "status": "completed-exit-0",
+    "report": "work/release-qa/jito-sequential-final-20261024.json",
+    "tests": 287,
+    "files": 27,
+    "failed": 0,
+    "skipped": 0
+  },
+  "reviews": [
+    {
+      "name": "opus-jito-sequential-evidence-20261024-v1",
+      "models": ["claude-opus-5-5"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "sourceUnchanged": true,
+      "permissionDenials": 0
+    },
+    {
+      "name": "opus-jito-sequential-evidence-20261024-v2",
+      "models": ["claude-opus-5-5"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "sourceUnchanged": true,
+      "permissionDenials": 0
+    }
+  ],
+  "providerProbes": [
+    {
+      "timestamp": "2026-10-23T23:53:25.071Z",
+      "provider": "Alchemy existing holder endpoint",
+      "configuredSettingUnchanged": true,
+      "methods": [
+        {
+          "method": "getGenesisHash",
+          "status": 200
+        }
+      ],
+      "unsignedOnly": true,
+      "amountLamports": "0",
+      "broadcasts": 0,
+      "signaturesCreated": 0,
+      "providerQualified": false,
+      "economicQualification": false,
+      "setupOrTransportRefused": true
+    },
+    {
+      "timestamp": "2026-10-23T23:53:47.733Z",
+      "provider": "Alchemy existing holder endpoint",
+      "configuredSettingUnchanged": true,
+      "methods": [
+        {
+          "method": "getGenesisHash",
+          "status": 200
+        },
+        {
+          "method": "getLatestBlockhash",
+          "status": 200
+        },
+        {
+          "method": "simulateBundle",
+          "status": 200
+        }
+      ],
+      "unsignedOnly": true,
+      "amountLamports": "0",
+      "broadcasts": 0,
+      "signaturesCreated": 0,
+      "providerQualified": false,
+      "economicQualification": false,
+      "refusal": {
+        "refused": true,
+        "rpcCode": -32602
+      }
+    },
+    {
+      "timestamp": "2026-10-23T23:54:38.428Z",
+      "provider": "Alchemy existing holder endpoint",
+      "configuredSettingUnchanged": true,
+      "profile": "documented-tip-bank-availability-only-not-pinned",
+      "methods": [
+        {
+          "method": "getGenesisHash",
+          "status": 200
+        },
+        {
+          "method": "getLatestBlockhash",
+          "status": 200
+        },
+        {
+          "method": "simulateBundle",
+          "status": 200
+        }
+      ],
+      "unsignedOnly": true,
+      "amountLamports": "0",
+      "broadcasts": 0,
+      "signaturesCreated": 0,
+      "providerQualified": false,
+      "economicQualification": false,
+      "outerFields": ["context", "value"],
+      "contextSlot": 460637245,
+      "valueFields": ["summary", "transactionResults"],
+      "summary": null,
+      "frames": [
+        {
+          "fields": [
+            "err",
+            "fee",
+            "loadedAccountsDataSize",
+            "loadedAddresses",
+            "logs",
+            "postBalances",
+            "postExecutionAccounts",
+            "postTokenBalances",
+            "preBalances",
+            "preExecutionAccounts",
+            "preTokenBalances",
+            "replacementBlockhash",
+            "returnData",
+            "unitsConsumed"
+          ],
+          "failed": true,
+          "preCount": 3,
+          "postCount": 3,
+          "hasFee": true,
+          "hasLoadedAddresses": true,
+          "hasLoadedAccountsDataSize": true
+        }
+      ]
+    }
+  ],
+  "sourceHashes": {
+    "lib/jito-bundle-server.ts": "4bbbe1729a2d21905cd7269c854464bc8b024f1f2409c1435d7f93122f094d9e",
+    "lib/jito-settlement-policy.ts": "0617c59874f094519181fa1d72213d7603600643d87de8722f0acb509c4dc117",
+    "lib/jito-bundle-simulation-frames.ts": "2aecb7556058088eaeda933d2f004a90cba267aab768bc095ff9bd7d05bb260e"
+  },
+  "noDeploy": true,
+  "noHostedSql": true,
+  "noFundedTransactions": true,
+  "focusedTests": 173,
+  "focusedFiles": 8
+}
