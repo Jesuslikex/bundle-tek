@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { VenueLaunchLive } from './venue-launch-live';
 import {
   useVenueLaunchRecovery,
   VenueLaunchRecoveryHistory,
@@ -549,6 +550,9 @@ function LaunchLabLaunchReviewInner({
             Recover saved launch status
           </Button>
         </div>
+      )}
+      {sent && ['submitted', 'finalized'].includes(sent.state) && (
+        <VenueLaunchLive venue="launchlab" id={sent.id} />
       )}
       {error && (
         <p role="alert" className="inspection-error">

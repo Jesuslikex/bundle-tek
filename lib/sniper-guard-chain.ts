@@ -48,6 +48,17 @@ const amount = (value: unknown) => {
     fail('Curve balance differs.');
   return BigInt(value as string);
 };
+/**
+ * The curve whose quote reserve is watched. Pump curves hold SOL as lamports
+ * or own their quote token account; LaunchLab and Meteora DBC pools keep the
+ * quote in a vault owned by a shared authority, so those name `quoteVault`.
+ */
+export type CurveScope = Pick<
+  SniperGuardLaunch,
+  'bondingCurve' | 'quoteMint'
+> & {
+  quoteVault?: string;
+};
 
 /**
  * Measures how much quote one successful transaction paid into the bonding
@@ -56,7 +67,7 @@ const amount = (value: unknown) => {
  */
 export function decodeCurveBuy(
   value: unknown,
-  scope: Pick<SniperGuardLaunch, 'bondingCurve' | 'quoteMint'>,
+  scope: CurveScope,
 ): SniperGuardCurveBuy | null {
   const tx = value as ParsedTransaction;
   if (
@@ -77,7 +88,24 @@ export function decodeCurveBuy(
   )
     return fail('Curve transaction accounts differ.');
   let delta = 0n;
-  if (scope.quoteMint === PUMP_NATIVE_QUOTE) {
+  if (scope.quoteVault) {
+    const vault = scope.quoteVault;
+    const vaultQuote = (rows: TokenBalance[] | undefined) => {
+      if (!Array.isArray(rows))
+        return fail('Curve token balances are unavailable.');
+      const matches = rows.filter(
+        (row) =>
+          row.mint === scope.quoteMint &&
+          keys[row.accountIndex]?.pubkey === vault,
+      );
+      if (matches.length > 1) fail('Curve quote account is ambiguous.');
+      return matches.length ? amount(matches[0].uiTokenAmount?.amount) : null;
+    };
+    const before = vaultQuote(tx.meta.preTokenBalances),
+      after = vaultQuote(tx.meta.postTokenBalances);
+    if (after === null) return null;
+    delta = after - (before ?? 0n);
+  } else if (scope.quoteMint === PUMP_NATIVE_QUOTE) {
     const index = keys.findIndex((k) => k.pubkey === scope.bondingCurve);
     if (index < 0) return null;
     delta =
@@ -125,7 +153,7 @@ type SignatureRow = { signature: string; slot: number; err: unknown };
  */
 export async function readCurveBuys(
   rpc: SniperGuardRpc,
-  scope: Pick<SniperGuardLaunch, 'bondingCurve' | 'quoteMint'>,
+  scope: CurveScope,
   untilSignature: string | null,
   signal: AbortSignal,
   maxPages = SNIPER_GUARD_MAX_PAGES,

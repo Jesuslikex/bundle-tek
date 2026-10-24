@@ -544,6 +544,8 @@ export async function prepareWalletCleanupSells(
     wallet: string;
     walletRevision: number;
     destination: string;
+    /** Sell only this token (a Sniper Guard Nuke); otherwise every leftover. */
+    mint?: string;
   },
   apiKey: string | undefined,
   signal: AbortSignal,
@@ -559,6 +561,7 @@ export async function prepareWalletCleanupSells(
     (s) =>
       s.reason === 'holds-tokens' &&
       s.mint !== WRAPPED_SOL_MINT &&
+      (input.mint === undefined || s.mint === input.mint) &&
       !seen.has(s.mint) &&
       seen.add(s.mint),
   );

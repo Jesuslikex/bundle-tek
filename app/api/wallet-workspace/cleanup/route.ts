@@ -22,6 +22,7 @@ import {
   recheckWalletCleanupSell,
 } from '@/lib/wallet-cleanup-server';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
+import { walletAddress } from '@/lib/wallet-workspace';
 export const dynamic = 'force-dynamic';
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
@@ -185,6 +186,14 @@ export async function POST(request: Request) {
         body.stage !== 'close'
       )
         return json({ error: 'Choose the sell or close cleanup stage.' }, 400);
+      let mint: string | undefined;
+      if (body.mint !== undefined)
+        try {
+          if (stage !== 'sell') throw new Error();
+          mint = walletAddress(body.mint, 'Solana');
+        } catch {
+          return json({ error: 'Choose one token to sell.' }, 400);
+        }
       const apiKey = (env as unknown as Record<string, unknown>)
         .JUPITER_API_KEY;
       if (stage === 'sell' && typeof apiKey !== 'string')
@@ -208,7 +217,7 @@ export async function POST(request: Request) {
             return document ? [document] : [];
           }
           const result = await prepareWalletCleanupSells(
-            context,
+            mint ? { ...context, mint } : context,
             apiKey as string,
             signal,
           );
