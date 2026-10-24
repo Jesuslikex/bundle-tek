@@ -4,8 +4,101 @@ import {
   buildMarketplaceOwnedInventory,
   admitMarketplaceOwnedInventory,
   MarketplaceInventoryClockError,
+  MarketplaceInventoryCapacityError,
+  marketplaceInventoryCapacityBody,
+  isMarketplaceInventoryCapacityResponse,
 } from './marketplace-owned-inventory';
 const now = Date.parse('2026-10-20T12:00:00Z');
+
+it('retains the100-history-check bound and distinguishes101 as a non-partial capacity refusal', () => {
+  const f = marketplaceOwnedFixture(now),
+    original = f.sources.runs[0] as { document: string };
+  f.sources.runs = Array.from({ length: 100 }, (_, index) => ({
+    ...original,
+    id: `run-${index}`,
+  }));
+  expect(buildMarketplaceOwnedInventory(f.sources, now).wallets).toHaveLength(
+    2,
+  );
+  f.sources.runs.push({ ...original, id: 'run-100' });
+  expect(() => buildMarketplaceOwnedInventory(f.sources, now)).toThrow(
+    MarketplaceInventoryCapacityError,
+  );
+  try {
+    buildMarketplaceOwnedInventory(f.sources, now);
+  } catch (error) {
+    expect(error).toMatchObject({ errorCode: 'saved-history-run-limit' });
+    expect(error).not.toHaveProperty('wallets');
+  }
+});
+it('keeps the aggregate4MiB history boundary exact and refuses one additional byte without partial evidence', () => {
+  const f = marketplaceOwnedFixture(now),
+    original = f.sources.runs[0] as { document: string };
+  const padded =
+    original.document +
+    ' '.repeat(65536 - new TextEncoder().encode(original.document).length);
+  f.sources.runs = Array.from({ length: 64 }, (_, index) => ({
+    ...original,
+    id: `run-${index}`,
+    document: padded,
+  }));
+  expect(
+    f.sources.runs.reduce<number>(
+      (sum, value) =>
+        sum +
+        new TextEncoder().encode((value as { document: string }).document)
+          .length,
+      0,
+    ),
+  ).toBe(4 * 1024 * 1024);
+  expect(buildMarketplaceOwnedInventory(f.sources, now).wallets).toHaveLength(
+    2,
+  );
+  (f.sources.runs[63] as { document: string }).document += ' ';
+  expect(() => buildMarketplaceOwnedInventory(f.sources, now)).toThrow(
+    MarketplaceInventoryCapacityError,
+  );
+  try {
+    buildMarketplaceOwnedInventory(f.sources, now);
+  } catch (error) {
+    expect(error).toMatchObject({ errorCode: 'saved-history-byte-limit' });
+  }
+});
+it('admits only the exact fixed409 capacity body with no inventory or authority', () => {
+  const body = marketplaceInventoryCapacityBody(
+    new MarketplaceInventoryCapacityError('saved-history-run-limit'),
+  );
+  expect(isMarketplaceInventoryCapacityResponse(409, body)).toBe(true);
+  expect(
+    isMarketplaceInventoryCapacityResponse(
+      409,
+      marketplaceInventoryCapacityBody(
+        new MarketplaceInventoryCapacityError('saved-history-byte-limit'),
+      ),
+    ),
+  ).toBe(true);
+  for (const value of [
+    { ...body, error: 'server-controlled arbitrary error' },
+    { ...body, errorCode: 'unknown' },
+    { ...body, wallets: [] },
+    { ...body, listingEnabled: true },
+    { ...body, inventoryShown: true },
+    { ...body, format: 'other' },
+    null,
+    [],
+  ])
+    expect(isMarketplaceInventoryCapacityResponse(409, value)).toBe(false);
+  for (const status of [200, 401, 403, 503])
+    expect(isMarketplaceInventoryCapacityResponse(status, body)).toBe(false);
+  const getter = { ...body };
+  Object.defineProperty(getter, 'error', {
+    get() {
+      throw Error('must not invoke accessors');
+    },
+    enumerable: true,
+  });
+  expect(isMarketplaceInventoryCapacityResponse(409, getter)).toBe(false);
+});
 it('keeps the exact inventory freshness boundaries and identifies stale or ahead-of-device time', () => {
   const inventory = buildMarketplaceOwnedInventory(
     marketplaceOwnedFixture(now).sources,

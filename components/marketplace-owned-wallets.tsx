@@ -4,6 +4,8 @@ import Link from 'next/link';
 import {
   admitMarketplaceOwnedInventory,
   type MarketplaceOwnedInventory,
+  isMarketplaceInventoryCapacityResponse,
+  MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
 } from '@/lib/marketplace-owned-inventory';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { readPanelJson } from './read-panel-json';
@@ -71,6 +73,10 @@ export function MarketplaceOwnedWallets() {
         throw Error('Sign in to view your saved wallets.');
       }
       if (!response.ok) {
+        if (isMarketplaceInventoryCapacityResponse(response.status, data)) {
+          setError(MARKETPLACE_INVENTORY_CAPACITY_MESSAGE);
+          return;
+        }
         failureMessage =
           'Saved inventory evidence is unavailable or inconsistent. No wallets were listed.';
         throw Error(

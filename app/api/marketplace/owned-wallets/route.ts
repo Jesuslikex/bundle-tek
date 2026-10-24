@@ -1,6 +1,10 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { readMarketplaceOwnedInventory } from '@/lib/marketplace-owned-inventory-server';
+import {
+  MarketplaceInventoryCapacityError,
+  marketplaceInventoryCapacityBody,
+} from '@/lib/marketplace-owned-inventory';
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -25,7 +29,12 @@ export async function GET(request: Request) {
       request.signal,
     );
     return json(result);
-  } catch {
+  } catch (error) {
+    if (
+      !request.signal.aborted &&
+      error instanceof MarketplaceInventoryCapacityError
+    )
+      return json(marketplaceInventoryCapacityBody(error), 409);
     return request.signal.aborted
       ? json({ error: 'Inventory read cancelled.' }, 408)
       : json(

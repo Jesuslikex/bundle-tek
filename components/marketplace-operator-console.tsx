@@ -4,6 +4,8 @@ import {
   admitMarketplaceOwnedInventory,
   MarketplaceInventoryClockError,
   type MarketplaceOwnedInventory,
+  isMarketplaceInventoryCapacityResponse,
+  MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
 } from '@/lib/marketplace-owned-inventory';
 import { marketplaceLamports, marketplaceSol } from '@/lib/marketplace-catalog';
 import {
@@ -111,6 +113,10 @@ export function MarketplaceOperatorConsole() {
       );
       if (!live(controller)) return;
       if (!response.ok) {
+        if (isMarketplaceInventoryCapacityResponse(response.status, data)) {
+          setError(MARKETPLACE_INVENTORY_CAPACITY_MESSAGE);
+          return;
+        }
         setError(
           response.status === 401
             ? 'Sign in before opening seller inventory.'

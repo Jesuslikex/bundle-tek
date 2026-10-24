@@ -5,7 +5,12 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { MarketplaceOwnedWallets } from './marketplace-owned-wallets';
 import { MarketplaceWorkspace } from './marketplace-workspace';
 import { marketplaceOwnedFixture } from '../test/marketplace-owned-fixture';
-import { buildMarketplaceOwnedInventory } from '@/lib/marketplace-owned-inventory';
+import {
+  buildMarketplaceOwnedInventory,
+  MarketplaceInventoryCapacityError,
+  marketplaceInventoryCapacityBody,
+  MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
+} from '@/lib/marketplace-owned-inventory';
 import bs58 from 'bs58';
 let root: Root, host: HTMLDivElement;
 const now = Date.parse('2026-10-20T12:00:00Z');
@@ -43,6 +48,106 @@ function result() {
     now,
   );
 }
+
+it.each(['saved-history-run-limit', 'saved-history-byte-limit'] as const)(
+  'explains %s without retaining old rows, repeating reads or changing wallets',
+  async (code) => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(result()))
+      .mockResolvedValueOnce(
+        Response.json(
+          marketplaceInventoryCapacityBody(
+            new MarketplaceInventoryCapacityError(code),
+          ),
+          { status: 409 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetcher);
+    await mount();
+    await click('Load my inventory');
+    expect(host.querySelectorAll('li').length).toBeGreaterThan(0);
+    await click('Refresh my inventory');
+    expect(host.querySelectorAll('li')).toHaveLength(0);
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
+    );
+    expect(host.textContent).toContain('Retrying alone will not fix');
+    expect(host.textContent).toContain('Keep your saved history');
+    await act(async () => vi.advanceTimersByTime(120000));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(
+      fetcher.mock.calls.every(
+        ([url, options]) =>
+          url === '/api/marketplace/owned-wallets' && !options?.method,
+      ),
+    ).toBe(true);
+    expect(
+      host.querySelector(
+        'select, input[type="checkbox"], input[type="password"]',
+      ),
+    ).toBeNull();
+  },
+);
+it.each([
+  'wrong-status',
+  'extra-field',
+  'wrong-code',
+  'arbitrary-message',
+] as const)('refuses misleading capacity details: %s', async (mode) => {
+  const body = marketplaceInventoryCapacityBody(
+    new MarketplaceInventoryCapacityError('saved-history-run-limit'),
+  );
+  const changed =
+    mode === 'extra-field'
+      ? { ...body, wallets: [] }
+      : mode === 'wrong-code'
+        ? { ...body, errorCode: 'unsupported' }
+        : mode === 'arbitrary-message'
+          ? { ...body, error: 'private server details' }
+          : body;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json(changed, { status: mode === 'wrong-status' ? 503 : 409 }),
+    ),
+  );
+  await mount();
+  await click('Load my inventory');
+  expect(host.textContent).not.toContain('bounded history pagination');
+  expect(host.textContent).not.toContain('private server details');
+  expect(host.querySelectorAll('li')).toHaveLength(0);
+});
+it('discards a late capacity response after cancellation and permits only an explicit new read', async () => {
+  let resolve!: (response: Response) => void;
+  const fetcher = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done;
+        }),
+    )
+    .mockResolvedValueOnce(Response.json(result()));
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Load my inventory');
+  await click('Cancel inventory read');
+  await click('Load my inventory');
+  await act(async () =>
+    resolve(
+      Response.json(
+        marketplaceInventoryCapacityBody(
+          new MarketplaceInventoryCapacityError('saved-history-run-limit'),
+        ),
+        { status: 409 },
+      ),
+    ),
+  );
+  expect(host.textContent).not.toContain('bounded history pagination');
+  expect(host.querySelectorAll('li').length).toBeGreaterThan(0);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
 async function field(label: string, value: string) {
   const el = [...host.querySelectorAll('label')]
     .find((l) => l.textContent?.startsWith(label))!

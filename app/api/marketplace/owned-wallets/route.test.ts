@@ -1,3 +1,4 @@
+import { MARKETPLACE_INVENTORY_CAPACITY_MESSAGE } from '@/lib/marketplace-owned-inventory';
 import {
   beforeAll,
   beforeEach,
@@ -275,5 +276,53 @@ it('does not perform storage or provider work after cancellation', async () => {
   controller.abort();
   expect((await read('', controller.signal)).status).toBe(408);
   expect(queries).toEqual([]);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('returns an authenticated no-store409 when retained history exceeds100checks without partial inventory', async () => {
+  const original = fixture.sources.runs[0] as {
+    revision: number;
+    createdAt: string;
+    updatedAt: string;
+    document: string;
+  };
+  await db.batch(
+    Array.from({ length: 99 }, (_, index) =>
+      db
+        .prepare('INSERT INTO warmup_history_runs VALUES(?,?,?,?,?,?)')
+        .bind(
+          'one',
+          `capacity-${index}`,
+          original.revision,
+          original.createdAt,
+          original.updatedAt,
+          original.document,
+        ),
+    ),
+  );
+  expect((await read()).status).toBe(200);
+  await db
+    .prepare('INSERT INTO warmup_history_runs VALUES(?,?,?,?,?,?)')
+    .bind(
+      'one',
+      'capacity-100',
+      original.revision,
+      original.createdAt,
+      original.updatedAt,
+      original.document,
+    )
+    .run();
+  const result = await read();
+  expect(result.status).toBe(409);
+  expect(result.headers.get('cache-control')).toBe('no-store');
+  expect(await result.json()).toEqual({
+    error: MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
+    format: 'marketplace-inventory-capacity-v1',
+    errorCode: 'saved-history-run-limit',
+    inventoryShown: false,
+    listingEnabled: false,
+    purchaseEnabled: false,
+    deliveryEnabled: false,
+  });
   expect(fetch).not.toHaveBeenCalled();
 });
