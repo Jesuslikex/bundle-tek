@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-24",
+  "sourceBaseCommit": "2801e6f",
+  "scope": "Unmounted unsigned local sequential Jito economic replay",
+  "source": [
+    {
+      "file": "lib/jito-bundle-economics.ts",
+      "sha256": "e62ad7f47ae224b5aae522679567de3a5fa270d7bb0ebc3a24887eaf41cfdaf3"
+    },
+    {
+      "file": "lib/jito-bundle-economics.test.ts",
+      "sha256": "e3e3be1eb1b66e9071927ff1f3e971420bf634f0c70effe786471a896e1825e0"
+    },
+    {
+      "file": "lib/jito-bundle-token-state.ts",
+      "sha256": "0d3397f59b5f02d6f9a4c7fa4ba47c7a6be7d7b3621308540f6214149067adf5"
+    },
+    {
+      "file": "lib/jito-bundle-token-state.test.ts",
+      "sha256": "eeb3b9e6a72ac69aa64dcea44b889106e263f7661cd9a58b783d1f57933fa73e"
+    },
+    {
+      "file": "test/jito-sequential-economics-fixture.ts",
+      "sha256": "248829bb0f22614db1e27e5c79264b66294606daf75a5ed0a91843046a24c272"
+    }
+  ],
+  "verification": {
+    "tests": [
+      {
+        "record": "jito-economics-transition-complete-20261024.json",
+        "files": 10,
+        "passed": 331,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "record": "jito-existing-flow-20261024.json",
+        "files": 17,
+        "passed": 71,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "totalTests": 402,
+    "totalFiles": 27,
+    "fullRepositorySuite": false,
+    "projectTypeScript": true,
+    "fiveFileTypedLint": true,
+    "fiveFileFormat": true,
+    "build": {
+      "code": 0,
+      "signal": null,
+      "changed": ["lib/jito-bundle-economics.test.ts"],
+      "sourceFiles": 3772,
+      "node": "v24.19.0",
+      "finishedAt": "2026-10-24T01:06:09.602Z",
+      "harnessExit": 1,
+      "reason": "Build child passed; frozen-source harness flagged a subsequent test-only fixture strengthening.",
+      "currentDiff": ["lib/jito-bundle-economics.test.ts"],
+      "applicationAndNewRuntimeSourceMatchBuild": true,
+      "environmentFilesCopied": false,
+      "excludedDraftCopied": false
+    },
+    "reviews": [
+      {
+        "record": "work/release-qa/opus-jito-economics-20261024-v1/status.json",
+        "model": "claude-opus-5-5",
+        "modelsUsed": ["claude-opus-5-5"],
+        "sourceUnchanged": true,
+        "permissionDenials": 0,
+        "sourceOnly": true,
+        "testsRunByReviewer": false
+      },
+      {
+        "record": "work/release-qa/opus-jito-economics-20261024-v2/status.json",
+        "model": "claude-opus-5-5",
+        "modelsUsed": ["claude-opus-5-5"],
+        "sourceUnchanged": true,
+        "permissionDenials": 0,
+        "sourceOnly": true,
+        "testsRunByReviewer": false
+      },
+      {
+        "record": "work/release-qa/opus-jito-economics-20261024-v3/status.json",
+        "model": "claude-opus-5-5",
+        "modelsUsed": ["claude-opus-5-5"],
+        "sourceUnchanged": true,
+        "permissionDenials": 0,
+        "sourceOnly": true,
+        "testsRunByReviewer": false
+      }
+    ],
+    "finalTransitionPatchReviewedBy": "Codex, independently tested; not sent for another Claude review"
+  },
+  "authority": {
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "automaticExecutionAllowed": false,
+    "providerQualified": false,
+    "signaturesVerified": false,
+    "sourceCurrent": false,
+    "runtimePrivilegesVerified": false,
+    "altProvenanceVerified": false,
+    "receiptVerified": false
+  },
+  "integration": {
+    "mounted": false,
+    "productionUsesIndividualSimulations": true,
+    "liveEndToEndQualified": false,
+    "remaining": [
+      "vendor adapter and endpoint qualification",
+      "raw evidence and fee provenance",
+      "actual runtime/code/ALT/genesis admission",
+      "owned immutable review and authorization",
+      "signed final prebroadcast replay",
+      "separately approved funded receipt proof"
+    ]
+  },
+  "boundaries": {
+    "deployed": false,
+    "hostedSql": false,
+    "migrationsAdded": false,
+    "providerSettingsChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletUnlocked": false,
+    "realTransactionsSigned": false,
+    "transactionsSent": false,
+    "fundedTrades": false,
+    "claudeProtectedUiChanged": false
+  },
+  "preserved": {
+    "agentsSha256": "8dcc60d3e1201d3df5dd5f3666fc85bb6a6864765304aac335caf61dfc9c1bea",
+    "excludedWarmupDraftFiles": 7,
+    "journalEntries": 146,
+    "nextUnclaimedMigration": "0147 subject to recheck"
+  }
+}
