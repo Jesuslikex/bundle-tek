@@ -3,6 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { LaunchRecoveryDiscoveryPanel } from './launch-recovery-discovery';
+import { RecoveryProjectNavigationProvider } from './recovery-project-navigation';
+import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
+import { DEFAULT_VENUE_OPTIONS, EMPTY_IDENTITY } from '@/lib/workspace-project';
 import {
   encodeLaunchRecoveryCursor,
   type LaunchRecoveryDiscovery,
@@ -266,4 +269,55 @@ it('warns unresolved when an old review still has stored signature evidence', as
   await click('Find saved launch recovery');
   expect(host.textContent).toContain('Outcome unresolved');
   expect(host.textContent).not.toContain('Saved review state only');
+});
+
+it('opens only the requested current saved project through the supplied workspace guard', async () => {
+  const project = {
+    id: item.projectId,
+    archived: false,
+    updatedAt: '2026-10-24T00:00:00.000Z',
+    plan: { ...DEFAULT_LAUNCH_PLAN },
+    identity: { ...EMPTY_IDENTITY },
+    options: { ...DEFAULT_VENUE_OPTIONS },
+  };
+  let guardedProject: unknown = null;
+  fetchMock.mockImplementation(async (url) => {
+    if (url === '/api/account-launch-recoveries') return Response.json(page);
+    if (url === '/api/projects/' + item.projectId)
+      return Response.json({ project });
+    throw Error('Unexpected read');
+  });
+  await act(async () =>
+    root.render(
+      <RecoveryProjectNavigationProvider
+        onOpen={(p) => {
+          guardedProject = p;
+        }}
+      >
+        <LaunchRecoveryDiscoveryPanel />
+      </RecoveryProjectNavigationProvider>,
+    ),
+  );
+  expect(fetchMock).not.toHaveBeenCalled();
+  await click('Find saved launch recovery');
+  expect(guardedProject).toBeNull();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  await click('Open current saved project');
+  expect(guardedProject).toMatchObject({ id: item.projectId, archived: false });
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  for (const [, init] of fetchMock.mock.calls)
+    expect(init?.method ?? 'GET').toBe('GET');
+  expect(host.textContent).toContain('original review');
+  expect(host.querySelector('input[type="password"]')).toBeNull();
+});
+it('does not expose a project shortcut when the protected navigation wiring is absent', async () => {
+  fetchMock.mockResolvedValue(Response.json(page));
+  await mount();
+  await click('Find saved launch recovery');
+  expect(
+    [...host.querySelectorAll('button')].some(
+      (button) => button.textContent === 'Open current saved project',
+    ),
+  ).toBe(false);
+  expect(fetchMock).toHaveBeenCalledOnce();
 });

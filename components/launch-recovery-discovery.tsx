@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { RecoveryProjectOpenButton } from './recovery-project-navigation';
 import { Button } from '@/components/ui/button';
 import {
   LAUNCH_RECOVERY_PAGE_LIMIT,
@@ -82,6 +83,7 @@ function RecoveryRecord({ item }: { item: LaunchRecoveryItem }) {
         receipt: {item.hasReceipt ? 'present' : 'absent'}. Neither is verified
         here.
       </p>
+      <RecoveryProjectOpenButton projectId={item.projectId} />
       <details>
         <summary>Original recovery reference</summary>
         <pre className={styles.reference}>{reference(item)}</pre>
@@ -178,9 +180,11 @@ export function LaunchRecoveryDiscoveryPanel() {
         receipts or authorize any wallet action.
       </p>
       <p>
-        Open the original project and its saved launch history manually using
-        the original reference. This panel does not restore a launch, renew
-        approval or send a transaction.
+        Use the original reference to find its saved launch history. A project
+        shortcut, when available, opens current saved settings only; those may
+        differ from the original review. Select that original review manually.
+        This panel does not restore a launch, renew approval or send a
+        transaction.
       </p>
       <div className={styles.actions}>
         <Button
