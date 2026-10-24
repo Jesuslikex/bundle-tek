@@ -1,5 +1,6 @@
 'use client';
 
+import { PortfolioPanel } from './portfolio-panel';
 import { ReferralPanel } from './referral-panel';
 import { NarrativeFinder } from './narrative-finder';
 import type { NarrativeDraft } from '@/lib/narratives';
@@ -145,6 +146,7 @@ export function ProjectDashboard({
         </div>
       )}
       {!archived && <AccountPerformancePanel />}
+      {!archived && !signedOut && <PortfolioPanel />}
       {!archived && !signedOut && onNarrativeDraft && (
         <NarrativeFinder onDraft={onNarrativeDraft} />
       )}
