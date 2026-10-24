@@ -173,6 +173,7 @@ export async function jitoSequentialEconomicsFixture(
     packets: JitoBundleSimulationPacket[] = [],
     frames: RawFrame[] = [],
     allKeys: string[][] = [];
+  const lookupAccounts: { address: string; account: RawAccount }[] = [];
   for (let walletIndex = 0; walletIndex < wallets; walletIndex++) {
     const f = await nativeWarmupFixture({
       side,
@@ -257,6 +258,37 @@ export async function jitoSequentialEconomicsFixture(
       readonly: [] as string[],
     };
     const keys = [...staticKeys, ...loadedAddresses.writable];
+    const lookupTableAddress = bs58.encode(
+      new Uint8Array(32).fill(100 + walletIndex),
+    );
+    let lookupObservation = f.simulation.lookupObservation;
+    if (options.lookup) {
+      if (!lookupObservation || f.message.addressTableLookups?.length !== 1)
+        throw Error('Synthetic original ALT observation missing.');
+      const data = new Uint8Array(88),
+        view = new DataView(data.buffer);
+      view.setUint32(0, 1, true);
+      view.setBigUint64(4, (1n << 64n) - 1n, true);
+      view.setBigUint64(12, 80n, true);
+      data.set(bs58.decode(loadedAddresses.writable[0]), 56);
+      const sha256 = await hash(data);
+      if (sha256 !== lookupObservation.tables[0].sha256)
+        throw Error('Synthetic original ALT bytes differ.');
+      lookupAccounts.push({
+        address: lookupTableAddress,
+        account: account(
+          pairRentMinimumRaw(rentProfile, data.length),
+          'AddressLookupTab1e1111111111111111111111111',
+          Buffer.from(data).toString('base64'),
+        ),
+      });
+      lookupObservation = {
+        ...lookupObservation,
+        tables: [
+          { address: lookupTableAddress, sha256, lastExtendedSlot: '80' },
+        ],
+      };
+    }
     const rawInstructions = f.rawInstructions.map((i) => ({
       ...i,
       accounts:
@@ -272,6 +304,12 @@ export async function jitoSequentialEconomicsFixture(
     }));
     const message = {
       ...f.message,
+      addressTableLookups: options.lookup
+        ? f.message.addressTableLookups!.map((table) => ({
+            ...table,
+            lookupTableAddress: address(lookupTableAddress),
+          }))
+        : [],
       header: {
         ...f.message.header,
         numReadonlyNonSignerAccounts: readonlyCount,
@@ -392,6 +430,7 @@ export async function jitoSequentialEconomicsFixture(
     const simulation: ImportedSwapSimulation = {
       ...f.simulation,
       sha256: preparation.sha256,
+      lookupObservation,
       instructionReview,
       routeAssessment,
       ...tokens,
@@ -582,6 +621,7 @@ export async function jitoSequentialEconomicsFixture(
     poolTokenAuthority: POOL_TOKEN_AUTHORITY,
     tipRecipient: TIP_RECIPIENT,
     walletRoster,
+    lookupAccounts,
     keys: allKeys,
   };
 }

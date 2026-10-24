@@ -1,0 +1,100 @@
+{
+  "date": "2026-10-24",
+  "base": "8d64a58159d9d88c38fa73689dcd4275e61c1808",
+  "source": [
+    {
+      "file": "test/jito-sequential-economics-fixture.ts",
+      "sha256": "cf6fc115e9071c05487d0855e143e2614ee5c9279bb2c3eddef192528b1817dd"
+    },
+    {
+      "file": "test/jito-sequential-lookup-fixture.test.ts",
+      "sha256": "940027f4a04a0257b9c02803163919b8548dcdd4c59a7978c477524b2456ab6b"
+    }
+  ],
+  "verification": {
+    "report": "work/release-qa/jito-profile-and-lookup-final-20261024.json",
+    "passed": 327,
+    "failed": 0,
+    "skipped": 0,
+    "files": 8,
+    "perFile": [
+      {
+        "file": "jito-sequential-lookup-fixture.test.ts",
+        "passed": 6
+      },
+      {
+        "file": "jito-simulation-stream-flow.test.ts",
+        "passed": 9
+      },
+      {
+        "file": "jito-bundle-economics.test.ts",
+        "passed": 100
+      },
+      {
+        "file": "jito-bundle-simulation-frames.test.ts",
+        "passed": 88
+      },
+      {
+        "file": "jito-bundle-token-state.test.ts",
+        "passed": 30
+      },
+      {
+        "file": "jito-provider.test.ts",
+        "passed": 14
+      },
+      {
+        "file": "jito-simulation-json.test.ts",
+        "passed": 77
+      },
+      {
+        "file": "swap-lookup-accounts.test.ts",
+        "passed": 3
+      }
+    ],
+    "projectTypeScript": true,
+    "fourFileTypedLint": true,
+    "fourFileFormat": true,
+    "sharedNativeFixtureByteIdentical": true,
+    "newWebpackBuild": false,
+    "wholeRepositorySuite": false,
+    "browser": false,
+    "providerRuntime": false
+  },
+  "scope": {
+    "deterministicDistinctTablePerWallet": true,
+    "rawTableSourcesExposed": true,
+    "existingDecoderReused": true,
+    "coherentReviewedMetadataAndMessage": true,
+    "sourceTests": "synthetic local same-bank callbacks; no source authenticity or live authority",
+    "programBytes": "structural placeholders"
+  },
+  "review": {
+    "helperImplementedAndTested": true,
+    "codexDiffReviewedAndCombinedTestsRun": true,
+    "opusReviewedThisFixturePatch": false,
+    "precedingBankReviewSeparate": true
+  },
+  "boundaries": {
+    "productionCodeChanged": false,
+    "mounted": false,
+    "providerQualified": false,
+    "altProvenanceQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "deployed": false,
+    "hostedSql": false,
+    "migrationsAdded": false,
+    "settingsChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletUnlocked": false,
+    "realSignaturesCreated": 0,
+    "broadcasts": 0,
+    "fundedTrades": false
+  },
+  "preserved": {
+    "agentsSha256": "8dcc60d3e1201d3df5dd5f3666fc85bb6a6864765304aac335caf61dfc9c1bea",
+    "excludedWarmupDraftFiles": 7,
+    "nextUnclaimedMigration": "0147 subject to recheck"
+  }
+}
