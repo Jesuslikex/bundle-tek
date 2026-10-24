@@ -1,0 +1,61 @@
+{
+  "base": "d8ab072ff17fabeee8eacd09b1203e3077846788",
+  "tests": {
+    "files": 32,
+    "passed": 694,
+    "failed": 0,
+    "skipped": 0,
+    "serverCases": 32,
+    "resultCases": 36,
+    "clientCases": 13,
+    "actualRouteSqlCases": 4
+  },
+  "verification": {
+    "isolatedHeadPlusOwnedOverlay": true,
+    "ownedCodeAndTestFiles": 11,
+    "envCopied": false,
+    "sourceStable": true,
+    "rootOwnedStillMatches": true,
+    "projectTypecheck": 0,
+    "typedLint": 0,
+    "format": 0,
+    "canSignAstUnchanged": true,
+    "protectedSigningSendRecoveryAndStockTextUnchangedAfterLineEndingNormalization": true,
+    "localManifest": "work/release-qa/jito-owned-check-isolated-20261024/manifest-final.json",
+    "localResults": "work/release-qa/jito-owned-check-isolated-20261024/tests-final.json",
+    "localStatus": "work/release-qa/jito-owned-check-isolated-20261024/final-status.json"
+  },
+  "opus": {
+    "requestedModel": "claude-opus-5-5",
+    "completedReview": false,
+    "terminalError": true,
+    "costUsd": 0,
+    "reason": "Session limit; CLI reported reset at 05:10 Europe/London",
+    "modelSubstitution": false
+  },
+  "coordination": {
+    "pr": 57,
+    "pinnedHead": "f7bc15aa1ed35e049937bacce4c28d9c88be4e36",
+    "comment": "https://github.com/Jesuslikex/bundle-tek/pull/57#issuecomment-6379061401",
+    "scopeAndUnknownOutcomeFindingsPosted": true,
+    "claudeAcknowledgementObserved": false,
+    "mergedByCodex": false,
+    "unrelatedWarmupEditsExcluded": true
+  },
+  "boundaries": {
+    "signingAuthorityAdded": false,
+    "sendOrRecoveryChanges": false,
+    "usesExistingOwnerRateGate": true,
+    "bundleOrIntentWritesByDiagnostic": false,
+    "applicationDatabaseChangedByAgent": false,
+    "hostedDatabaseChangedByAgent": false,
+    "migrationAdded": false,
+    "providerSettingsChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "liveProviderCallsByAgentThisCheckpoint": 0,
+    "realWalletUnlockedOrSigned": false,
+    "fundedTrades": false,
+    "deployedByCodex": false
+  }
+}

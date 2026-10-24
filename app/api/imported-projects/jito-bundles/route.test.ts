@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   database: vi.fn(),
   approvalRecover: vi.fn(),
+  sequentialCheck: vi.fn(),
 }));
 vi.mock('@/app/chatgpt-auth', () => ({
   getChatGPTUser: async () => mocks.user,
@@ -22,6 +23,9 @@ vi.mock('@/lib/jito-bundle-server', () => ({
   submitJitoBundle: mocks.submit,
   cancelJitoBundle: mocks.cancel,
   observeJitoBundle: mocks.recover,
+}));
+vi.mock('@/lib/jito-sequential-check-server', () => ({
+  checkJitoBundleSequential: mocks.sequentialCheck,
 }));
 vi.mock('@/lib/jito-bundle-preparation', () => ({
   prepareJitoBundle: mocks.prepare,
@@ -211,4 +215,95 @@ it('forwards finalized receipt evidence to bundle recovery instead of reducing i
   expect((await POST(request({ action: 'recover', id }))).status).toBe(200);
   const recoveryRequest = mocks.approvalRecover.mock.calls[0][0] as Request;
   expect(await recoveryRequest.json()).toEqual({ action: 'recover', id });
+});
+
+it('exposes an explicit owner-scoped sequential read without signing or submission approval', async () => {
+  const result = {
+    format: 'jito-sequential-check-v1',
+    signingAllowed: false,
+    executionAllowed: false,
+  };
+  mocks.sequentialCheck.mockResolvedValue(result);
+  const response = await POST(
+    request({
+      action: 'check-sequential',
+      id,
+      sha256: 'ab'.repeat(32),
+      owner: 'other',
+      transaction: 'never-forward',
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ sequentialCheck: result });
+  expect(mocks.sequentialCheck).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ prepare: mocks.database }),
+    'owner',
+    { id, sha256: 'ab'.repeat(32) },
+    expect.any(AbortSignal),
+  );
+  for (const fn of [
+    mocks.prepare,
+    mocks.create,
+    mocks.register,
+    mocks.submit,
+    mocks.recover,
+    mocks.approvalRecover,
+  ])
+    expect(fn).not.toHaveBeenCalled();
+});
+it('requires auth, same origin and JSON for a sequential diagnostic', async () => {
+  const body = { action: 'check-sequential', id, sha256: 'ab'.repeat(32) };
+  mocks.user = null;
+  expect((await POST(request(body))).status).toBe(401);
+  mocks.user = { userId: 'owner' };
+  expect(
+    (await POST(request(body, { origin: 'https://other.invalid' }))).status,
+  ).toBe(403);
+  expect(
+    (await POST(request(body, { 'content-type': 'text/plain' }))).status,
+  ).toBe(415);
+  expect(mocks.sequentialCheck).not.toHaveBeenCalled();
+});
+it.each([undefined, ['ab'.repeat(32)], 'AB'.repeat(32), 'x'])(
+  'rejects a noncanonical sequential-check digest %j before provider work',
+  async (sha256) => {
+    expect(
+      (await POST(request({ action: 'check-sequential', id, sha256 }))).status,
+    ).toBe(400);
+    expect(mocks.sequentialCheck).not.toHaveBeenCalled();
+  },
+);
+it('applies the existing 15-second owner rate gate to sequential reads', async () => {
+  mocks.database.mockImplementation(() => ({
+    bind: () => ({ run: async () => ({ meta: { changes: 0 } }) }),
+  }));
+  const response = await POST(
+    request({ action: 'check-sequential', id, sha256: 'ab'.repeat(32) }),
+  );
+  expect(response.status).toBe(429);
+  expect(mocks.sequentialCheck).not.toHaveBeenCalled();
+  expect(mocks.submit).not.toHaveBeenCalled();
+});
+it('returns fixed context errors and hides raw provider failures for sequential reads', async () => {
+  mocks.sequentialCheck.mockRejectedValueOnce(
+    Error('Sequential check context changed or unavailable.'),
+  );
+  let response = await POST(
+    request({ action: 'check-sequential', id, sha256: 'ab'.repeat(32) }),
+  );
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({
+    error: 'Sequential check context changed or unavailable.',
+  });
+  mocks.sequentialCheck.mockRejectedValueOnce(
+    Error('https://private.invalid/?key=FAKE_SEQUENCE_SECRET'),
+  );
+  response = await POST(
+    request({ action: 'check-sequential', id, sha256: 'ab'.repeat(32) }),
+  );
+  expect(response.status).toBe(409);
+  expect(JSON.stringify(await response.json())).not.toContain(
+    'FAKE_SEQUENCE_SECRET',
+  );
+  expect(mocks.submit).not.toHaveBeenCalled();
 });

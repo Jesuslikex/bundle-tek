@@ -1,3 +1,4 @@
+import { checkJitoBundleSequential } from '@/lib/jito-sequential-check-server';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { UUID } from '@/lib/wallet-operation';
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
         'submit',
         'recover',
         'cancel',
+        'check-sequential',
       ].includes(body.action)
     )
       throw new Error();
@@ -121,6 +123,13 @@ export async function POST(request: Request) {
         throw new Error();
     } else if (!UUID.test(body.id)) throw new Error();
     if (
+      body.action === 'check-sequential' &&
+      (typeof body.id !== 'string' ||
+        typeof body.sha256 !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(body.sha256))
+    )
+      throw new Error();
+    if (
       ['register', 'submit'].includes(body.action) &&
       (!/^[a-f0-9]{64}$/.test(body.sha256) || body.approved !== true)
     )
@@ -133,7 +142,11 @@ export async function POST(request: Request) {
   try {
     const db = getD1(),
       signal = AbortSignal.any([request.signal, AbortSignal.timeout(55000)]);
-    if (['prepare', 'create', 'submit', 'recover'].includes(body.action)) {
+    if (
+      ['prepare', 'create', 'submit', 'recover', 'check-sequential'].includes(
+        body.action,
+      )
+    ) {
       const now = Date.now();
       const gate = await db
         .prepare(
@@ -149,6 +162,15 @@ export async function POST(request: Request) {
     }
     let bundle;
     switch (body.action) {
+      case 'check-sequential':
+        return json({
+          sequentialCheck: await checkJitoBundleSequential(
+            db,
+            user.userId,
+            { id: body.id, sha256: body.sha256 },
+            signal,
+          ),
+        });
       case 'prepare':
         bundle = await prepareJitoBundle(db, user.userId, body, signal);
         break;
@@ -207,9 +229,11 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : '';
     // Only bounded app-authored validation messages leave the server. Never provider payloads/URLs.
     const safe =
-      /^(Choose |Bundle |Current complete |Sign every |Signed bundles |Only entirely |Approval belongs |Owned bundle |Project or wallet |Approved swap |Preparation changed |Tip payer |Cancel unsigned |Finalized tip |Exact finalized |Packets landed |Jito and chain |Signature recovery |Historical transaction |Registered bundle |Stored bundle |Reviewed tip)/.test(
+      message === 'Sequential check context changed or unavailable.' ||
+      (/^(Choose |Bundle |Current complete |Sign every |Signed bundles |Only entirely |Approval belongs |Owned bundle |Project or wallet |Approved swap |Preparation changed |Tip payer |Cancel unsigned |Finalized tip |Exact finalized |Packets landed |Jito and chain |Signature recovery |Historical transaction |Registered bundle |Stored bundle |Reviewed tip)/.test(
         message,
-      ) && message.length <= 250;
+      ) &&
+        message.length <= 250);
     return json(
       {
         error: safe

@@ -11,6 +11,7 @@ import type { TradeSession } from '@/lib/imported-trade-session';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { JitoPacketSigning } from './jito-packet-signing';
 import { JitoBundleTimeline } from './jito-bundle-timeline';
+import { JitoSequentialCheck } from './jito-sequential-check';
 import { requireJitoFinalization } from '@/lib/jito-finalization';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -364,6 +365,11 @@ function JitoAtomicBundleForContext({
             <article key={m.id} className="space-y-3 rounded-md border p-3">
               <h5>Bundle {m.id}</h5>
               <JitoBundleTimeline bundle={bundle} />
+              <JitoSequentialCheck
+                key={m.sha256}
+                manifest={m}
+                disabled={!canSign || bundle.signatures.some(Boolean)}
+              />
               <p>
                 State: {bundle.state}.{' '}
                 {bundle.signatures.filter(Boolean).length}/
