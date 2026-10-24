@@ -572,3 +572,285 @@ it('retains a completed asset read when its pending runtime sibling later refuse
   expect(result.evidence.runtimeBefore).toBeNull();
   expect(doubles.attempt).not.toHaveBeenCalled();
 });
+
+it('starts all three postflight reads after simulation and holds final genesis/replay for their barrier', async () => {
+  const x = await fixture({ lookup: true });
+  const assetStarted = deferred(),
+    lookupStarted = deferred(),
+    scanStarted = deferred();
+  const releaseAsset = deferred(),
+    releaseLookup = deferred(),
+    releaseScan = deferred();
+  const originalScan = doubles.scans.getMockImplementation()!;
+  let simulated = false,
+    scans = 0;
+  const floors: number[] = [];
+  doubles.scans.mockImplementation(async (...args) => {
+    if (++scans === 2) {
+      expect(simulated).toBe(true);
+      floors.push(args[2]);
+      scanStarted.resolve();
+      await releaseScan.promise;
+    }
+    return originalScan(...args);
+  });
+  const table = x.e.lookupAccounts[0].address;
+  const fetcher: typeof fetch = async (url, init) => {
+    const request = fixtureBody(init);
+    if (request.id === 'jito-assets:after') {
+      expect(simulated).toBe(true);
+      floors.push(request.params[1].minContextSlot);
+      assetStarted.resolve();
+      await releaseAsset.promise;
+    } else if (
+      simulated &&
+      request.method === 'getMultipleAccounts' &&
+      request.params[0].includes(table)
+    ) {
+      floors.push(request.params[1].minContextSlot);
+      lookupStarted.resolve();
+      await releaseLookup.promise;
+    }
+    const response = await x.fetcher(url, init);
+    if (Array.isArray(request)) simulated = true;
+    return response;
+  };
+  const pending = collectJitoReadOnlyQualification(
+    x.e.manifest,
+    [x.capsule],
+    new AbortController().signal,
+    { fetcher, pace: async () => {} },
+  );
+  await Promise.all([
+    assetStarted.promise,
+    lookupStarted.promise,
+    scanStarted.promise,
+  ]);
+  expect(floors).toEqual([101, 101, 101]);
+  expect(x.methods.filter((m) => m === 'getGenesisHash')).toHaveLength(1);
+  expect(doubles.check).not.toHaveBeenCalled();
+  releaseAsset.resolve();
+  releaseLookup.resolve();
+  await new Promise<void>((done) => setImmediate(done));
+  expect(x.methods.filter((m) => m === 'getGenesisHash')).toHaveLength(1);
+  expect(doubles.check).not.toHaveBeenCalled();
+  releaseScan.resolve();
+  const result = await pending;
+  expect(result).toMatchObject({
+    status: 'checks-passed',
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(x.methods.filter((m) => m === 'getGenesisHash')).toHaveLength(2);
+  expect(doubles.check).toHaveBeenCalledOnce();
+  expect(doubles.scans).toHaveBeenCalledTimes(2);
+});
+
+for (const branch of ['assets', 'lookup', 'runtime'] as const)
+  for (const slot of [132, 133])
+    it(`keeps original F+32 but refuses F+33 from postflight ${branch} (slot ${slot})`, async () => {
+      const x = await fixture({ lookup: true });
+      const originalScan = doubles.scans.getMockImplementation()!;
+      let simulated = false,
+        scans = 0;
+      doubles.scans.mockImplementation(async (...args) => {
+        const value = await originalScan(...args);
+        return ++scans === 2 && branch === 'runtime'
+          ? { ...value, maximumSlot: slot }
+          : value;
+      });
+      const table = x.e.lookupAccounts[0].address;
+      const fetcher: typeof fetch = async (url, init) => {
+        const request = fixtureBody(init),
+          response = await x.fetcher(url, init);
+        if (Array.isArray(request)) simulated = true;
+        const selected =
+          branch === 'assets'
+            ? request.id === 'jito-assets:after'
+            : branch === 'lookup' &&
+              simulated &&
+              request.method === 'getMultipleAccounts' &&
+              request.params[0].includes(table);
+        if (!selected) return response;
+        return new Response(
+          (await response.text()).replace('"slot":102', '"slot":' + slot),
+        );
+      };
+      const result = await collectJitoReadOnlyQualification(
+        x.e.manifest,
+        [x.capsule],
+        new AbortController().signal,
+        { fetcher, pace: async () => {} },
+      );
+      expect(result).toMatchObject({
+        status: slot === 132 ? 'checks-passed' : 'refused',
+        minimumSlot: 100,
+        maximumSlot: slot,
+        signingAllowed: false,
+        executionAllowed: false,
+      });
+      if (slot === 132) {
+        expect(result.evidence.runtimeAfter).toMatchObject({
+          minimumReadSlot: 101,
+        });
+        expect(doubles.check).toHaveBeenCalledOnce();
+      } else {
+        expect(doubles.check).not.toHaveBeenCalled();
+        expect(x.methods.filter((m) => m === 'getGenesisHash')).toHaveLength(1);
+      }
+    });
+
+for (const branch of ['assets', 'lookup', 'runtime'] as const)
+  for (const parsed of [false, true])
+    it(`stops all postflight siblings on ${branch} ${parsed ? 'RPC' : 'HTTP'} 429`, async () => {
+      const x = await fixture({ lookup: true });
+      const originalScan = doubles.scans.getMockImplementation()!;
+      const assetStarted = deferred(),
+        lookupStarted = deferred(),
+        scanStarted = deferred();
+      const started = Promise.all([
+        assetStarted.promise,
+        lookupStarted.promise,
+        scanStarted.promise,
+      ]);
+      const signals: AbortSignal[] = [],
+        late: Array<(response: Response) => void> = [];
+      let scans = 0,
+        simulated = false;
+      let returned = false;
+      const abortEvents: Array<{ stage: string; afterReturn: boolean }> = [];
+      doubles.scans.mockImplementation(async (...args) => {
+        if (++scans === 1) return originalScan(...args);
+        const signal = args[3] as AbortSignal;
+        signals.push(signal);
+        signal.addEventListener(
+          'abort',
+          () => abortEvents.push({ stage: 'runtime', afterReturn: returned }),
+          { once: true },
+        );
+        scanStarted.resolve();
+        if (branch === 'runtime') {
+          await started;
+          await args[4]('getGenesisHash', [], signal);
+          throw Error('Runtime rate limit must refuse');
+        }
+        await new Promise<void>((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => reject(Error('Sibling stopped')),
+            { once: true },
+          );
+          if (signal.aborted) reject(Error('Stopped'));
+        });
+      });
+      const limited = (id: string) =>
+        parsed
+          ? new Response(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                error: { code: 429, message: 'Limited' },
+              }),
+            )
+          : new Response(null, { status: 429 });
+      const table = x.e.lookupAccounts[0].address;
+      const fetcher: typeof fetch = async (url, init) => {
+        const request = fixtureBody(init);
+        let current: 'assets' | 'lookup' | undefined;
+        if (request.id === 'jito-assets:after') {
+          current = 'assets';
+          assetStarted.resolve();
+        } else if (
+          simulated &&
+          request.method === 'getMultipleAccounts' &&
+          request.params[0].includes(table)
+        ) {
+          current = 'lookup';
+          lookupStarted.resolve();
+        }
+        if (current) {
+          signals.push(init!.signal!);
+          init!.signal!.addEventListener(
+            'abort',
+            () => abortEvents.push({ stage: current!, afterReturn: returned }),
+            { once: true },
+          );
+          if (branch === current) {
+            await started;
+            return limited(request.id);
+          }
+          return new Promise<Response>((resolve) => late.push(resolve));
+        }
+        if (String(request.id).startsWith('jito-runtime:'))
+          return limited(request.id);
+        const response = await x.fetcher(url, init);
+        if (Array.isArray(request)) simulated = true;
+        return response;
+      };
+      const result = await collectJitoReadOnlyQualification(
+        x.e.manifest,
+        [x.capsule],
+        new AbortController().signal,
+        { fetcher, pace: async () => {} },
+      );
+      returned = true;
+      expect(abortEvents).toHaveLength(3);
+      expect(abortEvents.every((event) => !event.afterReturn)).toBe(true);
+      expect(result).toMatchObject({
+        status: 'refused',
+        stage:
+          branch === 'lookup'
+            ? 'lookup-after'
+            : branch === 'assets'
+              ? 'assets-after'
+              : 'runtime-after',
+        signingAllowed: false,
+        executionAllowed: false,
+      });
+      expect(signals).toHaveLength(3);
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+      expect(
+        result.evidence.transports[
+          branch === 'assets' ? 1 : branch === 'lookup' ? 0 : 3
+        ].summary.rateLimited,
+      ).toBe(true);
+      expect(x.methods.filter((m) => m === 'getGenesisHash')).toHaveLength(1);
+      expect(doubles.check).not.toHaveBeenCalled();
+      const snapshot = structuredClone(result);
+      late.forEach((resolve) => resolve(new Response('{}')));
+      await new Promise<void>((done) => setImmediate(done));
+      expect(result).toEqual(snapshot);
+    });
+
+it('retains completed postflight assets when the final scan later refuses', async () => {
+  const x = await fixture({ lookup: true });
+  const originalScan = doubles.scans.getMockImplementation()!;
+  const assetDone = deferred();
+  let assetReads = 0,
+    scans = 0;
+  doubles.assetRead.mockImplementation(() => {
+    if (++assetReads === 2) assetDone.resolve();
+  });
+  doubles.scans.mockImplementation(async (...args) => {
+    if (++scans === 1) return originalScan(...args);
+    await assetDone.promise;
+    await new Promise<void>((done) => setImmediate(done));
+    throw Error('Final scan refused after completed asset read');
+  });
+  const result = await collectJitoReadOnlyQualification(
+    x.e.manifest,
+    [x.capsule],
+    new AbortController().signal,
+    { fetcher: x.fetcher, pace: async () => {} },
+  );
+  expect(result).toMatchObject({
+    status: 'refused',
+    stage: 'runtime-after',
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(result.evidence.assetsAfter).toMatchObject({ slot: 102 });
+  expect(result.evidence.runtimeAfter).toBeNull();
+  expect(doubles.check).not.toHaveBeenCalled();
+  expect(x.methods.filter((m) => m === 'getGenesisHash')).toHaveLength(1);
+});

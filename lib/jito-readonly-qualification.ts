@@ -244,7 +244,7 @@ export async function collectJitoReadOnlyQualification(
     const beforeFloor = floor();
     stage = 'preflight';
     const failures: { stage: string; error: unknown }[] = [];
-    const preflight = async <T>(name: string, read: () => Promise<T>) => {
+    const guardedRead = async <T>(name: string, read: () => Promise<T>) => {
       try {
         return await read();
       } catch (error) {
@@ -256,7 +256,7 @@ export async function collectJitoReadOnlyQualification(
       }
     };
     const beforeReads = await Promise.allSettled([
-      preflight('assets-before', async () => {
+      guardedRead('assets-before', async () => {
         const beforePlan = buildJitoAssetRead(
           mints,
           minimumSlot,
@@ -272,7 +272,7 @@ export async function collectJitoReadOnlyQualification(
         floor();
         return value;
       }),
-      preflight('runtime-before', async () => {
+      guardedRead('runtime-before', async () => {
         const value = await collectJitoRuntimeEvidence(
           keys,
           minimumSlot,
@@ -317,39 +317,69 @@ export async function collectJitoReadOnlyQualification(
       return fail();
     slots.push(bank);
     floor();
-    stage = 'assets-after';
-    const afterPlan = buildJitoAssetRead(
-      mints,
-      minimumSlot,
-      floor(),
-      'jito-assets:after',
-    );
-    afterAssets = await readJitoAssetEvidence(
-      afterPlan,
-      (await assets.request(afterPlan.body, control)).body,
-      control,
-    );
-    slots.push(afterAssets.slot);
-    floor();
-    stage = 'lookup-after';
-    for (let i = 0; i < messages.length; i++)
-      if (lookups[i])
-        assertSameSwapLookups(
-          lookups[i]!,
-          await readSwapLookupAccounts(messages[i], floor(), (m, p) =>
-            rpc(m, p, control),
-          ),
-          attempt.simulation.frames.frames[i].loadedAddresses,
+    // Independent post-simulation branches all begin at the admitted bank floor.
+    // Later lookup reads chain their own observations, never a sibling's timing.
+    const afterFloor = floor(),
+      frames = attempt.simulation.frames;
+    stage = 'postflight';
+    const afterReads = await Promise.allSettled([
+      guardedRead('assets-after', async () => {
+        const afterPlan = buildJitoAssetRead(
+          mints,
+          minimumSlot,
+          afterFloor,
+          'jito-assets:after',
         );
-    stage = 'runtime-after';
-    afterCode = await collectJitoRuntimeEvidence(
-      keys,
-      minimumSlot,
-      floor(),
-      control,
-      finalCode.rpc,
-    );
-    slots.push(afterCode.maximumSlot);
+        const value = await readJitoAssetEvidence(
+          afterPlan,
+          (await assets.request(afterPlan.body, control)).body,
+          control,
+        );
+        slots.push(value.slot);
+        floor();
+        return value;
+      }),
+      guardedRead('lookup-after', async () => {
+        let lookupFloor = afterFloor;
+        for (let i = 0; i < messages.length; i++) {
+          if (!lookups[i]) continue;
+          const value = await readSwapLookupAccounts(
+            messages[i],
+            lookupFloor,
+            (m, p) => rpc(m, p, control),
+          );
+          assertSameSwapLookups(
+            lookups[i]!,
+            value,
+            frames.frames[i].loadedAddresses,
+          );
+          if (!value) return fail();
+          lookupFloor = Math.max(lookupFloor, value.observedSlot);
+        }
+      }),
+      guardedRead('runtime-after', async () => {
+        const value = await collectJitoRuntimeEvidence(
+          keys,
+          minimumSlot,
+          afterFloor,
+          control,
+          finalCode.rpc,
+        );
+        slots.push(value.maximumSlot);
+        floor();
+        return value;
+      }),
+    ]);
+    if (afterReads[0].status === 'fulfilled') afterAssets = afterReads[0].value;
+    if (afterReads[2].status === 'fulfilled') afterCode = afterReads[2].value;
+    const postflightRefused = afterReads.find((r) => r.status === 'rejected');
+    if (postflightRefused?.status === 'rejected') {
+      const failure = failures[0];
+      stage = failure?.stage ?? 'postflight';
+      throw failure?.error ?? postflightRefused.reason;
+    }
+    control.throwIfAborted();
+    if (!afterAssets || !afterCode) return fail();
     floor();
     if ((await rpc('getGenesisHash', [], control)) !== SOLANA_MAINNET_GENESIS)
       return fail();
