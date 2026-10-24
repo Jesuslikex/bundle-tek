@@ -1,0 +1,94 @@
+{
+  "sourceBaseCommit": "4e6f2a7",
+  "sourceSha256": {
+    "lib/jito-readonly-qualification.ts": "914f2bc7d9b617344817a9b68e5ff091dd3a563d2c356ac37b2e2b82442defcd",
+    "test/jito-readonly-composition.test.ts": "a0bfc95379e3eb083fdb3b7b57c9e3924ca16829e58198e02d0801a00b72f2b1",
+    "lib/jito-simulation-attempt.test.ts": "aed804d2e9970a0c8c478698c1333a95315c29bb756b24a0b2d1044109095c20"
+  },
+  "node": "24.19.0",
+  "tests": {
+    "finalIntegrated": {
+      "files": 43,
+      "passed": 872,
+      "failed": 0
+    },
+    "nativeOfflineHarness": {
+      "passed": 19,
+      "failed": 0
+    },
+    "independentOpenCodeComponentAndLibrary": {
+      "files": 2,
+      "passed": 24
+    }
+  },
+  "typecheckExit": 0,
+  "scopedTypedLintExit": 0,
+  "reviews": [
+    {
+      "startedAt": "2026-10-24T05:47:09.160Z",
+      "finishedAt": "2026-10-24T05:48:46.227Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "649c2ad37b873f31391041652221115b5dbaafc5",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.4779538,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    {
+      "startedAt": "2026-10-24T05:51:39.536Z",
+      "finishedAt": "2026-10-24T05:53:08.812Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "649c2ad37b873f31391041652221115b5dbaafc5",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.5043436,
+      "sourceUnchanged": true,
+      "changed": []
+    }
+  ],
+  "lastTestOnlyRefinementsIndependentlyVerified": true,
+  "runtimeDoubleInComposition": true,
+  "liveQualificationPassed": false,
+  "liveCampaignRun": false,
+  "authority": {
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "providerQualified": false,
+    "runtimeAttested": false
+  },
+  "preserved": {
+    "originalDirtyAgentsLines": 4,
+    "frozenDraftCount": 7,
+    "claudePr57Untouched": true
+  },
+  "actions": {
+    "deploy": false,
+    "hostedSql": false,
+    "credentialsOrProviderSettings": false,
+    "realWallet": false,
+    "fundedTrade": false
+  }
+}

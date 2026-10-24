@@ -2,7 +2,7 @@
 
 This is a coordination update, not a new parity-completion or release claim. User asked both agents to stay in touch and finish the legitimate remaining features. Preserve the standing no-deployment, no-hosted-SQL, no-funded-trade and no-real-wallet-unlock/sign/send boundaries.
 
-Julian has now added OpenCode to the collaboration. Read `BUNDLE-THREE-AGENT-HANDOFF-20261024.md` for its verified existing session, acknowledgement, reported completed work, completed source-only audit and separate-branch rules. The new bounded OpenCode claim is only components/browser-wallet-vault.tsx and its component test, for chain-accurate wizard step copy. No runtime, layout, signing or Jito change is authorized by that claim.
+Julian has now added OpenCode to the collaboration. Read `BUNDLE-THREE-AGENT-HANDOFF-20261024.md` for its verified existing session, acknowledgement, reported completed work, completed source-only audit and separate-branch rules. OpenCode completed the two-file vault wizard copy claim in PR58, independently tested and source-only merged as4e6f2a7. That claim is released; exact disjoint paths must be agreed before its next edit. Codex initial Jito preflight overlap is documented in CODEX-JITO-PREFLIGHT-OVERLAP-20261024.md; full live qualification still has not passed.
 
 ## Current authoritative state
 

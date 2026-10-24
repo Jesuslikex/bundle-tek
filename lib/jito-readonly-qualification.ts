@@ -239,29 +239,66 @@ export async function collectJitoReadOnlyQualification(
         source.flatMap((s) => [s.order.inputMint, s.order.outputMint]),
       ),
     ];
-    stage = 'assets-before';
-    const beforePlan = buildJitoAssetRead(
-      mints,
-      minimumSlot,
-      floor(),
-      'jito-assets:before',
-    );
-    beforeAssets = await readJitoAssetEvidence(
-      beforePlan,
-      (await assets.request(beforePlan.body, control)).body,
-      control,
-    );
-    slots.push(beforeAssets.slot);
-    floor();
-    stage = 'runtime-before';
-    beforeCode = await collectJitoRuntimeEvidence(
-      keys,
-      minimumSlot,
-      floor(),
-      control,
-      initialCode.rpc,
-    );
-    slots.push(beforeCode.maximumSlot);
+    // Independent pre-simulation reads share one admitted phase-start floor.
+    // Neither result can renew F or start simulation before the other finishes.
+    const beforeFloor = floor();
+    stage = 'preflight';
+    const failures: { stage: string; error: unknown }[] = [];
+    const preflight = async <T>(name: string, read: () => Promise<T>) => {
+      try {
+        return await read();
+      } catch (error) {
+        if (!failures.length) {
+          failures.push({ stage: name, error });
+          owner.abort();
+        }
+        throw error;
+      }
+    };
+    const beforeReads = await Promise.allSettled([
+      preflight('assets-before', async () => {
+        const beforePlan = buildJitoAssetRead(
+          mints,
+          minimumSlot,
+          beforeFloor,
+          'jito-assets:before',
+        );
+        const value = await readJitoAssetEvidence(
+          beforePlan,
+          (await assets.request(beforePlan.body, control)).body,
+          control,
+        );
+        slots.push(value.slot);
+        floor();
+        return value;
+      }),
+      preflight('runtime-before', async () => {
+        const value = await collectJitoRuntimeEvidence(
+          keys,
+          minimumSlot,
+          beforeFloor,
+          control,
+          initialCode.rpc,
+        );
+        slots.push(value.maximumSlot);
+        floor();
+        return value;
+      }),
+    ]);
+    // Settle both logical branches before capturing refusal evidence or closing
+    // their transports. A failed branch never leaves a scan issuing more reads.
+    if (beforeReads[0].status === 'fulfilled')
+      beforeAssets = beforeReads[0].value;
+    if (beforeReads[1].status === 'fulfilled')
+      beforeCode = beforeReads[1].value;
+    const refused = beforeReads.find((r) => r.status === 'rejected');
+    if (refused?.status === 'rejected') {
+      const failure = failures[0];
+      stage = failure?.stage ?? 'preflight';
+      throw failure?.error ?? refused.reason;
+    }
+    control.throwIfAborted();
+    if (!beforeAssets || !beforeCode) return fail();
     floor();
     stage = 'exact-simulation';
     attempt = await collectJitoCoherentSimulationAttempt({
