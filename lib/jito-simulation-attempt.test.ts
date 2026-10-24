@@ -290,17 +290,25 @@ for (const phase of ['fees', 'simulation'] as const)
       controller = new AbortController(),
       cancel = vi.fn();
     let resolve!: (value: Response) => void;
+    let acknowledgeStart!: () => void;
+    const started = new Promise<void>((done) => {
+      acknowledgeStart = done;
+    });
+    const cancelled = new Promise<void>((done) => {
+      cancel.mockImplementation(done);
+    });
     const transport = vi.fn(async (request: JitoSimulationRead) =>
       request.phase === phase
         ? new Promise<Response>((r) => {
             resolve = r;
+            acknowledgeStart();
           })
         : new Response(fees(f, request)),
     );
     const promise = collectJitoSimulationAttempt(
       policy(f, transport, { signal: controller.signal }),
     );
-    await until(() => !!resolve);
+    await started;
     controller.abort(Error('FAKE_PRIVATE_REASON'));
     const output = await promise;
     expect(output.status).toBe('refused');
@@ -312,7 +320,7 @@ for (const phase of ['fees', 'simulation'] as const)
         { highWaterMark: 0 },
       );
     resolve(new Response(stream));
-    await until(() => cancel.mock.calls.length === 1);
+    await cancelled;
     expect(pull).not.toHaveBeenCalled();
     expect(stream.locked).toBe(false);
     expect(transport).toHaveBeenCalledTimes(phase === 'fees' ? 1 : 2);
