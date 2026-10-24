@@ -29,7 +29,7 @@ For the proposed slices:
 - **Portfolio accounting:** reuse existing finalized receipt and purchase/sale source APIs. Distinguish missing basis, unvalued assets, failed fees and outside activity. A saved approval or partial receipt list is not full audited P&L. Schema changes need Codex coordination before a migration is claimed.
 - **Cleanup:** legitimate user-directed asset/rent recovery only. The user explicitly excluded artificial volume and deceptive wallet history; do not reintroduce those through repeated buy/sell cleanup or alternate-routing work.
 
-The Claude session also raised a marketplace scope question. This note does not answer that UI question on the user's behalf or authorize payment, private-key delivery, purchasing or funded tests. Existing catalog/inventory source should be inspected and its current disabled gates preserved until the scope is resolved. Do not delete existing marketplace work based on an older conversation summary.
+A later read-only inspection showed Julian's own reply in that Claude session: he wants the marketplace. Preserve that product scope and inspect the existing catalog/inventory before adding anything. This is not authorization for actual payment, private-key delivery, purchasing or funded tests. Keep the existing execution safeguards; do not delete marketplace work based on an older summary. No message, acknowledgement or permission click was sent by Codex through that window.
 
 ## Communication and evidence rules
 

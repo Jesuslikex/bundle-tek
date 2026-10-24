@@ -1,0 +1,49 @@
+{
+  "sourceBaseCommit": "fb036ac",
+  "tests": {
+    "files": 10,
+    "passed": 473,
+    "failed": 0,
+    "skipped": 0
+  },
+  "review": {
+    "model": [
+      "claude-opus-5-5"
+    ],
+    "sourceUnchanged": true,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "scope": "Source-only seven-file copy; five final test cases independently added and run afterwards; production source unchanged"
+  },
+  "live": {
+    "httpReads": 5,
+    "rpcMethods": 6,
+    "feeSlots": [
+      460683397,
+      460683397
+    ],
+    "fees": [
+      "5000",
+      "5000"
+    ],
+    "simulationStatus": "refused",
+    "simulationReason": "bank not found for the provided slot: 460683397",
+    "rpcErrorCode": -32602,
+    "requestBindingMatches": true,
+    "completeRawBodyRetained": true,
+    "signaturesCreated": 0,
+    "broadcasts": 0
+  },
+  "sourceDigests": {
+    "lib/jito-fee-batch.ts": "df18091b90f24bfa59c3dc9764f4027a6f55a25efd421f81267327772145d35f",
+    "lib/jito-fee-batch.test.ts": "7b747820fdeb50a703095860adfe1aeafc65c8e78bcacd5a960a9c58e22f12ac"
+  },
+  "limits": {
+    "providerQualified": false,
+    "executionAllowed": false,
+    "signingAllowed": false,
+    "productionMounted": false,
+    "deployed": false,
+    "hostedSql": false
+  }
+}
