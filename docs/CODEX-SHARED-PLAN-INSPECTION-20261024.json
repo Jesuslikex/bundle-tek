@@ -32,17 +32,9 @@
       "uncommittedOverlay": true,
       "sourceBaseCommit": "66598d3758b32a0eee56f4a67114d8d6a1b65ebc",
       "requestedModel": "claude-opus-5-5",
-      "selectedModels": [
-        "claude-opus-5-5"
-      ],
-      "modelsUsed": [
-        "claude-opus-5-5"
-      ],
-      "tools": [
-        "Glob",
-        "Grep",
-        "Read"
-      ],
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
       "status": {
         "code": 0,
         "signal": null
@@ -62,17 +54,9 @@
       "uncommittedOverlay": true,
       "sourceBaseCommit": "66598d3758b32a0eee56f4a67114d8d6a1b65ebc",
       "requestedModel": "claude-opus-5-5",
-      "selectedModels": [
-        "claude-opus-5-5"
-      ],
-      "modelsUsed": [
-        "claude-opus-5-5"
-      ],
-      "tools": [
-        "Glob",
-        "Grep",
-        "Read"
-      ],
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
       "status": {
         "code": 0,
         "signal": null
