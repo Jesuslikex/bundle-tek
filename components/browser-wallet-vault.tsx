@@ -89,6 +89,9 @@ export function BrowserWalletVault({
   const epoch = useRef(0);
   const id = useId();
   const family = chain === 'Solana' ? 'solana' : 'evm';
+  // Warmup custody is Solana-only and needs a host that can open it; the guided
+  // steps must not promise a third step this flow cannot take.
+  const warmupHandoff = chain === 'Solana' && Boolean(onOpenWarmup);
   const lock = useCallback(() => {
     epoch.current++;
     ownershipRequest.current?.abort();
@@ -260,7 +263,8 @@ export function BrowserWalletVault({
         </DialogHeader>
         {guided && (
           <p className="browser-vault-scope">
-            1. Protect your wallet · 2. Save a backup · 3. Open warmup
+            1. Protect your wallet · 2. Save a backup · 3.{' '}
+            {warmupHandoff ? 'Open warmup' : 'Done'}
           </p>
         )}
         {!created && (
@@ -330,9 +334,7 @@ export function BrowserWalletVault({
                   if (chain === 'Solana') onOpenWarmup?.(address);
                 }}
               >
-                {chain === 'Solana' && onOpenWarmup
-                  ? 'Continue to warmup'
-                  : 'Done'}
+                {warmupHandoff ? 'Continue to warmup' : 'Done'}
               </Button>
             )}
           </div>
