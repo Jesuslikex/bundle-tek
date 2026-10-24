@@ -3,10 +3,15 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WarmupReadiness } from './warmup-readiness';
+import type { LaunchChain } from '@/lib/launch-plan';
 
 const wallet = '11111111111111111111111111111111';
 const other = 'SysvarRent111111111111111111111111111111111';
 let host: HTMLDivElement, root: Root;
+const originalClipboard = Object.getOwnPropertyDescriptor(
+  navigator,
+  'clipboard',
+);
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -17,6 +22,9 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  if (originalClipboard)
+    Object.defineProperty(navigator, 'clipboard', originalClipboard);
+  else Reflect.deleteProperty(navigator, 'clipboard');
   vi.unstubAllGlobals();
 });
 
@@ -52,13 +60,20 @@ function balances(entries: Array<{ address: string; nativeBalance?: string }>) {
     }),
   );
 }
-async function mount(feeReserve = '0.01', addresses = [wallet]) {
+async function mount(
+  feeReserve = '0.01',
+  addresses = [wallet],
+  options: { chain?: LaunchChain; revision?: number } = {},
+) {
   await act(async () =>
     root.render(
       <WarmupReadiness
-        chain="Solana"
+        chain={options.chain ?? 'Solana'}
         addresses={addresses}
-        walletRevisions={addresses.map((address) => ({ address, revision: 1 }))}
+        walletRevisions={addresses.map((address) => ({
+          address,
+          revision: options.revision ?? 1,
+        }))}
         feeReserve={feeReserve}
       />,
     ),
@@ -164,4 +179,177 @@ it('surfaces a refused read without inventing a result', async () => {
     'No readiness check for this wallet selection.',
   );
   expect(host.textContent).not.toContain('ready,');
+});
+
+function clipboard(writeText: (text: string) => Promise<void>) {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+}
+async function showAddress() {
+  const details = host.querySelector('details')!;
+  expect(details).toBeTruthy();
+  await act(async () => {
+    details.open = true;
+  });
+  return details;
+}
+it('reveals and copies the exact selected public address with chain and fee-only guidance, without another read', async () => {
+  const fetcher = balances([{ address: wallet, nativeBalance: '0.001' }]);
+  const writeText = vi.fn(async (_address: string) => {});
+  clipboard(writeText);
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Check wallet readiness');
+  const details = await showAddress();
+  expect(details.querySelector('code')!.textContent).toBe(wallet);
+  expect(details.textContent).toContain('Solana · SOL native balance');
+  expect(details.textContent).toContain('Use native SOL for fees');
+  expect(host.textContent).toContain(
+    'This estimate covers fees and rent only.',
+  );
+  expect(host.textContent).toContain(
+    'It does not include token purchases or a complete trade or launch budget.',
+  );
+  await click('Copy public address');
+  expect(writeText).toHaveBeenCalledExactlyOnceWith(wallet);
+  expect(host.textContent).toContain('Public address copied.');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('keeps the full public address available as a manual fallback when clipboard access fails', async () => {
+  const fetcher = balances([{ address: wallet, nativeBalance: '0' }]);
+  clipboard(
+    vi.fn(async () => {
+      throw Error('Private clipboard detail');
+    }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Check wallet readiness');
+  await showAddress();
+  await click('Copy public address');
+  expect(host.textContent).toContain(
+    'Could not copy. Select and copy the full public address above.',
+  );
+  expect(host.querySelector('details code')!.textContent).toBe(wallet);
+  expect(host.textContent).not.toContain('Private clipboard detail');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('shows manual fallback without a clipboard API instead of inventing copy success', async () => {
+  Reflect.deleteProperty(navigator, 'clipboard');
+  vi.stubGlobal('fetch', balances([{ address: wallet, nativeBalance: '0' }]));
+  await mount();
+  await click('Check wallet readiness');
+  await showAddress();
+  await click('Copy public address');
+  expect(host.textContent).toContain('Could not copy.');
+  expect(host.textContent).not.toContain('Public address copied.');
+});
+it('offers no funding amount or verified-readiness claim for an unknown balance', async () => {
+  const fetcher = balances([{ address: wallet }]);
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Check wallet readiness');
+  const details = await showAddress();
+  expect(details.textContent).toContain(
+    'No funding amount is recommended while the balance is unknown.',
+  );
+  expect(details.textContent).not.toContain(
+    'If you choose to fund this wallet',
+  );
+  expect(host.textContent).toContain('Balance unknown · no conclusion');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+for (const context of ['selection', 'chain', 'revision'] as const)
+  it(`discards a pending clipboard result after the ${context} changes`, async () => {
+    const fetcher = balances([{ address: wallet, nativeBalance: '0' }]);
+    vi.stubGlobal('fetch', fetcher);
+    let finish!: () => void;
+    const writeText = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    clipboard(writeText);
+    await mount();
+    await click('Check wallet readiness');
+    await showAddress();
+    await click('Copy public address');
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(wallet);
+    expect(host.textContent).toContain('Copying address…');
+    await mount(
+      '0.01',
+      context === 'selection' ? [other] : [wallet],
+      context === 'chain'
+        ? { chain: 'Base' }
+        : context === 'revision'
+          ? { revision: 2 }
+          : {},
+    );
+    await act(async () => {
+      finish();
+    });
+    expect(host.textContent).not.toContain('Public address copied.');
+    expect(host.textContent).not.toContain('Copying address…');
+    expect(host.querySelector('details')).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+it('does not publish an old clipboard failure into a newly checked wallet revision', async () => {
+  const fetcher = balances([{ address: wallet, nativeBalance: '0' }]);
+  vi.stubGlobal('fetch', fetcher);
+  let reject!: (reason: Error) => void;
+  clipboard(
+    vi.fn(
+      () =>
+        new Promise<void>((_resolve, fail) => {
+          reject = fail;
+        }),
+    ),
+  );
+  await mount();
+  await click('Check wallet readiness');
+  await showAddress();
+  await click('Copy public address');
+  await mount('0.01', [wallet], { revision: 2 });
+  await click('Check wallet readiness');
+  await act(async () => {
+    reject(Error('Old failure'));
+  });
+  expect(host.textContent).not.toContain('Could not copy.');
+  expect(host.textContent).not.toContain('Old failure');
+  expect(host.textContent).not.toContain('Public address copied.');
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('labels Base funding in native ETH rather than SOL', async () => {
+  const address = '0x1111111111111111111111111111111111111111';
+  const fetcher = vi.fn(async () =>
+    Response.json({
+      chain: 'Base',
+      results: [
+        {
+          address,
+          observation: {
+            ...observation(address, '0'),
+            chain: 'Base',
+            currency: 'ETH',
+            blockHash: '0x' + '11'.repeat(32),
+            outgoingTransactions: '0',
+            sampleCount: null,
+            successfulSampleCount: null,
+          },
+        },
+      ],
+    }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount('0.01', [address], { chain: 'Base' });
+  await click('Check wallet readiness');
+  const details = await showAddress();
+  expect(details.textContent).toContain('Base · ETH native balance');
+  expect(details.textContent).toContain('Use native ETH for fees');
+  expect(details.textContent).not.toContain('SOL');
+  expect(details.querySelector('code')!.textContent).toBe(address);
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });

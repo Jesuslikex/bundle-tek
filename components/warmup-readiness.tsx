@@ -243,6 +243,11 @@ function ReadinessCheck({
               : ''}
             .
           </p>
+          <p className={styles.help}>
+            This estimate covers fees and rent only. It does not include token
+            purchases or a complete trade or launch budget. Balances can change;
+            check readiness again after any transfer.
+          </p>
           <ul className={own.wallets}>
             {readiness.wallets.map((wallet) => (
               <li key={wallet.address} data-status={wallet.status}>
@@ -254,12 +259,90 @@ function ReadinessCheck({
                       ? `Needs ${wallet.shortfall} ${readiness!.currency}`
                       : 'Balance unknown · no conclusion'}
                 </span>
+                <FundingAddress
+                  address={wallet.address}
+                  chain={chain}
+                  currency={readiness!.currency}
+                  needsFunding={wallet.status === 'needs-funding'}
+                  unknown={wallet.status === 'unknown'}
+                />
               </li>
             ))}
           </ul>
         </>
       )}
     </section>
+  );
+}
+
+function FundingAddress({
+  address,
+  chain,
+  currency,
+  needsFunding,
+  unknown,
+}: {
+  address: string;
+  chain: LaunchChain;
+  currency: string;
+  needsFunding: boolean;
+  unknown: boolean;
+}) {
+  const active = useRef(false);
+  const [copying, setCopying] = useState(false);
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  async function copy() {
+    if (copying) return;
+    setCopying(true);
+    setNotice('');
+    try {
+      await navigator.clipboard.writeText(address);
+      if (active.current) setNotice('Public address copied.');
+    } catch {
+      if (active.current)
+        setNotice(
+          'Could not copy. Select and copy the full public address above.',
+        );
+    } finally {
+      if (active.current) setCopying(false);
+    }
+  }
+  return (
+    <details className={own.fundingAddress}>
+      <summary>View full address</summary>
+      <p className={own.network}>
+        {chain} · {currency} native balance
+      </p>
+      <code className={own.fullAddress}>{address}</code>
+      <Button variant="outline" disabled={copying} onClick={() => void copy()}>
+        {copying ? 'Copying address…' : 'Copy public address'}
+      </Button>
+      {notice && (
+        <output className={own.copyNotice} aria-live="polite">
+          {notice}
+        </output>
+      )}
+      {needsFunding && (
+        <p>
+          If you choose to fund this wallet, review this full address and the{' '}
+          {chain} network in your sending wallet. Use native {currency} for
+          fees, then check readiness again. Copying this address does not
+          transfer funds.
+        </p>
+      )}
+      {unknown && (
+        <p>
+          No funding amount is recommended while the balance is unknown. Check
+          readiness again before deciding whether to transfer.
+        </p>
+      )}
+    </details>
   );
 }
 
