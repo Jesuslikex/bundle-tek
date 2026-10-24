@@ -1,0 +1,11 @@
+# Jito multiple lookup-table chaining proof
+
+24 October2026. Test-only completion of the composition gap identified in the prior Opus review. lib/jito-readonly-qualification.ts and all production checks are unchanged by this slice.
+
+The composition fixture now collects two genuinely distinct unsigned raw baseline capsules for two swap packets and two different ALT accounts, using each observation's own raw account/simulation response. Actual baseline, assets, lookup, coherent fee/frame and economic parsers run. Runtime collection remains the file's explicit fake-code double; this is not full runtime or live provider qualification.
+
+A controlled positive completes the independent final asset read at slot110 before releasing the first ALT at104. The second ALT must request104, neither global110 nor repeated phase-start101. OriginalF100 stays unchanged, final maximum110 and two economic outcomes pass. A second ALT at103 and a mutated second table both refuse atlookup-after with no final genesis or economic/runtime replay.
+
+Codex independently tested canaries in a fresh disposable tracked-source archive plus the exact test overlay and shared dependency junction. Unchanged code passes. Replacing only the ALT request floor with globalfloor() fails the expected checks-passed assertion; replacing it with afterFloor fails the expected[101,104] sequence with[101,101]. Both failures are the intended tested case, not compilation/setup failures. Production source hashes remain unchanged. Ignored receipts/logs:work/release-qa/jito-multi-alt-canary-20261024/. No provider calls or main-file mutation occurred in this canary.
+
+37 composition cases pass onNode24.19.0. The first actual Opus5.5 source review recognized the two-swap discrimination and requested stronger scheduling proof; the independent red canaries supply that proof. No reviewer ran the canaries or tests. Final combined verification is recorded in CODEX-SHARED-PLAN-INSPECTION-20261024.json. The private diagnostic remains unmounted and all financial authority flags false. Original32-slot limit, both serial scans, program policy, custody, minimum outputs, send/recovery and provider settings stay unchanged. Changed Jupiter/unlisted Tess and actual live timing qualification remain open. No deploy, hostedSQL, wallet unlock/sign/send or funded trade.

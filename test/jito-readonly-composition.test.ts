@@ -57,15 +57,13 @@ async function fixture(
     side?: 'Buy' | 'Sell';
     lookup?: boolean;
     token2022?: boolean;
+    wallets?: number;
   } = {},
   failure = 'none',
 ) {
   const f = await jitoRawResponseFixture(options),
     e = f.fixture,
-    original = e.observations[0],
-    s = original.simulation,
-    se = s.settlementEvidence!,
-    frame = e.result.value.transactionResults[0];
+    original = e.observations[0];
   const account = (value: unknown) => {
     if (value === null) return null;
     const a = value as {
@@ -83,54 +81,65 @@ async function fixture(
   };
   const response = (id: unknown, result: unknown) =>
     new Response(f.wire({ jsonrpc: '2.0', id, result }));
-  const baseline: typeof fetch = async (_url, init) => {
-    const r = fixtureBody(init);
-    let result: unknown;
-    if (r.method === 'getGenesisHash') result = SOLANA_MAINNET_GENESIS;
-    else if (r.method === 'getBlockHeight') result = 100;
-    else if (r.method === 'getFeeForMessage')
-      result = { context: { slot: 100n }, value: 5000n };
-    else if (r.method === 'getMinimumBalanceForRentExemption')
-      result = r.params[0] === 170 ? 2074080n : 2039280n;
-    else if (r.method === 'getMultipleAccounts')
-      result = {
-        context: { slot: BigInt(Math.max(100, r.params[1].minContextSlot)) },
-        value: r.params[0].map((key: string) => {
-          const mint = [
-            original.order.inputMint,
-            original.order.outputMint,
-          ].indexOf(key);
-          if (mint >= 0) return original.mintAccounts.before[mint];
-          const table = e.lookupAccounts.find((a) => a.address === key);
-          if (table) return table.account;
-          const at = se.keys.indexOf(key);
-          if (at < 0) throw Error('Unexpected baseline key');
-          return frame.preExecutionAccounts[at];
-        }),
-      };
-    else if (r.method === 'simulateTransaction')
-      result = {
-        context: { slot: 101n },
-        value: {
-          err: null,
-          unitsConsumed: s.unitsConsumed,
-          preBalances: se.before,
-          postBalances: se.after,
-          preTokenBalances: se.preTokens,
-          postTokenBalances: se.postTokens,
-          accounts: se.postAccounts,
-          loadedAddresses: frame.loadedAddresses,
-          replacementBlockhash: null,
-        },
-      };
-    else throw Error('Unexpected baseline method');
-    return response(r.id, result);
+  const baselineFor = (index: number): typeof fetch => {
+    const original = e.observations[index],
+      s = original.simulation,
+      se = s.settlementEvidence!,
+      frame = e.result.value.transactionResults[index];
+    return async (_url, init) => {
+      const r = fixtureBody(init);
+      let result: unknown;
+      if (r.method === 'getGenesisHash') result = SOLANA_MAINNET_GENESIS;
+      else if (r.method === 'getBlockHeight') result = 100;
+      else if (r.method === 'getFeeForMessage')
+        result = { context: { slot: 100n }, value: 5000n };
+      else if (r.method === 'getMinimumBalanceForRentExemption')
+        result = r.params[0] === 170 ? 2074080n : 2039280n;
+      else if (r.method === 'getMultipleAccounts')
+        result = {
+          context: { slot: BigInt(Math.max(100, r.params[1].minContextSlot)) },
+          value: r.params[0].map((key: string) => {
+            const mint = [
+              original.order.inputMint,
+              original.order.outputMint,
+            ].indexOf(key);
+            if (mint >= 0) return original.mintAccounts.before[mint];
+            const table = e.lookupAccounts.find((a) => a.address === key);
+            if (table) return table.account;
+            const at = se.keys.indexOf(key);
+            if (at < 0) throw Error('Unexpected baseline key');
+            return frame.preExecutionAccounts[at];
+          }),
+        };
+      else if (r.method === 'simulateTransaction')
+        result = {
+          context: { slot: 101n },
+          value: {
+            err: null,
+            unitsConsumed: s.unitsConsumed,
+            preBalances: se.before,
+            postBalances: se.after,
+            preTokenBalances: se.preTokens,
+            postTokenBalances: se.postTokens,
+            accounts: se.postAccounts,
+            loadedAddresses: frame.loadedAddresses,
+            replacementBlockhash: null,
+          },
+        };
+      else throw Error('Unexpected baseline method');
+      return response(r.id, result);
+    };
   };
-  const capsule = await captureJitoSwapSimulation(
-    original.order,
-    new AbortController().signal,
-    baseline,
-  );
+  const capsules = [];
+  for (let i = 0; i < e.observations.length; i++)
+    capsules.push(
+      await captureJitoSwapSimulation(
+        e.observations[i].order,
+        new AbortController().signal,
+        baselineFor(i),
+      ),
+    );
+  const capsule = capsules[0];
   const methods: string[] = [];
   let observed = false;
   const fetcher: typeof fetch = async (_url, init) => {
@@ -210,7 +219,7 @@ async function fixture(
     runtimeAttested: false,
     fixtureOnly: true,
   });
-  return { f, e, capsule, fetcher, methods };
+  return { f, e, capsule, capsules, fetcher, methods };
 }
 for (const side of ['Buy', 'Sell'] as const)
   for (const lookup of [false, true])
@@ -854,3 +863,118 @@ it('retains completed postflight assets when the final scan later refuses', asyn
   expect(doubles.check).not.toHaveBeenCalled();
   expect(x.methods.filter((m) => m === 'getGenesisHash')).toHaveLength(1);
 });
+
+/** Uses two real raw captures and real ALT/asset/economic parsers, with the
+ * file's explicit fake-code runtime double. This is not live qualification. */
+async function multiLookupFixture(
+  failure: 'none' | 'stale-second' | 'changed-second' = 'none',
+) {
+  const x = await fixture({ lookup: true, wallets: 2 });
+  const assetDone = deferred();
+  doubles.assetRead.mockImplementation((read: { slot: number }) => {
+    if (read.slot === 110) assetDone.resolve();
+  });
+  const postfloors: number[] = [];
+  let simulated = false;
+  const fetcher: typeof fetch = async (url, init) => {
+    const request = fixtureBody(init);
+    const response = await x.fetcher(url, init);
+    if (Array.isArray(request)) simulated = true;
+    if (request.id === 'jito-assets:after')
+      return new Response(
+        (await response.text()).replace('"slot":102', '"slot":110'),
+      );
+    if (
+      simulated &&
+      request.method === 'getMultipleAccounts' &&
+      x.e.lookupAccounts.some((table) =>
+        request.params[0].includes(table.address),
+      )
+    ) {
+      postfloors.push(request.params[1].minContextSlot);
+      if (postfloors.length === 1) {
+        // Finish the unrelated slot110 asset branch before allowing ALT104.
+        // A global-floor regression would therefore send the second ALT at110.
+        await assetDone.promise;
+        await new Promise<void>((done) => setImmediate(done));
+      }
+      let body = (await response.text()).replace(
+        /"slot":\d+/,
+        '"slot":' +
+          (postfloors.length === 1
+            ? 104
+            : failure === 'stale-second'
+              ? 103
+              : 105),
+      );
+      if (postfloors.length === 2 && failure === 'changed-second') {
+        const original = x.e.lookupAccounts[1].account.data[0];
+        const bytes = Buffer.from(original, 'base64');
+        bytes[56] ^= 1;
+        body = body.replace(original, bytes.toString('base64'));
+      }
+      return new Response(body);
+    }
+    return response;
+  };
+  return { ...x, fetcher, postfloors };
+}
+it('chains two postflight ALT reads from their own observations rather than a later asset sibling', async () => {
+  const x = await multiLookupFixture();
+  expect(x.capsules).toHaveLength(2);
+  expect(x.capsules[0]).not.toBe(x.capsules[1]);
+  expect(x.e.manifest.swaps[0].sha256).not.toBe(x.e.manifest.swaps[1].sha256);
+  expect(x.e.lookupAccounts).toHaveLength(2);
+  expect(x.e.lookupAccounts[0].address).not.toBe(x.e.lookupAccounts[1].address);
+  const result = await collectJitoReadOnlyQualification(
+    x.e.manifest,
+    x.capsules,
+    new AbortController().signal,
+    { fetcher: x.fetcher, pace: async () => {} },
+  );
+  expect(result).toMatchObject({
+    status: 'checks-passed',
+    minimumSlot: 100,
+    maximumSlot: 110,
+    fullProviderQualification: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(x.postfloors).toEqual([101, 104]);
+  expect(result.evidence.assetsAfter).toMatchObject({ slot: 110 });
+  if (result.status === 'checks-passed') {
+    expect(result.economic.frameEconomicChecksPassed).toBe(true);
+    expect(result.economic.outcomes).toHaveLength(2);
+    expect(result.runtimeProof).toHaveProperty('fixtureOnly', true);
+  }
+  expect(doubles.check).toHaveBeenCalledOnce();
+  expect(
+    x.methods.filter((method) => method === 'getGenesisHash'),
+  ).toHaveLength(2);
+});
+for (const failure of ['stale-second', 'changed-second'] as const)
+  it(`refuses a ${failure} ALT observation in a two-swap composition without final replay`, async () => {
+    const x = await multiLookupFixture(failure);
+    const result = await collectJitoReadOnlyQualification(
+      x.e.manifest,
+      x.capsules,
+      new AbortController().signal,
+      { fetcher: x.fetcher, pace: async () => {} },
+    );
+    expect(result).toMatchObject({
+      status: 'refused',
+      stage: 'lookup-after',
+      minimumSlot: 100,
+      maximumSlot: 110,
+      fullProviderQualification: false,
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+    expect(x.postfloors).toEqual([101, 104]);
+    expect(result.evidence.assetsAfter).toMatchObject({ slot: 110 });
+    expect(result.evidence.attempt).toMatchObject({ status: 'captured' });
+    expect(doubles.check).not.toHaveBeenCalled();
+    expect(
+      x.methods.filter((method) => method === 'getGenesisHash'),
+    ).toHaveLength(1);
+  });
