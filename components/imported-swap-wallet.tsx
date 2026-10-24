@@ -2,6 +2,7 @@
 import { subscribeImportedWalletReview } from '@/lib/imported-wallet-review-events';
 import { ImportedTradeSessions } from './imported-trade-sessions';
 import { AutoSell } from './auto-sell-modal';
+import { MarketCleanupPanel } from './market-cleanup-panel';
 import { ImportedPairTradeWalletReview } from './imported-pair-trade-wallet-review';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -413,6 +414,14 @@ export function ImportedSwapWallet({
       {!loading && project.document.token.chain === 'Solana' && (
         <AutoSell
           key={`auto-sell:${project.id}:${project.revision}`}
+          project={project}
+          wallets={wallets}
+          locked={locked || saving}
+        />
+      )}
+      {!loading && project.document.token.chain === 'Solana' && (
+        <MarketCleanupPanel
+          key={`market-cleanup:${project.id}:${project.revision}`}
           project={project}
           wallets={wallets}
           locked={locked || saving}
