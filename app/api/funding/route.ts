@@ -1,6 +1,7 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { validateFunding } from '@/lib/funding-plan';
+import { readFundingSaveStopRecovery } from '@/lib/funding-save-stop-storage';
 import {
   fundingOwnerScope,
   FUNDING_OWNER_SCOPE_HEADER,
@@ -32,23 +33,47 @@ export async function GET(request: Request) {
       },
       403,
     );
-  const id = request ? new URL(request.url).searchParams.get('id') : null;
+  const params = request ? new URL(request.url).searchParams : null;
+  const id = params?.get('id') ?? null;
+  const expected = params?.get('expectedRevision') ?? null;
+  if (
+    (params?.getAll('id').length ?? 0) > 1 ||
+    (params?.getAll('expectedRevision').length ?? 0) > 1
+  )
+    return reply(
+      { error: 'Choose one original funding draft and revision.' },
+      400,
+    );
+  if (
+    expected !== null &&
+    (id === null ||
+      !/^(0|[1-9][0-9]{0,9})$/.test(expected) ||
+      Number(expected) > 1_000_000_000)
+  )
+    return reply({ error: 'Choose the exact original funding revision.' }, 400);
   if (id !== null && !/^[a-zA-Z0-9-]{1,64}$/.test(id))
     return reply({ error: 'Choose a valid saved funding draft.' }, 400);
   try {
     if (id !== null) {
-      const row = await getD1()
-        .prepare(
-          'SELECT id, document, revision, archived, updated_at AS updatedAt FROM funding_plans WHERE owner_id=? AND id=?',
-        )
-        .bind(user.userId, id)
-        .first<{
-          id: string;
-          document: string;
-          revision: number;
-          archived: number;
-          updatedAt: string;
-        }>();
+      // One database observation prevents a stop's no-op revision advance from
+      // being misclassified as the original save. Legacy clients fail closed.
+      const { plan: row, stop } = await readFundingSaveStopRecovery(
+        getD1(),
+        user.userId,
+        id,
+        expected === null ? null : Number(expected),
+        AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]),
+      );
+      if (stop)
+        return reply(
+          {
+            error:
+              'The original expected revision is fenced. No transfer was cancelled.',
+            code: 'FUNDING_SAVE_STOPPED',
+            receipt: stop,
+          },
+          409,
+        );
       if (!row) return reply({ error: 'Saved funding draft not found.' }, 404);
       return reply({
         plan: {
@@ -114,6 +139,7 @@ export async function POST(request: Request) {
   )
     return reply({ error: 'Cross-origin write rejected.' }, 403);
   let writing = false;
+  let target: { id: string; expectedRevision: number } | null = null;
   try {
     const text = await request.text();
     if (text.length > 30000)
@@ -133,6 +159,7 @@ export async function POST(request: Request) {
     )
       throw new Error('Invalid funding action.');
     const doc = b.action === 'save' ? validateFunding(b.document) : null;
+    target = { id: b.id, expectedRevision: b.expectedRevision };
     const db = getD1(),
       mutation = crypto.randomUUID(),
       now = new Date().toISOString();
@@ -201,6 +228,31 @@ export async function POST(request: Request) {
       );
     return reply({ id: b.id, revision: b.expectedRevision + 1 });
   } catch (error) {
+    if (writing && target) {
+      try {
+        const { stop } = await readFundingSaveStopRecovery(
+          getD1(),
+          user.userId,
+          target.id,
+          target.expectedRevision,
+          AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]),
+        );
+        // An already-advanced row could be this batch's committed write whose
+        // reply was lost. Only an actual pre-commit fence proves rejection.
+        if (stop && stop.outcome !== 'already_advanced')
+          return reply(
+            {
+              error:
+                'The original expected revision is fenced. No transfer was cancelled.',
+              code: 'FUNDING_SAVE_STOPPED',
+              receipt: stop,
+            },
+            409,
+          );
+      } catch {
+        // An unavailable proof cannot turn an unknown write into a rejection.
+      }
+    }
     return writing
       ? reply({ error: 'Funding storage temporarily unavailable.' }, 503)
       : reply(

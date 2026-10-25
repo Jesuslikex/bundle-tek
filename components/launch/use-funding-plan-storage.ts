@@ -22,9 +22,15 @@ import {
   readFundingSaveReminder,
   fundingReminderOutcome,
 } from '@/lib/funding-save-reminder';
+import {
+  readFundingSaveStopRequest,
+  readFundingSaveStopReceipt,
+} from '@/lib/funding-save-stop';
 
 type Reminder = Awaited<ReturnType<typeof createFundingSaveReminder>>;
-type Phase = 'load' | 'save' | 'recover';
+type StopRequest = ReturnType<typeof readFundingSaveStopRequest>;
+type StopReceipt = Awaited<ReturnType<typeof readFundingSaveStopReceipt>>;
+type Phase = 'load' | 'save' | 'recover' | 'stop' | 'recover-stop';
 type RequestState = {
   controller: AbortController;
   timer: ReturnType<typeof setTimeout>;
@@ -34,6 +40,9 @@ export const FUNDING_REQUEST_TIMEOUT_MS = 30_000;
 const scopeHeader = 'x-bundle-funding-owner-scope';
 const scopePattern = /^[a-f0-9]{64}$/;
 const storageKey = (scope: string) => `bundle-funding-save:${scope}`;
+const stopStorageKey = (scope: string) => `bundle-funding-save-stop:${scope}`;
+const unknownStop =
+  'The draft-save stop needs checking. Its original ID is retained. No transfer was cancelled; do not repeat the original save.';
 const unknownSave =
   'Save outcome unknown. The server may have saved it. Check the original draft before continuing; no funds were moved.';
 const storageFailure =
@@ -62,6 +71,17 @@ function readStored(scope: string) {
   const reminder = readFundingSaveReminder(JSON.parse(text));
   if (reminder.ownerScope !== scope) throw Error(storageFailure);
   return { reminder, text };
+}
+function readStoredStop(scope: string) {
+  const text = localStorage.getItem(stopStorageKey(scope));
+  if (text === null) return null;
+  if (text.length > 2048) throw Error(storageFailure);
+  const request = readFundingSaveStopRequest(JSON.parse(text));
+  if (request.reminder.ownerScope !== scope) throw Error(storageFailure);
+  return { request, text };
+}
+function sameReminder(a: Reminder, b: Reminder) {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** Release local locks when waiting stops, even if a transport ignores abort.
@@ -92,10 +112,15 @@ function untilAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 export function useFundingPlanStorage(
   onCommitted: (attempt: FundingMutation, revision: number) => void,
   onScopeChanged?: () => void,
+  onFenced?: (id: string, expectedRevision: number) => void,
 ) {
   const [plans, setPlans] = useState<SavedFunding[]>([]);
   const [phase, setPhase] = useState<Phase | null>('load');
   const [pending, setPending] = useState<Reminder | null>(null);
+  const [pendingStop, setPendingStop] = useState<StopRequest | null>(null);
+  const stopRecord = useRef<{ request: StopRequest; text: string } | null>(
+    null,
+  );
   const [ownerScope, setOwnerScope] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(''),
@@ -114,11 +139,20 @@ export function useFundingPlanStorage(
     setHasOriginalPayload(value !== null);
   }, []);
   const committed = useRef(onCommitted),
-    changed = useRef(onScopeChanged);
+    changed = useRef(onScopeChanged),
+    fenced = useRef(onFenced);
   useEffect(() => {
     committed.current = onCommitted;
     changed.current = onScopeChanged;
-  }, [onCommitted, onScopeChanged]);
+    fenced.current = onFenced;
+  }, [onCommitted, onScopeChanged, onFenced]);
+  const retainStop = useCallback(
+    (value: { request: StopRequest; text: string } | null) => {
+      stopRecord.current = value;
+      setPendingStop(value?.request ?? null);
+    },
+    [],
+  );
   const setReadyState = useCallback((value: boolean) => {
     writeReady.current = value;
     setReady(value);
@@ -140,13 +174,15 @@ export function useFundingPlanStorage(
     request.controller.abort();
     setPhase(null);
     setError(
-      reminder.current
-        ? request.phase === 'save'
-          ? unknownSave
-          : 'Checking stopped. The original save still needs checking; no new save was sent.'
-        : timedOut
-          ? 'The funding request timed out before a save could be confirmed. Reload saved plans or check the original draft.'
-          : 'Request cancelled. Your editable draft is preserved.',
+      stopRecord.current
+        ? unknownStop
+        : reminder.current
+          ? request.phase === 'save'
+            ? unknownSave
+            : 'Checking stopped. The original save still needs checking; no new save was sent.'
+          : timedOut
+            ? 'The funding request timed out before a save could be confirmed. Reload saved plans or check the original draft.'
+            : 'Request cancelled. Your editable draft is preserved.',
     );
   }, []);
   const begin = useCallback(
@@ -218,11 +254,26 @@ export function useFundingPlanStorage(
         }
         retainPayload(null);
         retain(null, null);
+        retainStop(null);
       }
       scope.current = nextScope;
       setOwnerScope(nextScope);
       try {
         const stored = readStored(nextScope);
+        const storedStop = readStoredStop(nextScope);
+        if (storedStop) {
+          if (
+            stored &&
+            !sameReminder(stored.reminder, storedStop.request.reminder)
+          )
+            throw Error(storageFailure);
+          retainPayload(null);
+          retainStop(storedStop);
+          retain(
+            storedStop.request.reminder,
+            stored?.text ?? JSON.stringify(storedStop.request.reminder),
+          );
+        }
         if (stored && reminder.current === null) {
           retainPayload(null);
           retain(stored.reminder, stored.text);
@@ -233,7 +284,8 @@ export function useFundingPlanStorage(
           setReadyState(false);
           setError(locksFailure);
         } else setReadyState(true);
-        if (reminder.current)
+        if (stopRecord.current) setNotice(unknownStop);
+        else if (reminder.current)
           setNotice(
             'An original funding save needs checking. No new funding change was sent.',
           );
@@ -275,6 +327,7 @@ export function useFundingPlanStorage(
 
   /** Must run while holding this owner's exclusive browser lock. */
   function clearExact(captured: Reminder, text: string) {
+    if (readStoredStop(captured.ownerScope)) return false;
     const key = storageKey(captured.ownerScope);
     const value = localStorage.getItem(key);
     if (value !== null && value !== text) return false;
@@ -288,7 +341,214 @@ export function useFundingPlanStorage(
     setError(scopeFailure);
     return true;
   }
+  /** A strict receipt fences a revision, not transfers or the save's historical outcome.
+   * The caller must hold the same owner lock used by every save and stop. */
+  function clearFenced(
+    receipt: StopReceipt,
+    original: Reminder,
+    originalText: string,
+    request: RequestState,
+  ) {
+    if (
+      !current(request) ||
+      scope.current !== original.ownerScope ||
+      receipt.reminder.ownerScope !== original.ownerScope ||
+      receipt.reminder.id !== original.id ||
+      receipt.reminder.expectedRevision !== original.expectedRevision ||
+      !reminder.current ||
+      !sameReminder(reminder.current, original)
+    )
+      throw Error(unknownStop);
+    const storedStop = readStoredStop(original.ownerScope);
+    const capturedStop = stopRecord.current;
+    if (
+      (storedStop &&
+        (!sameReminder(storedStop.request.reminder, original) ||
+          (capturedStop && storedStop.text !== capturedStop.text))) ||
+      (capturedStop && !sameReminder(capturedStop.request.reminder, original))
+    )
+      throw Error(storageFailure);
+    const key = storageKey(original.ownerScope);
+    const savedText = localStorage.getItem(key);
+    if (savedText !== null && savedText !== originalText)
+      throw Error(storageFailure);
+    // Remove original first: the remaining stop marker carries its coordinates
+    // if storage removal fails or this page disappears between the two removals.
+    if (savedText !== null) localStorage.removeItem(key);
+    if (localStorage.getItem(key) !== null) throw Error(storageFailure);
+    const stopText = storedStop?.text ?? capturedStop?.text ?? null;
+    const stopKey = stopStorageKey(original.ownerScope);
+    if (
+      localStorage.getItem(stopKey) !== stopText &&
+      localStorage.getItem(stopKey) !== null
+    )
+      throw Error(storageFailure);
+    if (localStorage.getItem(stopKey) !== null)
+      localStorage.removeItem(stopKey);
+    if (localStorage.getItem(stopKey) !== null) throw Error(storageFailure);
+    retainStop(null);
+    retain(null, null);
+    setPlans((previous) => previous.filter((row) => row.id !== original.id));
+    fenced.current?.(original.id, original.expectedRevision);
+    setNotice(
+      'The original expected draft revision can no longer write. This does not establish whether the original save succeeded. No transfers were cancelled. Your editor was preserved. ' +
+        (receipt.outcome === 'creation_fenced'
+          ? 'No original saved draft existed when the stop committed. You can start a new draft.'
+          : 'Reload saved plans and explicitly open the current plan. Check earlier submitted transfers in funding history.'),
+    );
+  }
+  const stopOriginal = async (
+    mode: 'start' | 'retry' | 'recover',
+    approved = false,
+  ) => {
+    const original = reminder.current;
+    const originalText = recordText.current;
+    const capturedScope = scope.current;
+    if (
+      !original ||
+      originalText === null ||
+      capturedScope !== original.ownerScope
+    )
+      return;
+    if (!writeReady.current || (mode === 'start' && !approved)) {
+      setError(
+        'Verify this account and separately approve stopping this draft save.',
+      );
+      return;
+    }
+    const locks = lockManager();
+    if (!locks) {
+      setError(locksFailure);
+      return;
+    }
+    const request = begin(mode === 'recover' ? 'recover-stop' : 'stop');
+    if (!request) return;
+    let dispatched = false;
+    try {
+      await locks.request(
+        storageKey(capturedScope),
+        { ifAvailable: true },
+        async (lock) => {
+          if (!lock || !current(request) || scope.current !== capturedScope) {
+            if (current(request))
+              setError(
+                'Another tab is using funding recovery. No stop request was sent.',
+              );
+            return;
+          }
+          const stored = readStored(capturedScope);
+          const savedStop = readStoredStop(capturedScope);
+          if (
+            (stored && stored.text !== originalText) ||
+            (savedStop &&
+              !sameReminder(savedStop.request.reminder, original)) ||
+            (stopRecord.current &&
+              savedStop &&
+              stopRecord.current.text !== savedStop.text)
+          )
+            throw Error(storageFailure);
+          if (mode === 'start' && (savedStop || stopRecord.current)) {
+            if (savedStop) retainStop(savedStop);
+            throw Error(
+              'A stop request already exists. Check its original result or retry that same stop request.',
+            );
+          }
+          let stop = savedStop ?? stopRecord.current;
+          if (mode === 'start') {
+            if (!stored || !sameReminder(stored.reminder, original))
+              throw Error(storageFailure);
+            const value = readFundingSaveStopRequest({
+              format: 'funding-save-stop-request-v1',
+              stopId: crypto.randomUUID(),
+              reminder: original,
+              consent: 'stop-draft-save-v1',
+            });
+            stop = { request: value, text: JSON.stringify(value) };
+          }
+          if (!stop || !sameReminder(stop.request.reminder, original))
+            throw Error(unknownStop);
+          // A retained in-memory retry is never allowed to overwrite another tab.
+          if (!savedStop) {
+            localStorage.setItem(stopStorageKey(capturedScope), stop.text);
+            if (
+              localStorage.getItem(stopStorageKey(capturedScope)) !== stop.text
+            )
+              throw Error(storageFailure);
+          }
+          retainStop(stop);
+          retainPayload(null);
+          if (!current(request) || scope.current !== capturedScope) return;
+          dispatched = mode !== 'recover';
+          const response = await untilAbort(
+            fetch(
+              '/api/funding/save-stops' +
+                (mode === 'recover'
+                  ? '?stopId=' + encodeURIComponent(stop.request.stopId)
+                  : ''),
+              {
+                method: mode === 'recover' ? 'GET' : 'POST',
+                cache: 'no-store',
+                signal: request.controller.signal,
+                headers: {
+                  [scopeHeader]: capturedScope,
+                  ...(mode === 'recover'
+                    ? {}
+                    : { 'content-type': 'application/json' }),
+                },
+                ...(mode === 'recover' ? {} : { body: stop.text }),
+              },
+            ),
+            request.controller.signal,
+          );
+          if (
+            !current(request) ||
+            refuseChangedResponse(response, capturedScope)
+          )
+            return;
+          if (response.status !== 200) {
+            void response.body?.cancel().catch(() => {});
+            throw Error(
+              response.status === 404
+                ? 'The original stop receipt is not visible yet. Both recovery references are kept. Check it again or retry the same stop request.'
+                : unknownStop,
+            );
+          }
+          const body = await untilAbort(
+            readBoundedPanelJson(response, request.controller.signal),
+            request.controller.signal,
+          );
+          if (
+            !body ||
+            typeof body !== 'object' ||
+            Array.isArray(body) ||
+            Object.keys(body).join(',') !== 'receipt'
+          )
+            throw Error(unknownStop);
+          const receipt = await untilAbort(
+            readFundingSaveStopReceipt(
+              (body as { receipt: unknown }).receipt,
+              stop.request,
+            ),
+            request.controller.signal,
+          );
+          if (!current(request)) return;
+          clearFenced(receipt, original, originalText, request);
+        },
+      );
+    } catch {
+      if (current(request))
+        setError(
+          dispatched || stopRecord.current ? unknownStop : storageFailure,
+        );
+    } finally {
+      finish(request);
+    }
+  };
   const save = async (attempt: FundingMutation) => {
+    if (stopRecord.current) {
+      setError(unknownStop);
+      return;
+    }
     if (!writeReady.current || scope.current === null) {
       setError(
         'Load current saved plans and verify recovery storage before saving.',
@@ -335,6 +595,23 @@ export function useFundingPlanStorage(
           const original = capturedReminder!;
           const text = serialized!;
           try {
+            const stopping = readStoredStop(capturedScope);
+            if (stopping) {
+              retainStop(stopping);
+              retainPayload(null);
+              const prior = readStored(capturedScope);
+              if (
+                prior &&
+                !sameReminder(prior.reminder, stopping.request.reminder)
+              )
+                throw Error(storageFailure);
+              retain(
+                stopping.request.reminder,
+                prior?.text ?? JSON.stringify(stopping.request.reminder),
+              );
+              setError(unknownStop);
+              return;
+            }
             const stored = readStored(capturedScope);
             if (
               stored &&
@@ -512,16 +789,35 @@ export function useFundingPlanStorage(
       original.ownerScope !== capturedScope
     )
       return;
+    try {
+      const stopping = readStoredStop(capturedScope);
+      if (stopping) {
+        if (!sameReminder(stopping.request.reminder, original))
+          throw Error(storageFailure);
+        retainStop(stopping);
+        retainPayload(null);
+      }
+    } catch {
+      setReadyState(false);
+      setError(storageFailure);
+      return;
+    }
     const request = begin('recover');
     if (!request) return;
     const originalPayload = retained.current;
     try {
       const response = await untilAbort(
-        fetch('/api/funding?id=' + encodeURIComponent(original.id), {
-          cache: 'no-store',
-          signal: request.controller.signal,
-          headers: { [scopeHeader]: capturedScope },
-        }),
+        fetch(
+          '/api/funding?id=' +
+            encodeURIComponent(original.id) +
+            '&expectedRevision=' +
+            original.expectedRevision,
+          {
+            cache: 'no-store',
+            signal: request.controller.signal,
+            headers: { [scopeHeader]: capturedScope },
+          },
+        ),
         request.controller.signal,
       );
       if (!current(request)) return;
@@ -532,6 +828,51 @@ export function useFundingPlanStorage(
           'The original draft is not visible yet. Its save may still finish. Check again; do not create a different replacement save.',
         );
       if (refuseChangedResponse(response, capturedScope)) return;
+      if (response.status === 409) {
+        const body = await untilAbort(
+          readBoundedPanelJson(response, request.controller.signal),
+          request.controller.signal,
+        );
+        if (
+          !body ||
+          typeof body !== 'object' ||
+          Array.isArray(body) ||
+          Object.keys(body).sort().join(',') !== 'code,error,receipt' ||
+          (body as Record<string, unknown>).code !== 'FUNDING_SAVE_STOPPED' ||
+          typeof (body as Record<string, unknown>).error !== 'string'
+        )
+          throw Error(unknownStop);
+        const receipt = await untilAbort(
+          readFundingSaveStopReceipt((body as { receipt: unknown }).receipt),
+          request.controller.signal,
+        );
+        const locks = lockManager();
+        if (!locks) throw Error(locksFailure);
+        let cleared = false;
+        await locks.request(
+          storageKey(capturedScope),
+          { ifAvailable: true },
+          (lock) => {
+            if (!lock || !current(request)) return;
+            clearFenced(receipt, original, originalText, request);
+            cleared = true;
+          },
+        );
+        if (!cleared)
+          throw Error(
+            'Another tab is using recovery. The original reference was kept.',
+          );
+        return;
+      }
+      // A competing stop ID may have won the unique revision fence while our
+      // own stop ID remains absent. Only a strict fence receipt can resolve that
+      // combined operation; an ordinary saved document cannot clear it.
+      if (stopRecord.current || readStoredStop(capturedScope))
+        throw Error(unknownStop);
+      if (response.ok && response.status !== 200) {
+        void response.body?.cancel().catch(() => {});
+        throw Error('The response did not confirm a saved funding result.');
+      }
       const body = await untilAbort(
         fundingResponse(response),
         request.controller.signal,
@@ -602,6 +943,7 @@ export function useFundingPlanStorage(
     plans,
     phase,
     pending,
+    pendingStop,
     error,
     notice,
     setError,
@@ -611,9 +953,13 @@ export function useFundingPlanStorage(
     recover,
     ownerScope,
     ready,
-    writeBlocked: !ready || pending !== null,
+    writeBlocked: !ready || pending !== null || pendingStop !== null,
     hasOriginalPayload,
-    canRetry: pending !== null && hasOriginalPayload && ready,
+    canRetry:
+      pending !== null && pendingStop === null && hasOriginalPayload && ready,
+    stopOriginalSave: (approved: boolean) => stopOriginal('start', approved),
+    recoverStop: () => stopOriginal('recover'),
+    retryStop: () => stopOriginal('retry'),
     retry: () =>
       retained.current ? save(retained.current) : Promise.resolve(),
     cancel: () => cancel(false),

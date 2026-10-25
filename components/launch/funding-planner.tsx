@@ -71,6 +71,11 @@ export function FundingPlanner({
   const [handoffBusy, setHandoffBusy] = useState(false);
   const [draftId, setDraftId] = useState(() => crypto.randomUUID());
   const [historyId, setHistoryId] = useState<string | null>(null);
+  const [stoppedHistory, setStoppedHistory] = useState<{
+    id: string;
+    revision: number;
+  } | null>(null);
+  const [stopConsent, setStopConsent] = useState({ key: '', approved: false });
   const onCommitted = (attempt: FundingMutation, revision: number) => {
     if (attempt.action === 'save') {
       setSelected({ id: attempt.id, revision });
@@ -78,27 +83,49 @@ export function FundingPlanner({
     } else
       setSelected((current) => (current?.id === attempt.id ? null : current));
   };
-  const storage = useFundingPlanStorage(onCommitted, () => {
-    setSelected(null);
-    setHistoryId(null);
-    setDraftId(crypto.randomUUID());
-    setLines('');
-    setDraft({
-      name: `${plan.tokenName} funding`,
-      chain: plan.chain,
-      currency: CURRENCIES_BY_CHAIN[plan.chain][0],
-      source: 'Manual',
-      sourceLabel: '',
-      funderAddress: '',
-      startAt: new Date(Date.now() + 300000).toISOString(),
-      delaySeconds: 10,
-    });
-  });
+  const storage = useFundingPlanStorage(
+    onCommitted,
+    () => {
+      setSelected(null);
+      setHistoryId(null);
+      setStoppedHistory(null);
+      setStopConsent({ key: '', approved: false });
+      setDraftId(crypto.randomUUID());
+      setLines('');
+      setDraft({
+        name: `${plan.tokenName} funding`,
+        chain: plan.chain,
+        currency: CURRENCIES_BY_CHAIN[plan.chain][0],
+        source: 'Manual',
+        sourceLabel: '',
+        funderAddress: '',
+        startAt: new Date(Date.now() + 300000).toISOString(),
+        delaySeconds: 10,
+      });
+    },
+    (id, expectedRevision) => {
+      setSelected((current) => (current?.id === id ? null : current));
+      setHistoryId((current) => (current === id ? null : current));
+      if (expectedRevision > 0)
+        setStoppedHistory({ id, revision: expectedRevision });
+      setStopConsent({ key: '', approved: false });
+      setDraftId(crypto.randomUUID());
+    },
+  );
+  const stopConsentKey = JSON.stringify([
+    storage.ownerScope,
+    storage.pending,
+    storage.pendingStop,
+  ]);
+  const stopApproved =
+    stopConsent.key === stopConsentKey && stopConsent.approved;
   const { plans: saved, error, notice, setError, setNotice } = storage;
   const loading = storage.phase === 'load';
   const busy =
     storage.phase === 'save' ||
     storage.phase === 'recover' ||
+    storage.phase === 'stop' ||
+    storage.phase === 'recover-stop' ||
     Boolean(storage.pending);
   const [executionRevision, setExecutionRevision] = useState(0);
   const refreshExecution = useCallback(
@@ -523,14 +550,20 @@ export function FundingPlanner({
               ? 'Loading saved funding plans…'
               : storage.phase === 'save'
                 ? 'Saving this funding draft…'
-                : 'Checking the original save…'}
+                : storage.phase === 'stop'
+                  ? 'Stopping the original draft-save attempt…'
+                  : storage.phase === 'recover-stop'
+                    ? 'Checking the original draft-save stop…'
+                    : 'Checking the original save…'}
           </span>
           <Button variant="outline" onClick={storage.cancel}>
             {storage.phase === 'save'
               ? 'Stop waiting for save'
               : storage.phase === 'recover'
                 ? 'Stop checking original save'
-                : 'Cancel loading'}
+                : storage.phase === 'stop' || storage.phase === 'recover-stop'
+                  ? 'Stop waiting for draft-save stop'
+                  : 'Cancel loading'}
           </Button>
         </output>
       )}
@@ -573,6 +606,84 @@ export function FundingPlanner({
             Retry also requires a verified account and recovery storage. Reload
             saved plans checks the current account without repeating a save.
           </p>
+          {storage.pendingStop ? (
+            <div className={recoveryStyles.stop}>
+              <p>
+                The original stop request is retained for this account. Its
+                outcome is not confirmed. Checking reads its receipt; retrying
+                sends only that same draft-save stop. Neither action cancels
+                transfers.
+              </p>
+              <p>
+                Stop reference: <code>{storage.pendingStop.stopId}</code>
+              </p>
+              <div className="funding-actions">
+                <Button
+                  disabled={
+                    Boolean(storage.phase) || handoffBusy || !storage.ready
+                  }
+                  onClick={() => void storage.recoverStop()}
+                >
+                  Check stop result
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={
+                    Boolean(storage.phase) || handoffBusy || !storage.ready
+                  }
+                  onClick={() => void storage.retryStop()}
+                >
+                  Retry same stop request
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className={recoveryStyles.stop}>
+              <p>
+                If the original payload is unavailable or its save remains
+                unknown, you can stop that draft-save attempt. The server blocks
+                its original revision, including delayed requests. It may
+                advance the saved revision, making earlier unsent funding
+                reviews stale. Existing transfers, signatures, receipts and
+                financial reservations are not cancelled, released or refunded.
+              </p>
+              <label className={recoveryStyles.consent}>
+                <input
+                  type="checkbox"
+                  checked={stopApproved}
+                  disabled={
+                    Boolean(storage.phase) || handoffBusy || !storage.ready
+                  }
+                  onChange={(event) =>
+                    setStopConsent({
+                      key: stopConsentKey,
+                      approved: event.target.checked,
+                    })
+                  }
+                />
+                <span>
+                  Stop this original draft-save attempt. This does not cancel
+                  transfers. If the saved revision advances, earlier funding
+                  reviews may become stale.
+                </span>
+              </label>
+              <Button
+                variant="outline"
+                disabled={
+                  Boolean(storage.phase) ||
+                  handoffBusy ||
+                  !storage.ready ||
+                  !stopApproved
+                }
+                onClick={() => {
+                  setStopConsent({ key: '', approved: false });
+                  void storage.stopOriginalSave(stopApproved);
+                }}
+              >
+                Stop original draft save
+              </Button>
+            </div>
+          )}
         </section>
       )}
       {error && (
@@ -729,6 +840,32 @@ export function FundingPlanner({
           revision={historyDraft.revision}
           name={historyDraft.document.name}
         />
+      )}
+      {stoppedHistory && (
+        <section
+          aria-label="Earlier funding revision history"
+          className="source-note"
+        >
+          <h3>Earlier submitted transfers still need checking</h3>
+          <p>
+            Stopping the draft save did not cancel transfers or release
+            financial reservations. Inspect saved history for the earlier
+            revision independently of the current draft.
+          </p>
+          <MainnetFundingHistoryPanel
+            key={`stopped-mainnet:${stoppedHistory.id}:${stoppedHistory.revision}`}
+            id={stoppedHistory.id}
+            revision={stoppedHistory.revision}
+            name="Earlier funding revision"
+          />
+          <FundingExecutionHistoryPanel
+            key={`stopped-funding:${stoppedHistory.id}:${stoppedHistory.revision}`}
+            id={stoppedHistory.id}
+            revision={stoppedHistory.revision}
+            name="Earlier funding revision"
+            externalRevision={executionRevision}
+          />
+        </section>
       )}
       {historyDraft && (
         <FundingExecutionHistoryPanel

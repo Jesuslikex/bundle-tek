@@ -28,6 +28,15 @@ vi.mock('@/app/chatgpt-auth', () => ({
 }));
 vi.mock('@/db', () => ({ getD1: () => auth.db }));
 import { GET, POST } from '@/app/api/funding/route';
+import {
+  GET as stopGET,
+  POST as stopPOST,
+} from '@/app/api/funding/save-stops/route';
+import {
+  readFundingSaveStopRequest,
+  fundingSaveStopRequestHash,
+  type FundingSaveStopReceipt,
+} from '@/lib/funding-save-stop';
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -42,6 +51,11 @@ let writeReply: ((response: Response) => Promise<Response>) | null;
 let readReply: (() => Promise<Response>) | null;
 let writes: string[], writeFinished: ReturnType<typeof deferred<void>>;
 let rewriteRequest: ((body: string) => string) | null;
+let holdOriginal: boolean;
+let stopWrites: string[];
+let stopWriteReply: ((response: Response) => Promise<Response>) | null;
+let stopReadReply: ((response: Response) => Promise<Response>) | null;
+let holdStop: boolean;
 const button = (text: string) => {
   const found = [...host.querySelectorAll('button')].find(
     (value) => value.textContent?.trim() === text,
@@ -129,12 +143,20 @@ beforeEach(async () => {
   await client.executeMultiple(
     await readFile('drizzle/0007_superb_iron_monger.sql', 'utf8'),
   );
+  await client.executeMultiple(
+    await readFile('drizzle/0152_funding_save_stops.sql', 'utf8'),
+  );
   listReply = null;
   writeReply = null;
   readReply = null;
   writes = [];
   writeFinished = deferred<void>();
   rewriteRequest = null;
+  holdOriginal = false;
+  stopWrites = [];
+  stopWriteReply = null;
+  stopReadReply = null;
+  holdStop = false;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string, options?: RequestInit) => {
@@ -142,10 +164,42 @@ beforeEach(async () => {
         return Response.json({ wallets: [], folders: [] });
       if (!input.startsWith('/api/funding'))
         throw Error('Unexpected request: ' + input);
+      if (input.startsWith('/api/funding/save-stops')) {
+        const response =
+          options?.method === 'POST'
+            ? await (async () => {
+                if (typeof options.body !== 'string')
+                  throw Error('Expected stop metadata.');
+                stopWrites.push(options.body);
+                if (holdStop) return new Promise<Response>(() => {});
+                const headers = new Headers(options.headers);
+                headers.set('origin', 'https://bundle.test');
+                return stopPOST(
+                  new Request('https://bundle.test' + input, {
+                    ...options,
+                    headers,
+                  }),
+                );
+              })()
+            : await stopGET(
+                new Request('https://bundle.test' + input, options),
+              );
+        return options?.method === 'POST'
+          ? stopWriteReply
+            ? stopWriteReply(response)
+            : response
+          : stopReadReply
+            ? stopReadReply(response)
+            : response;
+      }
       if (options?.method === 'POST') {
         if (typeof options.body !== 'string')
           throw Error('Expected the exact JSON draft body.');
         writes.push(options.body);
+        if (holdOriginal) {
+          writeFinished.resolve();
+          return new Promise<Response>(() => {});
+        }
         const response = await POST(
           new Request('https://bundle.test/api/funding', {
             ...options,
@@ -777,4 +831,518 @@ it('keeps an accepted-but-not-committed HTTP202 acknowledgement unknown until an
   await click('Check original save');
   expect(host.textContent).toContain('confirmed in saved history');
   expect(writes).toHaveLength(1);
+});
+
+const stopKeys = () =>
+  Object.keys(localStorage).filter((key) =>
+    key.startsWith('bundle-funding-save-stop:'),
+  );
+const stopCheckbox = () =>
+  [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+    (input) =>
+      input.parentElement?.textContent?.includes(
+        'Stop this original draft-save attempt',
+      ),
+  )!;
+const approveStop = async () => {
+  await act(async () => stopCheckbox().click());
+};
+const unknownUnwritten = async () => {
+  holdOriginal = true;
+  await mount();
+  await fill();
+  await startSave();
+  await click('Stop waiting for save');
+};
+const stoppedRows = async () =>
+  (await client.execute('SELECT * FROM funding_save_stops')).rows;
+
+it('requires separate unchecked approval, fences a delayed first save and uses a new ID for the next explicit save', async () => {
+  await unknownUnwritten();
+  expect(stopCheckbox().checked).toBe(false);
+  expect(button('Stop original draft save').disabled).toBe(true);
+  expect(stopWrites).toHaveLength(0);
+  await approveStop();
+  await act(async () => {
+    const stop = button('Stop original draft save');
+    stop.click();
+    stop.click();
+  });
+  expect(stopWrites).toHaveLength(1);
+  expect(await stoppedRows()).toHaveLength(1);
+  expect(
+    (await client.execute('SELECT * FROM funding_plans')).rows,
+  ).toHaveLength(0);
+  expect(
+    (await client.execute('SELECT * FROM funding_events')).rows,
+  ).toHaveLength(0);
+  expect(host.textContent).toContain('No transfers were cancelled');
+  expect(host.textContent).not.toContain('confirmed in saved history');
+  expect(recoveryKeys()).toHaveLength(0);
+  expect(stopKeys()).toHaveLength(0);
+  expect((host.querySelector('#funding-name') as HTMLInputElement).value).toBe(
+    'Preserved funding draft',
+  );
+  const late = await POST(
+    new Request('https://bundle.test/api/funding', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: writes[0],
+    }),
+  );
+  expect(late.status).not.toBe(200);
+  expect(
+    (await client.execute('SELECT * FROM funding_plans')).rows,
+  ).toHaveLength(0);
+  holdOriginal = false;
+  writeFinished = deferred<void>();
+  await startSave();
+  expect(JSON.parse(writes[1]).id).not.toBe(JSON.parse(writes[0]).id);
+  expect(
+    (await client.execute('SELECT * FROM funding_plans')).rows,
+  ).toHaveLength(1);
+  expect(
+    vi
+      .mocked(fetch)
+      .mock.calls.every(
+        ([url]) =>
+          (typeof url === 'string' && url.startsWith('/api/funding')) ||
+          url === '/api/wallet-workspace',
+      ),
+  ).toBe(true);
+});
+
+it('retains only stop metadata before POST and recovers a lost stop reply after reload with GET only', async () => {
+  await unknownUnwritten();
+  stopWriteReply = async () => {
+    expect(stopKeys()).toHaveLength(1);
+    expect(localStorage.getItem(stopKeys()[0])).toBe(stopWrites[0]);
+    return new Promise(() => {});
+  };
+  await approveStop();
+  await click('Stop original draft save');
+  expect(stopWrites).toHaveLength(1);
+  const metadata = stopWrites[0];
+  expect(metadata).not.toContain('So111111');
+  expect(metadata).not.toContain('Preserved funding draft');
+  expect(metadata).not.toContain('0.012345678');
+  const request = readFundingSaveStopRequest(JSON.parse(metadata));
+  expect(await fundingSaveStopRequestHash(request)).toMatch(/^[a-f0-9]{64}$/);
+  await click('Stop waiting for draft-save stop');
+  await remount();
+  expect(button('Retry exact same request').disabled).toBe(true);
+  const callsBefore = vi.mocked(fetch).mock.calls.length;
+  await click('Check stop result');
+  expect(
+    vi
+      .mocked(fetch)
+      .mock.calls.slice(callsBefore)
+      .every(([, options]) => options?.method !== 'POST'),
+  ).toBe(true);
+  expect(stopWrites).toHaveLength(1);
+  expect(writes).toHaveLength(1);
+  expect(recoveryKeys()).toHaveLength(0);
+  expect(stopKeys()).toHaveLength(0);
+  expect(host.textContent).toContain('No transfers were cancelled');
+});
+
+it.each(['202', '404', 'hash', 'owner', 'id', 'flag', 'html'] as const)(
+  'keeps both stop and original references for refused %s recovery evidence',
+  async (fault) => {
+    await unknownUnwritten();
+    stopWriteReply = async () => new Promise(() => {});
+    await approveStop();
+    await click('Stop original draft save');
+    await click('Stop waiting for draft-save stop');
+    const originalText = localStorage.getItem(recoveryKeys()[0]);
+    const stopText = localStorage.getItem(stopKeys()[0]);
+    stopReadReply = async (response) => {
+      if (fault === 'html')
+        return new Response('<html>PRIVATE parser error</html>', {
+          status: 502,
+          headers: response.headers,
+        });
+      const body = (await response.json()) as {
+        receipt: FundingSaveStopReceipt | Record<string, unknown>;
+      };
+      if (fault === 'hash') body.receipt.requestHash = 'a'.repeat(64);
+      if (fault === 'owner')
+        (body.receipt.reminder as { ownerScope: string }).ownerScope =
+          fundingOwnerScope('bob');
+      if (fault === 'id') body.receipt.stopId = 'different-stop';
+      if (fault === 'flag') body.receipt.transfersCancelled = true;
+      return Response.json(body, {
+        status: fault === '202' ? 202 : fault === '404' ? 404 : 200,
+        headers: response.headers,
+      });
+    };
+    await click('Check stop result');
+    expect(localStorage.getItem(recoveryKeys()[0])).toBe(originalText);
+    expect(localStorage.getItem(stopKeys()[0])).toBe(stopText);
+    expect(button('New plan').disabled).toBe(true);
+    expect(host.textContent).not.toContain('PRIVATE parser error');
+    expect(stopWrites).toHaveLength(1);
+    stopReadReply = null;
+    await click('Check stop result');
+    expect(recoveryKeys()).toHaveLength(0);
+    expect(stopKeys()).toHaveLength(0);
+  },
+);
+
+it('manually retries only the exact stop ID after a missing receipt without sending the original draft', async () => {
+  await unknownUnwritten();
+  holdStop = true;
+  await approveStop();
+  await click('Stop original draft save');
+  await click('Stop waiting for draft-save stop');
+  expect(await stoppedRows()).toHaveLength(0);
+  await click('Check stop result');
+  expect(stopKeys()).toHaveLength(1);
+  expect(recoveryKeys()).toHaveLength(1);
+  holdStop = false;
+  await click('Retry same stop request');
+  expect(stopWrites).toHaveLength(2);
+  expect(stopWrites[1]).toBe(stopWrites[0]);
+  expect(writes).toHaveLength(1);
+  expect(await stoppedRows()).toHaveLength(1);
+  expect(stopKeys()).toHaveLength(0);
+});
+
+it('refuses a second-tab original retry once that tab has retained a stop intent', async () => {
+  await unknownUnwritten();
+  const original = JSON.parse(localStorage.getItem(recoveryKeys()[0])!);
+  const stop = readFundingSaveStopRequest({
+    format: 'funding-save-stop-request-v1',
+    stopId: 'other-tab-stop',
+    reminder: original,
+    consent: 'stop-draft-save-v1',
+  });
+  localStorage.setItem(
+    'bundle-funding-save-stop:' + original.ownerScope,
+    JSON.stringify(stop),
+  );
+  await click('Retry exact same request');
+  expect(writes).toHaveLength(1);
+  expect(stopWrites).toHaveLength(0);
+  expect(button('Retry exact same request').disabled).toBe(true);
+  expect(button('Check stop result').disabled).toBe(false);
+  await click('Retry same stop request');
+  expect(JSON.parse(stopWrites[0]).stopId).toBe('other-tab-stop');
+  expect(recoveryKeys()).toHaveLength(0);
+});
+
+it('sends no stop when metadata cannot be persisted or read back', async () => {
+  await unknownUnwritten();
+  const realSet = Storage.prototype.setItem.bind(localStorage);
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(
+    function (this: Storage, key, value) {
+      if (key.startsWith('bundle-funding-save-stop:'))
+        throw Error('PRIVATE browser storage detail');
+      return realSet(key, value);
+    },
+  );
+  await approveStop();
+  await click('Stop original draft save');
+  expect(stopWrites).toHaveLength(0);
+  expect(recoveryKeys()).toHaveLength(1);
+  expect(host.textContent).not.toContain('PRIVATE browser storage detail');
+  expect(button('New plan').disabled).toBe(true);
+});
+
+it('recovers from partial local clearing using the retained stop marker alone', async () => {
+  await unknownUnwritten();
+  const remove = Storage.prototype.removeItem.bind(localStorage);
+  const failure = vi
+    .spyOn(Storage.prototype, 'removeItem')
+    .mockImplementation(function (this: Storage, key) {
+      if (key.startsWith('bundle-funding-save-stop:'))
+        throw Error('removal failed');
+      return remove(key);
+    });
+  await approveStop();
+  await click('Stop original draft save');
+  expect(recoveryKeys()).toHaveLength(0);
+  expect(stopKeys()).toHaveLength(1);
+  failure.mockRestore();
+  await remount();
+  expect(button('New plan').disabled).toBe(true);
+  expect(stopWrites).toHaveLength(1);
+  await click('Check stop result');
+  expect(stopKeys()).toHaveLength(0);
+  expect(recoveryKeys()).toHaveLength(0);
+  expect(host.textContent).toContain('No transfers were cancelled');
+});
+
+it('leaves a winning original create intact and does not call it a failed or cancelled save', async () => {
+  writeReply = async () => new Promise(() => {});
+  await mount();
+  await fill();
+  await startSave();
+  await click('Stop waiting for save');
+  await approveStop();
+  await click('Stop original draft save');
+  const rows = (await client.execute('SELECT * FROM funding_plans')).rows;
+  expect(rows).toHaveLength(1);
+  expect(rows[0].revision).toBe(1);
+  expect((await stoppedRows())[0].outcome).toBe('already_advanced');
+  expect(host.textContent).toContain(
+    'does not establish whether the original save succeeded',
+  );
+  expect(host.textContent).not.toMatch(
+    /save (?:was )?(?:failed|cancelled)|confirmed in saved history/,
+  );
+});
+
+it.each([false, true])(
+  'recovers an externally fenced no-op save without confirming the stop bump (different binding: %s)',
+  async (differentBinding) => {
+    const document = exchangeFundingReviewFixture().plan.document;
+    document.source = 'Manual';
+    const seed = await POST(
+      new Request('https://bundle.test/api/funding', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: 'noop-existing',
+          action: 'save',
+          expectedRevision: 0,
+          document,
+        }),
+      }),
+    );
+    expect(seed.status).toBe(200);
+    await mount();
+    await act(async () =>
+      (
+        host.querySelector('.funding-saved-row button') as HTMLButtonElement
+      ).click(),
+    );
+    holdOriginal = true;
+    await act(async () => {
+      button('Save changes').click();
+      await writeFinished.promise;
+    });
+    await click('Stop waiting for save');
+    const originalKey = recoveryKeys()[0];
+    const reminder = JSON.parse(localStorage.getItem(originalKey)!);
+    if (differentBinding) {
+      reminder.action = 'archive';
+      reminder.documentHash = 'b'.repeat(64);
+    }
+    const external = readFundingSaveStopRequest({
+      format: 'funding-save-stop-request-v1',
+      stopId: 'external-stop',
+      reminder,
+      consent: 'stop-draft-save-v1',
+    });
+    expect(
+      (
+        await stopPOST(
+          new Request('https://bundle.test/api/funding/save-stops', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              origin: 'https://bundle.test',
+              'x-bundle-funding-owner-scope': reminder.ownerScope,
+            },
+            body: JSON.stringify(external),
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (await client.execute('SELECT revision FROM funding_plans')).rows[0]
+        .revision,
+    ).toBe(2);
+    // Old clients receive a failure, not a stop bump they could mistake for a save.
+    expect(
+      (
+        await GET(
+          new Request('https://bundle.test/api/funding?id=noop-existing'),
+        )
+      ).status,
+    ).toBe(409);
+    await click('Check original save');
+    expect(recoveryKeys()).toHaveLength(0);
+    expect(stopWrites).toHaveLength(0);
+    expect(writes).toHaveLength(1);
+    expect(host.textContent).toContain('No transfers were cancelled');
+    expect(host.textContent).not.toContain('confirmed in saved history');
+    expect(host.textContent).toContain('New draft');
+    expect(
+      (host.querySelector('#funding-name') as HTMLInputElement).value,
+    ).toBe(document.name);
+  },
+);
+
+it('keeps a strictly valid but unrelated revision-fence receipt from clearing this draft', async () => {
+  await unknownUnwritten();
+  const original = JSON.parse(localStorage.getItem(recoveryKeys()[0])!);
+  const other = readFundingSaveStopRequest({
+    format: 'funding-save-stop-request-v1',
+    stopId: 'unrelated-stop',
+    reminder: { ...original, id: 'unrelated-draft' },
+    consent: 'stop-draft-save-v1',
+  });
+  readReply = async () =>
+    Response.json(
+      {
+        error: 'Original revision fenced.',
+        code: 'FUNDING_SAVE_STOPPED',
+        receipt: {
+          format: 'funding-save-stop-receipt-v1',
+          stopId: other.stopId,
+          requestHash: await fundingSaveStopRequestHash(other),
+          reminder: other.reminder,
+          outcome: 'creation_fenced',
+          beforeRevision: null,
+          afterRevision: null,
+          createdAt: new Date().toISOString(),
+          transfersCancelled: false,
+          signingAuthorized: false,
+        },
+      },
+      {
+        status: 409,
+        headers: { 'x-bundle-funding-owner-scope': original.ownerScope },
+      },
+    );
+  await click('Check original save');
+  expect(recoveryKeys()).toHaveLength(1);
+  expect(button('New plan').disabled).toBe(true);
+  expect(host.textContent).not.toContain('can no longer write');
+  expect(writes).toHaveLength(1);
+});
+
+it('preserves old-account stop recovery across an account switch and resets unchecked consent', async () => {
+  await unknownUnwritten();
+  await approveStop();
+  expect(stopCheckbox().checked).toBe(true);
+  auth.owner = 'bob';
+  await click('Reload saved plans');
+  expect(host.querySelector('[aria-label="Funding save recovery"]')).toBeNull();
+  auth.owner = 'alice';
+  await click('Reload saved plans');
+  expect(stopCheckbox().checked).toBe(false);
+  expect(button('Stop original draft save').disabled).toBe(true);
+  stopWriteReply = async () => new Promise(() => {});
+  await approveStop();
+  await click('Stop original draft save');
+  await click('Stop waiting for draft-save stop');
+  const key = stopKeys()[0],
+    value = localStorage.getItem(key);
+  auth.owner = 'bob';
+  await click('Reload saved plans');
+  expect(host.querySelector('[aria-label="Funding save recovery"]')).toBeNull();
+  expect(localStorage.getItem(key)).toBe(value);
+  auth.owner = 'alice';
+  await click('Reload saved plans');
+  expect(button('Check stop result').disabled).toBe(false);
+  await click('Check stop result');
+  expect(stopWrites).toHaveLength(1);
+  expect(writes).toHaveLength(1);
+  expect(stopKeys()).toHaveLength(0);
+});
+
+it('never erases a newer tab recovery reference when the stop acknowledgement arrives', async () => {
+  await unknownUnwritten();
+  const late = deferred<Response>();
+  let acknowledgement: Response | undefined;
+  stopWriteReply = async (response) => {
+    acknowledgement = response;
+    return late.promise;
+  };
+  await approveStop();
+  await click('Stop original draft save');
+  const key = recoveryKeys()[0];
+  const changedText = JSON.stringify({
+    ...JSON.parse(localStorage.getItem(key)!),
+    id: 'newer-tab-draft',
+  });
+  localStorage.setItem(key, changedText);
+  await act(async () => late.resolve(acknowledgement!));
+  expect(localStorage.getItem(key)).toBe(changedText);
+  expect(stopKeys()).toHaveLength(1);
+  expect(button('New plan').disabled).toBe(true);
+});
+
+it('resolves an absent competing stop ID only through the winning original-revision fence', async () => {
+  await unknownUnwritten();
+  const reminder = JSON.parse(localStorage.getItem(recoveryKeys()[0])!);
+  const external = readFundingSaveStopRequest({
+    format: 'funding-save-stop-request-v1',
+    stopId: 'winning-other-stop',
+    reminder,
+    consent: 'stop-draft-save-v1',
+  });
+  expect(
+    (
+      await stopPOST(
+        new Request('https://bundle.test/api/funding/save-stops', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'https://bundle.test',
+            'x-bundle-funding-owner-scope': reminder.ownerScope,
+          },
+          body: JSON.stringify(external),
+        }),
+      )
+    ).status,
+  ).toBe(200);
+  await approveStop();
+  await click('Stop original draft save');
+  expect(stopKeys()).toHaveLength(1);
+  expect(JSON.parse(stopWrites[0]).stopId).not.toBe(external.stopId);
+  await click('Check stop result');
+  expect(stopKeys()).toHaveLength(1);
+  expect(recoveryKeys()).toHaveLength(1);
+  expect(await stoppedRows()).toHaveLength(1);
+  await click('Check original save');
+  expect(stopKeys()).toHaveLength(0);
+  expect(recoveryKeys()).toHaveLength(0);
+  expect(stopWrites).toHaveLength(1);
+  expect(writes).toHaveLength(1);
+  expect(host.textContent).toContain('No transfers were cancelled');
+});
+
+it('never treats an ordinary saved row as terminal proof while its stop is unresolved', async () => {
+  writeReply = async () => new Promise(() => {});
+  await mount();
+  await fill();
+  await startSave();
+  await click('Stop waiting for save');
+  holdStop = true;
+  await approveStop();
+  await click('Stop original draft save');
+  await click('Stop waiting for draft-save stop');
+  // The original save really committed, but this separate stop could still arrive.
+  await click('Check original save');
+  expect(stopKeys()).toHaveLength(1);
+  expect(recoveryKeys()).toHaveLength(1);
+  expect(host.textContent).not.toContain('confirmed in saved history');
+  expect(button('New plan').disabled).toBe(true);
+  expect(stopWrites).toHaveLength(1);
+});
+
+it('keeps a changed stop reference intact when an earlier stop acknowledgement arrives', async () => {
+  await unknownUnwritten();
+  const late = deferred<Response>();
+  let acknowledgement: Response | undefined;
+  stopWriteReply = async (response) => {
+    acknowledgement = response;
+    return late.promise;
+  };
+  await approveStop();
+  await click('Stop original draft save');
+  const key = stopKeys()[0];
+  const changedText = JSON.stringify({
+    ...JSON.parse(localStorage.getItem(key)!),
+    stopId: 'newer-stop-intent',
+  });
+  localStorage.setItem(key, changedText);
+  await act(async () => late.resolve(acknowledgement!));
+  expect(localStorage.getItem(key)).toBe(changedText);
+  expect(recoveryKeys()).toHaveLength(1);
+  expect(button('New plan').disabled).toBe(true);
 });

@@ -127,6 +127,13 @@ beforeAll(async () => {
     .filter((s) => s.trim()))
     await mocks.db.prepare(sql).run();
   for (const sql of readFileSync(
+    new URL('../../../drizzle/0152_funding_save_stops.sql', import.meta.url),
+    'utf8',
+  )
+    .split('--> statement-breakpoint')
+    .filter((s) => s.trim()))
+    await mocks.db.prepare(sql).run();
+  for (const sql of readFileSync(
     new URL('../../../drizzle/0012_messy_zzzax.sql', import.meta.url),
     'utf8',
   )

@@ -1,0 +1,205 @@
+{
+  "format": "funding-save-stop-verification-v1",
+  "baseCommit": "21f7d424cb0ce82ac3baa2645bc16601402e05ee",
+  "originalFundingSqlAndEventBatchUnchanged": true,
+  "originalPlannerHandlersUnchanged": [
+    "onCommitted",
+    "refreshExecution",
+    "change",
+    "open",
+    "fresh",
+    "persist"
+  ],
+  "financialEnabledPredicatesUnchanged": 5,
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "app/ux.css",
+    "lib/browser-wallet-vault.ts",
+    "lib/pump-group-runtime-service.ts",
+    "lib/pump-group-code-identity.ts",
+    "lib/jito-readonly-qualification.ts",
+    "components/auto-sell-modal.tsx",
+    "lib/auto-sell-runner.ts",
+    "lib/auto-sell-execute.ts",
+    "components/launch/mainnet-funding-execution.tsx",
+    "components/launch/devnet-funding-execution.tsx",
+    "components/launch/solana-funding-review.tsx",
+    "components/launch/exchange-funding-review.tsx",
+    "components/launch/funding-fee-review.tsx",
+    "components/launch/mainnet-funding-history.tsx",
+    "components/launch/funding-execution-history.tsx",
+    "components/launch/launch-funding-picker.tsx",
+    "components/launch/funding-wallet-picker.tsx",
+    "lib/funding-plan.ts",
+    "lib/funding-plan-storage.ts",
+    "lib/funding-save-reminder.ts",
+    "lib/funding-owner-scope.ts",
+    "vercel.json"
+  ],
+  "priorSqlUnchanged": 150,
+  "priorJournalEntriesUnchanged": 150,
+  "frozenFilesPresent": [
+    "drizzle/0144_wallet_warmup_runtime_read_attempts.sql",
+    "lib/wallet-warmup-execution-read-material.ts",
+    "lib/wallet-warmup-execution-read-schema.ts",
+    "lib/wallet-warmup-execution-read-storage.test.ts",
+    "lib/wallet-warmup-execution-read-storage.ts",
+    "lib/wallet-warmup-execution-runtime-source.ts",
+    "test/warmup-execution-read-storage-engines.test.ts"
+  ],
+  "sourceHashes": {
+    "app/api/funding/route.ts": "f24661ded4139ecb9cf2ff7a4edbf07c2ede28a1f6f62f8c1d09f2f4c856c680",
+    "app/api/funding/route.test.ts": "22dcaa1b7667c9320694b80680117800396781163809459251b774b1879190bc",
+    "app/api/funding/save-stops/route.ts": "f364feb3492dce69952adb227aa08f44cbac422d0a289bfc737d3cb793f2b71f",
+    "app/api/funding/save-stops/route.test.ts": "2cf7deb9c61e0d798cf11271cb02b556a402280070a0b6ac264cf05954384e5c",
+    "lib/funding-save-stop.ts": "f22c1372426211703f42f06b7a715f9bf8a1ef3dbb33d3da2fec558724b63dbf",
+    "lib/funding-save-stop.test.ts": "7e428bae9fbe93e605132048936e015fb086ec1bc2584cc538c87bafd0afc637",
+    "lib/funding-save-stop-storage.ts": "4683f4c576e0c4eb4adcf67caf5c217603e2f69c3e26c87860700b19f44f1306",
+    "lib/funding-save-stop-storage.test.ts": "45b08df4ae9fe2ba2da6eba08c5b0ecc590c40735ed1f3e05138f67a36cf9eef",
+    "test/funding-save-stop-storage-engines.test.ts": "17e49f12a395bb9e822d24439219c2a59999a155626ae32e09e536a445b9bd08",
+    "drizzle/0152_funding_save_stops.sql": "9fb7fdcec0eae49931963975a68aefe203991a42f274ef2403da4b621e53ccb9",
+    "drizzle/meta/_journal.json": "3a6380b0b2d4c197280a51aa5adac481fd531f406423670066fb9f5d5b6d4dbe",
+    "components/launch/funding-planner.tsx": "99bd9875d018c1eef78c844f2644474a331ae36c5ce2e833521770c04b9188f9",
+    "components/launch/use-funding-plan-storage.ts": "b037a1c0a6ff1d50f3b6bfb7290bb1e2bd754030d762be18d7f6b391d25bc6ba",
+    "components/launch/funding-planner-recovery.test.tsx": "292e46e6a0713aafdd5f12524bd55744581683bf4b5d31c760a6ee9cbb232674",
+    "components/launch/funding-planner-recovery.module.css": "bf70ba716661fb7a7f13b6793c09a43614dca8f263e06fcee4498d9a7c9e2d5a"
+  },
+  "verification": {
+    "node": "24.19.0",
+    "tests": {
+      "passed": 254,
+      "files": 10,
+      "failed": 0,
+      "names": [
+        "test/funding-save-stop-storage-engines.test.ts",
+        "lib/funding-owner-scope.test.ts",
+        "lib/funding-plan-storage.test.ts",
+        "lib/funding-save-reminder.test.ts",
+        "lib/funding-save-stop-storage.test.ts",
+        "lib/funding-save-stop.test.ts",
+        "components/launch/exchange-funding-review.test.tsx",
+        "components/launch/funding-planner-recovery.test.tsx",
+        "app/api/funding/route.test.ts",
+        "app/api/funding/save-stops/route.test.ts"
+      ]
+    },
+    "finalEngineAssertionsRechecked": true,
+    "typecheck": true,
+    "typedLintFiles": 12,
+    "formatFiles": 14,
+    "fullApplicationSuite": false,
+    "productionBuild": false
+  },
+  "migrations": {
+    "passed": true,
+    "migrations": 151,
+    "priorLedgerRowsPreserved": 150,
+    "priorTablesPreserved": 185,
+    "retainedFundingRows": 2,
+    "integrity": "ok",
+    "foreignKeys": "ok",
+    "latestSha256": "9fb7fdcec0eae49931963975a68aefe203991a42f274ef2403da4b621e53ccb9",
+    "applicationOrHostedSql": false,
+    "wholeFileWrangler": {
+      "passed": true,
+      "applied": 151,
+      "latestChecksumMatches": true
+    }
+  },
+  "browser": {
+    "syntheticAuthentication": true,
+    "actualComponentAndApi": true,
+    "productionTursoAdapter": true,
+    "disposableSqlite": true,
+    "originalHeldBeforeDispatch": true,
+    "lateOriginalRefused": true,
+    "stopReplyLost": true,
+    "reloadExactGetOnly": true,
+    "newIdSaved": true,
+    "stopRows": 1,
+    "newPlanRows": 1,
+    "events": 1,
+    "syntheticSecondAccountIsolated": true,
+    "desktop": {
+      "width": 1920,
+      "scrollWidth": 1920
+    },
+    "phone": {
+      "width": 375,
+      "scrollWidth": 360,
+      "recoveryButtonHeight": 44
+    },
+    "financialChildrenDisabled": true,
+    "finalPolicyAndRowidFollowupsSeparatelyTested": true,
+    "screenshot": "work/release-qa/funding-stop-browser-20261025/new-draft-desktop.png"
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-25T21:07:48.350Z",
+      "finishedAt": "2026-10-25T21:10:38.972Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "21f7d424cb0ce82ac3baa2645bc16601402e05ee",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.822744,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    {
+      "startedAt": "2026-10-25T21:11:33.052Z",
+      "finishedAt": "2026-10-25T21:14:42.245Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "21f7d424cb0ce82ac3baa2645bc16601402e05ee",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.812071,
+      "sourceUnchanged": true,
+      "changed": []
+    }
+  ],
+  "reviewLimits": "Both reviews source-only. Competing stop and ambiguous committed-batch findings fixed. Final root rowid/acknowledgement fixes independently tested; no final-snapshot Opus approval claimed.",
+  "knownLimits": [
+    "Owner capacity1000 and revision ceiling fail closed; no quota bypass.",
+    "Legacy exact GET without expectedRevision refuses fenced IDs.",
+    "Receipt audit is separate from funding_events.",
+    "Earlier-revision history link in mounted planner is not persistent navigation discovery after a fresh reload.",
+    "Rare fenced legacyrowid=-1 also blocks autoINSERT because of SQLite ambiguity, tested in both engines.",
+    "Hashes are not encryption; local references survive sign-out."
+  ],
+  "boundaries": {
+    "sourceOnlyMigration": "0152_funding_save_stops",
+    "claude0147Reserved": true,
+    "nextMigration": "0153 subject to recheck",
+    "deployed": false,
+    "applicationSql": false,
+    "hostedSql": false,
+    "providersChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletActions": false,
+    "fundedTrades": false,
+    "signingAuthorityAdded": false
+  }
+}

@@ -2,6 +2,22 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.stop {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding-block: 10px;
+}
+.consent input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
 .planner :global(.funding-actions) button,
 .recovery button {
   min-height: 44px;
