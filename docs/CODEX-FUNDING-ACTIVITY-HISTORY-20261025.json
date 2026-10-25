@@ -1,0 +1,105 @@
+{
+  "sourceBase": "b09deb20d776cfc2907583752f7775d2f65dac9f",
+  "files": {
+    "components/funding-activity-history.tsx": "3524654fe11179e68aca2c96c2014369a81a3277327a9a3451430912fba70c17",
+    "components/funding-activity-history.test.tsx": "6e83b08040fd437b7c149646343dfeccefde1068f7625ea2273eb968eead75e1"
+  },
+  "tests": {
+    "files": 5,
+    "passed": 60,
+    "newCases": 14
+  },
+  "typescript": "passed",
+  "typedLint": "passed",
+  "format": "passed",
+  "browser": {
+    "kind": "actual compiled component with local synthetic saved-history responses",
+    "desktopWidth": 1920,
+    "desktopScrollWidth": 1920,
+    "phoneWidth": 375,
+    "phoneScrollWidth": 360,
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/"
+      },
+      {
+        "method": "GET",
+        "url": "/global.css"
+      },
+      {
+        "method": "GET",
+        "url": "/ux.css"
+      },
+      {
+        "method": "GET",
+        "url": "/app.js"
+      },
+      {
+        "method": "GET",
+        "url": "/api/funding?id=fixture"
+      },
+      {
+        "method": "GET",
+        "url": "/api/funding/history?id=fixture&revision=2"
+      },
+      {
+        "method": "GET",
+        "url": "/favicon.ico"
+      },
+      {
+        "method": "GET",
+        "url": "/api/funding/mainnet-history?id=fixture"
+      }
+    ],
+    "allGet": true,
+    "production": false,
+    "providerRequests": 0,
+    "applicationErrorsObserved": 0,
+    "extensionWarningsObserved": true
+  },
+  "opus": {
+    "startedAt": "2026-10-25T15:49:20.554Z",
+    "finishedAt": "2026-10-25T15:50:07.894Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "b09deb20d776cfc2907583752f7775d2f65dac9f",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.23637119999999998,
+    "sourceUnchanged": true,
+    "changed": [],
+    "finalFollowupsIndependentlyTested": true,
+    "finalFollowupsRereviewed": false
+  },
+  "marketplaceReview": {
+    "head": "43c0b0dfb9a1d880567f8ca35900e28b94d8fca3",
+    "comment": "https://github.com/Jesuslikex/bundle-tek/pull/60#issuecomment-6399726402",
+    "blockers": [
+      "actual integer codec refuses checkout",
+      "absent receipt plus later finalized height can release paid inventory"
+    ],
+    "ownerFilesEdited": false
+  },
+  "financialActions": 0,
+  "deployed": false,
+  "hostedSql": false
+}

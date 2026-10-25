@@ -3,6 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { SavedFunding } from '@/lib/funding-plan';
 import { FundingExecutionHistoryPanel } from '@/components/launch/funding-execution-history';
+import { MainnetFundingHistoryPanel } from '@/components/launch/mainnet-funding-history';
+import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
+
+const unavailable =
+  'Funding draft unavailable. Retry funding history to try again.';
+class FundingDraftError extends Error {}
 
 export function FundingActivityHistory({
   id,
@@ -37,13 +43,25 @@ export function FundingActivityHistory({
             signal: controller.signal,
           },
         );
-        const data = (await response.json()) as {
+        if (!response.ok) {
+          void response.body?.cancel().catch(() => {});
+          throw new FundingDraftError(
+            response.status === 401
+              ? 'Sign in again before loading funding history.'
+              : response.status === 403 || response.status === 404
+                ? 'This saved funding draft is unavailable to your account.'
+                : response.status === 429
+                  ? 'Funding history is rate limited. Wait before retrying.'
+                  : unavailable,
+          );
+        }
+        const data = (await readBoundedPanelJson(
+          response,
+          controller.signal,
+        )) as {
           plan?: SavedFunding;
-          error?: string;
-        };
-        if (!response.ok)
-          throw new Error(data.error || 'Funding draft unavailable.');
-        const plan = data.plan;
+        } | null;
+        const plan = data?.plan;
         if (
           !plan ||
           plan.id !== id ||
@@ -51,10 +69,12 @@ export function FundingActivityHistory({
           plan.revision < 1 ||
           typeof plan.archived !== 'boolean' ||
           typeof plan.document?.name !== 'string' ||
+          typeof plan.document?.chain !== 'string' ||
+          typeof plan.document?.currency !== 'string' ||
           typeof plan.document?.total !== 'string' ||
           !Array.isArray(plan.document.recipients)
         )
-          throw new Error('Funding draft response mismatch.');
+          throw new FundingDraftError('Funding draft response mismatch.');
         if (!controller.signal.aborted) setState({ identity, plan, error: '' });
       } catch (error) {
         if (!controller.signal.aborted)
@@ -62,9 +82,7 @@ export function FundingActivityHistory({
             identity,
             plan: null,
             error:
-              error instanceof Error
-                ? error.message
-                : 'Funding draft unavailable.',
+              error instanceof FundingDraftError ? error.message : unavailable,
           });
       }
     })();
@@ -125,13 +143,26 @@ export function FundingActivityHistory({
               Reload funding draft
             </Button>
             {current.plan.document.chain === 'Solana' ? (
-              <FundingExecutionHistoryPanel
-                key={`${id}/${current.plan.revision}`}
-                id={id}
-                revision={current.plan.revision}
-                name={current.plan.document.name}
-                externalRevision={refreshRevision + reload}
-              />
+              <div key={identity}>
+                <h3>Mainnet</h3>
+                <p>
+                  Open saved mainnet attempts and verified receipts separately
+                  from devnet test history. Opening history does not send or
+                  verify a transaction.
+                </p>
+                <MainnetFundingHistoryPanel
+                  id={id}
+                  revision={current.plan.revision}
+                  name={current.plan.document.name}
+                />
+                <h3>Devnet test history</h3>
+                <FundingExecutionHistoryPanel
+                  id={id}
+                  revision={current.plan.revision}
+                  name={current.plan.document.name}
+                  externalRevision={refreshRevision + reload}
+                />
+              </div>
             ) : (
               <p>
                 Execution receipt history for {current.plan.document.chain} is
