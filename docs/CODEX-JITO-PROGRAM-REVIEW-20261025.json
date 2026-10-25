@@ -1,0 +1,379 @@
+{
+  "format": "jito-program-provenance-review-v1",
+  "reviewedAt": "2026-10-25T15:35:01.042Z",
+  "scope": "Retained on-chain bytes versus official published release; no independent build or complete security audit",
+  "retainedCaptureSource": "docs/CODEX-JITO-FRESH-PROGRAM-POLICY-20261025.json",
+  "artifacts": {
+    "sourceDirectory": "work/release-qa/jito-full-live-20261025-timing-v3/",
+    "originalFloor": 461300479,
+    "maximumContext": 461300507,
+    "checks": "original raw parent hashes/IDs/scopes/floors; stable links/headers; gapless full code and exact observed SHA256",
+    "artifacts": [
+      {
+        "name": "jupiter",
+        "program": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+        "codeBytes": 2892224,
+        "fullCodeSha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+        "trailingZeroBytes": 855847,
+        "trimmedBytes": 2036377,
+        "trimmedSha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+        "deploymentSlot": "459479624",
+        "upgradeAuthority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+        "elfMachine": 263,
+        "metadataBracketsCodeInRequestOrderAndSlots": true,
+        "headerSha256": "b4d8c7370554c3fd9904cd295434e0c82002defa5e0ac62e76e6593f0a0bbd97",
+        "headerObservations": [
+          {
+            "slot": 461300493,
+            "requestSha256": "a6d7d0d4f03c5b1c55fb4432e65c8c0264323adcde4a58dc6bd35a0600df7a16",
+            "responseSha256": "433f79446c274c6015b284f27ce5e50b81cd43807ce3c8282c79c8aaf6897b76"
+          },
+          {
+            "slot": 461300507,
+            "requestSha256": "414f1a7b9d066f08dffb52f0087bc5614739dcc13533d279066caf62ae8a624b",
+            "responseSha256": "adf635f04e227d750fb80dcb62338df5d6c231b02423f4e92d7a69665a70a14e"
+          }
+        ],
+        "chunks": [
+          {
+            "offset": 45,
+            "bytes": 208896,
+            "sha256": "4dede06ae63be34e49d88caee34647582495cb74ac80f2e6cd5677834c6b4962",
+            "slot": 461300494,
+            "requestSha256": "1aa3845cd2fa43429dfb36f6352bdce5b92bb81558b7d4c7f85d44cd2c304741",
+            "responseSha256": "a6545cfe9e380685fa9cebcae79a4975df80da5499072f370d3bcdce518f1a4d"
+          },
+          {
+            "offset": 208941,
+            "bytes": 262144,
+            "sha256": "20591fc1dc9b7c7f4aaf4655104a46ab4086c452ea06140c4dc47cb77047a1a5",
+            "slot": 461300495,
+            "requestSha256": "928b2356c8d2f6a19ebcc1a921e296851f1a5647994bdde9a4c1b904843e0ce9",
+            "responseSha256": "895f8888196e259907534e21d1a1cd2e85e6f857fa3167382905698e41653360"
+          },
+          {
+            "offset": 471085,
+            "bytes": 262144,
+            "sha256": "483a8856da2ffe35fbbdc319661e10dc2d52de3e7a09c66c8b15a61313be28ea",
+            "slot": 461300497,
+            "requestSha256": "e9fcb83a867f2c6ec00d69454704930ba8569eb8ffdc8846152c092dbd6c420b",
+            "responseSha256": "80dc80ab222f994c29322bb6a5debb6a2737ed4ef982b3e60191de3d6c5ea8ac"
+          },
+          {
+            "offset": 733229,
+            "bytes": 348160,
+            "sha256": "29d54fe6e88cf3f51c729c5738c984bd35472207fbfa5ff16f3f2df2eb7be913",
+            "slot": 461300499,
+            "requestSha256": "7aba337eac6c878fadfe5f476569339afbff9866917b17d0589b0eb405d9143c",
+            "responseSha256": "1404e2c535743ddc357082ce48144be8d61c0354fe9fd734e9f4155b49c949b4"
+          },
+          {
+            "offset": 1081389,
+            "bytes": 348160,
+            "sha256": "9d1abe4dd38ed6393267725f7915ba6f6122d30ab3fcb9eba1625a8a142e817d",
+            "slot": 461300501,
+            "requestSha256": "b024ddd5f219b7a1a51c4d684692883f15970e94e7db62b583c0b41b1605dbc4",
+            "responseSha256": "500f813eed3923860d2a9a689f23457b7949da6df160ef823046630d33ae6edc"
+          },
+          {
+            "offset": 1429549,
+            "bytes": 524288,
+            "sha256": "25b58a607b214a3a1ff31132a317049fb296a03b4ee31fb20f5c5d77259f9e9e",
+            "slot": 461300502,
+            "requestSha256": "10440d0d3a17e5b7e1687d458bdc959d5be8b0c246c7008281a949165a529785",
+            "responseSha256": "aab1d3ed4f06649e14ed3e1d1dafe882cdc56951dd17171e96246cb9b664775c"
+          },
+          {
+            "offset": 1953837,
+            "bytes": 737280,
+            "sha256": "449315f8f909b9385c33fff6e51ac877bb92aa90e8645ded81bed86a0d0fa539",
+            "slot": 461300504,
+            "requestSha256": "73769a437275b13b46075f7a2cccfb6f7d3d012713601f464d611600386d326c",
+            "responseSha256": "ac5d918808eb7bf048bfda76a19f830241fe784a4d19a98b3c381e3add9a05d2"
+          },
+          {
+            "offset": 2691117,
+            "bytes": 201152,
+            "sha256": "eefef3155f3a286de8f420f391d8560c9029903ef395fbb850f7f434a634317e",
+            "slot": 461300505,
+            "requestSha256": "339550379a103c9ba04247c5e89e2ff759f318d7263cb461e987813f4d48e45c",
+            "responseSha256": "a9b85b1dc39f7615a6ad0b10093559a9b98eebd36475558b88a3fb664a15fb2e"
+          }
+        ]
+      },
+      {
+        "name": "token2022",
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "programData": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+        "codeBytes": 1382016,
+        "fullCodeSha256": "15a2e615a42e20f31714bbaaee43002ae6f1cda2e8d7118243117ab3c1342e2d",
+        "trailingZeroBytes": 770975,
+        "trimmedBytes": 611041,
+        "trimmedSha256": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+        "deploymentSlot": "460497271",
+        "upgradeAuthority": "AeLmXCbPaQHGWRLr2saFsEVfmMNuKnxRAbWCT9P5twgz",
+        "elfMachine": 263,
+        "metadataBracketsCodeInRequestOrderAndSlots": true,
+        "headerSha256": "44e7ffbcb92a5c82a85a0d77699294d89c57daea032fae4491c8522a092a52c0",
+        "headerObservations": [
+          {
+            "slot": 461300493,
+            "requestSha256": "a6d7d0d4f03c5b1c55fb4432e65c8c0264323adcde4a58dc6bd35a0600df7a16",
+            "responseSha256": "433f79446c274c6015b284f27ce5e50b81cd43807ce3c8282c79c8aaf6897b76"
+          },
+          {
+            "slot": 461300507,
+            "requestSha256": "414f1a7b9d066f08dffb52f0087bc5614739dcc13533d279066caf62ae8a624b",
+            "responseSha256": "adf635f04e227d750fb80dcb62338df5d6c231b02423f4e92d7a69665a70a14e"
+          }
+        ],
+        "chunks": [
+          {
+            "offset": 45,
+            "bytes": 208896,
+            "sha256": "8d748acb3b81ba83e227f0dfc79c7559a1a73a887826afa56136b04e7348d40a",
+            "slot": 461300494,
+            "requestSha256": "1aa3845cd2fa43429dfb36f6352bdce5b92bb81558b7d4c7f85d44cd2c304741",
+            "responseSha256": "a6545cfe9e380685fa9cebcae79a4975df80da5499072f370d3bcdce518f1a4d"
+          },
+          {
+            "offset": 208941,
+            "bytes": 262144,
+            "sha256": "16aef98a068739cb4999f6a87202f35a29d307ea162ef5e395807c7b731a9225",
+            "slot": 461300495,
+            "requestSha256": "928b2356c8d2f6a19ebcc1a921e296851f1a5647994bdde9a4c1b904843e0ce9",
+            "responseSha256": "895f8888196e259907534e21d1a1cd2e85e6f857fa3167382905698e41653360"
+          },
+          {
+            "offset": 471085,
+            "bytes": 262144,
+            "sha256": "bfdb8913b620a520e15c7118482422ae6c41cb4d81be9e0bc3aac92b65dc8328",
+            "slot": 461300497,
+            "requestSha256": "e9fcb83a867f2c6ec00d69454704930ba8569eb8ffdc8846152c092dbd6c420b",
+            "responseSha256": "80dc80ab222f994c29322bb6a5debb6a2737ed4ef982b3e60191de3d6c5ea8ac"
+          },
+          {
+            "offset": 733229,
+            "bytes": 348160,
+            "sha256": "179a0bea61861bbf7b5c52d8d60d662991c65c3d424aa03564c43f568ac06b58",
+            "slot": 461300499,
+            "requestSha256": "7aba337eac6c878fadfe5f476569339afbff9866917b17d0589b0eb405d9143c",
+            "responseSha256": "1404e2c535743ddc357082ce48144be8d61c0354fe9fd734e9f4155b49c949b4"
+          },
+          {
+            "offset": 1081389,
+            "bytes": 300672,
+            "sha256": "c19e5def2aaa7182cdfbcb8740581506a6bd6fbf6cda4db647cade0997f0e6da",
+            "slot": 461300501,
+            "requestSha256": "b024ddd5f219b7a1a51c4d684692883f15970e94e7db62b583c0b41b1605dbc4",
+            "responseSha256": "500f813eed3923860d2a9a689f23457b7949da6df160ef823046630d33ae6edc"
+          }
+        ]
+      }
+    ],
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "token2022": {
+    "candidateStatus": "official-release-byte-match; exact policy owner review pending",
+    "sourceCommit": "8867f751c0f69367ba03af4f85510b5611989491",
+    "release": {
+      "release": "https://github.com/solana-program/token-2022/releases/tag/program%40v11.1.0",
+      "assetUrl": "https://github.com/solana-program/token-2022/releases/download/program%40v11.1.0/spl_token_2022-11.1.0.so",
+      "downloadFinalUrl": "https://release-assets.githubusercontent.com",
+      "releaseBytes": 611056,
+      "releaseSha256": "3dde54d202caa2d10514fd58a154df5f26f07643f9f5fd0402ff08084f0cb954",
+      "githubAssetDigest": "sha256:3dde54d202caa2d10514fd58a154df5f26f07643f9f5fd0402ff08084f0cb954",
+      "exactObservedPrefixMatched": true,
+      "remainingPaddingBytes": 770960,
+      "remainingPaddingAllZero": true,
+      "observedFullCodeBytes": 1382016,
+      "observedFullSha256": "15a2e615a42e20f31714bbaaee43002ae6f1cda2e8d7118243117ab3c1342e2d",
+      "codeExecuted": false,
+      "readAt": "2026-10-25T15:28:56.247Z"
+    },
+    "normalizedComparison": {
+      "algorithm": "strip trailing zero bytes, then SHA256; independent report only, not application hash policy",
+      "verifierSourceCommit": "26ba8211eddbfab49d30826d15a2408332b89543",
+      "verifierSourceUrl": "https://github.com/solana-foundation/solana-verifiable-build/blob/26ba8211eddbfab49d30826d15a2408332b89543/src/main.rs#L768",
+      "sourceSha256": "02b13dd4017035f47542d92694b614f08b5c4bcb038e840612d567a16a57691f",
+      "matchesVerifierHash": true,
+      "pinnedSourceReceipt": {
+        "url": "https://raw.githubusercontent.com/solana-foundation/solana-verifiable-build/26ba8211eddbfab49d30826d15a2408332b89543/src/main.rs",
+        "status": 200,
+        "bytes": 80184,
+        "sha256": "02b13dd4017035f47542d92694b614f08b5c4bcb038e840612d567a16a57691f",
+        "readAt": "2026-10-25T15:31:53.833Z"
+      }
+    },
+    "verifierStatus": {
+      "is_verified": true,
+      "message": "On chain program verified",
+      "on_chain_hash": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+      "executable_hash": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+      "repo_url": "https://github.com/solana-program/token-2022/tree/8867f751c0f69367ba03af4f85510b5611989491",
+      "commit": "8867f751c0f69367ba03af4f85510b5611989491",
+      "last_verified_at": "2026-10-23T15:43:22.904525",
+      "is_frozen": false,
+      "is_closed": false
+    },
+    "verifierReceipt": {
+      "url": "https://verify.osec.io/status/TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "status": 200,
+      "sha256": "b787471d3198cc29d86a5042a4d7d289ed1ccf9af8b4eab96b1a69d8921d376f",
+      "bytes": 466,
+      "readAt": "2026-10-25T15:27:03.089Z"
+    },
+    "audit": {
+      "url": "https://github.com/anza-xyz/security-audits/blob/master/spl/ZellicToken2022Audit-2026-09-24.pdf",
+      "sha256": "3549fecba16046dcdd677ce0adf21ff057b184781ed4d29e1a75e866f2302003",
+      "pages": 15,
+      "scopePages": [9, 10],
+      "visuallyCheckedPages": [6, 9, 10],
+      "scope": "Five selected PR diffs, not all code at release8867f75",
+      "reportedFindingsInThatScope": 0,
+      "wholeReleaseAuditClaimed": false,
+      "textReviewedPages": [5, 6, 9, 10, 14, 15],
+      "findingCountPage": 6
+    }
+  },
+  "jupiter": {
+    "candidateStatus": "unresolved; no proposed pin change",
+    "verifierStatus": {
+      "is_verified": false,
+      "message": "On chain program not verified",
+      "on_chain_hash": "",
+      "executable_hash": "",
+      "repo_url": "",
+      "commit": "",
+      "last_verified_at": null,
+      "is_frozen": false,
+      "is_closed": false
+    },
+    "verifierReceipt": {
+      "url": "https://verify.osec.io/status/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "status": 200,
+      "sha256": "d12a460cf74cc5e167e078636b4f1efa2cc82679d302d1d390d27d27facc4288",
+      "bytes": 189,
+      "readAt": "2026-10-25T15:27:03.095Z"
+    },
+    "coreRepository": {
+      "url": "https://api.github.com/repos/jup-ag/jupiter-aggregator-program",
+      "status": 404,
+      "bytes": 118,
+      "sha256": "4f50e254a719a6b1b06b529bdaa08980e4acf0878aad0090cba7771f6ebdf0b9",
+      "readAt": "2026-10-25T15:31:53.430Z"
+    },
+    "absenceLimit": "Unverified service result and inaccessible repo do not prove no evidence exists elsewhere or imply unsafe code",
+    "audit": {
+      "indexUrl": "https://developers.jup.ag/docs/resources/audits",
+      "url": "https://github.com/jup-ag/docs/blob/main/static/files/audits/swap-v6-offside-october-2025.pdf",
+      "sha256": "31179d111f84c7f6fe3f70d33ee7fb96ef0417d95398df5fcad0a62bd2f961e6",
+      "pages": 14,
+      "visuallyCheckedPages": [4, 5],
+      "sourceCommit": "41d454b84058a9680441b779eb46dc2a00f7d4f1",
+      "remediationCommits": [
+        "20af53e33ef128b54f2c4cb48ecd04a033124cca",
+        "87fc19c2949282eae8c5baa021cb81f8a2bc7086"
+      ],
+      "mappingToObservedBinaryEstablished": false,
+      "textReviewedPages": [4, 5, 7, 9, 12]
+    }
+  },
+  "candidate": {
+    "patch": "docs/patches/CODEX-TOKEN2022-PIN-REVIEW-20261025.patch",
+    "sha256": "f76c828bb6251eb127e8b5dc55cb65bf3331b9569e1d846841858511b7832e6e",
+    "applied": false,
+    "changes": "One Token-2022 full padded-code hash only; all other identities and functions unchanged",
+    "checks": {
+      "candidateOnly": true,
+      "applicationUnchanged": true,
+      "patchApplies": true,
+      "onlyToken2022FullHashChanges": true,
+      "checksPassed": 12,
+      "checks": [
+        "old policy refuses current token",
+        "candidate permits only matching current token scans",
+        "refuses loader",
+        "refuses authority",
+        "refuses hash",
+        "refuses oldHash",
+        "refuses mismatched second scan",
+        "refuses absent second scan",
+        "refuses full current route",
+        "only exact token full hash differs",
+        "application file remains original",
+        "normalized verifier hash is not accepted as full code hash"
+      ],
+      "matchedErrorClass": true,
+      "normalizedHashRefused": true,
+      "stillRequiresMatchingScans": true,
+      "stillRefusesMetadataDrift": true,
+      "stillRefusesFullCurrentRoute": true,
+      "signingAllowed": false,
+      "executionAllowed": false
+    },
+    "ownerBranchPatch": {
+      "path": "docs/patches/CODEX-TOKEN2022-PIN-PR59-20261025.patch",
+      "sha256": "cdb6c532de913f2c638f610f241976639aeac0bcc88b89bc0625897922c636f0",
+      "pullRequest": 59,
+      "head": "a00f0023c39975f32ec6efdfe1e394606aa5473a",
+      "contextMatches": true,
+      "gitApplyCheckInIsolatedCopy": true,
+      "onlyDifferenceFromMainCandidate": "quote formatting",
+      "applicationEdited": false,
+      "ownerApproval": false,
+      "policyAssertionsExecutedAgainst": "canonical main counterfactual only; owner branch patch checked in isolated source copy"
+    }
+  },
+  "environment": {
+    "windowsCargoFound": true,
+    "wslCargoFound": true,
+    "dockerFound": false,
+    "solanaVerifyFound": false,
+    "newToolsInstalled": false,
+    "binariesExecuted": false,
+    "unavailableReaEngineRetried": false
+  },
+  "authority": {
+    "sourceCurrent": false,
+    "policyApproved": false,
+    "providerQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "actions": {
+    "applicationEdited": false,
+    "pinsEdited": false,
+    "providerSettingsChanged": false,
+    "hostedSql": false,
+    "deploy": false,
+    "fundedTrades": false,
+    "newCampaignRun": false
+  },
+  "review": {
+    "startedAt": "2026-10-25T15:35:36.621Z",
+    "finishedAt": "2026-10-25T15:37:16.402Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "0e810441ae52818de57e50114ff7eafb35fb38a2",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": ["claude-opus-5-5"],
+    "modelsUsed": ["claude-opus-5-5"],
+    "tools": ["Glob", "Grep", "Read"],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.5937164,
+    "sourceUnchanged": true,
+    "changed": [],
+    "scope": "source-only provenance/patch review; no independent ELF hash computation, tests or security audit",
+    "followups": "Audit scope/finding pages visually checked; separate pinned-source-fetch receipt added; normalized hash refusal/error-class assertions and header/code-order brackets verified independently; not rereviewed"
+  }
+}

@@ -1,0 +1,16 @@
+diff --git a/lib/pair-trusted-programs.ts b/lib/pair-trusted-programs.ts
+--- a/lib/pair-trusted-programs.ts
++++ b/lib/pair-trusted-programs.ts
+@@ -114,11 +114,11 @@
+     // Token-2022, 1382016 bytes.
+     {
+       address: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+       loader: UPGRADEABLE,
+       identityKind: "elf-code",
+       upgradeAuthority: "AeLmXCbPaQHGWRLr2saFsEVfmMNuKnxRAbWCT9P5twgz",
+       codeSha256: [
+-        "0999dbf708971e723b08d1caafc988826a59c6001ed6dc02260da07defbe1469",
++        "15a2e615a42e20f31714bbaaee43002ae6f1cda2e8d7118243117ab3c1342e2d",
+       ],
+     },
+     // Route AMM (unlabelled), 425440 bytes.
