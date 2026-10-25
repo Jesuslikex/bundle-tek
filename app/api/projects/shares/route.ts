@@ -4,6 +4,7 @@ import {
   projectIdValid,
   validateProjectDocument,
 } from '@/lib/workspace-project';
+import { shareExpiresAt } from '@/lib/project-share-expiry';
 
 // Read-only project sharing. A collaborator can open the owner's saved launch
 // project; wallets and signing stay with the owner, whose keys never leave
@@ -36,6 +37,8 @@ type ShareRow = {
   memberId: string | null;
   createdAt: string;
   acceptedAt: string | null;
+  expiresAt: string | null;
+  expired: number;
 };
 type SharedRow = {
   shareId: string;
@@ -43,6 +46,7 @@ type SharedRow = {
   document: string;
   archived: number;
   updatedAt: string;
+  expiresAt: string | null;
 };
 
 export async function GET(request: Request) {
@@ -56,7 +60,8 @@ export async function GET(request: Request) {
         return json({ error: 'Invalid project.' }, 400);
       const result = await db
         .prepare(
-          `SELECT id, member_id AS memberId, created_at AS createdAt, accepted_at AS acceptedAt
+          `SELECT id, member_id AS memberId, created_at AS createdAt, accepted_at AS acceptedAt,
+           expires_at AS expiresAt, (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
            FROM project_shares WHERE owner_id=? AND project_id=? AND revoked_at IS NULL
            ORDER BY created_at DESC LIMIT 10`,
         )
@@ -68,14 +73,18 @@ export async function GET(request: Request) {
           accepted: s.memberId !== null,
           createdAt: s.createdAt,
           acceptedAt: s.acceptedAt,
+          expiresAt: s.expiresAt,
+          expired: Boolean(s.expired),
         })),
       });
     }
     const result = await db
       .prepare(
-        `SELECT s.id AS shareId, p.id, p.document, p.archived, p.updated_at AS updatedAt
+        `SELECT s.id AS shareId, p.id, p.document, p.archived, p.updated_at AS updatedAt, s.expires_at AS expiresAt
          FROM project_shares s JOIN workspace_projects p ON p.owner_id=s.owner_id AND p.id=s.project_id
-         WHERE s.member_id=? AND s.revoked_at IS NULL ORDER BY p.updated_at DESC LIMIT 100`,
+         WHERE s.member_id=? AND s.revoked_at IS NULL
+          AND (s.expires_at IS NULL OR s.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+         ORDER BY p.updated_at DESC LIMIT 100`,
       )
       .bind(user.userId)
       .all<SharedRow>();
@@ -87,6 +96,7 @@ export async function GET(request: Request) {
         archived: Boolean(r.archived),
         updatedAt: r.updatedAt,
         readOnly: true,
+        expiresAt: r.expiresAt,
       })),
     });
   } catch {
@@ -112,6 +122,7 @@ export async function POST(request: Request) {
     projectId?: unknown;
     token?: unknown;
     id?: unknown;
+    expiresInSeconds?: unknown;
   };
   try {
     const text = await request.text();
@@ -126,14 +137,30 @@ export async function POST(request: Request) {
     if (body.action === 'invite') {
       if (!projectIdValid(body.projectId))
         return json({ error: 'Invalid project.' }, 400);
+      let expiresAt: string;
+      try {
+        expiresAt = shareExpiresAt(body.expiresInSeconds, now);
+      } catch {
+        return json(
+          { error: 'Choose a share duration of 1 hour, 24 hours or 7 days.' },
+          400,
+        );
+      }
       const token = newToken();
       const id = crypto.randomUUID();
       try {
         await db
           .prepare(
-            'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at) VALUES(?,?,?,?,?)',
+            'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)',
           )
-          .bind(id, user.userId, body.projectId, await hash(token), now)
+          .bind(
+            id,
+            user.userId,
+            body.projectId,
+            await hash(token),
+            now,
+            expiresAt,
+          )
           .run();
       } catch (e) {
         const message = e instanceof Error ? e.message : '';
@@ -143,26 +170,49 @@ export async function POST(request: Request) {
           return json({ error: 'Up to 10 shares per project.' }, 409);
         throw e;
       }
-      return json({ share: { id, token } }, 201);
+      return json({ share: { id, token, expiresAt } }, 201);
     }
     if (body.action === 'accept') {
       if (typeof body.token !== 'string' || !TOKEN.test(body.token))
         return json({ error: 'Invalid invite link.' }, 400);
       const row = await db
         .prepare(
-          'SELECT id, owner_id AS ownerId, member_id AS memberId FROM project_shares WHERE token_hash=? AND revoked_at IS NULL',
+          `SELECT id, owner_id AS ownerId, project_id AS projectId, member_id AS memberId FROM project_shares
+           WHERE token_hash=? AND revoked_at IS NULL
+           AND (expires_at IS NULL OR expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
         )
         .bind(await hash(body.token))
-        .first<{ id: string; ownerId: string; memberId: string | null }>();
-      if (!row) return json({ error: 'Invite not found or revoked.' }, 404);
+        .first<{
+          id: string;
+          ownerId: string;
+          projectId: string;
+          memberId: string | null;
+        }>();
+      if (!row)
+        return json({ error: 'Invite not found, expired or revoked.' }, 404);
       if (row.ownerId === user.userId)
         return json({ error: 'This is your own project.' }, 409);
       if (row.memberId === user.userId) return json({ shareId: row.id });
       if (row.memberId !== null)
         return json({ error: 'This invite was already used.' }, 409);
+      const previous = await db
+        .prepare(`SELECT (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
+        FROM project_shares WHERE owner_id=? AND project_id=? AND member_id=? AND revoked_at IS NULL LIMIT 1`)
+        .bind(row.ownerId, row.projectId, user.userId)
+        .first<{ expired: number }>();
+      if (previous)
+        return json(
+          {
+            error: previous.expired
+              ? 'Ask the owner to revoke your expired share before accepting a new invite.'
+              : 'You already have a share for this project. Refresh shared projects.',
+          },
+          409,
+        );
       const result = await db
         .prepare(
-          'UPDATE project_shares SET member_id=?, accepted_at=? WHERE id=? AND member_id IS NULL AND revoked_at IS NULL',
+          `UPDATE project_shares SET member_id=?, accepted_at=? WHERE id=? AND member_id IS NULL AND revoked_at IS NULL
+           AND (expires_at IS NULL OR expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
         )
         .bind(user.userId, now, row.id)
         .run()

@@ -32,7 +32,10 @@ it.each([false, true])(
       expect(fetcher).toHaveBeenCalledTimes(1);
       expect(fetcher.mock.calls[0]).toEqual(
         owner
-          ? ['/api/projects/shares?projectId=p1', { cache: 'no-store' }]
+          ? [
+              '/api/projects/shares?projectId=p1',
+              { cache: 'no-store', signal: expect.any(AbortSignal) },
+            ]
           : [
               '/api/projects/shares',
               { cache: 'no-store', signal: expect.any(AbortSignal) },

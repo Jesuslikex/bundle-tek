@@ -137,3 +137,19 @@ it('bounded response admission rejects HTML and never exposes its content', asyn
     readSharedProjectSnapshots(new Response(null, { status: 401 })),
   ).rejects.toThrow('Sign in to open shared projects.');
 });
+
+it('admits canonical expiry and explicit legacy null without weakening private-field projection', () => {
+  const expiresAt = '2026-10-26T00:00:00.000Z';
+  expect(
+    decodeSharedProjectSnapshots({ projects: [{ ...saved(), expiresAt }] }),
+  ).toMatchObject([{ expiresAt, readOnly: true }]);
+  expect(
+    decodeSharedProjectSnapshots({
+      projects: [{ ...saved(), expiresAt: null }],
+    }),
+  ).toMatchObject([{ expiresAt: null }]);
+  for (const expiresAt of ['invalid', '2026-10-26', {}, 12, undefined])
+    expect(() =>
+      decodeSharedProjectSnapshots({ projects: [{ ...saved(), expiresAt }] }),
+    ).toThrow('Shared projects unavailable');
+});

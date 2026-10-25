@@ -1,6 +1,7 @@
 import { validateProjectDocument, projectIdValid } from './workspace-project';
 import { readBoundedPanelJson } from './read-bounded-panel-json';
 import type { LaunchPlanInput } from './launch-plan';
+import { readShareExpiry } from './project-share-expiry';
 
 const unavailable = () =>
   Error('Shared projects unavailable. Try again later.');
@@ -30,6 +31,7 @@ export type SharedProjectSnapshot = {
   readOnly: true;
   archived: boolean;
   updatedAt: string;
+  expiresAt?: string | null;
   plan: LaunchPlanInput;
   artworkSaved: boolean;
   totalSupply: string;
@@ -66,8 +68,10 @@ export function decodeSharedProjectSnapshots(
     return page.projects.map((input: unknown) => {
       const row = record(input);
       if (
-        Object.keys(row).sort().join(',') !==
-          'archived,id,identity,options,plan,readOnly,shareId,updatedAt' ||
+        ![
+          'archived,id,identity,options,plan,readOnly,shareId,updatedAt',
+          'archived,expiresAt,id,identity,options,plan,readOnly,shareId,updatedAt',
+        ].includes(Object.keys(row).sort().join(',')) ||
         !projectIdValid(row.id) ||
         typeof row.shareId !== 'string' ||
         !uuid.test(row.shareId) ||
@@ -98,6 +102,9 @@ export function decodeSharedProjectSnapshots(
         readOnly: true,
         archived: row.archived,
         updatedAt: row.updatedAt,
+        ...(Object.hasOwn(row, 'expiresAt')
+          ? { expiresAt: readShareExpiry(row.expiresAt) }
+          : {}),
         plan: document.plan,
         artworkSaved: document.identity.artworkUrl !== '',
         totalSupply: document.options.totalSupply,
