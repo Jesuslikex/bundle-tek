@@ -1,0 +1,317 @@
+{
+  "format": "jito-fresh-program-policy-evidence-v1",
+  "sourceCommit": "f92675c73d8465b5cb1ac6b59875f9e1fde927b2",
+  "observedAt": "2026-10-25T15:01:09.876Z",
+  "originalMinimumSlot": 461300479,
+  "maximumCapturedContextSlot": 461300507,
+  "span": 28,
+  "firstFullCodeScanCompleted": true,
+  "policyRefused": true,
+  "phase": "runtime-before",
+  "requestCount": 16,
+  "networkRequestsDuringReplay": 0,
+  "exactPrivateRawReplayMatched": true,
+  "rawParents": [
+    {
+      "ordinal": 0,
+      "requestSha256": "97ae2be6bff25b1fe38d103cde2e75f3d472a1bf2c94d83b819d1157695d490f",
+      "responseSha256": "00332350995dfcb37cc832b85cfd849301c20d9ad5ef0ecc35cce278692c023c",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300490"
+    },
+    {
+      "ordinal": 2,
+      "requestSha256": "5d562c7956f0f7b9a76043534c7309c0a1424d5d004e4f738be71b66064c62f3",
+      "responseSha256": "bd7f1b89dd62b3b0b7404c2c33ab285ab0cfc9eb7d2423f211fdaced94f07c0b",
+      "method": "getGenesisHash",
+      "contextSlot": null
+    },
+    {
+      "ordinal": 2,
+      "requestSha256": "c19834f761342ec629bc35539bb29b4395fdd83f27267084dcfff9ac3ba4070e",
+      "responseSha256": "192be967b57577e5db0ff3830cd7b3eab00c14b98b0d9084dc1d2c15c0e3715b",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300492"
+    },
+    {
+      "ordinal": 3,
+      "requestSha256": "a6d7d0d4f03c5b1c55fb4432e65c8c0264323adcde4a58dc6bd35a0600df7a16",
+      "responseSha256": "433f79446c274c6015b284f27ce5e50b81cd43807ce3c8282c79c8aaf6897b76",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300493"
+    },
+    {
+      "ordinal": 4,
+      "requestSha256": "3066e9f5c847d3004541023856c021d079f7a402ebc250b226240f7690451346",
+      "responseSha256": "655759dfe061451a44838aa2c28656b8ae66ea98afb7179085a750872a86ec8b",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300494"
+    },
+    {
+      "ordinal": 5,
+      "requestSha256": "1aa3845cd2fa43429dfb36f6352bdce5b92bb81558b7d4c7f85d44cd2c304741",
+      "responseSha256": "a6545cfe9e380685fa9cebcae79a4975df80da5499072f370d3bcdce518f1a4d",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300494"
+    },
+    {
+      "ordinal": 6,
+      "requestSha256": "928b2356c8d2f6a19ebcc1a921e296851f1a5647994bdde9a4c1b904843e0ce9",
+      "responseSha256": "895f8888196e259907534e21d1a1cd2e85e6f857fa3167382905698e41653360",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300495"
+    },
+    {
+      "ordinal": 7,
+      "requestSha256": "e9fcb83a867f2c6ec00d69454704930ba8569eb8ffdc8846152c092dbd6c420b",
+      "responseSha256": "80dc80ab222f994c29322bb6a5debb6a2737ed4ef982b3e60191de3d6c5ea8ac",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300497"
+    },
+    {
+      "ordinal": 8,
+      "requestSha256": "7aba337eac6c878fadfe5f476569339afbff9866917b17d0589b0eb405d9143c",
+      "responseSha256": "1404e2c535743ddc357082ce48144be8d61c0354fe9fd734e9f4155b49c949b4",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300499"
+    },
+    {
+      "ordinal": 9,
+      "requestSha256": "b024ddd5f219b7a1a51c4d684692883f15970e94e7db62b583c0b41b1605dbc4",
+      "responseSha256": "500f813eed3923860d2a9a689f23457b7949da6df160ef823046630d33ae6edc",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300501"
+    },
+    {
+      "ordinal": 10,
+      "requestSha256": "10440d0d3a17e5b7e1687d458bdc959d5be8b0c246c7008281a949165a529785",
+      "responseSha256": "aab1d3ed4f06649e14ed3e1d1dafe882cdc56951dd17171e96246cb9b664775c",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300502"
+    },
+    {
+      "ordinal": 11,
+      "requestSha256": "73769a437275b13b46075f7a2cccfb6f7d3d012713601f464d611600386d326c",
+      "responseSha256": "ac5d918808eb7bf048bfda76a19f830241fe784a4d19a98b3c381e3add9a05d2",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300504"
+    },
+    {
+      "ordinal": 12,
+      "requestSha256": "339550379a103c9ba04247c5e89e2ff759f318d7263cb461e987813f4d48e45c",
+      "responseSha256": "a9b85b1dc39f7615a6ad0b10093559a9b98eebd36475558b88a3fb664a15fb2e",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300505"
+    },
+    {
+      "ordinal": 15,
+      "requestSha256": "f954c224efaaf4870b4980f3f159f635bcc2a5229f2e42000bebafaea8df72de",
+      "responseSha256": "09b37b2f03ee7b926276dfb379fdc927bf432af9614e92feaab4575659fe4e8b",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300506"
+    },
+    {
+      "ordinal": 15,
+      "requestSha256": "414f1a7b9d066f08dffb52f0087bc5614739dcc13533d279066caf62ae8a624b",
+      "responseSha256": "adf635f04e227d750fb80dcb62338df5d6c231b02423f4e92d7a69665a70a14e",
+      "method": "getMultipleAccounts",
+      "contextSlot": "461300507"
+    },
+    {
+      "ordinal": 15,
+      "requestSha256": "a950c36c0489ea63b1556c9b02f32b4449c011a011462068fd75ca5c1fb4c580",
+      "responseSha256": "6946aaf72ad9c5e39e1a5d53ed5ee7e2e3d4ed637dd475a66e343f55525a2763",
+      "method": "getGenesisHash",
+      "contextSlot": null
+    }
+  ],
+  "observedPrograms": [
+    {
+      "address": "11111111111111111111111111111111",
+      "loader": "NativeLoader1111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+      "codeBytes": 21,
+      "identityKind": "native-system"
+    },
+    {
+      "address": "ALPHAQmeA7bjrVuccPsYPiCvsi428SNwte66Srvs4pHA",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "BVSfZyEjqJsfcGn5qq1VKhxSCJ7JCR2ypFXsXY8yUdRK",
+      "deploymentSlot": "422791798",
+      "upgradeAuthority": "H2mDaMYkYAkZxZy8ByTjU13yputt7ScyGQwVtCyj8TMA",
+      "codeSha256": "3d7bc173c67ba1858eacc69b5c504af8e160dbd38aea93779c3c65b6b011d877",
+      "codeBytes": 500000,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "loader": "BPFLoader2111111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "6804554e69fd3a58caa191dc4a58f4c67223d30ca28ab8987f39fc18d2f7374d",
+      "codeBytes": 105032,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "ComputeBudget111111111111111111111111111111",
+      "loader": "NativeLoader1111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "005950c007e8e550a16beddf836f0082d26d197f5f645ff7c04a5c8d171cf8a1",
+      "codeBytes": 22,
+      "identityKind": "native-marker"
+    },
+    {
+      "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+      "deploymentSlot": "459479624",
+      "upgradeAuthority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+      "codeSha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+      "codeBytes": 2892224,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+      "loader": "BPFLoader2111111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "f520eaf096361abbb9639ea4dc3e5388a87b9330e121f476607b87c46ef67954",
+      "codeBytes": 74800,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "6YDesqidNpd8H4pWThk3yzT1aYaHLK4XYDXJcwbgMxdq",
+      "deploymentSlot": "438767271",
+      "upgradeAuthority": "EmEa9b4yGffixdeFQ9zoyB3V5D9PZAbcE79mfwXb3bhs",
+      "codeSha256": "47e871597ac7c6750991722744a2fca235e6fc10448eb705adce10e7261c660c",
+      "codeBytes": 1498048,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+      "deploymentSlot": "419472000",
+      "upgradeAuthority": null,
+      "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+      "codeBytes": 108600,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+      "deploymentSlot": "460497271",
+      "upgradeAuthority": "AeLmXCbPaQHGWRLr2saFsEVfmMNuKnxRAbWCT9P5twgz",
+      "codeSha256": "15a2e615a42e20f31714bbaaee43002ae6f1cda2e8d7118243117ab3c1342e2d",
+      "codeBytes": 1382016,
+      "identityKind": "elf-code"
+    }
+  ],
+  "differences": [
+    {
+      "address": "ALPHAQmeA7bjrVuccPsYPiCvsi428SNwte66Srvs4pHA",
+      "observed": {
+        "address": "ALPHAQmeA7bjrVuccPsYPiCvsi428SNwte66Srvs4pHA",
+        "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "programData": "BVSfZyEjqJsfcGn5qq1VKhxSCJ7JCR2ypFXsXY8yUdRK",
+        "deploymentSlot": "422791798",
+        "upgradeAuthority": "H2mDaMYkYAkZxZy8ByTjU13yputt7ScyGQwVtCyj8TMA",
+        "codeSha256": "3d7bc173c67ba1858eacc69b5c504af8e160dbd38aea93779c3c65b6b011d877",
+        "codeBytes": 500000,
+        "identityKind": "elf-code"
+      },
+      "expected": null
+    },
+    {
+      "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "observed": {
+        "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+        "deploymentSlot": "459479624",
+        "upgradeAuthority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+        "codeSha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+        "codeBytes": 2892224,
+        "identityKind": "elf-code"
+      },
+      "expected": {
+        "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "identityKind": "elf-code",
+        "upgradeAuthority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+        "codeSha256": [
+          "099da3a26d336aa7174960f057546f192fc1ccda8e3e9d1b4aa5c69fa8a79a5f"
+        ]
+      }
+    },
+    {
+      "address": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+      "observed": {
+        "address": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+        "loader": "BPFLoader2111111111111111111111111111111111",
+        "programData": null,
+        "deploymentSlot": null,
+        "upgradeAuthority": null,
+        "codeSha256": "f520eaf096361abbb9639ea4dc3e5388a87b9330e121f476607b87c46ef67954",
+        "codeBytes": 74800,
+        "identityKind": "elf-code"
+      },
+      "expected": null
+    },
+    {
+      "address": "REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2",
+      "observed": {
+        "address": "REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2",
+        "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "programData": "6YDesqidNpd8H4pWThk3yzT1aYaHLK4XYDXJcwbgMxdq",
+        "deploymentSlot": "438767271",
+        "upgradeAuthority": "EmEa9b4yGffixdeFQ9zoyB3V5D9PZAbcE79mfwXb3bhs",
+        "codeSha256": "47e871597ac7c6750991722744a2fca235e6fc10448eb705adce10e7261c660c",
+        "codeBytes": 1498048,
+        "identityKind": "elf-code"
+      },
+      "expected": null
+    },
+    {
+      "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "observed": {
+        "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "programData": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+        "deploymentSlot": "460497271",
+        "upgradeAuthority": "AeLmXCbPaQHGWRLr2saFsEVfmMNuKnxRAbWCT9P5twgz",
+        "codeSha256": "15a2e615a42e20f31714bbaaee43002ae6f1cda2e8d7118243117ab3c1342e2d",
+        "codeBytes": 1382016,
+        "identityKind": "elf-code"
+      },
+      "expected": {
+        "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "identityKind": "elf-code",
+        "upgradeAuthority": "AeLmXCbPaQHGWRLr2saFsEVfmMNuKnxRAbWCT9P5twgz",
+        "codeSha256": [
+          "0999dbf708971e723b08d1caafc988826a59c6001ed6dc02260da07defbe1469"
+        ]
+      }
+    }
+  ],
+  "limits": [
+    "Provider-reported multi-slot identity bytes, not an atomic snapshot or node attestation",
+    "No reproduced-build or semantic security approval",
+    "Exact bundle simulation, postflight and final full scan were not reached",
+    "32-slot whole-path qualification and repeatability are unproven"
+  ],
+  "providerQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false
+}

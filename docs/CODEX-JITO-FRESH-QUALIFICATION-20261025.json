@@ -1,0 +1,906 @@
+{
+  "format": "jito-post-replay-fix-measurement-v1",
+  "outcome": {
+    "startedAt": "2026-10-25T15:01:01.808Z",
+    "sourceBaseCommit": "f92675c73d8465b5cb1ac6b59875f9e1fde927b2",
+    "plannedAttempts": 1,
+    "side": "Buy",
+    "inputLamports": "1000000",
+    "tipLamports": "1000",
+    "publicReferenceOnly": true,
+    "signaturesCreated": 0,
+    "broadcasts": 0,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "deploy": false,
+    "providerSettingsChanged": false,
+    "finishedAt": "2026-10-25T15:01:09.876Z",
+    "status": "refused",
+    "stage": "runtime-before",
+    "minimumSlot": 461300479,
+    "maximumSlot": 461300507,
+    "httpRequests": 32,
+    "rateLimited": false,
+    "fullProviderQualification": false
+  },
+  "compiledSource": {
+    "entrySha256": "d37f6066c7587f8ffadfe153a0f4e9b4c7f0579410ea96f7d2da7ccd77eb32c7",
+    "artifactSha256": "5bffb88e8410efcfe98f85884997d453785d14cb5f25483fb97deaebe7cb880a",
+    "inputCount": 108,
+    "allInputsMatchCommittedSource": true,
+    "inputs": [
+      {
+        "path": "lib/jito-simulation-json.ts",
+        "sha256": "0bdc889aeeaaade12066d3c6b0d1976bedd5d8921981710ee5f496b3547ab346"
+      },
+      {
+        "path": "lib/jito-swap-simulation-capture.ts",
+        "sha256": "2d91d9047dd9d81a6e311820edb0163fab054485f207912f1c67be432cf9dde8"
+      },
+      {
+        "path": "lib/jito-bundle.ts",
+        "sha256": "a96cac4c0708ec87487995a553364b4cf7d938ffbd45ebb9ca859e8ccdbfbef8"
+      },
+      {
+        "path": "lib/warmup-swap-quote.ts",
+        "sha256": "528225ecc32f9abc32483e9115e6253914a597ec5f7c4755abd07fad46df1024"
+      },
+      {
+        "path": "lib/pair-rent-evidence.ts",
+        "sha256": "bb265e5b43f9b2c3fba796e3cecede21fd15186d01d70a2517e338e9a7df81bf"
+      },
+      {
+        "path": "lib/wallet-balances.ts",
+        "sha256": "ee41af7318f0bbadca099d097e88b74dd7011f6ebaa47a16b4130422b6230455"
+      },
+      {
+        "path": "lib/solana-transfer-message.ts",
+        "sha256": "6608535ee05d914d5f2011851823e25ed3cafe3b1c22dc1f5ef9b6134564e6ce"
+      },
+      {
+        "path": "lib/jito-readonly-qualification.ts",
+        "sha256": "1c068f549b721e6e76ce234a73474591979272eacb0f46f027c186f3203677bb"
+      },
+      {
+        "path": "lib/solana-rpc.ts",
+        "sha256": "bda3847a729cb8f49ad8f1fc44e9274657d8d62247af4e8ff1076e970b738817"
+      },
+      {
+        "path": "lib/warmup-signing.ts",
+        "sha256": "6a7fd10717dd6d4cf464e2bcff5fec723f5aabe4163bcf224ab9d438dc3d2549"
+      },
+      {
+        "path": "lib/native-withdrawal.ts",
+        "sha256": "cced81f91ba60aa5e91985138289aba3550b1e629b48f7ffd26b90b935106780"
+      },
+      {
+        "path": "lib/imported-swap-simulation.ts",
+        "sha256": "137684a4ac78363f494852c6948746e624dcda1d41e4b1ab2b0d4285ad664fdc"
+      },
+      {
+        "path": "lib/jito-evidence-json.ts",
+        "sha256": "835cc021ed5b3ec0bb98dfb483f0453b2a761f41666dc3cc8fe715cf5c48edac"
+      },
+      {
+        "path": "lib/jito-retained-rpc-replay.ts",
+        "sha256": "315321e2d025fea0089fecede50bfa20ce25625d3250bca5420c2cc38d295b65"
+      },
+      {
+        "path": "lib/solana-funding-error.ts",
+        "sha256": "6cfb40cee8dfdefdddfed68e981fd010b175b1a41e322c917b859d86e986b585"
+      },
+      {
+        "path": "lib/server-env.ts",
+        "sha256": "a2134d1e153ec53c6e78d305ce5fa30519a54ca17b04983877527297fc2c88aa"
+      },
+      {
+        "path": "lib/wallet-operation.ts",
+        "sha256": "eefc155b9a50b2e7bb431b4fde5a61c390b9adf1acebb1248475326da5781685"
+      },
+      {
+        "path": "lib/unsigned-swap-order.ts",
+        "sha256": "0788a4a72dc32d410434b5907ab3f56abd813b7bd918d4ba9eb93a7319a41f80"
+      },
+      {
+        "path": "lib/wallet-warmup.ts",
+        "sha256": "5ae5d0ed27ce363672ee3db863be16ec77fa9a3db204c15bd29f003ca7a45005"
+      },
+      {
+        "path": "lib/token-source.ts",
+        "sha256": "bb3af905aae6de93ced4de895361f08bf6cf0fde35680328fed23c4182f72491"
+      },
+      {
+        "path": "lib/wallet-workspace.ts",
+        "sha256": "a59c02757856bdbd582a8b498e2347a5217c58fd724da20a6e4d56419c43bc41"
+      },
+      {
+        "path": "lib/solana-token-amount.ts",
+        "sha256": "445105230cfe8583581aeaa92ab0690110a86a85b43dbd9171755f4de15fb276"
+      },
+      {
+        "path": "lib/imported-trade-session.ts",
+        "sha256": "c0e042a361743df7d0289aa3a0ea966a23f7d15532c05f5b52bec8802c9e94a3"
+      },
+      {
+        "path": "lib/warmup-native-settlement.ts",
+        "sha256": "bb3ed0589fb4f506a1c46f057bcc080565ace826a0694d6d0f53e5d03d7c7e70"
+      },
+      {
+        "path": "lib/conditional-signing.ts",
+        "sha256": "b4f31dc77d311503566fef36289e1c948a25ce0d344aa782337be8a764b35725"
+      },
+      {
+        "path": "lib/wallet-rpc-pacing.ts",
+        "sha256": "dbb1b7ea1b4f00e6f7ffdecdd701e3173aea663cbf27ec1a65d1149f786f82de"
+      },
+      {
+        "path": "lib/evm-network.ts",
+        "sha256": "1aa38dd4953836cf5424a39f242c9cd65267c698189c24b3f37eec76c9947d86"
+      },
+      {
+        "path": "lib/wallet-balance-format.ts",
+        "sha256": "864bb3a590e26a3b62883afac7f47bfd16c9288d3277d60adcdb56e42a868027"
+      },
+      {
+        "path": "lib/wallet-verification.ts",
+        "sha256": "0053eadf1448faf0ae36ea4b30ac4492ae901e23ef6a001db2b27fb3bb1e7a7e"
+      },
+      {
+        "path": "lib/distribution-audit.ts",
+        "sha256": "ce39e183d2974e53bf3dcdeb732785d746c13413e8840355501ef19020594166"
+      },
+      {
+        "path": "lib/jito-runtime-evidence.ts",
+        "sha256": "38d73bc28c6cdf9d7b4af2e38c2210fad48ddbb279a71eb39e0153224ef8a9da"
+      },
+      {
+        "path": "lib/distribution-plan.ts",
+        "sha256": "ae58ad794b6dcb1f0e2937f9eeb9247a6993248a2a31d55375b779786c30e57c"
+      },
+      {
+        "path": "lib/jito-bundle-economics.ts",
+        "sha256": "e62ad7f47ae224b5aae522679567de3a5fa270d7bb0ebc3a24887eaf41cfdaf3"
+      },
+      {
+        "path": "lib/jito-coherent-simulation-attempt.ts",
+        "sha256": "1afdfc832cf2bd41427ed237d39d55e9285690f8568fb396c720eced6899ea14"
+      },
+      {
+        "path": "lib/jito-qualification-transport.ts",
+        "sha256": "3448a2892449f50bb878346da744bb977f20baf7c0fb5c3e6e676f3a30f0b666"
+      },
+      {
+        "path": "lib/jito-asset-evidence.ts",
+        "sha256": "8e864fceb883e423e14057bbc75b06176bee26dc497a1f3bad84c113f51c458d"
+      },
+      {
+        "path": "lib/jito-bundle-simulation-frames.ts",
+        "sha256": "22ee282066b1c538f8e203113d2d09ba4c6adc744d19d754f7e732f196aa00b5"
+      },
+      {
+        "path": "lib/swap-lookup-accounts.ts",
+        "sha256": "cdce7e689518d24be33c4bdb61a78b59514bd42f29d091358db6e2e58268aeaf"
+      },
+      {
+        "path": "lib/withdrawal-failure.ts",
+        "sha256": "ede6791501deff480b05a05b2f69718e8572fd1715cd566d094258d7a4eac14d"
+      },
+      {
+        "path": "lib/solana-signature.ts",
+        "sha256": "f91f71616c40d4ee283f932841cbe689c89840d02d662ce20797e5c6f9460156"
+      },
+      {
+        "path": "lib/mainnet-funding.ts",
+        "sha256": "b7b06a5510fecc97d8338b06fc1cc4f1d508435a015925a5e07c837c42e608bd"
+      },
+      {
+        "path": "lib/solana-token-transfer-message.ts",
+        "sha256": "e2d042767d3992001424d3b99e3787db0439b1e0df8423cadb11671fae77f1a4"
+      },
+      {
+        "path": "lib/token-withdrawal-fee.ts",
+        "sha256": "f156fe879b787864ecd6a5230f7ee7bb58e477130f7ae76de2432692e0e64f1c"
+      },
+      {
+        "path": "lib/jupiter-route-assessment.ts",
+        "sha256": "9696f21ea93ac9474da6b8ebdad9cfcd23e148fce1e6b91736aef5f4f748a52d"
+      },
+      {
+        "path": "lib/swap-instruction-review.ts",
+        "sha256": "f10cef22a4d509601e40297a8c3298747d7579f499252bb1dc3a5dfc29f84eaa"
+      },
+      {
+        "path": "lib/simulated-swap-balances.ts",
+        "sha256": "d02905be84f8d0e94e5b41bd2f6184a42bf8469b07ae1882925a056f5e5d2a77"
+      },
+      {
+        "path": "lib/swap-token-account-bindings.ts",
+        "sha256": "acd1e09091e9a43efa457d97b5c774db900a7cc4e17b224c723e5135cb0576a6"
+      },
+      {
+        "path": "lib/swap-token-program-evidence.ts",
+        "sha256": "69bd2187a364bd0da1d3635bdd560401df3dc3f295df3495e61e5271e614e135"
+      },
+      {
+        "path": "lib/launch-plan.ts",
+        "sha256": "462389a92e19fb41fdeedbc310ecc71708c12e5b55aa9ac475cf0346f9280e20"
+      },
+      {
+        "path": "lib/market-trigger.ts",
+        "sha256": "c0b4cf8afe6c77028c5da4c22adb5a4125dc2523c2982d73a0da78d625ea5629"
+      },
+      {
+        "path": "lib/conditional-order.ts",
+        "sha256": "cabd0f6bb3a2014189ed6fe1ab57e4ba939bb47565c3703c0ac096b8b7640d8e"
+      },
+      {
+        "path": "lib/dca-market-cap.ts",
+        "sha256": "dd0c6261ef138f301f4a54de1447c146efd44dfd60258e2fdf926f0c742308de"
+      },
+      {
+        "path": "lib/dca-supply-sizing.ts",
+        "sha256": "6ad3a0fa4867f27b1893d76b08163be2cdd3fccab8e54cead9e4f8201c99ccc6"
+      },
+      {
+        "path": "lib/dca-random-allocation.ts",
+        "sha256": "a1d527ddbccdca4721e67f494c87676f75c7a78b635d6d67f2a522de98d34142"
+      },
+      {
+        "path": "lib/warmup-history-capacity.ts",
+        "sha256": "47b8aca2d6755287ed793e753bef1be7a3e1a7f5f78a797044169ebb7ec88db9"
+      },
+      {
+        "path": "lib/jupiter-exact-out-assessment.ts",
+        "sha256": "dfa47db3b07050d097381f8094999c7247599be79380299dbe84315542626e9a"
+      },
+      {
+        "path": "lib/pump-group-code-identity.ts",
+        "sha256": "37290e060babc78f71e58adef1eb7acb096b0172af81e6bbc5d060277e5d6e0a"
+      },
+      {
+        "path": "lib/pair-runtime-exposure.ts",
+        "sha256": "b256a89c68876d5de5eff30f5559cef5719b3c95b111f78696c1de80d8358f61"
+      },
+      {
+        "path": "lib/pump-launch-group-deployments.ts",
+        "sha256": "0d4431d69caabd55962051955d4c6966c3fb3fcae14f5e41d6701bb1c5fd0019"
+      },
+      {
+        "path": "lib/pair-trusted-programs.ts",
+        "sha256": "0ce845c3910894452d5b8525be3f1d9f596075b4b127c0942d1f395fc1d54cda"
+      },
+      {
+        "path": "lib/pair-partition-observation.ts",
+        "sha256": "8cc957c416877f8aa6fa20929a145dc15d631ffdcba35510977da2fcb25c6a7a"
+      },
+      {
+        "path": "lib/pair-stock-clock.ts",
+        "sha256": "2bfe57d0fa0ba34b86315ce38542ee6ae8ccf746ed5c396e0626ab8e22f6559c"
+      },
+      {
+        "path": "lib/jito-fee-batch.ts",
+        "sha256": "df18091b90f24bfa59c3dc9764f4027a6f55a25efd421f81267327772145d35f"
+      },
+      {
+        "path": "lib/jito-simulation-response.ts",
+        "sha256": "04de90de4fb1a80f81be8e57aa55b947b9689a194636632daa34f616810df524"
+      },
+      {
+        "path": "lib/jito-rpc-batch-capture.ts",
+        "sha256": "e22e93e6eebc978fd400573f7b23a207363fd16c3c0a32bc9d8cca32cd9cb261"
+      },
+      {
+        "path": "lib/jito-bundle-token-state.ts",
+        "sha256": "0d3397f59b5f02d6f9a4c7fa4ba47c7a6be7d7b3621308540f6214149067adf5"
+      },
+      {
+        "path": "lib/jito-settlement-policy.ts",
+        "sha256": "0617c59874f094519181fa1d72213d7603600643d87de8722f0acb509c4dc117"
+      },
+      {
+        "path": "lib/pump-group-broadcast.ts",
+        "sha256": "10b5dfb444429487168700a1b2b6d5540d6de98ad9985a90fc22ae5ef6864134"
+      },
+      {
+        "path": "lib/solana-token-balance-changes.ts",
+        "sha256": "5b1d594994720c3552596cf86fef0ff3ff96df408edf6368e6f73b5a1d55352c"
+      },
+      {
+        "path": "lib/wallet-holdings.ts",
+        "sha256": "54c057b86bd9a834f687bb9cc06425be23fc6d3cf15dbe6af6ecba69897376cc"
+      },
+      {
+        "path": "lib/conditional-sell-order.ts",
+        "sha256": "29a3cb776edd4d0dbb2a27b88b7556337edeb89cd9dd590667977672d94b83af"
+      },
+      {
+        "path": "lib/token-withdrawal-extensions.ts",
+        "sha256": "1ac274a37701c8cdcfa806e6dc1a03c776e481eb0b84bdecc5faa20528a89a4e"
+      },
+      {
+        "path": "lib/funding-plan.ts",
+        "sha256": "956ec51bf1a6b2e3edbbd4f3023acdc0e80f7e98fe85c8181b033039229338ec"
+      },
+      {
+        "path": "lib/quote-catalog.ts",
+        "sha256": "94d79b21b19e06649902a81aba26b652c387a539f9f07a99832b837976bb4ad9"
+      },
+      {
+        "path": "lib/launch-distribution.ts",
+        "sha256": "a8908e97ed3be54d24e68639a78fda1f3550a009c5471aea031f669031f204f5"
+      },
+      {
+        "path": "lib/launch-buy.ts",
+        "sha256": "80f77793d55f321ef23418d4ff730a4fae2104573480cf8fb9e736f3c9ea6e57"
+      },
+      {
+        "path": "lib/jupiter-route-schema.json",
+        "sha256": "3850acde8e9a036b9e2ad101bf3cb09051460f60bd095a5a3c82ddd96121337b"
+      },
+      {
+        "path": "lib/launch-timing.ts",
+        "sha256": "f0c1c51d787c33a95efd4cb1709e866c8f8f36833418d778ec1b1832a8eb69b8"
+      },
+      {
+        "path": "lib/pump-launch-simulation.ts",
+        "sha256": "14c29c6c5f1738e359dd1d732cff65ee385582d061ac9368c9ca90076cee45c9"
+      },
+      {
+        "path": "lib/pair-account-partitions.ts",
+        "sha256": "06b8710ee4c59717133afbee1dfc5b12e57c7f703dc1119b817b40484ca0e4e9"
+      },
+      {
+        "path": "lib/pair-review-diagnostic.ts",
+        "sha256": "0f6404a839da78594911d16b33aa5ba0d6425a5c8faf6e2271f6c1947f60a89b"
+      },
+      {
+        "path": "lib/pump-launch-group-review.ts",
+        "sha256": "4b5d186cc26eebf4346eaf4968f41997d34a110712ebfcaa5f2828913f1fe3c9"
+      },
+      {
+        "path": "lib/pump-holder-review.ts",
+        "sha256": "ff9f0878375651a6588d08cb6ea4b122e938ae7ea2ce9be3f85b661536442488"
+      },
+      {
+        "path": "lib/pump-launch-group-signatures.ts",
+        "sha256": "abd2433915b2490a3f30bec17d595d6c68e3fa4e98d486e8617f3d8064ce3e14"
+      },
+      {
+        "path": "lib/holdings-batch-error.ts",
+        "sha256": "abb52a3ea19a38b4ef2d8718949658172a177f1615b4326a4ac7271c20f6bd2d"
+      },
+      {
+        "path": "lib/token-extension-names.ts",
+        "sha256": "eb0d607f8327f80499b1067f5609886eb20cb9dc2cce4fb7f0d358a01fad3eb0"
+      },
+      {
+        "path": "lib/launch-methods.ts",
+        "sha256": "5a61da8367f597f23034bb7ea6aef719873287c36f0404af653c98cbdf31ab8c"
+      },
+      {
+        "path": "lib/launch-timing-limits.ts",
+        "sha256": "87806ea5309d4816c8c9f612138df8386428f34f3c9f7bcb271ba1b7d3a21fe2"
+      },
+      {
+        "path": "lib/pump-launch-signing.ts",
+        "sha256": "61ebd7830f0163bbae68f040386f151bdb744ef1cc577d12a6b588568ad9e1da"
+      },
+      {
+        "path": "lib/pump-holder-message.ts",
+        "sha256": "308f01683098a71c5cc05c962744b7d6002eb9b7b358f9a8f3a4805f5e168e64"
+      },
+      {
+        "path": "lib/pump-holder-review-plan.ts",
+        "sha256": "df8cf4f12e552e482fbd49cce71a713b678758e9069b3e73e1a2aa8bba463a06"
+      },
+      {
+        "path": "lib/pump-launch-packet-group.ts",
+        "sha256": "04145c10a461c8a5b0ebe40273855483ce7a7b04104ed80bf8cf480eba385715"
+      },
+      {
+        "path": "lib/pump-launch-config.ts",
+        "sha256": "01dd4818363da1632896f784178d55724e9502561b85100ab128f3037bb7cf26"
+      },
+      {
+        "path": "lib/pump-launch-message.ts",
+        "sha256": "c86f123f5ff2bc6ac2b6ec88e0b591d9ceba40408b268c2c08393c54e690d151"
+      },
+      {
+        "path": "lib/workspace-project.ts",
+        "sha256": "974be8fb7ff5da2f2149b92ff9556b9dfaad3689a89c1c6039cd354a6415fb0a"
+      },
+      {
+        "path": "lib/pump-holder-targets.ts",
+        "sha256": "88ccbe219f22d7021110e7e34c353b57f526c17adaff41691f2484ffa004eaa6"
+      },
+      {
+        "path": "lib/pump-initial-buy-preparation.ts",
+        "sha256": "2aa0c0a6dec2e78814ad681c16b831a6429ef17866039bdd6e95c35e7c009119"
+      },
+      {
+        "path": "lib/pump-initial-buy-message.ts",
+        "sha256": "ccca173f17fb1af5064442f2e4275db6222f66e679eaa5e9026c4fccbf969e96"
+      },
+      {
+        "path": "lib/pump-exact-quote-schema.json",
+        "sha256": "3dd5a0333ae852dfc9bf4c98c4757c66e2ebef9a5a19396f54368303ce815a26"
+      },
+      {
+        "path": "lib/pump-launch-schema.json",
+        "sha256": "9923f1c6784cd9b05b187071e40f0951685e74a18071a04bd2c4925a88a6c5f5"
+      },
+      {
+        "path": "lib/pump-launch-preparation.ts",
+        "sha256": "ddfcaf8cc7b9d352c6aeda6f8ba28a36db3f83fc062cdd9acda0a8f7c8da65a1"
+      },
+      {
+        "path": "lib/artwork.ts",
+        "sha256": "6e1fdab588873229e90e4b7c88d492fb48f0f9fb007f12c63f4715b7739afa3a"
+      },
+      {
+        "path": "lib/venue-settings.ts",
+        "sha256": "473353d7f2d68c3ed8f6324284c169076b0bbd102ffed80b97acded366a98a5a"
+      },
+      {
+        "path": "lib/token-linked-metadata.ts",
+        "sha256": "d7f57fd393ffd16e7572d4ea5459e7a8546c9d6f7d2724093e63624612fd84f6"
+      },
+      {
+        "path": "lib/launch-wallets.ts",
+        "sha256": "96ce97287fcfbce2db52b998009af81384e51ae8d55e9bfdddad4f274eb364c2"
+      },
+      {
+        "path": "lib/pump-launch-lookups.ts",
+        "sha256": "b4bf2aee2b923b961488836e37b1dcbcffdaeacfa3a5dfa179bd264918781f2d"
+      },
+      {
+        "path": "lib/pump-initial-buy-schema.json",
+        "sha256": "d8ef16af3c46954eca3b79c37b121b67ba5003162f5a5089a990b2ff11a85be2"
+      },
+      {
+        "path": "lib/printr-settings.ts",
+        "sha256": "f204cb579f3d4b34caaebe9420e42f58967cbb1be5c1ad3cd0bfb29b6ed86023"
+      }
+    ]
+  },
+  "outerTiming": {
+    "clock": "process-monotonic",
+    "originMs": 72.2232,
+    "diagnosticOnly": true,
+    "phases": [
+      {
+        "phase": "compile",
+        "atMs": 0.0257000000000005
+      },
+      {
+        "phase": "unsigned-order",
+        "atMs": 629.9272
+      },
+      {
+        "phase": "full-baseline",
+        "atMs": 1039.3878000000002
+      },
+      {
+        "phase": "tip-read",
+        "atMs": 2976.2709
+      },
+      {
+        "phase": "full-qualification",
+        "atMs": 3367.2380000000003
+      },
+      {
+        "phase": "collector-terminal",
+        "atMs": 8032.0885
+      }
+    ]
+  },
+  "collectorTiming": {
+    "clock": "process-monotonic",
+    "originMs": 3440.4538,
+    "diagnosticOnly": true,
+    "originalMinimumSlot": 461300479,
+    "maximumCapturedContextSlot": 461300507,
+    "contextSlotsAdmitted": false,
+    "events": [
+      {
+        "phase": "collector",
+        "event": "begin",
+        "atMs": 0.0397000000002663
+      },
+      {
+        "phase": "manifest-validation",
+        "event": "begin",
+        "atMs": 0.209400000000187
+      },
+      {
+        "phase": "manifest-validation",
+        "event": "finish",
+        "atMs": 1.038000000000011
+      },
+      {
+        "phase": "baseline-replay",
+        "event": "begin",
+        "atMs": 1.0410000000001673
+      },
+      {
+        "phase": "baseline-replay",
+        "event": "finish",
+        "atMs": 24.313100000000304
+      },
+      {
+        "phase": "network",
+        "event": "begin",
+        "atMs": 24.819400000000314
+      },
+      {
+        "phase": "network",
+        "event": "finish",
+        "atMs": 380.77840000000015
+      },
+      {
+        "phase": "lookup-before",
+        "event": "begin",
+        "atMs": 380.7832000000003
+      },
+      {
+        "phase": "lookup-before",
+        "event": "finish",
+        "atMs": 568.0805
+      },
+      {
+        "phase": "packet-scope",
+        "event": "begin",
+        "atMs": 568.1191000000003
+      },
+      {
+        "phase": "packet-scope",
+        "event": "finish",
+        "atMs": 576.5673000000002
+      },
+      {
+        "phase": "assets-before",
+        "event": "begin",
+        "atMs": 576.6472000000003
+      },
+      {
+        "phase": "runtime-before",
+        "event": "begin",
+        "atMs": 577.1546000000003
+      },
+      {
+        "phase": "assets-before",
+        "event": "finish",
+        "atMs": 697.2750000000001
+      },
+      {
+        "phase": "runtime-before",
+        "event": "refused",
+        "atMs": 4637.871300000001
+      },
+      {
+        "phase": "collector",
+        "event": "refused",
+        "atMs": 4638.616400000001
+      }
+    ]
+  },
+  "transportTimings": [
+    {
+      "stage": "bundle",
+      "requests": [
+        {
+          "requestSha256": "62c7c4b915151ed851e5971afeaf6de69b4f4b7d47f3f40f4525c5587d2e33ca",
+          "responseSha256": "63e489b3dc8223d93882c52ca3a27dd90922de55538d4300d6d004a48cfe10fd",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 0.5796999999997752,
+            "pacedAtMs": 0.7282999999997628,
+            "sentAtMs": 0.7994999999996253,
+            "headersAtMs": 355.37189999999964,
+            "capturedAtMs": 355.58489999999983,
+            "finishedAtMs": 355.7132999999999
+          }
+        },
+        {
+          "requestSha256": "a8860234a1eec0e873b51a00b7c58bf4941d0506965a2092b3af5ad4fee00cc7",
+          "responseSha256": "f2cc2209348a942052caef01b19d4d201b752e9cd5896057604963f1c5b1ef25",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 357.70550000000003,
+            "pacedAtMs": 357.77239999999983,
+            "sentAtMs": 357.87660000000005,
+            "headersAtMs": 536.8190999999997,
+            "capturedAtMs": 537.5183999999999,
+            "finishedAtMs": 537.6502
+          }
+        }
+      ]
+    },
+    {
+      "stage": "assets",
+      "requests": [
+        {
+          "requestSha256": "f60c6761f2bbd1bf428aebc5f31b2fe8416f4d576077294cb8a536af45ae180c",
+          "responseSha256": "8d32319b646120716a673e59a291cf6df05b338b97eef22821424c02e1fb04bd",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 552.3411999999998,
+            "pacedAtMs": 573.0734000000002,
+            "sentAtMs": 573.2020000000002,
+            "headersAtMs": 669.2584000000002,
+            "capturedAtMs": 669.6451000000002,
+            "finishedAtMs": 669.7715000000003
+          }
+        }
+      ]
+    },
+    {
+      "stage": "runtime",
+      "requests": [
+        {
+          "requestSha256": "97ae2be6bff25b1fe38d103cde2e75f3d472a1bf2c94d83b819d1157695d490f",
+          "responseSha256": "00332350995dfcb37cc832b85cfd849301c20d9ad5ef0ecc35cce278692c023c",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 554.9049999999997,
+            "pacedAtMs": 758.5161999999996,
+            "sentAtMs": 758.6487000000002,
+            "headersAtMs": 862.2979,
+            "capturedAtMs": 862.9253999999996,
+            "finishedAtMs": 863.0089999999996
+          }
+        },
+        {
+          "requestSha256": "5d562c7956f0f7b9a76043534c7309c0a1424d5d004e4f738be71b66064c62f3",
+          "responseSha256": "bd7f1b89dd62b3b0b7404c2c33ab285ab0cfc9eb7d2423f211fdaced94f07c0b",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 866.7863000000002,
+            "pacedAtMs": 960.5594999999998,
+            "sentAtMs": 960.7333000000003,
+            "headersAtMs": 1058.0122999999999,
+            "capturedAtMs": 1058.1578000000004,
+            "finishedAtMs": 1058.2014000000004
+          }
+        },
+        {
+          "requestSha256": "c19834f761342ec629bc35539bb29b4395fdd83f27267084dcfff9ac3ba4070e",
+          "responseSha256": "192be967b57577e5db0ff3830cd7b3eab00c14b98b0d9084dc1d2c15c0e3715b",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 867.0405999999998,
+            "pacedAtMs": 1162.7198000000003,
+            "sentAtMs": 1162.9276999999997,
+            "headersAtMs": 1261.6645000000003,
+            "capturedAtMs": 1261.9086000000002,
+            "finishedAtMs": 1261.9550999999997
+          }
+        },
+        {
+          "requestSha256": "a6d7d0d4f03c5b1c55fb4432e65c8c0264323adcde4a58dc6bd35a0600df7a16",
+          "responseSha256": "433f79446c274c6015b284f27ce5e50b81cd43807ce3c8282c79c8aaf6897b76",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 1263.1048999999998,
+            "pacedAtMs": 1364.1567,
+            "sentAtMs": 1364.3479000000002,
+            "headersAtMs": 1462.9419000000003,
+            "capturedAtMs": 1463.2153999999996,
+            "finishedAtMs": 1463.2817
+          }
+        },
+        {
+          "requestSha256": "3066e9f5c847d3004541023856c021d079f7a402ebc250b226240f7690451346",
+          "responseSha256": "655759dfe061451a44838aa2c28656b8ae66ea98afb7179085a750872a86ec8b",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 1464.4577000000004,
+            "pacedAtMs": 1563.2243999999996,
+            "sentAtMs": 1563.3740999999995,
+            "headersAtMs": 1730.6657,
+            "capturedAtMs": 1733.3843000000002,
+            "finishedAtMs": 1733.6969999999997
+          }
+        },
+        {
+          "requestSha256": "1aa3845cd2fa43429dfb36f6352bdce5b92bb81558b7d4c7f85d44cd2c304741",
+          "responseSha256": "a6545cfe9e380685fa9cebcae79a4975df80da5499072f370d3bcdce518f1a4d",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 1758.2331,
+            "pacedAtMs": 1758.2958000000003,
+            "sentAtMs": 1758.4325999999996,
+            "headersAtMs": 2049.6018,
+            "capturedAtMs": 2059.7787000000003,
+            "finishedAtMs": 2060.3867999999998
+          }
+        },
+        {
+          "requestSha256": "928b2356c8d2f6a19ebcc1a921e296851f1a5647994bdde9a4c1b904843e0ce9",
+          "responseSha256": "895f8888196e259907534e21d1a1cd2e85e6f857fa3167382905698e41653360",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 2163.9952,
+            "pacedAtMs": 2164.0556,
+            "sentAtMs": 2164.6825000000003,
+            "headersAtMs": 2388.1173000000003,
+            "capturedAtMs": 2405.7445999999995,
+            "finishedAtMs": 2406.4968000000003
+          }
+        },
+        {
+          "requestSha256": "e9fcb83a867f2c6ec00d69454704930ba8569eb8ffdc8846152c092dbd6c420b",
+          "responseSha256": "80dc80ab222f994c29322bb6a5debb6a2737ed4ef982b3e60191de3d6c5ea8ac",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 2552.4327,
+            "pacedAtMs": 2552.4820999999997,
+            "sentAtMs": 2552.7951,
+            "headersAtMs": 2741.5555,
+            "capturedAtMs": 2750.2212000000004,
+            "finishedAtMs": 2750.7558999999997
+          }
+        },
+        {
+          "requestSha256": "7aba337eac6c878fadfe5f476569339afbff9866917b17d0589b0eb405d9143c",
+          "responseSha256": "1404e2c535743ddc357082ce48144be8d61c0354fe9fd734e9f4155b49c949b4",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 2841.0505,
+            "pacedAtMs": 2841.0916,
+            "sentAtMs": 2841.3044999999997,
+            "headersAtMs": 3000.2257999999997,
+            "capturedAtMs": 3016.2428999999997,
+            "finishedAtMs": 3016.9966
+          }
+        },
+        {
+          "requestSha256": "b024ddd5f219b7a1a51c4d684692883f15970e94e7db62b583c0b41b1605dbc4",
+          "responseSha256": "500f813eed3923860d2a9a689f23457b7949da6df160ef823046630d33ae6edc",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 3131.5227,
+            "pacedAtMs": 3131.5732999999996,
+            "sentAtMs": 3131.8516000000004,
+            "headersAtMs": 3261.5009999999997,
+            "capturedAtMs": 3304.8534999999997,
+            "finishedAtMs": 3305.5141
+          }
+        },
+        {
+          "requestSha256": "10440d0d3a17e5b7e1687d458bdc959d5be8b0c246c7008281a949165a529785",
+          "responseSha256": "aab1d3ed4f06649e14ed3e1d1dafe882cdc56951dd17171e96246cb9b664775c",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 3411.5727,
+            "pacedAtMs": 3411.6159000000002,
+            "sentAtMs": 3413.8547999999996,
+            "headersAtMs": 3631.3008999999997,
+            "capturedAtMs": 3638.6783,
+            "finishedAtMs": 3639.1126
+          }
+        },
+        {
+          "requestSha256": "73769a437275b13b46075f7a2cccfb6f7d3d012713601f464d611600386d326c",
+          "responseSha256": "ac5d918808eb7bf048bfda76a19f830241fe784a4d19a98b3c381e3add9a05d2",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 3703.4118000000003,
+            "pacedAtMs": 3703.4666,
+            "sentAtMs": 3704.1616,
+            "headersAtMs": 3807.3604,
+            "capturedAtMs": 3818.0256000000004,
+            "finishedAtMs": 3818.8489000000004
+          }
+        },
+        {
+          "requestSha256": "339550379a103c9ba04247c5e89e2ff759f318d7263cb461e987813f4d48e45c",
+          "responseSha256": "a9b85b1dc39f7615a6ad0b10093559a9b98eebd36475558b88a3fb664a15fb2e",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 3901.3824,
+            "pacedAtMs": 3903.5919,
+            "sentAtMs": 3905.4792999999995,
+            "headersAtMs": 3995.3021999999996,
+            "capturedAtMs": 3998.4854,
+            "finishedAtMs": 3998.7400999999995
+          }
+        },
+        {
+          "requestSha256": "f954c224efaaf4870b4980f3f159f635bcc2a5229f2e42000bebafaea8df72de",
+          "responseSha256": "09b37b2f03ee7b926276dfb379fdc927bf432af9614e92feaab4575659fe4e8b",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 4031.3709000000003,
+            "pacedAtMs": 4114.102500000001,
+            "sentAtMs": 4114.3531,
+            "headersAtMs": 4210.8557,
+            "capturedAtMs": 4211.1801,
+            "finishedAtMs": 4211.212799999999
+          }
+        },
+        {
+          "requestSha256": "414f1a7b9d066f08dffb52f0087bc5614739dcc13533d279066caf62ae8a624b",
+          "responseSha256": "adf635f04e227d750fb80dcb62338df5d6c231b02423f4e92d7a69665a70a14e",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 4031.4819999999995,
+            "pacedAtMs": 4313.465,
+            "sentAtMs": 4313.5964,
+            "headersAtMs": 4417.9712,
+            "capturedAtMs": 4418.2116000000005,
+            "finishedAtMs": 4418.2464
+          }
+        },
+        {
+          "requestSha256": "a950c36c0489ea63b1556c9b02f32b4449c011a011462068fd75ca5c1fb4c580",
+          "responseSha256": "6946aaf72ad9c5e39e1a5d53ed5ee7e2e3d4ed637dd475a66e343f55525a2763",
+          "status": 200,
+          "captureStatus": "captured",
+          "timing": {
+            "queuedAtMs": 4031.5099999999998,
+            "pacedAtMs": 4514.550300000001,
+            "sentAtMs": 4514.691699999999,
+            "headersAtMs": 4610.2819,
+            "capturedAtMs": 4610.411700000001,
+            "finishedAtMs": 4610.4547999999995
+          }
+        }
+      ]
+    },
+    {
+      "stage": "runtime",
+      "requests": []
+    }
+  ],
+  "programPolicyEvidence": {
+    "path": "docs/CODEX-JITO-FRESH-PROGRAM-POLICY-20261025.json",
+    "sha256": "e6fd932b0caa477edf0c9e07e56e109aa1fac3dce8e54152882abf1375c8100a",
+    "programCount": 9,
+    "differences": 5,
+    "changedPins": 2,
+    "unlisted": 3
+  },
+  "verification": {
+    "focusedFiles": 2,
+    "focusedTests": 19,
+    "exactHistoricalRuntimeRawReplayRequests": 16,
+    "rawReplayNetworkCalls": 0,
+    "applicationChanges": [],
+    "broaderTests": "Prior f92675c checkpoint888tests/40files+19offline native; not rerun here"
+  },
+  "coordination": {
+    "existingClaudeAcknowledgement": "https://github.com/Jesuslikex/bundle-tek/pull/59#issuecomment-6398976382",
+    "freshFindingSent": "https://github.com/Jesuslikex/bundle-tek/pull/59#issuecomment-6399245960",
+    "openCode": "existing session previously usage-limited; no accepted new claim/restart"
+  },
+  "limits": [
+    "Different live routes prevent controlled whole-path A/B timing claims",
+    "No exact bundle simulation, postflight or final scan reached",
+    "Current program identity observations are not semantic/build approval",
+    "First-scan F+28 is not complete32-slot qualification"
+  ],
+  "fullProviderQualification": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "deploy": false,
+  "fundedTrades": false
+}
