@@ -1,7 +1,11 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
-import type { WorkspaceProject } from '@/lib/workspace-project';
+import { SharedProjectReview } from './shared-project-review';
+import {
+  readSharedProjectSnapshots,
+  type SharedProjectSnapshot,
+} from '@/lib/shared-project-review';
 import { readWorkspaceResponse } from '@/lib/workspace-response';
 
 type Share = {
@@ -10,7 +14,7 @@ type Share = {
   createdAt: string;
   acceptedAt: string | null;
 };
-type SharedProject = WorkspaceProject & { shareId: string; readOnly: true };
+type SharedProject = SharedProjectSnapshot;
 
 async function call<T>(body: unknown): Promise<T> {
   const response = await fetch('/api/projects/shares', {
@@ -41,20 +45,16 @@ async function fetchShares(projectId: string) {
     throw new Error(value.error || 'Shares unavailable.');
   return value.shares;
 }
-async function fetchSharedProjects() {
-  const response = await fetch('/api/projects/shares', { cache: 'no-store' });
-  if (response.status === 401) return null;
-  const value = (await readWorkspaceResponse(
-    response,
-    'Shared projects unavailable. Try again later.',
-    'Sign in to open shared projects.',
-  )) as {
-    projects?: SharedProject[];
-    error?: string;
-  };
-  if (!response.ok || !value.projects)
-    throw new Error(value.error || 'Shared projects unavailable.');
-  return value.projects;
+async function fetchSharedProjects(signal: AbortSignal) {
+  const response = await fetch('/api/projects/shares', {
+    cache: 'no-store',
+    signal,
+  });
+  if (response.status === 401) {
+    void response.body?.cancel().catch(() => {});
+    return null;
+  }
+  return readSharedProjectSnapshots(response, signal);
 }
 
 /** Owner view: invite collaborators to read this saved project. */
@@ -86,8 +86,9 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
     <section aria-label="Collaborators" className="min-w-0 space-y-2">
       <h4>Collaborators</h4>
       <p className="text-xs text-muted-foreground">
-        Share a read-only view of this project. Collaborators see the saved
-        plan; wallets and signing stay with you.
+        Share a read-only view of this project. Collaborators receive the saved
+        plan, including public wallet assignments. Private keys and signing stay
+        with you.
       </p>
       <Button
         type="button"
@@ -146,23 +147,58 @@ export function SharedProjectsPanel() {
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const load = useCallback(
-    () =>
-      fetchSharedProjects().then(
-        (value) => {
-          if (value) setProjects(value);
-          const fromUrl = new URLSearchParams(window.location.search).get(
-            'share',
-          );
-          if (fromUrl) setToken(fromUrl);
-        },
-        (e) => setError(message(e)),
-      ),
-    [],
-  );
+  const generation = useRef(0);
+  const mounted = useRef(false);
+  const pending = useRef<AbortController | null>(null);
+  const load = useCallback(async () => {
+    const version = ++generation.current;
+    pending.current?.abort();
+    const controller = new AbortController();
+    pending.current = controller;
+    let signal: AbortSignal | undefined;
+    const current = () => mounted.current && generation.current === version;
+    try {
+      if (
+        typeof AbortSignal.any !== 'function' ||
+        typeof AbortSignal.timeout !== 'function'
+      )
+        throw Error(
+          'This browser cannot time-limit project reads. Update your browser to continue.',
+        );
+      signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]);
+      const value = await fetchSharedProjects(signal);
+      if (!current()) return;
+      setProjects(value ?? []);
+      setError(value === null ? 'Sign in to open shared projects.' : '');
+      const fromUrl = new URLSearchParams(window.location.search).get('share');
+      if (fromUrl) setToken(fromUrl);
+    } catch (error) {
+      // Capability failures are also asynchronous read outcomes, never a
+      // synchronous state update from the mounting effect.
+      await Promise.resolve();
+      if (!current()) return;
+      setProjects([]);
+      setError(
+        signal?.aborted
+          ? 'Shared projects read interrupted. Try again.'
+          : message(error),
+      );
+    } finally {
+      if (pending.current === controller) pending.current = null;
+    }
+  }, []);
+  const cancelRead = useCallback(() => {
+    mounted.current = false;
+    generation.current++;
+    pending.current?.abort();
+  }, []);
   useEffect(() => {
-    void load();
-  }, [load]);
+    mounted.current = true;
+    queueMicrotask(() => {
+      if (mounted.current) void load();
+    });
+    return cancelRead;
+  }, [load, cancelRead]);
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError('');
@@ -179,6 +215,14 @@ export function SharedProjectsPanel() {
   return (
     <section aria-label="Shared with you" className="min-w-0 space-y-2">
       <h3>Shared with you</h3>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={busy}
+        onClick={() => void run(async () => {})}
+      >
+        Refresh shared projects
+      </Button>
       {token && (
         <p>
           You opened a project invite.{' '}
@@ -207,6 +251,7 @@ export function SharedProjectsPanel() {
             {p.plan.chain} · {p.plan.launchpad} · updated{' '}
             {new Date(p.updatedAt).toLocaleString()}
             {p.archived ? ' · archived' : ''} · read only{' '}
+            <SharedProjectReview project={p} />
             <Button
               type="button"
               variant="outline"

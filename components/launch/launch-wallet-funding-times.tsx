@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { Clock3 } from 'lucide-react';
+import { FundingObservationReference } from '@/components/funding-observation-reference';
 import Link from 'next/link';
 import type { LaunchLayerEnvelope } from '@/lib/launch-layer-terms';
 import {
@@ -374,6 +375,12 @@ function FundingRead({ wallets }: { wallets: WalletFundingSelection }) {
                             ).toLocaleString()}{' '}
                             · slot {row.funding.slot}
                           </span>
+                          <FundingObservationReference
+                            address={row.address}
+                            revision={row.revision}
+                            source={source}
+                            funding={row.funding}
+                          />
                           {pair && (
                             <strong className={styles.warning}>
                               <Clock3 aria-hidden="true" size={13} />{' '}

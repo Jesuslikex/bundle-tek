@@ -1,0 +1,60 @@
+.review {
+  margin: 10px 0;
+  padding: 12px;
+  min-width: 0;
+  border: 1px solid var(--border, #30303c);
+  border-radius: 10px;
+}
+.review summary {
+  cursor: pointer;
+  min-height: 32px;
+  overflow-wrap: anywhere;
+}
+.review summary:focus-visible {
+  outline: 2px solid #7892ff;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.review h4 {
+  margin: 14px 0 8px;
+  overflow-wrap: anywhere;
+}
+.scope,
+.description {
+  margin: 10px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.scope {
+  color: #a7a7b8;
+}
+.description {
+  white-space: pre-wrap;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 18px;
+}
+.grid dt {
+  font-size: 11px;
+  color: #a7a7b8;
+  margin-bottom: 4px;
+}
+.grid dd {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.grid code {
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .review summary {
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-24",
+  "verifiedBaseCommit": "b4778900a6621a2d4ec3fe68e8d50c6d9f2aad8d",
+  "verificationScope": "current base plus two disjoint owned overlays, not full repository or production",
+  "node": "24.19.0",
+  "tests": {
+    "passed": 955,
+    "failed": 0,
+    "files": 43,
+    "sourceUnchangedDuringRun": true
+  },
+  "nativeHarness": {
+    "passed": 19,
+    "failed": 0,
+    "liveRequests": 0
+  },
+  "typescript": "passed tsc --noEmit --incremental false",
+  "typedLint": "passed14ownedTSfiles",
+  "format": "passed14ownedTSfiles",
+  "sourceReview": {
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "sourceUnchanged": true
+  },
+  "reviewLimit": "source-only no tests/browser/provider; final fractional/delayed-body tests, refusal-phase timing labels and exact route-body assertions independently verified after review snapshot",
+  "scopeComparison": {
+    "financialHandlers": {
+      "components/marketplace-operator-console.tsx:requestReview": "unchanged",
+      "components/marketplace-operator-console.tsx:invalidate": "unchanged",
+      "components/marketplace-operator-console.tsx:cancel": "unchanged",
+      "components/marketplace-operator-console.tsx:begin": "unchanged",
+      "components/marketplace-owned-wallets.tsx:cancel": "unchanged"
+    },
+    "untouched": [
+      "lib/marketplace-owned-inventory-server.ts",
+      "lib/pair-trusted-programs.ts",
+      "lib/pump-group-code-identity.ts",
+      "app/page.tsx"
+    ],
+    "predicatesUnchanged": {
+      "lib/jito-qualification-transport.ts": 26,
+      "lib/jito-readonly-qualification.ts": 23,
+      "lib/marketplace-owned-inventory.ts": 32
+    },
+    "limitation": "Predicate preservation plus named-handler comparison is scoped source evidence, not full behavioral equivalence or financial qualification."
+  },
+  "deploy": false,
+  "hostedSql": false,
+  "providerOrCredentialChange": false,
+  "realWalletOrFundedAction": false,
+  "sourceSha256": {
+    "lib/jito-qualification-transport.ts": "3448a2892449f50bb878346da744bb977f20baf7c0fb5c3e6e676f3a30f0b666",
+    "lib/jito-qualification-transport.test.ts": "4336448d3c9fbd9e318023988e790d4e39c332c4c75c0ecd3881c5331f693441",
+    "lib/jito-readonly-qualification.ts": "1c068f549b721e6e76ce234a73474591979272eacb0f46f027c186f3203677bb",
+    "test/jito-readonly-composition.test.ts": "d82a0ea8ec44e8ff8055c95f41a194581a6efafd97b771a5d7c9bf68eb33f135",
+    "lib/marketplace-owned-inventory.ts": "04355773a188deaca5eaec0cdc0f4a113a87bf7dcd100b955cda23da7c25e2b9",
+    "lib/marketplace-owned-inventory.test.ts": "f54f4e645b163cb96eb682b76705b914f6d7b9fc788f48233ab135308fe722e4",
+    "app/api/marketplace/owned-wallets/route.ts": "35e608eed9474c86686673062c913326a1768e4be2ec0a6a4ef67ccabf5a9007",
+    "app/api/marketplace/owned-wallets/route.test.ts": "d20805d0a8f260548132e9b610437738e60b7e72a41ee58a5fa3a6e870e4c599",
+    "app/api/marketplace/operator/inventory/route.ts": "9fea7cc1d8ad510867ea37c2fc5bed47c6ff311a2fd970425a849cc1e8d9974d",
+    "app/api/marketplace/operator/inventory/route.test.ts": "ec7c8de8fa7bd1c8e1cc8c3ed4b581b1886285b7da4c2fc4101a46ac8bb14ac9",
+    "components/marketplace-owned-wallets.tsx": "107a4c46b349cd07b0d48f269af6bb714cad39a441d46f8ebd7e2ed23797bef0",
+    "components/marketplace-owned-wallets.test.tsx": "0243c1f03593f6dc342b5f1e4371b1f5e5236cd769ab9fd638372a4ffb9383c6",
+    "components/marketplace-operator-console.tsx": "68d1a1134e81aa7d2ea64167042e48c217d9641d209610bb00c706a8bc9dca4a",
+    "components/marketplace-operator-console.test.tsx": "18c770e758c7e8e97f84940fcb2d6e377a10b4819e0ffa67fa4c41672f5735c0"
+  },
+  "slice": "jito-diagnostic-timing",
+  "newLiveCampaign": false,
+  "fullQualificationPassed": false,
+  "programPolicyChanged": false,
+  "slotLimit": 32,
+  "bothFullSerialScansPreserved": true,
+  "diagnosticOnly": true,
+  "artifactManifest": "CODEX-JITO-PROGRAM-ARTIFACTS-20261024.json",
+  "reaSemantics": "unsupportedELFarchitecture, no semantic audit",
+  "baselineAcquisitionTiming": "not instrumented; collector measures baseline replay, acquisition/outer-campaign marks remain future work"
+}

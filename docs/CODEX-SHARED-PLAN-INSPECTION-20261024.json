@@ -1,0 +1,123 @@
+{
+  "base": "66598d3758b32a0eee56f4a67114d8d6a1b65ebc",
+  "node": "24.19.0",
+  "sha256": {
+    "components/project-sharing.tsx": "d27f8f50be9fbb51f33b43b4c75e383517a19d0f3f836a5ee3ae5a35a494e84a",
+    "components/project-sharing.test.tsx": "9c86d13a7c871d91074c3afa8c64f07c9d83e95e8877a5e6bf4fea2772c87686",
+    "components/project-sharing-loading.test.tsx": "8c017bc1075c7b890781a65f2e12234200ee76916a53fddcc1f82cad98a740fc",
+    "components/shared-project-review.tsx": "e8c237501889fc38eb95340b82aca9693037bdba3e18ca077b10246073a073bd",
+    "components/shared-project-review.test.tsx": "b533a49c19c7f370ab836e22fcb0e7cec394b85fd0c8e8e375745bf7146dca33",
+    "components/shared-project-review.module.css": "53bde7444fc8bf38b1f58c334467e2d87a3370a7d7464961d77faad127a4a868",
+    "lib/shared-project-review.ts": "4865e7fc3a8332685b91604936a10c66cc34c6d71f8bd93ac5c4786b789ffd05",
+    "lib/shared-project-review.test.ts": "5a7e9d51349591ef0046fe4bf7ebdd237d3aff1af0cbf3dfbb2feddabdba25ec",
+    "test/jito-readonly-composition.test.ts": "f4663be957b1267547ebc8ccfdbc807697bb1170ac255df4b038ed4351fdc541"
+  },
+  "verification": {
+    "focusedSharingCases": 31,
+    "multiLookupCompositionCases": 37,
+    "combinedFinalPending": false,
+    "typecheckPendingFinal": false,
+    "scopedTypedLintExit": 0,
+    "combinedFiles": 52,
+    "combinedPassed": 993,
+    "combinedFailed": 0,
+    "typecheckExit": 0,
+    "mutationFunctionsPrinterIdentical": 3,
+    "mutationActionHandlersPrinterIdentical": 4
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-24T16:15:44.461Z",
+      "finishedAt": "2026-10-24T16:18:08.566Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "66598d3758b32a0eee56f4a67114d8d6a1b65ebc",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.6810558,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    {
+      "startedAt": "2026-10-24T16:24:44.012Z",
+      "finishedAt": "2026-10-24T16:26:00.516Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "66598d3758b32a0eee56f4a67114d8d6a1b65ebc",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.3353514,
+      "sourceUnchanged": true,
+      "changed": []
+    }
+  ],
+  "finalMinorRefinementsIndependentlyVerified": true,
+  "canaries": {
+    "results": [
+      {
+        "name": "unchanged",
+        "status": 0,
+        "expected": 0
+      },
+      {
+        "name": "global-floor-regression",
+        "status": 1,
+        "expected": 1
+      },
+      {
+        "name": "fixed-start-floor-regression",
+        "status": 1,
+        "expected": 1
+      }
+    ],
+    "originalUnchanged": true,
+    "passed": true
+  },
+  "browser": {
+    "synthetic": true,
+    "desktopAnd375pxFrame": true,
+    "reviewedCandidateVerified": true,
+    "finalNonvisualRefinementsUnitVerified": true,
+    "productionOrSignedInApp": false,
+    "tabsClosed": true,
+    "ownedServersStopped": true
+  },
+  "reference": {
+    "documentationRefreshed": true,
+    "freshReaCapture": false,
+    "reaBlocker": "endpoint_unreachable"
+  },
+  "permissions": {
+    "readOnlyViewOnly": true,
+    "newDelegatedAccess": false,
+    "serverAuthorizationChanged": false,
+    "transportPrivacyClaim": false
+  },
+  "actions": {
+    "deployed": false,
+    "hostedSql": false,
+    "providerCredentialsCronChanges": false,
+    "realWalletAction": false,
+    "fundedTrades": false
+  }
+}

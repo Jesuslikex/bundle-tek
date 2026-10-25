@@ -83,10 +83,33 @@ it('loads only on explicit request and shows exact gap details without claiming 
   expect(fetcher).toHaveBeenCalledOnce();
   expect(
     [...host.querySelectorAll('summary')].map((n) => n.textContent),
-  ).toEqual(['Review 1 close funding pair', '24m 34s apart', '24m 34s apart']);
+  ).toEqual([
+    'Review 1 close funding pair',
+    '24m 34s apart',
+    'Funding evidence reference',
+    '24m 34s apart',
+    'Funding evidence reference',
+  ]);
   expect(host.textContent).toContain('1 pair under 30 minutes');
   expect(host.textContent).toContain('not first-funding history');
   expect(host.textContent).not.toContain('Unlinked');
+  const reference = host.querySelector('pre')!;
+  expect(reference.textContent).toContain(reply().wallets[0].funding.signature);
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText },
+    configurable: true,
+  });
+  await act(async () => {
+    host.querySelectorAll('details')[2].open = true;
+  });
+  await click('Copy funding reference');
+  expect(writeText).toHaveBeenCalledWith(reference.textContent);
+  expect(fetcher).toHaveBeenCalledOnce();
+  Object.defineProperty(navigator, 'clipboard', {
+    value: undefined,
+    configurable: true,
+  });
 });
 it('reviews every checked close pair in bounded pages without another read, and clears on selection changes', async () => {
   const wallets = Array.from({ length: 7 }, (_, i) => ({
@@ -235,6 +258,8 @@ it('keeps missing funding time unknown instead of displaying a safe or green res
   await render();
   await click('Check recorded funding times');
   expect(host.textContent).toContain('2 unknown');
+  expect(host.querySelector('pre, a')).toBeNull();
+  expect(host.textContent).not.toContain('Funding evidence reference');
   expect(
     [...host.querySelectorAll('details > summary')].every((n) =>
       n.textContent?.includes('Funding time unknown'),
@@ -376,7 +401,13 @@ it('checks provider history only on its explicit action and labels its source an
   );
   expect(
     [...host.querySelectorAll('summary')].map((n) => n.textContent),
-  ).toEqual(['Review 1 close funding pair', '24m 34s apart', '24m 34s apart']);
+  ).toEqual([
+    'Review 1 close funding pair',
+    '24m 34s apart',
+    'Funding evidence reference',
+    '24m 34s apart',
+    'Funding evidence reference',
+  ]);
   expect(host.textContent).toContain('Provider-reported funding events');
   expect(host.textContent).toContain('Funding sources:');
 });

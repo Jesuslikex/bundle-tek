@@ -26,6 +26,8 @@ export type AutoSellExecuteDeps = {
   decimals: number;
   wallets: AutoSellWallet[];
   session: () => VaultSession | null;
+  /** Per-session slippage ceiling in bps, 1..50. Absent keeps 50 bps. */
+  maxSlippageBps?: number;
   fetcher?: typeof fetch;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   sign?: typeof signApprovedWarmupPacket;
@@ -165,6 +167,9 @@ export function createAutoSellExecutor(deps: AutoSellExecuteDeps) {
             walletRevision: wallet.revision,
             side: 'Sell',
             amount,
+            ...(deps.maxSlippageBps === undefined
+              ? {}
+              : { slippageBps: deps.maxSlippageBps }),
           },
           signal,
         ),

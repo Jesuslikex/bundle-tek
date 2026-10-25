@@ -1,0 +1,393 @@
+{
+  "format": "jito-exact-bank-checkpoint-v1",
+  "sourceBaseCommit": "6d611f9df68edaa60175786d688ed01c235d8bcf",
+  "committedOwnedSourceDigests": {
+    "lib/jito-rpc-batch-capture.ts": "e22e93e6eebc978fd400573f7b23a207363fd16c3c0a32bc9d8cca32cd9cb261",
+    "lib/jito-rpc-batch-capture.test.ts": "de8582e34d846ddf79602a8a026b5247ecb172b272f365919ccf6881971dd97c",
+    "lib/jito-coherent-simulation-attempt.ts": "1afdfc832cf2bd41427ed237d39d55e9285690f8568fb396c720eced6899ea14",
+    "lib/jito-coherent-simulation-attempt.test.ts": "5caec5eda0a1812bbfb7e756d4d9bdba96b32eb88bc56a70a793b50f6b532abe",
+    "lib/jito-sequential-check-server.ts": "410ae5937ab614c691ec535457cabce1a8352602d2ed31dc3b2926cc434baa01",
+    "lib/jito-sequential-check-server.test.ts": "ded46f761af30c5f40c927fee663ee31e96e76eb9b5be66eb94b6bff37408618",
+    "scripts/qualify-jito-native-readonly.mjs": "4e6e17d647e068d73cf441e5ad4dd926dca017a202a36d29c34c3924a4226fbc",
+    "scripts/qualify-jito-native-readonly.test.mjs": "06426f3081343e3b98f630dd926014f8703e800c60d6a8036e28579cb306b5c9",
+    "test/jito-coherent-native-replay.test.ts": "d645e02108e7f1b040d6fb85c6a7d5ace8f2474e22bfd2ddd6470126ce937f8f",
+    "test/fixtures/jito-coherent-native-20261024.json": "d5d8b74ef081cf5242f36eae76f703e27a294220649fee2ff8aeac072ace74a7"
+  },
+  "verification": {
+    "isolated": true,
+    "onlyOwnedOverlay": true,
+    "envCopied": false,
+    "sourceStable": true,
+    "rootOwnedMatches": true,
+    "vitest": {
+      "files": 35,
+      "passed": 795,
+      "failed": 0
+    },
+    "nativeHarness": {
+      "passed": 19,
+      "failed": 0
+    },
+    "checks": [
+      {
+        "name": "tests",
+        "exitCode": 0,
+        "error": null
+      },
+      {
+        "name": "native",
+        "exitCode": 0,
+        "error": null
+      },
+      {
+        "name": "typecheck",
+        "exitCode": 0,
+        "error": null
+      },
+      {
+        "name": "lint",
+        "exitCode": 0,
+        "error": null
+      },
+      {
+        "name": "format",
+        "exitCode": 0,
+        "error": null
+      }
+    ],
+    "fullSuite": false,
+    "build": false,
+    "browser": false,
+    "production": false
+  },
+  "actualOpus55Reviews": [
+    {
+      "startedAt": "2026-10-24T04:20:20.504Z",
+      "finishedAt": "2026-10-24T04:23:09.377Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "6d611f9df68edaa60175786d688ed01c235d8bcf",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.8829058,
+      "sourceUnchanged": true,
+      "changed": [],
+      "scope": "Initial source review; unmatched-ID RPC429 stop blocker found",
+      "testsRunByReviewer": false
+    },
+    {
+      "startedAt": "2026-10-24T04:25:04.038Z",
+      "finishedAt": "2026-10-24T04:26:37.826Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "6d611f9df68edaa60175786d688ed01c235d8bcf",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.48432439999999993,
+      "sourceUnchanged": true,
+      "changed": [],
+      "scope": "Focused follow-up; stop blocker closed; no remaining blocker in focused scope",
+      "testsRunByReviewer": false
+    }
+  ],
+  "live": {
+    "profile": "public unsigned zero-value native System transfers only",
+    "fixedPlannedAttempts": 3,
+    "completedAttempts": 3,
+    "nativeCaptured": 2,
+    "refused": 1,
+    "rateLimits": 0,
+    "httpRequests": 17,
+    "logicalMethods": 23,
+    "signaturesCreated": 0,
+    "broadcasts": 0,
+    "amountLamports": "0",
+    "samePublicPayerPinned": true,
+    "automaticRetry": false,
+    "originalWindowRenewed": false,
+    "pacing": "historical direct transport sample; later ordinary pacing refinement tested offline, not live",
+    "compiledArtifactSha256": "a0ce46f35c0469b6fc3e4d681777980732090f26381612e19042172e92390258",
+    "sourceIdentityLimit": "historical input hashes read after build; exact compiled artifact retained; later compiler freezes actual supplied input bytes, tested offline",
+    "measurements": [
+      {
+        "index": 1,
+        "originalFloor": 460711870,
+        "accountSlot": 460711872,
+        "discoverySlot": 460711872,
+        "actualFeeSlots": [460711872, 460711873],
+        "simulationReturnedSlot": 460711872,
+        "status": "refused",
+        "reason": "fees-refused",
+        "nativeCaptured": false,
+        "httpRequests": 5,
+        "logicalMethods": 7,
+        "reads": [
+          {
+            "index": 0,
+            "methods": ["getGenesisHash"],
+            "logicalMethods": 1,
+            "requestSha256": "43560b160b3f2f111d99d79030acc2a836eddfd6fd9a9a8faf0fbf52486bf7b3",
+            "httpStatus": 200,
+            "responseSha256": "860d305751591be81b331fc19f91c2bdd88060cf8f995dcecc554a826b13ff9e",
+            "responseBytes": 92
+          },
+          {
+            "index": 1,
+            "methods": ["getLatestBlockhash"],
+            "logicalMethods": 1,
+            "requestSha256": "963164b708bedf252e9ed34ae457e7dd1ed07265868ae1faa50841f5c4a514c5",
+            "httpStatus": 200,
+            "responseSha256": "62cdaa42e88254cbdd50b87fcaca28b0dfd3fd403accdd4530d02fb1ea120a78",
+            "responseBytes": 199
+          },
+          {
+            "index": 2,
+            "methods": ["getMultipleAccounts"],
+            "logicalMethods": 1,
+            "requestSha256": "d47be8d4675185111deccbd5e212e06fafd7f90aea8e38459cdc94bfdedf5a4f",
+            "httpStatus": 200,
+            "responseSha256": "e1102bbaa5cd10dd700caa351e48e69150cb81aafbcd8e6ff07c58af48dbc0fe",
+            "responseBytes": 766
+          },
+          {
+            "index": 3,
+            "methods": ["simulateBundle"],
+            "logicalMethods": 1,
+            "requestSha256": "c0be57c233382ce3b43ac9cbd8642baa86eb13ddd1eba31aa9d32fa4e83de844",
+            "httpStatus": 200,
+            "responseSha256": "c0aaff978afd926fc59fda7f78ab7a3b65843b485e093138b17b57fc626620d0",
+            "responseBytes": 3074
+          },
+          {
+            "index": 4,
+            "methods": [
+              "getFeeForMessage",
+              "getFeeForMessage",
+              "simulateBundle"
+            ],
+            "logicalMethods": 3,
+            "requestSha256": "f63e7189baf97d4f13ba97906a0b01137e1fbefa8a7c0af44d597bc6d5a200c6",
+            "httpStatus": 200,
+            "responseSha256": "aa892420b092af45a29b9eff0a8deb89eb4597499f9b60b98b9b60b0cc51a1bd",
+            "responseBytes": 3298
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "originalFloor": 460711873,
+        "accountSlot": 460711874,
+        "discoverySlot": 460711874,
+        "actualFeeSlots": [460711874, 460711874],
+        "simulationReturnedSlot": 460711874,
+        "status": "captured",
+        "reason": "native-profile-only",
+        "nativeCaptured": true,
+        "httpRequests": 6,
+        "logicalMethods": 8,
+        "reads": [
+          {
+            "index": 0,
+            "methods": ["getGenesisHash"],
+            "logicalMethods": 1,
+            "requestSha256": "a357b7b89b8f39a9b571d0070a019a53273e71098cc507bd67148b53e82d4391",
+            "httpStatus": 200,
+            "responseSha256": "c4ec450e39d8f25e174ec2395e18679891606f8761adeff5f7a09bffbe1b1a48",
+            "responseBytes": 92
+          },
+          {
+            "index": 1,
+            "methods": ["getLatestBlockhash"],
+            "logicalMethods": 1,
+            "requestSha256": "f613ac8631140e9c18670cfc20d9501621db438f6c65b68210eb5a9ba47134b6",
+            "httpStatus": 200,
+            "responseSha256": "1cf76feaf1b8f822826d0daf6c0294f94008dd54ec3f64284351f206bcce3a7a",
+            "responseBytes": 199
+          },
+          {
+            "index": 2,
+            "methods": ["getMultipleAccounts"],
+            "logicalMethods": 1,
+            "requestSha256": "39891ce009b1e9bdd9aeaea6c5f4a983f7a7c2b5990adf4cf67fab782f7693c4",
+            "httpStatus": 200,
+            "responseSha256": "452f25ce4f04014c8a20d2bfee794dd12aa12f7cc91a7c9f2749eb4b5cbcd90e",
+            "responseBytes": 766
+          },
+          {
+            "index": 3,
+            "methods": ["simulateBundle"],
+            "logicalMethods": 1,
+            "requestSha256": "53f83742d199aceaa19ba20f022ca91b1060f49076d2ce0632bf0520a1d153af",
+            "httpStatus": 200,
+            "responseSha256": "c1f083cb16da5399600f43c972d115132a3ec2429abcde2a4dee2733ede34cfe",
+            "responseBytes": 3074
+          },
+          {
+            "index": 4,
+            "methods": [
+              "getFeeForMessage",
+              "getFeeForMessage",
+              "simulateBundle"
+            ],
+            "logicalMethods": 3,
+            "requestSha256": "7c1cf6a5b647c3a79c43464a508cef716ed6a1ae3fddbe91f49ad44f8c6f13d3",
+            "httpStatus": 200,
+            "responseSha256": "670a50403566f56ab4802c9c64a2f89ebe49756391c58354da34645a600dce63",
+            "responseBytes": 3298
+          },
+          {
+            "index": 5,
+            "methods": ["getGenesisHash"],
+            "logicalMethods": 1,
+            "requestSha256": "98ba4bdb8a873b9ebcf4432d1cb542f8c9048abcda44e2aa16d42651d9b2cdab",
+            "httpStatus": 200,
+            "responseSha256": "f89c6a1287b59855b88285769218867cc134dfba71f3ac24d8fdcc19c2739200",
+            "responseBytes": 92
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "originalFloor": 460711876,
+        "accountSlot": 460711876,
+        "discoverySlot": 460711877,
+        "actualFeeSlots": [460711877, 460711877],
+        "simulationReturnedSlot": 460711877,
+        "status": "captured",
+        "reason": "native-profile-only",
+        "nativeCaptured": true,
+        "httpRequests": 6,
+        "logicalMethods": 8,
+        "reads": [
+          {
+            "index": 0,
+            "methods": ["getGenesisHash"],
+            "logicalMethods": 1,
+            "requestSha256": "c5e6f5f711f623be39ea2f2fdb2152843cd499e36abcd548121d5b89fcecd8d0",
+            "httpStatus": 200,
+            "responseSha256": "cd4af4df03db589f75cf9330488b7b9b77929ec0468a9ca72edfa1cc3ab3814c",
+            "responseBytes": 92
+          },
+          {
+            "index": 1,
+            "methods": ["getLatestBlockhash"],
+            "logicalMethods": 1,
+            "requestSha256": "f02d3c85438e6ac97a44d83b73f844501f6bc3de72c38c6c1eb7a40619f9190c",
+            "httpStatus": 200,
+            "responseSha256": "56282bbc385f8a386316f2de8e761717dbe8d06f0b2e24792ba87a66356e5e75",
+            "responseBytes": 199
+          },
+          {
+            "index": 2,
+            "methods": ["getMultipleAccounts"],
+            "logicalMethods": 1,
+            "requestSha256": "d4c5d9a5d22260940189825e2a50dcf61a152b895e44965e4bc474100ffd0a22",
+            "httpStatus": 200,
+            "responseSha256": "1fc59730b41ec6788dd6192be5b4b7c00e9181b02aeef5ed2c30b2ee23786e1e",
+            "responseBytes": 765
+          },
+          {
+            "index": 3,
+            "methods": ["simulateBundle"],
+            "logicalMethods": 1,
+            "requestSha256": "27927c5040bcdcc884cb2342795bff9c94db81cffe228219e1d4a4b15d7ea688",
+            "httpStatus": 200,
+            "responseSha256": "627350c3c8951cddb24e3ea2d314d9a2e445f70472a148dd1e90d5b663d29075",
+            "responseBytes": 3070
+          },
+          {
+            "index": 4,
+            "methods": [
+              "getFeeForMessage",
+              "getFeeForMessage",
+              "simulateBundle"
+            ],
+            "logicalMethods": 3,
+            "requestSha256": "05f6d9c9f41af607236d1fbba88b3542da94762198bf02d884992c49164c35de",
+            "httpStatus": 200,
+            "responseSha256": "1a193c4c8c521432a3b319e00d98e96d9ec6000888eebbe215995144675e82a2",
+            "responseBytes": 3294
+          },
+          {
+            "index": 5,
+            "methods": ["getGenesisHash"],
+            "logicalMethods": 1,
+            "requestSha256": "267e84b1a9a6fe0b635c61bd738ce19b41d0293f4b5eb7c726b1c5d92fb0f50b",
+            "httpStatus": 200,
+            "responseSha256": "e777deff034845165202fbe2f5a62b69a0ae501252f5e5d6e616059e66308365",
+            "responseBytes": 92
+          }
+        ]
+      }
+    ]
+  },
+  "publicReplay": {
+    "path": "test/fixtures/jito-coherent-native-20261024.json",
+    "sha256": "d5d8b74ef081cf5242f36eae76f703e27a294220649fee2ff8aeac072ace74a7",
+    "currentCollectorCases": 3,
+    "network": false
+  },
+  "qualification": {
+    "nativeFramesObserved": true,
+    "repeatableAllAttempts": false,
+    "fullSwapQualified": false,
+    "providerQualified": false,
+    "economicOutputVerified": false,
+    "runtimePrivilegesVerified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "unchanged": {
+    "original32SlotWindow": true,
+    "exactFeeSimulationBankEquality": true,
+    "feeCaps": true,
+    "packetBytesAndBlockhashMode": true,
+    "finalAltAndGenesisChecks": true,
+    "ownedCurrentUnsignedGuards": true,
+    "httpCap": 12,
+    "methodCap": 18,
+    "worstCaseTestedHttp": 12,
+    "worstCaseTestedMethods": 17
+  },
+  "remaining": [
+    "Full raw original swap simulation not present in saved scalar summaries",
+    "Independent mint/Rent observations bracketing exact bank within existing read budget",
+    "Explicit provenance binding of fresh fee vector into economic replay",
+    "Runtime privilege qualification and real swap evidence"
+  ],
+  "preserved": {
+    "claudeProtectedFiles": true,
+    "unrelatedWarmupAutoSellDirt": true,
+    "sevenWarmupDrafts": true,
+    "agentsOriginalFourDirtyLines": true
+  },
+  "boundaries": {
+    "deployed": false,
+    "hostedSql": false,
+    "providerSettingsChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletUnlocked": false,
+    "fundedTrades": false
+  }
+}

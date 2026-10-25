@@ -1,0 +1,106 @@
+# Bundle: Codex, Claude and OpenCode
+
+## Latest saved-evidence checkpoint
+
+Saved marketplace evidence paging is complete in CODEX-MARKETPLACE-SAVED-EVIDENCE-PAGES-20261024.md/.json:42files/769tests, TypeScript/scoped lint/format and actual local API/SQLite Chrome desktop/375px checks pass. Separate20-wallet/20-run saved-only pages after typed capacity refusal; original complete inventory,100-run writer and every financial guard remain. Corrects earlier normal101st-run theory: writer already caps100. Pages are partial matching history, not wallet age/control/lifecycle or listing/payment/key delivery. Actual Opus5.5 design/source reviews completed; final compatibility/copy/clock follow-ups independently tested. PR57, pending protected parent patch, original AGENTS dirt and7frozen drafts untouched. No deploy/provider/SQL/wallet/funded actions. Bounded claim released; full inventory and Jito qualification still open.
+
+24 October 2026. Julian explicitly asked Codex to coordinate with the existing OpenCode Bundle session as well as Claude. This is a coordination checkpoint, not a deployment or a claim of complete Proxima parity.
+
+## Verified starting point
+
+Canonical checkout: `C:\Users\Julian\Desktop\Bundle`. Local and remote main were `488f6cf` when this coordination started. That includes the storage-environment checkpoint `573b684`, Auto Sell slippage checkpoint `4bed783`, and both recent Jito checkpoints. The six Jito type errors in the supplied OpenCode screenshot were from an earlier working state. The latest Jito checkpoint passed 849 focused tests across 42 files plus 19 harness tests, TypeScript, typed lint and formatting on an isolated source overlay. Do not rebuild or patch an already-fixed failure based on that screenshot.
+
+OpenCode's existing Bundle session was matched through both its desktop tab and local CLI project/session metadata. Codex sent the handoff through the supported CLI to that exact session, preserving its selected model and permissions. No new session was created, no automatic permission approval was enabled, and the separate GMGN Trador session was left alone. OpenCode acknowledged: "Understood: read-only status and audit, no edits/staging/commits. Starting from verified git state and the three documents."
+
+The audit completed; its source-only findings and the accepted next claim are recorded below. Acknowledgement alone was not treated as a completed review or test result. OpenCode's visible session history reports that it produced `6d611f9` (honest wallet readiness), `4bed783` (tighten-only Auto Sell slippage) and `573b684` (jsdom storage). Codex independently confirmed those commits are in main, but did not rerun the session's self-reported Node26 test totals in this coordination turn. Older notes attributing that parallel work to Claude should not be used as evidence of authorship merely because its documents have `CLAUDE-` filenames.
+
+For future messages, use OpenCode's supported local CLI: list sessions in the canonical project with `session list --format json`, match the existing Bundle directory/session, then use `run --session <returned-id> --format json` with a focused prompt. Do not guess a session ID or send to the active GMGN tab. Do not add `--auto`, fork/start another session, override a model or interact with permission/security prompts. The installed CLI inspected today was `C:\Users\Julian\AppData\Roaming\ai.opencode.desktop\cli\2.1.4-x64\opencode-cli.exe`; rediscover it if that installation changes. Keep transcripts and transient session IDs in ignored local QA receipts, not this public handoff.
+
+The native Git executable verified in this turn is `C:\Users\Julian\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\git\cmd\git.exe`. Use a verified executable if an agent's PATH lacks Git; do not install a second Git or treat PowerShell's `where` alias as a reliable executable lookup. No global PATH or Git settings were changed.
+
+## Active split
+
+| Agent    | Current area                                                                 | Editing boundary                                                                                                                                                                                                                                                                                     |
+| -------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex    | Jito raw simulation, assets, runtime qualification and recovery verification | `lib/jito-*`, `test/jito-*`, associated Jito tests, diagnostic component/API wiring and focused evidence notes. No changes to program pins merely to pass a sample.                                                                                                                                  |
+| Claude   | Existing PR57 and its explicitly claimed UI/features                         | PR57 was OPEN at `ecdbb15aab4bb450e60d4375ecddc2714653fcc5` when inspected. Its file list includes venue launch/live views, portfolio, sniper guard, cleanup and chart-link work. This records ownership, not approval or a fresh code review. Read the actual current PR and claims before editing. |
+| OpenCode | Source audit and vault-wizard copy fix completed; no active editing claim    | PR58 is merged; the two-file claim is released. Future exact paths require a new claim and separate branch/worktree, without PR57/Jito overlap.                                                                                                                                                      |
+
+Protected shared layout files still need the existing exact-patch coordination. Existing ownership and pending PR review concerns are not waived by adding another agent. Do not assume another agent is idle or that old claims identify the latest code state.
+
+## Common working rules
+
+1. Read AGENTS, the active split note and this handoff; inspect current HEAD, index, working changes and the other agents' current PR paths.
+2. Before editing, claim a bounded area with exact paths. Reading another agent's files for context is allowed; changing them requires coordination first.
+3. Claude and OpenCode use their own branches/worktrees from origin/main. Do not switch canonical main's branch, manipulate its shared index, overwrite files, install dependencies into another agent's checkout or restart another agent's dev server.
+4. Preserve the four original unstaged AGENTS additions and seven frozen warmup drafts, including the unregistered `0144_wallet_warmup_runtime_read_attempts.sql`. Do not stage, resume, delete, stash, reset or renumber them. Recheck the actual migration journal and reservations before any future migration work.
+5. Verify on stable source and state the Node version and test scope. The primary package engine is Node24; Node26/jsdom compatibility work is a distinct test-environment concern. Do not change global Node, permissions or security settings to avoid a failing test.
+6. Commit only owned changes, publish the exact hash and handoff, and use ordinary fast-forward pushes/PRs. Never force-push main or silently include another agent's dirty work.
+7. A source commit, passing unit tests, a rendered mock, an unsigned provider observation and a funded final receipt are different kinds of evidence. Label them accurately. Main being pushed is not proof that a feature is live.
+
+No deployment, hosted SQL, provider/credential/cron changes, real wallet unlock/sign/send, strategy run or funded trade is authorized by this coordination. Do not read or copy `.env`, wallet secrets or secret-bearing logs into an assistant handoff. Do not bypass a permission rejection. Future financial tests need Julian's separate approval for the specific action.
+
+## Product acceptance priorities
+
+- **Wallet creation and custody:** clear supported-chain selection, simple password flow, encrypted browser custody, explicit backup/export and a readable ready/not-ready status. Reuse the existing vault and recovery work.
+- **Accurate history:** distinguish creation recorded by Bundle from observed on-chain activity. Show timestamps, provenance, unknowns and coverage. Time passing can make a wallet older; generated transactions do not establish independent ownership or justify an "aged" claim.
+- **Funding warnings:** show actual known funding times, sources, proximity and relationships, with uncertainty visible. Keep the existing exact-gap warnings. Do not hide links or imply coordinated wallets are independent.
+- **Supply and allocations:** show selected/team wallets, planned and observed allocations, amounts, fees, rent, quote assets and holder coverage clearly. A simulation is not acquired supply; missing coverage is not zero holdings.
+- **Launch execution and recovery:** preserve explicit review and consent, browser-only signing, fee/minimum-output bounds, send-once behavior and conservative unknown-outcome recovery. Clearly show unsupported routes and disabled reasons.
+- **Proof before claims:** qualify supported read-only profiles first. Do not promise landing, profitability, complete anonymity or market leadership from a test count.
+
+The agreed product scope excludes artificial volume, wash-trading loops and manufactured wallet history intended to disguise coordinated ownership. Work on legitimate wallet management and transparent, user-approved launch tools.
+
+## Current Jito release gate
+
+Read `CODEX-JITO-RAW-RUNTIME-20261024.md/.json`. Full read-only qualification has not passed. The real public-reference unsigned SOL/USDC attempt captured a complete baseline and mint/Rent-before data, then refused changed Jupiter code and unlisted Tess under the unchanged policy. The initial code scan already reached original F+32. Both code-policy review and timing work remain. Do not add observed hashes or allow an executable by ID just to obtain a pass; do not widen the window or remove the final scan.
+
+This handoff does not publish or deploy new application functionality. The latest production state has not been re-audited in this coordination turn.
+
+## Completed source audit and next bounded OpenCode claim
+
+The existing OpenCode session completed its read-only audit. Codex independently checked the vault wizard: it always advertises step 3 as Open warmup, while EVM creation ends at Done and never calls the Solana warmup callback. This is a copy mismatch, not permission to add EVM warmup execution.
+
+OpenCode's next exact claim is `components/browser-wallet-vault.tsx` and `components/browser-wallet-vault.test.tsx` only: make guided step labels match the existing chain and callback availability. Preserve every existing generation, encryption, password, backup, public-address save, locking, callback, approval and signing behavior. Test Solana with and without the callback plus an EVM chain; do not generate real wallets or use providers. Use a new separate branch/worktree from current origin/main and deliver a normal PR. No edits to canonical main, AGENTS, dependencies, global CSS, schema, protected layout, Jito or Claude PR57. Codex publishes this claim on OpenCode's behalf to preserve the original AGENTS dirt.
+
+Other audit findings are leads, not established missing implementations: funding warnings may need better next-step guidance, creation/import timestamps must not be called on-chain wallet age, and global recovery discovery merits inspection. The metadata-review component returning null does not by itself prove that a venue lacks launch execution: Base and other paths may have separate controls. Do not add a duplicate capability registry or label a route unsupported without tracing the complete current flow.
+
+The audit involved source reading only. It did not verify rendered screens, signed-in production, providers, launch execution or funding. Its historical storage test totals remain OpenCode's own report, not a fresh Codex full-suite run. Main was published as ad8a94c after the audit started; use the latest remote source before branching. Existing seven frozen drafts and four original unstaged AGENTS additions remain untouched.
+
+## Integrated OpenCode result and current checkpoint
+
+OpenCode completed its assigned two-file claim as97b8b03, PR58. Codex read the exact diff and independently ran24 component/library tests onNode24.19.0; the copy uses the existing Solana-plus-callback condition and all handlers remain unchanged. Source-only merge4e6f2a7 is integrated. That OpenCode editing claim is now released; the earlier next-claim section above is historical task context, not authorization for more edits. No rendered browser or actual wallet proof was supplied.
+
+Codex's initial Jito evidence overlap and separate deterministic cancellation-test fix are documented in CODEX-JITO-PREFLIGHT-OVERLAP-20261024.md/.json and CODEX-JITO-CANCELLATION-TEST-20261024.md. Final integrated872tests/43files, plain TypeScript and scoped typed lint pass onNode24.19.0;19offline harness tests pass. Two actual source-only Opus5.5 reviews found no blocker; final test-only refinements were independently checked. The overlap preserves originalF..F+32, serial1/default100 scanning and all policies; full live qualification remains refused/unproven. Only the initial phase overlaps, not the final scan phase. No deploy or financial action.
+
+Read-only helpers independently traced wallet funding guidance, exchange order creation and marketplace purchase/delivery. The first is a possible future disjoint UX task; the latter two remain qualified-provider/custody gaps. Do not start another implementation without a new exact claim. Claude PR57 remains open and unchanged by this checkpoint. Original four AGENTS additions and seven frozen warmup drafts are preserved.
+
+## Final-phase and funding-guidance checkpoint
+
+Read CODEX-JITO-POSTFLIGHT-OVERLAP-20261024.md/.json and CODEX-WALLET-FUNDING-GUIDANCE-20261024.md. Codex now overlaps final independent asset/ALT/code checks with the same fixed-floor/barrier/cancellation discipline. Full live qualification remains open; all authority stays false. One actual Opus5.5 source review found no blocker, with final test-only refinements independently checked. Final combined913tests/45files,19offline harness tests, TypeScript and scoped typed lint pass onNode24.19.0.
+
+The helper's three-file readiness guidance is verified and its claim released: full public-address reveal/copy, chain/native currency, clipboard fallback and fees/rent-only budget scope. Actual component synthetic Chrome checks covered desktop and375px frame viewport; no provider, OS clipboard, real wallet or signed-in production activity. Created tab and owned local harness servers were closed/stopped. Claude PR57 remains open and untouched. OpenCode should recheck current origin/main and obtain a new exact claim before further edits. No deploy or funded actions.
+
+## Shared-plan and multi-ALT checkpoint
+
+Read CODEX-SHARED-PLAN-INSPECTION-20261024.md/.json, CODEX-JITO-MULTI-LOOKUP-20261024.md and CODEX-PROXIMA-REFERENCE-REFRESH-20261024.md. Shared collaboration now exposes a useful collapsed read-only saved-plan inspector, strict display admission, labelled units/fees, manualrefresh, stale-response cancellation and visible401 recovery. Existing server authorization and mutation handlers are unchanged; public assignment/links/artwork data was already in the shared response, so the display projection is not a transport privacy boundary. The helper/primary exact claim is complete and released.
+
+Two real distinct unsigned baseline capsules/ALT tables now cover local-floor chaining. Independent scratch canaries prove wrongglobalfloor and repeatedstartfloor variants fail the intended test. Production Jito controller and all32slot/program/custody/minimum/signing rules remain unchanged. Actual full live qualification is still open.
+
+Final993tests/52files, plain TypeScript, scoped typed lint/format/diff checks pass onNode24.19.0. Two actual Opus5.5 source-only reviews found no blocker, with final minor lifecycle/capability/disclosure/test refinements independently verified afterwards. Actual component synthetic Chrome desktop/375px frame checks are documented, not full signed-in production or live providers. All created QA tabs/owned harness servers were closed/stopped.
+
+Official docs now explicitly name Husher in CEX funding and detail server-enforced collaboration roles/walletscope/expiry. Those requirements remain beyond Bundle's read-only sharing. No fresh REA livecapture: approved9223endpoint was unreachable. No browser launch/security/provider/credential/cron changes, hostedSQL, deployment or realwallet/funded actions. ClaudePR57, OpenCode vault files, original four AGENTS additions and all seven frozen drafts remain preserved. Claim exact disjoint paths before another feature edit; pushing source is not deploying it.
+
+## Original saved-review inspection checkpoint
+
+Read CODEX-SAVED-LAUNCH-INSPECTION-20261024.md/.json. Original stored terms, hashes, intent and raw budgets are inspectable without a current project or the pending protected parent patch. Every authority flag remains false. This extends saved recovery discovery, not launch execution. Final source checks are recorded in the companion evidence. The bounded inspection claim is released; pending guarded navigation and Jito claims remain reserved.
+
+The existing OpenCode session rechecked its clean `97b8b03` vault worktree and canonical main `62fb422`, then hit its provider free usage limit before a final reply. Do not claim a new task was accepted or bypass that limit. No new OpenCode edits are active. Claude PR57 remains protected. No deployment, hosted SQL, provider changes or financial action occurred.
+
+## Jito timing and marketplace capacity checkpoint
+
+Read CODEX-JITO-TIMING-PROVENANCE-20261024.md/.json and CODEX-JITO-PROGRAM-ARTIFACTS-20261024.json. Diagnostic request/stage clocks preserve both full serial scans, every admission check and the original32-slot limit. Full live qualification remains refused/unproven. Historical Jupiter/Tess artifact hashes reproduce; REA refuses their ELF architectures, with no semantic audit or pin update. Acquisition/outer-campaign timing and acceptable program provenance remain open.
+
+Read CODEX-MARKETPLACE-INVENTORY-CAPACITY-20261024.md/.json. Both inventory screens explain the actual100-run/4MiB history cap through an authenticated fixed409; no partial age claims, source truncation, history deletion or limit increase. History pagination still needs design/implementation. Five existing financial/cancel handlers and SQL are unchanged. Final955tests/43files,19offline harness tests, TypeScript/scoped lint/format and synthetic inventory desktop/375px checks pass. Actual Opus5.5 source-only review found no blocker; final timing/assertion follow-ups independently verified.
+
+The bounded marketplace claim is released; root keeps broader Jito and pending protected navigation ownership. ClaudePR57, all seven frozen warmup drafts and four original AGENTS additions remain preserved. OpenCode remains usage-limited; no new task/model/permission changes. No deploy, hosted SQL, credentials/provider/cron changes, real wallet unlock/sign/send or funded action.

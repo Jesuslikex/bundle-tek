@@ -56,7 +56,7 @@ it('opens a compact activity dialog with secondary history and saved controls', 
   );
   const dialog = host.querySelector('dialog')!;
   expect(dialog.open).toBe(true);
-  expect(host.querySelector('h3')?.textContent).toBe('Generate Activity');
+  expect(host.querySelector('h3')?.textContent).toBe('Wallet warmup');
   const secondary = [...host.querySelectorAll('details')].filter((detail) =>
     ['Wallet history · read only', 'Saved plans and recovery'].includes(
       detail.querySelector('summary')?.textContent ?? '',

@@ -1,0 +1,17 @@
+# Marketplace inventory capacity diagnosis
+
+24 October 2026. This fixes a misleading retry dead end, not the underlying history-scaling limit or wallet sales. No deployment, provider read, database write or funded action.
+
+The saved inventory reader intentionally refuses more than 100 relevant history runs, aggregate retained history above 4 MiB, or invalid source evidence. Previously, both My inventory and the operator seller console collapsed history-capacity refusal into a generic 503 and suggested retrying. A 101st relevant saved run could therefore leave either screen permanently unavailable without explaining why.
+
+Known history-run/byte capacity failures now have a typed internal error and a fixed seven-field 409 response, after the original authenticated/role guards. The response explicitly shows no inventory and grants no listing, purchase or delivery authority. Cancellation takes precedence; source corruption and unrelated failures retain generic refusals. SQL, source selection, all original capacity predicates and every financial handler stay unchanged.
+
+Both screens recognize only the exact status/body/code/false-flag shape. They discard previous rows before reading, refuse stale/cancelled responses and explain the actual bounded limit without showing partial age evidence. The copy says retrying alone cannot fix capacity and to keep saved history. There is no deletion/archive recommendation, silent truncation, automatic retry or hidden limit increase. Existing listing-review handlers remain byte-equivalent under TypeScript printing.
+
+Verification: 85 focused tests/5 files cover 100/101 runs, exactly 4 MiB/+1 byte, real disposable owned-source boundaries, auth/operator guards before DB access, malformed bodies, corruption, cancellation, old-data clearing and absence of extra requests. The combined Jito/marketplace cohort has 955 passes/43 files; 19 offline Jito harness tests, plain TypeScript and scoped typed lint/format also pass. Synthetic Chrome desktop and 375px iframe checks exercised success-to-capacity clearing, both screens, rejection of a true authority flag and wrapped byte-capacity wording. Fixtures are public synthetic metadata; no actual wallet, provider, listing review, payment or key delivery was touched. Own QA tab/server were closed.
+
+Read the companion evidence for source hashes and actual source-only Opus5.5 review status. The reviewer runs no tests/browser; Codex independently verifies findings. Later bounded history pagination is still required before larger inventories can load. Creation/first-funding evidence and exclusive custody are not inferred from sampled history or control proofs. No claim of complete marketplace or Proxima parity.
+
+Claim released after verified checkpoint. Claude PR57, protected shell, pending navigation patch, original four AGENTS additions and seven frozen warmup drafts remain untouched. No deploy, SQL, provider/credentials/cron changes, real wallet signing/send or funded trades.
+
+Actual source-only Opus5.5 review completed with unchanged copied files and zero permission denials. It found no blocker. Codex checked the missing fractional-number serializer context and added fractional-clock/delayed-body tests, exact capacity-body assertions and precise refusal-phase timing. Those final follow-ups were independently tested on unchanged source, not attributed to another Opus review. SQL, program pins, serial scanner and protected parent are unchanged; five existing financial/cancel handlers are printer-identical.

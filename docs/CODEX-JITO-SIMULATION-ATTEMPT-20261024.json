@@ -1,0 +1,249 @@
+{
+  "sourceBaseCommit": "a056939",
+  "tests": {
+    "passed": 500,
+    "failed": 0,
+    "skipped": 0,
+    "files": 11,
+    "collectorCases": 27
+  },
+  "checks": {
+    "projectTypeScript": true,
+    "scopedTypedLint": true,
+    "scopedFormatting": true
+  },
+  "reviews": [
+    {
+      "model": [
+        "claude-opus-5-5"
+      ],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "status": "success",
+      "scope": "source-only"
+    },
+    {
+      "model": [
+        "claude-opus-5-5"
+      ],
+      "sourceUnchanged": true,
+      "permissionDenials": 0,
+      "status": "success",
+      "scope": "source-only"
+    }
+  ],
+  "productionMatchesFinalOpusCopy": true,
+  "finalTestsAddedAfterReview": "Four plain-function abort-depth cases; test-only native getter type cast correction emitted identical JavaScript",
+  "liveDiagnosis": {
+    "httpRequests": 6,
+    "rpcMethods": 7,
+    "exactBank": 460684965,
+    "exactStatus": "refused",
+    "exactReason": "provider RPC refusal",
+    "discovery": {
+      "profile": "confirmed-bank-discovery-only",
+      "admitted": false,
+      "economicQualified": false,
+      "signingAllowed": false,
+      "status": "observed-not-admitted",
+      "slot": "460684969",
+      "summary": "succeeded",
+      "frameCount": 2
+    },
+    "rawBytesRetained": true,
+    "requestHash": "ec0379afbdc8164f589c1b6e0bee6fae740747205dabb8c08ddfd8fc41efb9bc",
+    "responseHash": "356f1a085b3ac6d3c596dc3179f4fa46a3044831a878ba37a8c6f7af4ff38d91",
+    "feeToSimulationStartMs": 4.346,
+    "simulationHeaderLatencyMs": 285.356,
+    "methodTimings": [
+      {
+        "method": "getGenesisHash",
+        "startedMs": 79.563,
+        "headersMs": 897.509,
+        "finishedMs": 899.674,
+        "httpStatus": 200
+      },
+      {
+        "method": "getLatestBlockhash",
+        "startedMs": 899.835,
+        "headersMs": 1286.973,
+        "finishedMs": 1287.207,
+        "httpStatus": 200
+      },
+      {
+        "method": "getMultipleAccounts",
+        "startedMs": 1287.444,
+        "headersMs": 1411.093,
+        "finishedMs": 1411.379,
+        "httpStatus": 200
+      },
+      {
+        "method": "getFeeForMessage batch",
+        "startedMs": 1423.78,
+        "headersMs": 1578.124,
+        "finishedMs": 1589.505,
+        "httpStatus": 200
+      },
+      {
+        "method": "simulateBundle",
+        "startedMs": 1593.851,
+        "headersMs": 1879.207,
+        "finishedMs": 1890.429,
+        "httpStatus": 200
+      },
+      {
+        "method": "simulateBundle confirmed discovery",
+        "startedMs": 1890.609,
+        "headersMs": 2204.988,
+        "finishedMs": 2206.915,
+        "httpStatus": 200
+      }
+    ]
+  },
+  "offlineRetainedReplay": {
+    "sourceBaseCommit": "a056939",
+    "uncommittedOverlay": true,
+    "networkCalls": 0,
+    "signatures": 0,
+    "broadcasts": 0,
+    "providerQualified": false,
+    "executionAllowed": false,
+    "outcomes": [
+      {
+        "capture": "jito-retained-native-batch-capture-20261024",
+        "status": "refused",
+        "reason": "bank-unavailable",
+        "originalFloor": 460683397,
+        "feeBank": 460683397,
+        "exactBodiesMatch": true,
+        "rawHashesMatch": true,
+        "logicalReads": 2,
+        "simulationBodySha256": "4050c3d8886b0d9dfc209e1f2c280bf5d24ba13603de721dd04e05438d6feefd",
+        "feeResponseSha256": "1f74c9ada63f6fda4fc3b257dc622aa4ced6ae70e1f1515f855679aacdd50e57",
+        "simulationResponseSha256": "311d68d31afb61078ce4e794911e0d0d4016f6074504d12c38bce2fe0d39294f"
+      },
+      {
+        "capture": "jito-retained-bank-availability-capture-20261024",
+        "status": "refused",
+        "reason": "bank-unavailable",
+        "originalFloor": 460684964,
+        "feeBank": 460684965,
+        "exactBodiesMatch": true,
+        "rawHashesMatch": true,
+        "logicalReads": 2,
+        "simulationBodySha256": "ec0379afbdc8164f589c1b6e0bee6fae740747205dabb8c08ddfd8fc41efb9bc",
+        "feeResponseSha256": "d6a1309d2259cf4e260406bc490d05b5bccadcdb40f8f33d30029321463c1609",
+        "simulationResponseSha256": "356f1a085b3ac6d3c596dc3179f4fa46a3044831a878ba37a8c6f7af4ff38d91"
+      }
+    ],
+    "sourceSha256": "16055462439e9cf4cda1468c5be7962abb817e6a262e7ab76ec15811b15129e1"
+  },
+  "cancellationMutation": {
+    "networkCalls": 0,
+    "productionSourceUnchanged": true,
+    "results": [
+      {
+        "variant": "fixed",
+        "depth": 0,
+        "status": "refused",
+        "reason": "interrupted",
+        "cancellations": 1,
+        "calls": 1,
+        "locked": false
+      },
+      {
+        "variant": "fixed",
+        "depth": 1,
+        "status": "refused",
+        "reason": "interrupted",
+        "cancellations": 1,
+        "calls": 1,
+        "locked": false
+      },
+      {
+        "variant": "fixed",
+        "depth": 2,
+        "status": "refused",
+        "reason": "interrupted",
+        "cancellations": 1,
+        "calls": 1,
+        "locked": false
+      },
+      {
+        "variant": "fixed",
+        "depth": 3,
+        "status": "refused",
+        "reason": "interrupted",
+        "cancellations": 1,
+        "calls": 1,
+        "locked": false
+      },
+      {
+        "variant": "old-post-race-ownership",
+        "depth": 0,
+        "status": "refused",
+        "reason": "interrupted",
+        "cancellations": 1,
+        "calls": 1,
+        "locked": false
+      },
+      {
+        "variant": "old-post-race-ownership",
+        "depth": 1,
+        "status": "refused",
+        "reason": "interrupted",
+        "cancellations": 1,
+        "calls": 1,
+        "locked": false
+      },
+      {
+        "variant": "old-post-race-ownership",
+        "depth": 2,
+        "status": "refused",
+        "reason": "interrupted",
+        "cancellations": 0,
+        "calls": 1,
+        "locked": false
+      },
+      {
+        "variant": "old-post-race-ownership",
+        "depth": 3,
+        "status": "refused",
+        "reason": "interrupted",
+        "cancellations": 1,
+        "calls": 1,
+        "locked": false
+      }
+    ]
+  },
+  "agentClaimPreservation": {
+    "oldWorkingSha256": "ace3385d981eba0a8f53672558f12fea9ce907875d99a0d87c77074508db1beb",
+    "newWorkingSha256": "cb4bdab6b96f3253567175a5ff3df85202fa9baf25e579f766b0144566345030",
+    "reversingOwnClaimUpdatePreservesAllOriginalBytes": true,
+    "stagedOnlyOwnClaimUpdate": true,
+    "unrelatedFourAddedLinesRemainUnstaged": true
+  },
+  "sourceDigests": {
+    "lib/jito-simulation-attempt.ts": "16055462439e9cf4cda1468c5be7962abb817e6a262e7ab76ec15811b15129e1",
+    "lib/jito-simulation-attempt.test.ts": "cb01bb3356137d428c80b099abe2a8165769108fdf1a1b50c3a2915ceeadaa79"
+  },
+  "boundaries": {
+    "productionMounted": false,
+    "providerQualified": false,
+    "sourceAuthenticated": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "deployed": false,
+    "hostedSql": false,
+    "settingsChanged": false,
+    "signaturesCreated": 0,
+    "broadcasts": 0,
+    "fundedTrades": 0
+  },
+  "coordination": {
+    "claudePr": 57,
+    "head": "5f6870194aa7c44a7266ca1c23ba246625f27e80",
+    "sourceOverlapWithJito": false,
+    "reviewedOrMergedByCodex": false
+  }
+}

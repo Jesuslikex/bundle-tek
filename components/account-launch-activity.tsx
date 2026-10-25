@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AccountLaunchCosts } from '@/components/account-launch-costs';
 import { AccountLaunchEvidencePanel } from '@/components/account-launch-evidence';
+import { LaunchRecoveryDiscoveryPanel } from '@/components/launch-recovery-discovery';
 import styles from './account-launch-activity.module.css';
 import {
   validatedAccountLaunchActivity,
@@ -120,7 +121,7 @@ export function AccountLaunchActivitySummary({
   );
 }
 
-export function AccountLaunchActivityPanel() {
+function PumpAccountLaunchActivityPanel() {
   const [value, setValue] = useState<AccountLaunchActivity | null>(null),
     [loading, setLoading] = useState(true),
     [needsSignIn, setNeedsSignIn] = useState(false),
@@ -198,4 +199,13 @@ export function AccountLaunchActivityPanel() {
       </section>
     );
   return <AccountLaunchActivitySummary value={value} onRefresh={refresh} />;
+}
+
+export function AccountLaunchActivityPanel() {
+  return (
+    <>
+      <PumpAccountLaunchActivityPanel />
+      <LaunchRecoveryDiscoveryPanel />
+    </>
+  );
 }

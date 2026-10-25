@@ -279,6 +279,7 @@ function AutoSellContext({
   const [sessionMaximumUnit, setSessionMaximumUnit] = useState<
     'supply' | 'tokens'
   >('supply');
+  const [maxSlippageBps, setMaxSlippageBps] = useState(50);
   const delay = optionalDuration(sessionDelay);
   const duration = optionalDuration(sessionDuration);
   const sessionRules = {
@@ -288,6 +289,7 @@ function AutoSellContext({
     ...(sessionMaximumUnit === 'tokens'
       ? { endMaxTokenAmount: sessionMaximum }
       : {}),
+    maxSlippageBps,
   };
   let sessionError = delay.error || duration.error;
   let startingSessionCap: bigint | null = null;
@@ -335,6 +337,7 @@ function AutoSellContext({
       configuration.session.endMaxTokenAmount ??
         configuration.session.endMaxSupplyPercent,
     );
+    setMaxSlippageBps(configuration.session.maxSlippageBps ?? 50);
     setGeneration((value) => value + 1);
   }
 
@@ -647,6 +650,7 @@ function AutoSellContext({
             revision: w.revision,
           })),
           session: () => vault.current,
+          maxSlippageBps,
         }),
         onUpdate: (next) => {
           if (!next.running && !next.selling) releaseThisRun();
@@ -895,6 +899,27 @@ function AutoSellContext({
                   uncertain submissions so they cannot be sold again. Blank
                   limits are optional; maximum duration and delay are 24 hours
                   each.
+                </p>
+                <label htmlFor={`${ids}-slippage`}>
+                  Maximum slippage per sell
+                </label>
+                <select
+                  id={`${ids}-slippage`}
+                  value={maxSlippageBps}
+                  onChange={(event) =>
+                    setMaxSlippageBps(Number(event.target.value))
+                  }
+                >
+                  <option value={50}>0.5% (default)</option>
+                  <option value={25}>0.25%</option>
+                  <option value={10}>0.1%</option>
+                  <option value={5}>0.05%</option>
+                </select>
+                <p className={styles.hint}>
+                  Tightening only. Every sell is quoted with this limit, so a
+                  fill worse than it fails on-chain instead of executing, and
+                  that failed attempt still costs a network fee. 0.5% is the
+                  loosest limit this app will quote.
                 </p>
                 <p className={styles.hint}>
                   Slippage is fixed at 0.5%. Every sell still checks the

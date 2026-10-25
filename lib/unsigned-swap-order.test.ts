@@ -108,3 +108,86 @@ it('requests a wallet-bound exact order without execute or referral parameters',
   expect(result.preparation.instructionsVerified).toBe(false);
   expect(result).not.toHaveProperty('requestId');
 });
+it('quotes at a tighter slippage only when the provider matches it exactly', async () => {
+  const fetcher = vi.fn(async (_url: unknown) =>
+    Response.json({
+      ...fixture(),
+      slippageBps: 25,
+      otherAmountThreshold: '998',
+    }),
+  );
+  const result = await prepareSolanaSwap(
+    {
+      tokenMint: mint,
+      side: 'Buy',
+      amount: '0.001',
+      decimals: 6,
+      wallet,
+      slippageBps: 25,
+    },
+    'key',
+    AbortSignal.timeout(1000),
+    fetcher as typeof fetch,
+  );
+  const url = new URL(String(fetcher.mock.calls[0][0]));
+  expect(url.searchParams.get('slippageBps')).toBe('25');
+  expect(result.slippageBps).toBe(25);
+  expect(result.minimumOutAmount).toBe('998');
+});
+it('keeps the 50 bps bound when no tighter limit is requested', async () => {
+  const fetcher = vi.fn(async (_url: unknown) => Response.json(fixture()));
+  const result = await prepareSolanaSwap(
+    { tokenMint: mint, side: 'Buy', amount: '0.001', decimals: 6, wallet },
+    'key',
+    AbortSignal.timeout(1000),
+    fetcher as typeof fetch,
+  );
+  const url = new URL(String(fetcher.mock.calls[0][0]));
+  expect(url.searchParams.get('slippageBps')).toBe('50');
+  expect(result.slippageBps).toBe(50);
+});
+it('refuses any looser or malformed slippage before contacting the provider', async () => {
+  for (const slippageBps of [51, 100, 0, -1, 1.5, Number.NaN, Infinity]) {
+    const fetcher = vi.fn();
+    await expect(
+      prepareSolanaSwap(
+        {
+          tokenMint: mint,
+          side: 'Buy',
+          amount: '0.001',
+          decimals: 6,
+          wallet,
+          slippageBps,
+        },
+        'key',
+        AbortSignal.timeout(1000),
+        fetcher as typeof fetch,
+      ),
+    ).rejects.toMatchObject({ code: 'PARAMETER_MISMATCH' });
+    expect(fetcher).not.toHaveBeenCalled();
+  }
+});
+it('refuses a tight bps echoed beside a loose minimum output', async () => {
+  const fetcher = vi.fn(async (_url: unknown) =>
+    Response.json({
+      ...fixture(),
+      slippageBps: 25,
+      otherAmountThreshold: '995',
+    }),
+  );
+  await expect(
+    prepareSolanaSwap(
+      {
+        tokenMint: mint,
+        side: 'Buy',
+        amount: '0.001',
+        decimals: 6,
+        wallet,
+        slippageBps: 25,
+      },
+      'key',
+      AbortSignal.timeout(1000),
+      fetcher as typeof fetch,
+    ),
+  ).rejects.toMatchObject({ code: 'OUTPUT_PROTECTION' });
+});

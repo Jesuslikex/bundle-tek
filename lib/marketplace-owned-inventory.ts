@@ -73,6 +73,8 @@ const runDocument = z
       .max(20),
   })
   .strict();
+// Reuse the exact retained-run parser in saved-only inspection; no writer or inventory rule changes.
+export const marketplaceInventoryHistoryDocument = runDocument;
 const receiptCounts = z
   .object({ address, receiptCount: count, uniqueSignatures: count })
   .strict();
@@ -129,6 +131,65 @@ const fail = (): never => {
     'Saved wallet inventory evidence is unavailable or inconsistent.',
   );
 };
+export const MARKETPLACE_INVENTORY_CAPACITY_MESSAGE =
+  "Saved history exceeds this inventory inspector's bounded capacity (100 relevant saved history runs or 4 MiB of retained history). Inventory is not partially shown. Retrying alone will not fix this capacity limit; this full inventory view cannot combine paged history yet. Keep your saved history. You can inspect individual saved records below.";
+type InventoryCapacityCode =
+  | 'saved-history-run-limit'
+  | 'saved-history-byte-limit';
+export class MarketplaceInventoryCapacityError extends Error {
+  constructor(readonly errorCode: InventoryCapacityCode) {
+    super(MARKETPLACE_INVENTORY_CAPACITY_MESSAGE);
+    this.name = 'MarketplaceInventoryCapacityError';
+  }
+}
+export function marketplaceInventoryCapacityBody(
+  error: MarketplaceInventoryCapacityError,
+) {
+  return {
+    format: 'marketplace-inventory-capacity-v1' as const,
+    errorCode: error.errorCode,
+    error: MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
+    inventoryShown: false as const,
+    listingEnabled: false as const,
+    purchaseEnabled: false as const,
+    deliveryEnabled: false as const,
+  };
+}
+export function isMarketplaceInventoryCapacityResponse(
+  status: number,
+  value: unknown,
+) {
+  if (
+    status !== 409 ||
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(value))
+  )
+    return false;
+  const code = Object.getOwnPropertyDescriptor(value, 'errorCode');
+  if (
+    !code ||
+    !Object.hasOwn(code, 'value') ||
+    !['saved-history-run-limit', 'saved-history-byte-limit'].includes(
+      code.value,
+    )
+  )
+    return false;
+  const expected = marketplaceInventoryCapacityBody(
+    new MarketplaceInventoryCapacityError(code.value),
+  );
+  if (Reflect.ownKeys(value).length !== Object.keys(expected).length)
+    return false;
+  return Object.entries(expected).every(([key, expectedValue]) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return (
+      descriptor?.enumerable &&
+      Object.hasOwn(descriptor, 'value') &&
+      descriptor.value === expectedValue
+    );
+  });
+}
 export class MarketplaceInventoryClockError extends Error {
   constructor() {
     super(
@@ -164,8 +225,17 @@ export function buildMarketplaceOwnedInventory(
     input.proofs.length > 500 ||
     input.runs.length > 100 ||
     input.receipts.length > 500
-  )
+  ) {
+    if (
+      Number.isSafeInteger(now) &&
+      input.wallets.length <= 500 &&
+      input.proofs.length <= 500 &&
+      input.receipts.length <= 500 &&
+      input.runs.length > 100
+    )
+      throw new MarketplaceInventoryCapacityError('saved-history-run-limit');
     return fail();
+  }
   const wallets = input.wallets.map((value) => wallet.parse(value)),
     walletMap = new Map(wallets.map((value) => [value.address, value]));
   if (walletMap.size !== wallets.length) return fail();
@@ -207,7 +277,8 @@ export function buildMarketplaceOwnedInventory(
       updated = time(item.updatedAt, now);
     if (updated < created) return fail();
     bytes += new TextEncoder().encode(item.document).byteLength;
-    if (bytes > 4 * 1024 * 1024) return fail();
+    if (bytes > 4 * 1024 * 1024)
+      throw new MarketplaceInventoryCapacityError('saved-history-byte-limit');
     const document = runDocument.parse(JSON.parse(item.document)),
       captures = new Map(document.wallets.map((w) => [w.address, w.revision]));
     if (

@@ -10,6 +10,11 @@ export type AutoSellSessionRules = {
   endDurationSeconds: number;
   endMaxSupplyPercent: string;
   endMaxTokenAmount?: string;
+  /**
+   * Per-session slippage ceiling in bps, 1..50. Absent means the app default of
+   * 50 bps (0.5%). This can only tighten: the quote path refuses more than 50.
+   */
+  maxSlippageBps?: number;
 };
 
 export function autoSellSessionError(rules: AutoSellSessionRules) {
@@ -21,6 +26,15 @@ export function autoSellSessionError(rules: AutoSellSessionRules) {
   ] as const) {
     if (!Number.isSafeInteger(value) || value < 0 || value > 86400)
       return `${label} must be a whole number from 0 to 86400 seconds.`;
+  }
+  if (rules.maxSlippageBps !== undefined) {
+    if (
+      typeof rules.maxSlippageBps !== 'number' ||
+      !Number.isSafeInteger(rules.maxSlippageBps) ||
+      rules.maxSlippageBps < 1 ||
+      rules.maxSlippageBps > 50
+    )
+      return 'Slippage must be a whole number from 1 to 50 bps. Counter Trading never uses more than 0.5%.';
   }
   if (rules.endMaxSupplyPercent) {
     try {

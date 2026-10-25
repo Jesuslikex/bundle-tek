@@ -539,3 +539,34 @@ it('synchronizes another open panel on an explicit click without stranding its b
     vi.useRealTimers();
   }
 });
+
+it('exposes the original saved funding reference without another read or changing launch terms', async () => {
+  const wallets = launchFundingRoster(envelope).wallets;
+  const before = JSON.stringify(envelope);
+  const fetcher = vi.fn(async (_u: RequestInfo | URL, init?: RequestInit) =>
+    reply(
+      JSON.parse(init!.body as string).wallets,
+      new Map([[wallets[0].address, 1700000000]]),
+    ),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await open();
+  await click('Check recorded launch funding times');
+  const rows = host.querySelectorAll(
+    'ul[aria-label="Launch funding observations"] li',
+  );
+  const first = rows[0];
+  expect(first.textContent).toContain(signature);
+  expect(first.textContent).toContain(wallets[0].address);
+  const link = first.querySelector('a');
+  expect(link?.href).toBe('https://solscan.io/tx/' + signature);
+  expect(link?.rel).toContain('noreferrer');
+  expect(link?.getAttribute('referrerpolicy')).toBe('no-referrer');
+  const details = first.querySelector('details');
+  expect(details).toBeTruthy();
+  await act(async () => details!.querySelector('summary')!.click());
+  expect(fetcher).toHaveBeenCalledOnce();
+  expect(rows[1].querySelector('a')).toBeNull();
+  expect(JSON.stringify(envelope)).toBe(before);
+});

@@ -1,9 +1,12 @@
 'use client';
+import { MarketplaceSavedEvidenceBrowser } from './marketplace-saved-evidence-browser';
 import { useEffect, useRef, useState } from 'react';
 import {
   admitMarketplaceOwnedInventory,
   MarketplaceInventoryClockError,
   type MarketplaceOwnedInventory,
+  isMarketplaceInventoryCapacityResponse,
+  MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
 } from '@/lib/marketplace-owned-inventory';
 import { marketplaceLamports, marketplaceSol } from '@/lib/marketplace-catalog';
 import {
@@ -26,6 +29,7 @@ export function MarketplaceOperatorConsole() {
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
     [error, setError] = useState('');
+  const [capacity, setCapacity] = useState(false);
   const pending = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -94,6 +98,7 @@ export function MarketplaceOperatorConsole() {
   async function load() {
     if (pending.current) return;
     const controller = begin();
+    setCapacity(false);
     setInventory(null);
     setWallet('');
     setPrice('');
@@ -111,6 +116,11 @@ export function MarketplaceOperatorConsole() {
       );
       if (!live(controller)) return;
       if (!response.ok) {
+        if (isMarketplaceInventoryCapacityResponse(response.status, data)) {
+          setCapacity(true);
+          setError(MARKETPLACE_INVENTORY_CAPACITY_MESSAGE);
+          return;
+        }
         setError(
           response.status === 401
             ? 'Sign in before opening seller inventory.'
@@ -216,6 +226,7 @@ export function MarketplaceOperatorConsole() {
         {busy && <button onClick={cancel}>Cancel seller review</button>}
       </div>
       {error && <p role="alert">{error}</p>}
+      {capacity && <MarketplaceSavedEvidenceBrowser />}
       {message && <output>{message}</output>}
       {inventory && (
         <>

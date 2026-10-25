@@ -1,0 +1,74 @@
+.panel {
+  min-width: 0;
+  margin-block: 0.75rem;
+  border-top: 1px solid var(--border, #303039);
+}
+.panel summary {
+  min-height: 44px;
+  padding-block: 0.75rem;
+  cursor: pointer;
+}
+.panel p,
+.panel dd,
+.panel code,
+.panel li {
+  overflow-wrap: anywhere;
+}
+.panel a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.panel code {
+  user-select: text;
+}
+.reference {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  font-size: 0.8rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.notice {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 0.5rem;
+}
+.facts dd {
+  margin: 0;
+  min-width: 0;
+}
+.budgets {
+  padding-inline-start: 1.5rem;
+}
+.budgets li {
+  margin-block: 0.5rem;
+}
+@media (max-width: 420px) {
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .facts dd {
+    margin-bottom: 0.5rem;
+  }
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+.pageStatus:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 3px;
+}

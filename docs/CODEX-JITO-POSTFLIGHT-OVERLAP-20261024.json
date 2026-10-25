@@ -1,0 +1,80 @@
+{
+  "sourceBase": "4a80b68c44cd500c8101108d88749a22094330f4",
+  "sha256": {
+    "lib/jito-readonly-qualification.ts": "895474d026a19375591b66cf993560b644d8136a9d5f8a75bd043a2da4dd36c7",
+    "test/jito-readonly-composition.test.ts": "f717d5ec26cc185e1f10bc341643b445ddd7b582c1ba0d0a38bebac2ad19ddce",
+    "components/warmup-readiness.tsx": "7e8dcc504d0cb3ccdb1d456053d8a002c356e894bdc8f13aec93658656e27eae",
+    "components/warmup-readiness.test.tsx": "05c0adf439a550a9d54b30b1865ebccd1d7d3dd264684d1cfc2108412feb8d65",
+    "components/warmup-readiness.module.css": "507a06297d78b19ca7f86c2eb024c720f329fef59932a562ddfd9a2b9b986d93"
+  },
+  "node": "24.19.0",
+  "verification": {
+    "combinedFiles": 45,
+    "combinedTestsPassed": 913,
+    "failed": 0,
+    "nativeHarnessPassed": 19,
+    "typecheckExit": 0,
+    "scopedTypedLintExit": 0,
+    "compositionRuntimeDouble": true,
+    "compositionCases": 34
+  },
+  "opusSourceReview": {
+    "startedAt": "2026-10-24T06:01:30.983Z",
+    "finishedAt": "2026-10-24T06:03:45.488Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "4a80b68c44cd500c8101108d88749a22094330f4",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": ["claude-opus-5-5"],
+    "modelsUsed": ["claude-opus-5-5"],
+    "tools": ["Glob", "Grep", "Read"],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.6891844,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "finalTestOnlyRefinementsIndependentlyVerified": true,
+  "browser": {
+    "synthetic": true,
+    "desktopObserved": true,
+    "narrowFrameWidth": 375,
+    "simulatedClipboard": true,
+    "providerCalls": 0,
+    "fullSignedInApp": false,
+    "createdTabClosed": true,
+    "ownedServersStopped": true
+  },
+  "qualification": {
+    "newLiveCampaign": false,
+    "liveQualificationPassed": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "runtimeAttested": false
+  },
+  "remaining": [
+    "Changed Jupiter code/unlisted Tess require reviewed policy; pins unchanged",
+    "No new measured32slot pass",
+    "Multiple swap ALT local-floor chaining lacks dedicated composition case",
+    "Fresh owned-source/current custody/lifetime/API integration remains open"
+  ],
+  "preserved": {
+    "originalAgentsDirtyLines": 4,
+    "frozenDraftCount": 7,
+    "claudePr57Untouched": true
+  },
+  "actions": {
+    "deployed": false,
+    "hostedSql": false,
+    "providerOrCredentialChanges": false,
+    "cronChanges": false,
+    "realWallet": false,
+    "fundedTrades": false
+  }
+}

@@ -139,6 +139,16 @@ it('validates optional session bounds without coercing invalid edits', () => {
     autoSellSessionCap({ ...defaults, endMaxSupplyPercent: '0.000001' }, 1n),
   ).toThrow('smaller than one');
 });
+it('accepts a tighten-only slippage ceiling and refuses anything looser', () => {
+  expect(autoSellSessionError({ ...defaults, maxSlippageBps: 50 })).toBe('');
+  expect(autoSellSessionError({ ...defaults, maxSlippageBps: 25 })).toBe('');
+  expect(autoSellSessionError({ ...defaults, maxSlippageBps: 1 })).toBe('');
+  for (const maxSlippageBps of [51, 100, 0, -5, 1.5, Number.NaN, Infinity])
+    expect(
+      autoSellSessionError({ ...defaults, maxSlippageBps }),
+      String(maxSlippageBps),
+    ).toMatch(/1 to 50 bps/);
+});
 it('delays every strategy until the approved start, then starts DCA', async () => {
   const t = fixture({ startDelaySeconds: 10 });
   t.runner.start();

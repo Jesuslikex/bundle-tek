@@ -1,3 +1,4 @@
+import { savedEvidenceAuthority } from '@/lib/marketplace-saved-evidence';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -5,7 +6,12 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MarketplaceOperatorConsole } from './marketplace-operator-console';
 import { marketplaceOwnedFixture } from '../test/marketplace-owned-fixture';
-import { buildMarketplaceOwnedInventory } from '@/lib/marketplace-owned-inventory';
+import {
+  buildMarketplaceOwnedInventory,
+  MarketplaceInventoryCapacityError,
+  marketplaceInventoryCapacityBody,
+  MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
+} from '@/lib/marketplace-owned-inventory';
 import { reviewOperatorListing } from '@/lib/marketplace-operator-review';
 import { marketplaceSaleInspectionFixture } from '../test/marketplace-sale-inspection-fixture';
 import { marketplaceTokenViewFixture } from '../test/marketplace-token-inspection-view-fixture';
@@ -17,6 +23,103 @@ function inventory() {
     now,
   );
 }
+
+it.each(['saved-history-run-limit', 'saved-history-byte-limit'] as const)(
+  'explains seller %s without granting review forms or partial inventory',
+  async (code) => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(inventory()))
+      .mockResolvedValueOnce(
+        Response.json(
+          marketplaceInventoryCapacityBody(
+            new MarketplaceInventoryCapacityError(code),
+          ),
+          { status: 409 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetcher);
+    await mount();
+    await click('Open seller inventory');
+    expect(host.querySelector('select')).not.toBeNull();
+    await click('Reload seller inventory');
+    expect(host.querySelector('select')).toBeNull();
+    expect(host.textContent).not.toContain('Asking price (SOL)');
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      MARKETPLACE_INVENTORY_CAPACITY_MESSAGE,
+    );
+    expect(host.textContent).toContain('Inventory is not partially shown');
+    expect(host.textContent).toContain('Keep your saved history');
+    await act(async () => vi.advanceTimersByTime(120000));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(
+      fetcher.mock.calls.every(
+        ([url, options]) =>
+          url === '/api/marketplace/operator/inventory' && !options?.method,
+      ),
+    ).toBe(true);
+  },
+);
+it.each([
+  'wrong-status',
+  'extra-field',
+  'wrong-code',
+  'arbitrary-message',
+] as const)('withholds typed seller capacity guidance for %s', async (mode) => {
+  const body = marketplaceInventoryCapacityBody(
+    new MarketplaceInventoryCapacityError('saved-history-run-limit'),
+  );
+  const changed =
+    mode === 'extra-field'
+      ? { ...body, purchaseEnabled: true }
+      : mode === 'wrong-code'
+        ? { ...body, errorCode: 'unsupported' }
+        : mode === 'arbitrary-message'
+          ? { ...body, error: 'private server details' }
+          : body;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json(changed, { status: mode === 'wrong-status' ? 503 : 409 }),
+    ),
+  );
+  await mount();
+  await click('Open seller inventory');
+  expect(host.textContent).not.toContain('bounded history pagination');
+  expect(host.textContent).not.toContain('private server details');
+  expect(host.querySelector('select')).toBeNull();
+  expect(host.textContent).not.toContain('Asking price (SOL)');
+});
+it('ignores stale seller capacity after cancellation and a newer valid inventory read', async () => {
+  let resolve!: (response: Response) => void;
+  const fetcher = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done;
+        }),
+    )
+    .mockResolvedValueOnce(Response.json(inventory()));
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Open seller inventory');
+  await click('Cancel seller review');
+  await click('Open seller inventory');
+  await act(async () =>
+    resolve(
+      Response.json(
+        marketplaceInventoryCapacityBody(
+          new MarketplaceInventoryCapacityError('saved-history-byte-limit'),
+        ),
+        { status: 409 },
+      ),
+    ),
+  );
+  expect(host.textContent).not.toContain('bounded history pagination');
+  expect(host.querySelector('select')).not.toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(now);
@@ -296,4 +399,70 @@ it('mounts the saved control check only after review and aborts it on price chan
   expect(button('Inspect owned token accounts')).toBeUndefined();
   await act(async () => resolve(Response.json({ evidence: {} })));
   expect(host.querySelector('[aria-label="Control record result"]')).toBeNull();
+});
+
+it('offers only a passive independent saved-record browser after validated capacity, never a listing selection', async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json(
+        marketplaceInventoryCapacityBody(
+          new MarketplaceInventoryCapacityError('saved-history-run-limit'),
+        ),
+        { status: 409 },
+      ),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        format: 'marketplace-saved-evidence-page-v1',
+        chain: 'Solana',
+        view: 'wallets',
+        request: { view: 'wallets', cursor: null },
+        observedAt: new Date(now).toISOString(),
+        nextCursor: null,
+        wallets: [],
+        ...savedEvidenceAuthority,
+      }),
+    );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Open seller inventory');
+  const browser = [...host.querySelectorAll('details')].find(
+    (d) =>
+      d.querySelector('summary')?.textContent ===
+      'Inspect saved wallet evidence',
+  );
+  expect(browser).toBeTruthy();
+  expect(fetcher).toHaveBeenCalledOnce();
+  await act(async () => {
+    browser!.open = true;
+    browser!.dispatchEvent(new Event('toggle'));
+  });
+  expect(fetcher).toHaveBeenCalledOnce();
+  await click('Load saved wallets');
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher.mock.calls[1][0]).toBe(
+    '/api/marketplace/saved-evidence?view=wallets',
+  );
+  expect(host.textContent).not.toContain('Asking price (SOL)');
+  expect(
+    fetcher.mock.calls.every((c) => (c[1]?.method ?? 'GET') === 'GET'),
+  ).toBe(true);
+});
+it('does not mount saved history from a generic error that copies the capacity message', async () => {
+  const fetcher = vi.fn(async () =>
+    Response.json(
+      { error: MARKETPLACE_INVENTORY_CAPACITY_MESSAGE },
+      { status: 503 },
+    ),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Open seller inventory');
+  expect(
+    [...host.querySelectorAll('summary')].some(
+      (s) => s.textContent === 'Inspect saved wallet evidence',
+    ),
+  ).toBe(false);
+  expect(fetcher).toHaveBeenCalledOnce();
 });
