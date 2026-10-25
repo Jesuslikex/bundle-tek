@@ -4,11 +4,12 @@ import { MarketplaceBundleCatalog } from './marketplace-bundle-catalog';
 import { MarketplaceOwnedWallets } from './marketplace-owned-wallets';
 import { MarketplaceOperatorConsole } from './marketplace-operator-console';
 import { MarketplaceReservationBuyer } from './marketplace-reservation-buyer';
+import { MarketplaceDeliveries, MarketplaceOrders } from './marketplace-orders';
 import styles from './marketplace-owned-wallets.module.css';
 export function MarketplaceWorkspace() {
-  const [section, setSection] = useState<'catalog' | 'owned' | 'operator'>(
-    'catalog',
-  );
+  const [section, setSection] = useState<
+    'catalog' | 'orders' | 'owned' | 'operator' | 'deliveries'
+  >('catalog');
   return (
     <>
       <nav className={styles.navigation} aria-label="Marketplace sections">
@@ -35,6 +36,10 @@ export function MarketplaceWorkspace() {
         <MarketplaceReservationBuyer>
           <MarketplaceBundleCatalog />
         </MarketplaceReservationBuyer>
+      ) : section === 'orders' ? (
+        <MarketplaceOrders />
+      ) : section === 'deliveries' ? (
+        <MarketplaceDeliveries />
       ) : section === 'owned' ? (
         <MarketplaceOwnedWallets />
       ) : (

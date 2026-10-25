@@ -121,7 +121,7 @@ it('requires fresh separate hold and release approvals, preserves exact totals a
   await check(RESERVATION_ACK);
   await click('Hold these wallets');
   expect(fetcher).toHaveBeenCalledTimes(1);
-  expect(document.body.textContent).toContain('Held · payment unavailable');
+  expect(document.body.textContent).toContain('Unlock to check out');
   const payload = JSON.parse(fetcher.mock.calls[0][1]!.body as string);
   expect(payload.review).toEqual(review);
   expect(sessionStorage.getItem(key)).toBe(saved!.id);
@@ -167,7 +167,7 @@ it('retains the exact unknown-write ID across remount and only recovers manually
   expect(fetcher).toHaveBeenCalledTimes(2);
   expect(fetcher.mock.calls[1][0]).toContain(id!);
   expect(fetcher.mock.calls[1][1]?.method).not.toBe('POST');
-  expect(document.body.textContent).toContain('Held · payment unavailable');
+  expect(document.body.textContent).toContain('Unlock to check out');
   expect(button('Release this hold').disabled).toBe(true);
 });
 it.each(['id', 'payment', 'state', 'html'] as const)(
@@ -241,7 +241,7 @@ it('stops waiting, aborts the request and ignores late committed results without
   await click('Stop waiting for hold');
   expect(init.signal!.aborted).toBe(true);
   await act(async () => finish(response()));
-  expect(document.body.textContent).not.toContain('Held · payment unavailable');
+  expect(document.body.textContent).not.toContain('Unlock to check out');
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(sessionStorage.getItem(key)).toBe(saved.id);
 });

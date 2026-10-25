@@ -4,6 +4,10 @@ import {
   unreservedMarketplaceWallet,
 } from './marketplace-reservation-availability';
 import {
+  marketplaceOrdersInstalled,
+  unsoldMarketplaceWallet,
+} from './marketplace-order-availability';
+import {
   readOperatorDraft,
   OperatorDraftStorageError,
 } from './marketplace-operator-draft-storage';
@@ -300,12 +304,17 @@ export async function readBundleCatalog(db: D1Database, signal: AbortSignal) {
   await installed(db);
   await requireMarketplaceReservations(db);
   const operators = configuredMarketplaceOperators();
+  // Sold wallets leave the catalog once checkout storage exists.
+  const unsold = (await marketplaceOrdersInstalled(db))
+    ? ' AND ' + unsoldMarketplaceWallet
+    : '';
   const rows = (
     await db
       .prepare(
         select +
           " JOIN workspace_wallets w ON w.owner_id=p.owner_id AND w.chain='Solana' AND w.address=p.wallet_address WHERE p.owner_id IN (SELECT value FROM json_each(?)) AND w.archived=0 AND w.revision=json_extract(d.document,'$.review.selection.walletRevision') AND x.publication_id IS NULL AND " +
           unreservedMarketplaceWallet +
+          unsold +
           ' ORDER BY p.published_at DESC,p.id LIMIT 501',
       )
       .bind(JSON.stringify(operators))
