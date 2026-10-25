@@ -272,6 +272,11 @@
   align-items: stretch;
   min-width: 0;
 }
+.suffixed > input {
+  min-width: 0;
+  width: 0;
+  flex: 1;
+}
 .suffixed > span {
   display: flex;
   align-items: center;
@@ -324,11 +329,13 @@
 }
 .duration {
   display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 4px;
 }
 .duration input {
+  min-width: 0;
+  width: 100%;
   text-align: center;
 }
 .hint {
@@ -361,6 +368,7 @@
   cursor: pointer;
 }
 .advanced fieldset {
+  min-width: 0;
   display: grid;
   gap: 6px;
   margin-top: 10px;

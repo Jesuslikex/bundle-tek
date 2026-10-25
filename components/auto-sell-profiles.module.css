@@ -1,0 +1,68 @@
+.panel {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #303241;
+  border-radius: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.panel summary {
+  min-height: 44px;
+  cursor: pointer;
+}
+.panel p {
+  margin: 0.75rem 0;
+  color: #aeb2c8;
+}
+.panel label {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.panel input:not([type='checkbox']) {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid #464959;
+  border-radius: 0.5rem;
+  background: #171922;
+  color: inherit;
+}
+.panel button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.panel li {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.panel pre {
+  max-height: 22rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.panel .check {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+.check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.25rem;
+}
+.settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+.settings dd {
+  margin: 0;
+}

@@ -62,6 +62,11 @@ import { AutoSellSessionSummary } from './auto-sell-session-summary';
 import { AutoSellStrategySummary } from './auto-sell-strategy-summary';
 import { AutoSellOutcomeRead } from './auto-sell-outcome-read';
 import { AutoSellSavedOutcomes } from './auto-sell-saved-outcomes';
+import { AutoSellProfiles } from './auto-sell-profiles';
+import {
+  requireAutoSellProfileTerms,
+  type SavedAutoSellProfile,
+} from '@/lib/auto-sell-profile';
 import {
   autoSellActivityLabel,
   autoSellEndLabel,
@@ -258,6 +263,7 @@ function AutoSellContext({
   );
   const [sellWallets, setSellWallets] = useState<string[]>([]);
   const [password, setPassword] = useState('');
+  const [profileNotice, setProfileNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [reviewReminders, setReviewReminders] = useState<
@@ -339,6 +345,52 @@ function AutoSellContext({
     );
     setMaxSlippageBps(configuration.session.maxSlippageBps ?? 50);
     setGeneration((value) => value + 1);
+  }
+
+  function restoreProfile(profile: SavedAutoSellProfile) {
+    if (
+      !mounted.current ||
+      running ||
+      busy ||
+      editing ||
+      snapshot?.selling ||
+      snapshot?.settling ||
+      locked ||
+      project.archived
+    )
+      return;
+    try {
+      const terms = requireAutoSellProfileTerms(profile.terms);
+      if (
+        terms.projectId !== project.id ||
+        terms.token.chain !== token.chain ||
+        terms.token.mint !== token.address ||
+        terms.token.decimals !== token.decimals ||
+        terms.token.totalSupplyRaw !== token.totalSupplyRaw
+      )
+        throw Error('Saved token context differs.');
+      const matched = terms.wallets.every((saved) =>
+        solanaWallets.some(
+          (w) => w.address === saved.address && w.revision === saved.revision,
+        ),
+      );
+      loadConfiguration(terms.configuration);
+      setSellWallets(matched ? terms.wallets.map((w) => w.address) : []);
+      setPassword('');
+      setEditReview(null);
+      setApprovedEdit('');
+      setReviewedDraft('');
+      setProfileNotice(
+        'Configuration restored for a new reviewed run. No previous session or approval resumed. ' +
+          (matched
+            ? 'Re-enter your wallet password and review Run when ready.'
+            : 'Saved wallets changed. Select current sell wallets before reviewing Run.'),
+      );
+    } catch {
+      setProfileNotice(
+        'Saved configuration cannot be restored into this token context.',
+      );
+    }
   }
 
   function cancelChanges() {
@@ -822,6 +874,32 @@ function AutoSellContext({
               >
                 + Add Strategy
               </button>
+            )}
+            <AutoSellProfiles
+              project={project}
+              wallets={wallets}
+              selectedWallets={sellWallets}
+              configuration={{ strategies, session: sessionRules }}
+              saveBlockedReason={sessionError || errors.find(Boolean) || ''}
+              draftContext={JSON.stringify([
+                sessionDelay,
+                sessionDuration,
+                sessionMaximum,
+                sessionMaximumUnit,
+                maxSlippageBps,
+              ])}
+              disabled={
+                running ||
+                busy ||
+                editing ||
+                !!snapshot?.selling ||
+                !!snapshot?.settling ||
+                locked
+              }
+              onRestore={restoreProfile}
+            />
+            {profileNotice && (
+              <output aria-live="polite">{profileNotice}</output>
             )}
             <details
               ref={advanced}
