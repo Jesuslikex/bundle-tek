@@ -1,0 +1,127 @@
+.panel {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid #303341;
+  border-radius: 12px;
+  background: #11131b;
+  min-width: 0;
+  color: #dfe2ef;
+}
+.panel summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+.panel p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #b3b9ca;
+  overflow-wrap: anywhere;
+}
+.panel output {
+  display: block;
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #b3b9ca;
+}
+.panel h3 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+.panel button {
+  min-height: 44px;
+  height: auto;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.panel a {
+  color: #c4b6ff;
+  text-decoration: underline;
+}
+.panel button:focus-visible,
+.panel summary:focus-visible,
+.panel a:focus-visible {
+  outline: 2px solid #b4a1ff;
+  outline-offset: 3px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.list li {
+  padding: 12px;
+  min-width: 0;
+  border: 1px solid #303341;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.list strong {
+  display: block;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.list p {
+  margin: 6px 0;
+}
+.section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #303341;
+  min-width: 0;
+}
+.identities {
+  margin-top: 10px;
+  min-width: 0;
+}
+.identities dl,
+.facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+.identities dt,
+.facts dt {
+  color: #929bb2;
+  margin-top: 5px;
+}
+.identities dd,
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.wrap,
+.wrap code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.panel .error {
+  color: #ffa8b2;
+}
+.panel .warning {
+  color: #ead49d;
+}
+@media (min-width: 520px) {
+  .facts {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  }
+  .facts dt {
+    margin-top: 0;
+  }
+}

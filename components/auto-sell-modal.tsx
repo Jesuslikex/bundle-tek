@@ -63,6 +63,7 @@ import { AutoSellStrategySummary } from './auto-sell-strategy-summary';
 import { AutoSellOutcomeRead } from './auto-sell-outcome-read';
 import { AutoSellSavedOutcomes } from './auto-sell-saved-outcomes';
 import { AutoSellProfiles } from './auto-sell-profiles';
+import { AutoSellRunRecovery } from './auto-sell-run-recovery';
 import {
   requireAutoSellProfileTerms,
   type SavedAutoSellProfile,
@@ -901,6 +902,7 @@ function AutoSellContext({
             {profileNotice && (
               <output aria-live="polite">{profileNotice}</output>
             )}
+            <AutoSellRunRecovery project={project} />
             <details
               ref={advanced}
               className={styles.advanced}

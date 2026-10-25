@@ -7,6 +7,7 @@ import {
   autoSellRunAttemptFixture,
 } from '@/test/auto-sell-run-storage-fixture';
 import { readAutoSellRun, readAutoSellRunAttempt } from '@/lib/auto-sell-run';
+import { startOwnedAutoSellPreparation } from '@/lib/auto-sell-run-storage';
 const auth = vi.hoisted(() => ({
   owner: 'alice' as string | null,
   db: null as unknown as D1Database,
@@ -463,4 +464,284 @@ it('returns408 for an aborted request and retains no unconfirmed new root', asyn
     (await client.execute('SELECT count(*) AS n FROM auto_sell_runs')).rows[0]
       .n,
   ).toBe(0);
+});
+async function appendAttempts(
+  run: Awaited<ReturnType<typeof root>>,
+  count: number,
+) {
+  const attempts: Awaited<ReturnType<typeof readAutoSellRunAttempt>>[] = [];
+  let previous = run.sha256;
+  for (let n = 0; n < count; n++) {
+    const response = await post({
+      action: 'reserve',
+      attempt: autoSellRunAttemptFixture(run, {
+        expectedSequence: n,
+        expectedHeadSha256: previous,
+        occurrence: {
+          kind: 'counter',
+          sourceIds: ['opaque-source-' + n],
+          bufferedRaw: '10',
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+    const attempt = await readAutoSellRunAttempt(
+      (await json(response)).attempt,
+    );
+    attempts.push(attempt);
+    previous = attempt.sha256;
+  }
+  return attempts;
+}
+it('adds an explicitly bound read-only index without changing the original index response', async () => {
+  const run = await root();
+  const original = await json(await get({ projectId: fixture.projectId }));
+  const index = await json(
+    await get({ projectId: fixture.projectId, index: '1' }),
+  );
+  expect(index).toEqual({ projectId: fixture.projectId, ...original });
+  expect(original).not.toHaveProperty('projectId');
+  expect(index.runs).toMatchObject([{ id: run.id }]);
+});
+it('pages the complete owned attempt journal with original context, hashes and exact start markers', async () => {
+  const run = await root(),
+    attempts = await appendAttempts(run, 25);
+  await startOwnedAutoSellPreparation(
+    auth.db,
+    'alice',
+    run.id,
+    attempts[24].id,
+    new AbortController().signal,
+  );
+  const before = (await client.execute('SELECT total_changes() AS n')).rows[0]
+    .n;
+  const first = await json(await get({ runId: run.id, attempts: '1' }));
+  expect(first).toMatchObject({
+    runId: run.id,
+    runSha256: run.sha256,
+    context: {
+      projectId: fixture.projectId,
+      projectRevision: 1,
+      mint: fixture.mint,
+      decimals: 0,
+    },
+    accounting: {
+      sequence: 25,
+      headSha256: attempts[24].sha256,
+      accountedRaw: '250',
+    },
+    stopped: false,
+    nextBeforeSequence: 6,
+  });
+  const rows = first.attempts as Record<string, unknown>[];
+  expect(rows.map((r) => r.sequence)).toEqual(
+    Array.from({ length: 20 }, (_, n) => 25 - n),
+  );
+  expect(rows[0]).toEqual({
+    id: attempts[24].id,
+    sequence: 25,
+    attemptSha256: attempts[24].sha256,
+    strategyId: 'counter',
+    wallet: fixture.wallet,
+    walletRevision: 1,
+    inputRaw: '10',
+    preparationId: attempts[24].preparationId,
+    reservedAt: attempts[24].reservedAt,
+    preparationStarted: true,
+  });
+  expect(rows.slice(1).every((r) => r.preparationStarted === false)).toBe(true);
+  for (const row of rows)
+    expect(Object.keys(row).sort()).toEqual(
+      [
+        'id',
+        'sequence',
+        'attemptSha256',
+        'strategyId',
+        'wallet',
+        'walletRevision',
+        'inputRaw',
+        'preparationId',
+        'reservedAt',
+        'preparationStarted',
+      ].sort(),
+    );
+  expect(JSON.stringify(first)).not.toContain('opaque-source-');
+  expect(JSON.stringify(first)).not.toContain('transaction');
+  const second = await json(
+    await get({ runId: run.id, attempts: '1', beforeSequence: '6' }),
+  );
+  const older = second.attempts as Record<string, unknown>[];
+  expect(older.map((r) => r.sequence)).toEqual([5, 4, 3, 2, 1]);
+  expect(second.nextBeforeSequence).toBeNull();
+  expect(new Set([...rows, ...older].map((r) => r.id)).size).toBe(25);
+  expect((await client.execute('SELECT total_changes() AS n')).rows[0].n).toBe(
+    before,
+  );
+});
+it('returns an empty valid first page and accepts cursor one only when that attempt actually exists', async () => {
+  const run = await root();
+  const empty = await json(await get({ runId: run.id, attempts: '1' }));
+  expect(empty.attempts).toEqual([]);
+  expect(empty.nextBeforeSequence).toBeNull();
+  expect(
+    (await get({ runId: run.id, attempts: '1', beforeSequence: '1' })).status,
+  ).toBe(400);
+  await appendAttempts(run, 1);
+  const final = await json(
+    await get({ runId: run.id, attempts: '1', beforeSequence: '1' }),
+  );
+  expect(final.attempts).toEqual([]);
+  expect(final.nextBeforeSequence).toBeNull();
+  expect(
+    (await get({ runId: run.id, attempts: '1', beforeSequence: '2' })).status,
+  ).toBe(400);
+});
+it('keeps stopped and archived-source attempts readable with the original context', async () => {
+  const run = await root(),
+    [attempt] = await appendAttempts(run, 1);
+  await post({
+    action: 'stop',
+    id: crypto.randomUUID(),
+    runId: run.id,
+    runSha256: run.sha256,
+    consent: 'stop-auto-sell-run-v1',
+  });
+  await client.execute({
+    sql: 'UPDATE imported_token_projects SET archived=1,revision=2 WHERE owner_id=?',
+    args: ['alice'],
+  });
+  await client.execute({
+    sql: 'UPDATE workspace_wallets SET archived=1,revision=2 WHERE owner_id=?',
+    args: ['alice'],
+  });
+  const page = await json(await get({ runId: run.id, attempts: '1' }));
+  expect(page).toMatchObject({
+    stopped: true,
+    context: {
+      projectId: fixture.projectId,
+      projectRevision: 1,
+      mint: fixture.mint,
+      decimals: 0,
+    },
+    attempts: [{ id: attempt.id, inputRaw: '10', preparationStarted: false }],
+  });
+});
+it('refuses a corrupted older attempt outside the first page rather than returning partial valid rows', async () => {
+  const run = await root();
+  await appendAttempts(run, 21);
+  const trigger = (
+    await client.execute(
+      "SELECT sql FROM sqlite_master WHERE name='auto_sell_run_attempts_no_update'",
+    )
+  ).rows[0].sql;
+  expect(typeof trigger).toBe('string');
+  await client.execute('DROP TRIGGER auto_sell_run_attempts_no_update');
+  await client.execute({
+    sql: "UPDATE auto_sell_run_attempts SET document=json_set(document,'$.inputRaw','11') WHERE owner_id=? AND run_id=? AND sequence=1",
+    args: ['alice', run.id],
+  });
+  if (typeof trigger !== 'string') throw Error('Fixture trigger missing');
+  await client.execute(trigger);
+  const response = await get({ runId: run.id, attempts: '1' });
+  expect(response.status).toBe(409);
+  const body = await json(response);
+  expect(body).not.toHaveProperty('attempts');
+});
+it.each([
+  '0',
+  '01',
+  '-1',
+  '+1',
+  '1.0',
+  '1e0',
+  '1001',
+  '9007199254740992',
+  ' ',
+  'NaN',
+  'Infinity',
+])('refuses noncanonical attempt cursor %s', async (beforeSequence) => {
+  const run = await root();
+  const r = await get({ runId: run.id, attempts: '1', beforeSequence });
+  expect(r.status).toBe(400);
+  await json(r);
+});
+it.each([
+  'attempts=1',
+  'runId=bad&attempts=1',
+  'runId=x&attempts=0',
+  'runId=x&attempts=true',
+  'runId=x&beforeSequence=1',
+  'runId=x&attempts=1&attemptId=x',
+  'runId=x&attempts=1&projectId=x',
+  'runId=x&attempts=1&attempts=1',
+  'runId=x&runId=y&attempts=1',
+  'runId=x&attempts=1&beforeSequence=1&beforeSequence=1',
+  'runId=x&attempts=1&beforeId=x',
+  'runId=x&attempts=1&index=1',
+  'runId=x&attempts=1&extra=1',
+  'index=1',
+  'projectId=bad&index=1',
+  'projectId=x&index=0',
+  'projectId=x&index=true',
+  'projectId=x&index=1&index=1',
+  'projectId=x&projectId=y&index=1',
+  'projectId=x&index=1&runId=x',
+  'projectId=x&index=1&beforeId=x',
+  'projectId=x&index=1&beforeAt=x',
+  'projectId=x&index=1&extra=1',
+])(
+  'refuses mixed, duplicate or malformed new read coordinates %#',
+  async (query) => {
+    const response = await GET(new Request(url + '?' + query));
+    expect(response.status).toBe(400);
+    await json(response);
+  },
+);
+it('keeps new read routes owner-isolated and refuses foreign index cursors', async () => {
+  const run = await root();
+  await appendAttempts(run, 1);
+  auth.owner = 'bob';
+  expect((await get({ runId: run.id, attempts: '1' })).status).toBe(404);
+  const index = await json(
+    await get({ projectId: fixture.projectId, index: '1' }),
+  );
+  expect(index).toMatchObject({
+    projectId: fixture.projectId,
+    runs: [],
+    nextCursor: null,
+  });
+  expect(
+    (
+      await get({
+        projectId: fixture.projectId,
+        index: '1',
+        beforeId: run.id,
+        beforeAt: run.createdAt,
+      })
+    ).status,
+  ).toBe(400);
+  auth.owner = null;
+  expect((await get({ runId: run.id, attempts: '1' })).status).toBe(401);
+  expect((await get({ projectId: fixture.projectId, index: '1' })).status).toBe(
+    401,
+  );
+});
+it('maps cancelled new saved reads to408 without changing any journal record', async () => {
+  const run = await root(),
+    controller = new AbortController();
+  controller.abort();
+  for (const query of [
+    new URLSearchParams({ runId: run.id, attempts: '1' }),
+    new URLSearchParams({ projectId: fixture.projectId, index: '1' }),
+  ]) {
+    const response = await GET(
+      new Request(url + '?' + query, { signal: controller.signal }),
+    );
+    expect(response.status).toBe(408);
+    await json(response);
+  }
+  expect((await json(await get({ runId: run.id }))).accounting).toMatchObject({
+    sequence: 0,
+    accountedRaw: '0',
+  });
 });

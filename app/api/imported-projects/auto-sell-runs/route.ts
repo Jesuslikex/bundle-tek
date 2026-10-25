@@ -62,11 +62,137 @@ function keys(body: Record<string, unknown>, expected: string[]) {
   if (Object.keys(body).sort().join(',') !== expected.sort().join(','))
     throw new SyntaxError('Invalid journal request');
 }
+function savedIndexId(value: unknown) {
+  try {
+    return autoSellRunId(value);
+  } catch {
+    throw new AutoSellRunStorageError(
+      'Choose a complete original run or project ID.',
+      400,
+    );
+  }
+}
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user)
     return json({ error: 'Sign in to inspect original Auto Sell runs.' }, 401);
   const params = new URL(request.url).searchParams;
+  if (params.has('index')) {
+    if (
+      [...params.keys()].some(
+        (key) =>
+          !['projectId', 'index', 'beforeId', 'beforeAt'].includes(key) ||
+          params.getAll(key).length !== 1,
+      ) ||
+      params.get('index') !== '1' ||
+      !params.has('projectId') ||
+      params.has('beforeId') !== params.has('beforeAt')
+    )
+      return json(
+        {
+          error:
+            'Choose one owned project and complete saved-run index cursor.',
+        },
+        400,
+      );
+    const signal = AbortSignal.any([
+      request.signal,
+      AbortSignal.timeout(20000),
+    ]);
+    try {
+      const projectId = savedIndexId(params.get('projectId'));
+      const result = await listOwnedAutoSellRuns(
+        getD1(),
+        user.userId,
+        projectId,
+        params.has('beforeId')
+          ? { id: params.get('beforeId')!, createdAt: params.get('beforeAt')! }
+          : null,
+        signal,
+      );
+      return json({ projectId, ...result });
+    } catch (error) {
+      return failure(error, signal);
+    }
+  }
+  if (params.has('attempts') || params.has('beforeSequence')) {
+    const cursor = params.get('beforeSequence');
+    if (
+      [...params.keys()].some(
+        (key) =>
+          !['runId', 'attempts', 'beforeSequence'].includes(key) ||
+          params.getAll(key).length !== 1,
+      ) ||
+      params.get('attempts') !== '1' ||
+      !params.has('runId') ||
+      (cursor !== null &&
+        (!/^[1-9][0-9]{0,3}$/.test(cursor) || Number(cursor) > 1000))
+    )
+      return json(
+        { error: 'Choose one original run and complete attempt cursor.' },
+        400,
+      );
+    const signal = AbortSignal.any([
+      request.signal,
+      AbortSignal.timeout(20000),
+    ]);
+    try {
+      const runId = savedIndexId(params.get('runId'));
+      const history = await readOwnedAutoSellAttempts(
+        getD1(),
+        user.userId,
+        runId,
+        signal,
+      );
+      const before = cursor === null ? null : Number(cursor);
+      if (
+        before !== null &&
+        !history.attempts.some((a) => a.sequence === before)
+      )
+        return json(
+          { error: 'Choose an existing attempt sequence from this owned run.' },
+          400,
+        );
+      const candidates = history.attempts
+        .filter((a) => before === null || a.sequence < before)
+        .reverse();
+      const page = candidates.slice(0, 20),
+        started = new Set(history.preparationStarts.map((s) => s.attemptId));
+      const terms = history.run.profile.terms;
+      return json({
+        runId,
+        runSha256: history.run.sha256,
+        context: {
+          projectId: terms.projectId,
+          projectRevision: terms.projectRevision,
+          mint: terms.token.mint,
+          decimals: terms.token.decimals,
+        },
+        accounting: {
+          sequence: history.accounting.sequence,
+          headSha256: history.accounting.headSha256,
+          accountedRaw: history.accounting.accountedRaw,
+        },
+        stopped: history.stopped,
+        attempts: page.map((a) => ({
+          id: a.id,
+          sequence: a.sequence,
+          attemptSha256: a.sha256,
+          strategyId: a.strategyId,
+          wallet: a.wallet,
+          walletRevision: a.walletRevision,
+          inputRaw: a.inputRaw,
+          preparationId: a.preparationId,
+          reservedAt: a.reservedAt,
+          preparationStarted: started.has(a.id),
+        })),
+        nextBeforeSequence:
+          candidates.length > 20 ? page.at(-1)!.sequence : null,
+      });
+    } catch (error) {
+      return failure(error, signal);
+    }
+  }
   if (
     [...params.keys()].some(
       (key) =>

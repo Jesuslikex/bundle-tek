@@ -48,7 +48,9 @@ export async function setupAutoSellRunPacketStorageFixture(
     totalSupplyRaw: '1000000000',
   };
   await db
-    .prepare('INSERT INTO imported_token_projects VALUES(?,?,?,?,?,?,?,?,?)')
+    .prepare(
+      'INSERT INTO imported_token_projects(owner_id,id,chain,address,document,revision,archived,mutation_id,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',
+    )
     .bind(
       owner,
       projectId,
@@ -62,7 +64,9 @@ export async function setupAutoSellRunPacketStorageFixture(
     )
     .run();
   await db
-    .prepare('INSERT INTO workspace_wallets VALUES(?,?,?,?,?,?,?,?,?)')
+    .prepare(
+      'INSERT INTO workspace_wallets(owner_id,chain,address,folder_id,label,role,archived,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',
+    )
     .bind(
       owner,
       'Solana',

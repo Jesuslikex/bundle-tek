@@ -1,0 +1,254 @@
+{
+  "format": "saved-auto-sell-run-recovery-ui-verification-v1",
+  "baseCommit": "4eedabf2051a935d4009b25d6f37ca92770ea0a9",
+  "completeModalUnchangedExceptAdditiveMount": true,
+  "originalGetAndPostUnchanged": true,
+  "fixtureOnlyAddsExplicitColumnNames": true,
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "app/ux.css",
+    "lib/auto-sell-runner.ts",
+    "lib/auto-sell-execute.ts",
+    "lib/auto-sell-edit.ts",
+    "lib/auto-sell.ts",
+    "lib/auto-sell-profile.ts",
+    "lib/auto-sell-profile-storage.ts",
+    "lib/browser-wallet-vault.ts",
+    "lib/warmup-signing.ts",
+    "lib/imported-swap-approval.ts",
+    "lib/imported-trade-session-server.ts",
+    "app/api/imported-projects/prepare/route.ts",
+    "app/api/imported-projects/signing/route.ts",
+    "lib/pump-group-runtime-service.ts",
+    "lib/pump-group-code-identity.ts",
+    "lib/jito-readonly-qualification.ts",
+    "vercel.json",
+    "lib/auto-sell-run.ts",
+    "lib/auto-sell-run-storage.ts",
+    "lib/auto-sell-run-preparation.ts",
+    "lib/unsigned-swap-order.ts",
+    "lib/auto-sell-run-packet.ts",
+    "lib/auto-sell-run-packet-storage.ts",
+    "lib/imported-swap-preparation-history.ts",
+    "lib/prepare-owned-imported-swap.ts",
+    "app/api/imported-projects/auto-sell-run-recovery/route.ts",
+    "components/auto-sell-profiles.tsx",
+    "db/turso.ts",
+    "lib/auth.ts"
+  ],
+  "priorSqlUnchanged": 153,
+  "journalUnchanged": true,
+  "sourceHashes": {
+    "components/auto-sell-run-recovery.tsx": "3f063503a3d26990f29631e575cdf6b1a44bf9bf0a27c86b5e565f14fc7a94cc",
+    "components/auto-sell-run-recovery.test.tsx": "fd7c5439fbf997763525693b982faf6f8b84c1b66e632bd98764983dd9f3d155",
+    "components/auto-sell-run-recovery.module.css": "7cb25bcc356a453faa3b43c6c83ac7c1c4efa20bc46fadff7492b76f550876a5",
+    "components/auto-sell-run-recovery-modal.test.tsx": "188fb47fb02b2fad62c5d930a79698eb4c6c2b1e45d7576d49bd2795bddf19ce",
+    "components/auto-sell-modal.tsx": "381f174829ba9207aad0b6deb25603ff7b8301e8ed40a850f30a5ffdf4e03ff7",
+    "lib/auto-sell-run-recovery-client.ts": "6968a07f18a26a7a857e244c24427eba4b1e44b68be6c05aecbe86e3c8e5dca7",
+    "lib/auto-sell-run-recovery-client.test.ts": "8e3fd558f54c641b6d29b388cb84d40bc54b4113e992a7048ceb0c631b3e7c8b",
+    "app/api/imported-projects/auto-sell-runs/route.ts": "071de38af4e86aa2d03abf1ab5d24f27688ea9f4e1c43dc5ca33ac3604235e67",
+    "app/api/imported-projects/auto-sell-runs/route.test.ts": "f252ca135a9e2de24fbc08588e48c0227704df7b6e574b38fc8e6e6dfe3a4c16",
+    "test/auto-sell-run-packet-storage-fixture.ts": "bf1ae2055be86c30cf6a4c4e858e8ff19894633ea48a5551bc2b7fac74e20e31"
+  },
+  "regression": {
+    "passed": 974,
+    "total": 974,
+    "files": 54,
+    "failed": 0,
+    "pending": 0,
+    "exit": 0,
+    "maxWorkers": 2,
+    "report": "work/release-qa/auto-sell-run-ui-regression-final-v2-20261025.json",
+    "consoleLog": "work/release-qa/auto-sell-run-ui-regression-final-v2-20261025.log",
+    "allAssertionsIndividuallyPassed": true
+  },
+  "invalidEarlierRun": {
+    "report": "work/release-qa/auto-sell-run-ui-regression-final-20261025.json",
+    "exit": 1,
+    "passed": 969,
+    "unfinished": 5,
+    "countedAsPass": false,
+    "runnerWarning": "Some tests still running when generating JSON report",
+    "isolatedFileRetest": "15/15 passed, exit0"
+  },
+  "typeScript": {
+    "exit": 0,
+    "command": "node node_modules/typescript/bin/tsc --noEmit"
+  },
+  "typedLint": {
+    "files": 9,
+    "exit": 0
+  },
+  "sourceFormatting": {
+    "files": 10,
+    "exit": 0
+  },
+  "opusSourceReviews": [
+    {
+      "startedAt": "2026-10-25T23:19:03.163Z",
+      "finishedAt": "2026-10-25T23:20:41.346Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "4eedabf2051a935d4009b25d6f37ca92770ea0a9",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.5014776000000001,
+      "sourceUnchanged": true,
+      "changed": [],
+      "copiedFiles": 15,
+      "changedSinceReview": [
+        "components/auto-sell-run-recovery-modal.test.tsx",
+        "components/auto-sell-run-recovery.module.css",
+        "components/auto-sell-run-recovery.test.tsx",
+        "components/auto-sell-run-recovery.tsx"
+      ]
+    },
+    {
+      "startedAt": "2026-10-25T23:25:16.866Z",
+      "finishedAt": "2026-10-25T23:26:29.528Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "4eedabf2051a935d4009b25d6f37ca92770ea0a9",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.41488780000000003,
+      "sourceUnchanged": true,
+      "changed": [],
+      "copiedFiles": 17,
+      "changedSinceReview": []
+    }
+  ],
+  "finalOwnedSourcesMatchFollowupCopies": true,
+  "browser": {
+    "passed": true,
+    "syntheticAuth": true,
+    "realCompiledModal": true,
+    "realReadApis": true,
+    "realProductionTursoAdapter": true,
+    "disposableFullMigrationChain": 153,
+    "providerVaultExecutorRunnerDisabled": true,
+    "browser": "existing Chrome profile3",
+    "viewportChecks": [
+      {
+        "width": 1920,
+        "documentOverflow": false,
+        "dialogOverflow": false,
+        "panelOverflow": false,
+        "minButtonHeight": 44
+      },
+      {
+        "width": 375,
+        "documentOverflow": false,
+        "dialogOverflow": false,
+        "panelOverflow": false,
+        "minButtonHeight": 44,
+        "longHashOverflow": false
+      }
+    ],
+    "reloadRecoveredSamePacket": true,
+    "originalExpiry": "2026-10-25T23:13:54.224Z",
+    "passwordEmpty": true,
+    "runButtonDisabled": true,
+    "secondSyntheticOwnerEmpty": true,
+    "consoleErrors": [],
+    "requests": [
+      {
+        "method": "GET",
+        "kind": "index",
+        "owner": "browser-owner",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "kind": "attempts",
+        "owner": "browser-owner",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "kind": "packet",
+        "owner": "browser-owner",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "kind": "index",
+        "owner": "other-owner",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "kind": "index",
+        "owner": "browser-owner",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "kind": "attempts",
+        "owner": "browser-owner",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "kind": "packet",
+        "owner": "browser-owner",
+        "status": 200
+      }
+    ],
+    "counts": {
+      "auto_sell_runs": 1,
+      "auto_sell_run_attempts": 1,
+      "auto_sell_run_preparation_starts": 1,
+      "imported_swap_preparations": 1,
+      "auto_sell_run_packets": 1,
+      "imported_swap_signing_intents": 0
+    },
+    "viewportReset": true,
+    "ownTabClosed": true,
+    "ownServerStopped": true,
+    "appBundleSha256": "a6d8f68a8d49915c39f380e3f9322e94e76664f7e8b8e04f8a4750ff11b73acf",
+    "finalSnapshotBrowserClaimed": false,
+    "postBrowserChanges": "Pending identity clearing, semantic output/Link/formatter refinements and both review consistency fixes are independently unit/regression verified; original browser snapshot is retained as bounded rendered evidence."
+  },
+  "reactChecklist": {
+    "eventOnlyJournalReads": true,
+    "lazyIdentitySubscription": true,
+    "dynamicPacketCodec": true,
+    "scopedAbortAndRemount": true,
+    "noInlineStyles": true,
+    "semanticStatusAndNavigation": true,
+    "exactIntegerFormatting": true,
+    "keyboardFocusAndFortyFourPixelTargets": true
+  },
+  "journalBackedSigningAllowed": false,
+  "journalBackedExecutionAllowed": false,
+  "automaticResumeAllowed": false,
+  "allowanceReleased": false,
+  "existingTabOnlyFinancialHandlersUnchanged": true,
+  "schemaChanges": false,
+  "applicationOrHostedSql": false,
+  "providerCredentialCronChanges": false,
+  "deployed": false,
+  "fundedActions": false,
+  "productionBuildOrRealHostedAuthClaimed": false
+}
