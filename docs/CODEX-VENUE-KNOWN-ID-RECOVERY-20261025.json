@@ -1,0 +1,187 @@
+{
+  "format": "venue-known-id-recovery-checkpoint-v1",
+  "baseCommit": "0932278bb320907d9e6548ad46a1484687ecc8fd",
+  "sourceOnly": true,
+  "originalHookUnchangedExceptContextKey": true,
+  "originalAdmissionUnchanged": true,
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "components/meteora-dbc-launch-review.tsx",
+    "components/stonkfun-launch-review.tsx",
+    "components/launchlab-launch-review.tsx",
+    "lib/venue-launch-recovery.ts",
+    "lib/venue-launch-signed-packet.ts",
+    "app/api/meteora-dbc/launch/route.ts",
+    "app/api/stonkfun/launch/route.ts",
+    "app/api/launchlab/launch/route.ts"
+  ],
+  "uuidParityCases": 28,
+  "ownedHashes": {
+    "components/venue-launch-recovery.tsx": "38bdbf42056e476f8d4eb1c9eb37aee7a9bf7a20bda8588eacdf52873e524a4f",
+    "components/venue-launch-recovery-known-id.test.tsx": "fa4b173698a48827ee6f4dafccdd9927ccf956c930ade882c21a41eb784f893a"
+  },
+  "verification": {
+    "node": "24.19.0",
+    "relatedTests": {
+      "files": 8,
+      "passed": 153
+    },
+    "finalKnownIdTests": {
+      "files": 1,
+      "passed": 33
+    },
+    "typecheck": true,
+    "typedLintFiles": 2,
+    "formatFiles": 2,
+    "uuidParserParity": 28
+  },
+  "browser": {
+    "syntheticOwner": true,
+    "disposableDatabase": true,
+    "originalTableDeclarationsOnly": true,
+    "fixtureWriteAndProviderCallsBlocked": true,
+    "venues": [
+      "meteora-dbc",
+      "stonkfun",
+      "launchlab"
+    ],
+    "rowsPerVenue": 22,
+    "recentLimit": 20,
+    "recordedRequests": [
+      {
+        "method": "GET",
+        "url": "/api/meteora-dbc/launch?projectId=fixture-project",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "/api/meteora-dbc/launch?id=11111111-1111-4111-8111-111111111111",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "/api/launchlab/launch?projectId=fixture-project",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "/api/launchlab/launch?id=11111111-1111-4111-8111-111111111113",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "/api/launchlab/launch?id=11111111-1111-4111-8111-111111111111",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "url": "/api/stonkfun/launch?projectId=fixture-project",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "/api/meteora-dbc/launch?projectId=fixture-project",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "/api/stonkfun/launch?projectId=fixture-project",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "/api/stonkfun/launch?id=11111111-1111-4111-8111-111111111112",
+        "status": 200
+      }
+    ],
+    "layout": {
+      "desktop": {
+        "documentWidth": 1920,
+        "overflow": [],
+        "width": 1920
+      },
+      "phone": {
+        "width": 375,
+        "documentWidth": 360,
+        "overflow": []
+      },
+      "synthetic": true,
+      "financialPathsDisabled": true
+    },
+    "productionOrFundedProof": false
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-25T17:15:18.533Z",
+      "finishedAt": "2026-10-25T17:16:32.395Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "0932278bb320907d9e6548ad46a1484687ecc8fd",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.3022894,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    {
+      "startedAt": "2026-10-25T17:17:28.282Z",
+      "finishedAt": "2026-10-25T17:18:06.531Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "0932278bb320907d9e6548ad46a1484687ecc8fd",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.25368480000000004,
+      "sourceUnchanged": true,
+      "changed": []
+    }
+  ],
+  "reviewLimits": "Final stale-history UI guard and wording correction independently verified after the final source review, not rereviewed.",
+  "constraints": {
+    "deployed": false,
+    "hostedSql": false,
+    "migrationsAdded": false,
+    "providerChanges": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "walletActions": false,
+    "fundedTrades": false,
+    "claudeFilesTouched": false
+  }
+}
