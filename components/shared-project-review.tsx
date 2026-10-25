@@ -167,10 +167,49 @@ export function SharedProjectReview({
           </dd>
         </div>
       </dl>
+      <section
+        className={styles.assignments}
+        aria-label="Shared assignment references"
+      >
+        <h4>Shared assignment references</h4>
+        {project.walletScope === undefined ? (
+          <p className={styles.scope}>
+            This server did not report an assignment scope. Refresh to check
+            access; no wallet permission is inferred.
+          </p>
+        ) : (
+          <>
+            <p className={styles.scope}>
+              {project.walletScope.mode === 'legacy'
+                ? 'Legacy share: all current saved assignment references are visible. Ask the owner to revoke and invite again to limit visibility.'
+                : project.walletScope.mode === 'none'
+                  ? 'No assignment references are shared.'
+                  : 'Only the exact references selected by the owner are visible. New wallets, changed revisions and changed roles are not added automatically.'}{' '}
+              These are saved references, not proof of current balances,
+              private-key ownership or signing access.
+            </p>
+            {project.walletScope.unavailableCount > 0 && (
+              <p className={styles.scope}>
+                {project.walletScope.unavailableCount} selected references no
+                longer match the saved project. Ask the owner for a new invite
+                if visibility is still needed.
+              </p>
+            )}
+            <ul>
+              {project.walletScope.wallets.map((wallet) => (
+                <li key={`${wallet.chain}:${wallet.address}`}>
+                  {wallet.role} · {wallet.chain} · revision {wallet.revision}
+                  <code>{wallet.address}</code>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
       <p className={styles.scope}>
         This snapshot does not grant edit, funding, signing or submission
-        permissions. No artwork, external links or wallet addresses are opened
-        here.
+        permissions. Addresses are displayed as text; there are no wallet
+        actions or external links here.
       </p>
     </details>
   );

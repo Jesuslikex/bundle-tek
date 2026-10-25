@@ -1037,6 +1037,13 @@
       "when": 1794860000010,
       "tag": "0149_auto_sell_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "6",
+      "when": 1794860000011,
+      "tag": "0150_project_share_scope",
+      "breakpoints": true
     }
   ]
 }

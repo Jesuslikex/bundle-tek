@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { Miniflare } from 'miniflare';
 import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
+import { EMPTY_IDENTITY, DEFAULT_VENUE_OPTIONS } from '@/lib/workspace-project';
 
 const mocks = vi.hoisted(() => ({
   user: null as { userId: string; email: string } | null,
@@ -31,6 +32,85 @@ const post = (body: unknown, headers: Record<string, string> = { origin }) =>
   );
 const get = (query = '') =>
   GET(new Request(`${origin}/api/projects/shares${query}`));
+
+const selectedAddress = 'SysvarRent111111111111111111111111111111111';
+const hiddenAddress = 'SysvarC1ock11111111111111111111111111111111';
+const deployerAddress = '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM';
+async function assignmentDocument() {
+  const document = {
+    plan: structuredClone(DEFAULT_LAUNCH_PLAN),
+    identity: {
+      ...EMPTY_IDENTITY,
+      website: 'https://hidden.example.test/private-social',
+    },
+    options: {
+      ...structuredClone(DEFAULT_VENUE_OPTIONS),
+      wallets: {
+        chain: 'Solana',
+        deployer: {
+          address: deployerAddress,
+          revision: 1,
+          folderRevision: 1,
+          folderId: 'private-folder',
+        },
+        recipients: [selectedAddress, hiddenAddress].map((address) => ({
+          address,
+          revision: 1,
+          folderRevision: 1,
+          folderId: 'private-folder',
+        })),
+      },
+    },
+  };
+  document.options.settings.pumpfun.feeSharing = true;
+  document.options.settings.pumpfun.feeShares = [
+    { address: hiddenAddress, shareBps: 10000 },
+  ];
+  await mocks.db
+    .prepare(
+      'UPDATE workspace_projects SET document=?,updated_at=? WHERE owner_id=? AND id=?',
+    )
+    .bind(
+      JSON.stringify(document),
+      '2026-10-25T00:00:00.000Z',
+      'alice',
+      'shared-project',
+    )
+    .run();
+  return document;
+}
+async function assignmentSource() {
+  const response = await get('?projectId=shared-project');
+  expect(response.status).toBe(200);
+  return (
+    (await response.json()) as {
+      source: {
+        projectId: string;
+        projectRevision: string;
+        candidates: {
+          chain: string;
+          address: string;
+          revision: number;
+          role: string;
+        }[];
+      };
+    }
+  ).source;
+}
+async function scopedInvite(
+  wallets: unknown[],
+  projectRevision = '2026-10-25T00:00:00.000Z',
+) {
+  return post({
+    action: 'invite',
+    projectId: 'shared-project',
+    walletScope: {
+      format: 'project-share-wallet-scope-v1',
+      projectRevision,
+      wallets,
+    },
+  });
+}
 
 let mf: Miniflare;
 beforeAll(async () => {
@@ -75,6 +155,7 @@ beforeAll(async () => {
     '0010_magical_ender_wiggin.sql',
     '0100_project_shares.sql',
     '0148_project_share_expiry.sql',
+    '0150_project_share_scope.sql',
   ])
     for (const sql of readFileSync(
       new URL('../../../../drizzle/' + file, import.meta.url),
@@ -258,9 +339,12 @@ it.each([null, 0, 60, 3601, '3600', {}, [], 604801])(
         })
       ).status,
     ).toBe(400);
-    expect(await (await get('?projectId=shared-project')).json()).toEqual({
-      shares: [],
-    });
+    expect(await (await get('?projectId=shared-project')).json()).toMatchObject(
+      {
+        shares: [],
+        source: { projectId: 'shared-project', candidates: [] },
+      },
+    );
   },
 );
 it('filters expired members and refuses accepting an expired or exact-boundary invite', async () => {
@@ -283,6 +367,7 @@ it('filters expired members and refuses accepting an expired or exact-boundary i
         acceptedAt: expect.any(String),
         expiresAt: '2000-01-01T00:00:00.000Z',
         expired: true,
+        walletScope: expect.objectContaining({ count: 0 }),
       },
     ]),
   });
@@ -382,7 +467,7 @@ it('requires a valid future expiry on new SQL inserts and keeps expired rows in 
     await expect(
       mocks.db
         .prepare(
-          'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)',
+          'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at,wallet_scope) VALUES(?,?,?,?,?,?,?)',
         )
         .bind(
           crypto.randomUUID(),
@@ -391,6 +476,16 @@ it('requires a valid future expiry on new SQL inserts and keeps expired rows in 
           crypto.randomUUID(),
           new Date().toISOString(),
           expiry,
+          JSON.stringify({
+            format: 'project-share-wallet-scope-v1',
+            projectRevision: (await mocks.db
+              .prepare(
+                'SELECT updated_at AS t FROM workspace_projects WHERE owner_id=? AND id=?',
+              )
+              .bind('alice', 'shared-project')
+              .first<{ t: string }>())!.t,
+            wallets: [],
+          }),
         )
         .run(),
     ).rejects.toThrow('Share expiry invalid');
@@ -406,4 +501,299 @@ it('requires a valid future expiry on new SQL inserts and keeps expired rows in 
   ).toBe(409);
   expect((await post({ action: 'revoke', id: first })).status).toBe(200);
   await invite();
+});
+
+it('defaults new shares to no assignments and never transports hidden structured wallet or identity fields', async () => {
+  await assignmentDocument();
+  const share = await invite();
+  as('bob');
+  await post({ action: 'accept', token: share.token });
+  const value = (await (await get()).json()) as {
+    projects: Record<string, unknown>[];
+  };
+  const text = JSON.stringify(value);
+  expect(value.projects[0]).toMatchObject({
+    format: 'shared-project-scoped-v1',
+    readOnly: true,
+    walletScope: { mode: 'none', wallets: [], unavailableCount: 0 },
+  });
+  for (const hidden of [
+    selectedAddress,
+    hiddenAddress,
+    deployerAddress,
+    'private-folder',
+    'hidden.example.test',
+    'feeShares',
+    'identity',
+    'options',
+  ])
+    expect(text).not.toContain(hidden);
+});
+
+it('discloses only exact selected public assignment references, excluding later additions, roles and revisions', async () => {
+  const document = await assignmentDocument();
+  const source = await assignmentSource();
+  expect(source.projectId).toBe('shared-project');
+  expect(source.candidates).toHaveLength(3);
+  expect(JSON.stringify(source)).not.toContain('private-folder');
+  const selected = source.candidates.find(
+    (w) => w.address === selectedAddress,
+  )!;
+  const response = await scopedInvite([selected], source.projectRevision);
+  expect(response.status).toBe(201);
+  const { share } = (await response.json()) as {
+    share: { token: string; id: string };
+  };
+  as('bob');
+  await post({ action: 'accept', token: share.token });
+  let value = await (await get()).json();
+  expect(value).toMatchObject({
+    projects: [
+      {
+        walletScope: {
+          mode: 'selected',
+          wallets: [selected],
+          unavailableCount: 0,
+        },
+      },
+    ],
+  });
+  for (const hidden of [
+    hiddenAddress,
+    deployerAddress,
+    'private-folder',
+    'hidden.example.test',
+  ])
+    expect(JSON.stringify(value)).not.toContain(hidden);
+  document.options.wallets.recipients[0].revision = 2;
+  await mocks.db
+    .prepare(
+      'UPDATE workspace_projects SET document=? WHERE owner_id=? AND id=?',
+    )
+    .bind(JSON.stringify(document), 'alice', 'shared-project')
+    .run();
+  value = await (await get()).json();
+  expect(value).toMatchObject({
+    projects: [
+      { walletScope: { mode: 'selected', wallets: [], unavailableCount: 1 } },
+    ],
+  });
+  expect(JSON.stringify(value)).not.toContain(selectedAddress);
+  as('alice');
+  await expect(
+    mocks.db
+      .prepare('UPDATE project_shares SET wallet_scope=? WHERE id=?')
+      .bind(
+        JSON.stringify({
+          format: 'project-share-wallet-scope-v1',
+          projectRevision: source.projectRevision,
+          wallets: [],
+        }),
+        share.id,
+      )
+      .run(),
+  ).rejects.toThrow('Share wallet scope is immutable');
+});
+
+it('rejects foreign, stale, duplicate and malformed assignment grants before saving an invite', async () => {
+  await assignmentDocument();
+  const source = await assignmentSource(),
+    selected = source.candidates[1];
+  expect(
+    (await scopedInvite([selected], '2026-10-24T00:00:00.000Z')).status,
+  ).toBe(409);
+  expect(
+    (
+      await scopedInvite([
+        { ...selected, address: 'So11111111111111111111111111111111111111112' },
+      ])
+    ).status,
+  ).toBe(409);
+  expect((await scopedInvite([selected, selected])).status).toBe(400);
+  expect(
+    (await scopedInvite([{ ...selected, signingAllowed: true }])).status,
+  ).toBe(400);
+  as('mallory');
+  expect((await scopedInvite([selected])).status).toBe(404);
+  as('alice');
+  expect((await assignmentSource()).candidates).toHaveLength(3);
+  expect(await (await get('?projectId=shared-project')).json()).toMatchObject({
+    shares: [],
+  });
+});
+
+it('SQL independently refuses stale source revisions and widened or missing scopes', async () => {
+  await assignmentDocument();
+  const source = await assignmentSource();
+  for (const scope of [
+    null,
+    {
+      format: 'project-share-wallet-scope-v1',
+      projectRevision: '2026-10-24T00:00:00.000Z',
+      wallets: [],
+    },
+    {
+      format: 'project-share-wallet-scope-v1',
+      projectRevision: source.projectRevision,
+      wallets: [{ ...source.candidates[1], revision: 2 }],
+    },
+  ]) {
+    const now = new Date().toISOString();
+    await expect(
+      mocks.db
+        .prepare(
+          'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at,wallet_scope) VALUES(?,?,?,?,?,?,?)',
+        )
+        .bind(
+          crypto.randomUUID(),
+          'alice',
+          'shared-project',
+          crypto.randomUUID(),
+          now,
+          new Date(Date.parse(now) + 3600000).toISOString(),
+          scope === null ? null : JSON.stringify(scope),
+        )
+        .run(),
+    ).rejects.toThrow(/scope invalid|source changed/i);
+  }
+});
+
+it('retains migrated legacy scope explicitly and fails closed on a corrupt persisted scope', async () => {
+  await assignmentDocument();
+  const share = await invite();
+  const trigger = await mocks.db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='project_shares_scope_immutable'",
+    )
+    .first<{ sql: string }>();
+  await mocks.db.prepare('DROP TRIGGER project_shares_scope_immutable').run();
+  await mocks.db
+    .prepare('UPDATE project_shares SET wallet_scope=NULL WHERE id=?')
+    .bind(share.id)
+    .run();
+  await mocks.db.prepare(trigger!.sql).run();
+  as('bob');
+  await post({ action: 'accept', token: share.token });
+  expect(await (await get()).json()).toMatchObject({
+    projects: [{ walletScope: { mode: 'legacy', wallets: expect.any(Array) } }],
+  });
+  as('alice');
+  expect(await (await get('?projectId=shared-project')).json()).toMatchObject({
+    shares: [{ walletScope: { mode: 'legacy', count: null } }],
+  });
+  await mocks.db.prepare('DROP TRIGGER project_shares_scope_immutable').run();
+  await mocks.db
+    .prepare('UPDATE project_shares SET wallet_scope=? WHERE id=?')
+    .bind('{"signingAllowed":true}', share.id)
+    .run();
+  await mocks.db.prepare(trigger!.sql).run();
+  as('bob');
+  expect((await get()).status).toBe(503);
+  as('alice');
+  expect(await (await get('?projectId=shared-project')).json()).toMatchObject({
+    shares: [
+      { id: share.id, walletScope: { mode: 'unavailable', count: null } },
+    ],
+  });
+  expect((await post({ action: 'revoke', id: share.id })).status).toBe(200);
+});
+
+it('treats old-chain saved assignments as unavailable while keeping owner revoke and member reads usable', async () => {
+  const document = await assignmentDocument();
+  const source = await assignmentSource();
+  const response = await scopedInvite([source.candidates[1]]);
+  const { share } = (await response.json()) as {
+    share: { id: string; token: string };
+  };
+  as('bob');
+  await post({ action: 'accept', token: share.token });
+  document.plan = {
+    ...DEFAULT_LAUNCH_PLAN,
+    chain: 'Base',
+    launchpad: 'Clanker',
+    currency: 'ETH',
+  };
+  document.options.settings.pumpfun = {
+    holderRewards: false,
+    offchainCreation: false,
+    feeSharing: false,
+    feeShares: [],
+  };
+  await mocks.db
+    .prepare(
+      'UPDATE workspace_projects SET document=? WHERE owner_id=? AND id=?',
+    )
+    .bind(JSON.stringify(document), 'alice', 'shared-project')
+    .run();
+  expect(await (await get()).json()).toMatchObject({
+    projects: [
+      {
+        walletSelectionMatchesPlan: false,
+        walletScope: { mode: 'selected', wallets: [], unavailableCount: 1 },
+      },
+    ],
+  });
+  as('alice');
+  expect((await assignmentSource()).candidates).toEqual([]);
+  expect((await post({ action: 'revoke', id: share.id })).status).toBe(200);
+  const none = await invite();
+  as('bob');
+  await post({ action: 'accept', token: none.token });
+  expect(await (await get()).json()).toMatchObject({
+    projects: [{ walletScope: { mode: 'none', wallets: [] } }],
+  });
+  as('alice');
+  expect((await scopedInvite([source.candidates[1]])).status).toBe(409);
+});
+
+it('admits exactly stored checksummed EVM references without changing their address case', async () => {
+  const document = await assignmentDocument();
+  const evm = '0x52908400098527886E0F7030069857D2E4169EE7';
+  const options = {
+    ...document.options,
+    settings: structuredClone(DEFAULT_VENUE_OPTIONS.settings),
+    wallets: {
+      chain: 'Base',
+      recipients: [
+        { address: evm, revision: 1, folderRevision: 0, root: true },
+      ],
+    },
+  };
+  const plan = {
+    ...DEFAULT_LAUNCH_PLAN,
+    chain: 'Base',
+    launchpad: 'Clanker',
+    currency: 'ETH',
+  };
+  await mocks.db
+    .prepare(
+      'UPDATE workspace_projects SET document=? WHERE owner_id=? AND id=?',
+    )
+    .bind(
+      JSON.stringify({ ...document, plan, options }),
+      'alice',
+      'shared-project',
+    )
+    .run();
+  const source = await assignmentSource();
+  expect(source.candidates[0].address).toBe(evm);
+  const response = await scopedInvite(
+    source.candidates,
+    source.projectRevision,
+  );
+  expect(response.status).toBe(201);
+  const { share } = (await response.json()) as { share: { token: string } };
+  as('bob');
+  await post({ action: 'accept', token: share.token });
+  expect(await (await get()).json()).toMatchObject({
+    projects: [
+      {
+        walletScope: {
+          wallets: [
+            { chain: 'Base', address: evm, revision: 1, role: 'Recipient' },
+          ],
+        },
+      },
+    ],
+  });
 });

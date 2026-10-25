@@ -4,7 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SharedProjectReview } from './shared-project-review';
 import { SharedProjectsPanel } from './project-sharing';
-import { decodeSharedProjectSnapshots } from '@/lib/shared-project-review';
+import {
+  createScopedSharedProjectSnapshot,
+  decodeSharedProjectSnapshots,
+} from '@/lib/shared-project-review';
 import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
 import { EMPTY_IDENTITY, DEFAULT_VENUE_OPTIONS } from '@/lib/workspace-project';
 const saved = () => ({
@@ -64,6 +67,57 @@ it('mounts the inspector in the existing shared panel with no fetch or mutation 
     '/api/projects/shares',
     { cache: 'no-store', signal: expect.any(AbortSignal) },
   ]);
+});
+
+it('displays only owner-selected assignment references without wallet controls or provider calls', async () => {
+  const value = saved();
+  const address = 'SysvarRent111111111111111111111111111111111';
+  const wallets = {
+    chain: 'Solana' as const,
+    recipients: [
+      { address, revision: 1, folderRevision: 0, root: true as const },
+    ],
+  };
+  const project = createScopedSharedProjectSnapshot(
+    {
+      id: value.id,
+      shareId: value.shareId,
+      archived: false,
+      updatedAt: value.updatedAt,
+      expiresAt: null,
+    },
+    {
+      plan: value.plan,
+      identity: value.identity,
+      options: { ...value.options, wallets },
+    },
+    {
+      format: 'project-share-wallet-scope-v1',
+      projectRevision: value.updatedAt,
+      wallets: [{ chain: 'Solana', address, revision: 1, role: 'Recipient' }],
+    },
+  );
+  const fetcher = vi.fn();
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => root.render(<SharedProjectReview project={project} />));
+  await click('Inspect saved plan');
+  expect(host.textContent).toContain(address);
+  expect(host.textContent).toContain(
+    'New wallets, changed revisions and changed roles are not added automatically',
+  );
+  expect(host.querySelectorAll('a,input,button')).toHaveLength(0);
+  expect(fetcher).not.toHaveBeenCalled();
+  const expired = {
+    ...project,
+    walletScope: {
+      mode: 'selected' as const,
+      wallets: [],
+      unavailableCount: 1,
+    },
+  };
+  await act(async () => root.render(<SharedProjectReview project={expired} />));
+  expect(host.textContent).not.toContain(address);
+  expect(host.textContent).toContain('1 selected references no longer match');
 });
 it('shows supply percentages separately from a saved quote amount', async () => {
   const value = saved();

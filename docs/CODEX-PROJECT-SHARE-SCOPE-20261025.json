@@ -1,0 +1,291 @@
+{
+  "format": "project-share-scope-checkpoint-v1",
+  "baseCommit": "109fb10ce12a66e76758ac4f92d210f0c3b879fe",
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "app/api/projects/route.ts",
+    "app/api/wallet-workspace/route.ts",
+    "components/auto-sell-modal.tsx",
+    "lib/auto-sell-execute.ts",
+    "lib/auto-sell-runner.ts",
+    "lib/browser-wallet-vault.ts",
+    "lib/venue-launch-recovery.ts",
+    "lib/pump-group-runtime-service.ts"
+  ],
+  "originalAcceptRevokeLeaveHandlersUnchanged": true,
+  "priorSqlFilesUnchanged": 148,
+  "migrationCount": 149,
+  "sourceHashes": {
+    "app/api/projects/shares/route.ts": "0e774b3da9469fd2602fc45d5212fb17762a9d1715b67ea5940da6b4fe1edeb1",
+    "app/api/projects/shares/route.test.ts": "342e71e249c77eea42f98d5c1d84bc3b03c7726f1515566ea75dec37706232b9",
+    "lib/project-share-scope.ts": "c14c789261588e9c7c0928363ad2d7d1e6cd5969357f407d00fd160533ecd607",
+    "lib/project-share-scope.test.ts": "27e7f2b06c1cc6659751084ccde25156e584ae5d8609f4f2f60b244fa9fd081a",
+    "lib/shared-project-review.ts": "7093dd3b0fcd5ede1afd8febf5d16fdfbba6493623a581a3dddb30293953f575",
+    "lib/shared-project-review.test.ts": "b798338b890deec8664f12f24c13adefd5c8fdc5d1bedee7ae38562c102ea24c",
+    "components/project-sharing.tsx": "17ac1c0bcc7ab20fb06e2c2ae77542ec97253e4241285b09d3844867d647746b",
+    "components/project-sharing.test.tsx": "48b5c0b18a5e80eb543fabfc0b6c75dd706f7695ea78ff906e050ae8a481f406",
+    "components/shared-project-review.tsx": "b17e1baab6bacd94186e939dbf30ff8e2fa47102df882bbbcf75f07e279246a2",
+    "components/shared-project-review.test.tsx": "3662f7b88a81e89675e001e84f21af8a17bdef1c2b56cca5c8ee2ef8efc72f87",
+    "components/shared-project-review.module.css": "89f230d735b5e01ae04b40ebb981cf2735810e22d02a43af02bc4383fb121e50",
+    "components/project-share-scope-picker.tsx": "5961d00550cf79bdd84495863eb5a97429bfb313ace275096439816848e63600",
+    "components/project-share-scope-picker.test.tsx": "15e83f79779d3409c80c32ffde0d2c91dd4e9f8c61c7eb307f33b0db3094ae69",
+    "components/project-share-scope-picker.module.css": "b6d3bc06ef66016ac28da243909474000b78048a253fd1ea419776bd0132f356",
+    "drizzle/0150_project_share_scope.sql": "7a382ea385b469d85300c4dfda67afb23918721d12c369f5cfa858bc624ef9aa",
+    "drizzle/meta/_journal.json": "664afe59244af7aef70e7c57024312598bb1e142c07063989a1ed13be7f65d1a"
+  },
+  "browser": {
+    "synthetic": true,
+    "realRouteAndAdapter": true,
+    "all149MigrationsInDisposableDatabase": true,
+    "selectedCount": 1,
+    "hiddenStructuredReferencesOmitted": true,
+    "revocationConfirmed": true,
+    "requests": [
+      {
+        "method": "GET",
+        "actor": "owner",
+        "status": 200,
+        "action": null
+      },
+      {
+        "method": "GET",
+        "actor": "owner",
+        "status": 200,
+        "action": null
+      },
+      {
+        "method": "POST",
+        "actor": "owner",
+        "status": 201,
+        "action": "invite"
+      },
+      {
+        "method": "GET",
+        "actor": "owner",
+        "status": 200,
+        "action": null
+      },
+      {
+        "method": "GET",
+        "actor": "member",
+        "status": 200,
+        "action": null
+      },
+      {
+        "method": "POST",
+        "actor": "member",
+        "status": 200,
+        "action": "accept"
+      },
+      {
+        "method": "GET",
+        "actor": "member",
+        "status": 200,
+        "action": null
+      },
+      {
+        "method": "GET",
+        "actor": "owner",
+        "status": 200,
+        "action": null
+      },
+      {
+        "method": "GET",
+        "actor": "owner",
+        "status": 200,
+        "action": null
+      },
+      {
+        "method": "POST",
+        "actor": "owner",
+        "status": 200,
+        "action": "revoke"
+      },
+      {
+        "method": "GET",
+        "actor": "owner",
+        "status": 200,
+        "action": null
+      },
+      {
+        "method": "GET",
+        "actor": "member",
+        "status": 200,
+        "action": null
+      }
+    ],
+    "desktopWidth": 1920,
+    "phoneWidth": 375,
+    "phoneDocumentWidth": 360,
+    "ownerAndMemberOverflow": [],
+    "limits": "Local compiled components and synthetic authentication; not signed-in production, provider, funded, or execution proof."
+  },
+  "verification": {
+    "node": "24.19.0",
+    "relatedTests": {
+      "files": 8,
+      "passed": 186
+    },
+    "typecheck": true,
+    "typedLintFiles": 12,
+    "formatFiles": 15
+  },
+  "migrationVerification": {
+    "migrationCount": 149,
+    "sourceUnchanged": true,
+    "journalTail": {
+      "tag": "0150_project_share_scope",
+      "idx": 148,
+      "when": 1794860000011
+    },
+    "results": [
+      {
+        "status": "fulfilled",
+        "value": {
+          "passed": true,
+          "database": ":memory:",
+          "incrementalMigration": "0150_project_share_scope",
+          "priorMigrationCount": 148,
+          "appliedMigrationCount": 149,
+          "all149CanonicalChecksumsMatch": true,
+          "priorLedgerRowsUnchanged": 148,
+          "baselineTableCount": 183,
+          "allBaselineRowsAndColumnsUnchangedDuringMigration": true,
+          "addedWalletScopeIsNullForAllLegacyRows": true,
+          "sentinels": [
+            "workspace_projects",
+            "wallet_folders",
+            "workspace_wallets",
+            "unused/accepted/revoked project_shares",
+            "naturally expired accepted project_shares"
+          ],
+          "fixtureClock": "Native SQLite strftime delegates to separate connection; explicit current-time advance only, no guard/schema removal.",
+          "checks": [
+            "empty and selected exact scopes inserted",
+            "new NULL scope refused",
+            "malformed JSON refused",
+            "stale project revision refused",
+            "missing wallets refused",
+            "unknown top-level permission refused",
+            "wrong reference refused",
+            "stale wallet revision refused",
+            "wrong saved role refused",
+            "wrong chain refused",
+            "duplicate address refused",
+            "missing wallet field refused",
+            "unknown wallet field refused",
+            "non-array wallets refused",
+            "over-201 array refused",
+            "over-byte-limit scope refused",
+            "new scope cannot widen or change revision",
+            "legacy NULL scope cannot convert",
+            "OR REPLACE existing ID refused without eviction",
+            "accept new share unchanged",
+            "revoke new share unchanged",
+            "legacy accept and revoke unchanged",
+            "expired legacy share remains expired and unchanged",
+            "expired unused legacy invite still refuses acceptance",
+            "already revoked legacy share retains old immutable rules"
+          ],
+          "integrity": [
+            {
+              "integrity_check": "ok"
+            }
+          ],
+          "foreignKeys": []
+        }
+      },
+      {
+        "status": "fulfilled",
+        "value": {
+          "exit": 0,
+          "scratch": "C:\\Users\\Julian\\AppData\\Local\\Temp\\bundle-wrangler-migrations-AQidpw",
+          "migrationCount": 149,
+          "appliedCount": 149,
+          "applyExit": 0,
+          "passed": true,
+          "wholeFileCli": true,
+          "ledger": "Exact current journal filenames in disposable D1; not hosted Bundle ledger."
+        }
+      }
+    ],
+    "applicationDatabaseAccess": false,
+    "hostedDatabaseAccess": false,
+    "providerRequests": 0
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-25T17:32:32.301Z",
+      "finishedAt": "2026-10-25T17:34:13.044Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "109fb10ce12a66e76758ac4f92d210f0c3b879fe",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 3,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.5193441999999999,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    {
+      "startedAt": "2026-10-25T17:37:19.648Z",
+      "finishedAt": "2026-10-25T17:38:57.708Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "109fb10ce12a66e76758ac4f92d210f0c3b879fe",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": [
+        "claude-opus-5-5"
+      ],
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read"
+      ],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.49495900000000004,
+      "sourceUnchanged": true,
+      "changed": []
+    }
+  ],
+  "reviewLimits": "Source-only reviews. First3out-of-scope dependency reads denied; final explicit copies0denials/no concrete blocker. Root verified normalized project persistence. Final copy/additional tests independently verified afterwards.",
+  "limits": {
+    "productionVerified": false,
+    "deployed": false,
+    "applicationSqlApplied": false,
+    "hostedSqlApplied": false,
+    "providerChanges": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "walletActions": false,
+    "fundedTrades": false,
+    "collaboratorEditOrTradeDelegation": false
+  }
+}

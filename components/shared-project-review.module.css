@@ -50,6 +50,23 @@
 .grid code {
   font-size: 11px;
 }
+.assignments {
+  min-width: 0;
+}
+.assignments ul {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+.assignments li {
+  min-width: 0;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.assignments code {
+  display: block;
+  overflow-wrap: anywhere;
+}
 @media (max-width: 600px) {
   .grid {
     grid-template-columns: minmax(0, 1fr);

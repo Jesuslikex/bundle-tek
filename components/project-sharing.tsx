@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { SharedProjectReview } from './shared-project-review';
+import { ProjectShareScopePicker } from './project-share-scope-picker';
+import type { ProjectShareScope } from '@/lib/project-share-scope';
 import {
   readSharedProjectSnapshots,
   type SharedProjectSnapshot,
@@ -19,6 +21,10 @@ type Share = {
   acceptedAt: string | null;
   expiresAt: string | null;
   expired: boolean;
+  walletScope?: {
+    mode: 'legacy' | 'selected' | 'none' | 'unavailable';
+    count: number | null;
+  };
 };
 type SharedProject = SharedProjectSnapshot;
 
@@ -41,6 +47,7 @@ async function call<T>(body: unknown): Promise<T> {
         'This invite was already used.',
         'This is your own project.',
         'Up to 10 shares per project.',
+        'Project changed. Reload saved wallet assignments before creating an invite.',
       ];
       if (typeof value?.error === 'string' && messages.includes(value.error))
         throw new Error(value.error);
@@ -92,6 +99,20 @@ async function fetchShares(projectId: string, signal: AbortSignal) {
     readShareExpiry(s.createdAt);
     readShareExpiry(s.acceptedAt);
     if (
+      s.walletScope !== undefined &&
+      (!s.walletScope ||
+        !['legacy', 'selected', 'none', 'unavailable'].includes(
+          s.walletScope.mode,
+        ) ||
+        (['legacy', 'unavailable'].includes(s.walletScope.mode)
+          ? s.walletScope.count !== null
+          : !Number.isSafeInteger(s.walletScope.count) ||
+            Number(s.walletScope.count) < 0 ||
+            Number(s.walletScope.count) > 201 ||
+            (s.walletScope.mode === 'none' && s.walletScope.count !== 0)))
+    )
+      throw new Error('Shares unavailable. Try again later.');
+    if (
       s.accepted !== (s.acceptedAt !== null) ||
       (s.expiresAt === null && s.expired)
     )
@@ -120,6 +141,12 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   const [duration, setDuration] = useState(86400);
   const [linkExpiry, setLinkExpiry] = useState('');
+  const [scopeSelection, setScopeSelection] = useState<{
+    projectId: string;
+    scope: ProjectShareScope | null;
+  }>({ projectId, scope: null });
+  const walletScope =
+    scopeSelection.projectId === projectId ? scopeSelection.scope : null;
   const generation = useRef(0),
     mutation = useRef(0),
     mounted = useRef(false);
@@ -189,9 +216,10 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
     <section aria-label="Collaborators" className="min-w-0 space-y-2">
       <h4>Collaborators</h4>
       <p className="text-xs text-muted-foreground">
-        Share a read-only view of this project. Collaborators receive the saved
-        plan, including public wallet assignments. Private keys and signing stay
-        with you.
+        Share a read-only saved plan. New invites disclose no wallet assignments
+        unless you select them below. Wallet control and signing stay with you.
+        The plan name, description, settings and aggregate counts remain shared;
+        avoid putting private information into that text.
       </p>
       <p>
         Expiry ends future shared reads, including after an invite is accepted.
@@ -227,6 +255,12 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
           ))}
         </select>
       </label>
+      <ProjectShareScopePicker
+        key={projectId}
+        projectId={projectId}
+        busy={busy}
+        onChange={(scope) => setScopeSelection({ projectId, scope })}
+      />
       <Button
         type="button"
         variant="outline"
@@ -235,7 +269,12 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
           void run(async (current) => {
             const { share } = await call<{
               share: { token: string; expiresAt: string };
-            }>({ action: 'invite', projectId, expiresInSeconds: duration });
+            }>({
+              action: 'invite',
+              projectId,
+              expiresInSeconds: duration,
+              ...(walletScope ? { walletScope } : {}),
+            });
             let expiry: string | null = null;
             try {
               expiry = readShareExpiry(share?.expiresAt);
@@ -290,6 +329,13 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
                   .
                 </>
               )}{' '}
+              {s.walletScope === undefined
+                ? 'Assignment visibility was not reported by this server.'
+                : s.walletScope.mode === 'legacy'
+                  ? 'Legacy scope: all current saved assignment references. Revoke and invite again to limit visibility.'
+                  : s.walletScope.mode === 'unavailable'
+                    ? 'Assignment scope unavailable. Revoke this share before creating a replacement.'
+                    : `${s.walletScope.count} selected assignment ${s.walletScope.count === 1 ? 'reference' : 'references'}; no future wallets added.`}{' '}
               <Button
                 type="button"
                 variant="outline"

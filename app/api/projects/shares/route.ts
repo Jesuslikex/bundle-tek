@@ -5,6 +5,12 @@ import {
   validateProjectDocument,
 } from '@/lib/workspace-project';
 import { shareExpiresAt } from '@/lib/project-share-expiry';
+import {
+  readProjectShareScope,
+  shareAssignmentCandidates,
+  type ProjectShareScope,
+} from '@/lib/project-share-scope';
+import { createScopedSharedProjectSnapshot } from '@/lib/shared-project-review';
 
 // Read-only project sharing. A collaborator can open the owner's saved launch
 // project; wallets and signing stay with the owner, whose keys never leave
@@ -39,6 +45,7 @@ type ShareRow = {
   acceptedAt: string | null;
   expiresAt: string | null;
   expired: number;
+  walletScope: string | null;
 };
 type SharedRow = {
   shareId: string;
@@ -47,7 +54,18 @@ type SharedRow = {
   archived: number;
   updatedAt: string;
   expiresAt: string | null;
+  walletScope: string | null;
 };
+function ownerScopeSummary(scope: string | null) {
+  if (scope === null) return { mode: 'legacy', count: null };
+  try {
+    const count = readProjectShareScope(JSON.parse(scope)).wallets.length;
+    return { mode: count ? 'selected' : 'none', count };
+  } catch {
+    // Owners must still be able to revoke a corrupt row. This grants no reads.
+    return { mode: 'unavailable', count: null };
+  }
+}
 
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
@@ -61,13 +79,38 @@ export async function GET(request: Request) {
       const result = await db
         .prepare(
           `SELECT id, member_id AS memberId, created_at AS createdAt, accepted_at AS acceptedAt,
-           expires_at AS expiresAt, (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
+           expires_at AS expiresAt, wallet_scope AS walletScope, (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
            FROM project_shares WHERE owner_id=? AND project_id=? AND revoked_at IS NULL
            ORDER BY created_at DESC LIMIT 10`,
         )
         .bind(user.userId, projectId)
         .all<ShareRow>();
+      const source = await db
+        .prepare(
+          'SELECT document,updated_at AS projectRevision FROM workspace_projects WHERE owner_id=? AND id=?',
+        )
+        .bind(user.userId, projectId)
+        .first<{ document: string; projectRevision: string }>();
+      let assignmentSource: {
+        projectId: string;
+        projectRevision: string;
+        candidates: ReturnType<typeof shareAssignmentCandidates>;
+      } | null = null;
+      try {
+        assignmentSource = source
+          ? {
+              projectId,
+              projectRevision: source.projectRevision,
+              candidates: shareAssignmentCandidates(
+                validateProjectDocument(JSON.parse(source.document)),
+              ),
+            }
+          : null;
+      } catch {
+        /* Keep owner revocation usable. */
+      }
       return json({
+        source: assignmentSource,
         shares: result.results.map((s) => ({
           id: s.id,
           accepted: s.memberId !== null,
@@ -75,12 +118,13 @@ export async function GET(request: Request) {
           acceptedAt: s.acceptedAt,
           expiresAt: s.expiresAt,
           expired: Boolean(s.expired),
+          walletScope: ownerScopeSummary(s.walletScope),
         })),
       });
     }
     const result = await db
       .prepare(
-        `SELECT s.id AS shareId, p.id, p.document, p.archived, p.updated_at AS updatedAt, s.expires_at AS expiresAt
+        `SELECT s.id AS shareId, p.id, p.document, p.archived, p.updated_at AS updatedAt, s.expires_at AS expiresAt, s.wallet_scope AS walletScope
          FROM project_shares s JOIN workspace_projects p ON p.owner_id=s.owner_id AND p.id=s.project_id
          WHERE s.member_id=? AND s.revoked_at IS NULL
           AND (s.expires_at IS NULL OR s.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -89,15 +133,21 @@ export async function GET(request: Request) {
       .bind(user.userId)
       .all<SharedRow>();
     return json({
-      projects: result.results.map((r) => ({
-        ...validateProjectDocument(JSON.parse(r.document)),
-        id: r.id,
-        shareId: r.shareId,
-        archived: Boolean(r.archived),
-        updatedAt: r.updatedAt,
-        readOnly: true,
-        expiresAt: r.expiresAt,
-      })),
+      projects: result.results.map((r) =>
+        createScopedSharedProjectSnapshot(
+          {
+            id: r.id,
+            shareId: r.shareId,
+            archived: Boolean(r.archived),
+            updatedAt: r.updatedAt,
+            expiresAt: r.expiresAt,
+          },
+          validateProjectDocument(JSON.parse(r.document)),
+          r.walletScope === null
+            ? null
+            : readProjectShareScope(JSON.parse(r.walletScope)),
+        ),
+      ),
     });
   } catch {
     return json({ error: 'Shared projects temporarily unavailable.' }, 503);
@@ -123,11 +173,15 @@ export async function POST(request: Request) {
     token?: unknown;
     id?: unknown;
     expiresInSeconds?: unknown;
+    walletScope?: unknown;
   };
   try {
     const text = await request.text();
-    if (text.length > 1024) return json({ error: 'Request too large.' }, 413);
+    if (new TextEncoder().encode(text).byteLength > 49152)
+      return json({ error: 'Request too large.' }, 413);
     body = JSON.parse(text);
+    if (!body || typeof body !== 'object' || Array.isArray(body))
+      return json({ error: 'Invalid request.' }, 400);
   } catch {
     return json({ error: 'Invalid request.' }, 400);
   }
@@ -137,6 +191,57 @@ export async function POST(request: Request) {
     if (body.action === 'invite') {
       if (!projectIdValid(body.projectId))
         return json({ error: 'Invalid project.' }, 400);
+      const source = await db
+        .prepare(
+          'SELECT document,updated_at AS projectRevision FROM workspace_projects WHERE owner_id=? AND id=?',
+        )
+        .bind(user.userId, body.projectId)
+        .first<{ document: string; projectRevision: string }>();
+      if (!source) return json({ error: 'Project not found.' }, 404);
+      let walletScope: ProjectShareScope;
+      try {
+        walletScope = readProjectShareScope(
+          body.walletScope === undefined
+            ? {
+                format: 'project-share-wallet-scope-v1',
+                projectRevision: source.projectRevision,
+                wallets: [],
+              }
+            : body.walletScope,
+        );
+      } catch {
+        return json({ error: 'Choose valid saved wallet assignments.' }, 400);
+      }
+      if (walletScope.projectRevision !== source.projectRevision)
+        return json(
+          {
+            error:
+              'Project changed. Reload saved wallet assignments before creating an invite.',
+          },
+          409,
+        );
+      const candidates = shareAssignmentCandidates(
+        validateProjectDocument(JSON.parse(source.document)),
+      );
+      if (
+        walletScope.wallets.some(
+          (w) =>
+            !candidates.some(
+              (c) =>
+                c.chain === w.chain &&
+                c.address === w.address &&
+                c.revision === w.revision &&
+                c.role === w.role,
+            ),
+        )
+      )
+        return json(
+          {
+            error:
+              'Project changed. Reload saved wallet assignments before creating an invite.',
+          },
+          409,
+        );
       let expiresAt: string;
       try {
         expiresAt = shareExpiresAt(body.expiresInSeconds, now);
@@ -151,7 +256,7 @@ export async function POST(request: Request) {
       try {
         await db
           .prepare(
-            'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)',
+            'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at,wallet_scope) VALUES(?,?,?,?,?,?,?)',
           )
           .bind(
             id,
@@ -160,6 +265,7 @@ export async function POST(request: Request) {
             await hash(token),
             now,
             expiresAt,
+            JSON.stringify(walletScope),
           )
           .run();
       } catch (e) {
@@ -168,6 +274,17 @@ export async function POST(request: Request) {
           return json({ error: 'Project not found.' }, 404);
         if (message.includes('Share limit reached'))
           return json({ error: 'Up to 10 shares per project.' }, 409);
+        if (
+          message.includes('Share source changed') ||
+          message.includes('Share wallet scope invalid')
+        )
+          return json(
+            {
+              error:
+                'Project changed. Reload saved wallet assignments before creating an invite.',
+            },
+            409,
+          );
         throw e;
       }
       return json({ share: { id, token, expiresAt } }, 201);
