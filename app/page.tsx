@@ -108,6 +108,7 @@ import { WorkspaceActivity } from '@/components/workspace-activity';
 import { ImportedTokenProjects } from '@/components/imported-token-projects';
 import { useImportedProjects } from '@/components/use-imported-projects';
 import { PumpTokenWorkspaceNavigation } from '@/components/launch/pump-token-workspace-navigation';
+import { RecoveryProjectNavigationProvider } from '@/components/recovery-project-navigation';
 import {
   DEFAULT_VENUE_OPTIONS,
   EMPTY_IDENTITY,
@@ -1774,7 +1775,17 @@ export default function Home() {
             }}
           />
         ) : isLibrary ? (
-          <>
+          <RecoveryProjectNavigationProvider
+            blocked={saveBusy || persistenceState === 'loading'}
+            onOpen={(project) => {
+              if (saveBusy || persistenceState === 'loading') return;
+              setProjects((current) => [
+                project,
+                ...current.filter((saved) => saved.id !== project.id),
+              ]);
+              openProject(project);
+            }}
+          >
             <ProjectDashboard
               projects={projects}
               archived={view === 'archived'}
@@ -1802,7 +1813,7 @@ export default function Home() {
               signedOut={persistenceState === 'auth'}
             />
             {persistenceState !== 'auth' && <SharedProjectsPanel />}
-          </>
+          </RecoveryProjectNavigationProvider>
         ) : view === 'wallets' ? (
           <WalletWorkspace
             key={activityWarmupId + '/' + activityWithdrawalWallet}

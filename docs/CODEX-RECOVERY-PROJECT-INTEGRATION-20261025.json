@@ -1,0 +1,76 @@
+{
+  "sourceBase": "bfc295b",
+  "approval": "User approved this exact patch on25October2026",
+  "patchApplied": true,
+  "approvedPatchSha256": "bfdcce1b029391e476575c7254a225429c89adfb70f5c37c25769046718c65aa",
+  "parentSha256": "d0a87398bab341778694c67bfe283f000144fd23fe3d900ff42ab9072c9b08e5",
+  "stable": {
+    "guardDraft": true,
+    "openProject": true,
+    "metadataProject": true
+  },
+  "scenarios": [
+    {
+      "saveBusy": false,
+      "persistenceState": "ready",
+      "hasEdits": false,
+      "passed": true
+    },
+    {
+      "saveBusy": false,
+      "persistenceState": "ready",
+      "hasEdits": true,
+      "passed": true
+    },
+    {
+      "saveBusy": false,
+      "persistenceState": "loading",
+      "hasEdits": false,
+      "passed": true
+    },
+    {
+      "saveBusy": false,
+      "persistenceState": "loading",
+      "hasEdits": true,
+      "passed": true
+    },
+    {
+      "saveBusy": true,
+      "persistenceState": "ready",
+      "hasEdits": false,
+      "passed": true
+    },
+    {
+      "saveBusy": true,
+      "persistenceState": "ready",
+      "hasEdits": true,
+      "passed": true
+    },
+    {
+      "saveBusy": true,
+      "persistenceState": "loading",
+      "hasEdits": false,
+      "passed": true
+    },
+    {
+      "saveBusy": true,
+      "persistenceState": "loading",
+      "hasEdits": true,
+      "passed": true
+    }
+  ],
+  "providerWrapsActualDashboardAndShares": true,
+  "scope": "Actual physical parent AST and extracted actual callbacks with controlled state; not a full page mount or signed-in browser check",
+  "financialActions": 0,
+  "tests": {
+    "files": 8,
+    "passed": 156
+  },
+  "typescript": "passed",
+  "typedParentLint": "passed",
+  "parentFormatting": "passed; line-ending normalization only",
+  "signedInFullPageBrowser": false,
+  "deployed": false,
+  "hostedSql": false,
+  "relatedExpiryCommit": "bfc295b"
+}
