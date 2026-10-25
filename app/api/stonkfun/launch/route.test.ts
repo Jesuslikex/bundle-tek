@@ -19,6 +19,7 @@ import {
 } from '@/lib/stonkfun-launch';
 import type {
   StonkLaunchReview,
+  StonkLaunchTerms,
   StonkRpc,
 } from '@/lib/stonkfun-launch-service';
 import { signStonkLaunch } from '@/lib/stonkfun-launch-signing';
@@ -225,7 +226,7 @@ function rpc(): StonkRpc {
   };
 }
 
-let mf: Miniflare, terms: Record<string, unknown>;
+let mf: Miniflare, terms: Omit<StonkLaunchTerms, 'origin'>;
 const send = (value: unknown, headers: Record<string, string> = {}) =>
   POST(
     new Request(origin + '/api/stonkfun/launch', {
@@ -612,4 +613,144 @@ it('refuses too little quote balance, failed simulation, foreign projects and ba
       })
     ).status,
   ).toBe(400);
+});
+
+it('refuses an older published identity even with the current project revision, before provider calls', async () => {
+  await mocks.db
+    .prepare(
+      "UPDATE workspace_projects SET document=json_set(document,'$.plan.tokenName',?) WHERE owner_id=? AND id=?",
+    )
+    .bind('Changed after publishing', 'alice', terms.projectId)
+    .run();
+  const checked = vi.fn(mocks.rpc);
+  mocks.rpc = checked;
+  const pricing = vi.fn(mocks.fetcher);
+  mocks.fetcher = pricing;
+  const response = await send({ action: 'prepare', terms });
+  expect(response.status).toBe(409);
+  expect(checked).not.toHaveBeenCalled();
+  expect(pricing).not.toHaveBeenCalled();
+  expect(state.sent).toEqual([]);
+});
+
+it.each([
+  ['symbol', '$.plan.ticker', 'NEW'],
+  ['description', '$.plan.description', 'Changed published description'],
+  ['artwork', '$.identity.artworkUrl', '/api/artwork/' + 'b'.repeat(64)],
+  ['website', '$.identity.website', 'https://changed.example.test/site'],
+  ['twitter', '$.identity.twitter', 'https://changed.example.test/social'],
+  ['telegram', '$.identity.telegram', 'https://changed.example.test/chat'],
+])(
+  'refuses changed %s with a fresh current revision before any provider work',
+  async (_label, path, value) => {
+    const next = new Date(Date.parse(terms.updatedAt) + 1).toISOString();
+    await mocks.db
+      .prepare(
+        'UPDATE workspace_projects SET document=json_set(document,?,?),updated_at=? WHERE owner_id=? AND id=?',
+      )
+      .bind(path, value, next, 'alice', terms.projectId)
+      .run();
+    terms = { ...terms, updatedAt: next };
+    const checked = vi.fn(mocks.rpc);
+    mocks.rpc = checked;
+    const pricing = vi.fn(mocks.fetcher);
+    mocks.fetcher = pricing;
+    const response = await send({ action: 'prepare', terms });
+    expect(response.status).toBe(409);
+    expect(checked).not.toHaveBeenCalled();
+    expect(pricing).not.toHaveBeenCalled();
+    expect(state.sent).toEqual([]);
+  },
+);
+
+it('retains metadata when only unrelated saved plan settings change', async () => {
+  const next = new Date(Date.parse(terms.updatedAt) + 1).toISOString();
+  await mocks.db
+    .prepare(
+      "UPDATE workspace_projects SET document=json_set(document,'$.plan.routingEmphasis',47),updated_at=? WHERE owner_id=? AND id=?",
+    )
+    .bind(next, 'alice', terms.projectId)
+    .run();
+  terms = { ...terms, updatedAt: next };
+  const response = await send({ action: 'prepare', terms });
+  expect(response.status).toBe(200);
+  expect(state.sent).toEqual([]);
+});
+
+it('rechecks the source after asynchronous artwork hashing before starting provider work', async () => {
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  let entered!: () => void, release!: () => void;
+  const enteredPromise = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const spy = vi
+    .spyOn(crypto.subtle, 'digest')
+    .mockImplementation(async (...args) => {
+      entered();
+      await gate;
+      return digest(...args);
+    });
+  const checked = vi.fn(mocks.rpc);
+  mocks.rpc = checked;
+  const pricing = vi.fn(mocks.fetcher);
+  mocks.fetcher = pricing;
+  try {
+    const pending = send({ action: 'prepare', terms });
+    await enteredPromise;
+    await mocks.db
+      .prepare(
+        "UPDATE workspace_projects SET document=json_set(document,'$.plan.description','Changed while hashing') WHERE owner_id=? AND id=?",
+      )
+      .bind('alice', terms.projectId)
+      .run();
+    release();
+    const response = await pending;
+    expect(response.status).toBe(409);
+    expect(checked).not.toHaveBeenCalled();
+    expect(pricing).not.toHaveBeenCalled();
+    expect(state.sent).toEqual([]);
+  } finally {
+    release();
+    spy.mockRestore();
+  }
+});
+
+it('standalone submit refuses a stale published description with a fresh current revision before any provider or send', async () => {
+  const prepared = await send({ action: 'prepare', terms });
+  expect(prepared.status).toBe(200);
+  const review = (await prepared.json()) as StonkLaunchReview;
+  const signed = await signStonkLaunch(
+    session(7, payer),
+    session(9, mint),
+    review,
+    () => {},
+  );
+  const next = new Date(Date.parse(terms.updatedAt) + 1).toISOString();
+  await mocks.db
+    .prepare(
+      "UPDATE workspace_projects SET document=json_set(document,'$.plan.description','Changed before standalone submit'),updated_at=? WHERE owner_id=? AND id=?",
+    )
+    .bind(next, 'alice', terms.projectId)
+    .run();
+  const checked = vi.fn(mocks.rpc);
+  mocks.rpc = checked;
+  const pricing = vi.fn(mocks.fetcher);
+  mocks.fetcher = pricing;
+  const { submitStonkLaunch } = await import('@/lib/stonkfun-launch-service');
+  await expect(
+    submitStonkLaunch(
+      mocks.db,
+      'alice',
+      { ...terms, origin, updatedAt: next },
+      review.input,
+      signed.transaction,
+      new AbortController().signal,
+    ),
+  ).rejects.toMatchObject({ status: 409 });
+  expect(checked).not.toHaveBeenCalled();
+  expect(pricing).not.toHaveBeenCalled();
+  expect(state.sent).toEqual([]);
 });

@@ -1,0 +1,133 @@
+{
+  "format": "released-launch-identity-checkpoint-v1",
+  "baseCommit": "5ff4041209e8bd1c73a3d196c75b64002e8948ce",
+  "unchangedServiceFunctions": [
+    "lib/meteora-dbc-launch-service.ts:tokenAmount",
+    "lib/meteora-dbc-launch-service.ts:mintSupply",
+    "lib/meteora-dbc-launch-service.ts:readChain",
+    "lib/meteora-dbc-launch-service.ts:simulate",
+    "lib/meteora-dbc-launch-service.ts:prepareMeteoraDbcLaunch",
+    "lib/meteora-dbc-launch-service.ts:submitMeteoraDbcLaunch",
+    "lib/stonkfun-launch-service.ts:tokenAmount",
+    "lib/stonkfun-launch-service.ts:readChain",
+    "lib/stonkfun-launch-service.ts:simulate",
+    "lib/stonkfun-launch-service.ts:prepareStonkLaunch",
+    "lib/stonkfun-launch-service.ts:submitStonkLaunch",
+    "lib/stonkfun-launch-service.ts:stonkLaunchStatus",
+    "lib/launchlab-launch-service.ts:tokenAmount",
+    "lib/launchlab-launch-service.ts:readChain",
+    "lib/launchlab-launch-service.ts:simulate",
+    "lib/launchlab-launch-service.ts:prepareLaunchLabLaunch",
+    "lib/launchlab-launch-service.ts:submitLaunchLabLaunch"
+  ],
+  "unchangedServiceClassesAndConstants": true,
+  "pumpSourceAdmissionUnchanged": true,
+  "pumpVenueAndSettingsPredicatesUnchanged": true,
+  "pumpQuoteSupplyPacketAndFinalBarrierUnchanged": true,
+  "exactSevenFieldProjection": true,
+  "exactPublishedMetadataPredicate": true,
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "lib/venue-launch-recovery.ts",
+    "lib/owned-pump-preflight.ts",
+    "lib/pump-launch-signing.ts",
+    "lib/pump-group-code-identity.ts",
+    "lib/jito-readonly-qualification.ts",
+    "lib/meteora-dbc-launch-signing.ts",
+    "lib/stonkfun-launch-signing.ts",
+    "lib/launchlab-launch-signing.ts",
+    "app/api/launch/metadata/[id]/route.ts",
+    "app/api/launch/metadata/[id]/image/route.ts",
+    "lib/launch-metadata-release.ts",
+    "drizzle/meta/_journal.json"
+  ],
+  "sourceHashes": {
+    "lib/released-launch-identity.ts": "2fb12b5291f81966c2152c7ff97fcc3c853353e84669e5688b2562fd33ff34a4",
+    "lib/released-launch-identity.test.ts": "e5964d97721b646892b22d59c2df9e4e8c7ef2b3dfbba6abd302267f3444325a",
+    "lib/pump-launch-preparation.ts": "b46664b4abee4d0954eb6987b3e1e13d12f3559cb055ad98f33706d3d8bfc9f9",
+    "lib/meteora-dbc-launch-service.ts": "00c50b4bf1f91332112c10ea17d95cbd9044f53836f016d2c70c8a2b7a3ab4c0",
+    "lib/stonkfun-launch-service.ts": "5483c2a83bd029d0684e97f32527c3b9d09265e9b697b983a77f41248c5a6d79",
+    "lib/launchlab-launch-service.ts": "db400a80b386ed0b52dc673ab6268c438d145beb6f99eb24f54115487b33af0d",
+    "app/api/meteora-dbc/launch/route.test.ts": "03d8b6d8bf3d9597fef4c86d789516a794f432127c8d7d04cce9a5488c35f274",
+    "app/api/stonkfun/launch/route.test.ts": "cc42fabdd999e681229b041ec26f682786b4cf9f2dcd1ac7bebfcb785e0c47a0",
+    "app/api/launchlab/launch/route.test.ts": "01c76fcde59c330b1d4017d5c41ffcfe4da52a4c3198a7e3fcf59846f6b0a2b3"
+  },
+  "preFixRefusals": {
+    "baseCommit": "5ff4041209e8bd1c73a3d196c75b64002e8948ce",
+    "test": "older published identity with current project revision",
+    "meteora-dbc": {
+      "expected": 409,
+      "actual": 200
+    },
+    "stonkfun": {
+      "expected": 409,
+      "actual": 200
+    },
+    "launchlab": {
+      "expected": 409,
+      "actual": 200
+    },
+    "fixture": "actual releaseLaunchMetadata and disposable D1; mocked RPC and no real provider/wallet",
+    "fundedOrProductionProof": false
+  },
+  "verification": {
+    "node": "24.19.0",
+    "broadRegression": {
+      "passed": 310,
+      "files": 17,
+      "durationSeconds": 679.7
+    },
+    "finalApiFollowUps": {
+      "passed": 37,
+      "files": 2,
+      "note": "Overlaps broad regression; verifies final test-only ArrayBuffer/corrupt-read and initial pricing follow-ups. Application source unchanged during broad run."
+    },
+    "typecheck": true,
+    "typedLintFiles": 9,
+    "formatFiles": 9
+  },
+  "review": {
+    "startedAt": "2026-10-25T17:59:01.045Z",
+    "finishedAt": "2026-10-25T18:00:52.008Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "5ff4041209e8bd1c73a3d196c75b64002e8948ce",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": [
+      "claude-opus-5-5"
+    ],
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "tools": [
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.7443334,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "reviewLimits": "Source-only; reviewer did not run tests. Final test-only follow-ups independently verified, not rereviewed.",
+  "boundaries": {
+    "schemaChanged": false,
+    "collaboratorEditPermissionEnabled": false,
+    "deployed": false,
+    "applicationDatabaseAccess": false,
+    "hostedDatabaseAccess": false,
+    "providersChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletActions": false,
+    "fundedTrades": false
+  },
+  "proofLimits": "Actual service/API code, real metadata releases and disposable D1 with mocked providers/synthetic fixture signatures. No new browser, production, live provider or funded proof."
+}

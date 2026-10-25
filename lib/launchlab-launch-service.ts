@@ -10,6 +10,7 @@ import bs58 from 'bs58';
 import { validateProjectDocument } from './workspace-project';
 import { quoteCatalog, validateQuoteSelection } from './quote-catalog';
 import { artworkIdValid } from './artwork';
+import { verifyReleasedLaunchIdentity } from './released-launch-identity';
 import { verifySolanaSignature } from './solana-signature';
 import { getSolanaRpcEndpoint, rpcCall } from './solana-rpc';
 import {
@@ -63,7 +64,15 @@ const defaultRpc: LaunchLabRpc = (method, params) =>
 export const LAUNCHLAB_REVIEW_MS = 45_000;
 export const LAUNCHLAB_MAX_SOL_LIMIT = 1_000_000_000n;
 
-type Row = { document: string; updated_at: string; archived: number };
+type Row = {
+  document: string;
+  updated_at: string;
+  archived: number;
+  source_document: string;
+  metadata: string;
+  image: number[];
+  mime: string;
+};
 
 /** Owner, saved plan for this venue, released metadata and verified payer, from the database only. */
 async function ownedSelection(
@@ -89,16 +98,20 @@ async function ownedSelection(
       'Review a saved project, payer and public metadata release.',
       400,
     );
-  const read = () =>
-    db
+  const read = async () => {
+    const row = await db
       .prepare(
-        `SELECT p.document,p.updated_at,p.archived FROM workspace_projects p
+        `SELECT p.document,p.updated_at,p.archived,m.source_document,m.metadata,m.image,m.mime FROM workspace_projects p
     JOIN launch_metadata_releases m ON m.owner_id=p.owner_id AND m.project_id=p.id AND m.id=?
     JOIN workspace_wallets w ON w.owner_id=p.owner_id AND w.chain='Solana' AND w.address=? AND w.revision=? AND w.archived=0
     WHERE p.owner_id=? AND p.id=? AND EXISTS(SELECT 1 FROM wallet_ownership_proofs o WHERE o.owner_id=w.owner_id AND o.chain='Solana' AND o.address=w.address)`,
       )
       .bind(t.releaseId, t.payer, t.payerRevision, owner, t.projectId)
       .first<Row>();
+    return row
+      ? { ...row, image: Array.from(new Uint8Array(row.image)) }
+      : null;
+  };
   const check = (row: Row | null) => {
     if (!row)
       throw new LaunchLabError(
@@ -138,6 +151,32 @@ async function ownedSelection(
     return { row, doc, quote: quotes[0] };
   };
   const original = check(await read());
+  try {
+    await verifyReleasedLaunchIdentity(
+      original.doc,
+      original.row,
+      t.origin,
+      t.releaseId,
+    );
+  } catch (error) {
+    throw new LaunchLabError(
+      error instanceof Error
+        ? error.message
+        : 'Publish metadata for this exact saved identity and image first.',
+      409,
+    );
+  }
+  async function assertUnchanged() {
+    const latest = await read();
+    if (!latest || JSON.stringify(latest) !== JSON.stringify(original.row))
+      throw new LaunchLabError(
+        'The project or payer changed during review. Review again.',
+        409,
+      );
+    check(latest);
+  }
+  // Finish the asynchronous image check with a fresh, synchronous source barrier.
+  await assertUnchanged();
   return {
     original,
     identity: {
@@ -145,15 +184,7 @@ async function ownedSelection(
       symbol: original.doc.plan.ticker,
       uri: `${t.origin}/api/launch/metadata/${t.releaseId}`,
     },
-    async assertUnchanged() {
-      const latest = await read();
-      if (!latest || JSON.stringify(latest) !== JSON.stringify(original.row))
-        throw new LaunchLabError(
-          'The project or payer changed during review. Review again.',
-          409,
-        );
-      check(latest);
-    },
+    assertUnchanged,
   };
 }
 

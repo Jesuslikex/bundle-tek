@@ -1,5 +1,6 @@
 import { validateProjectDocument } from './workspace-project';
-import { inspectArtwork, isUploadedArtwork, artworkIdValid } from './artwork';
+import { artworkIdValid } from './artwork';
+import { verifyReleasedLaunchIdentity } from './released-launch-identity';
 import { quoteCatalog, validateQuoteSelection } from './quote-catalog';
 import {
   buildPumpCreateMessage,
@@ -64,8 +65,7 @@ export async function buildSavedPumpCreateComponent(
     throw new Error(
       'Reload the owned active project and its released metadata.',
     );
-  const current = validateProjectDocument(JSON.parse(row.document)),
-    source = validateProjectDocument(JSON.parse(row.source_document));
+  const current = validateProjectDocument(JSON.parse(row.document));
   const plan = current.plan;
   if (plan.chain !== 'Solana' || plan.launchpad !== 'PumpFun')
     throw new Error(
@@ -84,45 +84,12 @@ export async function buildSavedPumpCreateComponent(
     throw new Error(
       'Saved launch options require additional reviewed create instructions.',
     );
-  const fields = (project: typeof current) => [
-    project.plan.tokenName,
-    project.plan.ticker,
-    project.plan.description,
-    project.identity.artworkUrl,
-    project.identity.website,
-    project.identity.twitter,
-    project.identity.telegram,
-  ];
-  if (
-    JSON.stringify(fields(current)) !== JSON.stringify(fields(source)) ||
-    !isUploadedArtwork(current.identity.artworkUrl)
-  )
-    throw new Error(
-      'Publish metadata for this exact saved identity and image first.',
-    );
-  const image = new Uint8Array(row.image);
-  if (inspectArtwork(image).mime !== row.mime)
-    throw new Error('Released artwork MIME differs.');
-  const sha = Array.from(
-    new Uint8Array(await crypto.subtle.digest('SHA-256', image)),
-    (b) => b.toString(16).padStart(2, '0'),
-  ).join('');
-  if (!current.identity.artworkUrl.endsWith('/' + sha))
-    throw new Error('Released artwork differs from the saved image.');
-  const metadata = JSON.parse(row.metadata) as Record<string, unknown>,
-    uri = `${t.origin}/api/launch/metadata/${t.releaseId}`;
-  if (
-    metadata.image !== `${uri}/image` ||
-    metadata.name !== plan.tokenName ||
-    metadata.symbol !== plan.ticker ||
-    metadata.description !== plan.description ||
-    (['website', 'twitter', 'telegram'] as const).some(
-      (key) => metadata[key] !== (current.identity[key] || undefined),
-    )
-  )
-    throw new Error(
-      'Released metadata differs from the reviewed token identity or site.',
-    );
+  const { uri } = await verifyReleasedLaunchIdentity(
+    current,
+    row,
+    t.origin,
+    t.releaseId,
+  );
   validateQuoteSelection(plan);
   const catalog = quoteCatalog(plan.chain, plan.launchpad);
   const quotes = catalog.assets.filter(

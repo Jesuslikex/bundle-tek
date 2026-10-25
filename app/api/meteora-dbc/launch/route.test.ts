@@ -21,6 +21,7 @@ import {
 } from '@/lib/meteora-dbc-launch';
 import type {
   MeteoraDbcReview,
+  MeteoraDbcTerms,
   MeteoraDbcRpc,
 } from '@/lib/meteora-dbc-launch-service';
 import { signMeteoraDbcLaunch } from '@/lib/meteora-dbc-launch-signing';
@@ -222,7 +223,7 @@ function rpc(): MeteoraDbcRpc {
   };
 }
 
-let mf: Miniflare, terms: Record<string, unknown>;
+let mf: Miniflare, terms: Omit<MeteoraDbcTerms, 'origin'>;
 const send = (value: unknown, headers: Record<string, string> = {}) =>
   POST(
     new Request(origin + '/api/meteora-dbc/launch', {
@@ -688,3 +689,226 @@ it('refuses too little quote balance, failed simulation, high limits, foreign pr
       .status,
   ).toBe(400);
 });
+
+it('refuses an older published identity even with the current project revision, before provider calls', async () => {
+  await mocks.db
+    .prepare(
+      "UPDATE workspace_projects SET document=json_set(document,'$.plan.tokenName',?) WHERE owner_id=? AND id=?",
+    )
+    .bind('Changed after publishing', 'alice', terms.projectId)
+    .run();
+  const checked = vi.fn(mocks.rpc);
+  mocks.rpc = checked;
+  const response = await send({ action: 'prepare', terms });
+  expect(response.status).toBe(409);
+  expect(checked).not.toHaveBeenCalled();
+  expect(state.sent).toEqual([]);
+});
+
+it.each([
+  ['symbol', '$.plan.ticker', 'NEW'],
+  ['description', '$.plan.description', 'Changed published description'],
+  ['artwork', '$.identity.artworkUrl', '/api/artwork/' + 'b'.repeat(64)],
+  ['website', '$.identity.website', 'https://changed.example.test/site'],
+  ['twitter', '$.identity.twitter', 'https://changed.example.test/social'],
+  ['telegram', '$.identity.telegram', 'https://changed.example.test/chat'],
+])(
+  'refuses changed %s with a fresh current revision before any provider work',
+  async (_label, path, value) => {
+    const next = new Date(Date.parse(terms.updatedAt) + 1).toISOString();
+    await mocks.db
+      .prepare(
+        'UPDATE workspace_projects SET document=json_set(document,?,?),updated_at=? WHERE owner_id=? AND id=?',
+      )
+      .bind(path, value, next, 'alice', terms.projectId)
+      .run();
+    terms = { ...terms, updatedAt: next };
+    const checked = vi.fn(mocks.rpc);
+    mocks.rpc = checked;
+
+    const response = await send({ action: 'prepare', terms });
+    expect(response.status).toBe(409);
+    expect(checked).not.toHaveBeenCalled();
+
+    expect(state.sent).toEqual([]);
+  },
+);
+
+it('retains metadata when only unrelated saved plan settings change', async () => {
+  const next = new Date(Date.parse(terms.updatedAt) + 1).toISOString();
+  await mocks.db
+    .prepare(
+      "UPDATE workspace_projects SET document=json_set(document,'$.plan.routingEmphasis',47),updated_at=? WHERE owner_id=? AND id=?",
+    )
+    .bind(next, 'alice', terms.projectId)
+    .run();
+  terms = { ...terms, updatedAt: next };
+  const response = await send({ action: 'prepare', terms });
+  expect(response.status).toBe(200);
+  expect(state.sent).toEqual([]);
+});
+
+it('rechecks the source after asynchronous artwork hashing before starting provider work', async () => {
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  let entered!: () => void, release!: () => void;
+  const enteredPromise = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const spy = vi
+    .spyOn(crypto.subtle, 'digest')
+    .mockImplementation(async (...args) => {
+      entered();
+      await gate;
+      return digest(...args);
+    });
+  const checked = vi.fn(mocks.rpc);
+  mocks.rpc = checked;
+
+  try {
+    const pending = send({ action: 'prepare', terms });
+    await enteredPromise;
+    await mocks.db
+      .prepare(
+        "UPDATE workspace_projects SET document=json_set(document,'$.plan.description','Changed while hashing') WHERE owner_id=? AND id=?",
+      )
+      .bind('alice', terms.projectId)
+      .run();
+    release();
+    const response = await pending;
+    expect(response.status).toBe(409);
+    expect(checked).not.toHaveBeenCalled();
+
+    expect(state.sent).toEqual([]);
+  } finally {
+    release();
+    spy.mockRestore();
+  }
+});
+
+it('standalone submit refuses a stale published description with a fresh current revision before any provider or send', async () => {
+  const prepared = await send({ action: 'prepare', terms });
+  expect(prepared.status).toBe(200);
+  const review = (await prepared.json()) as MeteoraDbcReview;
+  const signed = await signMeteoraDbcLaunch(
+    session(7, payer),
+    session(9, mint),
+    review,
+    () => {},
+  );
+  const next = new Date(Date.parse(terms.updatedAt) + 1).toISOString();
+  await mocks.db
+    .prepare(
+      "UPDATE workspace_projects SET document=json_set(document,'$.plan.description','Changed before standalone submit'),updated_at=? WHERE owner_id=? AND id=?",
+    )
+    .bind(next, 'alice', terms.projectId)
+    .run();
+  const checked = vi.fn(mocks.rpc);
+  mocks.rpc = checked;
+
+  const { submitMeteoraDbcLaunch } =
+    await import('@/lib/meteora-dbc-launch-service');
+  await expect(
+    submitMeteoraDbcLaunch(
+      mocks.db,
+      'alice',
+      { ...terms, origin, updatedAt: next },
+      review.input,
+      signed.transaction,
+      new AbortController().signal,
+    ),
+  ).rejects.toMatchObject({ status: 409 });
+  expect(checked).not.toHaveBeenCalled();
+
+  expect(state.sent).toEqual([]);
+});
+
+// Simulate adapter/read corruption without changing or dropping immutable SQL
+// release guards. Every lookup still executes the original owner-scoped query.
+function overrideReleasedRead(
+  original: D1Database,
+  transform: (
+    row: Record<string, unknown>,
+    read: number,
+  ) => Record<string, unknown>,
+) {
+  let reads = 0;
+  return new Proxy(original, {
+    get(target, property) {
+      if (property !== 'prepare') {
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      return (sql: string) => {
+        const statement = target.prepare(sql);
+        if (!sql.includes('m.source_document')) return statement;
+        const wrap = (bound: D1PreparedStatement): D1PreparedStatement =>
+          new Proxy(bound, {
+            get(target, key) {
+              if (key === 'bind')
+                return (...args: unknown[]) => wrap(target.bind(...args));
+              if (key === 'first')
+                return async () => {
+                  const row = await target.first<Record<string, unknown>>();
+                  return row ? transform(row, ++reads) : row;
+                };
+              const value = Reflect.get(target, key);
+              return typeof value === 'function' ? value.bind(target) : value;
+            },
+          });
+        return wrap(statement);
+      };
+    },
+  });
+}
+
+it('compares actual ArrayBuffer image bytes at the post-hash barrier', async () => {
+  const original = mocks.db;
+  mocks.db = overrideReleasedRead(original, (row, read) => {
+    const bytes = Uint8Array.from(row.image as number[]);
+    if (read > 1) bytes[bytes.length - 1] ^= 1;
+    return { ...row, image: bytes.buffer };
+  });
+  const checked = vi.fn(mocks.rpc);
+  mocks.rpc = checked;
+  try {
+    const response = await send({ action: 'prepare', terms });
+    expect(response.status).toBe(409);
+    expect(checked).not.toHaveBeenCalled();
+    expect(state.sent).toEqual([]);
+  } finally {
+    mocks.db = original;
+  }
+});
+
+it.each(['image', 'metadata'])(
+  'refuses a corrupt released %s read despite matching source identity',
+  async (field) => {
+    const original = mocks.db;
+    mocks.db = overrideReleasedRead(original, (row) => {
+      if (field === 'metadata')
+        return {
+          ...row,
+          metadata: JSON.stringify({
+            ...JSON.parse(row.metadata as string),
+            name: 'Unexpected released name',
+          }),
+        };
+      const bytes = Uint8Array.from(row.image as number[]);
+      bytes[bytes.length - 1] ^= 1;
+      return { ...row, image: bytes.buffer };
+    });
+    const checked = vi.fn(mocks.rpc);
+    mocks.rpc = checked;
+    try {
+      const response = await send({ action: 'prepare', terms });
+      expect(response.status).toBe(409);
+      expect(checked).not.toHaveBeenCalled();
+      expect(state.sent).toEqual([]);
+    } finally {
+      mocks.db = original;
+    }
+  },
+);
