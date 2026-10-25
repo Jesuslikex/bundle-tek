@@ -4,7 +4,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { createClient, type Client } from '@libsql/client';
 import { readFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
 import { createTursoDatabase } from '@/db/turso';
+import { fundingOwnerScope } from '@/lib/funding-owner-scope';
 import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
 import { exchangeFundingReviewFixture } from '@/test/exchange-funding-review-fixture';
 import { FundingPlanner } from './funding-planner';
@@ -92,6 +94,33 @@ const advance = async () => {
 
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  localStorage.clear();
+  vi.stubGlobal('crypto', {
+    randomUUID,
+    subtle: {
+      digest: async (_algorithm: string, bytes: Uint8Array) =>
+        Uint8Array.from(createHash('sha256').update(bytes).digest()).buffer,
+    },
+  });
+  const held = new Set<string>();
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: {
+      request: async (
+        name: string,
+        _options: unknown,
+        callback: (lock: object | null) => unknown,
+      ) => {
+        if (held.has(name)) return callback(null);
+        held.add(name);
+        try {
+          return await callback({ name, mode: 'exclusive' });
+        } finally {
+          held.delete(name);
+        }
+      },
+    },
+  });
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-10-18T15:00:00.000Z'));
   auth.owner = 'alice';
@@ -128,7 +157,7 @@ beforeEach(async () => {
       }
       if (input === '/api/funding' && listReply) return listReply();
       if (input.startsWith('/api/funding?id=') && readReply) return readReply();
-      return GET(new Request('https://bundle.test' + input));
+      return GET(new Request('https://bundle.test' + input, options));
     }),
   );
   host = document.createElement('div');
@@ -142,6 +171,8 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  localStorage.clear();
+  Reflect.deleteProperty(navigator, 'locks');
 });
 
 it('cancels stalled initial loading, ignores its late response and preserves edits on reload', async () => {
@@ -214,7 +245,13 @@ it('returns to editing after a definite route validation rejection without prete
 });
 it('times out a stalled response body and makes Reload reachable without another request', async () => {
   listReply = async () =>
-    ({ ok: true, json: () => new Promise(() => {}) }) as Response;
+    ({
+      ok: true,
+      headers: new Headers({
+        'x-bundle-funding-owner-scope': fundingOwnerScope(auth.owner),
+      }),
+      json: () => new Promise(() => {}),
+    }) as Response;
   await mount();
   await fill();
   await advance();
@@ -288,7 +325,7 @@ it('does not interpret a missing or old revision as proof that an abandoned writ
   await click('Stop waiting for save');
   auth.owner = 'bob';
   await click('Check original save');
-  expect(host.textContent).toContain('not visible yet');
+  expect(host.textContent).toContain('Account changed');
   expect(button('New plan').disabled).toBe(true);
   auth.owner = 'alice';
   await client.execute('UPDATE funding_plans SET revision=0');
@@ -314,7 +351,15 @@ it('keeps a mismatched acknowledgement unknown and ignores a late response after
   expect(writes).toHaveLength(1);
 });
 it('keeps wrong acknowledgements and stalled recovery blocked until a valid original read', async () => {
-  writeReply = async () => Response.json({ id: 'wrong-id', revision: 1 });
+  writeReply = async () =>
+    Response.json(
+      { id: 'wrong-id', revision: 1 },
+      {
+        headers: {
+          'x-bundle-funding-owner-scope': fundingOwnerScope(auth.owner),
+        },
+      },
+    );
   await mount();
   await fill();
   await startSave();
@@ -418,4 +463,318 @@ it('admits only one save on a double click and ignores its late result after unm
   );
   expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
   expect(host.textContent).toBe('Different screen');
+});
+
+const recoveryKeys = () =>
+  Object.keys(localStorage).filter((key) =>
+    key.startsWith('bundle-funding-save:'),
+  );
+const remount = async () => {
+  await act(async () => root.render(<p>Another screen</p>));
+  await mount();
+};
+it('recovers the original committed create after reload without retaining allocations or posting again', async () => {
+  writeReply = () => new Promise(() => {});
+  await mount();
+  await fill();
+  await startSave();
+  const key = recoveryKeys()[0],
+    text = localStorage.getItem(key)!;
+  expect(JSON.parse(text)).toEqual({
+    format: 'funding-save-reminder-v1',
+    ownerScope: expect.stringMatching(/^[a-f0-9]{64}$/),
+    id: JSON.parse(writes[0]).id,
+    action: 'save',
+    expectedRevision: 0,
+    documentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+  });
+  expect(text).not.toContain('Preserved funding draft');
+  expect(text).not.toContain('So111111');
+  expect(text).not.toContain('0.012345678');
+  await remount();
+  expect(writes).toHaveLength(1);
+  expect(
+    host.querySelector('[aria-label="Funding save recovery"]'),
+  ).not.toBeNull();
+  expect(button('Retry exact same request').disabled).toBe(true);
+  expect(button('New plan').disabled).toBe(true);
+  await click('Check original save');
+  expect(writes).toHaveLength(1);
+  expect(host.textContent).toContain('confirmed in saved history');
+  expect(host.textContent).toContain('Open the saved plan explicitly');
+  expect(recoveryKeys()).toHaveLength(0);
+  expect(host.textContent).not.toContain('Revision 1');
+  expect(
+    (await client.execute('SELECT * FROM funding_plans')).rows,
+  ).toHaveLength(1);
+  expect(
+    (await client.execute('SELECT * FROM funding_events')).rows,
+  ).toHaveLength(1);
+});
+it.each(['archive', 'restore', 'save'] as const)(
+  'retains and explicitly recovers a lost %s result across remount',
+  async (action) => {
+    const document = exchangeFundingReviewFixture().plan.document;
+    document.source = 'Manual';
+    const seed = async (action: string, expectedRevision: number) =>
+      POST(
+        new Request('https://bundle.test/api/funding', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            id: 'retained-existing',
+            action,
+            expectedRevision,
+            document,
+          }),
+        }),
+      );
+    expect((await seed('save', 0)).status).toBe(200);
+    if (action === 'restore')
+      expect((await seed('archive', 1)).status).toBe(200);
+    await mount();
+    writeReply = () => new Promise(() => {});
+    if (action === 'save') {
+      await act(async () =>
+        (
+          host.querySelector('.funding-saved-row button') as HTMLButtonElement
+        ).click(),
+      );
+      await edit('#funding-name', 'Updated before remount');
+    }
+    await act(async () => {
+      button(
+        action === 'save'
+          ? 'Save changes'
+          : action === 'archive'
+            ? 'Archive'
+            : 'Restore',
+      ).click();
+      await writeFinished.promise;
+    });
+    await remount();
+    expect(writes).toHaveLength(1);
+    expect(button('Retry exact same request').disabled).toBe(true);
+    await click('Check original save');
+    expect(host.textContent).toContain('confirmed in saved history');
+    expect(writes).toHaveLength(1);
+    expect(recoveryKeys()).toHaveLength(0);
+  },
+);
+it('keeps a missing original unknown after reload instead of enabling a replacement save', async () => {
+  writeReply = () => new Promise(() => {});
+  await mount();
+  await fill();
+  await startSave();
+  await client.execute('DELETE FROM funding_plans');
+  await remount();
+  await click('Check original save');
+  expect(host.textContent).toContain('not visible yet');
+  expect(button('New plan').disabled).toBe(true);
+  expect(recoveryKeys()).toHaveLength(1);
+  expect(writes).toHaveLength(1);
+});
+it('isolates retained records between authenticated accounts and rediscovers the old account record', async () => {
+  writeReply = () => new Promise(() => {});
+  await mount();
+  await fill();
+  await startSave();
+  const aliceKey = recoveryKeys()[0],
+    aliceRecord = localStorage.getItem(aliceKey);
+  auth.owner = 'bob';
+  await remount();
+  expect(host.querySelector('[aria-label="Funding save recovery"]')).toBeNull();
+  expect(localStorage.getItem(aliceKey)).toBe(aliceRecord);
+  expect(writes).toHaveLength(1);
+  auth.owner = 'alice';
+  await click('Reload saved plans');
+  expect(
+    host.querySelector('[aria-label="Funding save recovery"]'),
+  ).not.toBeNull();
+  expect(writes).toHaveLength(1);
+  await click('Check original save');
+  expect(host.textContent).toContain('confirmed in saved history');
+  expect(recoveryKeys()).toHaveLength(0);
+});
+it('does not send a write when durable storage or cross-tab browser protection is unavailable', async () => {
+  await mount();
+  await fill();
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw Error('PRIVATE quota diagnostic');
+  });
+  await click('Save funding draft');
+  expect(writes).toHaveLength(0);
+  expect(host.textContent).toContain('recovery storage');
+  expect(host.textContent).not.toContain('PRIVATE');
+  vi.restoreAllMocks();
+  Reflect.deleteProperty(navigator, 'locks');
+  await click('Reload saved plans');
+  expect(button('Save funding draft').disabled).toBe(true);
+  expect(host.textContent).toContain('protect funding saves across tabs');
+  expect(writes).toHaveLength(0);
+});
+it('retains corrupt local recovery data and blocks a new save without displaying raw contents', async () => {
+  const scope = (
+    await GET(new Request('https://bundle.test/api/funding'))
+  ).headers.get('x-bundle-funding-owner-scope')!;
+  localStorage.setItem('bundle-funding-save:' + scope, 'PRIVATE not JSON');
+  await mount();
+  await fill();
+  expect(button('Save funding draft').disabled).toBe(true);
+  expect(host.textContent).toContain('recovery storage');
+  expect(host.textContent).not.toContain('PRIVATE');
+  expect(localStorage.getItem('bundle-funding-save:' + scope)).toBe(
+    'PRIVATE not JSON',
+  );
+  expect(writes).toHaveLength(0);
+});
+
+it('uses one cross-tab critical section and adopts the original pending save rather than posting a second draft', async () => {
+  const otherHost = document.createElement('div');
+  document.body.appendChild(otherHost);
+  const otherRoot = createRoot(otherHost);
+  try {
+    await mount();
+    await fill();
+    await act(async () =>
+      otherRoot.render(<FundingPlanner plan={DEFAULT_LAUNCH_PLAN} />),
+    );
+    const otherEdit = async (selector: string, value: string) =>
+      act(async () => {
+        const element = otherHost.querySelector(selector)!;
+        const prototype =
+          element.tagName === 'TEXTAREA'
+            ? HTMLTextAreaElement.prototype
+            : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(
+          element,
+          value,
+        );
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    const otherButton = (text: string) =>
+      [...otherHost.querySelectorAll('button')].find(
+        (b) => b.textContent?.trim() === text,
+      )!;
+    await otherEdit('#funding-name', 'Another tab draft');
+    await otherEdit(
+      '[aria-label="Funding recipients"]',
+      'So11111111111111111111111111111111111111112 0.1',
+    );
+    writeReply = () => new Promise(() => {});
+    await startSave();
+    await act(async () => otherButton('Save funding draft').click());
+    expect(writes).toHaveLength(1);
+    expect(otherHost.textContent).toContain('Another tab');
+    await click('Stop waiting for save');
+    await act(async () => otherButton('Save funding draft').click());
+    expect(writes).toHaveLength(1);
+    expect(
+      otherHost.querySelector('[aria-label="Funding save recovery"]'),
+    ).not.toBeNull();
+    expect(otherButton('Retry exact same request').disabled).toBe(true);
+    await act(async () => otherButton('Check original save').click());
+    expect(writes).toHaveLength(1);
+    expect(otherHost.textContent).toContain('confirmed in saved history');
+    expect(recoveryKeys()).toHaveLength(0);
+  } finally {
+    await act(async () => otherRoot.unmount());
+    otherHost.remove();
+  }
+});
+it('never erases a different recovery record when its acknowledgement arrives', async () => {
+  const late = deferred<Response>();
+  let ack: Response | undefined;
+  writeReply = (response) => {
+    ack = response;
+    return late.promise;
+  };
+  await mount();
+  await fill();
+  await startSave();
+  const key = recoveryKeys()[0];
+  const replacement = {
+    ...JSON.parse(localStorage.getItem(key)!),
+    id: 'another-pending-draft',
+    documentHash: 'b'.repeat(64),
+  };
+  const text = JSON.stringify(replacement);
+  localStorage.setItem(key, text);
+  await act(async () => late.resolve(ack!));
+  expect(localStorage.getItem(key)).toBe(text);
+  expect(writes).toHaveLength(1);
+  expect(host.textContent).toContain('changed in another tab');
+  expect(button('New plan').disabled).toBe(true);
+});
+it('keeps a missing-owner-scope acknowledgement unknown without losing the original reminder', async () => {
+  writeReply = async (response) => Response.json(await response.json());
+  await mount();
+  await fill();
+  await startSave();
+  expect(
+    host.querySelector('[aria-label="Funding save recovery"]'),
+  ).not.toBeNull();
+  expect(recoveryKeys()).toHaveLength(1);
+  expect(button('New plan').disabled).toBe(true);
+  expect(writes).toHaveLength(1);
+  await click('Check original save');
+  expect(host.textContent).toContain('confirmed in saved history');
+  expect(recoveryKeys()).toHaveLength(0);
+  expect(writes).toHaveLength(1);
+});
+
+it('clears only a definitively rejected first POST when the account changes before it reaches the route', async () => {
+  await mount();
+  await fill();
+  auth.owner = 'bob';
+  await startSave();
+  expect(writes).toHaveLength(1);
+  expect(
+    (await client.execute('SELECT * FROM funding_plans')).rows,
+  ).toHaveLength(0);
+  expect(host.textContent).toContain('changed before this save');
+  expect(recoveryKeys()).toHaveLength(0);
+  await click('Reload saved plans');
+  expect(
+    (
+      host.querySelector(
+        '[aria-label="Funding recipients"]',
+      ) as HTMLTextAreaElement
+    ).value,
+  ).toBe('');
+});
+it('never uses a later account-mismatch rejection to clear an earlier unknown write', async () => {
+  writeReply = () => new Promise(() => {});
+  await mount();
+  await fill();
+  await startSave();
+  await click('Stop waiting for save');
+  auth.owner = 'bob';
+  writeReply = async (response) => response;
+  await click('Retry exact same request');
+  expect(writes).toHaveLength(2);
+  expect(recoveryKeys()).toHaveLength(1);
+  expect(button('New plan').disabled).toBe(true);
+  auth.owner = 'alice';
+  await click('Check original save');
+  expect(host.textContent).toContain('confirmed in saved history');
+  expect(recoveryKeys()).toHaveLength(0);
+});
+it('keeps an accepted-but-not-committed HTTP202 acknowledgement unknown until an exact saved read', async () => {
+  writeReply = async (response) =>
+    Response.json(await response.json(), {
+      status: 202,
+      headers: response.headers,
+    });
+  await mount();
+  await fill();
+  await startSave();
+  expect(
+    host.querySelector('[aria-label="Funding save recovery"]'),
+  ).not.toBeNull();
+  expect(button('New plan').disabled).toBe(true);
+  expect(writes).toHaveLength(1);
+  await click('Check original save');
+  expect(host.textContent).toContain('confirmed in saved history');
+  expect(writes).toHaveLength(1);
 });

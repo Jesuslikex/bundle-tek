@@ -78,7 +78,22 @@ export function FundingPlanner({
     } else
       setSelected((current) => (current?.id === attempt.id ? null : current));
   };
-  const storage = useFundingPlanStorage(onCommitted);
+  const storage = useFundingPlanStorage(onCommitted, () => {
+    setSelected(null);
+    setHistoryId(null);
+    setDraftId(crypto.randomUUID());
+    setLines('');
+    setDraft({
+      name: `${plan.tokenName} funding`,
+      chain: plan.chain,
+      currency: CURRENCIES_BY_CHAIN[plan.chain][0],
+      source: 'Manual',
+      sourceLabel: '',
+      funderAddress: '',
+      startAt: new Date(Date.now() + 300000).toISOString(),
+      delaySeconds: 10,
+    });
+  });
   const { plans: saved, error, notice, setError, setNotice } = storage;
   const loading = storage.phase === 'load';
   const busy =
@@ -156,7 +171,7 @@ export function FundingPlanner({
     });
   };
   function persist(action: 'save' | 'archive' | 'restore', row?: SavedFunding) {
-    if (busy || loading || handoffBusy) return;
+    if (busy || storage.writeBlocked || loading || handoffBusy) return;
     const document = action === 'save' ? preview : row?.document;
     if (!document) return;
     void storage.save({
@@ -167,7 +182,10 @@ export function FundingPlanner({
     });
   }
   return (
-    <section className="funding-planner" aria-label="Funding plan editor">
+    <section
+      className={`funding-planner ${recoveryStyles.planner}`}
+      aria-label="Funding plan editor"
+    >
       <header>
         <div>
           <span className="eyebrow">SAVED FUNDING PLANS</span>
@@ -475,7 +493,9 @@ export function FundingPlanner({
       )}
       <div className="funding-actions">
         <Button
-          disabled={busy || handoffBusy || loading || !preview}
+          disabled={
+            busy || storage.writeBlocked || handoffBusy || loading || !preview
+          }
           onClick={() => persist('save')}
         >
           <Save />
@@ -489,7 +509,7 @@ export function FundingPlanner({
         </Button>
         <Button
           variant="outline"
-          disabled={busy || handoffBusy || loading}
+          disabled={Boolean(storage.phase) || handoffBusy}
           onClick={() => void storage.load()}
         >
           Reload saved plans
@@ -508,7 +528,9 @@ export function FundingPlanner({
           <Button variant="outline" onClick={storage.cancel}>
             {storage.phase === 'save'
               ? 'Stop waiting for save'
-              : 'Cancel loading'}
+              : storage.phase === 'recover'
+                ? 'Stop checking original save'
+                : 'Cancel loading'}
           </Button>
         </output>
       )}
@@ -518,9 +540,10 @@ export function FundingPlanner({
           className={`source-note ${recoveryStyles.recovery}`}
         >
           <p>
-            The original request is retained while its outcome is checked. Keep
-            this page open. Checking only reads saved data. Retrying repeats the
-            exact same draft ID and revision; it does not move funds.
+            A recovery reference for this account survives reloads. Funding
+            allocations and signing data are not stored with that reference.
+            Check the original saved draft before editing further. No funds move
+            when checking a save.
           </p>
           <p>
             Draft: <code>{storage.pending.id}</code> · expected revision{' '}
@@ -535,12 +558,21 @@ export function FundingPlanner({
             </Button>
             <Button
               variant="outline"
-              disabled={Boolean(storage.phase) || handoffBusy}
+              disabled={
+                Boolean(storage.phase) || handoffBusy || !storage.canRetry
+              }
               onClick={() => void storage.retry()}
             >
               Retry exact same request
             </Button>
           </div>
+          <p>
+            {storage.hasOriginalPayload
+              ? 'The exact request is still in this page’s memory. Retrying keeps its original ID and revision.'
+              : 'After reloading, the original request payload is unavailable. Check its saved result, then explicitly open the saved plan. It will not be sent again.'}{' '}
+            Retry also requires a verified account and recovery storage. Reload
+            saved plans checks the current account without repeating a save.
+          </p>
         </section>
       )}
       {error && (
@@ -562,6 +594,7 @@ export function FundingPlanner({
           draft={preview}
           enabled={
             !busy &&
+            !storage.writeBlocked &&
             !loading &&
             !handoffBusy &&
             Boolean(
@@ -589,6 +622,7 @@ export function FundingPlanner({
             revision={selected.revision}
             enabled={
               !busy &&
+              !storage.writeBlocked &&
               !loading &&
               !handoffBusy &&
               saved.some(
@@ -618,6 +652,7 @@ export function FundingPlanner({
             revision={selected.revision}
             enabled={
               !busy &&
+              !storage.writeBlocked &&
               !loading &&
               !handoffBusy &&
               saved.some(
@@ -649,6 +684,7 @@ export function FundingPlanner({
             revision={selected.revision}
             enabled={
               !busy &&
+              !storage.writeBlocked &&
               !loading &&
               !handoffBusy &&
               saved.some(
@@ -673,6 +709,7 @@ export function FundingPlanner({
             plan={mainnetPlan}
             enabled={
               !busy &&
+              !storage.writeBlocked &&
               !loading &&
               !handoffBusy &&
               saved.some(
@@ -737,7 +774,7 @@ export function FundingPlanner({
               </Button>
               <Button
                 variant="outline"
-                disabled={busy || handoffBusy}
+                disabled={busy || storage.writeBlocked || handoffBusy}
                 aria-label={`${row.archived ? 'Restore' : 'Archive'} ${row.document.name}`}
                 onClick={() =>
                   persist(row.archived ? 'restore' : 'archive', row)

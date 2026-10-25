@@ -189,7 +189,10 @@ describe('saved funding plans on real D1', () => {
     expect(await missing.json()).toEqual({
       error: 'Saved funding draft not found.',
     });
-    expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans).toHaveLength(1);
+    expect(
+      (await read(await GET(new Request('http://localhost:3000/api/funding'))))
+        .plans,
+    ).toHaveLength(1);
   });
   it('preserves exact amounts and derives recipient times from delay', () => {
     const value = input(),
@@ -263,7 +266,9 @@ describe('saved funding plans on real D1', () => {
       ],
     };
     expect((await post({ document })).status).toBe(200);
-    const before = await read(await GET(new Request('http://localhost:3000/api/funding')));
+    const before = await read(
+      await GET(new Request('http://localhost:3000/api/funding')),
+    );
     expect(before.plans[0].document).toMatchObject({
       assetAddress: document.assetAddress,
       total: '0.123456789012345678',
@@ -279,12 +284,16 @@ describe('saved funding plans on real D1', () => {
         })
       ).status,
     ).toBe(400);
-    expect(await read(await GET(new Request('http://localhost:3000/api/funding')))).toEqual(before);
+    expect(
+      await read(await GET(new Request('http://localhost:3000/api/funding'))),
+    ).toEqual(before);
     expect((await read(await history())).events).toHaveLength(1);
   });
   it('enforces authentication, same origin and JSON', async () => {
     mocks.user = null;
-    expect((await GET(new Request('http://localhost:3000/api/funding'))).status).toBe(401);
+    expect(
+      (await GET(new Request('http://localhost:3000/api/funding'))).status,
+    ).toBe(401);
     expect((await history()).status).toBe(401);
     expect((await post()).status).toBe(401);
     mocks.user = { userId: 'alice', email: 'a@b.test' };
@@ -292,7 +301,11 @@ describe('saved funding plans on real D1', () => {
       403,
     );
     expect((await post({}, { 'content-type': 'text/plain' })).status).toBe(415);
-    expect((await GET(new Request('http://localhost:3000/api/funding'))).headers.get('cache-control')).toBe('no-store');
+    expect(
+      (await GET(new Request('http://localhost:3000/api/funding'))).headers.get(
+        'cache-control',
+      ),
+    ).toBe('no-store');
   });
   it('saves actual history through update, archive and restore', async () => {
     expect((await post()).status).toBe(200);
@@ -313,7 +326,9 @@ describe('saved funding plans on real D1', () => {
     expect(
       (await post({ action: 'restore', expectedRevision: 3 })).status,
     ).toBe(200);
-    const rows = await read(await GET(new Request('http://localhost:3000/api/funding')));
+    const rows = await read(
+      await GET(new Request('http://localhost:3000/api/funding')),
+    );
     expect(rows.plans[0].revision).toBe(4);
     expect(rows.plans[0].document.name).toBe('Changed');
     expect(rows.plans[0].archived).toBe(false);
@@ -327,7 +342,10 @@ describe('saved funding plans on real D1', () => {
   it('isolates owners even when IDs coincide', async () => {
     await post();
     mocks.user = { userId: 'bob', email: 'b@b.test' };
-    expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans).toEqual([]);
+    expect(
+      (await read(await GET(new Request('http://localhost:3000/api/funding'))))
+        .plans,
+    ).toEqual([]);
     expect((await read(await history())).events).toEqual([]);
     expect((await post({ expectedRevision: 1 })).status).toBe(409);
     expect((await post()).status).toBe(200);
@@ -343,7 +361,10 @@ describe('saved funding plans on real D1', () => {
       200, 409,
     ]);
     expect((await read(await history())).events).toHaveLength(2);
-    expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans[0].revision).toBe(2);
+    expect(
+      (await read(await GET(new Request('http://localhost:3000/api/funding'))))
+        .plans[0].revision,
+    ).toBe(2);
   });
   it('rolls back the plan mutation when event storage fails', async () => {
     await post();
@@ -352,7 +373,13 @@ describe('saved funding plans on real D1', () => {
       .run();
     try {
       expect((await post({ expectedRevision: 1 })).status).toBe(503);
-      expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans[0].revision).toBe(1);
+      expect(
+        (
+          await read(
+            await GET(new Request('http://localhost:3000/api/funding')),
+          )
+        ).plans[0].revision,
+      ).toBe(1);
     } finally {
       await mocks.db
         .prepare('ALTER TABLE funding_events_hidden RENAME TO funding_events')
@@ -371,7 +398,10 @@ describe('saved funding plans on real D1', () => {
       ).status,
     ).toBe(400);
     expect((await post({ action: 'execute' })).status).toBe(400);
-    expect((await read(await GET(new Request('http://localhost:3000/api/funding')))).plans).toEqual([]);
+    expect(
+      (await read(await GET(new Request('http://localhost:3000/api/funding'))))
+        .plans,
+    ).toEqual([]);
     expect((await read(await history())).events).toEqual([]);
   });
   it('pages history without duplicate events and rejects invalid cursors', async () => {
@@ -576,4 +606,63 @@ describe('owner-scoped saved funding fee reviews', () => {
     await mocks.db.prepare('UPDATE funding_plans SET archived=1').run();
     expect((await request(2, 'prepare')).status).toBe(404);
   });
+});
+
+it('binds recovery headers to the current authenticated owner and refuses cross-account requests before writes', async () => {
+  mocks.user = { userId: 'alice', email: 'alice@example.test' };
+  const first = await GET(new Request('http://localhost/api/funding'));
+  const scope = first.headers.get('x-bundle-funding-owner-scope')!;
+  expect(scope).toMatch(/^[0-9a-f]{64}$/);
+  expect(first.headers.get('cache-control')).toBe('no-store');
+  const saved = await post({}, { 'x-bundle-funding-owner-scope': scope });
+  expect(saved.status).toBe(200);
+  expect(saved.headers.get('x-bundle-funding-owner-scope')).toBe(scope);
+  mocks.user = { userId: 'bob', email: 'bob@example.test' };
+  const refused = await post(
+    { id: 'foreign-scope' },
+    { 'x-bundle-funding-owner-scope': scope },
+  );
+  expect(refused.status).toBe(403);
+  const bobScope = refused.headers.get('x-bundle-funding-owner-scope');
+  expect(await refused.json()).toMatchObject({
+    code: 'FUNDING_SCOPE_REJECTED_BEFORE_WRITE',
+    rejectedScope: scope,
+  });
+  expect(bobScope).toMatch(/^[0-9a-f]{64}$/);
+  expect(bobScope).not.toBe(scope);
+  const wrongRead = await GET(
+    new Request('http://localhost/api/funding?id=plan-a', {
+      headers: { 'x-bundle-funding-owner-scope': scope },
+    }),
+  );
+  expect(wrongRead.status).toBe(403);
+  const bob = await GET(new Request('http://localhost/api/funding'));
+  expect(await bob.json()).toMatchObject({ plans: [] });
+  mocks.user = { userId: 'alice', email: 'alice@example.test' };
+  expect(
+    (await read(await GET(new Request('http://localhost/api/funding')))).plans,
+  ).toHaveLength(1);
+});
+it.each(['', 'invalid', 'A'.repeat(64)])(
+  'refuses malformed supplied owner scope %j without storing a draft',
+  async (scope) => {
+    mocks.user = { userId: 'alice', email: 'alice@example.test' };
+    expect(
+      (await post({}, { 'x-bundle-funding-owner-scope': scope })).status,
+    ).toBe(403);
+    expect(
+      (await read(await GET(new Request('http://localhost/api/funding'))))
+        .plans,
+    ).toHaveLength(0);
+  },
+);
+it('emits no owner namespace to an unauthenticated caller', async () => {
+  mocks.user = null;
+  for (const response of [
+    await GET(new Request('http://localhost/api/funding')),
+    await post(),
+  ]) {
+    expect(response.status).toBe(401);
+    expect(response.headers.has('x-bundle-funding-owner-scope')).toBe(false);
+  }
 });

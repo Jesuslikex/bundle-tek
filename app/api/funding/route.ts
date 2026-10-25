@@ -1,15 +1,40 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { validateFunding } from '@/lib/funding-plan';
+import {
+  fundingOwnerScope,
+  FUNDING_OWNER_SCOPE_HEADER,
+} from '@/lib/funding-owner-scope';
 export const dynamic = 'force-dynamic';
-const json = (body: unknown, status = 200) =>
-  Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
+const json = (body: unknown, status = 200, ownerScope?: string) =>
+  Response.json(body, {
+    status,
+    headers: {
+      'cache-control': 'no-store',
+      ...(ownerScope ? { [FUNDING_OWNER_SCOPE_HEADER]: ownerScope } : {}),
+    },
+  });
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
-  if (!user) return json({ error: 'Sign in to open funding plans.' }, 401);
+  const ownerScope = user ? fundingOwnerScope(user.userId) : undefined;
+  const reply = (body: unknown, status = 200) => json(body, status, ownerScope);
+  if (!user) return reply({ error: 'Sign in to open funding plans.' }, 401);
+  const requestedScope = request?.headers.get(FUNDING_OWNER_SCOPE_HEADER);
+  if (
+    requestedScope !== null &&
+    requestedScope !== undefined &&
+    requestedScope !== ownerScope
+  )
+    return reply(
+      {
+        error:
+          'The signed-in account changed. Reload saved funding plans before continuing.',
+      },
+      403,
+    );
   const id = request ? new URL(request.url).searchParams.get('id') : null;
   if (id !== null && !/^[a-zA-Z0-9-]{1,64}$/.test(id))
-    return json({ error: 'Choose a valid saved funding draft.' }, 400);
+    return reply({ error: 'Choose a valid saved funding draft.' }, 400);
   try {
     if (id !== null) {
       const row = await getD1()
@@ -24,8 +49,8 @@ export async function GET(request: Request) {
           archived: number;
           updatedAt: string;
         }>();
-      if (!row) return json({ error: 'Saved funding draft not found.' }, 404);
-      return json({
+      if (!row) return reply({ error: 'Saved funding draft not found.' }, 404);
+      return reply({
         plan: {
           ...row,
           archived: Boolean(row.archived),
@@ -45,7 +70,7 @@ export async function GET(request: Request) {
         archived: number;
         updatedAt: string;
       }>();
-    return json({
+    return reply({
       plans: rows.results.map((r) => ({
         ...r,
         archived: Boolean(r.archived),
@@ -53,29 +78,46 @@ export async function GET(request: Request) {
       })),
     });
   } catch {
-    return json({ error: 'Funding storage temporarily unavailable.' }, 503);
+    return reply({ error: 'Funding storage temporarily unavailable.' }, 503);
   }
 }
 export async function POST(request: Request) {
   const user = await getChatGPTUser();
-  if (!user) return json({ error: 'Sign in to save funding plans.' }, 401);
+  const ownerScope = user ? fundingOwnerScope(user.userId) : undefined;
+  const reply = (body: unknown, status = 200) => json(body, status, ownerScope);
+  if (!user) return reply({ error: 'Sign in to save funding plans.' }, 401);
+  const requestedScope = request.headers.get(FUNDING_OWNER_SCOPE_HEADER);
+  if (requestedScope !== null && requestedScope !== ownerScope)
+    return reply(
+      {
+        error:
+          'The signed-in account changed. Reload saved funding plans before continuing.',
+        ...(/^[a-f0-9]{64}$/.test(requestedScope)
+          ? {
+              code: 'FUNDING_SCOPE_REJECTED_BEFORE_WRITE',
+              rejectedScope: requestedScope,
+            }
+          : {}),
+      },
+      403,
+    );
   if (
     !request.headers
       .get('content-type')
       ?.toLowerCase()
       .startsWith('application/json')
   )
-    return json({ error: 'JSON required.' }, 415);
+    return reply({ error: 'JSON required.' }, 415);
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin
   )
-    return json({ error: 'Cross-origin write rejected.' }, 403);
+    return reply({ error: 'Cross-origin write rejected.' }, 403);
   let writing = false;
   try {
     const text = await request.text();
     if (text.length > 30000)
-      return json({ error: 'Funding plan is too large.' }, 413);
+      return reply({ error: 'Funding plan is too large.' }, 413);
     const b = JSON.parse(text);
     if (typeof b.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(b.id))
       throw new Error('Invalid plan ID.');
@@ -150,18 +192,18 @@ export async function POST(request: Request) {
         .bind(type, user.userId, b.id, mutation),
     ]);
     if (!results[0].meta.changes)
-      return json(
+      return reply(
         {
           error:
             'Plan changed in another tab, is archived, or the 100-plan limit was reached. Reload saved plans.',
         },
         409,
       );
-    return json({ id: b.id, revision: b.expectedRevision + 1 });
+    return reply({ id: b.id, revision: b.expectedRevision + 1 });
   } catch (error) {
     return writing
-      ? json({ error: 'Funding storage temporarily unavailable.' }, 503)
-      : json(
+      ? reply({ error: 'Funding storage temporarily unavailable.' }, 503)
+      : reply(
           {
             error:
               error instanceof Error

@@ -56,6 +56,17 @@ async function change(value: string) {
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  localStorage.clear();
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: {
+      request: async (
+        _name: string,
+        _options: unknown,
+        callback: (lock: object) => unknown,
+      ) => callback({ name: 'fixture', mode: 'exclusive' }),
+    },
+  });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -80,6 +91,8 @@ afterEach(async () => {
   container.remove();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  Reflect.deleteProperty(navigator, 'locks');
+  localStorage.clear();
 });
 it('keeps missing provider setup clear when quote history storage is not installed', async () => {
   configured = false;
@@ -275,7 +288,12 @@ it('wires a saved CEX draft into the real FundingPlanner in place of wallet prep
   const existing = fetcher.getMockImplementation()!;
   fetcher.mockImplementation((input, options) => {
     if (input === '/api/funding' && !options?.method)
-      return Promise.resolve(Response.json({ plans: [fixture.plan] }));
+      return Promise.resolve(
+        Response.json(
+          { plans: [fixture.plan] },
+          { headers: { 'x-bundle-funding-owner-scope': 'a'.repeat(64) } },
+        ),
+      );
     if (
       typeof input === 'string' &&
       (input.startsWith('/api/funding/history') ||
@@ -316,7 +334,12 @@ it.each(['Wallet', 'Manual'] as const)(
     const existing = fetcher.getMockImplementation()!;
     fetcher.mockImplementation((input, options) =>
       input === '/api/funding' && !options?.method
-        ? Promise.resolve(Response.json({ plans: [fixture.plan] }))
+        ? Promise.resolve(
+            Response.json(
+              { plans: [fixture.plan] },
+              { headers: { 'x-bundle-funding-owner-scope': 'a'.repeat(64) } },
+            ),
+          )
         : existing(input, options),
     );
     await act(async () =>

@@ -1,0 +1,146 @@
+{
+  "format": "funding-draft-reload-recovery-v1",
+  "baseCommit": "5b4464faa920594ff3a7a6216623fcd62baee9ec",
+  "originalGetAndPostSqlAdmissionEventBodiesUnchanged": true,
+  "originalPlannerHandlersUnchanged": [
+    "onCommitted",
+    "refreshExecution",
+    "change",
+    "open",
+    "fresh"
+  ],
+  "persistOnlyAddsWriteBlock": true,
+  "financialEnabledPredicatesRetained": 5,
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "app/ux.css",
+    "lib/browser-wallet-vault.ts",
+    "lib/pump-group-runtime-service.ts",
+    "lib/pump-group-code-identity.ts",
+    "lib/jito-readonly-qualification.ts",
+    "components/auto-sell-modal.tsx",
+    "lib/auto-sell-runner.ts",
+    "lib/auto-sell-execute.ts",
+    "components/launch/mainnet-funding-execution.tsx",
+    "components/launch/devnet-funding-execution.tsx",
+    "components/launch/solana-funding-review.tsx",
+    "components/launch/exchange-funding-review.tsx",
+    "components/launch/funding-fee-review.tsx",
+    "components/launch/mainnet-funding-history.tsx",
+    "components/launch/funding-execution-history.tsx",
+    "components/launch/launch-funding-picker.tsx",
+    "components/launch/funding-wallet-picker.tsx",
+    "lib/funding-plan.ts",
+    "lib/funding-plan-storage.ts",
+    "drizzle/meta/_journal.json",
+    "vercel.json"
+  ],
+  "priorSqlFilesUnchanged": 150,
+  "sourceHashes": {
+    "app/api/funding/route.ts": "2a7d701310547f73d5257a6dbd062e257dbbdd1d497a627c4eb4344472b713a8",
+    "app/api/funding/route.test.ts": "e9db0453202fa32bf7428ff592104b94345035ea7022cd4c2d5cfcff214a39ae",
+    "components/launch/use-funding-plan-storage.ts": "31867f6643a527ab9b6e1145a8501af44cb888fa6ca60bf8fb8edbaddbafe7a9",
+    "components/launch/funding-planner.tsx": "f4fa1fd98040c1a25e549bdf35ff285e3a0c48bd69476c282b3f192248673142",
+    "components/launch/funding-planner-recovery.test.tsx": "becc2f844e54c4359652777e07df50152804fc46464bb1b44fc1feb8b6279811",
+    "components/launch/funding-planner-recovery.module.css": "872b724eed26a3d425f7062af91301cf4428448def46e79d623c49c0bdc8d091",
+    "components/launch/exchange-funding-review.test.tsx": "0bdb9c8f0b603590291c3c70d06d37b12599181d8beb6d4ba55eebdecb8c8ba1",
+    "lib/funding-owner-scope.ts": "0120bf69509ca8851fda816d1a5e58741046d2a96bcfcbb7f6f94ffe526deccc",
+    "lib/funding-owner-scope.test.ts": "2b7cd490bad6514a6882425cdaf22ad3993a97446910c2e2ee53a636933062e7",
+    "lib/funding-save-reminder.ts": "e4a27181262918de94a0041c58a3939024a749b88b14443fb70657c0d7eeccc1",
+    "lib/funding-save-reminder.test.ts": "d1e2d3208843d43d8609aaac30ec244005d06411857356ddbc7a02ce3fc22106"
+  },
+  "verification": {
+    "node": "24.19.0",
+    "tests": {
+      "passed": 170,
+      "files": 7,
+      "durationSeconds": 13.02
+    },
+    "typecheck": true,
+    "typedLintFiles": 10,
+    "formatFiles": 11,
+    "fullApplicationSuite": false,
+    "productionBuild": false
+  },
+  "browser": {
+    "passed": true,
+    "actualCompiledPlannerAndHook": true,
+    "actualDraftApi": true,
+    "productionTursoAdapter": true,
+    "disposableFundingSchema": "0007_superb_iron_monger.sql",
+    "intendedDraftWrites": 4,
+    "recoveryReadsAtLeast": 4,
+    "duplicatePosts": 0,
+    "plans": 1,
+    "finalRevision": 4,
+    "eventTypes": [
+      "funding.created",
+      "funding.updated",
+      "funding.archived",
+      "funding.restored"
+    ],
+    "networkReplyDroppedForCreate": true,
+    "clientReplyDiscardedForUpdateArchiveRestore": true,
+    "reloadBeforeEveryRecovery": true,
+    "differentAccountHasNoPlansOrReminder": true,
+    "noAutomaticPlanSelectionAfterReload": true,
+    "phone": {
+      "width": 375,
+      "scrollWidth": 360,
+      "recoveryButtons": 44
+    },
+    "desktop": {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "recoveryButtons": 44
+    },
+    "financialPanelsDisabled": true,
+    "providerCalls": 0,
+    "realAccountAccess": false,
+    "fundedActions": false,
+    "notProduction": true,
+    "ownedTabsClosed": true,
+    "ownedServerStopped": true
+  },
+  "review": {
+    "startedAt": "2026-10-25T20:34:28.368Z",
+    "finishedAt": "2026-10-25T20:37:24.329Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "5b4464faa920594ff3a7a6216623fcd62baee9ec",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": ["claude-opus-5-5"],
+    "modelsUsed": ["claude-opus-5-5"],
+    "tools": ["Glob", "Grep", "Read"],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.6762264,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "reviewLimits": "Source-only snapshot. Final capture admission/React display state/copy/CSS/HTTP202 follow-ups independently verified after review, no second approval claimed.",
+  "knownLimits": [
+    "No terminal cancel/fence API: missing/equal saved revisions remain held after payload loss.",
+    "Same-scope refresh cannot erase a retained unknown simply because another tab removed its persisted record.",
+    "Device-local namespace and WebLocks only, no cross-device or financial reservation.",
+    "Unsalted hashes are not encryption and local references survive sign-out."
+  ],
+  "boundaries": {
+    "schemaChanged": false,
+    "deployed": false,
+    "applicationSql": false,
+    "hostedSql": false,
+    "providersChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletActions": false,
+    "fundedTrades": false,
+    "signingAuthorityAdded": false
+  }
+}

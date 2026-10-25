@@ -2,3 +2,11 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.planner :global(.funding-actions) button,
+.recovery button {
+  min-height: 44px;
+  height: auto;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
