@@ -147,6 +147,7 @@ function harness(options: {
         tokenUnitsRaw: amount / 10n,
       };
     },
+    approveRound: async () => {},
     sleep: vi.fn(async () => {}),
     onUpdate: (s) => snapshots.push(s),
     random: () => 0,
@@ -225,6 +226,91 @@ describe('market cleanup runner', () => {
       uncertainSignature: 'sig-unknown',
     });
   });
+  it('waits for each round to be approved before trading', async () => {
+    const trades: string[] = [];
+    const approvals: (() => void)[] = [];
+    const snapshots: MarketCleanupSnapshot[] = [];
+    const runner = startMarketCleanup({
+      config: { ...base, maxRounds: 2 },
+      readBalances: async (w) =>
+        w.map((wallet) => ({ wallet, tokenRaw: 100n, lamports: rich })),
+      trade: async (wallet, side, amountRaw) => {
+        trades.push(side);
+        return {
+          intentId: 'i',
+          signature: 's' + trades.length,
+          wallet,
+          side,
+          inputRaw: amountRaw.toString(),
+        };
+      },
+      awaitFinal: async (sent) => ({
+        state: 'finalized',
+        signature: sent.signature,
+        nativeChangeRaw: 10n,
+        tokenUnitsRaw: 5n,
+      }),
+      approveRound: () =>
+        new Promise<void>((resolve) => {
+          approvals.push(() => resolve());
+        }),
+      sleep: async () => {},
+      onUpdate: (s) => snapshots.push(s),
+    });
+    await vi.waitFor(() => expect(approvals).toHaveLength(1));
+    expect(trades).toEqual([]);
+    expect(snapshots.at(-1)!.awaitingApproval).toMatchObject({
+      round: 1,
+      seller: 's1',
+      amountRaw: 50n,
+    });
+    approvals[0]();
+    await vi.waitFor(() => expect(approvals).toHaveLength(2));
+    expect(trades).toEqual(['Sell', 'Buy']);
+    runner.stop();
+    await runner.done;
+    expect(trades).toEqual(['Sell', 'Buy']);
+    expect(snapshots.at(-1)!.end).toBe('stopped');
+  });
+  it('stops as uncertain when a sent trade outcome cannot be read', async () => {
+    for (const failOn of ['Sell', 'Buy'] as const) {
+      const trades: string[] = [];
+      const snapshots: MarketCleanupSnapshot[] = [];
+      const runner = startMarketCleanup({
+        config: base,
+        readBalances: async (w) =>
+          w.map((wallet) => ({ wallet, tokenRaw: 100n, lamports: rich })),
+        trade: async (wallet, side, amountRaw) => {
+          trades.push(side);
+          return {
+            intentId: 'i',
+            signature: 'sig-' + side,
+            wallet,
+            side,
+            inputRaw: amountRaw.toString(),
+          };
+        },
+        awaitFinal: async (sent) => {
+          if (sent.side === failOn) throw new TypeError('network down');
+          return {
+            state: 'finalized',
+            signature: sent.signature,
+            nativeChangeRaw: 10n,
+            tokenUnitsRaw: 5n,
+          };
+        },
+        approveRound: async () => {},
+        sleep: async () => {},
+        onUpdate: (s) => snapshots.push(s),
+      });
+      await runner.done;
+      expect(snapshots.at(-1)).toMatchObject({
+        end: 'uncertain',
+        uncertainSignature: 'sig-' + failOn,
+      });
+      expect(trades).toEqual(failOn === 'Sell' ? ['Sell'] : ['Sell', 'Buy']);
+    }
+  });
   it('stops cleanly and reports a sent trade still waiting to finalize', async () => {
     let release!: () => void;
     const snapshots: MarketCleanupSnapshot[] = [];
@@ -244,6 +330,7 @@ describe('market cleanup runner', () => {
           release = () => reject(new Error('stopped'));
           signal.addEventListener('abort', () => release());
         }),
+      approveRound: async () => {},
       sleep: async () => {},
       onUpdate: (s) => snapshots.push(s),
     });

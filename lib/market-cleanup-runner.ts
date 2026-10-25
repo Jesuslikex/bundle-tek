@@ -29,7 +29,14 @@ export type MarketCleanupEnd =
   | 'stopped'
   | 'uncertain'
   | 'failed';
+export type MarketCleanupRoundApproval = {
+  round: number;
+  seller: string;
+  amountRaw: bigint;
+};
 export type MarketCleanupSnapshot = {
+  /** The round waiting for the user's approval, if any. */
+  awaitingApproval: MarketCleanupRoundApproval | null;
   running: boolean;
   round: number;
   soldRaw: bigint;
@@ -59,6 +66,14 @@ export type MarketCleanupRunnerDeps = {
     signal: AbortSignal,
   ) => Promise<CleanupFinalOutcome>;
   sleep: (ms: number, signal: AbortSignal) => Promise<void>;
+  /**
+   * Resolves once the user approves this round's sell and the buy back with
+   * its proceeds. Every round needs its own approval; nothing is signed first.
+   */
+  approveRound: (
+    round: MarketCleanupRoundApproval,
+    signal: AbortSignal,
+  ) => Promise<void>;
   onUpdate: (snapshot: MarketCleanupSnapshot) => void;
   random?: () => number;
   now?: () => number;
@@ -86,6 +101,7 @@ export function startMarketCleanup(deps: MarketCleanupRunnerDeps) {
   const signal = controller.signal;
   const snapshot: MarketCleanupSnapshot = {
     running: true,
+    awaitingApproval: null,
     round: 0,
     soldRaw: 0n,
     boughtRaw: 0n,
@@ -110,6 +126,7 @@ export function startMarketCleanup(deps: MarketCleanupRunnerDeps) {
   };
   const finish = (end: MarketCleanupEnd, message: string) => {
     snapshot.running = false;
+    snapshot.awaitingApproval = null;
     snapshot.end = end;
     log({ kind: 'end', message });
     emit();
@@ -139,6 +156,24 @@ export function startMarketCleanup(deps: MarketCleanupRunnerDeps) {
           config,
           random,
         );
+        snapshot.awaitingApproval = {
+          round: snapshot.round,
+          seller,
+          amountRaw: amount,
+        };
+        emit();
+        // Stop also ends a wait for approval.
+        await new Promise<void>((resolve, reject) => {
+          const onAbort = () => reject(signal.reason);
+          if (signal.aborted) return onAbort();
+          signal.addEventListener('abort', onAbort, { once: true });
+          deps
+            .approveRound(snapshot.awaitingApproval!, signal)
+            .then(resolve, reject)
+            .finally(() => signal.removeEventListener('abort', onAbort));
+        });
+        snapshot.awaitingApproval = null;
+        emit();
         let proceeds: bigint;
         try {
           const sale = await deps.trade(seller, 'Sell', amount, signal);
@@ -180,6 +215,15 @@ export function startMarketCleanup(deps: MarketCleanupRunnerDeps) {
             );
           }
           if (signal.aborted) throw error;
+          // A sent trade whose finalized outcome could not be read may have
+          // landed: stop instead of counting it as a failure.
+          if (pending) {
+            snapshot.uncertainSignature = pending.signature;
+            return finish(
+              'uncertain',
+              `Could not confirm ${pending.signature}; check it before trading that wallet again.`,
+            );
+          }
           log({
             kind: 'error',
             wallet: seller,
@@ -262,6 +306,15 @@ export function startMarketCleanup(deps: MarketCleanupRunnerDeps) {
             );
           }
           if (signal.aborted) throw error;
+          // A sent trade whose finalized outcome could not be read may have
+          // landed: stop instead of counting it as a failure.
+          if (pending) {
+            snapshot.uncertainSignature = pending.signature;
+            return finish(
+              'uncertain',
+              `Could not confirm ${pending.signature}; check it before trading that wallet again.`,
+            );
+          }
           log({
             kind: 'error',
             wallet: buyer,
@@ -281,12 +334,14 @@ export function startMarketCleanup(deps: MarketCleanupRunnerDeps) {
       }
       finish('max-rounds', `Finished ${config.maxRounds} rounds.`);
     } catch (error) {
-      if (pending) snapshot.uncertainSignature = pending.signature;
+      // Set inside the loop; an abort can arrive while a sent trade waits.
+      const sent = pending as CleanupTradeResult | null;
+      if (sent) snapshot.uncertainSignature = sent.signature;
       if (signal.aborted)
         finish(
           'stopped',
-          pending
-            ? `Stopped. Trade ${pending.signature} was already sent; check its outcome before trading that wallet again.`
+          sent
+            ? `Stopped. Trade ${sent.signature} was already sent; check its outcome before trading that wallet again.`
             : 'Stopped. No new trade starts.',
         );
       else

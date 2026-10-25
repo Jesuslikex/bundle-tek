@@ -121,6 +121,7 @@ export function MarketCleanupPanel({
   const [busy, setBusy] = useState(false);
   const vault = useRef<VaultSession | null>(null);
   const run = useRef<ReturnType<typeof startMarketCleanup> | null>(null);
+  const approve = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
       run.current?.stop();
@@ -235,6 +236,10 @@ export function MarketCleanupPanel({
           ),
         awaitFinal: executor.awaitFinal,
         sleep: abortableSleep,
+        approveRound: () =>
+          new Promise<void>((resolve) => {
+            approve.current = resolve;
+          }),
         onUpdate: (next) => {
           setSnapshot(next);
           if (next.balances.length) setBalances(next.balances);
@@ -433,9 +438,8 @@ export function MarketCleanupPanel({
               disabled={disabled || !!configError}
               onChange={(e) => setConsent(e.target.checked)}
             />{' '}
-            I approve Cleanup to sign and send each round&apos;s sell and buy
-            from these wallets with my unlocked vault while this tab stays open,
-            until it stops.
+            Keep my vault unlocked in this tab for this Cleanup. Nothing is
+            signed until I approve each round below.
           </label>
           <label htmlFor={field + '-pass'}>
             Wallet vault passphrase
@@ -456,6 +460,30 @@ export function MarketCleanupPanel({
             Start Cleanup
           </Button>
         </>
+      )}
+      {running && snapshot?.awaitingApproval && (
+        <fieldset aria-label="Approve round">
+          <p>
+            Round {snapshot.awaitingApproval.round}: sell{' '}
+            {formatNativeBalance(
+              snapshot.awaitingApproval.amountRaw.toString(),
+              token.decimals,
+            )}{' '}
+            {token.symbol} from {short(snapshot.awaitingApproval.seller)}, then
+            buy it back into an output wallet with exactly the SOL that sale
+            returns.
+          </p>
+          <Button
+            type="button"
+            onClick={() => {
+              const resolve = approve.current;
+              approve.current = null;
+              resolve?.();
+            }}
+          >
+            Approve and sign round {snapshot.awaitingApproval.round}
+          </Button>
+        </fieldset>
       )}
       {running && (
         <Button
