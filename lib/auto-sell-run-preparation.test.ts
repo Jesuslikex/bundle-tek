@@ -29,6 +29,17 @@ import {
   swapPreparationSummary,
 } from './imported-swap-preparation-history';
 
+const recoveryAuth = vi.hoisted(() => ({
+  owner: null as string | null,
+  db: null as unknown as D1Database,
+}));
+vi.mock('@/app/chatgpt-auth', () => ({
+  getChatGPTUser: async () =>
+    recoveryAuth.owner ? { userId: recoveryAuth.owner } : null,
+}));
+vi.mock('@/db', () => ({ getD1: () => recoveryAuth.db }));
+import { GET as recoverAutoSellRunPacket } from '../app/api/imported-projects/auto-sell-run-recovery/route';
+
 const mocks = vi.hoisted(() => ({
   balance: vi.fn(),
   prepare: vi.fn(),
@@ -92,6 +103,213 @@ async function stop() {
 }
 const prepare = (body?: unknown) =>
   prepareOwnedAutoSellRunAttempt(request(body), owner, db, run.id, attempt.id);
+const recover = () =>
+  recoverAutoSellRunPacket(
+    new Request(
+      'https://bundle.test/api/imported-projects/auto-sell-run-recovery?' +
+        new URLSearchParams({ runId: run.id, attemptId: attempt.id }),
+    ),
+  );
+
+it('returns the same original journal summary and context if an internal caller mutates its objects while awaiting storage', async () => {
+  const guard = await startOwnedAutoSellPreparation(
+    db,
+    owner,
+    run.id,
+    attempt.id,
+    signal(),
+  );
+  const document = swapPreparationSummary(
+    fixture.order,
+    fixture.simulation,
+    balance as unknown as Parameters<typeof swapPreparationSummary>[2],
+  );
+  const original = structuredClone(document);
+  const context = {
+    projectId: guard.projectId,
+    projectRevision: guard.projectRevision,
+    wallet: guard.wallet,
+    walletRevision: guard.walletRevision,
+  };
+  const pending = saveSwapPreparation(
+    db,
+    owner,
+    context,
+    document,
+    undefined,
+    undefined,
+    undefined,
+    guard,
+    fixture.order.preparation.transaction,
+  );
+  context.projectId = crypto.randomUUID();
+  context.projectRevision = 999;
+  context.walletRevision = 999;
+  document.inAmountRaw = '999';
+  document.transaction.sha256 = 'f'.repeat(64);
+  const saved = await pending;
+  expect(saved).toMatchObject({
+    id: attempt.preparationId,
+    projectId: guard.projectId,
+    projectRevision: guard.projectRevision,
+    walletRevision: guard.walletRevision,
+    document: original,
+  });
+  expect((await recover()).status).toBe(200);
+});
+
+it('recovers the original packet after a lost response without another provider call', async () => {
+  const originalBatch = db.batch.bind(db);
+  let injected = false;
+  const spy = vi.spyOn(db, 'batch').mockImplementation(async (statements) => {
+    if (statements.length === 2 && !injected) {
+      injected = true;
+      await originalBatch(statements);
+      throw Error('Synthetic response lost after atomic commit');
+    }
+    return originalBatch(statements);
+  });
+  try {
+    const lost = await prepare();
+    expect(lost.status).toBe(502);
+    expect(await lost.json()).toMatchObject({
+      error: expect.stringContaining('Recover this exact attempt'),
+    });
+  } finally {
+    spy.mockRestore();
+  }
+  expect(injected).toBe(true);
+  const response = await recover();
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as {
+    summary: { id: string };
+    packet: unknown;
+  };
+  expect(body).toMatchObject({
+    status: 'retained',
+    signingAllowed: false,
+    executionAllowed: false,
+    automaticResumeAllowed: false,
+    allowanceReleased: false,
+  });
+  expect(body.summary.id).toBe(attempt.preparationId);
+  expect(JSON.stringify(body.packet)).toContain(
+    fixture.order.preparation.transaction,
+  );
+  expect((await prepare()).status).toBe(409);
+  expect(mocks.balance).toHaveBeenCalledTimes(1);
+  expect(mocks.prepare).toHaveBeenCalledTimes(1);
+  expect(mocks.simulate).toHaveBeenCalledTimes(1);
+  expect(await count('imported_swap_preparations')).toBe(1);
+  expect(await count('auto_sell_run_packets')).toBe(1);
+  expect(await count('imported_swap_signing_intents')).toBe(0);
+});
+
+it('keeps the charged unknown start when atomic publication fails', async () => {
+  const originalBatch = db.batch.bind(db);
+  let injected = false;
+  const spy = vi.spyOn(db, 'batch').mockImplementation(async (statements) => {
+    if (statements.length === 2 && !injected) {
+      injected = true;
+      return originalBatch([
+        statements[0],
+        db.prepare(
+          'INSERT INTO nonexistent_auto_sell_packet_test_table VALUES(1)',
+        ),
+      ]);
+    }
+    return originalBatch(statements);
+  });
+  try {
+    expect((await prepare()).status).toBe(502);
+  } finally {
+    spy.mockRestore();
+  }
+  expect(injected).toBe(true);
+  expect(await count('auto_sell_run_preparation_starts')).toBe(1);
+  expect(await count('imported_swap_preparations')).toBe(0);
+  expect(await count('auto_sell_run_packets')).toBe(0);
+  const response = await recover();
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    status: 'started-without-result',
+    allowanceReleased: false,
+    signingAllowed: false,
+  });
+  expect((await prepare()).status).toBe(409);
+  expect(mocks.balance).toHaveBeenCalledTimes(1);
+});
+
+it('refuses packet storage drift before rate gates, starts or provider work', async () => {
+  const trigger = (
+    await client.execute(
+      "SELECT name,sql FROM sqlite_master WHERE type='trigger' AND tbl_name='auto_sell_run_packets' ORDER BY name LIMIT 1",
+    )
+  ).rows[0];
+  expect(trigger).toBeDefined();
+  const name = trigger.name;
+  const sql = trigger.sql;
+  if (typeof name !== 'string' || typeof sql !== 'string')
+    throw Error('Missing synthetic packet trigger source');
+  expect(name).toMatch(/^[a-z_]+$/);
+  await client.execute('DROP TRIGGER ' + name);
+  try {
+    expect((await prepare()).status).toBe(503);
+    expect(await count('auto_sell_run_preparation_starts')).toBe(0);
+    expect(await count('imported_token_project_gates')).toBe(0);
+    expect(await count('wallet_balance_gates')).toBe(0);
+    expect(mocks.balance).not.toHaveBeenCalled();
+  } finally {
+    await client.execute(sql);
+  }
+});
+
+it('never publishes a summary when the packet differs from its original hash', async () => {
+  const other = await nativeWarmupFixture({
+    side: 'Sell',
+    existing: true,
+    v2: true,
+    tokenRaw: 1001n,
+  });
+  mocks.prepare.mockResolvedValueOnce({
+    ...fixture.order,
+    preparation: {
+      ...fixture.order.preparation,
+      transaction: other.order.preparation.transaction,
+    },
+  });
+  expect((await prepare()).status).toBe(502);
+  expect(await count('auto_sell_run_preparation_starts')).toBe(1);
+  expect(await count('imported_swap_preparations')).toBe(0);
+  expect(await count('auto_sell_run_packets')).toBe(0);
+});
+
+it('reads the original packet after Stop and source drift without renewing it', async () => {
+  expect((await prepare()).status).toBe(200);
+  await stop();
+  await client.execute({
+    sql: 'UPDATE imported_token_projects SET archived=1,revision=2 WHERE owner_id=?',
+    args: [owner],
+  });
+  await client.execute({
+    sql: 'UPDATE workspace_wallets SET archived=1,revision=2 WHERE owner_id=?',
+    args: [owner],
+  });
+  const response = await recover();
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toMatchObject({
+    status: 'retained',
+    signingAllowed: false,
+    executionAllowed: false,
+    automaticResumeAllowed: false,
+    allowanceReleased: false,
+  });
+  expect(JSON.stringify(body)).toContain(fixture.order.preparation.transaction);
+  expect((await prepare()).status).toBe(409);
+  expect(mocks.balance).toHaveBeenCalledTimes(1);
+  expect(await count('imported_swap_signing_intents')).toBe(0);
+});
 beforeAll(async () => {
   client = createClient({ url: ':memory:' });
   db = createTursoDatabase(client);
@@ -112,6 +330,8 @@ afterEach(() => {
 beforeEach(async () => {
   vi.clearAllMocks();
   owner = 'unsigned-adapter-' + crypto.randomUUID();
+  recoveryAuth.owner = owner;
+  recoveryAuth.db = db;
   fixture = await nativeWarmupFixture({
     side: 'Sell',
     existing: true,

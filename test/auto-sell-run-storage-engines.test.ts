@@ -739,8 +739,8 @@ async function exerciseUnfinishedPreparationSerialization(db: D1Database) {
   expect(held.accounting.sequence).toBe(2);
   expect(held.accounting.accountedRaw).toBe('20');
   expect(held.preparationStarts).toHaveLength(1);
-  // This deliberately synthetic summary exercises the actual writer's source
-  // association only. It is not route, runtime or instruction qualification.
+  // The old 0153-only fixture retains SQL association coverage. The current
+  // writer requires original packet bytes and must refuse this old projection.
   const document = {
     executionAllowed: false,
     instructionsVerified: false,
@@ -753,22 +753,46 @@ async function exerciseUnfinishedPreparationSerialization(db: D1Database) {
     transaction: { sha256: 'c'.repeat(64) },
     expiresAt: new Date(Date.now() + 60000).toISOString(),
   } as unknown as SwapPreparationSummary;
-  const saved = await saveSwapPreparation(
-    db,
-    f.owner,
-    {
-      projectId: f.projectId,
-      projectRevision: 1,
-      wallet: f.wallet,
-      walletRevision: 1,
-    },
-    document,
-    undefined,
-    undefined,
-    undefined,
-    guard,
-  );
-  expect(saved?.id).toBe(a.preparationId);
+  await expect(
+    saveSwapPreparation(
+      db,
+      f.owner,
+      {
+        projectId: f.projectId,
+        projectRevision: 1,
+        wallet: f.wallet,
+        walletRevision: 1,
+      },
+      document,
+      undefined,
+      undefined,
+      undefined,
+      guard,
+    ),
+  ).rejects.toThrow();
+  expect(
+    await db
+      .prepare('SELECT id FROM imported_swap_preparations WHERE id=?')
+      .bind(a.preparationId)
+      .first(),
+  ).toBeNull();
+  // Simulate a historical pre-0154 summary with the unchanged 0153 guards.
+  // Exact packet atomicity is covered separately by the new packet engines.
+  await db
+    .prepare(
+      'INSERT INTO imported_swap_preparations(id,owner_id,project_id,project_revision,wallet_address,wallet_revision,document,created_at) VALUES(?,?,?,?,?,?,?,?)',
+    )
+    .bind(
+      a.preparationId,
+      f.owner,
+      f.projectId,
+      1,
+      f.wallet,
+      1,
+      JSON.stringify(document),
+      new Date().toISOString(),
+    )
+    .run();
   const c = await reserveOwnedAutoSellAttempt(db, f.owner, next, signal());
   expect(c.sequence).toBe(3);
   const secondGuard = await startOwnedAutoSellPreparation(

@@ -22,6 +22,8 @@ import {
   importedAcquisitionWriteGuard,
   type ImportedAcquisitionGuard,
 } from './imported-acquisition-server';
+import { prepareAutoSellRunPacketWrite } from './auto-sell-run-packet-storage';
+import { readAutoSellRunPacketSummary } from './auto-sell-run-packet';
 const uint = (value: string) => {
   if (
     typeof value !== 'string' ||
@@ -173,7 +175,11 @@ export async function saveSwapPreparation(
   conditionalGuard?: ConditionalPreparationGuard,
   sessionGuard?: TradeSessionGuard,
   autoSellRunGuard?: AutoSellRunPreparationGuard,
+  autoSellRunTransaction?: string,
 ) {
+  // Journal recovery must return exactly the same detached summary that is
+  // hashed and stored, even if an internal caller mutates its original object.
+  if (autoSellRunGuard) document = readAutoSellRunPacketSummary(document);
   if (document.conditional)
     requireConditionalSwapContext(document.conditional, {
       side: document.side,
@@ -181,6 +187,10 @@ export async function saveSwapPreparation(
       outputMint: document.outputMint,
       inputRaw: document.inAmountRaw,
     });
+  if (!autoSellRunGuard && autoSellRunTransaction !== undefined)
+    throw new Error(
+      'Only an original journal guard can retain an Auto Sell packet.',
+    );
   const text = JSON.stringify(document);
   if (
     text.length > 8192 ||
@@ -201,6 +211,13 @@ export async function saveSwapPreparation(
   const journalGuard = autoSellRunGuard
     ? autoSellPreparationWriteGuard(owner, autoSellRunGuard, context, document)
     : undefined;
+  const savedContext = autoSellRunGuard
+    ? {
+        projectId: autoSellRunGuard.projectId,
+        projectRevision: autoSellRunGuard.projectRevision,
+        walletRevision: autoSellRunGuard.walletRevision,
+      }
+    : context;
   const id = journalGuard?.preparationId ?? crypto.randomUUID(),
     createdAt = new Date().toISOString();
   const sourceGuard = importedAcquisitionWriteGuard(owner, acquisitionGuard);
@@ -210,7 +227,7 @@ export async function saveSwapPreparation(
     conditionalGuard,
   );
   const sessionWrite = tradeSessionWriteGuard(owner, sessionGuard);
-  const write = await db
+  const preparationStatement = db
     .prepare(`INSERT INTO imported_swap_preparations
     (id,owner_id,project_id,project_revision,wallet_address,wallet_revision,document,created_at)
     SELECT ?,?,?,?,?,?,?,? WHERE
@@ -242,14 +259,27 @@ export async function saveSwapPreparation(
       ...conditionGuard.bindings,
       ...sessionWrite.bindings,
       ...(journalGuard?.bindings ?? []),
-    )
-    .run();
+    );
+  const write = autoSellRunGuard
+    ? await (
+        await prepareAutoSellRunPacketWrite(
+          db,
+          preparationStatement,
+          owner,
+          id,
+          text,
+          autoSellRunTransaction,
+          document,
+          autoSellRunGuard,
+        )
+      )()
+    : await preparationStatement.run();
   if (!write.meta.changes) return null;
   return {
     id,
-    projectId: context.projectId,
-    projectRevision: context.projectRevision,
-    walletRevision: context.walletRevision,
+    projectId: savedContext.projectId,
+    projectRevision: savedContext.projectRevision,
+    walletRevision: savedContext.walletRevision,
     document,
     createdAt,
   } satisfies SavedSwapPreparation;

@@ -40,6 +40,7 @@ import {
   requireAutoSellRunPreparationGuard,
   type AutoSellRunPreparationGuard,
 } from '@/lib/auto-sell-run-storage';
+import { autoSellRunPacketWriteReady } from '@/lib/auto-sell-run-packet-storage';
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const startedAutoSellGuards = new WeakSet<AutoSellRunPreparationGuard>();
@@ -319,6 +320,19 @@ export async function prepareOwnedImportedSwap(
         { error: 'Swap preparation service is not configured.' },
         503,
       );
+    if (startAutoSellRunPreparation) {
+      try {
+        await autoSellRunPacketWriteReady(db, request.signal);
+      } catch {
+        return json(
+          {
+            error:
+              'Auto Sell exact-packet recovery storage is unavailable. No provider work was started.',
+          },
+          request.signal.aborted ? 408 : 503,
+        );
+      }
+    }
     const retained = await db
       .prepare(
         'SELECT COUNT(*) AS count FROM imported_swap_preparations WHERE owner_id=? AND project_id=?',
@@ -478,6 +492,12 @@ export async function prepareOwnedImportedSwap(
       },
       {
         ...swapPreparationSummary(order, simulation, balance),
+        ...(autoSellRunGuard
+          ? {
+              limitations:
+                'Saved unsigned Auto Sell summary and exact original packet, retained atomically. Historical simulation is not finalized execution or profit. Recovery does not refresh expiry, release allowance or enable signing, submission or automatic resume.',
+            }
+          : {}),
         ...(acquisition ? { acquisition: acquisition.selection } : {}),
         ...(conditional ? { conditional: conditional.selection } : {}),
         ...(session ? { session: session.selection } : {}),
@@ -486,6 +506,7 @@ export async function prepareOwnedImportedSwap(
       conditional,
       session,
       autoSellRunGuard,
+      autoSellRunGuard ? order.preparation.transaction : undefined,
     );
     if (!history)
       return json(
@@ -516,6 +537,14 @@ export async function prepareOwnedImportedSwap(
       reviewWaitMs: Math.min(15000, Math.max(0, now + 15000 - Date.now())),
     });
   } catch {
+    if (autoSellRunGuard)
+      return json(
+        {
+          error:
+            'The original unsigned Auto Sell preparation result is unconfirmed. Recover this exact attempt; do not start another attempt. Its allowance stays charged. Signing and submission remain disabled.',
+        },
+        502,
+      );
     return json(
       {
         error:
