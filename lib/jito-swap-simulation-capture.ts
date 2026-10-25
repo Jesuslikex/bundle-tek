@@ -7,6 +7,7 @@ import { getSolanaIndexerRpcEndpoint } from './solana-rpc';
 import { readJitoSimulationPayload } from './jito-simulation-json';
 import { snapshotJitoEvidence, jitoEvidenceSha256 } from './jito-evidence-json';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
+import { createJitoRetainedRpcReplay } from './jito-retained-rpc-replay';
 
 type Read = {
   requestBody: string;
@@ -270,34 +271,23 @@ export async function replayJitoSwapSimulation(
       )) !== saved.reads[i].requestSha256
     )
       return fail();
-  let next = 0;
-  const replay: typeof fetch = async (target, init) => {
-    signal.throwIfAborted();
-    const r = saved.reads[next++];
-    if (
-      !r ||
-      typeof target !== 'string' ||
-      target !== saved.endpoint ||
-      init?.body !== r.requestBody
-    )
-      return fail();
-    return new Response(Uint8Array.from(r.rawBody), { status: 200 });
-  };
+  const replay = createJitoRetainedRpcReplay(
+    saved.endpoint,
+    saved.reads,
+    signal,
+  );
   const reproduced = await simulateImportedSwap(
     snapshotJitoEvidence(saved.order),
     signal,
-    replay,
+    replay.fetcher,
     true,
   );
   const stable = (v: ImportedSwapSimulation) => {
     const { observedAt: _time, ...rest } = snapshotJitoEvidence(v);
     return JSON.stringify(rest);
   };
-  if (
-    next !== saved.reads.length ||
-    stable(reproduced) !== stable(saved.simulation)
-  )
-    return fail();
+  replay.assertComplete();
+  if (stable(reproduced) !== stable(saved.simulation)) return fail();
   await requireWarmupSigningReview(saved.order, reproduced);
   signal.throwIfAborted();
   return {

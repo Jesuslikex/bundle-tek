@@ -1,6 +1,7 @@
 import type { LaunchChain } from './launch-plan';
 import { getSolanaRpcEndpoint } from './solana-rpc';
 import { paceWalletRpc } from './wallet-rpc-pacing';
+import { isJitoRetainedRpcReplay } from './jito-retained-rpc-replay';
 import { walletAddress, walletChain } from './wallet-workspace';
 import {
   formatNativeBalance,
@@ -61,7 +62,8 @@ export async function balanceRpc(
     maxResponseBytes > 2097152
   )
     throw new Error('Invalid RPC response bound.');
-  if (!/^(eth_|net_|web3_)/.test(method)) await paceWalletRpc(endpoint, signal);
+  if (!/^(eth_|net_|web3_)/.test(method) && !isJitoRetainedRpcReplay(fetcher))
+    await paceWalletRpc(endpoint, signal);
   const response = await fetcher(endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

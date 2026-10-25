@@ -1,0 +1,557 @@
+{
+  "sourceBaseCommit": "fb0b44e8a0580797aab4bdde1aa800a455abbce8",
+  "scope": "closed local retained replay only; real provider pacing unchanged",
+  "ownedSource": [
+    {
+      "path": "lib/jito-retained-rpc-replay.ts",
+      "sha256": "315321e2d025fea0089fecede50bfa20ce25625d3250bca5420c2cc38d295b65"
+    },
+    {
+      "path": "lib/jito-retained-rpc-replay.test.ts",
+      "sha256": "d7427d986ff74e727571283f03e9d6b2fb2bcfd374d91da7e6c067d98ccffb68"
+    },
+    {
+      "path": "lib/wallet-balances.ts",
+      "sha256": "ee41af7318f0bbadca099d097e88b74dd7011f6ebaa47a16b4130422b6230455"
+    },
+    {
+      "path": "lib/jito-swap-simulation-capture.ts",
+      "sha256": "2d91d9047dd9d81a6e311820edb0163fab054485f207912f1c67be432cf9dde8"
+    },
+    {
+      "path": "lib/jito-swap-simulation-capture.test.ts",
+      "sha256": "79f59e7303cde4afa032707ebf761a83f524b450c2e4b83f8e58959676cb35f3"
+    }
+  ],
+  "unchanged": [
+    "lib/wallet-rpc-pacing.ts",
+    "lib/imported-swap-simulation.ts",
+    "lib/warmup-signing.ts",
+    "lib/pair-trusted-programs.ts",
+    "lib/pump-group-code-identity.ts",
+    "lib/jito-readonly-qualification.ts",
+    "lib/jito-runtime-evidence.ts",
+    "app/page.tsx",
+    "vercel.json"
+  ],
+  "walletDiff": "offline factory import and pacing predicate only; response parser identical",
+  "liveCaptureBody": "printer-identical",
+  "tests": {
+    "files": 40,
+    "passed": 888,
+    "nativeHarness": 19
+  },
+  "typecheck": "pass",
+  "typedLint": "pass",
+  "format": "pass",
+  "review": {
+    "startedAt": "2026-10-25T14:44:12.373Z",
+    "finishedAt": "2026-10-25T14:45:46.001Z",
+    "uncommittedOverlay": true,
+    "sourceBaseCommit": "fb0b44e8a0580797aab4bdde1aa800a455abbce8",
+    "requestedModel": "claude-opus-5-5",
+    "selectedModels": ["claude-opus-5-5"],
+    "modelsUsed": ["claude-opus-5-5"],
+    "tools": ["Glob", "Grep", "Read"],
+    "status": {
+      "code": 0,
+      "signal": null
+    },
+    "timedOut": false,
+    "spawnError": null,
+    "permissionDenials": 0,
+    "resultSubtype": "success",
+    "isError": false,
+    "totalCostUsd": 0.4794424,
+    "sourceUnchanged": true,
+    "changed": []
+  },
+  "reviewFinalFollowups": "byte-copy hardening and real-pacer controlled-clock test verified independently, not rereviewed",
+  "preFixSample": {
+    "startedAt": "2026-10-25T14:38:43.763Z",
+    "sourceBaseCommit": "fb0b44e8a0580797aab4bdde1aa800a455abbce8",
+    "plannedAttempts": 1,
+    "side": "Buy",
+    "inputLamports": "1000000",
+    "tipLamports": "1000",
+    "publicReferenceOnly": true,
+    "signaturesCreated": 0,
+    "broadcasts": 0,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "deploy": false,
+    "providerSettingsChanged": false,
+    "finishedAt": "2026-10-25T14:39:03.058Z",
+    "status": "refused",
+    "stage": "runtime-before",
+    "minimumSlot": 461294213,
+    "maximumSlot": 461294246,
+    "httpRequests": 26,
+    "rateLimited": false,
+    "fullProviderQualification": false,
+    "outerTiming": {
+      "clock": "process-monotonic",
+      "originMs": 143.0909,
+      "diagnosticOnly": true,
+      "phases": [
+        {
+          "phase": "compile",
+          "atMs": 0.02389999999999759
+        },
+        {
+          "phase": "unsigned-order",
+          "atMs": 11201.4773
+        },
+        {
+          "phase": "full-baseline",
+          "atMs": 11622.526600000001
+        },
+        {
+          "phase": "tip-read",
+          "atMs": 13663.065100000002
+        },
+        {
+          "phase": "full-qualification",
+          "atMs": 14040.744700000001
+        },
+        {
+          "phase": "collector-terminal",
+          "atMs": 19248.6679
+        }
+      ]
+    },
+    "collectorTiming": {
+      "clock": "process-monotonic",
+      "originMs": 14185.0782,
+      "diagnosticOnly": true,
+      "originalMinimumSlot": 461294213,
+      "maximumCapturedContextSlot": 461294246,
+      "contextSlotsAdmitted": false,
+      "events": [
+        {
+          "phase": "collector",
+          "event": "begin",
+          "atMs": 0.06860000000051514
+        },
+        {
+          "phase": "manifest-validation",
+          "event": "begin",
+          "atMs": 0.40200000000004366
+        },
+        {
+          "phase": "manifest-validation",
+          "event": "finish",
+          "atMs": 1.7109000000000378
+        },
+        {
+          "phase": "baseline-replay",
+          "event": "begin",
+          "atMs": 1.7167000000008557
+        },
+        {
+          "phase": "baseline-replay",
+          "event": "finish",
+          "atMs": 1904.5319999999992
+        },
+        {
+          "phase": "network",
+          "event": "begin",
+          "atMs": 1905.1841999999997
+        },
+        {
+          "phase": "network",
+          "event": "finish",
+          "atMs": 2184.570100000001
+        },
+        {
+          "phase": "lookup-before",
+          "event": "begin",
+          "atMs": 2184.5748999999996
+        },
+        {
+          "phase": "lookup-before",
+          "event": "finish",
+          "atMs": 2359.5734999999986
+        },
+        {
+          "phase": "packet-scope",
+          "event": "begin",
+          "atMs": 2359.5934000000016
+        },
+        {
+          "phase": "packet-scope",
+          "event": "finish",
+          "atMs": 2367.8207
+        },
+        {
+          "phase": "assets-before",
+          "event": "begin",
+          "atMs": 2367.8653000000013
+        },
+        {
+          "phase": "runtime-before",
+          "event": "begin",
+          "atMs": 2368.2559
+        },
+        {
+          "phase": "assets-before",
+          "event": "finish",
+          "atMs": 2502.097600000001
+        },
+        {
+          "phase": "runtime-before",
+          "event": "refused",
+          "atMs": 5180.548900000002
+        },
+        {
+          "phase": "collector",
+          "event": "refused",
+          "atMs": 5180.8236
+        }
+      ]
+    },
+    "http": [
+      {
+        "i": 0,
+        "stage": "unsigned-order",
+        "methods": ["Jupiter unsigned order"],
+        "startedMs": 11203.3217,
+        "responseAvailableMs": 11594.349600000001,
+        "bodyCapturedMs": 11606.5486,
+        "contextSlots": [],
+        "bytes": 3667,
+        "httpStatus": 200
+      },
+      {
+        "i": 1,
+        "stage": "full-baseline",
+        "methods": ["getGenesisHash"],
+        "startedMs": 11630.4683,
+        "responseAvailableMs": 11917.676500000001,
+        "bodyCapturedMs": 11919.3102,
+        "contextSlots": [],
+        "bytes": 80,
+        "httpStatus": 200
+      },
+      {
+        "i": 2,
+        "stage": "full-baseline",
+        "methods": ["getBlockHeight"],
+        "startedMs": 11920.8376,
+        "responseAvailableMs": 12022.9107,
+        "bodyCapturedMs": 12024.1947,
+        "contextSlots": [],
+        "bytes": 44,
+        "httpStatus": 200
+      },
+      {
+        "i": 3,
+        "stage": "full-baseline",
+        "methods": ["getFeeForMessage"],
+        "startedMs": 12133.250100000001,
+        "responseAvailableMs": 12243.077500000001,
+        "bodyCapturedMs": 12244.640300000001,
+        "contextSlots": ["461294213"],
+        "bytes": 100,
+        "httpStatus": 200
+      },
+      {
+        "i": 4,
+        "stage": "full-baseline",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 12334.054600000001,
+        "responseAvailableMs": 12434.087300000001,
+        "bodyCapturedMs": 12480.459700000001,
+        "contextSlots": ["461294213"],
+        "bytes": 50661,
+        "httpStatus": 200
+      },
+      {
+        "i": 5,
+        "stage": "full-baseline",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 12531.1376,
+        "responseAvailableMs": 12632.8317,
+        "bodyCapturedMs": 12634.062600000001,
+        "contextSlots": ["461294215"],
+        "bytes": 488,
+        "httpStatus": 200
+      },
+      {
+        "i": 6,
+        "stage": "full-baseline",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 12729.8556,
+        "responseAvailableMs": 12828.970700000002,
+        "bodyCapturedMs": 12831.092900000001,
+        "contextSlots": ["461294215"],
+        "bytes": 656,
+        "httpStatus": 200
+      },
+      {
+        "i": 7,
+        "stage": "full-baseline",
+        "methods": ["getMinimumBalanceForRentExemption"],
+        "startedMs": 12927.108600000001,
+        "responseAvailableMs": 13028.2173,
+        "bodyCapturedMs": 13029.3237,
+        "contextSlots": [],
+        "bytes": 42,
+        "httpStatus": 200
+      },
+      {
+        "i": 8,
+        "stage": "full-baseline",
+        "methods": ["simulateTransaction"],
+        "startedMs": 13127.775500000002,
+        "responseAvailableMs": 13307.9495,
+        "bodyCapturedMs": 13320.871700000002,
+        "contextSlots": ["461294216"],
+        "bytes": 17539,
+        "httpStatus": 200
+      },
+      {
+        "i": 9,
+        "stage": "full-baseline",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 13323.252600000002,
+        "responseAvailableMs": 13397.76,
+        "bodyCapturedMs": 13439.3644,
+        "contextSlots": ["461294219"],
+        "bytes": 50661,
+        "httpStatus": 200
+      },
+      {
+        "i": 10,
+        "stage": "full-baseline",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 13537.7104,
+        "responseAvailableMs": 13644.845200000002,
+        "bodyCapturedMs": 13646.135100000001,
+        "contextSlots": ["461294220"],
+        "bytes": 656,
+        "httpStatus": 200
+      },
+      {
+        "i": 11,
+        "stage": "tip-read",
+        "methods": ["getFeeForMessage"],
+        "startedMs": 13735.680400000001,
+        "responseAvailableMs": 13832.741,
+        "bodyCapturedMs": 13834.2103,
+        "contextSlots": ["461294221"],
+        "bytes": 99,
+        "httpStatus": 200
+      },
+      {
+        "i": 12,
+        "stage": "tip-read",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 13933.4655,
+        "responseAvailableMs": 14032.5917,
+        "bodyCapturedMs": 14034.0017,
+        "contextSlots": ["461294222"],
+        "bytes": 286,
+        "httpStatus": 200
+      },
+      {
+        "i": 13,
+        "stage": "full-qualification",
+        "methods": ["getGenesisHash"],
+        "startedMs": 15948.1846,
+        "responseAvailableMs": 16224.116800000002,
+        "bodyCapturedMs": 16225.109600000002,
+        "contextSlots": [],
+        "bytes": 95,
+        "httpStatus": 200
+      },
+      {
+        "i": 14,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 16228.1697,
+        "responseAvailableMs": 16330.140600000002,
+        "bodyCapturedMs": 16393.5274,
+        "contextSlots": ["461294232"],
+        "bytes": 50668,
+        "httpStatus": 200
+      },
+      {
+        "i": 15,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 16428.819,
+        "responseAvailableMs": 16540.6908,
+        "bodyCapturedMs": 16541.799600000002,
+        "contextSlots": ["461294233"],
+        "bytes": 851,
+        "httpStatus": 200
+      },
+      {
+        "i": 16,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 16640.5511,
+        "responseAvailableMs": 16736.8973,
+        "bodyCapturedMs": 16738.7575,
+        "contextSlots": ["461294235"],
+        "bytes": 11808,
+        "httpStatus": 200
+      },
+      {
+        "i": 17,
+        "stage": "full-qualification",
+        "methods": ["getGenesisHash"],
+        "startedMs": 16840.2375,
+        "responseAvailableMs": 16952.8507,
+        "bodyCapturedMs": 16953.5587,
+        "contextSlots": [],
+        "bytes": 96,
+        "httpStatus": 200
+      },
+      {
+        "i": 18,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 17039.0652,
+        "responseAvailableMs": 17149.09,
+        "bodyCapturedMs": 17150.2219,
+        "contextSlots": ["461294236"],
+        "bytes": 1966,
+        "httpStatus": 200
+      },
+      {
+        "i": 19,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 17237.5858,
+        "responseAvailableMs": 17316.6133,
+        "bodyCapturedMs": 17318.0295,
+        "contextSlots": ["461294237"],
+        "bytes": 1698,
+        "httpStatus": 200
+      },
+      {
+        "i": 20,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 17434.894200000002,
+        "responseAvailableMs": 17531.705700000002,
+        "bodyCapturedMs": 17538.6895,
+        "contextSlots": ["461294238"],
+        "bytes": 140320,
+        "httpStatus": 200
+      },
+      {
+        "i": 21,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 17634.5361,
+        "responseAvailableMs": 17730.956000000002,
+        "bodyCapturedMs": 17912.5405,
+        "contextSlots": ["461294238"],
+        "bytes": 1325726,
+        "httpStatus": 200
+      },
+      {
+        "i": 22,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 18064.2687,
+        "responseAvailableMs": 18156.8604,
+        "bodyCapturedMs": 18220.1235,
+        "contextSlots": ["461294241"],
+        "bytes": 1377369,
+        "httpStatus": 200
+      },
+      {
+        "i": 23,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 18378.0224,
+        "responseAvailableMs": 18491.8818,
+        "bodyCapturedMs": 18606.0888,
+        "contextSlots": ["461294242"],
+        "bytes": 1377369,
+        "httpStatus": 200
+      },
+      {
+        "i": 24,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 18775.0769,
+        "responseAvailableMs": 18861.9545,
+        "bodyCapturedMs": 18944.343800000002,
+        "contextSlots": ["461294244"],
+        "bytes": 952445,
+        "httpStatus": 200
+      },
+      {
+        "i": 25,
+        "stage": "full-qualification",
+        "methods": ["getMultipleAccounts"],
+        "startedMs": 19058.0667,
+        "responseAvailableMs": 19151.2232,
+        "bodyCapturedMs": 19196.242000000002,
+        "contextSlots": ["461294246"],
+        "bytes": 1051821,
+        "httpStatus": 200
+      }
+    ]
+  },
+  "postFixSample": {
+    "startedAt": "2026-10-25T14:48:12.382Z",
+    "sourceBaseCommit": "fb0b44e8a0580797aab4bdde1aa800a455abbce8",
+    "plannedAttempts": 1,
+    "side": "Buy",
+    "inputLamports": "1000000",
+    "tipLamports": "1000",
+    "publicReferenceOnly": true,
+    "signaturesCreated": 0,
+    "broadcasts": 0,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "deploy": false,
+    "providerSettingsChanged": false,
+    "finishedAt": "2026-10-25T14:48:13.676Z",
+    "status": "refused",
+    "stage": "unsigned-order",
+    "httpRequests": 1,
+    "http429": false,
+    "reason": "bounded check or provider refused; inspect private raw captures without publishing secrets",
+    "http": [
+      {
+        "i": 0,
+        "stage": "unsigned-order",
+        "methods": ["Jupiter unsigned order"],
+        "httpStatus": 400,
+        "bytes": 83
+      }
+    ],
+    "providerMessage": "Failed to get quotes",
+    "diagnosticClassification": "quote-provider HTTP400, baseline/runtime not reached; no retry"
+  },
+  "historicalLocalMeasurement": {
+    "profile": "historical retained baseline only; controlled past clock; no provider or freshness claim",
+    "historicalClock": "2026-10-25T14:38:57.456Z",
+    "baselineReadCount": 10,
+    "localFixtureAcquisitionMs": 1824.8536,
+    "retainedReplayMs": 28.59990000000016,
+    "simulationEqual": true,
+    "networkRequests": 0,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "providerQualified": false
+  },
+  "coordination": {
+    "checkIn": "https://github.com/Jesuslikex/bundle-tek/pull/59#issuecomment-6398972086",
+    "claudeAcknowledgement": "https://github.com/Jesuslikex/bundle-tek/pull/59#issuecomment-6398976382",
+    "openCode": "previous session usage-limited; no accepted new claim or restart",
+    "protectedPrs": [57, 59, 60]
+  },
+  "providerQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "deploy": false,
+  "fundedTrades": false
+}
