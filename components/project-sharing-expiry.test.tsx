@@ -81,6 +81,7 @@ it('defaults to24h, sends selected duration and displays exact returned expiry',
     action: 'invite',
     projectId: 'shared-project',
     expiresInSeconds: 604800,
+    permissions: { editMetadata: false },
   });
   const expiresAt = '2026-11-01T00:00:00.000Z';
   await respond(1, { share: { id, token: 'A'.repeat(43), expiresAt } });

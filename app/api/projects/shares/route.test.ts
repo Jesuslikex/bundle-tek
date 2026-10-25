@@ -156,6 +156,7 @@ beforeAll(async () => {
     '0100_project_shares.sql',
     '0148_project_share_expiry.sql',
     '0150_project_share_scope.sql',
+    '0151_project_collaboration_metadata.sql',
   ])
     for (const sql of readFileSync(
       new URL('../../../../drizzle/' + file, import.meta.url),
@@ -368,6 +369,7 @@ it('filters expired members and refuses accepting an expired or exact-boundary i
         expiresAt: '2000-01-01T00:00:00.000Z',
         expired: true,
         walletScope: expect.objectContaining({ count: 0 }),
+        permissions: { editMetadata: false },
       },
     ]),
   });
@@ -513,7 +515,7 @@ it('defaults new shares to no assignments and never transports hidden structured
   };
   const text = JSON.stringify(value);
   expect(value.projects[0]).toMatchObject({
-    format: 'shared-project-scoped-v1',
+    format: 'shared-project-scoped-v2',
     readOnly: true,
     walletScope: { mode: 'none', wallets: [], unavailableCount: 0 },
   });
@@ -796,4 +798,81 @@ it('admits exactly stored checksummed EVM references without changing their addr
       },
     ],
   });
+});
+
+it.each([false, true])(
+  'retains an exact owner-selected saved-text permission (%s)',
+  async (editMetadata) => {
+    const response = await post({
+      action: 'invite',
+      projectId: 'shared-project',
+      permissions: { editMetadata },
+    });
+    expect(response.status).toBe(201);
+    const { share } = (await response.json()) as {
+      share: {
+        id: string;
+        token: string;
+        permissions: { editMetadata: boolean };
+      };
+    };
+    expect(share.permissions).toEqual({ editMetadata });
+    expect(await (await get('?projectId=shared-project')).json()).toMatchObject(
+      { shares: [{ id: share.id, permissions: { editMetadata } }] },
+    );
+    as('bob');
+    expect((await post({ action: 'accept', token: share.token })).status).toBe(
+      200,
+    );
+    expect(await (await get()).json()).toMatchObject({
+      projects: [
+        {
+          format: 'shared-project-scoped-v2',
+          permissions: { editMetadata },
+          readOnly: true,
+        },
+      ],
+    });
+    await expect(
+      mocks.db
+        .prepare('UPDATE project_shares SET metadata_edit=? WHERE id=?')
+        .bind(editMetadata ? 0 : 1, share.id)
+        .run(),
+    ).rejects.toThrow('permission is immutable');
+  },
+);
+it.each([
+  null,
+  [],
+  {},
+  { editMetadata: 1 },
+  { editMetadata: 'true' },
+  { editMetadata: true, signing: true },
+])('rejects malformed or broader edit grants %j', async (permissions) => {
+  expect(
+    (await post({ action: 'invite', projectId: 'shared-project', permissions }))
+      .status,
+  ).toBe(400);
+  expect(await (await get('?projectId=shared-project')).json()).toMatchObject({
+    shares: [],
+  });
+});
+it('keeps legacy omitted permissions off and rejects a foreign owner grant', async () => {
+  const response = await post({
+    action: 'invite',
+    projectId: 'shared-project',
+  });
+  expect(await response.json()).toMatchObject({
+    share: { permissions: { editMetadata: false } },
+  });
+  as('bob');
+  expect(
+    (
+      await post({
+        action: 'invite',
+        projectId: 'shared-project',
+        permissions: { editMetadata: true },
+      })
+    ).status,
+  ).toBe(404);
 });

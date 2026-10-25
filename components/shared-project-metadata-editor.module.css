@@ -1,0 +1,98 @@
+.editor {
+  min-width: 0;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border, #30303c);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.editor summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 10px 0;
+}
+.editor summary:focus-visible {
+  outline: 2px solid #7892ff;
+  outline-offset: 3px;
+}
+.editor button {
+  min-height: 44px;
+  height: auto;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+}
+.note {
+  margin: 10px 0;
+  color: var(--muted-foreground, #a7a7b8);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 12px 0;
+}
+.fields label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+.fields input,
+.fields textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--border, #30303c);
+  border-radius: 6px;
+  padding: 10px;
+  background: transparent;
+  color: inherit;
+  box-sizing: border-box;
+  font: inherit;
+}
+.fields textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.review,
+.pending,
+.receipt {
+  min-width: 0;
+  padding: 10px;
+  margin: 12px 0;
+  border: 1px solid var(--border, #30303c);
+  border-radius: 8px;
+}
+.comparison {
+  min-width: 0;
+  margin: 12px 0;
+}
+.comparison p,
+.receipt p {
+  margin: 6px 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.approval {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 12px;
+  margin: 10px 0;
+}
+.approval input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+.editor code {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}

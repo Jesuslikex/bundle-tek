@@ -207,6 +207,101 @@ function readScoped(value: unknown) {
   return decodeSharedProjectSnapshots({ projects: [value] })[0];
 }
 
+it('keeps omitted metadata editing permissions on the v1 wire format', () => {
+  const value = scoped();
+  expect(value.format).toBe('shared-project-scoped-v1');
+  expect(Object.hasOwn(value, 'permissions')).toBe(false);
+  expect(readScoped(value)).toEqual(value);
+});
+
+it.each([false, true])(
+  'round trips explicit metadata editing permission %s only as v2',
+  (editMetadata) => {
+    const f = scopeFixture();
+    const permissions = { editMetadata };
+    const value = createScopedSharedProjectSnapshot(
+      f.meta,
+      f.document,
+      f.scope,
+      permissions,
+    );
+    expect(value).toMatchObject({
+      format: 'shared-project-scoped-v2',
+      readOnly: true,
+      permissions: { editMetadata },
+    });
+    const decoded = readScoped(value);
+    expect(decoded).toEqual(value);
+    permissions.editMetadata = !editMetadata;
+    expect(value.permissions).toEqual({ editMetadata });
+    value.permissions!.editMetadata = !editMetadata;
+    expect(decoded.permissions).toEqual({ editMetadata });
+  },
+);
+
+it.each([
+  undefined,
+  null,
+  {},
+  { editMetadata: undefined },
+  { editMetadata: 1 },
+  { editMetadata: 'true' },
+  { editMetadata: false, signingAllowed: true },
+  { editMetadata: true, publishingAllowed: true },
+])(
+  'refuses incomplete, nonboolean or expanded v2 permissions %j',
+  (permissions) => {
+    expect(() =>
+      readScoped({
+        ...scoped(),
+        format: 'shared-project-scoped-v2',
+        permissions,
+      }),
+    ).toThrow('Shared projects unavailable');
+  },
+);
+
+it('requires a v2 permissions field and rejects accessor/prototype permissions without reading them', () => {
+  expect(() =>
+    readScoped({ ...scoped(), format: 'shared-project-scoped-v2' }),
+  ).toThrow();
+  let invoked = false;
+  const permissions = Object.defineProperty({}, 'editMetadata', {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return true;
+    },
+  });
+  expect(() =>
+    readScoped({
+      ...scoped(),
+      format: 'shared-project-scoped-v2',
+      permissions,
+    }),
+  ).toThrow();
+  expect(invoked).toBe(false);
+  expect(() =>
+    readScoped({
+      ...scoped(),
+      format: 'shared-project-scoped-v2',
+      permissions: Object.assign(Object.create({ editMetadata: true }), {
+        editMetadata: true,
+      }),
+    }),
+  ).toThrow();
+});
+
+it.each([false, true])(
+  'refuses permission injection into v1 and legacy formats (%s)',
+  (editMetadata) => {
+    for (const value of [scoped(), saved()])
+      expect(() =>
+        readScoped({ ...value, permissions: { editMetadata } }),
+      ).toThrow('Shared projects unavailable');
+  },
+);
+
 it('keeps a legacy view readable while old-chain assignments are unavailable', () => {
   const f = scopeFixture();
   f.document.plan = {

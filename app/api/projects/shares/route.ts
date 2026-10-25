@@ -12,9 +12,8 @@ import {
 } from '@/lib/project-share-scope';
 import { createScopedSharedProjectSnapshot } from '@/lib/shared-project-review';
 
-// Read-only project sharing. A collaborator can open the owner's saved launch
-// project; wallets and signing stay with the owner, whose keys never leave
-// their browser.
+// View-only by default. An immutable owner opt-in can separately allow edits to
+// three saved text fields. Wallets, publication and signing stay with the owner.
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -46,6 +45,7 @@ type ShareRow = {
   expiresAt: string | null;
   expired: number;
   walletScope: string | null;
+  metadataEdit: number;
 };
 type SharedRow = {
   shareId: string;
@@ -55,6 +55,7 @@ type SharedRow = {
   updatedAt: string;
   expiresAt: string | null;
   walletScope: string | null;
+  metadataEdit: number;
 };
 function ownerScopeSummary(scope: string | null) {
   if (scope === null) return { mode: 'legacy', count: null };
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
       const result = await db
         .prepare(
           `SELECT id, member_id AS memberId, created_at AS createdAt, accepted_at AS acceptedAt,
-           expires_at AS expiresAt, wallet_scope AS walletScope, (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
+           expires_at AS expiresAt, wallet_scope AS walletScope, metadata_edit AS metadataEdit, (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
            FROM project_shares WHERE owner_id=? AND project_id=? AND revoked_at IS NULL
            ORDER BY created_at DESC LIMIT 10`,
         )
@@ -119,12 +120,13 @@ export async function GET(request: Request) {
           expiresAt: s.expiresAt,
           expired: Boolean(s.expired),
           walletScope: ownerScopeSummary(s.walletScope),
+          permissions: { editMetadata: s.metadataEdit === 1 },
         })),
       });
     }
     const result = await db
       .prepare(
-        `SELECT s.id AS shareId, p.id, p.document, p.archived, p.updated_at AS updatedAt, s.expires_at AS expiresAt, s.wallet_scope AS walletScope
+        `SELECT s.id AS shareId, p.id, p.document, p.archived, p.updated_at AS updatedAt, s.expires_at AS expiresAt, s.wallet_scope AS walletScope, s.metadata_edit AS metadataEdit
          FROM project_shares s JOIN workspace_projects p ON p.owner_id=s.owner_id AND p.id=s.project_id
          WHERE s.member_id=? AND s.revoked_at IS NULL
           AND (s.expires_at IS NULL OR s.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -146,6 +148,7 @@ export async function GET(request: Request) {
           r.walletScope === null
             ? null
             : readProjectShareScope(JSON.parse(r.walletScope)),
+          { editMetadata: r.metadataEdit === 1 },
         ),
       ),
     });
@@ -174,6 +177,7 @@ export async function POST(request: Request) {
     id?: unknown;
     expiresInSeconds?: unknown;
     walletScope?: unknown;
+    permissions?: unknown;
   };
   try {
     const text = await request.text();
@@ -191,6 +195,22 @@ export async function POST(request: Request) {
     if (body.action === 'invite') {
       if (!projectIdValid(body.projectId))
         return json({ error: 'Invalid project.' }, 400);
+      let editMetadata = false;
+      if (body.permissions !== undefined) {
+        const permission = body.permissions as { editMetadata?: unknown };
+        if (
+          !permission ||
+          typeof permission !== 'object' ||
+          Array.isArray(permission) ||
+          Object.keys(permission).join(',') !== 'editMetadata' ||
+          typeof permission.editMetadata !== 'boolean'
+        )
+          return json(
+            { error: 'Choose an explicit saved-text editing permission.' },
+            400,
+          );
+        editMetadata = permission.editMetadata;
+      }
       const source = await db
         .prepare(
           'SELECT document,updated_at AS projectRevision FROM workspace_projects WHERE owner_id=? AND id=?',
@@ -256,7 +276,7 @@ export async function POST(request: Request) {
       try {
         await db
           .prepare(
-            'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at,wallet_scope) VALUES(?,?,?,?,?,?,?)',
+            'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at,wallet_scope,metadata_edit) VALUES(?,?,?,?,?,?,?,?)',
           )
           .bind(
             id,
@@ -266,6 +286,7 @@ export async function POST(request: Request) {
             now,
             expiresAt,
             JSON.stringify(walletScope),
+            editMetadata ? 1 : 0,
           )
           .run();
       } catch (e) {
@@ -287,7 +308,10 @@ export async function POST(request: Request) {
           );
         throw e;
       }
-      return json({ share: { id, token, expiresAt } }, 201);
+      return json(
+        { share: { id, token, expiresAt, permissions: { editMetadata } } },
+        201,
+      );
     }
     if (body.action === 'accept') {
       if (typeof body.token !== 'string' || !TOKEN.test(body.token))

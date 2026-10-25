@@ -5,6 +5,10 @@ import { SharedProjectReview } from './shared-project-review';
 import { ProjectShareScopePicker } from './project-share-scope-picker';
 import type { ProjectShareScope } from '@/lib/project-share-scope';
 import {
+  SharedProjectMetadataEditor,
+  SharedProjectMetadataRecovery,
+} from './shared-project-metadata-editor';
+import {
   readSharedProjectSnapshots,
   type SharedProjectSnapshot,
 } from '@/lib/shared-project-review';
@@ -25,6 +29,7 @@ type Share = {
     mode: 'legacy' | 'selected' | 'none' | 'unavailable';
     count: number | null;
   };
+  permissions?: { editMetadata: boolean };
 };
 type SharedProject = SharedProjectSnapshot;
 
@@ -99,6 +104,14 @@ async function fetchShares(projectId: string, signal: AbortSignal) {
     readShareExpiry(s.createdAt);
     readShareExpiry(s.acceptedAt);
     if (
+      s.permissions !== undefined &&
+      (!s.permissions ||
+        typeof s.permissions !== 'object' ||
+        Object.keys(s.permissions).join(',') !== 'editMetadata' ||
+        typeof s.permissions.editMetadata !== 'boolean')
+    )
+      throw new Error('Shares unavailable. Try again later.');
+    if (
       s.walletScope !== undefined &&
       (!s.walletScope ||
         !['legacy', 'selected', 'none', 'unavailable'].includes(
@@ -135,12 +148,16 @@ async function fetchSharedProjects(signal: AbortSignal) {
 
 /** Owner view: invite collaborators to read this saved project. */
 export function ProjectSharePanel({ projectId }: { projectId: string }) {
+  return <ProjectShareOwnerPanel key={projectId} projectId={projectId} />;
+}
+function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
   const [shares, setShares] = useState<Share[]>([]);
   const [link, setLink] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [duration, setDuration] = useState(86400);
   const [linkExpiry, setLinkExpiry] = useState('');
+  const [editMetadata, setEditMetadata] = useState(false);
   const [scopeSelection, setScopeSelection] = useState<{
     projectId: string;
     scope: ProjectShareScope | null;
@@ -216,10 +233,11 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
     <section aria-label="Collaborators" className="min-w-0 space-y-2">
       <h4>Collaborators</h4>
       <p className="text-xs text-muted-foreground">
-        Share a read-only saved plan. New invites disclose no wallet assignments
-        unless you select them below. Wallet control and signing stay with you.
-        The plan name, description, settings and aggregate counts remain shared;
-        avoid putting private information into that text.
+        Share a saved plan with view-only access by default. New invites
+        disclose no wallet assignments unless you select them below. Wallet
+        control and signing stay with you. The plan name, description, settings
+        and aggregate counts remain shared; avoid putting private information
+        into that text.
       </p>
       <p>
         Expiry ends future shared reads, including after an invite is accepted.
@@ -261,6 +279,22 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
         busy={busy}
         onChange={(scope) => setScopeSelection({ projectId, scope })}
       />
+      <label className="flex min-h-11 items-start gap-2">
+        <input
+          type="checkbox"
+          disabled={busy}
+          checked={editMetadata}
+          onChange={(event) => setEditMetadata(event.target.checked)}
+        />
+        Allow this invite to edit only the saved project name, symbol and
+        description.
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Off by default. These are saved draft text changes, not on-chain
+        changes. They can invalidate pending launch reviews. Artwork, links,
+        launch settings, wallets, publishing, trading and signing stay with the
+        owner. To change this permission later, revoke and create a new invite.
+      </p>
       <Button
         type="button"
         variant="outline"
@@ -268,11 +302,16 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
         onClick={() =>
           void run(async (current) => {
             const { share } = await call<{
-              share: { token: string; expiresAt: string };
+              share: {
+                token: string;
+                expiresAt: string;
+                permissions?: { editMetadata: boolean };
+              };
             }>({
               action: 'invite',
               projectId,
               expiresInSeconds: duration,
+              permissions: { editMetadata },
               ...(walletScope ? { walletScope } : {}),
             });
             let expiry: string | null = null;
@@ -285,7 +324,13 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
               !share ||
               typeof share.token !== 'string' ||
               !/^[A-Za-z0-9_-]{43}$/.test(share.token) ||
-              expiry === null
+              expiry === null ||
+              (share.permissions === undefined
+                ? editMetadata
+                : !share.permissions ||
+                  typeof share.permissions !== 'object' ||
+                  Object.keys(share.permissions).join(',') !== 'editMetadata' ||
+                  share.permissions.editMetadata !== editMetadata)
             )
               throw new Error(
                 'Invite response unavailable. Refresh shares before creating another invite.',
@@ -336,6 +381,9 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
                   : s.walletScope.mode === 'unavailable'
                     ? 'Assignment scope unavailable. Revoke this share before creating a replacement.'
                     : `${s.walletScope.count} selected assignment ${s.walletScope.count === 1 ? 'reference' : 'references'}; no future wallets added.`}{' '}
+              {s.permissions?.editMetadata === true
+                ? 'Saved-text editor permission.'
+                : 'View-only permission.'}{' '}
               <Button
                 type="button"
                 variant="outline"
@@ -442,7 +490,8 @@ export function SharedProjectsPanel() {
       setBusy(false);
     }
   }
-  if (!token && !projects.length && !error) return null;
+  if (!token && !projects.length && !error)
+    return <SharedProjectMetadataRecovery activeShareIds={[]} />;
   return (
     <section aria-label="Shared with you" className="min-w-0 space-y-2">
       <h3>Shared with you</h3>
@@ -481,7 +530,10 @@ export function SharedProjectsPanel() {
             <strong>{p.plan.tokenName}</strong> ${p.plan.ticker} ·{' '}
             {p.plan.chain} · {p.plan.launchpad} · updated{' '}
             {new Date(p.updatedAt).toLocaleString()}
-            {p.archived ? ' · archived' : ''} · read only{' '}
+            {p.archived ? ' · archived' : ''} ·{' '}
+            {p.permissions?.editMetadata === true
+              ? 'saved-text editor permission'
+              : 'view only'}{' '}
             <p>
               {p.expiresAt === undefined ? (
                 'Expiry not supplied by this server. Refresh to check access.'
@@ -498,6 +550,15 @@ export function SharedProjectsPanel() {
               )}
             </p>
             <SharedProjectReview project={p} />
+            {p.permissions?.editMetadata === true && (
+              <SharedProjectMetadataEditor
+                key={`${p.shareId}:${p.updatedAt}`}
+                projectId={p.id}
+                shareId={p.shareId}
+                projectUpdatedAt={p.updatedAt}
+                locked={p.archived}
+              />
+            )}
             <Button
               type="button"
               variant="outline"
@@ -511,6 +572,11 @@ export function SharedProjectsPanel() {
           </li>
         ))}
       </ul>
+      <SharedProjectMetadataRecovery
+        activeShareIds={projects
+          .filter((p) => p.permissions?.editMetadata === true)
+          .map((p) => p.shareId)}
+      />
     </section>
   );
 }

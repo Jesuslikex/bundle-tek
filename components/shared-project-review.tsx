@@ -207,9 +207,13 @@ export function SharedProjectReview({
         )}
       </section>
       <p className={styles.scope}>
-        This snapshot does not grant edit, funding, signing or submission
-        permissions. Addresses are displayed as text; there are no wallet
-        actions or external links here.
+        This snapshot performs no edits.{' '}
+        {project.permissions?.editMetadata === true
+          ? 'Your separate saved-text editor permission requires a fresh review in the editor below.'
+          : 'No saved-text edit permission was reported.'}{' '}
+        Funding, wallet actions, publishing, signing and submission are not
+        granted. Addresses are displayed as text; there are no wallet actions or
+        external links here.
       </p>
     </details>
   );

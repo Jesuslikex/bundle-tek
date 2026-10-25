@@ -1,0 +1,175 @@
+{
+  "format": "collaborator-text-edit-checkpoint-v1",
+  "baseCommit": "787b7ec0878637b6cf8e5ee52394a3b30ca8dfb5",
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "app/api/projects/route.ts",
+    "app/api/wallet-workspace/route.ts",
+    "components/auto-sell-modal.tsx",
+    "lib/auto-sell-execute.ts",
+    "lib/auto-sell-runner.ts",
+    "lib/browser-wallet-vault.ts",
+    "lib/venue-launch-recovery.ts",
+    "lib/pump-group-runtime-service.ts",
+    "lib/pump-group-code-identity.ts",
+    "lib/jito-readonly-qualification.ts",
+    "lib/owned-pump-preflight.ts",
+    "lib/pump-launch-signing.ts",
+    "lib/meteora-dbc-launch-signing.ts",
+    "lib/stonkfun-launch-signing.ts",
+    "lib/launchlab-launch-signing.ts",
+    "lib/launch-metadata-release.ts",
+    "vercel.json"
+  ],
+  "originalAcceptRevokeLeaveUnchanged": true,
+  "priorSqlFilesUnchanged": 149,
+  "journalPrefixUnchanged": true,
+  "sourceHashes": {
+    "app/api/projects/collaboration/metadata/route.ts": "fee0b3dd39d69d0d4beb33d0eedad64136293a185ccd95ee7ecf249473684b75",
+    "app/api/projects/collaboration/metadata/route.test.ts": "c8095c8ea07620da57ab5891a6797c8aa4fc609c8dab3df441858769ebc82a99",
+    "app/api/projects/shares/route.ts": "6a493187b931f5779e54523b6ed8ce44e36519af52f604fb4fd7de9114a69508",
+    "app/api/projects/shares/route.test.ts": "b930801124c30487f83c3748569225f3c80c3958731568f14ef65bce0a9aaa06",
+    "components/project-sharing.tsx": "fb0b25b843f87155f85ff6f10e5548b96282af1e4902643c9e150003430652ec",
+    "components/project-sharing-expiry.test.tsx": "f8578ff1a7732256e9e796a453713f18c2f464629ab664e9df0a7ff0c350940f",
+    "components/project-sharing-permissions.test.tsx": "eb37d01e1b13872ecd40da944d6e4a587efb1a4b9592bd5e9a3da4e7e7d0efbc",
+    "components/shared-project-review.tsx": "fecbe520bbbb841a9224335b2f771136a7c2881760bae371cc3dcc077352c483",
+    "components/shared-project-metadata-editor.tsx": "0488d3a0ec0684eabfb28f52fbf6fd47a327c43ecb37ac133a2173f98e898828",
+    "components/shared-project-metadata-editor.test.tsx": "925c05288ddb82dd568da9a3f2fe9dfda47f0a1622b716156de7ed0d60eb1b82",
+    "components/shared-project-metadata-editor.module.css": "65ba82124b7f928759cabc541de9b5252dbec5f66d29556350c8ee685c701fc6",
+    "lib/shared-project-review.ts": "dccd7093cfaa1f25039d47fa5c18e6a545863958bee63090b735245ddd7cd898",
+    "lib/shared-project-review.test.ts": "bd85fd66a02038ddd203dba3cb1588a6eab5c8bed8dce3d87be0316b552c7f7a",
+    "lib/project-collaboration-metadata.ts": "c9fb6b708824c8a3ad595ab2036127ff5ca6d21c390cb09cef88375f765de127",
+    "lib/project-collaboration-metadata.test.ts": "dddc37c6dad513643886cd652a7e1b8cb408d53fa147895afe31ea16eca53f06",
+    "lib/project-collaboration-metadata-storage.ts": "9330aa3b38db02928f8c6a8554baee320760769c0524a42b43a71c40072227fe",
+    "lib/project-collaboration-metadata-storage.test.ts": "08b4d1c8b3772717f87df7c91c1d66ce6671ea58a5e3d3e9bd0605cc9061eba4",
+    "drizzle/0151_project_collaboration_metadata.sql": "eae493de9431b38e0b745838bf7dba2efe38c68743dc03f67219354ef9674940",
+    "drizzle/meta/_journal.json": "7273eb76aba3ae34f6860ca000b8b67512755641f683d72797972fefe310e741"
+  },
+  "verification": {
+    "node": "24.19.0",
+    "tests": {
+      "passed": 440,
+      "files": 14,
+      "durationSeconds": 46.67
+    },
+    "typecheck": true,
+    "typedLint": true,
+    "format": true,
+    "fullApplicationSuite": false,
+    "productionBuild": false,
+    "finalSqlWhitespaceOnlyFollowup": "Removed surplus trailing EOF blank after test run. Final whole-file Wrangler and incremental native migration checks rerun against exact staged SQL; no SQL statements changed."
+  },
+  "migrations": {
+    "native": {
+      "passed": true,
+      "migrations": 150,
+      "priorLedgerRowsPreserved": 149,
+      "priorTablesPreserved": 184,
+      "legacyPermission": 0,
+      "integrity": "ok",
+      "foreignKeys": "ok",
+      "latestSha256": "eae493de9431b38e0b745838bf7dba2efe38c68743dc03f67219354ef9674940",
+      "applicationOrHostedSql": false
+    },
+    "wrangler": {
+      "passed": true,
+      "count": 150,
+      "scratch": "bundle-wrangler-migrations-faHhUW"
+    },
+    "newTag": "0151_project_collaboration_metadata",
+    "when": 1794860000012,
+    "checksum": "eae493de9431b38e0b745838bf7dba2efe38c68743dc03f67219354ef9674940"
+  },
+  "browser": {
+    "passed": true,
+    "actualCompiledComponents": true,
+    "actualSharingAndMetadataRoutes": true,
+    "actualTursoAdapter": true,
+    "disposableMigrationCount": 150,
+    "metadataPostAttempts": 1,
+    "metadataEdits": 1,
+    "ownerEvents": 1,
+    "otherFieldsPreserved": true,
+    "deliberatelyDroppedSuccessfulReply": true,
+    "revokedOriginalGrant": true,
+    "reloadedOrphanReceiptRecovery": true,
+    "noNewEditingAccess": true,
+    "readOnlyProviderOrFundedActions": false,
+    "mobile": {
+      "width": 375,
+      "scrollWidth": 360,
+      "buttonHeight": 44
+    },
+    "desktop": {
+      "width": 1920,
+      "scrollWidth": 1920
+    },
+    "notProduction": true,
+    "followupUnicodeContractIndependentlyTested": true
+  },
+  "reviews": [
+    {
+      "startedAt": "2026-10-25T18:26:26.218Z",
+      "finishedAt": "2026-10-25T18:29:36.471Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "787b7ec0878637b6cf8e5ee52394a3b30ca8dfb5",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.9290566,
+      "sourceUnchanged": true,
+      "changed": []
+    },
+    {
+      "startedAt": "2026-10-25T18:33:12.804Z",
+      "finishedAt": "2026-10-25T18:35:40.465Z",
+      "uncommittedOverlay": true,
+      "sourceBaseCommit": "787b7ec0878637b6cf8e5ee52394a3b30ca8dfb5",
+      "requestedModel": "claude-opus-5-5",
+      "selectedModels": ["claude-opus-5-5"],
+      "modelsUsed": ["claude-opus-5-5"],
+      "tools": ["Glob", "Grep", "Read"],
+      "status": {
+        "code": 0,
+        "signal": null
+      },
+      "timedOut": false,
+      "spawnError": null,
+      "permissionDenials": 0,
+      "resultSubtype": "success",
+      "isError": false,
+      "totalCostUsd": 0.6615528,
+      "sourceUnchanged": true,
+      "changed": []
+    }
+  ],
+  "reviewLimits": "Bounded source-only snapshots. Final Unicode/SQL canonical roundtrip, duplicate-ID diagnostic and test follow-ups independently verified by Codex after review; reviewer did not run tests.",
+  "knownLimits": [
+    "No cancellation tombstone; unknown/no-receipt edit holds until original receipt or old grant ends and a new invitation is used.",
+    "Canonical writer only; alternate valid raw JSON spellings can be refused.",
+    "Past receipt parser uses v1 project/text rules; future validator changes need versioned compatibility.",
+    "1000 immutable edit records per owner/project, no eviction.",
+    "No new signed-in production, provider or funded proof."
+  ],
+  "boundaries": {
+    "deployed": false,
+    "applicationSql": false,
+    "hostedSql": false,
+    "providersChanged": false,
+    "credentialsChanged": false,
+    "cronChanged": false,
+    "realWalletActions": false,
+    "fundedTrades": false,
+    "signingAuthorityAdded": false
+  }
+}

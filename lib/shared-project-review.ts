@@ -38,7 +38,8 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 export type SharedProjectSnapshot = {
-  format?: 'shared-project-scoped-v1';
+  format?: 'shared-project-scoped-v1' | 'shared-project-scoped-v2';
+  permissions?: { editMetadata: boolean };
   walletScope?: SharedProjectWalletScope;
   id: string;
   shareId: string;
@@ -70,7 +71,7 @@ export type SharedProjectWalletScope = {
   unavailableCount: number;
 };
 export type ScopedSharedProjectSnapshot = SharedProjectSnapshot & {
-  format: 'shared-project-scoped-v1';
+  format: 'shared-project-scoped-v1' | 'shared-project-scoped-v2';
   expiresAt: string | null;
   walletScope: SharedProjectWalletScope;
 };
@@ -154,6 +155,8 @@ function canonicalPlan(value: unknown): LaunchPlanInput {
 }
 
 function scopedSnapshot(value: unknown): ScopedSharedProjectSnapshot {
+  const input = record(value);
+  const withPermissions = input.format === 'shared-project-scoped-v2';
   const row = exact(value, [
     'format',
     'id',
@@ -173,8 +176,20 @@ function scopedSnapshot(value: unknown): ScopedSharedProjectSnapshot {
     'walletSelectionMatchesPlan',
     'pumpSettings',
     'walletScope',
+    ...(withPermissions ? ['permissions'] : []),
   ]);
-  if (row.format !== 'shared-project-scoped-v1') throw unavailable();
+  if (
+    !['shared-project-scoped-v1', 'shared-project-scoped-v2'].includes(
+      row.format as string,
+    )
+  )
+    throw unavailable();
+  let permissions: { editMetadata: boolean } | undefined;
+  if (withPermissions) {
+    const p = exact(row.permissions, ['editMetadata']);
+    if (typeof p.editMetadata !== 'boolean') throw unavailable();
+    permissions = { editMetadata: p.editMetadata };
+  }
   const meta = metadata(row);
   const plan = canonicalPlan(row.plan);
   if (
@@ -258,7 +273,10 @@ function scopedSnapshot(value: unknown): ScopedSharedProjectSnapshot {
     throw unavailable();
   return {
     ...meta,
-    format: 'shared-project-scoped-v1',
+    format: withPermissions
+      ? 'shared-project-scoped-v2'
+      : 'shared-project-scoped-v1',
+    ...(permissions ? { permissions } : {}),
     expiresAt: readShareExpiry(row.expiresAt),
     plan,
     artworkSaved: row.artworkSaved as boolean,
@@ -336,6 +354,7 @@ export function createScopedSharedProjectSnapshot(
   meta: SharedProjectSnapshotMetadata,
   document: ProjectDocument,
   scope: ProjectShareScope | null,
+  permissions?: { editMetadata: boolean },
 ): ScopedSharedProjectSnapshot {
   try {
     const admittedMeta = exact(meta, [
@@ -355,7 +374,11 @@ export function createScopedSharedProjectSnapshot(
         : resolveProjectShareScope(scope, validated);
     return scopedSnapshot({
       ...summary,
-      format: 'shared-project-scoped-v1',
+      format:
+        permissions === undefined
+          ? 'shared-project-scoped-v1'
+          : 'shared-project-scoped-v2',
+      ...(permissions === undefined ? {} : { permissions }),
       expiresAt: meta.expiresAt ?? null,
       walletScope: {
         mode:
