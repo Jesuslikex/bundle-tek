@@ -36,13 +36,28 @@ import {
   saveSwapPreparation,
   swapPreparationSummary,
 } from '@/lib/imported-swap-preparation-history';
+import {
+  requireAutoSellRunPreparationGuard,
+  type AutoSellRunPreparationGuard,
+} from '@/lib/auto-sell-run-storage';
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
+const startedAutoSellGuards = new WeakSet<AutoSellRunPreparationGuard>();
 export async function prepareOwnedImportedSwap(
   request: Request,
   owner: string,
   db: D1Database,
+  startAutoSellRunPreparation?: () => Promise<AutoSellRunPreparationGuard>,
 ) {
+  if (
+    startAutoSellRunPreparation !== undefined &&
+    typeof startAutoSellRunPreparation !== 'function'
+  )
+    return json(
+      { error: 'Choose one original server preparation binding.' },
+      409,
+    );
+  let autoSellRunGuard: AutoSellRunPreparationGuard | undefined;
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin
@@ -217,6 +232,44 @@ export async function prepareOwnedImportedSwap(
       side: input.side,
       unitsRaw,
     };
+    // A server-created one-shot journal start is not accepted from request JSON.
+    // The original provider/runtime path remains unchanged after this binding.
+    const admitAutoSellRunGuard = (guard: AutoSellRunPreparationGuard) => {
+      requireAutoSellRunPreparationGuard(guard);
+      if (startedAutoSellGuards.has(guard))
+        return json(
+          {
+            error:
+              'The original Auto Sell attempt already started preparation. Inspect its exact saved result.',
+          },
+          409,
+        );
+      startedAutoSellGuards.add(guard);
+      if (
+        guard.owner !== owner ||
+        guard.projectId !== conditionContext.projectId ||
+        guard.projectRevision !== conditionContext.projectRevision ||
+        guard.wallet !== conditionContext.wallet ||
+        guard.walletRevision !== conditionContext.walletRevision ||
+        guard.mint !== conditionContext.mint ||
+        guard.decimals !== conditionContext.decimals ||
+        guard.inputRaw !== conditionContext.unitsRaw ||
+        conditionContext.side !== 'Sell' ||
+        (input.slippageBps ?? 50) !== guard.maxSlippageBps ||
+        input.buyReceiptId !== undefined ||
+        input.buyAllocations !== undefined ||
+        input.conditional !== undefined ||
+        input.session !== undefined
+      )
+        return json(
+          {
+            error:
+              'The unsigned preparation differs from the original Auto Sell attempt.',
+          },
+          409,
+        );
+      return null;
+    };
     let session;
     try {
       session = input.session
@@ -304,6 +357,15 @@ export async function prepareOwnedImportedSwap(
       request.signal,
       AbortSignal.timeout(25000),
     ]);
+    if (startAutoSellRunPreparation) {
+      // Deterministic configuration/capacity/rate refusals above never consume
+      // the one-shot journal start. The start is still durable before any RPC.
+      signal.throwIfAborted();
+      autoSellRunGuard = await startAutoSellRunPreparation();
+      signal.throwIfAborted();
+      const rejection = admitAutoSellRunGuard(autoSellRunGuard);
+      if (rejection) return rejection;
+    }
     const balance = await observeImportedSwapBalance(
       token,
       input.wallet,
@@ -423,6 +485,7 @@ export async function prepareOwnedImportedSwap(
       acquisition,
       conditional,
       session,
+      autoSellRunGuard,
     );
     if (!history)
       return json(

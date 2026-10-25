@@ -1058,6 +1058,13 @@
       "when": 1794860000013,
       "tag": "0152_funding_save_stops",
       "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "6",
+      "when": 1794860000014,
+      "tag": "0153_auto_sell_runs",
+      "breakpoints": true
     }
   ]
 }

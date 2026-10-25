@@ -15,6 +15,10 @@ import {
 } from './conditional-preparation-server';
 import { requireConditionalSwapContext } from './conditional-signing';
 import {
+  autoSellPreparationWriteGuard,
+  type AutoSellRunPreparationGuard,
+} from './auto-sell-run-storage';
+import {
   importedAcquisitionWriteGuard,
   type ImportedAcquisitionGuard,
 } from './imported-acquisition-server';
@@ -168,6 +172,7 @@ export async function saveSwapPreparation(
   acquisitionGuard?: ImportedAcquisitionGuard,
   conditionalGuard?: ConditionalPreparationGuard,
   sessionGuard?: TradeSessionGuard,
+  autoSellRunGuard?: AutoSellRunPreparationGuard,
 ) {
   if (document.conditional)
     requireConditionalSwapContext(document.conditional, {
@@ -193,7 +198,10 @@ export async function saveSwapPreparation(
       document.inAmountRaw !== document.conditional.unitsRaw)
   )
     throw new Error('Invalid saved preparation.');
-  const id = crypto.randomUUID(),
+  const journalGuard = autoSellRunGuard
+    ? autoSellPreparationWriteGuard(owner, autoSellRunGuard, context, document)
+    : undefined;
+  const id = journalGuard?.preparationId ?? crypto.randomUUID(),
     createdAt = new Date().toISOString();
   const sourceGuard = importedAcquisitionWriteGuard(owner, acquisitionGuard);
   const conditionGuard = conditionalPreparationWriteGuard(
@@ -209,7 +217,7 @@ export async function saveSwapPreparation(
     EXISTS (SELECT 1 FROM imported_token_projects WHERE owner_id=? AND id=? AND chain='Solana' AND revision=? AND address=? AND archived=0)
     AND EXISTS (SELECT 1 FROM workspace_wallets WHERE owner_id=? AND chain='Solana' AND address=? AND revision=? AND archived=0)
     AND (SELECT COUNT(*) FROM imported_swap_preparations WHERE owner_id=? AND project_id=?)<200
-    AND ?>?${sourceGuard.sql}${conditionGuard.sql}${sessionWrite.sql}`)
+    AND ?>?${sourceGuard.sql}${conditionGuard.sql}${sessionWrite.sql}${journalGuard?.sql ?? ''}`)
     .bind(
       id,
       owner,
@@ -233,6 +241,7 @@ export async function saveSwapPreparation(
       ...sourceGuard.bindings,
       ...conditionGuard.bindings,
       ...sessionWrite.bindings,
+      ...(journalGuard?.bindings ?? []),
     )
     .run();
   if (!write.meta.changes) return null;
