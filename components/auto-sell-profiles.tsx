@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { AutoSellStrategySummary } from './auto-sell-strategy-summary';
+import { AutoSellRunEnrollment } from './auto-sell-run-enrollment';
 import { autoSellMaximumLabel, formatDuration } from '@/lib/auto-sell';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
@@ -661,6 +662,11 @@ function ProfilePanel({
           </Button>
         </section>
       )}
+      <AutoSellRunEnrollment
+        project={project}
+        profile={selected}
+        disabled={disabled || busy || !!pendingSave || project.archived}
+      />
       {busy && <output>Reading or saving configuration…</output>}
       {error && <p role="alert">{error}</p>}
       {error === 'Sign in again to access saved configurations.' && (

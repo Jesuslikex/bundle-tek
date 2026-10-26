@@ -1,0 +1,147 @@
+{
+  "baseCommit": "10493bf96651af33671bb49dfa71bf55ca1e6468",
+  "completeProfilePanelPreservedExceptImportAndMount": true,
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "app/ux.css",
+    "lib/auto-sell-runner.ts",
+    "lib/auto-sell-execute.ts",
+    "lib/auto-sell-edit.ts",
+    "lib/auto-sell.ts",
+    "lib/auto-sell-profile.ts",
+    "lib/auto-sell-profile-storage.ts",
+    "lib/browser-wallet-vault.ts",
+    "lib/warmup-signing.ts",
+    "lib/imported-swap-approval.ts",
+    "lib/imported-trade-session-server.ts",
+    "app/api/imported-projects/prepare/route.ts",
+    "app/api/imported-projects/signing/route.ts",
+    "lib/pump-group-runtime-service.ts",
+    "lib/pump-group-code-identity.ts",
+    "lib/jito-readonly-qualification.ts",
+    "vercel.json",
+    "lib/auto-sell-run.ts",
+    "lib/auto-sell-run-storage.ts",
+    "lib/auto-sell-run-preparation.ts",
+    "lib/unsigned-swap-order.ts",
+    "lib/auto-sell-run-packet.ts",
+    "lib/auto-sell-run-packet-storage.ts",
+    "lib/imported-swap-preparation-history.ts",
+    "lib/prepare-owned-imported-swap.ts",
+    "app/api/imported-projects/auto-sell-run-recovery/route.ts",
+    "db/turso.ts",
+    "lib/auth.ts",
+    "components/auto-sell-modal.tsx",
+    "components/auto-sell-run-recovery.tsx",
+    "lib/auto-sell-run-recovery-client.ts",
+    "app/api/imported-projects/auto-sell-runs/route.ts",
+    "app/api/imported-projects/auto-sell-profiles/route.ts"
+  ],
+  "priorSqlUnchanged": 153,
+  "journalAppendOnly": true,
+  "ownedSourceHashes": {
+    "components/auto-sell-profiles.tsx": "c4b45a10d5ba1617d6d75076f5b56846b7623b793040e612935ed53ed55788c1",
+    "components/auto-sell-run-enrollment.tsx": "6f5f07c595fc2016454ed9f5161741b1de79585627944dc98193d10e47117cd5",
+    "components/auto-sell-run-enrollment.test.tsx": "69bfe00f8fde827f506021c6ca1f3986b515d3cbf5f490f77006f609c63179a8",
+    "components/auto-sell-run-enrollment.module.css": "c406f01beb060fffe870103ef988c03cd6d8473f3c2d0b0c89b3185448c2425c",
+    "components/auto-sell-run-enrollment-modal.test.tsx": "a269c827802b5be4607d376ba6846dbcb416479dc26ddad4eac0c678b574f27b",
+    "lib/auto-sell-run-enrollment-client.ts": "ae44e6bba7c121f5a7fba1bfdd70f7cdf8ebbf9bc578b44c8c8a287d35b16356",
+    "lib/auto-sell-run-enrollment-client.test.ts": "16057c379c4e5e60e5785c2559bab873b8cecbe805131e2500161d9b1766e2c2",
+    "lib/auto-sell-run-record-stop-client.ts": "8f44ec3e8bd970e1ab5cbf26a9a9b96e29fac215fc99535469e9229e748a9a10",
+    "lib/auto-sell-run-record-stop-client.test.ts": "5193c0adbc218923391a1ef2832169894f695fc0e44a494ad77eb19724b420c6",
+    "lib/auto-sell-run-record-stop.ts": "64cbc596235990cebec7cd3f3b5f5814123a849f4d8802a8c65ce9ef26717aa1",
+    "lib/auto-sell-run-record-stop-storage.ts": "2af6806c02611ca5bbc263f43d90a29affeecc0b29bcd6a63da760e58d1c8998",
+    "lib/auto-sell-run-record-stop-storage.test.ts": "671ceaf84cabb5eed482f83e8abca701f66b3401ceac7d222e7084327d0465da",
+    "app/api/imported-projects/auto-sell-run-record-stops/route.ts": "4204e2579e9b0ae1afea2f159993b7223bbee8120bfae0c87fe91687a9be0cac",
+    "app/api/imported-projects/auto-sell-run-record-stops/route.test.ts": "9b3748365ad2c90cecbca9b60d618d777f0ab00bd208b49d3ec50962105c9682",
+    "test/auto-sell-run-enrollment-flow.test.ts": "1c059bcd4e1f2082d5bc51c35d3876bd6b77ac6412376918669fd22f201fce65",
+    "test/auto-sell-run-record-stop-engines.test.ts": "365e02e24b75bc0b04c12556481d2c85afabbd073766309becc131ef2a5ee72e",
+    "drizzle/0155_auto_sell_run_record_stops.sql": "7792eda92de174602414e853a2830ca23c096d4d9a0d670deb856b2b334cb7e6",
+    "drizzle/meta/_journal.json": "56fa92d10ecda52f453ecd8c00a96b80eb890c2fdf71433804302c3e3f8ffe75"
+  },
+  "review": {
+    "requestedModel": "claude-opus-5-5",
+    "modelsUsed": [
+      "claude-opus-5-5"
+    ],
+    "sourceUnchanged": true,
+    "currentFilesEqualCopiesExceptOneFormatterOnlyFile": true,
+    "formattedComponentJavaScriptIdentical": true,
+    "permissionDenials": 0,
+    "noBlockerReported": true,
+    "sourceOnly": true
+  },
+  "regression": {
+    "tests": 1116,
+    "files": 62,
+    "allAssertionsPassed": true,
+    "exit": 0,
+    "maxWorkers": 2
+  },
+  "browser": {
+    "syntheticAuth": true,
+    "actualConfigurationPanelClientsApisTursoAdapter": true,
+    "disposableMigrations": 154,
+    "lostCreateThenReloadSameId": true,
+    "lostStopThenReloadSameId": true,
+    "newSeparateApprovedRecordAfterFence": true,
+    "accountChangeClearsOwnView": true,
+    "viewports": [
+      1920,
+      375
+    ],
+    "horizontalOverflow": false,
+    "minVisibleButtonHeight": 44,
+    "counts": {
+      "auto_sell_runs": 2,
+      "auto_sell_run_record_stops": 1,
+      "auto_sell_run_attempts": 0,
+      "auto_sell_run_preparation_starts": 0,
+      "imported_swap_signing_intents": 0
+    },
+    "requestCount": 19,
+    "ownTabAndServerClosed": true
+  },
+  "nativeUpgrade": {
+    "passed": true,
+    "migrations": 154,
+    "priorLedgerRowsPreserved": 153,
+    "priorTablesPreserved": 194,
+    "retainedFundingRows": 2,
+    "integrity": "ok",
+    "foreignKeys": "ok",
+    "latestSha256": "7792eda92de174602414e853a2830ca23c096d4d9a0d670deb856b2b334cb7e6",
+    "applicationOrHostedSql": false
+  },
+  "wholeFileWrangler": {
+    "passed": true,
+    "migrations": 154,
+    "scratch": "C:/Users/Julian/AppData/Local/Temp/bundle-wrangler-migrations-CCtebP"
+  },
+  "deployment": false,
+  "hostedSql": false,
+  "realWalletOrFundedAction": false,
+  "format": "auto-sell-journal-enrollment-verification-v1",
+  "typecheck": {
+    "plainTscNoEmit": true,
+    "exit": 0
+  },
+  "lint": {
+    "ownedTypeScriptFiles": 15,
+    "typeAware": true,
+    "passed": true
+  },
+  "formatting": {
+    "sourceFiles": 16,
+    "passed": true
+  },
+  "limitations": [
+    "Metadata-only journal enrollment; actual browser runner remains memory-only and unjournaled.",
+    "No automatic execution/resume, financial release or finalized settlement authority.",
+    "Browser auth synthetic; no production authentication or full Next production-build proof.",
+    "Scope regression, not repository-wide full suite.",
+    "Migration0155 source only; no application or hosted SQL.",
+    "Only final formatting differs from reviewed/rendered component; compiled JavaScript is identical.",
+    "No new final-snapshot Opus approval claimed."
+  ]
+}

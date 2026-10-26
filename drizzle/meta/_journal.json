@@ -1072,6 +1072,13 @@
       "when": 1794860000015,
       "tag": "0154_auto_sell_run_packets",
       "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "6",
+      "when": 1794860000016,
+      "tag": "0155_auto_sell_run_record_stops",
+      "breakpoints": true
     }
   ]
 }
