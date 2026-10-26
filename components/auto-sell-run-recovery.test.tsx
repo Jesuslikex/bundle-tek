@@ -37,12 +37,14 @@ vi.mock('@/app/chatgpt-auth', () => ({
 vi.mock('@/db', () => ({ getD1: () => identity.db }));
 import { GET as journalGET } from '@/app/api/imported-projects/auto-sell-runs/route';
 import { GET as packetGET } from '@/app/api/imported-projects/auto-sell-run-recovery/route';
+import { GET as progressGET } from '@/app/api/imported-projects/auto-sell-run-progress/route';
 import { AutoSellRunRecovery } from './auto-sell-run-recovery';
 let client: Client;
 let f: Awaited<ReturnType<typeof setupAutoSellRunPacketStorageFixture>>;
 let indexBody: Record<string, unknown>,
   pageBody: Record<string, unknown>,
-  packetBody: Record<string, unknown>;
+  packetBody: Record<string, unknown>,
+  progressBody: Record<string, unknown>;
 let root: Root, host: HTMLDivElement, project: typeof profileProject;
 let requests: {
   url: string;
@@ -97,6 +99,14 @@ beforeAll(async () => {
       ),
     )
   ).json()) as Record<string, unknown>;
+  const progressResponse = await progressGET(
+    new Request(
+      'https://bundle.test/api/imported-projects/auto-sell-run-progress?' +
+        new URLSearchParams({ projectId: f.projectId, runId: f.run.id }),
+    ),
+  );
+  expect(progressResponse.status).toBe(200);
+  progressBody = (await progressResponse.json()) as Record<string, unknown>;
 });
 afterAll(() => client.close());
 beforeEach(() => {
@@ -361,4 +371,100 @@ it('advances the cached attempt marker after its original preparation is recover
   await click('Back to attempts');
   expect(host.textContent).toContain('Preparation start recorded');
   expect(host.textContent).not.toContain('Not started');
+});
+it('mounts explicit complete progress and advances cached preparation markers from actual canonical evidence', async () => {
+  await render();
+  await click('Load saved runs');
+  await reply(0, indexBody);
+  await click('Inspect run ' + f.run.id.slice(0, 8) + '…' + f.run.id.slice(-4));
+  const before = structuredClone(pageBody) as {
+    attempts: { preparationStarted: boolean }[];
+  };
+  before.attempts[0].preparationStarted = false;
+  await reply(1, before);
+  const details = [...host.querySelectorAll('details')].find(
+    (d) =>
+      d.querySelector('summary')?.textContent ===
+      'Original progress and remaining allowance',
+  )!;
+  await act(async () => {
+    details.open = true;
+    details.dispatchEvent(new Event('toggle', { bubbles: true }));
+  });
+  expect(requests).toHaveLength(2);
+  await click('Load complete saved progress');
+  await reply(2, progressBody);
+  await waitText('Finalized sales');
+  expect(host.textContent).toContain('Preparation start recorded');
+  expect(host.textContent).not.toContain('Not started');
+  expect(host.textContent).toContain('No allowance has been released');
+  await click('Back to saved runs');
+  await click('Inspect run ' + f.run.id.slice(0, 8) + '…' + f.run.id.slice(-4));
+  await reply(3, before);
+  await waitText('Saved preparation history moved backwards');
+});
+it('refuses a complete progress response that loses a start already known from the attempt page', async () => {
+  await inspect();
+  const details = [...host.querySelectorAll('details')].find(
+    (d) =>
+      d.querySelector('summary')?.textContent ===
+      'Original progress and remaining allowance',
+  )!;
+  await act(async () => {
+    details.open = true;
+    details.dispatchEvent(new Event('toggle', { bubbles: true }));
+  });
+  await click('Load complete saved progress');
+  const absent = structuredClone(progressBody) as typeof progressBody & {
+    evidence: { preparationStarts: unknown[] };
+  };
+  absent.evidence.preparationStarts = [];
+  await reply(2, absent);
+  await waitText('Complete saved progress could not be verified');
+  expect(
+    host.querySelector('[aria-label="Verified original run progress"]'),
+  ).toBeNull();
+  expect(host.textContent).toContain('Preparation start recorded');
+});
+it('replaces a cached not-started preparation after progress verifies its start and refuses a later regression', async () => {
+  await render();
+  await click('Load saved runs');
+  await reply(0, indexBody);
+  await click('Inspect run ' + f.run.id.slice(0, 8) + '…' + f.run.id.slice(-4));
+  const before = structuredClone(pageBody) as {
+    attempts: { preparationStarted: boolean }[];
+  };
+  before.attempts[0].preparationStarted = false;
+  await reply(1, before);
+  await click('Inspect preparation #1');
+  const missing = {
+    ...packetBody,
+    status: 'not-started',
+    packet: null,
+    summary: null,
+  };
+  await reply(2, missing);
+  await waitText('Preparation not started');
+  const details = [...host.querySelectorAll('details')].find(
+    (d) =>
+      d.querySelector('summary')?.textContent ===
+      'Original progress and remaining allowance',
+  )!;
+  await act(async () => {
+    details.open = true;
+    details.dispatchEvent(new Event('toggle', { bubbles: true }));
+  });
+  await click('Load complete saved progress');
+  await reply(3, progressBody);
+  await waitText('Read this preparation again');
+  expect(host.textContent).not.toContain('Preparation not started');
+  await click('Read this preparation again');
+  await reply(4, missing);
+  await waitText(
+    'Saved Auto Sell recovery is unavailable or its original context differs',
+  );
+  expect(host.textContent).not.toContain('Preparation not started');
+  expect(
+    host.querySelector('[aria-label="Verified original run progress"]'),
+  ).not.toBeNull();
 });

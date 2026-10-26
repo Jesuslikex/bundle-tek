@@ -1,0 +1,151 @@
+{
+  "baseCommit": "1e7bc6fbb3cc5c0a5b9a6bbafb1891b843650a87",
+  "originalRecoveryBehaviorPreservedExceptExplicitAdditions": true,
+  "protectedFilesUnchanged": [
+    "app/page.tsx",
+    "app/ux.css",
+    "lib/auto-sell-runner.ts",
+    "lib/auto-sell-execute.ts",
+    "lib/auto-sell-edit.ts",
+    "lib/auto-sell.ts",
+    "lib/auto-sell-profile.ts",
+    "lib/auto-sell-profile-storage.ts",
+    "lib/browser-wallet-vault.ts",
+    "lib/warmup-signing.ts",
+    "lib/imported-swap-approval.ts",
+    "lib/imported-trade-session-server.ts",
+    "app/api/imported-projects/prepare/route.ts",
+    "app/api/imported-projects/signing/route.ts",
+    "lib/pump-group-runtime-service.ts",
+    "lib/pump-group-code-identity.ts",
+    "lib/jito-readonly-qualification.ts",
+    "vercel.json",
+    "lib/auto-sell-run.ts",
+    "lib/auto-sell-run-storage.ts",
+    "lib/auto-sell-run-preparation.ts",
+    "lib/unsigned-swap-order.ts",
+    "lib/auto-sell-run-packet.ts",
+    "lib/auto-sell-run-packet-storage.ts",
+    "lib/imported-swap-preparation-history.ts",
+    "lib/prepare-owned-imported-swap.ts",
+    "app/api/imported-projects/auto-sell-run-recovery/route.ts",
+    "db/turso.ts",
+    "lib/auth.ts",
+    "components/auto-sell-modal.tsx",
+    "lib/auto-sell-run-recovery-client.ts",
+    "app/api/imported-projects/auto-sell-runs/route.ts",
+    "app/api/imported-projects/auto-sell-profiles/route.ts",
+    "components/auto-sell-profiles.tsx",
+    "components/auto-sell-run-enrollment.tsx",
+    "lib/auto-sell-run-enrollment-client.ts",
+    "lib/auto-sell-run-record-stop-storage.ts",
+    "lib/auto-sell-run-record-stop-client.ts"
+  ],
+  "priorSqlUnchanged": 154,
+  "journalUnchanged": true,
+  "frozenDraftsUnchanged": 7,
+  "ownedSourceHashes": {
+    "lib/auto-sell-run-progress.ts": "3e4b9077fda47160babfa93851cbad97ebadafcfd4222faea1e2966b5f11b559",
+    "lib/auto-sell-run-progress.test.ts": "38d28b6e4d5cb4ff5557558c2fd8c99f563f9d3cc839f91916a306ec7fc73f33",
+    "lib/auto-sell-run-progress-client.ts": "74a7d87e15afce72a48a4becfe88c2b2e2e79a670f82949999d89a9bf10c5ada",
+    "lib/auto-sell-run-progress-client.test.ts": "a5c743e8e041593ca535c9c1013ef1d59b2cf217851771cfbcf59a7b3b9e70d4",
+    "lib/auto-sell-run-progress-storage.ts": "3d2dc8077103b1c43ef6ee2c762319ed3a75f80df4b416a9c3284945f83791b5",
+    "lib/auto-sell-run-progress-storage.test.ts": "4a988deb1731ec43b164aa59956edafff8d7d5c0a49f49ec602981807905095a",
+    "app/api/imported-projects/auto-sell-run-progress/route.ts": "e9302b93506acca981775508e83794be5f07f5c00f9b077e30508c84bf4eb9ac",
+    "app/api/imported-projects/auto-sell-run-progress/route.test.ts": "8a5da3140c8b826cbcce30213f93a95d1f032a35fd8872e257b15d1902fbbd51",
+    "components/auto-sell-run-progress.tsx": "01dad2e5223b47b320417593c76a7c5cae70fb66783595499aa78682fba36419",
+    "components/auto-sell-run-progress.test.tsx": "0f0c964678e776e983a2d3d0dca27a125de7f5e2192ede937e65ef333c308bb5",
+    "components/auto-sell-run-progress.module.css": "fd2874a40696d495eb3cb30f04af668e167a163770af8194c96b7cea66b8c302",
+    "components/auto-sell-run-recovery.tsx": "9c283e09fdaeb35b4a65e4226ab8f7f8163467c683be8f5970f96bd26d777c74",
+    "components/auto-sell-run-recovery.test.tsx": "2884de773c0dceaf37ecb394b906508ca595ed679767f71ad16543a27ffea298"
+  },
+  "format": "auto-sell-complete-saved-progress-verification-v1",
+  "regression": {
+    "passed": 1228,
+    "total": 1228,
+    "files": 67,
+    "allAssertionsPassed": true,
+    "exit": 0,
+    "maxWorkers": 2,
+    "scope": "Auto Sell profile/journal/progress/HTTP/UI/native-D1 engines and imported/conditional regressions; not repository-wide"
+  },
+  "typecheck": {
+    "plainTscNoEmit": true,
+    "exit": 0
+  },
+  "lint": {
+    "typeAwareFiles": 12,
+    "passed": true
+  },
+  "formatting": {
+    "files": 13,
+    "passed": true
+  },
+  "browser": {
+    "passed": true,
+    "syntheticAuth": true,
+    "actualModalClientsApisTursoAdapter": true,
+    "disposableMigrations": 154,
+    "requests": 7,
+    "methods": [
+      "GET"
+    ],
+    "progressReads": 2,
+    "reloadRetainsOriginalRunClocksAndCharge": true,
+    "otherOwnerEmpty": true,
+    "viewports": [
+      1920,
+      375
+    ],
+    "horizontalOverflow": false,
+    "progressButtonMinHeight": 44,
+    "passwordLength": 0,
+    "runDisabled": true,
+    "consoleErrors": 0,
+    "counts": {
+      "auto_sell_runs": 1,
+      "auto_sell_run_attempts": 1,
+      "auto_sell_run_preparation_starts": 1,
+      "auto_sell_run_packets": 1,
+      "imported_swap_signing_intents": 0
+    },
+    "ownTabClosed": true,
+    "viewportReset": true,
+    "ownServerStopped": true
+  },
+  "reviews": [
+    {
+      "model": "claude-opus-5-5",
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "copiedSourcesUnchanged": true,
+      "sourceOnly": true,
+      "copies": 17
+    },
+    {
+      "model": "claude-opus-5-5",
+      "modelsUsed": [
+        "claude-opus-5-5"
+      ],
+      "permissionDenials": 0,
+      "copiedSourcesUnchanged": true,
+      "sourceOnly": true,
+      "copies": 18
+    }
+  ],
+  "finalSourcesEqualFollowupCopies": true,
+  "limitations": [
+    "Actual browser runner remains memory-only and unconnected.",
+    "No qualified trade decision, execution, resume, release or finality authority.",
+    "Full historical unsaved queues, random draws and skipped events are unavailable.",
+    "Complete evidence over1MiB refuses, paged saved attempts remain available.",
+    "Bracketing assumes normal primary SQL clock/read consistency; not funded/runtime qualification.",
+    "Parent latest allowance totals can accompany an earlier attempt page until manually reloaded.",
+    "Browser auth synthetic, no production-auth/build/funded verification."
+  ],
+  "deployment": false,
+  "hostedOrApplicationSql": false,
+  "realWalletOrFundedAction": false
+}

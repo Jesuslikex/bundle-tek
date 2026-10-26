@@ -10,6 +10,7 @@ import {
   loadAutoSellRunPacketRecovery,
 } from '@/lib/auto-sell-run-recovery-client';
 import { Button } from './ui/button';
+import { AutoSellRunProgressPanel } from './auto-sell-run-progress';
 import styles from './auto-sell-run-recovery.module.css';
 
 const auth = createAuthClient();
@@ -100,6 +101,8 @@ function RecoveryPanel({
   const [notice, setNotice] = useState('');
   const pending = useRef<AbortController | null>(null);
   const observedRuns = useRef(new Map<string, Run>());
+  const observedStarts = useRef(new Map<string, Set<string>>());
+  const [startedFloor, setStartedFloor] = useState(new Map<string, string[]>());
   const runHeading = useRef<HTMLHeadingElement | null>(null);
   const preparationHeading = useRef<HTMLHeadingElement | null>(null);
   useEffect(
@@ -200,6 +203,19 @@ function RecoveryPanel({
         'Saved run history moved backwards or differs from an earlier verified read. The previous allowance and Stop observation are retained.',
       );
   }
+  function rememberStarted(runId: string, ids: string[]) {
+    const known = observedStarts.current.get(runId) ?? new Set<string>();
+    const merged = new Set([...known, ...ids]);
+    if (
+      merged.size > 1000 ||
+      (!observedStarts.current.has(runId) && observedStarts.current.size >= 100)
+    )
+      throw Error(
+        'Saved preparation observations exceed this complete view. No earlier start was discarded.',
+      );
+    observedStarts.current.set(runId, merged);
+    setStartedFloor((previous) => new Map(previous).set(runId, [...merged]));
+  }
   function inspectRun(run: Run, beforeSequence?: number) {
     const observed = observedRuns.current.get(run.id) ?? run;
     const minimumAccounting = {
@@ -223,6 +239,16 @@ function RecoveryPanel({
         signal,
       );
       if (current()) {
+        if (
+          value.attempts.some(
+            (attempt) =>
+              observedStarts.current.get(run.id)?.has(attempt.id) &&
+              !attempt.preparationStarted,
+          )
+        )
+          throw Error(
+            'Saved preparation history moved backwards. Earlier start observations are retained.',
+          );
         const updated = {
           ...run,
           attemptCount: value.accounting.sequence,
@@ -230,6 +256,12 @@ function RecoveryPanel({
           stopped: value.stopped,
         };
         checkObservedRun(updated);
+        rememberStarted(
+          run.id,
+          value.attempts
+            .filter((attempt) => attempt.preparationStarted)
+            .map((attempt) => attempt.id),
+        );
         observedRuns.current.set(run.id, updated);
         setPage(value);
         const update = (r: Run) =>
@@ -266,8 +298,16 @@ function RecoveryPanel({
         signal,
       );
       if (current()) {
+        if (
+          value.status === 'not-started' &&
+          observedStarts.current.get(captured.runId)?.has(attempt.id)
+        )
+          throw Error(
+            'Saved preparation history moved backwards. Earlier start observations are retained.',
+          );
         setRecovery(value);
         if (value.status !== 'not-started') {
+          rememberStarted(captured.runId, [attempt.id]);
           const update = (row: Attempt) =>
             row.id === attempt.id ? { ...row, preparationStarted: true } : row;
           setSelectedAttempt((previous) =>
@@ -387,6 +427,101 @@ function RecoveryPanel({
             >
               Read this run again
             </Button>
+          ) : null}
+          {owner && !checking ? (
+            <AutoSellRunProgressPanel
+              key={JSON.stringify([
+                owner,
+                projectId,
+                selectedRun.id,
+                selectedRun.runSha256,
+              ])}
+              owner={owner}
+              projectId={projectId}
+              run={selectedRun}
+              disabled={unavailable}
+              startedAttemptIds={startedFloor.get(selectedRun.id) ?? []}
+              minimumHead={
+                page && page.runId === selectedRun.id
+                  ? {
+                      sequence: page.accounting.sequence,
+                      sha256: page.accounting.headSha256,
+                    }
+                  : undefined
+              }
+              onObserved={(progress) => {
+                if (
+                  [...(observedStarts.current.get(selectedRun.id) ?? [])].some(
+                    (id) =>
+                      !progress.evidence.preparationStarts.some(
+                        (start) => start.attemptId === id,
+                      ),
+                  )
+                )
+                  throw Error(
+                    'Saved preparation history moved backwards. Earlier start observations are retained.',
+                  );
+                const updated = {
+                  ...selectedRun,
+                  attemptCount: progress.accounting.sequence,
+                  accountedRaw: progress.accounting.accountedRaw,
+                  stopped: progress.evidence.stop !== null,
+                };
+                checkObservedRun(updated);
+                rememberStarted(
+                  updated.id,
+                  progress.evidence.preparationStarts.map(
+                    (start) => start.attemptId,
+                  ),
+                );
+                observedRuns.current.set(updated.id, updated);
+                setSelectedRun(updated);
+                setIndex((previous) =>
+                  previous
+                    ? {
+                        ...previous,
+                        runs: previous.runs.map((row) =>
+                          row.id === updated.id ? updated : row,
+                        ),
+                      }
+                    : previous,
+                );
+                const started = new Set(
+                  progress.evidence.preparationStarts.map(
+                    (start) => start.attemptId,
+                  ),
+                );
+                setPage((previous) =>
+                  previous && previous.runId === updated.id
+                    ? {
+                        ...previous,
+                        accounting: {
+                          sequence: progress.accounting.sequence,
+                          headSha256: progress.accounting.headSha256,
+                          accountedRaw: progress.accounting.accountedRaw,
+                        },
+                        stopped: updated.stopped,
+                        attempts: previous.attempts.map((attempt) =>
+                          started.has(attempt.id)
+                            ? { ...attempt, preparationStarted: true }
+                            : attempt,
+                        ),
+                      }
+                    : previous,
+                );
+                setRecovery((previous) =>
+                  previous?.status === 'not-started' &&
+                  started.has(previous.attemptId)
+                    ? null
+                    : previous,
+                );
+                setSelectedAttempt((previous) =>
+                  previous && started.has(previous.id)
+                    ? { ...previous, preparationStarted: true }
+                    : previous,
+                );
+              }}
+            />
           ) : null}
           {page ? (
             <>
