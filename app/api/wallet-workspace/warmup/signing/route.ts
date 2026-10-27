@@ -29,6 +29,7 @@ import {
   WalletRpcError,
 } from '@/lib/wallet-balances';
 import { getSolanaRpcEndpoint } from '@/lib/solana-rpc';
+import { refreshPacketBlockhash } from '@/lib/warmup-swap-quote';
 import type { WarmupApprovalHistoryRow } from '@/lib/warmup-approval-history';
 import { requireStoredWarmupBuyLink } from '@/lib/warmup-buy-link';
 import type { SavedWarmupBuyReceipt } from '@/lib/warmup-buy-receipt';
@@ -179,6 +180,7 @@ export async function POST(request: Request) {
     return json({ error: 'Cross-origin request rejected.' }, 403);
   let body: {
     action: string;
+    intentId?: string;
     preparationId?: string;
     id?: string;
     transaction?: string;
@@ -206,7 +208,7 @@ export async function POST(request: Request) {
   let stage = 'saved approval';
   try {
     const db = getD1(),
-      signal = AbortSignal.any([request.signal, AbortSignal.timeout(25000)]),
+      signal = AbortSignal.any([request.signal, AbortSignal.timeout(60000)]),
       now = new Date().toISOString();
     if (body.action === 'review') {
       const row = await db
@@ -249,6 +251,34 @@ export async function POST(request: Request) {
       }
       stage = 'restore owned order';
       const order = await restoreWarmupOrder(saved, body.transaction);
+      // DFlow's blockhash can arrive already near expiry, and the review plus a
+      // wallet approval eat the rest of it. Take a fresh one before the review
+      // simulation, so the signed packet starts with a full window.
+      const fresh = await refreshPacketBlockhash(
+        order.preparation.transaction,
+        signal,
+        fetch,
+      );
+      console.error('review refresh', {
+        fresh: !!fresh,
+        lvbh: fresh?.lastValidBlockHeight,
+        reviewLvbh: order.preparation.lastValidBlockHeight,
+      });
+      if (fresh) {
+        const digest = await crypto.subtle.digest(
+          'SHA-256',
+          Uint8Array.from(getBase64Encoder().encode(fresh.transaction)).buffer,
+        );
+        order.preparation.transaction = fresh.transaction;
+        order.preparation.lastValidBlockHeight = fresh.lastValidBlockHeight;
+        order.preparation.sha256 = Array.from(
+          new Uint8Array(digest),
+          (b) => b.toString(16).padStart(2, '0'),
+        ).join('');
+        saved.document.transaction.lastValidBlockHeight =
+          fresh.lastValidBlockHeight;
+        saved.document.transaction.sha256 = order.preparation.sha256;
+      }
       const occupied = await db
         .prepare(
           "SELECT id FROM warmup_signing_intents WHERE owner_id=? AND (preparation_id=? OR (wallet_address=? AND state IN ('awaiting_signature','signed','submitted'))) LIMIT 1",
@@ -261,18 +291,30 @@ export async function POST(request: Request) {
         )
         .bind(user.userId, saved.document.wallet)
         .first();
-      if (occupied || reservation)
+      // A re-review of the same intent (blockhash refresh before a re-sign) is
+      // not a second approval, so it may reuse its own intent and reservation.
+      const sameIntent =
+        typeof body.intentId === 'string' &&
+        (occupied as { id?: string } | null)?.id === body.intentId &&
+        (!reservation ||
+          (reservation as { intentId?: string }).intentId === body.intentId);
+      if ((occupied || reservation) && !sameIntent)
         return json(
           { error: 'Recover the existing wallet approval first.', reservation },
           409,
         );
       const gateNow = Date.now();
-      const gate = await db
-        .prepare(
-          'INSERT INTO wallet_balance_gates(owner_id,next_allowed_at) VALUES (?,?) ON CONFLICT(owner_id) DO UPDATE SET next_allowed_at=excluded.next_allowed_at WHERE wallet_balance_gates.next_allowed_at<=?',
-        )
-        .bind(user.userId, gateNow + 15000, gateNow)
-        .run();
+      // The review re-simulates an order the prepare already read for, so it must
+      // not queue behind the 15s read gate: the blockhash only lives ~150 blocks.
+      const gate =
+        body.action === 'review'
+          ? { meta: { changes: 1 } }
+          : await db
+              .prepare(
+                'INSERT INTO wallet_balance_gates(owner_id,next_allowed_at) VALUES (?,?) ON CONFLICT(owner_id) DO UPDATE SET next_allowed_at=excluded.next_allowed_at WHERE wallet_balance_gates.next_allowed_at<=?',
+              )
+              .bind(user.userId, gateNow + 15000, gateNow)
+              .run();
       if (!gate.meta.changes) {
         const currentGate = await db
           .prepare(
@@ -317,6 +359,22 @@ export async function POST(request: Request) {
           },
           409,
         );
+      // A re-review supersedes the intent it replaces, so the wallet is not left
+      // occupied by a signature that can no longer land.
+      if (sameIntent) {
+        await db
+          .prepare(
+            "UPDATE warmup_signing_intents SET state='failed', updated_at=? WHERE owner_id=? AND id=? AND state IN ('awaiting_signature','signed')",
+          )
+          .bind(new Date().toISOString(), user.userId, body.intentId)
+          .run();
+        await db
+          .prepare(
+            'DELETE FROM solana_swap_reservations WHERE owner_id=? AND intent_id=?',
+          )
+          .bind(user.userId, body.intentId)
+          .run();
+      }
       const id = crypto.randomUUID(),
         review: WarmupSigningReview = {
           id,
@@ -338,6 +396,20 @@ export async function POST(request: Request) {
             ? { buyReceipt: saved.document.buyReceipt }
             : {}),
         };
+      // Persist the refreshed packet so submission signs the same bytes.
+      if (fresh) {
+        review.transaction = order.preparation.transaction;
+        review.lastValidBlockHeight = order.preparation.lastValidBlockHeight;
+        review.sha256 = order.preparation.sha256;
+        const document = JSON.stringify(saved.document);
+        await db
+          .prepare(
+            'UPDATE warmup_swap_preparations SET document=? WHERE owner_id=? AND id=? AND document=?',
+          )
+          .bind(document, user.userId, saved.id, row.document)
+          .run();
+        row.document = document;
+      }
       stage = 'reserve unsigned approval';
       const write = await db
         .prepare(
@@ -713,7 +785,8 @@ export async function POST(request: Request) {
       err.message.includes(SESSION_PREPARATION_SIGNING_DISABLED)
     )
       return json({ error: SESSION_PREPARATION_SIGNING_DISABLED }, 409);
-    if (err instanceof SwapBlockhashExpiredError)
+    if (err instanceof SwapBlockhashExpiredError) {
+      console.error('blockhash expired', { stage, action: body.action });
       return json(
         {
           error:
@@ -723,9 +796,11 @@ export async function POST(request: Request) {
         },
         409,
       );
+    }
     console.error('Warmup approval failed', {
       stage,
       status: err instanceof WalletRpcError ? err.status : null,
+      message: err instanceof Error ? err.message : String(err),
     });
     if (err instanceof WalletRpcError)
       return json(

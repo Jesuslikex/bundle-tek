@@ -191,7 +191,7 @@ export async function POST(request: Request) {
       return json({ error: 'Wait 15 seconds between wallet reads.' }, 429);
     const signal = AbortSignal.any([
       request.signal,
-      AbortSignal.timeout(25000),
+      AbortSignal.timeout(60000),
     ]);
     const side = input.side ?? 'Buy';
     const inventory =
@@ -309,12 +309,16 @@ export async function POST(request: Request) {
       order,
       simulation,
       history,
-      reviewWaitMs: Math.max(0, now + 15000 - Date.now()),
+      reviewWaitMs: Math.max(0, now + 5000 - Date.now()),
       ...(inventory ? { inventory } : {}),
       ...(buyLink ? { buyLink } : {}),
     });
   } catch (error) {
-    if (error instanceof SwapBlockhashExpiredError)
+    if (error instanceof SwapBlockhashExpiredError) {
+      console.error('Warmup blockhash expired', {
+        stage,
+        message: (error as Error).message,
+      });
       return json(
         {
           error:
@@ -322,8 +326,10 @@ export async function POST(request: Request) {
         },
         409,
       );
+    }
     console.error('Warmup preparation failed', {
       stage,
+      message: error instanceof Error ? error.message : String(error),
     });
     if (error instanceof WalletRpcError)
       return json(

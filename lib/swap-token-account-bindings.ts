@@ -1,9 +1,11 @@
 import bs58 from 'bs58';
+import { address, getProgramDerivedAddress } from '@solana/kit';
 import type { JupiterRouteAssessment } from './jupiter-route-assessment';
 import type { SolanaSwapPreparation } from './warmup-swap-quote';
 import { swapTokenBytes } from './swap-token-program-evidence';
 const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+const ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
 type Rpc = (method: string, params: unknown[]) => Promise<unknown>;
 type AccountBinding = {
   tokenProgram?: string;
@@ -32,30 +34,50 @@ export async function readSwapTokenAccountBindings(
   },
   minContextSlot: number,
   rpc: Rpc,
-) {
+): Promise<{
+  slot: number | null;
+  accounts: AccountBinding[];
+  limitations: string;
+  status: 'Matched bindings' | 'Mismatch' | 'Unavailable';
+}> {
   const limitations =
     'Confirmed chain account bindings only, not simulated post-state. Newly created or temporary wrapped SOL accounts can be absent. Token-2022 accounts accept only canonical immutable-owner extensions; mint extensions need separate fresh evidence. Mint authenticity, other instructions, route graph and total debits remain unverified. No signing clearance.';
-  if (!route.decoded)
-    return {
-      slot: null,
-      status: 'Unavailable' as const,
-      accounts: [] as AccountBinding[],
-      limitations,
-    };
+  // DFlow routes are outside the pinned Jupiter interface. The two wallet
+  // token accounts are still derivable from the wallet and the order mints.
+  const derived = route.decoded
+    ? null
+    : await Promise.all(
+        (
+          [
+            ['Source', order.inputMint],
+            ['Destination', order.outputMint],
+          ] as const
+        ).map(async ([role, mint]) => {
+          const [ata] = await getProgramDerivedAddress({
+            programAddress: address(ATA),
+            seeds: [
+              bs58.decode(order.preparation.wallet),
+              bs58.decode(TOKEN),
+              bs58.decode(mint),
+            ],
+          });
+          return { role, address: ata, expectedMint: mint, expectedProgram: TOKEN };
+        }),
+      );
   if (!Number.isSafeInteger(minContextSlot) || minContextSlot < 0)
     throw new Error('Invalid token account observation slot.');
-  const selections = [
+  const selections = derived ?? [
     {
       role: 'Source' as const,
-      address: route.decoded.sourceAccount,
+      address: route.decoded!.sourceAccount,
       expectedMint: order.inputMint,
-      expectedProgram: route.decoded.inputTokenProgram ?? TOKEN,
+      expectedProgram: route.decoded!.inputTokenProgram ?? TOKEN,
     },
     {
       role: 'Destination' as const,
-      address: route.decoded.destinationAccount,
+      address: route.decoded!.destinationAccount,
       expectedMint: order.outputMint,
-      expectedProgram: route.decoded.outputTokenProgram ?? TOKEN,
+      expectedProgram: route.decoded!.outputTokenProgram ?? TOKEN,
     },
   ];
   const addresses = [...new Set(selections.map((a) => a.address))];

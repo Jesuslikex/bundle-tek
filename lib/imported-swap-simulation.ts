@@ -1,4 +1,7 @@
+import bs58 from 'bs58';
 import {
+  address,
+  getProgramDerivedAddress,
   getBase64Encoder,
   getBase64Decoder,
   getTransactionDecoder,
@@ -83,15 +86,23 @@ export async function simulateImportedSwap(
   if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
     throw new Error('Wrong simulation network.');
   const [height, feeRaw] = await Promise.all([
-    rpc('getBlockHeight', [{ commitment: 'confirmed' }]),
+    // Finalized: some providers answer a confirmed getBlockHeight with the slot,
+    // which is ~22M above the block height and would read every order as expired.
+    rpc('getBlockHeight', [{ commitment: 'finalized' }]),
     rpc('getFeeForMessage', [
       getBase64Decoder().decode(tx.messageBytes),
       { commitment: 'confirmed' },
     ]),
   ]);
   const blockHeight = integer(height);
-  if (blockHeight > integer(order.preparation.lastValidBlockHeight))
+  if (blockHeight > integer(order.preparation.lastValidBlockHeight)) {
+    console.error('blockhash check', {
+      blockHeight: blockHeight.toString(),
+      lastValid: order.preparation.lastValidBlockHeight,
+      endpoint,
+    });
     throw new SwapBlockhashExpiredError();
+  }
   const fee = feeRaw as { context: { slot: unknown }; value: unknown };
   const feeSlot = slot(fee.context.slot);
   const feeLamports = integer(fee.value).toString();
@@ -147,32 +158,7 @@ export async function simulateImportedSwap(
         ]),
       ).toString()
     : null;
-  const result = (await rpc('simulateTransaction', [
-    order.preparation.transaction,
-    {
-      encoding: 'base64',
-      commitment: 'confirmed',
-      sigVerify: false,
-      replaceRecentBlockhash: false,
-      minContextSlot:
-        mintBefore?.slot ??
-        beforeBindings?.slot ??
-        lookupAccounts?.observedSlot ??
-        feeSlot,
-      ...(signingEvidence && routeAssessment.decoded
-        ? {
-            accounts: {
-              encoding: 'base64',
-              addresses: [
-                routeAssessment.decoded.sourceAccount,
-                routeAssessment.decoded.destinationAccount,
-              ],
-            },
-          }
-        : {}),
-      innerInstructions: false,
-    },
-  ])) as {
+  type SimResult = {
     context: { slot: unknown };
     value: {
       err: unknown;
@@ -186,6 +172,66 @@ export async function simulateImportedSwap(
       postTokenBalances?: unknown;
     };
   };
+  // DFlow routes are outside the pinned Jupiter interface, so the two wallet
+  // token accounts are derived from the wallet and the order mints.
+  const reviewAddresses = routeAssessment.decoded
+    ? [
+        routeAssessment.decoded.sourceAccount,
+        routeAssessment.decoded.destinationAccount,
+      ]
+    : await Promise.all(
+        [order.inputMint, order.outputMint].map(async (mint) => {
+          const [ata] = await getProgramDerivedAddress({
+            programAddress: address(
+              'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+            ),
+            seeds: [
+              bs58.decode(order.preparation.wallet),
+              bs58.decode('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+              bs58.decode(mint),
+            ],
+          });
+          return ata;
+        }),
+      );
+  const simulate = () =>
+    rpc('simulateTransaction', [
+    order.preparation.transaction,
+    {
+      encoding: 'base64',
+      commitment: 'confirmed',
+      sigVerify: false,
+      replaceRecentBlockhash: false,
+      minContextSlot:
+        mintBefore?.slot ??
+        beforeBindings?.slot ??
+        lookupAccounts?.observedSlot ??
+        feeSlot,
+      ...(signingEvidence && reviewAddresses
+        ? {
+            accounts: {
+              encoding: 'base64',
+              addresses: reviewAddresses,
+            },
+          }
+        : {}),
+      innerInstructions: false,
+      logs: true,
+    },
+  ]);
+  // DFlow's blockhash comes from its own node, so this node may not know it yet.
+  // Retry briefly rather than replacing it, so the reviewed blockhash stays exact.
+  let result: SimResult | undefined;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    result = (await simulate()) as SimResult;
+    if (
+      !result.value?.err ||
+      !JSON.stringify(result.value.err).includes('BlockhashNotFound')
+    )
+      break;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  if (!result) throw new Error('Simulation unavailable.');
   const simulationSlot = slot(result.context.slot);
   if (
     simulationSlot < feeSlot ||
@@ -233,6 +279,8 @@ export async function simulateImportedSwap(
       instructionIndex: Number.isSafeInteger(instruction[0])
         ? instruction[0]
         : null,
+      raw: JSON.stringify(failure).slice(0, 200),
+      logs: (result.value as any).logs?.slice(-4),
       customCode:
         custom &&
         typeof custom === 'object' &&
@@ -252,8 +300,10 @@ export async function simulateImportedSwap(
     if (
       !Array.isArray(result.value.preBalances) ||
       !Array.isArray(result.value.postBalances) ||
-      result.value.preBalances.length !== order.preparation.accountCount ||
-      result.value.postBalances.length !== order.preparation.accountCount
+      // Lookup-loaded accounts are appended to the balance arrays, so the
+      // static count is a floor rather than an exact length.
+      result.value.preBalances.length < order.preparation.accountCount ||
+      result.value.postBalances.length < order.preparation.accountCount
     )
       throw new Error('Missing simulated wallet balances.');
     // The envelope reviewer requires the wallet to be the first, sole signer.

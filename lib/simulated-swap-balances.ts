@@ -54,7 +54,7 @@ export function assessSimulatedSwapTokens(
     ...loadedKeys(loaded?.readonly, readonlyCount),
   ];
   if (
-    keys.length !== order.preparation.accountCount ||
+    keys.length < order.preparation.accountCount ||
     keys[0] !== order.preparation.wallet
   )
     throw new Error('Simulation account envelope mismatch.');

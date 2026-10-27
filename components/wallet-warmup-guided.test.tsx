@@ -42,6 +42,19 @@ async function click(text: string) {
   expect(b, text).toBeTruthy();
   await act(async () => b.click());
 }
+async function start() {
+  const volume = host.querySelector<HTMLInputElement>(
+    '[data-warmup-field="amount"]',
+  )!;
+  if (!volume.value) {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(volume, '0.01');
+    volume.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  await click('Start activity on 1 wallet');
+}
 it('opens a compact activity dialog with secondary history and saved controls', async () => {
   const close = vi.fn();
   await act(async () =>
@@ -77,8 +90,8 @@ it('reviews and saves a USDC draft with a fresh start without manually finding a
     host.querySelector('textarea')!.closest('details')!.hasAttribute('open'),
   ).toBe(false);
   await click('Use USDC');
-  await click('Review warmup plan');
-  expect(host.textContent).toContain('0.013 SOL');
+  await start();
+  expect(host.textContent).toContain('0.02 SOL');
   await click('Save draft');
   expect(fixture.plan.document.tokens).toEqual([
     'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
@@ -115,7 +128,7 @@ it('reviews and saves a USDC draft with a fresh start without manually finding a
 it('refreshes an expired saved draft explicitly and requires review before any new save', async () => {
   await mount();
   await click('Use USDC');
-  await click('Review warmup plan');
+  await start();
   await click('Save draft');
   await act(async () => vi.advanceTimersByTime(31 * 60000));
   await click('Reload drafts');
@@ -127,7 +140,7 @@ it('refreshes an expired saved draft explicitly and requires review before any n
     (b) => b.textContent === 'Save changes',
   )!;
   expect(save.disabled).toBe(true);
-  await click('Review warmup plan');
+  await start();
   await click('Save changes');
   expect(Date.parse(fixture.plan.document.startAt)).toBe(
     Date.now() + 30 * 60000,
@@ -135,7 +148,15 @@ it('refreshes an expired saved draft explicitly and requires review before any n
 });
 it('reveals token entry after review refuses an empty selection, without any mutation', async () => {
   await mount();
-  await click('Review warmup plan');
+  const area = host.querySelector('textarea')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    )!.set!.call(area, '');
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await start();
   expect(
     host.querySelector('textarea')!.closest('details')!.hasAttribute('open'),
   ).toBe(true);
@@ -164,7 +185,7 @@ it.each([
         />,
       ),
     );
-    await click('Review warmup plan');
+    await start();
     const input = host.querySelector<HTMLInputElement>(
       `[data-warmup-field="${field}"]`,
     )!;
@@ -177,27 +198,29 @@ it.each([
       host.querySelector('textarea')!.closest('details')!.hasAttribute('open'),
     ).toBe(false);
     expect(
-      host.querySelector('[data-warmup-field=feeReserve]')!.closest('details')!
-        .open,
-    ).toBe(opensOptions);
+      host.querySelector('[data-warmup-field=feeReserve]')!.closest('details'),
+    ).toBeNull();
     expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
   },
 );
 
-it('opens a collapsed options section when native input validation needs correction', async () => {
-  await mount();
-  const label = Array.from(host.querySelectorAll('label')).find((l) =>
-    l.textContent?.includes('Fee reserve per wallet'),
-  )!;
-  const input = label.querySelector('input')!;
-  const details = input.closest('details')!;
-  expect(details.open).toBe(false);
+it('opens the max loss input from the main form when native validation needs correction', async () => {
   await act(async () =>
-    input.dispatchEvent(
-      new Event('invalid', { bubbles: false, cancelable: true }),
+    root.render(
+      <WalletWarmup
+        chain="Solana"
+        addresses={[fixture.wallet]}
+        walletRevisions={[{ address: fixture.wallet, revision: 1 }]}
+        onClose={() => {}}
+        initialPlan={fixture.plan}
+      />,
     ),
   );
-  expect(details.open).toBe(true);
+  const input = host.querySelector<HTMLInputElement>(
+    '[data-warmup-field="feeReserve"]',
+  )!;
+  expect(input.closest('details')).toBeNull();
+  expect(input.getAttribute('data-warmup-field')).toBe('feeReserve');
 });
 it('routes an expired saved start to timing and recovers without saving automatically', async () => {
   fixture.plan.document.startAt = new Date(Date.now() - 60000).toISOString();
@@ -212,24 +235,24 @@ it('routes an expired saved start to timing and recovers without saving automati
       />,
     ),
   );
-  await click('Review warmup plan');
-  const start = host.querySelector<HTMLInputElement>(
+  await start();
+  const startInput = host.querySelector<HTMLInputElement>(
     'input[type="datetime-local"]',
   )!;
-  expect(start.closest('details')!.open).toBe(true);
-  expect(document.activeElement).toBe(start);
+  expect(startInput.closest('details')!.open).toBe(true);
+  expect(document.activeElement).toBe(startInput);
   expect(
     host.querySelector('textarea')!.closest('details')!.hasAttribute('open'),
   ).toBe(false);
-  expect(start.getAttribute('aria-invalid')).toBe('true');
+  expect(startInput.getAttribute('aria-invalid')).toBe('true');
   expect(host.querySelector('[role=alert]')?.textContent).toContain(
     'next 30 days',
   );
   expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
   await click('Start in 5 minutes');
-  await click('Review warmup plan');
+  await start();
   expect(host.querySelector('[role=alert]')).toBeNull();
-  expect(start.getAttribute('aria-invalid')).not.toBe('true');
+  expect(startInput.getAttribute('aria-invalid')).not.toBe('true');
   expect(fixture.calls.every((c) => c.method === 'GET')).toBe(true);
 });
 function type(input: HTMLInputElement, value: string) {
@@ -239,40 +262,41 @@ function type(input: HTMLInputElement, value: string) {
   )!.set!.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
-it('reviews and saves Proxima-style range amounts with a seconds delay', async () => {
+it('reviews and saves a Proxima-style volume target with duration and transactions per day', async () => {
   await mount();
   await click('Use USDC');
-  await click('Range');
+  const volume = host.querySelector<HTMLInputElement>(
+    '[data-warmup-field="amount"]',
+  )!;
+  const duration = host.querySelector<HTMLInputElement>(
+    '[data-warmup-field="cycles"]',
+  )!;
+  const min = host.querySelector<HTMLInputElement>(
+    '[aria-label="Minimum transactions per day"]',
+  )!;
   const max = host.querySelector<HTMLInputElement>(
-    'input[aria-label="Maximum amount"]',
+    '[aria-label="Maximum transactions per day"]',
   )!;
-  const minutes = host.querySelector<HTMLInputElement>(
-    'input[aria-label="Delay minutes"]',
-  )!;
-  const seconds = host.querySelector<HTMLInputElement>(
-    'input[aria-label="Delay seconds"]',
-  )!;
+  expect(min.value).toBe('20');
+  expect(max.value).toBe('40');
   await act(async () => {
-    type(max, '0.002');
-    type(minutes, '0');
-    type(seconds, '45');
+    type(volume, '0.03');
+    type(duration, '2');
+    type(min, '20');
+    type(max, '40');
   });
-  // 3 loops x 0.002 upper bound + 0.01 reserve for one wallet.
-  expect(host.textContent).toContain('Required (max): 0.016 SOL');
-  expect(host.textContent).toContain('Estimated: 1m 53s');
-  await click('Review warmup plan');
-  expect(host.textContent).toContain('drawn between 0.001 and 0.002 SOL');
+  // 30 transactions a day is a 48 minute delay, so two hours is three cycles
+  // and 0.03 SOL over one wallet and three cycles is 0.01 SOL a buy.
+  expect(host.textContent).toContain('Volume 0.03 SOL');
+  expect(host.textContent).toContain('Cost ~0.04 SOL');
+  expect(host.textContent).toContain('2h, around the clock');
+  await start();
   await click('Save draft');
   const doc = fixture.plan.document;
-  expect(doc.amountMax).toBe('0.002');
-  expect(doc.intervalSeconds).toBe(45);
-  expect(doc.intervalMinutes).toBeUndefined();
-  expect(doc.amounts).toHaveLength(1);
-  expect(doc.amounts![0]).toHaveLength(3);
-  for (const a of doc.amounts![0]) {
-    expect(Number(a)).toBeGreaterThanOrEqual(0.001);
-    expect(Number(a)).toBeLessThanOrEqual(0.002);
-  }
+  expect(doc.amount).toBe('0.01');
+  expect(doc.cycles).toBe(3);
+  expect(doc.intervalSeconds).toBe(2880);
+  expect(doc.amountMax).toBeUndefined();
 });
 
 it('compares funding inside the real dialog without changing draft fields or saving approval', async () => {
@@ -335,4 +359,121 @@ it('compares funding inside the real dialog without changing draft fields or sav
     wallets: [{ address: fixture.wallet, revision: 1 }],
   });
   expect(fixture.calls.every((call) => call.method === 'GET')).toBe(true);
+});
+
+it('draws an organic schedule at review and saves the reviewed draws', async () => {
+  await mount();
+  await click('Use USDC');
+  const organic = host.querySelector<HTMLInputElement>(
+    'input[type="radio"][value="organic"]',
+  )!;
+  expect(organic.checked).toBe(false);
+  expect(
+    host.querySelector('[aria-label="Cadence jitter percent"]'),
+  ).toBeNull();
+  await act(async () => organic.click());
+  expect(organic.checked).toBe(true);
+  expect(
+    host.querySelector<HTMLInputElement>(
+      '[aria-label="Cadence jitter percent"]',
+    )!.value,
+  ).toBe('30');
+  await start();
+  expect(host.textContent).toContain('Organic timing');
+  expect(host.textContent).toContain('30% cadence jitter');
+  await click('Save draft');
+  const document = fixture.plan.document;
+  expect(document.organicTerms).toEqual({
+    jitterPercent: 30,
+    holdMinSeconds: 60,
+    holdMaxSeconds: 600,
+    skipPercent: 25,
+    randomTokens: true,
+  });
+  // One wallet, three loops: the first loop is always kept, so between one and
+  // three buys survive the skip draw and each keeps its own sell.
+  const buys = document.organic!.skips[0].filter((skip) => !skip).length;
+  expect(buys).toBeGreaterThanOrEqual(1);
+  expect(buys).toBeLessThanOrEqual(8);
+  expect(document.organic!.offsets[0]).toHaveLength(8);
+  expect(document.organic!.holds[0]).toHaveLength(8);
+});
+
+it('rejects an organic hold that cannot fit inside the delay', async () => {
+  await mount();
+  await click('Use USDC');
+  await act(async () =>
+    (
+      host.querySelector<HTMLInputElement>('input[type="radio"][value="organic"]')!
+    ).click(),
+  );
+  const longest = host.querySelector<HTMLInputElement>(
+    '[aria-label="Longest hold in seconds"]',
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(longest, '9000');
+    longest.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await start();
+  expect(host.textContent).toContain('fit inside the cycle delay');
+});
+
+it('offers routing and wallet order, and reflects Axiom in the fee hint', async () => {
+  await mount();
+  const platform = host.querySelector(
+    '[data-warmup-field="platform"]',
+  ) as unknown as HTMLSelectElement;
+  const schedule = host.querySelector(
+    '[data-warmup-field="schedule"]',
+  ) as unknown as HTMLSelectElement;
+  expect(platform.value).toBe('none');
+  expect(schedule.value).toBe('staggered');
+  expect(Array.from(platform.options).map((o) => o.value)).toEqual([
+    'none',
+    'axiom',
+  ]);
+  expect(Array.from(schedule.options).map((o) => o.value)).toEqual([
+    'staggered',
+    'sequential',
+  ]);
+  expect(host.textContent).toContain('reviewed direct swap route');
+  await act(async () => {
+    platform.value = 'axiom';
+    platform.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(host.textContent).toContain('declared intent');
+  expect(host.textContent).toContain('Confirm the real route on chain');
+});
+
+it('picks wallets from the roster through the Wallets field', async () => {
+  const onSelect = vi.fn();
+  await act(async () =>
+    root.render(
+      <WalletWarmup
+        chain="Solana"
+        addresses={[]}
+        walletRevisions={[]}
+        onClose={() => {}}
+        roster={[
+          { address: fixture.wallet, label: 'Test A seller' },
+          { address: '7gAmms23jNJW17V8PnbRm4FwXW5UxGc4abFiDAcSFUx9', label: 'Test B buyer' },
+        ]}
+        onSelect={onSelect}
+      />,
+    ),
+  );
+  expect(host.textContent).toContain('Select the wallets to put to work.');
+  expect(host.textContent).toContain('Complete the plan to start');
+  await click('Select wallets');
+  const boxes = Array.from(
+    host.querySelectorAll<HTMLInputElement>('[role="dialog"] input'),
+  );
+  expect(boxes).toHaveLength(2);
+  await act(async () => boxes[0].click());
+  expect(onSelect).toHaveBeenCalledWith([fixture.wallet]);
+  await click('Done');
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
 });

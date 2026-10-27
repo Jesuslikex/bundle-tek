@@ -190,6 +190,15 @@ export function WalletWarmupPlans({
                 : {}),
               feeReserve: plan.feeReserve,
               cycles: plan.cycles,
+              // Non-default routing and the reviewed organic draws are part of
+              // the terms, so a saved plan rebuilds to the same schedule.
+              ...(plan.platform === 'none' ? {} : { platform: plan.platform }),
+              ...(plan.schedule === 'staggered'
+                ? {}
+                : { schedule: plan.schedule }),
+              ...(plan.organic && plan.organicTerms
+                ? { organic: plan.organic, organicTerms: plan.organicTerms }
+                : {}),
               ...(plan.intervalMinutes === undefined
                 ? { intervalSeconds: plan.intervalSeconds }
                 : { intervalMinutes: plan.intervalMinutes }),

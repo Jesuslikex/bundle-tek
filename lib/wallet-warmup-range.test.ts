@@ -37,12 +37,13 @@ describe('warmup range amounts and second delays', () => {
     expect(estimateWarmupTotals(2, 2, '0.01', '0.005', 30, 9)).toEqual({
       required: '0.05',
       seconds: 49,
+      suggestedReserve: '0.00013',
     });
     for (const [walletCount, cycles, delay] of [
       [0, 2, 30],
       [1.5, 2, 30],
       [2, 21, 30],
-      [2, 2, 9],
+      [2, 2, 0],
       [2, 2, 30.5],
       [2, 2, 604801],
     ]) {
@@ -128,7 +129,8 @@ describe('warmup range amounts and second delays', () => {
     const times = plan.actions.map((a) => a.scheduledAt);
     expect(times[0]).toBe('2026-10-10T01:00:00.000Z');
     expect(times.at(-1)).toBe('2026-10-10T01:00:48.750Z');
-    expect(field({ intervalSeconds: 9 })).toBe('intervalSeconds');
+    expect(field({ intervalSeconds: 0 })).toBe('intervalSeconds');
+    expect(buildWarmupPlan({ ...base, intervalSeconds: 1 }, now).intervalSeconds).toBe(1);
     expect(field({ intervalSeconds: 30.5 })).toBe('intervalSeconds');
     const legacy = { ...base, intervalSeconds: undefined, intervalMinutes: 60 };
     expect(buildWarmupPlan(legacy, now).intervalSeconds).toBe(3600);

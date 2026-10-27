@@ -51,7 +51,11 @@ export const MAX_WORKSPACE_WALLETS = 500;
 export function walletFolderIds(
   wallet: Pick<WorkspaceWallet, 'folderId' | 'folderIds'>,
 ) {
-  return wallet.folderIds ?? (wallet.folderId ? [wallet.folderId] : []);
+  return wallet.folderIds?.length
+    ? wallet.folderIds
+    : wallet.folderId
+      ? [wallet.folderId]
+      : [];
 }
 export function activeWalletFolders(
   wallet: WorkspaceWallet,

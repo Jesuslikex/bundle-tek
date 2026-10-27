@@ -62,52 +62,61 @@ export async function balanceRpc(
     maxResponseBytes > 2097152
   )
     throw new Error('Invalid RPC response bound.');
-  if (!/^(eth_|net_|web3_)/.test(method) && !isJitoRetainedRpcReplay(fetcher))
-    await paceWalletRpc(endpoint, signal);
-  const response = await fetcher(endpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    redirect: 'manual',
-    cache: 'no-store',
-    signal,
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  if (!response.ok) throw new WalletRpcError(response.status);
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('Empty balance provider response.');
-  let size = 0,
-    text = '';
-  const decoder = new TextDecoder();
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > maxResponseBytes) {
-        await reader.cancel();
-        throw new Error('Balance response too large.');
+  for (let attempt = 0; ; attempt += 1) {
+    if (!/^(eth_|net_|web3_)/.test(method) && !isJitoRetainedRpcReplay(fetcher))
+      await paceWalletRpc(endpoint, signal);
+    const response = await fetcher(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      redirect: 'manual',
+      cache: 'no-store',
+      signal,
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    });
+    if (!response.ok) throw new WalletRpcError(response.status);
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('Empty balance provider response.');
+    let size = 0,
+      text = '';
+    const decoder = new TextDecoder();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxResponseBytes) {
+          await reader.cancel();
+          throw new Error('Balance response too large.');
+        }
+        text += decoder.decode(value, { stream: true });
       }
-      text += decoder.decode(value, { stream: true });
+      text += decoder.decode();
+    } finally {
+      reader.releaseLock();
     }
-    text += decoder.decode();
-  } finally {
-    reader.releaseLock();
+    const result = parseBalanceJson(text) as {
+      jsonrpc?: unknown;
+      id?: unknown;
+      result?: unknown;
+      error?: unknown;
+    };
+    // A JSON-RPC level error is usually the provider throttling a burst; retry
+    // briefly before surfacing it as an invalid response.
+    if (result && result.jsonrpc === '2.0' && result.error && attempt < 2) {
+      console.error('rpc retry', method, JSON.stringify(result.error).slice(0, 160));
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+      continue;
+    }
+    if (
+      !result ||
+      result.jsonrpc !== '2.0' ||
+      result.id !== '1' ||
+      result.error ||
+      result.result === undefined
+    )
+      throw new Error('Invalid balance provider response.');
+    return result.result;
   }
-  const result = parseBalanceJson(text) as {
-    jsonrpc?: unknown;
-    id?: unknown;
-    result?: unknown;
-    error?: unknown;
-  };
-  if (
-    !result ||
-    result.jsonrpc !== '2.0' ||
-    result.id !== '1' ||
-    result.error ||
-    result.result === undefined
-  )
-    throw new Error('Invalid balance provider response.');
-  return result.result;
 }
 function decimalUint(value: unknown, max: bigint) {
   if (

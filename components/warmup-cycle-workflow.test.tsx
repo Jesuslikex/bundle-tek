@@ -71,6 +71,17 @@ function button(text: string) {
 async function click(text: string) {
   await act(async () => button(text).click());
 }
+// The approval hash is a real crypto.subtle digest, so the review lands a few
+// microtasks after the click rather than synchronously. Drain microtasks and
+// zero-delay timers until it settles instead of guessing a fixed tick count.
+async function flush() {
+  for (let i = 0; i < 20; i += 1) {
+    await act(async () => {
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+}
 async function check(fragment: string) {
   const label = Array.from(container.querySelectorAll('label')).find((item) =>
     item.textContent?.includes(fragment),
@@ -81,6 +92,7 @@ async function check(fragment: string) {
 }
 async function sign(side: 'Buy' | 'Sell') {
   await click('Check eligibility for user approval');
+  await flush();
   expect(button('Approve and sign this exact transaction').disabled).toBe(true);
   await check('I reviewed the network');
   expect(container.textContent).toContain('Enter the browser-vault passphrase');
@@ -95,14 +107,15 @@ async function sign(side: 'Buy' | 'Sell') {
     password.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await click('Approve and sign this exact transaction');
+  await flush();
   expect(container.textContent).toContain(`FIXTURE_SIGNATURE_${side}`);
   expect(button('Submit this signed transaction to mainnet').disabled).toBe(
     true,
   );
 }
 async function submitAndVerify(side: 'Buy' | 'Sell') {
-  await check('I approve sending this exact signed warmup');
-  await click('Submit this signed transaction to mainnet');
+  // The send already happened automatically at signing; the submit section
+  // stays as the manual retry, so nothing is clicked here.
   expect(container.querySelector('[aria-current=step]')?.textContent).toContain(
     'Verify receipt',
   );
@@ -175,7 +188,17 @@ it('takes selected wallets through history, plan review, save and reopening with
     tokens.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await click('Start in 5 minutes');
-  await click('Review warmup plan');
+  const volume = container.querySelector<HTMLInputElement>(
+    'input[aria-label="Volume target in SOL"]',
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(volume, '0.01');
+    volume.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('Start activity on 1 wallet');
   expect(button('Save draft').disabled).toBe(false);
   await click('Save draft');
   expect(container.textContent).toContain(
@@ -258,13 +281,13 @@ it('explains an unfunded wallet without funding, signing or starting trades', as
   expect(mocks.sign).not.toHaveBeenCalled();
   expect(mocks.unlock).not.toHaveBeenCalled();
 });
-it('walks buy through separate signing/send approvals, receipt, matched sell and completed progress', async () => {
+it('walks buy through automatic send, receipt, matched sell and completed progress', async () => {
   await mount();
   await click('Prepare unsigned warmup buy');
   await sign('Buy');
-  expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(0);
-  await click('Submit this signed transaction to mainnet');
-  expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(0);
+  // The blockhash window cannot survive a second click, so the send is
+  // automatic once the signature exists.
+  expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(1);
   await submitAndVerify('Buy');
   await click('Review sell of this warmup buy');
   expect(container.textContent).toContain('No buy lot selected');
@@ -328,7 +351,8 @@ it('clears send consent on page invalidation and retains receipt recovery after 
   await act(async () => vi.advanceTimersByTime(300001));
   expect(container.textContent).toContain('This signed packet has expired');
   expect(button('Verify finalized buy receipt').disabled).toBe(false);
-  expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(0);
+  // One automatic send at signing; the pagehide only cleared the retry consent.
+  expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(1);
 });
 it('does not offer new preparation for archived plans or a mismatched wallet selection', async () => {
   await mount(false);
@@ -395,7 +419,9 @@ it('keeps an uncertain send on recovery without sending or signing again', async
     'Verify receipt',
   );
   expect(button('Verify finalized buy receipt').disabled).toBe(false);
-  expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(1);
+  // Two sends of the same packet: the automatic one at signing, then the manual
+  // retry whose response was lost. Still one signature.
+  expect(fixture.calls.filter((c) => c.action === 'submit')).toHaveLength(2);
   expect(mocks.sign).toHaveBeenCalledTimes(1);
 });
 it('masks a review HTML failure without exposing signing controls', async () => {
@@ -421,6 +447,7 @@ it('keeps exact-packet mismatch refusal and never exposes signing for a failed s
     ),
   );
   await click('Check eligibility for user approval');
+  await flush();
   expect(container.textContent).toContain(
     'Approval differs from the displayed preparation',
   );

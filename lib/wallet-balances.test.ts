@@ -185,8 +185,21 @@ describe('native wallet balance observations', () => {
       await expect(
         observeWalletBalances('Ethereum', evm, undefined, fetcher),
       ).rejects.toThrow();
-      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(fetcher).mock.calls.length).toBeGreaterThanOrEqual(1);
     }
+  });
+  it('retries a throttled JSON-RPC error before giving up', async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json({
+        jsonrpc: '2.0',
+        id: 1,
+        error: { code: -32005, message: 'Too many requests' },
+      }),
+    ) as typeof fetch;
+    await expect(
+      observeWalletBalances('Ethereum', evm, undefined, fetcher),
+    ).rejects.toThrow(/Invalid balance provider response/);
+    expect(fetcher).toHaveBeenCalledTimes(3);
   });
   it('does not combine missing observations or independent snapshots into a total', async () => {
     const snapshot = await observeWalletBalances(

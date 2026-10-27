@@ -5,16 +5,25 @@ import { Input } from '@/components/ui/input';
 import {
   buildWarmupPlan,
   drawWarmupAmounts,
+  drawWarmupOrganic,
   formatWarmupDelay,
   nativeUnits,
   estimateWarmupTotals,
   warmupDelaySeconds,
+  warmupOrganicTerms,
+  WARMUP_HARD_MAX_DELAY_SECONDS,
   WARMUP_MIN_DELAY_SECONDS,
+  WARMUP_ORGANIC_LIMITS,
   WarmupPlanInputError,
+  warmupSuggestedReserve,
   type WarmupPlanField,
   type WarmupPlan,
+  type WarmupOrganicTerms,
+  type WarmupPlatform,
+  type WarmupSchedule,
 } from '@/lib/wallet-warmup';
 import type { LaunchChain } from '@/lib/launch-plan';
+import { WARMUP_MAX_CYCLES } from '@/lib/warmup-history-capacity';
 import { WalletWarmupPlans } from '@/components/wallet-warmup-plans';
 import type { SavedWarmup } from '@/lib/wallet-warmup-storage';
 import { WarmupPlanSummary } from './warmup-plan-summary';
@@ -22,7 +31,12 @@ import { WarmupReadiness } from './warmup-readiness';
 import { WarmupWalletHistory } from './warmup-wallet-history';
 import { WarmupExecutionInventory } from './warmup-execution-inventory';
 import styles from './wallet-warmup.module.css';
+import { ChevronDown, Clock, Wallet } from 'lucide-react';
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+function short(address: string) {
+  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
 
 function revealOptions(element: HTMLElement | null) {
   let details = element?.closest('details');
@@ -38,39 +52,113 @@ export function WalletWarmup({
   walletRevisions,
   onClose,
   initialPlan,
+  roster,
+  onSelect,
 }: {
   chain: LaunchChain;
   addresses: string[];
   walletRevisions: Array<{ address: string; revision: number }>;
   onClose: () => void;
   initialPlan?: SavedWarmup;
+  roster?: Array<{ address: string; label: string }>;
+  onSelect?: (addresses: string[]) => void;
 }) {
   const id = useId(),
     unit = nativeUnits(chain);
-  const [amount, setAmount] = useState(
-    initialPlan?.document.amount ?? (chain === 'Solana' ? '0.001' : '0.0001'),
+  // Proxima's Generate Activity form: volume target, duration, transactions per
+  // day and max loss per wallet. Cycles and the delay are derived from those,
+  // because the engine underneath still schedules fixed cycles.
+  const [volumeTarget, setVolumeTarget] = useState(() => {
+    const doc = initialPlan?.document;
+    if (!doc) return '';
+    const per = Number(doc.amountMax ?? doc.amount);
+    if (!Number.isFinite(per)) return String(doc.amountMax ?? doc.amount);
+    return String(per * Math.max(1, doc.cycles) * Math.max(1, addresses.length));
+  });
+  const [durationHours, setDurationHours] = useState(
+    initialPlan
+      ? String(
+          Math.max(
+            1,
+            Math.round(
+              (initialPlan.document.cycles *
+                warmupDelaySeconds(initialPlan.document)) /
+                3600,
+            ),
+          ),
+        )
+      : '6',
   );
-  const [reserve, setReserve] = useState(
-    initialPlan?.document.feeReserve ?? '0.01',
+  const [txMin, setTxMin] = useState(() => {
+    const doc = initialPlan?.document;
+    if (!doc) return '20';
+    const delay = Math.max(1, warmupDelaySeconds(doc));
+    return String(Math.max(1, Math.round(86400 / delay)));
+  });
+  const [txMax, setTxMax] = useState(() => {
+    const doc = initialPlan?.document;
+    if (!doc) return '40';
+    const delay = Math.max(1, warmupDelaySeconds(doc));
+    return String(Math.max(1, Math.round(86400 / delay)));
+  });
+  const [lossOn, setLossOn] = useState(!!initialPlan?.document.feeReserve);
+  const [maxLoss, setMaxLoss] = useState(
+    initialPlan?.document.feeReserve ?? '',
   );
+  const reserve = lossOn && maxLoss ? maxLoss : '0.01';
+  const txMid = (Number(txMin || 0) + Number(txMax || 0)) / 2;
+  const delayTotal = txMid > 0
+    ? Math.min(
+        WARMUP_HARD_MAX_DELAY_SECONDS,
+        Math.max(WARMUP_MIN_DELAY_SECONDS, Math.round(86400 / txMid)),
+      )
+    : WARMUP_MIN_DELAY_SECONDS;
+  const cycles = String(
+    Math.min(
+      WARMUP_MAX_CYCLES,
+      Math.max(
+        1,
+        Math.round((Number(durationHours || 0) * 3600) / Math.max(1, delayTotal)),
+      ),
+    ),
+  );
+  const amount = useMemo(() => {
+    const target = Number(volumeTarget);
+    const wallets = addresses.length;
+    const count = Number(cycles);
+    if (!Number.isFinite(target) || target <= 0 || !wallets || !count) return '';
+    const per = target / (wallets * count);
+    const fixed = per.toFixed(unit.decimals);
+    return fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed;
+  }, [volumeTarget, addresses.length, cycles, unit.decimals]);
+  const [platform, setPlatform] = useState<WarmupPlatform>(
+    initialPlan?.document.platform ?? 'none',
+  );
+  const [schedule, setSchedule] = useState<WarmupSchedule>(
+    initialPlan?.document.schedule ?? 'staggered',
+  );
+  const [organicMode, setOrganicMode] = useState(
+    !!initialPlan?.document.organicTerms,
+  );
+  const [organicJitter, setOrganicJitter] = useState(
+    String(initialPlan?.document.organicTerms?.jitterPercent ?? 30),
+  );
+  const [organicHoldMin, setOrganicHoldMin] = useState(
+    String(initialPlan?.document.organicTerms?.holdMinSeconds ?? 60),
+  );
+  const [organicHoldMax, setOrganicHoldMax] = useState(
+    String(initialPlan?.document.organicTerms?.holdMaxSeconds ?? 600),
+  );
+  const [organicSkip, setOrganicSkip] = useState(
+    String(initialPlan?.document.organicTerms?.skipPercent ?? 25),
+  );
+  const [organicRandomTokens, setOrganicRandomTokens] = useState(
+    initialPlan?.document.organicTerms?.randomTokens ?? true,
+  );
+  const [picker, setPicker] = useState(false);
   const [tokens, setTokens] = useState(
-    initialPlan?.document.tokens.join('\n') ?? '',
+    initialPlan?.document.tokens.join('\n') ?? (chain === 'Solana' ? USDC : ''),
   );
-  const [cycles, setCycles] = useState(
-    String(initialPlan?.document.cycles ?? 3),
-  );
-  const [range, setRange] = useState(!!initialPlan?.document.amountMax);
-  const [amountMax, setAmountMax] = useState(
-    initialPlan?.document.amountMax ?? '',
-  );
-  const initialDelay = initialPlan
-    ? warmupDelaySeconds(initialPlan.document)
-    : 120 * 60;
-  const [delayMinutes, setDelayMinutes] = useState(
-    String(Math.floor(initialDelay / 60)),
-  );
-  const [delaySeconds, setDelaySeconds] = useState(String(initialDelay % 60));
-  const delayTotal = Number(delayMinutes || 0) * 60 + Number(delaySeconds || 0);
   const [start, setStart] = useState(() => {
     if (!initialPlan) return '';
     const date = new Date(initialPlan.document.startAt);
@@ -111,39 +199,41 @@ export function WalletWarmup({
     try {
       return drawWarmupAmounts(
         amount,
-        amountMax,
+        amount,
         unit.decimals,
         addresses.length,
         Number.isSafeInteger(cycleCount) && cycleCount > 0 ? cycleCount : 0,
       );
     } catch (e) {
       throw new WarmupPlanInputError(
-        'amountMax',
-        e instanceof Error ? e.message : 'Invalid range.',
+        'amount',
+        e instanceof Error ? e.message : 'Invalid amount.',
       );
     }
   }
-  // Live Proxima-style totals. Range mode shows the upper bound until the
-  // exact amounts are drawn at review. Mirrors buildWarmupPlan's schedule.
+  void drawRangeAmounts;
+  // Live totals, mirroring buildWarmupPlan's schedule.
   const estimate = useMemo(
     () =>
       estimateWarmupTotals(
         addresses.length,
         Number(cycles),
-        range ? amountMax : amount,
+        amount,
         reserve,
         delayTotal,
         unit.decimals,
+        schedule,
+        platform,
       ),
     [
       addresses.length,
       cycles,
-      range,
       amount,
-      amountMax,
       reserve,
       delayTotal,
       unit.decimals,
+      schedule,
+      platform,
     ],
   );
   function download() {
@@ -204,19 +294,39 @@ export function WalletWarmup({
           e.preventDefault();
           try {
             const cycleCount = Number(cycles);
+            const tokenList = tokens.split(/[\s,]+/).filter(Boolean);
+            // Organic draws happen once, here at review, and are saved on the
+            // plan so every rebuild reproduces the exact reviewed schedule.
+            const organicTerms: WarmupOrganicTerms | undefined = organicMode
+              ? warmupOrganicTerms({
+                  jitterPercent: Number(organicJitter),
+                  holdMinSeconds: Number(organicHoldMin),
+                  holdMaxSeconds: Number(organicHoldMax),
+                  skipPercent: Number(organicSkip),
+                  randomTokens: organicRandomTokens,
+                })
+              : undefined;
             setPlan(
               buildWarmupPlan({
                 chain,
                 addresses,
-                tokens: tokens.split(/[\s,]+/).filter(Boolean),
+                tokens: tokenList,
                 amount,
-                ...(range
+                feeReserve: reserve,
+                platform,
+                schedule,
+                ...(organicTerms
                   ? {
-                      amountMax,
-                      amounts: drawRangeAmounts(cycleCount),
+                      organicTerms,
+                      organic: drawWarmupOrganic(
+                        organicTerms,
+                        addresses.length,
+                        cycleCount,
+                        tokenList.length,
+                        delayTotal,
+                      ),
                     }
                   : {}),
-                feeReserve: reserve,
                 cycles: cycleCount,
                 intervalSeconds: delayTotal,
                 startAt: freshStart
@@ -249,6 +359,75 @@ export function WalletWarmup({
           independent to anyone reading the chain. Readiness above is the part
           that prepares wallets; every swap still needs its own approval.
         </p>
+        <div className={styles.field}>
+          <p className={styles.fieldLabel}>Wallets</p>
+          <button
+            type="button"
+            className={styles.walletPicker}
+            onClick={() => setPicker(true)}
+          >
+            <Wallet size={13} />
+            <span>
+              {addresses.length === 0
+                ? 'Select wallets'
+                : `${addresses.length} wallet${addresses.length === 1 ? '' : 's'} selected`}
+            </span>
+            <ChevronDown size={10} className={styles.walletPickerChevron} />
+          </button>
+        </div>
+        {picker && (
+          <div className={styles.backdrop}>
+            <div
+              className={styles.picker}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Select Wallets"
+              tabIndex={-1}
+              ref={(node) => node?.focus()}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setPicker(false);
+              }}
+            >
+              <div className={styles.pickerHead}>
+                <p>Select Wallets</p>
+                <Button type="button" size="sm" onClick={() => setPicker(false)}>
+                  Done
+                </Button>
+              </div>
+              <p className={styles.help}>Select the wallets to put to work.</p>
+              <div className={styles.pickerList}>
+                {(roster ?? []).length ? (
+                  (roster ?? []).map((w) => (
+                    <label key={w.address}>
+                      <input
+                        type="checkbox"
+                        checked={addresses.includes(w.address)}
+                        onChange={(e) =>
+                          edit(() =>
+                            onSelect?.(
+                              e.target.checked
+                                ? [...addresses, w.address]
+                                : addresses.filter((a) => a !== w.address),
+                            ),
+                          )
+                        }
+                      />{' '}
+                      {w.label || short(w.address)}
+                    </label>
+                  ))
+                ) : (
+                  <p>No active Solana wallets.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {addresses.length === 0 && (
+          <div className={styles.empty}>
+            <Wallet size={16} />
+            <p>Select the wallets to put to work.</p>
+          </div>
+        )}
         <details className={styles.options} open={!tokens || undefined}>
           <summary>
             {tokens === USDC
@@ -296,151 +475,285 @@ export function WalletWarmup({
             </small>
           </details>
         </details>
-        <div className={styles.amount}>
-          <div className={styles.amountHead}>
-            <span id={`${id}-amount-label`}>
-              Amount per transaction ({unit.symbol})
-              <small>Buy size for each cycle.</small>
+        <div className={styles.field}>
+          <p className={styles.fieldLabel}>
+            Volume target
+            <span
+              className={styles.helpIcon}
+              title="Buys are sized to reach it over the duration, and the activity stops once every chain has reached its own."
+              aria-label="Buys are sized to reach it over the duration, and the activity stops once every chain has reached its own."
+            >
+              ?
             </span>
-            <fieldset className={styles.modeToggle} aria-label="Amount mode">
-              <button
-                type="button"
-                aria-pressed={!range}
-                onClick={() => edit(() => setRange(false))}
-              >
-                Fixed
-              </button>
-              <button
-                type="button"
-                aria-pressed={range}
-                onClick={() => edit(() => setRange(true))}
-              >
-                Range
-              </button>
-            </fieldset>
-          </div>
-          <div className={range ? styles.rangeInputs : undefined}>
+          </p>
+          <div className={styles.currency}>
+            <span className={styles.currencyLead} aria-hidden="true">
+              <Wallet size={12} />
+            </span>
             <Input
-              id={`${id}-amount`}
-              aria-labelledby={range ? undefined : `${id}-amount-label`}
-              aria-label={range ? 'Minimum amount' : undefined}
+              id={`${id}-volume`}
+              aria-label={`Volume target in ${unit.symbol}`}
               {...fieldProps('amount')}
-              value={amount}
-              placeholder={range ? 'Min' : '0.00'}
-              onChange={(e) => edit(() => setAmount(e.target.value))}
+              value={volumeTarget}
+              placeholder="0.00"
+              onChange={(e) => edit(() => setVolumeTarget(e.target.value))}
               inputMode="decimal"
               required
             />
-            {range && (
-              <Input
-                id={`${id}-amount-max`}
-                aria-label="Maximum amount"
-                {...fieldProps('amountMax')}
-                value={amountMax}
-                placeholder="Max"
-                onChange={(e) => edit(() => setAmountMax(e.target.value))}
-                inputMode="decimal"
-                required
-              />
-            )}
+            <span className={styles.currencySide}>{unit.symbol}</span>
           </div>
-          {range && (
-            <small className={styles.help}>
-              Each wallet and cycle gets its own random amount in this range,
-              drawn when you review. The exact amounts are shown and saved, and
-              every buy still needs your approval.
-            </small>
-          )}
+          <small className={styles.help}>
+            {amount
+              ? `${amount} ${unit.symbol} per transaction across ${addresses.length} wallet${addresses.length === 1 ? '' : 's'}.`
+              : 'Buys are sized to reach it over the duration, and the activity stops once every chain has reached its own.'}
+          </small>
         </div>
         <div className="warmup-fields">
-          <label htmlFor={`${id}-cycles`}>
-            Loop count
+          <label htmlFor={`${id}-duration`}>
+            Duration
             <Input
-              id={`${id}-cycles`}
+              id={`${id}-duration`}
               {...fieldProps('cycles')}
               type="number"
               min={1}
-              max={20}
-              placeholder="1-20"
-              value={cycles}
-              onChange={(e) => edit(() => setCycles(e.target.value))}
+              max={168}
+              placeholder="6"
+              value={durationHours}
+              onChange={(e) => edit(() => setDurationHours(e.target.value))}
               required
             />
+            <span className={styles.delayUnit}>hours</span>
           </label>
           <fieldset className={styles.delay}>
-            <legend>Delay between loops</legend>
-            <label htmlFor={`${id}-delay-min`}>
+            <legend>Transactions per day</legend>
+            <label htmlFor={`${id}-tx-min`}>
               <span className={styles.delayUnit}>Min</span>
               <Input
-                id={`${id}-delay-min`}
+                id={`${id}-tx-min`}
                 {...fieldProps('intervalSeconds')}
-                aria-label="Delay minutes"
+                aria-label="Minimum transactions per day"
                 type="number"
-                min={0}
-                max={10080}
-                value={delayMinutes}
-                onChange={(e) => edit(() => setDelayMinutes(e.target.value))}
+                min={1}
+                max={86400}
+                placeholder="20"
+                value={txMin}
+                onChange={(e) => edit(() => setTxMin(e.target.value))}
               />
+              <span className={styles.delayUnit}>tx</span>
             </label>
-            <span aria-hidden="true">:</span>
-            <label htmlFor={`${id}-delay-sec`}>
-              <span className={styles.delayUnit}>Sec</span>
+            <span aria-hidden="true">–</span>
+            <label htmlFor={`${id}-tx-max`}>
+              <span className={styles.delayUnit}>Max</span>
               <Input
-                id={`${id}-delay-sec`}
-                aria-label="Delay seconds"
+                id={`${id}-tx-max`}
+                aria-label="Maximum transactions per day"
                 type="number"
-                min={0}
-                max={59}
-                value={delaySeconds}
-                onChange={(e) => edit(() => setDelaySeconds(e.target.value))}
+                min={1}
+                max={86400}
+                placeholder="40"
+                value={txMax}
+                onChange={(e) => edit(() => setTxMax(e.target.value))}
               />
+              <span className={styles.delayUnit}>tx</span>
             </label>
           </fieldset>
         </div>
         <small className={styles.help}>
-          At least {WARMUP_MIN_DELAY_SECONDS} seconds. Each sell is planned half
-          a delay after its buy.
+          {cycles} loops per wallet, about {formatWarmupDelay(delayTotal)} apart
+          (minimum {WARMUP_MIN_DELAY_SECONDS} second{WARMUP_MIN_DELAY_SECONDS === 1 ? '' : 's'}).{' '}
+          {organicMode
+            ? 'Organic timing jitters each wallet around this beat instead of selling half a delay later.'
+            : 'Each sell is planned half a delay after its buy.'}
         </small>
-        <div className={styles.routingNote}>
-          <strong>Direct routing</strong>
-          <span>
-            Every loop uses the reviewed direct swap route. Alternative platform
-            routing is not available; it exists to make activity look like
-            third-party platform usage, which this app does not do.
-          </span>
-        </div>
-        <p className={styles.estimate} aria-live="polite">
-          <span>
-            {addresses.length} {addresses.length === 1 ? 'wallet' : 'wallets'}
-          </span>
-          <span>
-            {range ? 'Required (max)' : 'Required'}:{' '}
-            {estimate ? `${estimate.required} ${unit.symbol}` : 'Unavailable'}
-          </span>
-          <span>
-            Estimated:{' '}
-            {estimate ? formatWarmupDelay(estimate.seconds) : 'Unavailable'}
-          </span>
-        </p>
-        <details className={styles.options}>
-          <summary>Fee reserve and start time</summary>
-          <p>
-            {cycles} loops, {formatWarmupDelay(Math.max(0, delayTotal))} apart.{' '}
-            {reserve} {unit.symbol} reserved per wallet. Review the complete
-            budget before saving.
-          </p>
-          <div className="warmup-fields">
-            <label htmlFor={`${id}-reserve`}>
-              Fee reserve per wallet ({unit.symbol})
+        <div className={styles.field}>
+          <div className={styles.lossHead}>
+            <label className={styles.fieldLabel} htmlFor={`${id}-max-loss`}>
+              Max loss per wallet
+              <span
+                className={styles.helpIcon}
+                title="The most a wallet can lose there to gas, fees and swap costs."
+                aria-label="The most a wallet can lose there to gas, fees and swap costs."
+              >
+                ?
+              </span>
+            </label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={lossOn}
+              aria-label="Cap the loss per wallet"
+              className={`${styles.switch} ${lossOn ? styles.switchOn : ''}`}
+              onClick={() => edit(() => setLossOn(!lossOn))}
+            >
+              <span />
+            </button>
+          </div>
+          {lossOn && (
+            <div className={styles.currency}>
               <Input
-                id={`${id}-reserve`}
+                id={`${id}-max-loss`}
+                aria-label={`Max loss per wallet in ${unit.symbol}`}
                 {...fieldProps('feeReserve')}
-                value={reserve}
-                onChange={(e) => edit(() => setReserve(e.target.value))}
+                value={maxLoss}
+                placeholder="No limit"
+                onChange={(e) => edit(() => setMaxLoss(e.target.value))}
                 inputMode="decimal"
                 required
               />
-            </label>
+              <span className={styles.currencySide}>{unit.symbol}</span>
+            </div>
+          )}
+          <small className={styles.help}>
+            The most a wallet can lose there to gas, fees and swap costs.
+          </small>
+        </div>
+        <fieldset className={styles.routingNote} aria-label="Timing mode">
+          <legend>Timing</legend>
+          <label>
+            <input
+              type="radio"
+              name={`${id}-timing`}
+              value="fixed"
+              checked={!organicMode}
+              onChange={() => edit(() => setOrganicMode(false))}
+            />
+            Fixed beat, every wallet on the same rhythm
+          </label>
+          <label>
+            <input
+              type="radio"
+              name={`${id}-timing`}
+              value="organic"
+              checked={organicMode}
+              onChange={() => edit(() => setOrganicMode(true))}
+            />
+            Organic, jittered cadence, holds and skipped loops
+          </label>
+          {organicMode && (
+            <>
+              <div className="warmup-fields">
+                <label htmlFor={`${id}-organic-jitter`}>
+                  Cadence jitter (%)
+                  <Input
+                    id={`${id}-organic-jitter`}
+                    {...fieldProps('organic')}
+                    aria-label="Cadence jitter percent"
+                    type="number"
+                    min={0}
+                    max={WARMUP_ORGANIC_LIMITS.maxJitterPercent}
+                    value={organicJitter}
+                    onChange={(e) => edit(() => setOrganicJitter(e.target.value))}
+                  />
+                </label>
+                <label htmlFor={`${id}-organic-skip`}>
+                  Skip chance (%)
+                  <Input
+                    id={`${id}-organic-skip`}
+                    aria-label="Skip chance percent"
+                    type="number"
+                    min={0}
+                    max={WARMUP_ORGANIC_LIMITS.maxSkipPercent}
+                    value={organicSkip}
+                    onChange={(e) => edit(() => setOrganicSkip(e.target.value))}
+                  />
+                </label>
+              </div>
+              <div className="warmup-fields">
+                <label htmlFor={`${id}-organic-hold-min`}>
+                  Shortest hold (sec)
+                  <Input
+                    id={`${id}-organic-hold-min`}
+                    aria-label="Shortest hold in seconds"
+                    type="number"
+                    min={WARMUP_ORGANIC_LIMITS.minHoldSeconds}
+                    value={organicHoldMin}
+                    onChange={(e) => edit(() => setOrganicHoldMin(e.target.value))}
+                  />
+                </label>
+                <label htmlFor={`${id}-organic-hold-max`}>
+                  Longest hold (sec)
+                  <Input
+                    id={`${id}-organic-hold-max`}
+                    aria-label="Longest hold in seconds"
+                    type="number"
+                    min={WARMUP_ORGANIC_LIMITS.minHoldSeconds}
+                    value={organicHoldMax}
+                    onChange={(e) => edit(() => setOrganicHoldMax(e.target.value))}
+                  />
+                </label>
+              </div>
+              <label className={styles.freshStart}>
+                <input
+                  type="checkbox"
+                  checked={organicRandomTokens}
+                  onChange={() => edit(() => setOrganicRandomTokens(!organicRandomTokens))}
+                />
+                Pick tokens at random instead of in order
+              </label>
+              <span>
+                Cadence, holds, token order and skipped loops are drawn once when
+                you review and saved with the plan. The first loop of every wallet
+                is always kept, skipped loops drop out of the budget, and the
+                longest hold must fit inside the delay. This disguises the
+                activity; it does not make the wallets independent.
+              </span>
+            </>
+          )}
+        </fieldset>
+        <fieldset className={styles.routingNote}>
+          <legend>Routing and order</legend>
+          <label htmlFor={`${id}-platform`}>
+            Alternative routing
+            <select
+              id={`${id}-platform`}
+              {...fieldProps('platform')}
+              value={platform}
+              onChange={(e) => edit(() => setPlatform(e.target.value as WarmupPlatform))}
+            >
+              <option value="none">Direct swap route</option>
+              <option value="axiom">Axiom</option>
+            </select>
+          </label>
+          <label htmlFor={`${id}-schedule`}>
+            Wallet order
+            <select
+              id={`${id}-schedule`}
+              {...fieldProps('schedule')}
+              value={schedule}
+              onChange={(e) => edit(() => setSchedule(e.target.value as WarmupSchedule))}
+            >
+              <option value="staggered">Overlapping</option>
+              <option value="sequential">One wallet at a time</option>
+            </select>
+          </label>
+          <span>
+            {platform === 'axiom'
+              ? `Axiom routing is a declared intent and needs about ${warmupSuggestedReserve('axiom', Math.max(1, Number(cycles) || 1), unit.decimals)} ${unit.symbol} of fees per wallet. Confirm the real route on chain.`
+              : 'Every loop uses the reviewed direct swap route. Axiom makes the activity look like third-party platform usage.'}
+          </span>
+        </fieldset>
+        {estimate && (
+          <div className={styles.estimate} aria-live="polite">
+            <div className={styles.summary}>
+              <span>
+                <Wallet size={12} /> {addresses.length}/{addresses.length} ready
+              </span>
+              <span>
+                <Clock size={12} />{' '}
+                {durationHours
+                  ? `${durationHours}h, around the clock`
+                  : 'No duration'}
+              </span>
+              <span>
+                Volume {volumeTarget || '0'} {unit.symbol}
+              </span>
+              <span>Cost ~{estimate.required} {unit.symbol}</span>
+            </div>
+          </div>
+        )}
+        <details className={styles.options}>
+          <summary>Start time</summary>
+          <div className="warmup-fields">
             <label htmlFor={`${id}-start`}>
               Start time
               <Input
@@ -500,8 +813,17 @@ export function WalletWarmup({
           Saving a draft starts no trades. Every buy and sell needs your
           approval.
         </p>
-        <div className={styles.reviewActions}>
-          <Button type="submit">Review warmup plan</Button>
+        <div className={styles.bottom}>
+          <Button
+            type="submit"
+            variant="secondary"
+            size="lg"
+            className={styles.startButton}
+          >
+            {addresses.length
+              ? `Start activity on ${addresses.length} wallet${addresses.length === 1 ? '' : 's'}`
+              : 'Complete the plan to start'}
+          </Button>
         </div>
       </form>
       {error && (
@@ -523,15 +845,32 @@ export function WalletWarmup({
           plan={plan}
           onLoad={(doc, useFreshStart = false) => {
             setFreshStart(useFreshStart);
-            setAmount(doc.amount);
-            setRange(!!doc.amountMax);
-            setAmountMax(doc.amountMax ?? '');
-            setReserve(doc.feeReserve);
+            const per = Number(doc.amountMax ?? doc.amount);
+            setVolumeTarget(
+              Number.isFinite(per)
+                ? String(per * Math.max(1, doc.cycles) * Math.max(1, addresses.length))
+                : '',
+            );
+            setLossOn(!!doc.feeReserve);
+            setMaxLoss(doc.feeReserve ?? '');
+            setPlatform(doc.platform ?? 'none');
+            setSchedule(doc.schedule ?? 'staggered');
+            setOrganicMode(!!doc.organicTerms);
+            if (doc.organicTerms) {
+              setOrganicJitter(String(doc.organicTerms.jitterPercent));
+              setOrganicHoldMin(String(doc.organicTerms.holdMinSeconds));
+              setOrganicHoldMax(String(doc.organicTerms.holdMaxSeconds));
+              setOrganicSkip(String(doc.organicTerms.skipPercent));
+              setOrganicRandomTokens(doc.organicTerms.randomTokens);
+            }
             setTokens(doc.tokens.join('\n'));
-            setCycles(String(doc.cycles));
-            const delay = warmupDelaySeconds(doc);
-            setDelayMinutes(String(Math.floor(delay / 60)));
-            setDelaySeconds(String(delay % 60));
+            const delay = Math.max(1, warmupDelaySeconds(doc));
+            const perDay = String(Math.max(1, Math.round(86400 / delay)));
+            setTxMin(perDay);
+            setTxMax(perDay);
+            setDurationHours(
+              String(Math.max(1, Math.round((doc.cycles * delay) / 3600))),
+            );
             const date = new Date(doc.startAt);
             setStart(
               new Date(date.getTime() - date.getTimezoneOffset() * 60000)

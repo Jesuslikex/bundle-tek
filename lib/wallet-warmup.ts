@@ -5,6 +5,9 @@ import {
   WARMUP_MAX_CYCLES,
 } from './warmup-history-capacity';
 
+export type WarmupPlatform = 'none' | 'axiom';
+/** How wallets share the timeline. */
+export type WarmupSchedule = 'staggered' | 'sequential';
 export type WarmupInput = {
   chain: string;
   addresses: string[];
@@ -14,6 +17,18 @@ export type WarmupInput = {
   amountMax?: string;
   /** Range mode: reviewed buy amount per wallet (input order) and cycle. */
   amounts?: string[][];
+  /** Organic mode: reviewed cadence, hold, token and skip draws. */
+  organic?: WarmupOrganic;
+  /** Organic mode settings the draws were made from, kept for the form. */
+  organicTerms?: WarmupOrganicTerms;
+  /**
+   * Alternative routing. `axiom` sends each swap through the Axiom terminal so
+   * the history shows trading-platform use instead of bare wallet transfers.
+   * Client-side evidence only: the capture cannot prove the backend route.
+   */
+  platform?: WarmupPlatform;
+  /** `sequential` runs one wallet at a time, the way Proxima does. */
+  schedule?: WarmupSchedule;
   feeReserve: string;
   cycles: number;
   /** Legacy whole-minute delay (15 to 10,080). */
@@ -22,10 +37,44 @@ export type WarmupInput = {
   intervalSeconds?: number;
   startAt: string;
 };
+
+/**
+ * Organic mode settings. The legacy schedule is a fixed metronome: every
+ * wallet trades the same amount on the same beat, rotating tokens in order and
+ * selling exactly half an interval later. Organic mode keeps the same budget
+ * and ordering guarantees but draws a per-wallet cadence, hold time, token and
+ * occasional skipped cycle, so the resulting history does not read as a
+ * machine. Draws are made once at review and saved, so every later rebuild,
+ * preparation and receipt check binds the exact reviewed schedule.
+ */
+export type WarmupOrganicTerms = {
+  /** Cadence jitter as a percentage of the interval, 0 to 50. */
+  jitterPercent: number;
+  /** Shortest hold between a buy and its sell, in seconds (at least 30). */
+  holdMinSeconds: number;
+  holdMaxSeconds: number;
+  /** Percent chance a wallet skips a cycle, 0 to 40. */
+  skipPercent: number;
+  /** Pick tokens at random instead of rotating them in order. */
+  randomTokens: boolean;
+};
+export type WarmupOrganic = {
+  /** Buy offset in seconds from the start, per wallet (input order) and cycle. */
+  offsets: number[][];
+  /** Hold in seconds between a buy and its sell, same shape as `offsets`. */
+  holds: number[][];
+  /** Token index per cycle. */
+  tokenPicks: number[];
+  /** Skipped cycles, same shape as `offsets`. */
+  skips: boolean[][];
+};
 export type WarmupPlanField =
   | 'tokens'
   | 'amount'
   | 'amountMax'
+  | 'organic'
+  | 'platform'
+  | 'schedule'
   | 'feeReserve'
   | 'cycles'
   | 'intervalMinutes'
@@ -75,6 +124,144 @@ export function warmupDecimal(value: bigint, decimals: number) {
   const fraction = s.slice(-decimals).replace(/0+$/, '');
   return s.slice(0, -decimals) + (fraction ? '.' + fraction : '');
 }
+export const WARMUP_ORGANIC_LIMITS = {
+  maxJitterPercent: 50,
+  maxSkipPercent: 40,
+  minHoldSeconds: 30,
+} as const;
+
+/** Strict validation of organic mode settings. */
+export function warmupOrganicTerms(value: unknown): WarmupOrganicTerms {
+  const input = value as Record<string, unknown> | null;
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    throw new Error('Choose organic settings.');
+  const keys = Object.keys(input).sort().join(',');
+  if (keys !== 'holdMaxSeconds,holdMinSeconds,jitterPercent,randomTokens,skipPercent')
+    throw new Error('Organic settings contain unknown fields.');
+  const int = (raw: unknown, min: number, max: number, label: string) => {
+    if (!Number.isSafeInteger(raw) || (raw as number) < min || (raw as number) > max)
+      throw new Error(`Choose ${label} between ${min} and ${max}.`);
+    return raw as number;
+  };
+  const jitterPercent = int(input.jitterPercent, 0, WARMUP_ORGANIC_LIMITS.maxJitterPercent, 'cadence jitter as a percentage');
+  const holdMinSeconds = int(input.holdMinSeconds, WARMUP_ORGANIC_LIMITS.minHoldSeconds, 604800, 'a shortest hold in seconds');
+  const holdMaxSeconds = int(input.holdMaxSeconds, holdMinSeconds, 604800, 'a longest hold at or above the shortest');
+  const skipPercent = int(input.skipPercent, 0, WARMUP_ORGANIC_LIMITS.maxSkipPercent, 'a skip chance as a percentage');
+  if (typeof input.randomTokens !== 'boolean')
+    throw new Error('Choose whether tokens are picked at random.');
+  return { jitterPercent, holdMinSeconds, holdMaxSeconds, skipPercent, randomTokens: input.randomTokens };
+}
+
+/**
+ * Validates reviewed organic draws against the current shape and interval.
+ * Every draw is checked, so a tampered or stale schedule cannot silently
+ * produce a different history than the one that was reviewed.
+ */
+export function warmupOrganic(
+  organic: unknown,
+  terms: unknown,
+  shape: { wallets: number; cycles: number; tokens: number; intervalSeconds: number },
+): WarmupOrganic | undefined {
+  if (organic === undefined) {
+    if (terms !== undefined) throw new Error('Review the plan again to draw an organic schedule.');
+    return undefined;
+  }
+  const settings = warmupOrganicTerms(terms);
+  const input = organic as Record<string, unknown> | null;
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    throw new Error('Review the plan again to draw an organic schedule.');
+  const keys = Object.keys(input).sort().join(',');
+  if (keys !== 'holds,offsets,skips,tokenPicks')
+    throw new Error('Organic schedule contains unknown fields.');
+  const grid = (raw: unknown, label: string, check: (value: unknown) => boolean) => {
+    if (!Array.isArray(raw) || raw.length !== shape.wallets)
+      throw new Error(`Review the plan again to draw organic ${label}.`);
+    return raw.map((row) => {
+      if (!Array.isArray(row) || row.length !== shape.cycles)
+        throw new Error(`Review the plan again to draw organic ${label}.`);
+      if (!row.every(check))
+        throw new Error(`An organic ${label} value is out of range.`);
+      return row as number[];
+    });
+  };
+  const seconds = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 0;
+  const offsets = grid(input.offsets, 'cadence', seconds);
+  const holds = grid(input.holds, 'hold', (value) => seconds(value) && (value as number) >= WARMUP_ORGANIC_LIMITS.minHoldSeconds && (value as number) <= shape.intervalSeconds);
+  const skips = grid(input.skips, 'skip', (value) => typeof value === 'boolean') as unknown as boolean[][];
+  const horizon = shape.cycles * shape.intervalSeconds;
+  for (let wallet = 0; wallet < shape.wallets; wallet++) {
+    let previous = -1;
+    for (let cycle = 0; cycle < shape.cycles; cycle++) {
+      const offset = offsets[wallet][cycle];
+      if (offset >= horizon) throw new Error('An organic cadence falls outside the plan window.');
+      if (skips[wallet][cycle]) continue;
+      if (offset <= previous) throw new Error('Organic cycles must stay in order for each wallet.');
+      previous = offset + holds[wallet][cycle];
+    }
+    if (previous < 0) throw new Error('Every wallet needs at least one organic cycle.');
+  }
+  if (!Array.isArray(input.tokenPicks) || input.tokenPicks.length !== shape.cycles)
+    throw new Error('Review the plan again to draw organic tokens.');
+  const tokenPicks = input.tokenPicks.map((pick) => {
+    if (!Number.isSafeInteger(pick) || (pick as number) < 0 || (pick as number) >= shape.tokens)
+      throw new Error('An organic token pick is out of range.');
+    return pick as number;
+  });
+  return { offsets, holds, tokenPicks, skips };
+}
+
+/**
+ * Draws one organic schedule. Cadence is jittered around the interval and
+ * pushed forward so a wallet never opens a second cycle before its previous
+ * sell, holds are drawn inside the reviewed range, tokens are picked at random
+ * when asked, and cycles are skipped at the reviewed chance. The first cycle of
+ * every wallet is always kept so no wallet is left with an empty history.
+ */
+export function drawWarmupOrganic(
+  terms: WarmupOrganicTerms,
+  wallets: number,
+  cycles: number,
+  tokenCount: number,
+  intervalSeconds: number,
+  random: (bound: bigint) => bigint = cryptoBelow,
+) {
+  const settings = warmupOrganicTerms(terms);
+  if (settings.holdMaxSeconds > intervalSeconds)
+    throw new Error('The longest hold must fit inside the cycle delay.');
+  const draw = (min: number, max: number) =>
+    max <= min ? min : min + Number(random(BigInt(max - min + 1)));
+  const spread = Math.floor((intervalSeconds * settings.jitterPercent) / 100);
+  const offsets: number[][] = [];
+  const holds: number[][] = [];
+  const skips: boolean[][] = [];
+  for (let wallet = 0; wallet < wallets; wallet++) {
+    const rowOffsets: number[] = [];
+    const rowHolds: number[] = [];
+    const rowSkips: boolean[] = [];
+    let previous = -1;
+    for (let cycle = 0; cycle < cycles; cycle++) {
+      const hold = draw(settings.holdMinSeconds, settings.holdMaxSeconds);
+      let offset = cycle * intervalSeconds + draw(-spread, spread);
+      if (offset <= previous) offset = previous + 1;
+      if (offset >= cycles * intervalSeconds) offset = cycles * intervalSeconds - 1;
+      const skip = cycle > 0 && draw(0, 99) < settings.skipPercent;
+      rowOffsets.push(offset);
+      rowHolds.push(hold);
+      rowSkips.push(skip);
+      previous = offset + hold;
+    }
+    offsets.push(rowOffsets);
+    holds.push(rowHolds);
+    skips.push(rowSkips);
+  }
+  const tokenPicks = Array.from({ length: cycles }, (_, cycle) =>
+    settings.randomTokens && tokenCount > 0
+      ? Number(random(BigInt(tokenCount)))
+      : cycle % Math.max(1, tokenCount),
+  );
+  return { offsets, holds, tokenPicks, skips };
+}
+
 export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
   const chain = walletChain(input.chain),
     unit = nativeUnits(chain);
@@ -130,11 +317,23 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
   } else if (
     !Number.isSafeInteger(input.intervalSeconds) ||
     input.intervalSeconds! < WARMUP_MIN_DELAY_SECONDS ||
-    input.intervalSeconds! > 604800
+    input.intervalSeconds! > WARMUP_HARD_MAX_DELAY_SECONDS
   )
     throw new WarmupPlanInputError(
       'intervalSeconds',
-      `Choose a delay from ${WARMUP_MIN_DELAY_SECONDS} seconds to 7 days.`,
+      `Choose a delay from ${WARMUP_MIN_DELAY_SECONDS} second to ${WARMUP_HARD_MAX_DELAY_SECONDS} seconds.`,
+    );
+  const platform = input.platform ?? 'none';
+  if (platform !== 'none' && platform !== 'axiom')
+    throw new WarmupPlanInputError(
+      'platform',
+      'Choose no routing or Axiom routing.',
+    );
+  const schedule = input.schedule ?? 'staggered';
+  if (schedule !== 'staggered' && schedule !== 'sequential')
+    throw new WarmupPlanInputError(
+      'schedule',
+      'Choose a staggered or sequential schedule.',
     );
   const intervalSeconds = legacyInterval
     ? input.intervalMinutes! * 60
@@ -187,16 +386,37 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
       'amountMax',
       'Per-cycle amounts need a range maximum.',
     );
+  const organic = validateField('organic', () =>
+    warmupOrganic(input.organic, input.organicTerms, {
+      wallets: addresses.length,
+      cycles: input.cycles,
+      tokens: tokens.length,
+      intervalSeconds,
+    }),
+  );
   const interval = intervalSeconds * 1000;
   const actions = addresses
     .flatMap((address, walletIndex) =>
       Array.from({ length: input.cycles }, (_, cycle) => {
-        const token = tokens[cycle % tokens.length];
-        // Fixed, disclosed staggering keeps review reproducible. No fake organic activity.
-        const buyAt =
-          start +
-          cycle * interval +
-          Math.floor((walletIndex * interval) / (addresses.length * 4));
+        if (organic?.skips[walletIndex][cycle]) return [];
+        const token = organic
+          ? tokens[organic.tokenPicks[cycle]]
+          : tokens[cycle % tokens.length];
+        // Sequential gives each wallet its own slot so only one wallet is live
+        // at a time, which is how Proxima schedules the run. Staggered keeps
+        // the legacy overlapping beat.
+        const walletBase =
+          schedule === 'sequential' ? start + walletIndex * input.cycles * interval : start;
+        const buyAt = organic
+          ? walletBase + organic.offsets[walletIndex][cycle] * 1000
+          : walletBase +
+            cycle * interval +
+            (schedule === 'sequential'
+              ? 0
+              : Math.floor((walletIndex * interval) / (addresses.length * 4)));
+        const sellAt = organic
+          ? buyAt + organic.holds[walletIndex][cycle] * 1000
+          : buyAt + interval / 2;
         return [
           {
             address,
@@ -212,7 +432,7 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
             cycle: cycle + 1,
             side: 'Sell' as const,
             amount: '100% of tokens acquired in this cycle',
-            scheduledAt: new Date(buyAt + interval / 2).toISOString(),
+            scheduledAt: new Date(sellAt).toISOString(),
           },
         ];
       }).flat(),
@@ -222,7 +442,13 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
         a.scheduledAt.localeCompare(b.scheduledAt) ||
         a.address.localeCompare(b.address),
     );
-  const buyTotals = amounts.map((row) => row.reduce((a, b) => a + b, 0n));
+  const buyTotals = amounts.map((row, walletIndex) =>
+    row.reduce(
+      (total, value, cycle) =>
+        organic?.skips[walletIndex][cycle] ? total : total + value,
+      0n,
+    ),
+  );
   const walletBudgets = addresses.map((address, i) => ({
     address,
     required: warmupDecimal(buyTotals[i] + reserve, unit.decimals),
@@ -240,6 +466,8 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
     cycles: input.cycles,
     ...(legacyInterval ? { intervalMinutes: input.intervalMinutes! } : {}),
     intervalSeconds,
+    platform,
+    schedule,
     startAt: new Date(start).toISOString(),
     buyAmount: warmupDecimal(amount, unit.decimals),
     ...(ranged
@@ -251,6 +479,9 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
         }
       : {}),
     feeReserve: warmupDecimal(reserve, unit.decimals),
+    ...(organic && input.organicTerms
+      ? { organicTerms: warmupOrganicTerms(input.organicTerms), organic }
+      : {}),
     buyBudgetPerWallet: warmupDecimal(maxBuys, unit.decimals),
     requiredPerWallet: warmupDecimal(maxBuys + reserve, unit.decimals),
     walletBudgets,
@@ -258,11 +489,41 @@ export function buildWarmupPlan(input: WarmupInput, now = Date.now()) {
     actions,
     createdAt: new Date(now).toISOString(),
     limitations:
-      'Review plan only. No scheduler, quote, token verification or signing. Sell proceeds are not reused in the budget. Fees and sell output are unknown; the reserve is user-chosen. Activity does not prove wallet creation age or launch eligibility.',
+      'Review plan only. No scheduler, quote, token verification or signing. Sell proceeds are not reused in the budget. Fees and sell output are unknown; the reserve is user-chosen. Activity does not prove wallet creation age or launch eligibility.' +
+      (platform === 'axiom'
+        ? ' Axiom routing is a declared intent: the capture shows the flag and its fee, not the backend route, so confirm it on chain.'
+        : '') +
+      (organic
+        ? ' Organic mode only randomises timing, size, token order and skipped cycles. Every wallet is still funded and driven by the same operator, so the history is disguised, not independent.'
+        : ''),
   };
 }
 export type WarmupPlan = ReturnType<typeof buildWarmupPlan>;
-export const WARMUP_MIN_DELAY_SECONDS = 10;
+export const WARMUP_MIN_DELAY_SECONDS = 1;
+/** Proxima's own cap. The UI recommends this; the hard ceiling is below. */
+export const WARMUP_MAX_DELAY_SECONDS = 300;
+/** Bundle warmups can run for days, so the hard ceiling stays at 7 days. */
+export const WARMUP_HARD_MAX_DELAY_SECONDS = 604800;
+/**
+ * Per-loop, per-wallet fee floor in lamports, from Proxima's own estimate:
+ * 50,000 lamports bare and 1,050,000 through Axiom, each scaled by its 13,000
+ * basis-point balance multiplier. Real fees still come from each simulation.
+ */
+export const WARMUP_FEE_PER_LOOP_LAMPORTS = {
+  none: 65_000n,
+  axiom: 1_365_000n,
+} as const;
+/** Suggested reserve for one wallet's whole run, as a decimal string. */
+export function warmupSuggestedReserve(
+  platform: WarmupPlatform,
+  cycles: number,
+  decimals: number,
+) {
+  return warmupDecimal(
+    WARMUP_FEE_PER_LOOP_LAMPORTS[platform] * BigInt(cycles),
+    decimals,
+  );
+}
 /** Live totals for the form, mirroring buildWarmupPlan's schedule. */
 export function estimateWarmupTotals(
   wallets: number,
@@ -271,6 +532,8 @@ export function estimateWarmupTotals(
   reserve: string,
   delaySeconds: number,
   decimals: number,
+  schedule: WarmupSchedule = 'staggered',
+  platform: WarmupPlatform = 'none',
 ) {
   try {
     if (
@@ -282,7 +545,7 @@ export function estimateWarmupTotals(
       cycles > WARMUP_MAX_CYCLES ||
       !Number.isSafeInteger(delaySeconds) ||
       delaySeconds < WARMUP_MIN_DELAY_SECONDS ||
-      delaySeconds > 604800
+      delaySeconds > WARMUP_HARD_MAX_DELAY_SECONDS
     )
       return null;
     const per = warmupAtoms(amount, decimals),
@@ -290,15 +553,18 @@ export function estimateWarmupTotals(
     if (per <= 0n) return null;
     const ms = delaySeconds * 1000;
     const window =
-      (cycles - 1) * ms +
-      Math.floor(((wallets - 1) * ms) / (wallets * 4)) +
-      ms / 2;
+      schedule === 'sequential'
+        ? wallets * cycles * ms
+        : (cycles - 1) * ms +
+          Math.floor(((wallets - 1) * ms) / (wallets * 4)) +
+          ms / 2;
     return {
       required: warmupDecimal(
         (per * BigInt(cycles) + fee) * BigInt(wallets),
         decimals,
       ),
       seconds: Math.ceil(window / 1000),
+      suggestedReserve: warmupSuggestedReserve(platform, cycles, decimals),
     };
   } catch {
     return null;

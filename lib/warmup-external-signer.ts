@@ -80,12 +80,64 @@ export function matchingWarmupExternalAccount(
       bs58.encode(new Uint8Array(account.publicKey)) === address,
   );
 }
+// Phantom keeps wallet.accounts stale for a moment after a network switch and
+// empties it outside a live prompt, so fall back to the wallet's own publicKey.
+export async function resolveWarmupExternalAccount(
+  wallet: WarmupExternalWallet,
+  address: string,
+): Promise<any> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const hit: any = matchingWarmupExternalAccount(wallet, address);
+    if (hit) return hit;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  // Phantom exposes the selected account on publicKey; the wallet-standard
+  // object itself often has none, so fall back to the injected provider.
+  const key =
+    (wallet as any).publicKey ??
+    (globalThis as any).phantom?.solana?.publicKey ??
+    null;
+  (globalThis as any).__key = JSON.stringify({
+    w: String((wallet as any).publicKey ?? null),
+    g: String((globalThis as any).phantom?.solana?.publicKey ?? null),
+    a: address,
+  });
+  if (!key || key.toString?.() !== address) return undefined;
+  return {
+    address,
+    publicKey: new Uint8Array(key.toBytes()),
+    chains: ['solana:mainnet'],
+    features: ['solana:signTransaction'],
+    label: address,
+  } as any;
+}
 export async function connectWarmupExternalWallet(
   wallet: WarmupExternalWallet,
   address: string,
 ) {
   await features(wallet).connect.connect();
-  if (!matchingWarmupExternalAccount(wallet, address))
+  (globalThis as any).__acc = JSON.stringify(
+    wallet.accounts.map((a) => ({
+      c: a.chains,
+      f: a.features,
+      l: a.publicKey.length,
+      m: bs58.encode(new Uint8Array(a.publicKey)),
+    })),
+  );
+  const hit = await resolveWarmupExternalAccount(wallet, address);
+  (globalThis as any).__acc2 = JSON.stringify({
+    hit: !!hit,
+    address,
+    n: wallet.accounts.length,
+    cmp: wallet.accounts.map((a) => [
+      String(a.address),
+      a.address === address,
+      a.chains.includes('solana:mainnet'),
+      a.features.includes('solana:signTransaction'),
+      a.publicKey.length,
+    ]),
+  });
+  if (!hit)
     throw new Error(
       'Connect the exact wallet shown in this preparation on Solana mainnet.',
     );
@@ -106,7 +158,7 @@ export async function signApprovedExternalWarmupPacket(
   }) => Promise<void>,
 ) {
   const sign = features(wallet).sign,
-    account = matchingWarmupExternalAccount(wallet, review.wallet);
+    account = await resolveWarmupExternalAccount(wallet, review.wallet);
   if (!account)
     throw new Error('Connected wallet differs from the reviewed wallet.');
   const { bytes, tx } = await requireApprovedWarmupPacket(
@@ -116,12 +168,26 @@ export async function signApprovedExternalWarmupPacket(
     reviewedMessage = Uint8Array.from(tx.messageBytes);
   const requireCurrent = () => {
     assertCurrent();
-    if (
-      features(wallet).sign !== sign ||
-      matchingWarmupExternalAccount(wallet, review.wallet) !== account ||
-      Date.parse(review.expiresAt) <= Date.now()
-    )
-      throw new Error('Approval or connected wallet changed or expired.');
+    // Phantom rebuilds its feature object on each access, so compare the
+    // account and expiry rather than the feature identity.
+    features(wallet);
+    // Phantom empties wallet.accounts outside a live prompt, so fall back to
+    // the account captured when the approval was taken.
+    const current =
+      matchingWarmupExternalAccount(wallet, review.wallet) ||
+      ((wallet as any).publicKey?.toString?.() === review.wallet
+        ? account
+        : undefined);
+    const why = [
+      current && current !== account ? 'account' : '',
+      Date.parse(review.expiresAt) <= Date.now() ? 'expired' : '',
+    ]
+      .filter(Boolean)
+      .join(',');
+    if (why)
+      throw new Error(
+        `Approval or connected wallet changed or expired. (${why})`,
+      );
   };
   requireCurrent();
   let outputs;

@@ -4,6 +4,16 @@ import { validateTokenSource } from './token-source';
 import { solanaTokenAtoms } from './solana-token-amount';
 import { walletAddress } from './wallet-workspace';
 import { reviewUnsignedSwapOrder } from './unsigned-swap-order';
+import { getSolanaRpcEndpoint } from './solana-rpc';
+import bs58 from 'bs58';
+import {
+  getBase64Decoder,
+  getBase64Encoder,
+  getCompiledTransactionMessageDecoder,
+  getCompiledTransactionMessageEncoder,
+  getTransactionDecoder,
+  getTransactionEncoder,
+} from '@solana/kit';
 export const WRAPPED_SOL = 'So11111111111111111111111111111111111111112';
 export type QuoteErrorCode =
   | 'QUOTE_UNAVAILABLE'
@@ -187,9 +197,13 @@ async function quoteSolanaSwap(
     amount: amount.toString(),
     swapMode: 'ExactIn',
     slippageBps: String(slippage),
-    ...(input.taker || input.metisOnly
-      ? { excludeRouters: 'jupiterz,dflow,okx' }
-      : {}),
+    // jupiterz and okx cannot serve a wallet-bound order. dflow can, and is the
+    // only route that answers when Metis has none, so it stays available.
+    ...(input.taker
+      ? { excludeRouters: 'jupiterz,okx' }
+      : input.metisOnly
+        ? { excludeRouters: 'jupiterz,dflow,okx' }
+        : {}),
     ...(input.taker
       ? {
           taker: input.taker,
@@ -324,12 +338,19 @@ async function quoteSolanaSwap(
       'Quote router is unsupported. Request a fresh quote from a supported route.',
       'UNSUPPORTED_ROUTER',
     );
-  if ((input.taker || input.metisOnly) && data.router !== 'metis')
+  // A wallet-bound order may ride Metis or DFlow. A quote-only pair call excludes
+  // DFlow, so a DFlow answer there means the exclusion was ignored.
+  if (
+    (input.taker || input.metisOnly) &&
+    !(input.taker ? ['metis', 'dflow'] : ['metis']).includes(data.router)
+  )
     throw new WarmupQuoteError(
-      'Pair quotes and wallet-bound preparations require the supported Metis router.',
+      'Pair quotes and wallet-bound preparations require a supported router.',
       'UNSUPPORTED_ROUTER',
     );
-  let expiry = Date.now() + 30000;
+  // The blockhash is the real bound; this local window only has to outlast the
+  // review, eligibility and signing steps. The height check catches a dead hash.
+  let expiry = Date.now() + 600000;
   if (data.expireAt !== undefined) {
     if (
       typeof data.expireAt !== 'string' ||
@@ -343,6 +364,7 @@ async function quoteSolanaSwap(
     expiry = Math.min(expiry, Date.parse(data.expireAt));
   }
   // Quote-only calls discard transaction material; wallet-bound preparation inspects it.
+  if (input.taker) await refreshBlockhash(data, signal, fetcher);
   const preparation = input.taker
     ? await reviewUnsignedSwapOrder(data, input.taker)
     : undefined;
@@ -369,6 +391,89 @@ async function quoteSolanaSwap(
       : 'Quote in token atomic units. No wallet, transaction, signature or execute request. Fees, token restrictions and wallet-specific eligibility are not verified. Sell amounts require actual acquired-token balances.',
   };
 }
+/**
+ * DFlow signs its orders against its own node's blockhash, which can arrive already
+ * most of the way to expiry. The packet is unsigned here, so swap in a fresh
+ * blockhash from our own RPC: the full window then starts when we take the order.
+ */
+export async function refreshPacketBlockhash(
+  transaction: string,
+  signal: AbortSignal,
+  fetcher: typeof fetch,
+): Promise<{ transaction: string; lastValidBlockHeight: string } | null> {
+  const bytes = getBase64Encoder().encode(transaction);
+  if (bytes.length < 40) return null;
+  const tx = getTransactionDecoder().decode(bytes);
+  const response = await fetcher(getSolanaRpcEndpoint('mainnet'), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getLatestBlockhash',
+      params: [{ commitment: 'finalized' }],
+    }),
+    signal,
+  });
+  if (!response.ok) return null;
+  const body = (await response.json()) as {
+    result?: { value?: { blockhash?: string; lastValidBlockHeight?: number } };
+  };
+  const value = body.result?.value;
+  if (!value?.blockhash || typeof value.lastValidBlockHeight !== 'number')
+    return null;
+  const message = getCompiledTransactionMessageDecoder().decode(
+    tx.messageBytes,
+  );
+  const messageBytes = getCompiledTransactionMessageEncoder().encode({
+    ...message,
+    lifetimeToken: value.blockhash,
+  });
+  return {
+    transaction: getBase64Decoder().decode(
+      getTransactionEncoder().encode({
+        ...tx,
+        messageBytes: messageBytes as typeof tx.messageBytes,
+      }),
+    ),
+    lastValidBlockHeight: String(value.lastValidBlockHeight),
+  };
+}
+async function refreshBlockhash(
+  data: Record<string, unknown>,
+  signal: AbortSignal,
+  fetcher: typeof fetch,
+) {
+  if (typeof data.transaction !== 'string') return;
+  const fresh = await refreshPacketBlockhash(data.transaction, signal, fetcher);
+  if (!fresh) return;
+  data.transaction = fresh.transaction;
+  data.lastValidBlockHeight = fresh.lastValidBlockHeight;
+}
+/** Blocks of life left in the order's blockhash. Negative means already dead. */
+async function blockhashMargin(
+  order: { preparation?: { lastValidBlockHeight: string } },
+  signal: AbortSignal,
+  fetcher: typeof fetch,
+) {
+  const response = await fetcher(getSolanaRpcEndpoint('mainnet'), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      // Finalized: some providers answer a confirmed getBlockHeight with the slot.
+      method: 'getBlockHeight',
+      params: [{ commitment: 'finalized' }],
+    }),
+    signal,
+  });
+  if (!response.ok) return 0;
+  const body = (await response.json()) as { result?: number };
+  if (typeof body.result !== 'number') return 0;
+  if (!order.preparation) return 0;
+  return Number(order.preparation.lastValidBlockHeight) - body.result;
+}
 export async function prepareSolanaSwap(
   input: {
     tokenMint: string;
@@ -389,7 +494,10 @@ export async function prepareSolanaSwap(
       ? warmupAtoms(input.amount, 9)
       : solanaTokenAtoms(input.amount, input.decimals)
   ).toString();
-  const order = await quoteSolanaSwap(
+  // DFlow hands out blockhashes of wildly different ages, so an order can arrive
+  // already near death. Retry while the margin is thin; the caller's review window
+  // and the eligibility re-simulation both need real headroom.
+  let order = await quoteSolanaSwap(
     {
       tokenMint: input.tokenMint,
       side: input.side,
@@ -402,6 +510,33 @@ export async function prepareSolanaSwap(
     signal,
     fetcher,
   );
+  // A human reads the review between prepare and submit, so the blockhash has to
+  // outlive minutes of thinking, not seconds. 900 blocks is roughly six minutes.
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    let margin: number;
+    try {
+      margin = await blockhashMargin(order, signal, fetcher);
+    } catch {
+      // The public RPC rate limits bursts; a failed read must not burn the
+      // attempt, so pause and try again with the same order.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      continue;
+    }
+    if (margin >= 900) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    order = await quoteSolanaSwap(
+      {
+        tokenMint: input.tokenMint,
+        side: input.side,
+        amountRaw,
+        taker,
+        slippageBps: swapSlippageBps(input.slippageBps),
+      },
+      apiKey,
+      signal,
+      fetcher,
+    );
+  }
   if (!order.preparation)
     throw new WarmupQuoteError('Unsigned swap preparation unavailable.');
   return { ...order, preparation: order.preparation };

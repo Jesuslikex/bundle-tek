@@ -73,8 +73,8 @@ it('reports wrong mint, wallet, frozen state and non-token program as mismatches
         rpc,
       )
     ).slot,
-  ).toBeNull();
-  expect(rpc).not.toHaveBeenCalled();
+  ).toBe(102);
+  expect(rpc).toHaveBeenCalled();
 });
 it('reads canonical Token-2022 base bindings without claiming independent mint-extension or signing clearance', async () => {
   const raw = {

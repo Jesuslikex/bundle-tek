@@ -66,6 +66,7 @@ const fixture = (patch: Record<string, unknown> = {}) => {
     getGenesisHash: SOLANA_MAINNET_GENESIS,
     getBlockHeight: 100,
     getFeeForMessage: { context: { slot: 100 }, value: 5000 },
+    getMultipleAccounts: { context: { slot: '101' }, value: [null, null] },
     simulateTransaction: {
       context: { slot: 101 },
       value: {
@@ -210,6 +211,7 @@ it('simulates the exact unsigned bytes and reports independent fee and exact SOL
       replaceRecentBlockhash: false,
       minContextSlot: 100,
       innerInstructions: false,
+      logs: true,
     },
   ]);
   expect(requests.some((r) => r.method === 'sendTransaction')).toBe(false);
@@ -249,6 +251,14 @@ it('binds lookup-backed instruction review to table observations before and afte
       if (typeof init?.body !== 'string') throw new Error('Expected JSON body');
       const body = JSON.parse(init.body);
       if (body.method !== 'getMultipleAccounts') return base(input, init);
+      // The wallet token-account bindings read two addresses; the lookup table
+      // read is a single address.
+      if (Array.isArray(body.params?.[0]) && body.params[0].length === 2)
+        return Response.json({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { context: { slot: 103 }, value: [null, null] },
+        });
       reads++;
       if (reads === 2 && mode === 'changed') table[88] ^= 1;
       return Response.json({

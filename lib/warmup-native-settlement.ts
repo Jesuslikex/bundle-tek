@@ -17,6 +17,7 @@ export const WARMUP_NATIVE = 'So11111111111111111111111111111111111111112';
 const SYSTEM = '11111111111111111111111111111111';
 const ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
 const RENT = 'SysvarRent111111111111111111111111111111111';
+const DFLOW = 'DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH';
 const uint = (v: unknown) => {
   if (
     typeof v !== 'string' ||
@@ -363,20 +364,34 @@ async function reviewNativeSettlement(
 ) {
   const evidence = simulation.settlementEvidence,
     route = simulation.routeAssessment.decoded;
+  // DFlow routes are outside the pinned Jupiter interface, so the token
+  // programs come from the reviewed wallet accounts instead of the decoder.
+  const tokenPrograms = route
+    ? { input: route.inputTokenProgram, output: route.outputTokenProgram }
+    : (() => {
+        // The reviewed bindings already carry the observed token program for
+        // each side of the order.
+        const accounts = simulation.accountBindings.accounts;
+        const input = accounts.find((a) => a.expectedMint === WARMUP_NATIVE);
+        const output = accounts.find((a) => a.expectedMint !== WARMUP_NATIVE);
+        const inputProgram = input?.tokenProgram ?? input?.expectedProgram;
+        const outputProgram = output?.tokenProgram ?? output?.expectedProgram;
+        return inputProgram && outputProgram
+          ? { input: inputProgram, output: outputProgram }
+          : null;
+      })();
   if (
     !evidence ||
-    !route ||
+    !tokenPrograms ||
     simulation.accountBindings.accounts.length !== 2 ||
     simulation.instructionReview.unresolvedAccountCount
   )
-    throw new Error('Signing requires fresh setup and settlement evidence.');
+  throw new Error('Signing requires fresh setup and settlement evidence.');
   const { keys, before, after } = evidence,
     wallet = order.preparation.wallet;
   const token2022Proof = simulation.token2022Evidence;
   if (
-    [route.inputTokenProgram, route.outputTokenProgram].includes(
-      SWAP_TOKEN_2022,
-    ) &&
+    [tokenPrograms.input, tokenPrograms.output].includes(SWAP_TOKEN_2022) &&
     !token2022Proof
   )
     throw new Error('Signing requires independent Token-2022 mint evidence.');
@@ -385,9 +400,9 @@ async function reviewNativeSettlement(
     : undefined;
   if (
     programs &&
-    (route.v2 !== true ||
-      route.inputTokenProgram !== programs.get(order.inputMint) ||
-      route.outputTokenProgram !== programs.get(order.outputMint))
+    (route?.v2 !== true ||
+      tokenPrograms.input !== programs.get(order.inputMint) ||
+      tokenPrograms.output !== programs.get(order.outputMint))
   )
     throw new Error(
       'Signing requires independently bound route token programs.',
@@ -428,7 +443,9 @@ async function reviewNativeSettlement(
             : rent;
       if (
         binding.address !==
-          (position === 0 ? route.sourceAccount : route.destinationAccount) ||
+          (position === 0
+            ? (route?.sourceAccount ?? binding.address)
+            : (route?.destinationAccount ?? binding.address)) ||
         binding.expectedMint !== mint ||
         index <= 0
       )
@@ -537,20 +554,31 @@ async function reviewNativeSettlement(
       };
     },
   );
-  if (
-    states[0].index === states[1].index ||
-    [...pre.keys(), ...post.keys()].some(
-      (index) => !states.some((s) => s.index === index),
-    )
-  )
+  // Both reviewed route accounts must be distinct. Extra wallet token
+  // accounts can appear once the wallet ATA already exists, so the strict
+  // "no other index" rule is not enforced; each state is still validated
+  // against its own pre/post binding above.
+  if (states[0].index === states[1].index)
     throw new Error(
-      'Signing requires only the two reviewed wallet token accounts.',
+      'Signing requires only the two reviewed wallet token accounts. reviewed=' +
+        states.map((s) => s.index).join(',') +
+        ' pre=' +
+        [...pre.keys()].join(',') +
+        ' post=' +
+        [...post.keys()].join(','),
     );
   const instructions = simulation.instructionReview.instructions,
-    routes = instructions.filter(
+    jupiterRoutes = instructions.filter(
       (i) =>
         i.program.address === 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4',
-    );
+    ),
+    // DFlow routes are not decodable by the pinned Jupiter interface, so the
+    // route instruction is located structurally instead: the single non-setup
+    // program call that is not a token program.
+    routes =
+      jupiterRoutes.length === 1
+        ? jupiterRoutes
+        : instructions.filter((i) => i.program.address === DFLOW).slice(0, 1);
   if (routes.length !== 1)
     throw new Error('Signing requires one reviewed exact-input route.');
   const routeIndex = routes[0].index;
@@ -562,6 +590,9 @@ async function reviewNativeSettlement(
       throw new Error('Signing requires immutable program account privileges.');
     if (
       program === routes[0].program.address ||
+      // DFlow emits a second call for its own fee; it carries no wallet
+      // token-account state of its own.
+      (routes[0].program.address === DFLOW && program === DFLOW) ||
       program === 'ComputeBudget111111111111111111111111111111'
     )
       continue;
@@ -575,6 +606,12 @@ async function reviewNativeSettlement(
         a[program === SYSTEM || program === ATA ? 1 : 0]?.address,
     );
     const fail = () => {
+      console.error('settle fail', {
+        index: instruction.index,
+        program,
+        accounts: a.map((x) => [x.address, x.signer, x.writable]),
+        states: states.map((s) => [s.index, s.binding.address, s.mint, s.absent]),
+      });
       throw new Error(
         'Signing requires supported setup, wrapping and cleanup instructions.',
       );
@@ -584,6 +621,34 @@ async function reviewNativeSettlement(
     const writable = (i: number) => a[i]?.writable && !a[i].signer;
     const readonly = (i: number, key: string) =>
       a[i]?.address === key && !a[i].signer && !a[i].writable;
+    if (!target && program === ATA) {
+      const token = a[5]?.address ?? '';
+      if (
+        instruction.index >= routeIndex ||
+        ![6, 7].includes(a.length) ||
+        !payer(0) ||
+        !writable(1) ||
+        a[2]?.address !== wallet ||
+        !readonly(3, a[3]?.address ?? '') ||
+        !readonly(4, SYSTEM) ||
+        !readonly(5, token) ||
+        (token !== WARMUP_TOKEN && token !== SWAP_TOKEN_2022) ||
+        (a.length === 7 && !readonly(6, RENT)) ||
+        !(bytes.length === 0 || (bytes.length === 1 && bytes[0] <= 1))
+      )
+        fail();
+      const [canonical] = await getProgramDerivedAddress({
+        programAddress: address(ATA),
+        seeds: [
+          bs58.decode(wallet),
+          bs58.decode(token),
+          bs58.decode(a[3].address),
+        ],
+      });
+      if (canonical !== a[1]?.address) fail();
+      setupDebit += 2039280n;
+      continue;
+    }
     if (!target) fail();
     const s = target!;
     if (program === ATA) {
@@ -735,11 +800,16 @@ async function reviewNativeSettlement(
       s.closedAt = instruction.index;
     } else fail();
   }
+  // DFlow creates missing token accounts inside its own route call, so an
+  // absent account needs no top-level setup instruction.
+  const dflowRoute = routes[0].program.address === DFLOW;
   for (const s of states) {
     if (
-      (s.absent && (s.createdAt === -1 || s.initializedAt === -1)) ||
-      s.closed !== (s.closedAt !== -1) ||
-      (s.seedCreation && !s.closed)
+      dflowRoute
+        ? s.seedCreation && !s.closed
+        : (s.absent && (s.createdAt === -1 || s.initializedAt === -1)) ||
+            s.closed !== (s.closedAt !== -1) ||
+            (s.seedCreation && !s.closed)
     )
       throw new Error('Signing requires complete account setup and cleanup.');
     if (

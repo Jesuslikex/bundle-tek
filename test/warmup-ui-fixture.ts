@@ -58,8 +58,13 @@ export function warmupUiFixture() {
       expiresAt,
       preparation: {
         wallet,
-        sha256: (side === 'Buy' ? 'a' : 'b').repeat(64),
-        transaction: 'UNSIGNED_FIXTURE_ONLY',
+        // Real base64 so the approval panel's self-consistency hash check runs
+        // for real instead of throwing on a placeholder string.
+        sha256:
+          side === 'Buy'
+            ? '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a'
+            : '55e5509f8052998294266ee5b50cb592938191fb5d67f73cac2e60b0276b1bdd',
+        transaction: side === 'Buy' ? 'AQIDBA==' : 'BQYHCA==',
         executionAllowed: false,
         instructionsVerified: false,
       },

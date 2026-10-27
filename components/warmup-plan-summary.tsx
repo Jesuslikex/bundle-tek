@@ -63,6 +63,9 @@ export function WarmupPlanSummary({ plan }: { plan: WarmupPlan }) {
           ? `Each buy: drawn between ${plan.buyAmount} and ${plan.buyAmountMax} ${plan.currency}; exact amounts are in the full schedule.`
           : `Each buy: ${plan.buyAmount} ${plan.currency}.`}{' '}
         Delay between loops: {formatWarmupDelay(plan.intervalSeconds)}.
+        {plan.organicTerms
+          ? ` Organic timing: ${plan.organicTerms.jitterPercent}% cadence jitter, holds of ${plan.organicTerms.holdMinSeconds} to ${plan.organicTerms.holdMaxSeconds} seconds, ${plan.organicTerms.skipPercent}% skipped loops${plan.organicTerms.randomTokens ? ', random token order' : ''}.`
+          : ''}{' '}
         User-chosen fee reserve: {plan.feeReserve} {plan.currency} per wallet.
         Sell proceeds are not reused in this budget.
       </p>

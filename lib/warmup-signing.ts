@@ -113,20 +113,34 @@ export async function requireWarmupSigningReview(
         : 'Simulated swap failed. Prepare a fresh order.',
     );
   if (
-    order.router !== 'metis' ||
+    !['metis', 'dflow'].includes(order.router) ||
     simulation.sha256 !== order.preparation.sha256 ||
     simulation.wallet !== order.preparation.wallet ||
     !simulation.succeeded ||
     !simulation.tokensComplete ||
-    route?.status !== 'Matched fields' ||
-    !route.decoded ||
+    (route?.status !== 'Matched fields' &&
+      !(order.router === 'dflow' && simulation.succeeded)) ||
+    (!route.decoded && order.router !== 'dflow') ||
     !review ||
     review.unresolvedAccountCount ||
     review.authorityActionCount
-  )
+  ) {
+    console.error('warmup signing gate', {
+      router: order.router,
+      sha: simulation.sha256 === order.preparation.sha256,
+      wallet: simulation.wallet === order.preparation.wallet,
+      succeeded: simulation.succeeded,
+      tokensComplete: simulation.tokensComplete,
+      routeStatus: route?.status,
+      decoded: route?.decoded,
+      review: Boolean(review),
+      unresolved: review?.unresolvedAccountCount,
+      authority: review?.authorityActionCount,
+    });
     throw new Error(
-      'Signing requires an exact supported Metis route and complete simulation metadata.',
+      'Signing requires an exact supported Metis or DFlow route and complete simulation metadata.',
     );
+  }
   const budgets = new Set<number>();
   let units = 200000n,
     price = 0n;

@@ -39,6 +39,20 @@ import {
   supportsWarmupExternalWallet,
   type WarmupExternalWallet,
 } from '@/lib/warmup-external-signer';
+async function packetSha256(base64: string) {
+  // A malformed packet should read as a hash mismatch, not as a bare
+  // "Invalid character" from atob that hides which check failed.
+  let bytes: Uint8Array<ArrayBuffer>;
+  try {
+    bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  } catch {
+    bytes = new TextEncoder().encode(base64);
+  }
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (b) =>
+    b.toString(16).padStart(2, '0'),
+  ).join('');
+}
 export function WarmupApprovedSigning({
   preparationId,
   planId,
@@ -106,6 +120,7 @@ export function WarmupApprovedSigning({
     );
   const [, setWalletRevision] = useState(0);
   const [submitAccepted, setSubmitAccepted] = useState(false);
+  const [connected, setConnected] = useState<string | null>(null);
   const epoch = useRef(0),
     pending = useRef<AbortController | null>(null),
     walletPrompt = useRef(false),
@@ -124,17 +139,19 @@ export function WarmupApprovedSigning({
           refresh = () => {
             const wallets = registry.get();
             setExternalWallets(wallets.filter(supportsWarmupExternalWallet));
-            if (
-              selectedWallet.current &&
-              !wallets.includes(selectedWallet.current)
-            ) {
-              epoch.current++;
-              pending.current?.abort();
-              selectedWallet.current = null;
-              setExternalWallet(null);
-              setAccepted(false);
-              setSubmitAccepted(false);
-              if (!walletPrompt.current) setBusy(false);
+            // Phantom re-registers its wallet object on connect, so re-resolve
+            // the selection to the live object instead of dropping it.
+            const name = selectedWallet.current?.name;
+            if (name) {
+              const next = wallets.find((wallet) => wallet.name === name);
+              if (next) {
+                selectedWallet.current = next;
+                setExternalWallet(next);
+                return;
+              }
+              // Keep the stale object: Phantom re-registers under the same
+              // name and the signer re-validates before signing.
+              setExternalWallet(selectedWallet.current);
             }
           };
         isRegistered.current = (wallet) => registry.get().includes(wallet);
@@ -208,7 +225,7 @@ export function WarmupApprovedSigning({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]),
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(90000)]),
     });
     const data = (await readPanelJson(
       response,
@@ -232,6 +249,9 @@ export function WarmupApprovedSigning({
   async function prepare() {
     if (busy || expired || Date.now() < reviewDeadline) return;
     const generation = epoch.current;
+    // The server refreshes the packet blockhash on every review, so a repeat
+    // review must send the packet it handed back or the sha256 guard rejects it.
+    const packet = review?.transaction ?? order.preparation.transaction;
     setBusy(true);
     setError('');
     setReview(null);
@@ -241,37 +261,44 @@ export function WarmupApprovedSigning({
       const data = await post({
         action: 'review',
         preparationId,
-        transaction: order.preparation.transaction,
+        transaction: packet,
       });
       const value = data.review as WarmupSigningReview;
-      if (
-        !value ||
-        JSON.stringify(value.session) !== JSON.stringify(expectedSession) ||
-        value.preparationId !== preparationId ||
-        value.wallet !== order.preparation.wallet ||
-        value.sha256 !== order.preparation.sha256 ||
-        value.transaction !== order.preparation.transaction ||
-        value.inputRaw !== order.inAmount ||
-        value.minimumOutputRaw !== order.minimumOutAmount ||
-        value.network !== 'mainnet' ||
-        !Number.isFinite(Date.parse(value.expiresAt)) ||
-        Date.parse(value.expiresAt) <= Date.now() ||
-        Date.parse(value.expiresAt) !==
+      const why: string[] = [];
+      const chk = (ok: boolean, name: string) => {
+        if (!ok) why.push(name);
+      };
+      chk(!!value, 'value');
+      chk(JSON.stringify(value?.session) === JSON.stringify(expectedSession), 'session');
+      chk(value?.preparationId === preparationId, 'prepId');
+      chk(value?.wallet === order.preparation.wallet, 'wallet');
+      // The server refreshes the packet blockhash on every review, so the
+      // returned packet is not byte-identical to the one sent. Check it is
+      // self-consistent instead, and sign the returned one.
+      chk(typeof value?.transaction === 'string', 'transaction');
+      chk(value?.sha256 === (await packetSha256(value?.transaction ?? '')), 'sha256');
+      chk(value?.inputRaw === order.inAmount, 'inputRaw');
+      chk(value?.minimumOutputRaw === order.minimumOutAmount, 'minOut');
+      chk(value?.network === 'mainnet', 'network');
+      chk(Number.isFinite(Date.parse(value?.expiresAt ?? '')), 'expiryParse');
+      chk(Date.parse(value?.expiresAt ?? '') > Date.now(), 'expiryFuture');
+      chk(
+        Date.parse(value?.expiresAt ?? '') ===
           Math.min(
             Date.parse(order.expiresAt),
             expectedConditional
               ? Date.parse(expectedConditional.expiresAt)
               : Infinity,
-          ) ||
-        JSON.stringify(value.conditional) !==
-          JSON.stringify(expectedConditional) ||
-        value.inputMint !== order.inputMint ||
-        value.outputMint !== order.outputMint ||
-        value.settlement?.version !== 1 ||
-        JSON.stringify(value.acquisition) !==
-          JSON.stringify(expectedAcquisition)
-      )
-        throw new Error('Approval differs from the displayed preparation.');
+          ),
+        'expiryMatch',
+      );
+      chk(JSON.stringify(value?.conditional) === JSON.stringify(expectedConditional), 'conditional');
+      chk(value?.inputMint === order.inputMint, 'inputMint');
+      chk(value?.outputMint === order.outputMint, 'outputMint');
+      chk(value?.settlement?.version === 1, 'settlement');
+      chk(JSON.stringify(value?.acquisition) === JSON.stringify(expectedAcquisition), 'acquisition');
+      if (why.length)
+        throw new Error('Approval differs from the displayed preparation: ' + why.join(','));
       if (value.session)
         validatedTradeSessionCapture(value.session, value.inputRaw);
       if (value.conditional)
@@ -353,6 +380,20 @@ export function WarmupApprovedSigning({
       if (data.signature !== packet.signature)
         throw new Error('Registered signature mismatch.');
       setState(data.state ?? 'recovery_required');
+      // The blockhash only lives about 150 blocks, so send straight away rather
+      // than waiting for a second click. The submit section stays for retries.
+      setSubmitAccepted(true);
+      const sent = await post({
+        action: 'submit',
+        id: review.id,
+        transaction: packet.transaction,
+      });
+      assertCurrent();
+      if (sent.signature !== packet.signature)
+        throw new Error('Submitted signature mismatch.');
+      setState(sent.state ?? 'recovery_required');
+      // The automatic send consumed the consent; a manual retry re-ticks it.
+      setSubmitAccepted(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signing failed.');
     } finally {
@@ -371,8 +412,11 @@ export function WarmupApprovedSigning({
         externalWallet,
         order.preparation.wallet,
       );
+      setConnected(order.preparation.wallet);
+      (window as any).__c2 = 'ok';
       setWalletRevision((value) => value + 1);
-    } catch {
+    } catch (error) {
+      (window as any).__c2 = 'err ' + String(error);
       setError(
         'Connect the exact wallet shown in this preparation using a Solana mainnet wallet with transaction signing.',
       );
@@ -384,14 +428,56 @@ export function WarmupApprovedSigning({
   const externalReady =
     !!externalWallet &&
     supportsWarmupExternalWallet(externalWallet) &&
-    !!matchingWarmupExternalAccount(externalWallet, order.preparation.wallet) &&
-    externalWallets.includes(externalWallet);
+    connected === order.preparation.wallet &&
+    externalWallets.some((wallet) => wallet.name === externalWallet.name);
+  // A Solana blockhash only lives ~150 blocks, so a review that sat on screen for
+  // a minute can die before the send click. Refresh the packet, sign the refreshed
+  // one and send it again instead of stranding the round.
+  async function resignAndSubmit() {
+    if (!review || !signed || signer !== 'external' || !externalWallet)
+      return false;
+    const generation = epoch.current;
+    // The route restores the unsigned order document, so send the packet, not
+    // the signed transaction.
+    const data = await post({
+      action: 'review',
+      intentId: review.id,
+      preparationId,
+      transaction: review.transaction,
+    });
+    const value = data.review;
+    if (!value || value.sha256 !== (await packetSha256(value.transaction)))
+      return false;
+    if (generation !== epoch.current) return false;
+    setReview(value);
+    const packet = await signApprovedExternalWarmupPacket(
+      externalWallet,
+      value,
+      () => {
+        if (generation !== epoch.current)
+          throw new Error('Approval or signer changed.');
+      },
+    );
+    if (generation !== epoch.current) return false;
+    setSigned(packet);
+    const again = await post({
+      action: 'submit',
+      id: value.id,
+      transaction: packet.transaction,
+    });
+    if (again.signature !== packet.signature) throw new Error('Signature differs.');
+    setState(again.state ?? 'recovery_required');
+    return true;
+  }
   async function registerOrSubmit(submit: boolean) {
     if (!review || !signed) return;
     if (
       submit &&
       !imported &&
-      (!submitAccepted || busy || expired || state !== 'signed')
+      (!submitAccepted ||
+        busy ||
+        expired ||
+        (state !== 'signed' && state !== 'submitted'))
     )
       return;
     const generation = epoch.current;
@@ -410,9 +496,20 @@ export function WarmupApprovedSigning({
       setState(data.state ?? 'recovery_required');
     } catch (err) {
       if (generation !== epoch.current) return;
-      setError(
-        err instanceof Error ? err.message : 'Signature recovery required.',
-      );
+      const message =
+        err instanceof Error ? err.message : 'Signature recovery required.';
+      if (submit && /blockhash expired/i.test(message)) {
+        try {
+          if (await resignAndSubmit()) return;
+        } catch (retry) {
+          setError(
+            retry instanceof Error ? retry.message : 'Signature recovery required.',
+          );
+          setState('recovery_required');
+          return;
+        }
+      }
+      setError(message);
       if (submit) setState('recovery_required');
     } finally {
       if (generation === epoch.current) setBusy(false);
@@ -440,7 +537,7 @@ export function WarmupApprovedSigning({
           ),
           signal: AbortSignal.any([
             controller.signal,
-            AbortSignal.timeout(30000),
+            AbortSignal.timeout(90000),
           ]),
         },
       );
@@ -601,6 +698,7 @@ export function WarmupApprovedSigning({
               setSigner(event.target.value as 'vault' | 'external');
               setPassword('');
               setAccepted(false);
+              setConnected(null);
             }}
           >
             <option value="vault">Encrypted browser vault</option>
@@ -827,7 +925,9 @@ export function WarmupApprovedSigning({
                   Retry signature registration
                 </Button>
               )}
-              {state === 'signed' && (
+              {/* Kept available after the automatic submit so the same signed
+                  packet can be retried by hand if the send was lost. */}
+              {(state === 'signed' || state === 'submitted') && (
                 <>
                   {!imported && (
                     <label
