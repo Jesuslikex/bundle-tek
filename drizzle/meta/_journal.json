@@ -1079,6 +1079,13 @@
       "when": 1794860000016,
       "tag": "0155_auto_sell_run_record_stops",
       "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "6",
+      "when": 1794860000017,
+      "tag": "0156_wallet_cleanup_buy",
+      "breakpoints": true
     }
   ]
 }
