@@ -22,7 +22,8 @@ export function MarketplaceOwnedWallets() {
     [query, setQuery] = useState(''),
     [minimumDays, setMinimumDays] = useState(''),
     [sort, setSort] = useState('age'),
-    [page, setPage] = useState(0);
+    [page, setPage] = useState(0),
+    [importing, setImporting] = useState(false);
   const [capacity, setCapacity] = useState(false);
   const pending = useRef<AbortController | null>(null);
   useEffect(
@@ -106,6 +107,73 @@ export function MarketplaceOwnedWallets() {
     setBusy(false);
     setMessage('Inventory read cancelled. No wallet was changed.');
   }
+  async function importToWorkspace() {
+    if (importing || !rows.length) return;
+    setImporting(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch('/api/wallet-workspace', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'wallet.add',
+          chain: 'Solana',
+          wallets: rows.slice(0, 100).map((w, index) => ({
+            address: w.address,
+            label: w.label || `Purchased ${index + 1}`,
+            role: 'Recipient',
+            tags: ['purchased'],
+          })),
+        }),
+      });
+      const data = (await readPanelJson(
+        response,
+        'Import failed. No wallet was added.',
+      )) as { error?: unknown };
+      // 409 means every address already exists, which is fine: the tag call
+      // below still has to run so the purchased filter can find them.
+      if (!response.ok && response.status !== 409)
+        throw Error(
+          typeof data?.error === 'string'
+            ? data.error
+            : 'Import failed. No wallet was added.',
+        );
+      const tagged = await fetch('/api/wallet-workspace', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'wallet.tag',
+          chain: 'Solana',
+          tags: ['purchased'],
+          wallets: rows
+            .slice(0, 100)
+            .map((w) => ({ address: w.address })),
+        }),
+      });
+      const tagData = (await readPanelJson(
+        tagged,
+        'Wallets were added but could not be tagged.',
+      )) as { error?: unknown };
+      if (!tagged.ok)
+        throw Error(
+          typeof tagData?.error === 'string'
+            ? tagData.error
+            : 'Wallets were added but could not be tagged.',
+        );
+      setMessage(
+        `${Math.min(rows.length, 100)} wallet${rows.length === 1 ? '' : 's'} imported to My wallets and tagged purchased.`,
+      );
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : 'Import failed. No wallet was added.',
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
   const validDays =
     minimumDays === '' ||
     (/^\d{1,5}$/.test(minimumDays) && Number(minimumDays) <= 36500);
@@ -178,6 +246,15 @@ export function MarketplaceOwnedWallets() {
             {inventory.wallets.length === 1 ? 'wallet' : 'wallets'}. Inventory
             snapshot: {new Date(inventory.observedAt).toLocaleString()}.
           </p>
+          <button
+            type="button"
+            disabled={importing || !rows.length}
+            onClick={() => void importToWorkspace()}
+          >
+            {importing
+              ? 'Importing…'
+              : `Import ${Math.min(rows.length, 100)} to My wallets`}
+          </button>
           <div className={styles.filters}>
             <label>
               Search wallets

@@ -1,146 +1,199 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
+
+import { useCallback, useEffect, useState } from 'react';
+import { Check, Copy, Ticket, UserPlus } from 'lucide-react';
 
 type Summary = {
   code: string | null;
   referredCount: number;
   referredBy: { code: string; at: string } | null;
 };
-const PENDING_KEY = 'bundle.referral-code.v1';
 
-async function request(init?: RequestInit): Promise<Summary | null> {
-  const response = await fetch('/api/referrals', {
-    cache: 'no-store',
-    ...init,
-  });
-  if (response.status === 401) return null;
-  const value = (await response.json().catch(() => ({}))) as Summary & {
-    error?: string;
-  };
-  if (!response.ok) throw new Error(value.error || 'Referrals unavailable.');
-  return value;
-}
-const post = (body: unknown) =>
-  request({
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-const message = (e: unknown) =>
-  e instanceof Error ? e.message : 'Referrals unavailable.';
-
+/**
+ * Referral codes and who joined through them. Bundle takes no trading fees, so
+ * this tracks referrals only; there is nothing to pay out.
+ */
 export function ReferralPanel() {
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [entry, setEntry] = useState('');
-  const [error, setError] = useState('');
+  const [signedOut, setSignedOut] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [code, setCode] = useState('');
   const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    void request().then(
-      (value) => {
-        // A ?ref= link prefills the code; applying it still takes a click.
-        const fromUrl = new URLSearchParams(window.location.search).get('ref');
-        let pending = fromUrl;
-        try {
-          if (fromUrl) localStorage.setItem(PENDING_KEY, fromUrl);
-          else pending = localStorage.getItem(PENDING_KEY);
-        } catch {}
-        if (pending) setEntry(pending.toUpperCase().slice(0, 8));
-        setSummary(value);
-      },
-      (e) => setError(message(e)),
-    );
+
+  const load = useCallback(async () => {
+    try {
+      const response = await fetch('/api/referrals', { cache: 'no-store' });
+      if (response.status === 401) {
+        setSignedOut(true);
+        return;
+      }
+      const data = (await response.json()) as Summary & { error?: string };
+      if (!response.ok) {
+        setError(data?.error ?? 'Referrals temporarily unavailable.');
+        return;
+      }
+      setSignedOut(false);
+      setSummary(data);
+    } catch {
+      setError('Referrals temporarily unavailable.');
+    }
   }, []);
-  async function run(action: () => Promise<Summary | null>) {
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function send(action: 'create' | 'apply', value?: string) {
+    if (busy) return;
     setBusy(true);
     setError('');
+    setNotice('');
     try {
-      const value = await action();
-      if (value) setSummary(value);
-      return value;
-    } catch (e) {
-      setError(message(e));
-      return null;
+      const response = await fetch('/api/referrals', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(value ? { action, code: value } : { action }),
+      });
+      const data = (await response.json()) as Summary & { error?: string };
+      if (!response.ok) {
+        setError(data?.error ?? 'Referrals temporarily unavailable.');
+        return;
+      }
+      setSummary(data);
+      setCode('');
+      setNotice(
+        action === 'create' ? 'Referral code created.' : 'Referral code applied.',
+      );
+    } catch {
+      setError('Referrals temporarily unavailable.');
     } finally {
       setBusy(false);
     }
   }
-  if (!summary) return error ? <p role="alert">{error}</p> : null;
-  const link =
-    summary.code && typeof window !== 'undefined'
-      ? `${window.location.origin}/?ref=${summary.code}`
-      : '';
+
+  async function copy() {
+    if (!summary?.code) return;
+    const value = summary.code;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      // Clipboard API is unavailable on insecure origins and in some webviews.
+      const area = document.createElement('textarea');
+      area.value = value;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      area.remove();
+      if (!ok) {
+        setError('Could not copy the code.');
+        return;
+      }
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
   return (
-    <section aria-label="Referrals" className="min-w-0 space-y-2">
-      <h3>Referrals</h3>
-      {summary.code ? (
-        <>
-          <p>
-            Your code <strong>{summary.code}</strong> · {summary.referredCount}{' '}
-            account
-            {summary.referredCount === 1 ? '' : 's'} joined with it.
-          </p>
-          <p>
-            <code className="break-all">{link}</code>{' '}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                void navigator.clipboard
-                  .writeText(link)
-                  .then(() => setCopied(true))
-                  .catch(() => setError('Copy the link manually.'))
-              }
-            >
-              {copied ? 'Copied' : 'Copy link'}
-            </Button>
-          </p>
-        </>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={() => void run(() => post({ action: 'create' }))}
-        >
-          Get my referral link
-        </Button>
-      )}
-      {summary.referredBy ? (
-        <p className="text-xs text-muted-foreground">
-          You joined with code {summary.referredBy.code}.
+    <section className="referral-panel">
+      <div className="page-title">
+        <span className="eyebrow">REFERRALS</span>
+        <h1>Invite people to Bundle</h1>
+        <p>
+          Share a code. Bundle takes no trading fees, so referrals are tracked
+          only, with nothing to pay out.
         </p>
+      </div>
+
+      {signedOut ? (
+        <div className="referral-card">
+          <Ticket size={16} />
+          <h2>Sign in to use referrals</h2>
+          <p>Codes are tied to your account.</p>
+        </div>
       ) : (
-        <form
-          className="flex flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run(() => post({ action: 'apply', code: entry })).then(
-              (value) => {
-                if (value?.referredBy)
-                  try {
-                    localStorage.removeItem(PENDING_KEY);
-                  } catch {}
-              },
-            );
-          }}
-        >
-          <Input
-            aria-label="Referral code"
-            placeholder="Referral code"
-            value={entry}
-            maxLength={8}
-            onChange={(e) => setEntry(e.target.value.toUpperCase())}
-            className="w-40"
-          />
-          <Button type="submit" variant="outline" disabled={busy || !entry}>
-            Apply code
-          </Button>
-        </form>
+        <>
+          <div className="referral-card">
+            <Ticket size={16} />
+            <h2>Your code</h2>
+            {summary?.code ? (
+              <>
+                <div className="referral-code">
+                  <code>{summary.code}</code>
+                  <button
+                    type="button"
+                    onClick={() => void copy()}
+                    aria-label="Copy referral code"
+                  >
+                    {copied ? <Check size={13} /> : <Copy size={13} />}
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+                <p className="referral-muted">
+                  {summary.referredCount === 1
+                    ? '1 person joined through your code.'
+                    : `${summary.referredCount} people joined through your code.`}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="referral-muted">
+                  You do not have a code yet. Creating one is instant.
+                </p>
+                <button
+                  type="button"
+                  className="referral-primary"
+                  disabled={busy}
+                  onClick={() => void send('create')}
+                >
+                  Create my code
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="referral-card">
+            <UserPlus size={16} />
+            <h2>Were you invited?</h2>
+            {summary?.referredBy ? (
+              <p className="referral-muted">
+                Applied <code>{summary.referredBy.code}</code> on{' '}
+                {new Date(summary.referredBy.at).toLocaleDateString()}.
+              </p>
+            ) : (
+              <form
+                className="referral-apply"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (code.trim()) void send('apply', code.trim());
+                }}
+              >
+                <input
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="ABCD2345"
+                  aria-label="Referral code"
+                  maxLength={8}
+                />
+                <button type="submit" disabled={busy || code.trim().length !== 8}>
+                  Apply
+                </button>
+              </form>
+            )}
+          </div>
+        </>
       )}
-      {error && <p role="alert">{error}</p>}
+
+      {notice && <p className="referral-notice">{notice}</p>}
+      {error && (
+        <p className="referral-error" role="alert">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

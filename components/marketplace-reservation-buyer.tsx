@@ -255,6 +255,28 @@ export function MarketplaceReservationBuyer({
             ? 'Hold released. Refresh inventory to see current availability.'
             : 'Hold expired. Refresh inventory and request a new cart review.',
       );
+      if (action === 'reserve' && checked.state === 'held') {
+        // Proxima imports purchased wallets automatically; the manual import
+        // button stays as the fallback when this fails.
+        void fetch('/api/marketplace/reservations', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ action: 'settle', id: activeId }),
+          cache: 'no-store',
+        })
+          .then(async (r) => {
+            if (!r.ok) return;
+            const settled = (await r.json()) as {
+              settled?: { walletCount?: number };
+            };
+            const count = settled.settled?.walletCount ?? 0;
+            if (!count || !live(c)) return;
+            setMessage(
+              `Wallet hold verified and ${count} wallet${count === 1 ? '' : 's'} imported to My wallets. No payment or key delivery was authorized.`,
+            );
+          })
+          .catch(() => {});
+      }
     } catch {
       if (live(c)) {
         setReceipt(null);

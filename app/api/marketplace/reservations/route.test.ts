@@ -64,7 +64,7 @@ beforeEach(async () => {
   client = createClient({ url: 'file::memory:', intMode: 'number' });
   db = createTursoDatabase(client);
   for (const sql of [
-    'CREATE TABLE workspace_wallets(owner_id TEXT,chain TEXT,address TEXT,label TEXT,revision INTEGER,updated_at TEXT,archived INTEGER)',
+    'CREATE TABLE workspace_wallets(owner_id TEXT,chain TEXT,address TEXT,folder_id TEXT,folder_ids TEXT,label TEXT,role TEXT,tags TEXT,revision INTEGER,updated_at TEXT,archived INTEGER)',
     'CREATE TABLE wallet_ownership_proofs(owner_id TEXT,chain TEXT,address TEXT,verified_at TEXT)',
     'CREATE TABLE warmup_history_runs(owner_id TEXT,id TEXT,revision INTEGER,created_at TEXT,updated_at TEXT,document TEXT)',
     'CREATE TABLE warmup_buy_receipts(owner_id TEXT,wallet_address TEXT,signature TEXT)',
@@ -76,6 +76,7 @@ beforeEach(async () => {
     '0119_marketplace_publications',
     '0120_marketplace_reservations',
     '0121_marketplace_reservation_history',
+    '0159_marketplace_reservation_settlement',
   ])
     for (const sql of readFileSync('drizzle/' + file + '.sql', 'utf8')
       .split('--> statement-breakpoint')
@@ -91,7 +92,9 @@ beforeEach(async () => {
       updatedAt: string;
     };
     await db
-      .prepare('INSERT INTO workspace_wallets VALUES(?,?,?,?,?,?,?)')
+      .prepare(
+        "INSERT INTO workspace_wallets(owner_id,chain,address,label,revision,updated_at,archived) VALUES(?,?,?,?,?,?,?)",
+      )
       .bind(
         'operator',
         'Solana',
@@ -483,4 +486,55 @@ it('returns empty history and fails closed on missing index or corrupt owned rec
   expect(await result.text()).not.toMatch(
     /sqlite|SELECT |stack|askingPriceLamports/,
   );
+});
+
+it('settles a held reservation into the buyer workspace once, idempotently', async () => {
+  const selected = await input();
+  const held = await reservationBody(await post(selected));
+  const addresses = held.reservation.record.review.items.map(
+    (e) => e.listing.address,
+  );
+  const first = await post({ action: 'settle', id: selected.id });
+  expect(first.status).toBe(200);
+  const body = (await first.json()) as {
+    settled: { settledAt: string; walletCount: number };
+  };
+  expect(body.settled.walletCount).toBe(addresses.length);
+  const rows = await db
+    .prepare(
+      "SELECT address,label,role,tags FROM workspace_wallets WHERE owner_id='buyer' ORDER BY address",
+    )
+    .all<{ address: string; label: string; role: string; tags: string }>();
+  expect(rows.results.map((r) => r.address).sort()).toEqual(
+    [...addresses].sort(),
+  );
+  expect(rows.results.map((r) => r.label).sort()).toEqual(
+    addresses.map((_, i) => `Purchased ${i + 1}`).sort(),
+  );
+  expect(rows.results.every((r) => r.role === 'Recipient')).toBe(true);
+  expect(rows.results.every((r) => r.tags === '["purchased"]')).toBe(true);
+  const again = await post({ action: 'settle', id: selected.id });
+  expect(again.status).toBe(200);
+  expect(await again.json()).toEqual(body);
+  const count = await db
+    .prepare(
+      "SELECT count(*) AS n FROM workspace_wallets WHERE owner_id='buyer'",
+    )
+    .first<{ n: number }>();
+  expect(count?.n).toBe(addresses.length);
+});
+it('refuses to settle a released or unknown reservation', async () => {
+  const selected = await input();
+  const held = await reservationBody(await post(selected));
+  await post({
+    action: 'release',
+    id: selected.id,
+    contextSha256: held.reservation.record.contextSha256,
+    acknowledgement: RESERVATION_CANCEL_ACK,
+  });
+  const released = await post({ action: 'settle', id: selected.id });
+  expect(released.status).toBe(409);
+  expect(await released.text()).toMatch(/released/);
+  const missing = await post({ action: 'settle', id: crypto.randomUUID() });
+  expect(missing.status).toBe(404);
 });

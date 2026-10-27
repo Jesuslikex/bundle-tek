@@ -30,6 +30,7 @@ const json = (body: unknown, status = 200, retry = false) =>
 const actions = z.discriminatedUnion('action', [
   reservationRequest.extend({ action: z.literal('reserve') }),
   reservationCancel.extend({ action: z.literal('release') }),
+  z.object({ action: z.literal('settle'), id: operatorDraftId }).strict(),
 ]);
 function failure(error: unknown, request: Request) {
   if (request.signal.aborted)
@@ -152,6 +153,71 @@ export async function POST(request: Request) {
           request.signal,
         ),
       });
+    if (action === 'settle') {
+      const reservation = await readMarketplaceReservation(
+        db,
+        user.userId,
+        payload.id,
+        request.signal,
+      );
+      if (!reservation)
+        return json({ error: 'Reservation not found.' }, 404);
+      const settled = await db
+        .prepare(
+          'SELECT settled_at AS settledAt,wallet_count AS walletCount FROM marketplace_reservation_settlements WHERE buyer_id=? AND reservation_id=?',
+        )
+        .bind(user.userId, payload.id)
+        .first<{ settledAt: string; walletCount: number }>();
+      if (settled) return json({ settled });
+      const released = await db
+        .prepare(
+          'SELECT released_at AS releasedAt FROM marketplace_reservation_releases WHERE buyer_id=? AND reservation_id=?',
+        )
+        .bind(user.userId, payload.id)
+        .first<{ releasedAt: string }>();
+      if (released)
+        return json({ error: 'This reservation was released.' }, 409);
+      if (Date.parse(reservation.record.expiresAt) <= Date.now())
+        return json({ error: 'This reservation expired.' }, 409);
+      const addresses = reservation.record.review.items.map(
+        (e) => e.listing.address,
+      );
+      const now = new Date().toISOString();
+      const entries = addresses.map((address, index) => ({
+        address,
+        label: `Purchased ${index + 1}`,
+        role: 'Recipient',
+        tags: ['purchased'],
+      }));
+      const inserted = await db
+        .prepare(
+          `WITH incoming AS (SELECT json_extract(value,'$.address') AS address,json_extract(value,'$.label') AS label,json_extract(value,'$.role') AS role,json_extract(value,'$.tags') AS tags FROM json_each(?))
+          INSERT INTO workspace_wallets (owner_id,chain,address,folder_id,folder_ids,label,role,tags,archived,revision,updated_at)
+          SELECT ?,?,address,'','[]',label,role,tags,0,1,? FROM incoming
+          WHERE NOT EXISTS (SELECT 1 FROM workspace_wallets w WHERE w.owner_id=? AND w.chain='Solana' AND w.address=incoming.address)`,
+        )
+        .bind(JSON.stringify(entries), user.userId, 'Solana', now, user.userId)
+        .run();
+      const walletCount = inserted.meta.changes ?? 0;
+      await db
+        .prepare(
+          'INSERT OR IGNORE INTO marketplace_reservation_settlements(buyer_id,reservation_id,settled_at,wallet_count) VALUES(?,?,?,?)',
+        )
+        .bind(user.userId, payload.id, new Date().toISOString(), addresses.length)
+        .run();
+      const settlement = await db
+        .prepare(
+          'SELECT settled_at, wallet_count FROM marketplace_reservation_settlements WHERE buyer_id = ? AND reservation_id = ?',
+        )
+        .bind(user.userId, payload.id)
+        .first<{ settled_at: string; wallet_count: number }>();
+      return json({
+        settled: {
+          settledAt: settlement?.settled_at ?? now,
+          walletCount: settlement?.wallet_count ?? addresses.length,
+        },
+      });
+    }
     // Existing IDs recover even during the new-hold cooldown. GET and release
     // remain available, so a lost response never forces a different ID or retry.
     if (
