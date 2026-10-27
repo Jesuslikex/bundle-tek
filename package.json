@@ -6,9 +6,9 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev --webpack -p 4310",
     "build": "next build --webpack",
-    "start": "next start",
+    "start": "next start -p 4310",
     "lint": "oxlint",
     "format": "oxfmt",
     "db:generate": "drizzle-kit generate",
@@ -48,7 +48,7 @@
     "embla-carousel-react": "8.5.2",
     "input-otp": "1.4.2",
     "lucide-react": "1.31.0",
-    "next": "^16.4.0",
+    "next": "16.4.3",
     "react": "19.2.8",
     "react-day-picker": "9.8.1",
     "react-dom": "19.2.8",

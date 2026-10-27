@@ -9,11 +9,13 @@ export function getTursoClient(): Client {
   if (client) return client;
   const url = process.env.TURSO_DATABASE_URL,
     authToken = process.env.TURSO_AUTH_TOKEN;
-  if (!url || !authToken)
-    throw new Error('Database configuration is unavailable.');
+  if (!url) throw new Error('Database configuration is unavailable.');
   const parsed = new URL(url);
+  const local = parsed.protocol === 'file:';
+  if (!local && !authToken)
+    throw new Error('Database configuration is unavailable.');
   if (
-    !['libsql:', 'https:'].includes(parsed.protocol) ||
+    !['libsql:', 'https:', 'file:'].includes(parsed.protocol) ||
     parsed.username ||
     parsed.password
   )
