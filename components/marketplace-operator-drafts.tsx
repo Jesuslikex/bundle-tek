@@ -44,6 +44,8 @@ export function MarketplaceOperatorDrafts({
     [ready, setReady] = useState(false),
     [consentedFor, setConsentedFor] = useState(''),
     [busy, setBusy] = useState(false),
+    [expiredAt, setExpiredAt] = useState(''),
+    [deadline, setDeadline] = useState(''),
     [record, setRecord] = useState<OperatorDraftRecord | null>(null),
     [message, setMessage] = useState(''),
     [error, setError] = useState('');
@@ -98,6 +100,20 @@ export function MarketplaceOperatorDrafts({
       );
     }
   }, [review]);
+  useEffect(() => {
+    if (review) setDeadline(review.reviewExpiresAt);
+  }, [review]);
+  useEffect(() => {
+    if (!deadline) return;
+    const remaining = Date.parse(deadline) - Date.now();
+    if (remaining <= 0) {
+      setExpiredAt(deadline);
+      return;
+    }
+    setExpiredAt('');
+    const timer = setTimeout(() => setExpiredAt(deadline), remaining);
+    return () => clearTimeout(timer);
+  }, [deadline]);
   function stop() {
     const kind = pending.current?.kind;
     pending.current?.controller.abort();
@@ -127,6 +143,23 @@ export function MarketplaceOperatorDrafts({
       'Local recovery reminder cleared. Saved drafts were not deleted.',
     );
   }
+  function abandon() {
+    if (pending.current || !unresolved) return;
+    try {
+      sessionStorage.removeItem(reminderKey);
+    } catch {
+      setError(
+        'The recovery reminder could not be abandoned. No server data changed.',
+      );
+      return;
+    }
+    setMarker(null);
+    setResolvedId('');
+    setNotFoundId('');
+    setMessage(
+      'Recovery reminder abandoned. The save outcome stays unknown and the draft may still exist; its ID stays in the field for a later recover. Saved drafts were not deleted.',
+    );
+  }
   function begin(kind: 'save' | 'recover') {
     const controller = new AbortController();
     pending.current = { controller, kind };
@@ -147,6 +180,7 @@ export function MarketplaceOperatorDrafts({
       consentedFor !== context ||
       invalidReminder ||
       unresolved ||
+      !!expiredAt ||
       alreadyRetained ||
       Date.parse(review.reviewExpiresAt) <= Date.now()
     )
@@ -241,8 +275,8 @@ export function MarketplaceOperatorDrafts({
           response.status === 401
             ? 'Sign in to recover the draft.'
             : response.status === 403
-              ? 'Only configured Bundle operators can recover listing drafts.'
-              : 'Draft recovery unavailable. The save outcome remains unresolved.',
+              ? 'Only configured Bundle operators can recover listing drafts. Abandon the unresolved save if this draft is out of reach.'
+              : 'Draft recovery unavailable. The save outcome remains unresolved; abandon it to save again.',
         );
         return;
       }
@@ -260,7 +294,7 @@ export function MarketplaceOperatorDrafts({
     } catch {
       if (live(controller))
         setError(
-          'Saved draft response could not be verified. No save or retry was sent.',
+          'Saved draft response could not be verified. No save or retry was sent; abandon the unresolved save to start again.',
         );
     } finally {
       if (owns(controller)) {
@@ -301,6 +335,7 @@ export function MarketplaceOperatorDrafts({
                 unresolved ||
                 invalidReminder ||
                 consentedFor !== context ||
+                !!expiredAt ||
                 alreadyRetained
               }
               onClick={() => void save()}
@@ -319,7 +354,14 @@ export function MarketplaceOperatorDrafts({
       {unresolved && (
         <p>
           A previous save has not been resolved. Recover its original ID before
-          saving another draft.
+          saving another draft, or abandon it if the draft is out of reach.
+        </p>
+      )}
+      {expiredAt && (
+        <p>
+          This review expired at {new Date(expiredAt).toLocaleTimeString()}.
+          Request a fresh review before saving; existing drafts can still be
+          recovered.
         </p>
       )}
       <label className={draftStyles.recovery}>
@@ -346,6 +388,11 @@ export function MarketplaceOperatorDrafts({
         {(marker || invalidReminder) && (
           <button disabled={busy || unresolved} onClick={clearReminder}>
             Clear recovery reminder
+          </button>
+        )}
+        {unresolved && (
+          <button disabled={busy} onClick={abandon}>
+            Abandon unresolved save
           </button>
         )}
       </div>

@@ -100,8 +100,6 @@ export function MarketplaceOperatorConsole() {
     const controller = begin();
     setCapacity(false);
     setInventory(null);
-    setWallet('');
-    setPrice('');
     try {
       const response = await fetch('/api/marketplace/operator/inventory', {
         cache: 'no-store',
@@ -133,7 +131,11 @@ export function MarketplaceOperatorConsole() {
       const result = admitMarketplaceOwnedInventory(data);
       if (live(controller)) {
         setInventory(result);
-        setWallet(result.wallets[0]?.address ?? '');
+        setWallet((current) =>
+          result.wallets.some((w) => w.address === current)
+            ? current
+            : (result.wallets[0]?.address ?? ''),
+        );
       }
     } catch (error) {
       if (live(controller))

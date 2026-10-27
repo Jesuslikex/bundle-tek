@@ -238,6 +238,43 @@ it('permits clearing an original reminder only after that exact ID was resolved 
   expect(sessionStorage.getItem(key)).toBeNull();
   expect(host.textContent).toContain('Saved drafts were not deleted');
 });
+it('lets an unresolved save be abandoned when recovery keeps failing', async () => {
+  const input = operatorDraftRequest(randomUUID(), review, true);
+  sessionStorage.setItem(key, JSON.stringify(input));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ error: 'boom' }, { status: 500 })),
+  );
+  await mount();
+  await recoveryId(input.id);
+  await click('Recover saved draft');
+  expect(host.textContent).toContain('abandon it to save again');
+  expect(button('Clear recovery reminder').disabled).toBe(true);
+  await click('Abandon unresolved save');
+  expect(sessionStorage.getItem(key)).toBeNull();
+  expect(
+    (host.querySelector('input[maxlength="36"]') as HTMLInputElement).value,
+  ).toBe(input.id);
+  expect(host.textContent).toContain('outcome stays unknown');
+  expect(host.textContent).not.toContain('has not been resolved');
+  expect(button('Abandon unresolved save')).toBeUndefined();
+  await check();
+  expect(button('Save unpublished draft').disabled).toBe(false);
+});
+it('disables saving and says so once the review expires', async () => {
+  vi.stubGlobal('fetch', vi.fn());
+  await mount();
+  await check();
+  expect(button('Save unpublished draft').disabled).toBe(false);
+  await act(async () => {
+    vi.setSystemTime(now + 61000);
+    await vi.advanceTimersByTimeAsync(61000);
+  });
+  expect(host.textContent).toContain('This review expired at');
+  expect(button('Save unpublished draft').disabled).toBe(true);
+  await mount(null);
+  expect(host.textContent).toContain('This review expired at');
+});
 it('blocks writes when a recovery reminder cannot be persisted', async () => {
   vi.stubGlobal('fetch', vi.fn());
   await mount();
