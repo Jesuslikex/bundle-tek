@@ -132,7 +132,7 @@ it('auto sizing spreads the exact target across the duration', () => {
   invariants(plan);
 });
 
-it('excludes underfunded wallets when others remain, refuses when none can trade', () => {
+it('excludes underfunded wallets and still plans when none can trade', () => {
   const balances = rich.map((b, n) => ({
     ...b,
     lamports: n === 1 ? '1000' : b.lamports,
@@ -140,16 +140,30 @@ it('excludes underfunded wallets when others remain, refuses when none can trade
   const plan = planVolumeSession(terms(), balances, seed);
   expect(plan.excludedWallets).toEqual([wallets[1]]);
   expect(plan.events.some((e) => e.wallet === wallets[1])).toBe(false);
-  expect(() =>
-    planVolumeSession(
-      terms(),
-      rich.map((b) => ({ ...b, lamports: '1000' })),
-      seed,
-    ),
-  ).toThrow(/No selected wallet/);
+  const short = planVolumeSession(
+    terms(),
+    rich.map((b) => ({ ...b, lamports: '1000' })),
+    seed,
+  );
+  expect(short.excludedWallets).toEqual(wallets);
+  expect(short.wallets).toEqual(wallets);
+  expect(short.events).toHaveLength(short.estimate.trades);
   expect(() => planVolumeSession(terms(), rich.slice(1), seed)).toThrow(
     /Observe every selected wallet/,
   );
+});
+
+it('reports the shortest duration a duration schedule can fit', () => {
+  const durationTerms = terms({ endCondition: 'time', durationSeconds: 600 });
+  // Duration mode carries neither a delay pair nor an amount per trade.
+  delete durationTerms.delayMinMs;
+  delete durationTerms.delayMaxMs;
+  delete durationTerms.amount;
+  const plan = planVolumeSession(durationTerms, rich, seed);
+  // No delay pair exists in duration mode, so the floor is one second of
+  // spacing per gap between sends.
+  expect(plan.estimate.minimumDurationSeconds).toBe(plan.events.length - 1);
+  expect(plan.estimate.minimumDurationSeconds).toBeGreaterThan(0);
 });
 
 it('refuses a schedule that cannot fit the duration and states the minimum', () => {
@@ -161,7 +175,7 @@ it('refuses a schedule that cannot fit the duration and states the minimum', () 
 it('rejects malformed terms and too many rounds', () => {
   expect(() =>
     planVolumeSession(terms({ delayMaxMs: 1_000 }), rich, seed),
-  ).toThrow(/maximum delay/);
+  ).toThrow(/min delay and max delay/);
   expect(() =>
     planVolumeSession(
       { ...terms(), extra: 1 } as unknown as VolumeTerms,

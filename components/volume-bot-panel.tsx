@@ -14,6 +14,8 @@ import {
   volumeTerms,
   newVolumeSeed,
   rawToDecimal,
+  type VolumeAmount,
+  type VolumeMode,
   type VolumePlan,
   type VolumeTerms,
 } from '@/lib/volume-bot-plan';
@@ -83,17 +85,25 @@ const duration = (seconds: number) => {
 };
 
 async function call(payload?: object, projectId?: string) {
-  const response = await fetch(
-    payload ? endpoint : `${endpoint}?projectId=${projectId}`,
-    payload
-      ? {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(60_000),
-        }
-      : { cache: 'no-store', signal: AbortSignal.timeout(30_000) },
-  );
+  const send = () =>
+    fetch(
+      payload ? endpoint : `${endpoint}?projectId=${projectId}`,
+      payload
+        ? {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(60_000),
+          }
+        : { cache: 'no-store', signal: AbortSignal.timeout(30_000) },
+    );
+  let response = await send();
+  // The server holds a three second gate per owner. A quote immediately
+  // followed by its estimate lands inside it, so wait the gate out once.
+  if (response.status === 429) {
+    await new Promise((resolve) => setTimeout(resolve, 3_200));
+    response = await send();
+  }
   const data = await readPanelJson(
     response,
     'Volume Bot request unavailable. Reload before retrying.',
@@ -169,21 +179,25 @@ function VolumeBotWorkspace({
   locked: boolean;
 }) {
   const id = useId();
-  const [target, setTarget] = useState('1'),
+  const [targetUnit, setTargetUnit] = useState<'SOL' | 'USD'>('USD'),
+    [target, setTarget] = useState('100'),
     [durationParts, setDurationParts] = useState(() =>
       splitDurationSeconds(1800),
     ),
     [delayMin, setDelayMin] = useState('5'),
     [delayMax, setDelayMax] = useState('20'),
+    [endCondition, setEndCondition] = useState<'time' | 'delay'>('time'),
     [sizing, setSizing] = useState<'auto' | 'fixed' | 'range'>('auto'),
-    [fixed, setFixed] = useState('0.05'),
-    [rangeMin, setRangeMin] = useState('0.02'),
-    [rangeMax, setRangeMax] = useState('0.08'),
+    [fixed, setFixed] = useState(''),
+    [rangeMin, setRangeMin] = useState(''),
+    [rangeMax, setRangeMax] = useState(''),
     [waveIntensity, setWaveIntensity] = useState(0),
+    [mode, setMode] = useState<VolumeMode>('Organic'),
+    [feeTarget, setFeeTarget] = useState(''),
     [selected, setSelected] = useState<string[]>([]);
-  const [targetUnit, setTargetUnit] = useState<'SOL' | 'USD'>('SOL');
   const [usdQuote, setUsdQuote] = useState<VolumeUsdTarget | null>(null);
   const [acceptConversion, setAcceptConversion] = useState(false);
+  const [picker, setPicker] = useState(false);
   const draftVersion = useRef(0);
   const tradeSettings = useRef<HTMLDetailsElement>(null);
   const [estimate, setEstimate] = useState<{
@@ -256,11 +270,11 @@ function VolumeBotWorkspace({
   const validDuration =
     parsedDuration.seconds !== null &&
     parsedDuration.seconds >= VOLUME_LIMITS.minDurationSeconds;
-  const terms = (): VolumeTerms => {
+  const terms = (quote: VolumeUsdTarget | null): VolumeTerms => {
     const lamports = (text: string, label: string) => {
       const raw = decimalToRaw(text, 9);
       if (raw === undefined || raw <= 0n)
-        throw new Error(`Enter ${label} in SOL.`);
+        throw new Error(`${label} must be greater than 0.`);
       return raw.toString();
     };
     const seconds = (text: string, label: string) => {
@@ -271,36 +285,51 @@ function VolumeBotWorkspace({
         raw > BigInt(VOLUME_LIMITS.maxDelayMs)
       )
         throw new Error(
-          `Enter ${label} from 1 to 600 seconds with at most three decimal places.`,
+          `Enter ${label} from 1 to 300 seconds with at most three decimal places.`,
         );
       return Number(raw);
     };
-    if (!validDuration || parsedDuration.seconds === null)
+    const delayMode = endCondition === 'delay';
+    if (!delayMode && (!validDuration || parsedDuration.seconds === null))
       throw new Error(
         parsedDuration.error ||
           'Choose a session duration from 1 minute to 24 hours.',
       );
     if (!selected.length) throw new Error('Choose at least one wallet.');
+    const delays = delayMode
+      ? {
+          delayMinMs: seconds(delayMin, 'a minimum delay'),
+          delayMaxMs: seconds(delayMax, 'a maximum delay'),
+        }
+      : undefined;
+    if (delayMode && sizing === 'auto')
+      throw new Error('Choose fixed or random trade amounts.');
+    const amount: VolumeAmount | undefined = !delayMode
+      ? undefined
+      : sizing === 'fixed'
+        ? { kind: 'fixed', lamports: lamports(fixed, 'Amount per trade') }
+        : {
+            kind: 'range',
+            minLamports: lamports(rangeMin, 'Min amount'),
+            maxLamports: lamports(rangeMax, 'Max amount'),
+          };
     return volumeTerms({
       targetVolumeLamports:
         targetUnit === 'USD'
-          ? currentUsdQuote().targetVolumeLamports
-          : lamports(target, 'a target volume'),
-      durationSeconds: parsedDuration.seconds,
-      delayMinMs: seconds(delayMin, 'a minimum delay'),
-      delayMaxMs: seconds(delayMax, 'a maximum delay'),
-      amount:
-        sizing === 'auto'
-          ? { kind: 'auto' }
-          : sizing === 'fixed'
-            ? { kind: 'fixed', lamports: lamports(fixed, 'a trade amount') }
-            : {
-                kind: 'range',
-                minLamports: lamports(rangeMin, 'a minimum amount'),
-                maxLamports: lamports(rangeMax, 'a maximum amount'),
-              },
+          ? quote!.targetVolumeLamports
+          : lamports(target, 'Target volume'),
+      endCondition,
+      ...(delays ? delays : { durationSeconds: parsedDuration.seconds! }),
+      ...(amount ? { amount } : {}),
       wave: waveIntensity === 0 ? 'tight' : 'big-waves',
-      ...(waveIntensity === 0 ? {} : { waveIntensityTenths: waveIntensity }),
+      ...(mode === 'Bundle'
+        ? { mode }
+        : {
+            ...(waveIntensity === 0 ? {} : { waveIntensityTenths: waveIntensity }),
+          }),
+      ...(feeTarget.trim()
+        ? { feeTargetLamports: lamports(feeTarget, 'Fee target') }
+        : {}),
       wallets: selected,
     });
   };
@@ -324,38 +353,53 @@ function VolumeBotWorkspace({
       throw new Error('Capture a fresh USD conversion before estimating.');
     return usdQuote;
   };
+  const captureQuote = async () => {
+    const version = draftVersion.current;
+    setUsdQuote(null);
+    setAcceptConversion(false);
+    const data = (await call({
+      action: 'quote-usd-target',
+      projectId: project.id,
+      projectRevision: project.revision,
+      targetUsd: target,
+    })) as { quote: unknown; executionAllowed: boolean };
+    if (!mounted.current || version !== draftVersion.current) return null;
+    const quote = validateVolumeUsdTarget(data.quote);
+    if (
+      data.executionAllowed !== false ||
+      quote.projectId !== project.id ||
+      quote.projectRevision !== project.revision ||
+      quote.targetUsd !== target ||
+      Date.parse(quote.observedAt) > Date.now() ||
+      Date.parse(quote.expiresAt) <= Date.now()
+    )
+      throw new Error('USD conversion changed or expired. Capture it again.');
+    setUsdQuote(quote);
+    return quote;
+  };
   const captureUsd = () =>
     run(async () => {
-      const version = draftVersion.current;
       setEstimate(null);
-      setUsdQuote(null);
-      setAcceptConversion(false);
-      const data = (await call({
-        action: 'quote-usd-target',
-        projectId: project.id,
-        projectRevision: project.revision,
-        targetUsd: target,
-      })) as { quote: unknown; executionAllowed: boolean };
-      if (!mounted.current || version !== draftVersion.current) return;
-      const quote = validateVolumeUsdTarget(data.quote);
-      if (
-        data.executionAllowed !== false ||
-        quote.projectId !== project.id ||
-        quote.projectRevision !== project.revision ||
-        quote.targetUsd !== target ||
-        Date.parse(quote.observedAt) > Date.now() ||
-        Date.parse(quote.expiresAt) <= Date.now()
-      )
-        throw new Error('USD conversion changed or expired. Capture it again.');
-      setUsdQuote(quote);
+      const quote = await captureQuote();
+      if (quote && selected.length) await doEstimate();
     });
 
   const doEstimate = () =>
     run(async () => {
       const version = draftVersion.current;
-      const t = terms(),
+      if (targetUnit === 'USD' && !(Number(target) > 0))
+        throw new Error('Target volume (USD) must be greater than 0.');
+      const quote =
+        targetUnit === 'USD'
+          ? usdQuote &&
+            usdQuote.targetUsd === target &&
+            Date.parse(usdQuote.expiresAt) > Date.now()
+            ? usdQuote
+            : await captureQuote()
+          : null;
+      if (targetUnit === 'USD' && !quote) return;
+      const t = terms(quote),
         seed = newVolumeSeed();
-      const quote = targetUnit === 'USD' ? currentUsdQuote() : null;
       const data = (await call({
         action: 'estimate',
         projectId: project.id,
@@ -386,6 +430,31 @@ function VolumeBotWorkspace({
         ...(quote ? { usdQuoteId: quote.id } : {}),
       });
     });
+  const draftKey = JSON.stringify([
+    targetUnit,
+    target,
+    durationParts,
+    delayMin,
+    delayMax,
+    endCondition,
+    sizing,
+    fixed,
+    rangeMin,
+    rangeMax,
+    waveIntensity,
+    mode,
+    feeTarget,
+    selected,
+  ]);
+  const autoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Proxima re-estimates on a 300ms debounce instead of waiting for a button.
+  useEffect(() => {
+    if (locked || !selected.length || !validDuration) return;
+    clearTimeout(autoTimer.current);
+    autoTimer.current = setTimeout(() => void doEstimate(), 300);
+    return () => clearTimeout(autoTimer.current);
+  }, [draftKey]);
+
   const start = () =>
     run(async () => {
       if (!estimate) throw new Error('Estimate first.');
@@ -560,6 +629,14 @@ function VolumeBotWorkspace({
         </details>
       </section>
       <TransactionDeliveryNotice transport="rpc" />
+      {plan &&
+        plan.wallets.length > 0 &&
+        plan.excludedWallets.length === plan.wallets.length && (
+          <p role="alert" className={styles.error}>
+            No wallets have sufficient balance. Minimum required per wallet:{' '}
+            {sol(plan.estimate.requiredPerWalletLamports)}.
+          </p>
+        )}
       {error && (
         <div>
           <p role="alert" className={styles.error}>
@@ -597,23 +674,45 @@ function VolumeBotWorkspace({
               event.target.closest('details')?.setAttribute('open', '');
           }}
         >
-          <label htmlFor={`${id}-unit`}>Target currency</label>
-          <select
-            id={`${id}-unit`}
-            value={targetUnit}
-            onChange={(e) => {
-              clearConversion();
-              setTargetUnit(e.target.value as 'SOL' | 'USD');
-              setTarget(e.target.value === 'USD' ? '100' : '1');
-            }}
+          <p className={styles.heading}>
+            Target Volume <span className={styles.required}>*</span>
+          </p>
+          <p className={styles.note}>Amount of volume to generate.</p>
+          <div
+            className={styles.segmented}
+            role="group"
+            aria-label="Target currency"
           >
-            <option value="SOL">SOL</option>
-            <option value="USD">USD at captured SOL price</option>
-          </select>
-          <label htmlFor={`${id}-target`}>Target volume ({targetUnit})</label>
+            <button
+              type="button"
+              aria-pressed={targetUnit === 'SOL'}
+              disabled={busy || locked}
+              onClick={() => {
+                clearConversion();
+                setTargetUnit('SOL');
+                setTarget('10');
+              }}
+            >
+              SOL
+            </button>
+            <button
+              type="button"
+              aria-pressed={targetUnit === 'USD'}
+              disabled={busy || locked}
+              onClick={() => {
+                clearConversion();
+                setTargetUnit('USD');
+                setTarget('100');
+              }}
+            >
+              USD
+            </button>
+          </div>
           <Input
             id={`${id}-target`}
+            aria-label="Target volume"
             inputMode="decimal"
+            placeholder={targetUnit === 'USD' ? '100' : '10'}
             value={target}
             onChange={(e) => {
               clearConversion();
@@ -621,15 +720,15 @@ function VolumeBotWorkspace({
             }}
           />
           {targetUnit === 'USD' && (
-            <>
-              <Button
-                type="button"
-                onClick={captureUsd}
-                disabled={busy || locked}
-              >
-                Capture USD conversion
-              </Button>
-              {usdQuote && (
+            <Button
+              type="button"
+              onClick={captureUsd}
+              disabled={busy || locked}
+            >
+              Capture USD conversion
+            </Button>
+          )}
+          {targetUnit === 'USD' && usdQuote && (
                 <p className={styles.note}>
                   ${usdQuote.targetUsd} converts to{' '}
                   {sol(usdQuote.targetVolumeLamports)} at $
@@ -641,193 +740,364 @@ function VolumeBotWorkspace({
                   This fixes a SOL turnover target. It does not guarantee USD
                   turnover or profit.
                 </p>
+          )}
+          <div className={styles.segmented} role="group" aria-label="End condition">
+            <button
+              type="button"
+              aria-pressed={endCondition === 'time'}
+              disabled={busy || locked}
+              onClick={() => {
+                changed();
+                setEndCondition('time');
+                setMode('Organic');
+              }}
+            >
+              Duration
+            </button>
+            <button
+              type="button"
+              aria-pressed={endCondition === 'delay'}
+              disabled={busy || locked}
+              onClick={() => {
+                changed();
+                setEndCondition('delay');
+                // Proxima ticks the custom-amount control as soon as Delay is
+                // picked, so Fixed is preselected with an empty field.
+                setSizing((current) => (current === 'auto' ? 'fixed' : current));
+              }}
+            >
+              Delay
+            </button>
+          </div>
+          {endCondition === 'time' ? (
+            <>
+              <DurationInput
+                label="Session duration"
+                value={durationParts}
+                onChange={setDurationParts}
+                maximumSeconds={VOLUME_LIMITS.maxDurationSeconds}
+                disabled={busy || locked}
+              />
+              <p className={styles.note}>
+                From 1 minute to 24 hours as a planned schedule limit. The
+                schedule can finish sooner at its volume target or{' '}
+                {VOLUME_LIMITS.maxRounds}-round limit. Approval and settlement
+                waits can make wall time longer.
+              </p>
+              <p className={styles.note}>
+                Trade sizes will be auto-calculated based on target volume and
+                duration.
+              </p>
+              {parsedDuration.seconds !== null && !validDuration && (
+                <p role="alert" className={styles.error}>
+                  Choose a session duration from 1 minute to 24 hours.
+                </p>
               )}
             </>
+          ) : (
+            <>
+              <div className={styles.pair}>
+                <div>
+                  <label htmlFor={`${id}-dmin`}>Min Delay</label>
+                  <Input
+                    id={`${id}-dmin`}
+                    aria-label="Minimum delay"
+                    inputMode="decimal"
+                    value={delayMin}
+                    onChange={(e) => setDelayMin(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`${id}-dmax`}>Max Delay</label>
+                  <Input
+                    id={`${id}-dmax`}
+                    aria-label="Maximum delay"
+                    inputMode="decimal"
+                    value={delayMax}
+                    onChange={(e) => setDelayMax(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className={styles.note}>
+                Random delay between min and max for each trade. Minimum: 1
+                second, Maximum: 300 seconds (5 minutes).
+              </p>
+            </>
           )}
-          <DurationInput
-            label="Session duration"
-            value={durationParts}
-            onChange={setDurationParts}
-            maximumSeconds={VOLUME_LIMITS.maxDurationSeconds}
-            disabled={busy || locked}
-          />
-          <p className={styles.note}>
-            From 1 minute to 24 hours as a planned schedule limit. The schedule
-            can finish sooner at its volume target or {VOLUME_LIMITS.maxRounds}
-            -round limit. Approval and settlement waits can make wall time
-            longer.
-          </p>
-          {parsedDuration.seconds !== null && !validDuration && (
-            <p role="alert" className={styles.error}>
-              Choose a session duration from 1 minute to 24 hours.
-            </p>
-          )}
+            {endCondition === 'delay' && (
+              <>
+                <p className={styles.heading}>
+                  Amount per trade <span className={styles.required}>*</span>
+                </p>
+                <p className={styles.note}>
+                  {sizing === 'fixed'
+                    ? 'Fixed amount per trade in SOL.'
+                    : 'Min and max amount per trade in SOL.'}
+                </p>
+                <div
+                  className={styles.segmented}
+                  role="group"
+                  aria-label="Amount per trade"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={sizing === 'fixed'}
+                    disabled={busy || locked}
+                    onClick={() => {
+                      changed();
+                      setSizing('fixed');
+                    }}
+                  >
+                    Fixed
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={sizing === 'range'}
+                    disabled={busy || locked}
+                    onClick={() => {
+                      changed();
+                      setSizing('range');
+                    }}
+                  >
+                    Random
+                  </button>
+                </div>
+                {sizing === 'fixed' ? (
+                  <Input
+                    id={`${id}-amount-fixed`}
+                    aria-label="Fixed amount in SOL"
+                    inputMode="decimal"
+                    placeholder="0.1"
+                    value={fixed}
+                    onChange={(e) => setFixed(e.target.value)}
+                  />
+                ) : (
+                  <div className={styles.pair}>
+                    <div className={styles.amountCell}>
+                      <span className={styles.prefix}>Min.</span>
+                      <Input
+                        aria-label="Minimum amount in SOL"
+                        inputMode="decimal"
+                        placeholder="0.05"
+                        value={rangeMin}
+                        onChange={(e) => setRangeMin(e.target.value)}
+                      />
+                    </div>
+                    <div className={styles.amountCell}>
+                      <span className={styles.prefix}>Max.</span>
+                      <Input
+                        aria-label="Maximum amount in SOL"
+                        inputMode="decimal"
+                        placeholder="0.15"
+                        value={rangeMax}
+                        onChange={(e) => setRangeMax(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           <details ref={tradeSettings} className={styles.settings}>
             <summary>Trade settings</summary>
             <p className={styles.note}>
-              Optional delay, trade amounts and wave intensity. The defaults are
+              Optional mode, wave intensity and fee target. The defaults are
               included in your estimate.
             </p>
-            <label htmlFor={`${id}-dmin`}>Delay between trades (seconds)</label>
-            <div className={styles.pair}>
-              <Input
-                id={`${id}-dmin`}
-                aria-label="Minimum delay"
-                inputMode="decimal"
-                value={delayMin}
-                onChange={(e) => setDelayMin(e.target.value)}
-              />
-              <Input
-                aria-label="Maximum delay"
-                inputMode="decimal"
-                value={delayMax}
-                onChange={(e) => setDelayMax(e.target.value)}
-              />
-            </div>
-            <p className={styles.note}>
-              From 1 to 600 seconds, with up to three decimal places for exact
-              millisecond delays.
+            <fieldset className={styles.mode}>
+              <legend>Mode</legend>
+              <p className={styles.note}>Choose how to generate volume.</p>
+              <label>
+                <input
+                  type="radio"
+                  name={`${id}-mode`}
+                  value="Bundle"
+                  checked={mode === 'Bundle'}
+                  disabled={busy || locked || endCondition === 'time'}
+                  onChange={() => {
+                    changed();
+                    setMode('Bundle');
+                  }}
+                />
+                Bundle
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name={`${id}-mode`}
+                  value="Organic"
+                  checked={mode === 'Organic'}
+                  disabled={busy || locked}
+                  onChange={() => {
+                    changed();
+                    setMode('Organic');
+                  }}
+                />
+                Organic
+              </label>
+              <p className={styles.note}>
+                {endCondition === 'time'
+                  ? 'Organic only: Bundle needs a trade amount, so it is Delay only.'
+                  : mode === 'Bundle'
+                    ? 'Bundle: buys and sells land in the same block, one wallet per bundle.'
+                    : 'Organic: spread trades with delays.'}
+              </p>
+            </fieldset>
+            {mode === 'Organic' && (
+              <>
+                <label htmlFor={`${id}-wave`}>
+                  Wave intensity: {(waveIntensity / 10).toFixed(1)}
+                </label>
+                <input
+                  id={`${id}-wave`}
+                  aria-label="Wave intensity"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={waveIntensity / 10}
+                  className={styles.wave}
+                  aria-valuetext={(waveIntensity / 10).toFixed(1)}
+                  disabled={busy || locked}
+                  onChange={(event) => {
+                    const raw = decimalToRaw(event.target.value, 1);
+                    if (raw !== undefined && raw >= 0n && raw <= 10n)
+                      setWaveIntensity(Number(raw));
+                  }}
+                />
+                <div className={styles.waveLabels}>
+                  <span>Tight</span>
+                  <span>Big waves</span>
+                </div>
+                <p className={styles.note}>
+                  Controls how long buy and sell streaks last before reversing.
+                  Streaks stay inside the eligible wallets and at most six buys
+                  in a row, and each wallet sells only after its own buy settles.
+                </p>
+              </>
+            )}
+            <p className={styles.heading}>
+              Fee Target <span className={styles.optional}>(optional)</span>
             </p>
-            <label htmlFor={`${id}-sizing`}>Trade amounts</label>
-            <select
-              id={`${id}-sizing`}
-              value={sizing}
-              onChange={(e) => setSizing(e.target.value as typeof sizing)}
-            >
-              <option value="auto">Auto (from duration)</option>
-              <option value="fixed">Fixed</option>
-              <option value="range">Random range</option>
-            </select>
-            {sizing === 'fixed' && (
-              <Input
-                aria-label="Fixed amount in SOL"
-                inputMode="decimal"
-                value={fixed}
-                onChange={(e) => setFixed(e.target.value)}
-              />
-            )}
-            {sizing === 'range' && (
-              <div className={styles.pair}>
-                <Input
-                  aria-label="Minimum amount in SOL"
-                  inputMode="decimal"
-                  value={rangeMin}
-                  onChange={(e) => setRangeMin(e.target.value)}
-                />
-                <Input
-                  aria-label="Maximum amount in SOL"
-                  inputMode="decimal"
-                  value={rangeMax}
-                  onChange={(e) => setRangeMax(e.target.value)}
-                />
-              </div>
-            )}
-            <label htmlFor={`${id}-wave`}>
-              Wave intensity: {(waveIntensity / 10).toFixed(1)}
-            </label>
-            <input
-              id={`${id}-wave`}
-              aria-label="Wave intensity"
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={waveIntensity / 10}
-              className={styles.wave}
-              aria-valuetext={(waveIntensity / 10).toFixed(1)}
+            <p className={styles.note}>Total tip budget for the session.</p>
+            <Input
+              id={`${id}-fee-target`}
+              aria-label="Fee target in SOL"
+              inputMode="decimal"
+              placeholder="0.05"
+              value={feeTarget}
               disabled={busy || locked}
-              onChange={(event) => {
-                const raw = decimalToRaw(event.target.value, 1);
-                if (raw !== undefined && raw >= 0n && raw <= 10n)
-                  setWaveIntensity(Number(raw));
+              onChange={(e) => {
+                changed();
+                setFeeTarget(e.target.value);
               }}
             />
-            <div className={styles.waveLabels}>
-              <span>Tight</span>
-              <span>Big waves</span>
-            </div>
-            <p className={styles.note}>
-              Higher intensity makes longer buy and sell streaks, limited to
-              eligible wallets and at most six buys in a row. Each wallet sells
-              only after its own buy settles, with a separate reviewed batch.
-            </p>
           </details>
           <fieldset className={styles.wallets}>
-            <legend>Wallets</legend>
-            {wallets.length ? (
-              wallets.map((w) => (
-                <label key={w.address}>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(w.address)}
-                    onChange={(e) =>
-                      setSelected((old) =>
-                        e.target.checked
-                          ? [...old, w.address].slice(0, 25)
-                          : old.filter((a) => a !== w.address),
-                      )
-                    }
-                  />{' '}
-                  {w.label || short(w.address)}
-                </label>
-              ))
-            ) : (
-              <p>No active Solana wallets.</p>
+            <legend>Wallets (optional)</legend>
+            <p className={styles.note}>
+              Choose which wallets to use for volume.
+            </p>
+            <div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!wallets.length}
+                onClick={() => setPicker((open) => !open)}
+              >
+                Select Wallets
+                {selected.length ? ` (${selected.length})` : ''}
+              </Button>
+            </div>
+            {picker && (
+              <div className={styles.backdrop}>
+                <div
+                  className={styles.picker}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Select wallets"
+                  tabIndex={-1}
+                  ref={(node) => node?.focus()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setPicker(false);
+                  }}
+                >
+                  <div className={styles.pickerHead}>
+                    <p>Select wallets</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setPicker(false)}
+                    >
+                      Done
+                    </Button>
+                  </div>
+                  <div className={styles.pickerList}>
+                    {wallets.length ? (
+                      wallets.map((w) => (
+                        <label key={w.address}>
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(w.address)}
+                            onChange={(e) =>
+                              setSelected((old) =>
+                                e.target.checked
+                                  ? [...old, w.address].slice(0, 25)
+                                  : old.filter((a) => a !== w.address),
+                              )
+                            }
+                          />{' '}
+                          {w.label || short(w.address)}
+                        </label>
+                      ))
+                    ) : (
+                      <p>No active Solana wallets.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </fieldset>
-          <Button
-            type="submit"
-            disabled={
-              busy ||
-              locked ||
-              !validDuration ||
-              (targetUnit === 'USD' &&
-                (!usdQuote || Date.parse(usdQuote.expiresAt) <= now))
-            }
-          >
-            Estimate
-          </Button>
         </form>
       )}
       {!active && plan && (
         <section aria-label="Volume Bot estimate" className={styles.card}>
-          <dl>
-            <dt>Execution mode</dt>
-            <dd>Scheduled swaps</dd>
-            <dt>Volume</dt>
-            <dd>{sol(plan.estimate.volumeLamports)}</dd>
-            <dt>Round trips</dt>
-            <dd>
-              {plan.estimate.rounds} ({plan.estimate.trades} trades)
-            </dd>
-            <dt>Wave pattern</dt>
-            <dd>
-              {plan.terms.waveIntensityTenths === undefined
-                ? plan.terms.wave === 'tight'
-                  ? 'Tight'
-                  : 'Legacy big waves'
-                : `${(plan.terms.waveIntensityTenths / 10).toFixed(1)} intensity`}
-            </dd>
-            <dt>Approvals</dt>
-            <dd>{plan.estimate.approvals} batches</dd>
-            <dt>Schedule limit</dt>
-            <dd>{duration(plan.terms.durationSeconds)}</dd>
-            <dt>Scheduled time</dt>
-            <dd>{duration(plan.estimate.scheduledSeconds)}</dd>
-            <dt>Needed per wallet</dt>
-            <dd>{sol(plan.estimate.requiredPerWalletLamports)}</dd>
-            <dt>Network fees</dt>
-            <dd>~{sol(plan.estimate.networkFeesLamports)}</dd>
-            <dt>Swap cost</dt>
-            <dd>~{sol(plan.estimate.swapCostLamports)}</dd>
+          <h3>Estimation</h3>
+          <dl className={styles.estimateRows}>
+            <div>
+              <dt>Round Trips</dt>
+              <dd>{plan.estimate.rounds}</dd>
+            </div>
+            <div>
+              <dt>Wallets</dt>
+              <dd>{plan.wallets.length}</dd>
+            </div>
+            <div>
+              <dt>Cost</dt>
+              <dd>
+                {sol(
+                  BigInt(plan.estimate.networkFeesLamports) +
+                    BigInt(plan.estimate.swapCostLamports) +
+                    BigInt(plan.estimate.tipTotalLamports ?? 0),
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Required per Wallet</dt>
+              <dd>{sol(plan.estimate.requiredPerWalletLamports)}</dd>
+            </div>
+            <div>
+              <dt>Min. Duration</dt>
+              <dd>{duration(plan.estimate.minimumDurationSeconds)}</dd>
+            </div>
           </dl>
           {plan.excludedWallets.length > 0 && (
-            <p>
-              Excluded for low balance:{' '}
-              {plan.excludedWallets.map(short).join(', ')}
+            <p className={styles.error}>
+              {plan.excludedWallets.length} wallet
+              {plan.excludedWallets.length > 1 ? 's have' : ' has'} insufficient
+              balance. Min required:{' '}
+              {sol(plan.estimate.requiredPerWalletLamports)}
             </p>
           )}
-          <p className={styles.note}>{plan.estimate.assumptions}</p>
           {plan.usdTarget && (
             <label>
               <input
@@ -840,21 +1110,28 @@ function VolumeBotWorkspace({
               price, not guaranteed USD turnover.
             </label>
           )}
-          <Button
-            type="button"
-            disabled={
-              busy ||
-              locked ||
-              !!(
-                plan.usdTarget &&
-                (!acceptConversion ||
-                  Date.parse(plan.usdTarget.expiresAt) <= now)
-              )
-            }
-            onClick={start}
-          >
-            Save session and reserve wallets
-          </Button>
+          <div className={styles.buttons}>
+            <Button type="button" onClick={() => setEstimate(null)}>
+              Back
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              style={{ width: '25%' }}
+              disabled={
+                busy ||
+                locked ||
+                !!(
+                  plan.usdTarget &&
+                  (!acceptConversion ||
+                    Date.parse(plan.usdTarget.expiresAt) <= now)
+                )
+              }
+              onClick={start}
+            >
+              Run
+            </Button>
+          </div>
         </section>
       )}
       {active && (

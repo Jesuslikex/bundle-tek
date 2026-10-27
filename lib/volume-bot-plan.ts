@@ -14,18 +14,46 @@ import {
  * later batch than its buy and sells exactly the amount that buy received.
  */
 export type VolumeWave = 'tight' | 'big-waves';
+/**
+ * Proxima's Mode switch: `Bundle` buys and sells in the same block and removes
+ * the wave control, `Organic` spreads trades over time.
+ */
+export type VolumeMode = 'Bundle' | 'Organic';
+/**
+ * Proxima's end condition. `time` runs a fixed duration with the trades spread
+ * evenly across it; `delay` waits a random delay between min and max before
+ * each trade. Only `delay` carries trade amounts.
+ */
+export type VolumeEndCondition = 'time' | 'delay';
 export type VolumeAmount =
   | { kind: 'auto' }
   | { kind: 'fixed'; lamports: string }
   | { kind: 'range'; minLamports: string; maxLamports: string };
+/**
+ * Proxima's volume bot payload. Target volume is always required; the end
+ * condition picks either a duration or a min/max delay pair, and the amount per
+ * trade is required in delay mode and absent in time mode (the server sizes
+ * trades from the target and duration instead).
+ */
 export type VolumeTerms = {
   targetVolumeLamports: string;
-  durationSeconds: number;
-  delayMinMs: number;
-  delayMaxMs: number;
-  amount: VolumeAmount;
+  /** Defaults to `delay` so plans saved before the switch still rebuild. */
+  endCondition?: VolumeEndCondition;
+  /** Required in time mode, absent in delay mode. */
+  durationSeconds?: number;
+  /** Required in delay mode, absent in time mode. */
+  delayMinMs?: number;
+  delayMaxMs?: number;
+  /** Required in delay mode, absent in time mode. */
+  amount?: VolumeAmount;
   wave: VolumeWave;
   waveIntensityTenths?: number;
+  /** Defaults to `Organic` so plans saved before the switch still rebuild. */
+  mode?: VolumeMode;
+  /** Native SOL tip budget for the whole run, split across its trades. */
+  feeTargetLamports?: string;
+  /** Legacy organic sizing, kept so plans saved before it was dropped rebuild. */
+  organic?: unknown;
   wallets: string[];
 };
 export type VolumeWalletBalance = { address: string; lamports: string };
@@ -44,7 +72,7 @@ export const VOLUME_LIMITS = {
   maxWallets: 25,
   maxRounds: 250,
   minDelayMs: 1_000,
-  maxDelayMs: 600_000,
+  maxDelayMs: 300_000,
   minDurationSeconds: 60,
   maxDurationSeconds: 86_400,
   minTradeLamports: 1_000_000n,
@@ -98,28 +126,51 @@ export function volumeTerms(value: unknown): VolumeTerms {
   if (!input || typeof input !== 'object' || Array.isArray(input))
     return fail('Choose Volume Bot settings.');
   const target = lamports(input.targetVolumeLamports, 'target volume');
-  const durationSeconds = int(
-    input.durationSeconds,
-    VOLUME_LIMITS.minDurationSeconds,
-    VOLUME_LIMITS.maxDurationSeconds,
-    'a duration in seconds',
-  );
-  const delayMinMs = int(
-    input.delayMinMs,
-    VOLUME_LIMITS.minDelayMs,
-    VOLUME_LIMITS.maxDelayMs,
-    'a minimum delay in milliseconds',
-  );
-  const delayMaxMs = int(
-    input.delayMaxMs,
-    delayMinMs,
-    VOLUME_LIMITS.maxDelayMs,
-    'a maximum delay at or above the minimum',
-  );
+  const hasEnd = Object.hasOwn(input, 'endCondition');
+  const endCondition = (hasEnd ? input.endCondition : 'delay') as VolumeEndCondition;
+  if (endCondition !== 'time' && endCondition !== 'delay')
+    return fail('Choose a duration or a delay.');
+  const delayMode = endCondition === 'delay';
+  const hasDuration = Object.hasOwn(input, 'durationSeconds');
+  const hasDelays =
+    Object.hasOwn(input, 'delayMinMs') || Object.hasOwn(input, 'delayMaxMs');
+  // Plans saved before the switch carry both a duration and delays, so the
+  // exclusive rules only apply once an end condition is actually stored.
+  if (hasEnd && delayMode && hasDuration)
+    fail('Delay mode has no duration. Clear it or switch to Duration.');
+  if (hasEnd && !delayMode && hasDelays)
+    fail('Duration mode has no delays. Clear them or switch to Delay.');
+  const durationSeconds =
+    hasEnd && delayMode
+      ? undefined
+      : int(
+          input.durationSeconds,
+          VOLUME_LIMITS.minDurationSeconds,
+          VOLUME_LIMITS.maxDurationSeconds,
+          'a duration in seconds',
+        );
+  const delayMinMs =
+    hasEnd && !delayMode
+      ? undefined
+      : int(
+          input.delayMinMs,
+          VOLUME_LIMITS.minDelayMs,
+          VOLUME_LIMITS.maxDelayMs,
+          'a min delay and max delay that are positive with min <= max',
+        );
+  const delayMaxMs =
+    delayMinMs === undefined
+      ? undefined
+      : int(
+          input.delayMaxMs,
+          delayMinMs,
+          VOLUME_LIMITS.maxDelayMs,
+          'a min delay and max delay that are positive with min <= max',
+        );
   if (input.wave !== 'tight' && input.wave !== 'big-waves')
     return fail('Choose Tight or Big waves.');
   const amountInput = input.amount as Record<string, unknown> | null;
-  let amount: VolumeAmount;
+  let amount: VolumeAmount | undefined;
   const bounded = (value: unknown, label: string) => {
     const raw = lamports(value, label);
     if (
@@ -129,6 +180,10 @@ export function volumeTerms(value: unknown): VolumeTerms {
       fail(`Each trade must be between 0.001 and 1000 SOL.`);
     return raw.toString();
   };
+  if (hasEnd && !delayMode && Object.hasOwn(input, 'amount'))
+    return fail(
+      'Duration mode has no amount per trade. Clear it or switch to Delay.',
+    );
   if (amountInput?.kind === 'auto') amount = { kind: 'auto' };
   else if (amountInput?.kind === 'fixed')
     amount = {
@@ -145,9 +200,14 @@ export function volumeTerms(value: unknown): VolumeTerms {
       'maximum trade amount',
     );
     if (BigInt(maxLamports) < BigInt(minLamports))
-      fail('Maximum trade amount must be at or above the minimum.');
+      fail('Min amount must be positive and less than max amount.');
     amount = { kind: 'range', minLamports, maxLamports };
-  } else return fail('Choose auto, fixed or random trade amounts.');
+  } else if (hasEnd && delayMode)
+    return fail('Choose fixed or random trade amounts.');
+  else if (Object.hasOwn(input, 'amount'))
+    return fail(
+      'Duration mode has no amount per trade. Clear it or switch to Delay.',
+    );
   if (
     !Array.isArray(input.wallets) ||
     !input.wallets.length ||
@@ -169,22 +229,50 @@ export function volumeTerms(value: unknown): VolumeTerms {
     input.wave !== (intensity === 0 ? 'tight' : 'big-waves')
   )
     fail('Wave mode differs from the selected intensity.');
-  const keys = Object.keys(input).sort().join(',');
-  if (
-    keys !==
-    (hasIntensity
-      ? 'amount,delayMaxMs,delayMinMs,durationSeconds,targetVolumeLamports,wallets,wave,waveIntensityTenths'
-      : 'amount,delayMaxMs,delayMinMs,durationSeconds,targetVolumeLamports,wallets,wave')
-  )
+  const hasMode = Object.hasOwn(input, 'mode');
+  const mode = (hasMode ? input.mode : 'Organic') as VolumeMode;
+  if (mode !== 'Bundle' && mode !== 'Organic')
+    fail('Choose Bundle or Organic mode.');
+  // Proxima removes the wave control in Bundle mode, so a stray intensity is
+  // a stale form rather than a setting to honour.
+  if (mode === 'Bundle' && intensity !== undefined)
+    fail('Bundle mode has no wave intensity. Clear it or switch to Organic.');
+  const hasFeeTarget = Object.hasOwn(input, 'feeTargetLamports');
+  const feeTarget = hasFeeTarget
+    ? lamports(input.feeTargetLamports, 'fee target in lamports')
+    : undefined;
+  const expected = [
+    'targetVolumeLamports',
+    'wallets',
+    'wave',
+    ...(hasEnd ? ['endCondition'] : []),
+    ...(hasDuration ? ['durationSeconds'] : []),
+    ...(Object.hasOwn(input, 'delayMinMs') ? ['delayMinMs'] : []),
+    ...(Object.hasOwn(input, 'delayMaxMs') ? ['delayMaxMs'] : []),
+    ...(Object.hasOwn(input, 'amount') ? ['amount'] : []),
+    ...(hasIntensity ? ['waveIntensityTenths'] : []),
+    ...(hasMode ? ['mode'] : []),
+    ...(hasFeeTarget ? ['feeTargetLamports'] : []),
+    // Legacy: plans saved while organic carried its own jitter and shuffle
+    // still rebuild, the field is simply dropped.
+    ...(Object.hasOwn(input, 'organic') ? ['organic'] : []),
+  ].sort();
+  if (Object.keys(input).sort().join(',') !== expected.join(','))
     fail('Volume Bot settings contain unknown fields.');
   return {
     targetVolumeLamports: target.toString(),
-    durationSeconds,
-    delayMinMs,
-    delayMaxMs,
-    amount,
+    ...(hasEnd ? { endCondition } : {}),
+    ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+    ...(delayMinMs !== undefined ? { delayMinMs } : {}),
+    ...(delayMaxMs !== undefined ? { delayMaxMs } : {}),
+    ...(amount !== undefined ? { amount } : {}),
     wave: input.wave,
     ...(intensity !== undefined ? { waveIntensityTenths: intensity } : {}),
+    // Keep this order identical to the panel's draft builder: the estimate is
+    // compared to the draft by JSON, so key order is part of the contract.
+    ...(Object.hasOwn(input, 'organic') ? { organic: input.organic } : {}),
+    ...(hasMode ? { mode } : {}),
+    ...(feeTarget !== undefined ? { feeTargetLamports: feeTarget.toString() } : {}),
     wallets: [...(input.wallets as string[])],
   };
 }
@@ -228,16 +316,39 @@ function roundAmounts(
   rand: ReturnType<typeof volumeRandom>,
   gaps: number[],
 ) {
+  return baseRoundAmounts(terms, rand, gaps);
+}
+
+function baseRoundAmounts(
+  terms: VolumeTerms,
+  rand: ReturnType<typeof volumeRandom>,
+  gaps: number[],
+) {
   const target = BigInt(terms.targetVolumeLamports);
   const { minTradeLamports, maxRounds } = VOLUME_LIMITS;
   const amounts: bigint[] = [];
-  if (terms.amount.kind === 'auto') {
+  if (terms.endCondition === 'time') {
+    // Duration mode: no amount inputs, so the target is split into as many
+    // equal round trips as it covers, then spread across the duration.
+    const rounds = Math.max(
+      1,
+      Math.min(Number(target / (2n * minTradeLamports)), maxRounds),
+    );
+    const each = target / 2n / BigInt(rounds);
+    for (let n = 0; n < rounds; n++) amounts.push(each);
+    amounts[rounds - 1] += (target - 2n * each * BigInt(rounds) + 1n) / 2n;
+    return amounts;
+  }
+  if (terms.amount!.kind === 'auto') {
     // As many trades as the sampled delays fit into the duration, so the
-    // schedule always ends inside it.
+    // schedule always ends inside it. Legacy plans still carry a duration.
+    const limitMs = terms.durationSeconds
+      ? terms.durationSeconds * 1000
+      : Number.POSITIVE_INFINITY;
     let events = 1,
       elapsed = 0;
     for (const gap of gaps) {
-      if (elapsed + gap > terms.durationSeconds * 1000) break;
+      if (elapsed + gap > limitMs) break;
       elapsed += gap;
       events++;
     }
@@ -256,11 +367,11 @@ function roundAmounts(
   let volume = 0n;
   while (volume < target) {
     const amount =
-      terms.amount.kind === 'fixed'
-        ? BigInt(terms.amount.lamports)
+      terms.amount!.kind === 'fixed'
+        ? BigInt(terms.amount!.lamports)
         : rand.big(
-            BigInt(terms.amount.minLamports),
-            BigInt(terms.amount.maxLamports),
+            BigInt(terms.amount!.minLamports),
+            BigInt(terms.amount!.maxLamports),
           );
     amounts.push(amount);
     volume += 2n * amount;
@@ -289,27 +400,46 @@ export function planVolumeSession(
   if (usd && usd.targetVolumeLamports !== terms.targetVolumeLamports)
     fail('USD conversion differs from the fixed SOL target.');
   const rand = volumeRandom(seed);
+  const delayMode = terms.endCondition !== 'time';
   // Delays come from their own stream so trade sizing never shifts timing.
   const timing = volumeRandom(seed.split('').reverse().join(''));
-  const gaps = Array.from({ length: 2 * VOLUME_LIMITS.maxRounds }, () =>
-    timing.int(terms.delayMinMs, terms.delayMaxMs),
-  );
-  const amounts = roundAmounts(terms, rand, gaps);
+  const sampled = delayMode
+    ? Array.from({ length: 2 * VOLUME_LIMITS.maxRounds }, () =>
+        timing.int(terms.delayMinMs!, terms.delayMaxMs!),
+      )
+    : [];
+  const amounts = roundAmounts(terms, rand, sampled);
+  // Duration mode has no delay inputs: the trades are spread evenly across the
+  // duration instead, so the run still ends inside it.
+  const gaps = delayMode
+    ? sampled
+    : Array.from({ length: 2 * amounts.length }, () =>
+        Math.max(1, Math.floor((terms.durationSeconds! * 1000) / (2 * amounts.length))),
+      );
   const largest = amounts.reduce((a, b) => (a > b ? a : b));
   const fee = VOLUME_LIMITS.feePerTradeLamports;
+  // The fee target is a whole-run tip budget, so it is split evenly per trade.
+  const tradeCount = BigInt(2 * amounts.length);
+  const tipTarget = terms.feeTargetLamports ? BigInt(terms.feeTargetLamports) : 0n;
+  if (tipTarget && tipTarget < tradeCount)
+    fail(
+      `A ${tipTarget} lamport fee target cannot cover ${tradeCount} trades. Raise it or lower the round count.`,
+    );
+  const tipPerTrade = tipTarget ? tipTarget / tradeCount : 0n;
   const requiredPerWallet =
-    largest + VOLUME_LIMITS.tokenAccountRentLamports + 2n * fee;
+    largest + VOLUME_LIMITS.tokenAccountRentLamports + 2n * (fee + tipPerTrade);
   const observed = new Map(balances.map((b) => [b.address, b.lamports]));
   if (terms.wallets.some((w) => !/^\d{1,20}$/.test(observed.get(w) ?? '')))
     fail('Observe every selected wallet balance before planning.');
-  const eligible = terms.wallets.filter(
-    (w) => BigInt(observed.get(w)!) >= requiredPerWallet,
+  const excluded = terms.wallets.filter(
+    (w) => BigInt(observed.get(w)!) < requiredPerWallet,
   );
-  if (!eligible.length)
-    fail(
-      `No selected wallet holds the ${requiredPerWallet} lamports each needs (largest trade, token account rent and fees).`,
-    );
-  const excluded = terms.wallets.filter((w) => !eligible.includes(w));
+  // A wallet short of the requirement still gets a schedule so the review can
+  // show the shortfall, exactly like Proxima. Only when every wallet is short
+  // does the plan fall back to using them all.
+  const eligible = excluded.length === terms.wallets.length
+    ? terms.wallets
+    : terms.wallets.filter((w) => !excluded.includes(w));
 
   // Order buys and sells. A wallet holds at most one open round at a time so
   // each sell can only ever sell what its own buy received.
@@ -328,9 +458,13 @@ export function planVolumeSession(
     }
     return undefined;
   };
+  const mode: VolumeMode = terms.mode ?? 'Organic';
   while (next < amounts.length) {
     let streak: number;
-    if (terms.waveIntensityTenths === undefined) {
+    if (mode === 'Bundle') {
+      // One wallet per bundle: its buy and sell share a block.
+      streak = 1;
+    } else if (terms.waveIntensityTenths === undefined) {
       // Preserve legacy random draws and exact serialized plans.
       streak =
         terms.wave === 'tight'
@@ -378,12 +512,18 @@ export function planVolumeSession(
   let inBatch = new Set<string>();
   const buyBatch = new Map<number, number>();
   for (const [index, step] of order.entries()) {
-    if (index) offset += gaps[index - 1];
+    // A bundle sell rides its own buy's block, so it takes the same offset and
+    // must stay in the same batch as that buy.
+    const bundleSell = mode === 'Bundle' && step.side === 'Sell';
+    if (index && !bundleSell) offset += gaps[index - 1];
     const conflict =
       batch < 0 ||
-      offset - batchStart > VOLUME_LIMITS.batchSpanMs ||
-      inBatch.has(step.wallet) ||
-      (step.side === 'Sell' && buyBatch.get(step.round) === batch);
+      // Every bundle round gets its own block, so a buy always opens a batch.
+      (mode === 'Bundle' && step.side === 'Buy' && batch >= 0) ||
+      (!bundleSell &&
+        (offset - batchStart > VOLUME_LIMITS.batchSpanMs ||
+          inBatch.has(step.wallet) ||
+          (step.side === 'Sell' && buyBatch.get(step.round) === batch)));
     if (conflict) {
       batch++;
       batchStart = offset;
@@ -402,10 +542,14 @@ export function planVolumeSession(
     });
   }
   const scheduledMs = offset;
+  // A delay schedule knows its own floor; a duration schedule is only bound by
+  // the shortest spacing the runner allows between two trades.
   const minimumDurationSeconds = Math.ceil(
-    ((order.length - 1) * terms.delayMinMs) / 1000,
+    ((order.length - 1) * (terms.delayMinMs ?? VOLUME_LIMITS.minDelayMs)) / 1000,
   );
-  if (scheduledMs > terms.durationSeconds * 1000)
+  // Only a duration end condition can be overrun; a delay schedule has no
+  // duration to fit inside.
+  if (terms.durationSeconds !== undefined && scheduledMs > terms.durationSeconds * 1000)
     fail(
       `This schedule needs at least ${Math.ceil(scheduledMs / 1000)} seconds. Lengthen the duration, shorten delays or raise trade sizes.`,
     );
@@ -434,6 +578,13 @@ export function planVolumeSession(
       minimumDurationSeconds,
       requiredPerWalletLamports: requiredPerWallet.toString(),
       networkFeesLamports: (trades * fee).toString(),
+      ...(tipTarget
+        ? {
+            feeTargetLamports: tipTarget.toString(),
+            tipPerTradeLamports: tipPerTrade.toString(),
+            tipTotalLamports: (tipPerTrade * trades).toString(),
+          }
+        : {}),
       swapCostLamports: (
         (volume * VOLUME_LIMITS.swapCostBps) /
         10_000n

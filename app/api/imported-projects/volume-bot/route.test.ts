@@ -111,7 +111,7 @@ it('parses strict actions and rate-gates provider work per owner', async () => {
   });
   expect(bad.status).toBe(400);
   expect(((await bad.json()) as { error: string }).error).toMatch(
-    /maximum delay/,
+    /min delay and max delay/,
   );
 });
 

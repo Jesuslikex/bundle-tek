@@ -96,6 +96,56 @@
 .settings > * + * {
   margin-top: 8px;
 }
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 45%);
+}
+.picker {
+  display: grid;
+  gap: 0.5rem;
+  width: min(24rem, 100%);
+  max-height: 70vh;
+  padding: 0.75rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.75rem;
+  background: var(--card, #fff);
+}
+.pickerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.pickerList {
+  display: grid;
+  gap: 0.25rem;
+  overflow-y: auto;
+}
+.estimateRows {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.25rem;
+}
+.estimateRows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.estimateRows dt {
+  color: var(--muted-foreground, #666);
+}
+.buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+.buttons > * {
+  flex: 0 0 auto;
+}
 .error {
   color: var(--destructive, #c62828);
 }
@@ -112,6 +162,80 @@
   white-space: nowrap;
 }
 
+.mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  font-size: 0.85rem;
+}
+.mode legend {
+  padding: 0;
+  font-size: 0.8rem;
+  color: #a7a7b8;
+}
+.mode label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mode p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.heading {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.required {
+  color: rgb(var(--red, 220 38 38));
+}
+.optional {
+  color: var(--muted-foreground, #777);
+  font-weight: 400;
+}
+.amountCell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.amountCell > :last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.prefix {
+  font-size: 0.8em;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+.segmented {
+  display: flex;
+  gap: 0;
+}
+.segmented button {
+  flex: 1;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #2c2c3a;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.segmented button + button {
+  border-left: 0;
+}
+.segmented button[aria-pressed='true'] {
+  background: #2c2c3a;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
 .wave {
   width: 100%;
   min-width: 0;

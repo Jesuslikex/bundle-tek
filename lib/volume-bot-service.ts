@@ -158,7 +158,12 @@ export async function quoteVolumeUsdTarget(
   let quote: VolumeUsdTarget;
   try {
     quote = captureVolumeUsdTarget(
-      { ...input, id: crypto.randomUUID() },
+      {
+        id: crypto.randomUUID(),
+        projectId: input.projectId,
+        projectRevision: input.projectRevision,
+        targetUsd: input.targetUsd,
+      },
       observation,
       Date.now(),
     );

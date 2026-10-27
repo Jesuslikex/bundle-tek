@@ -73,6 +73,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   calls = [];
+  cachedQuote = null;
   localStorage.setItem(VAULT_STORAGE_KEY, encrypted);
   vi.stubGlobal(
     'fetch',
@@ -81,7 +82,10 @@ beforeEach(() => {
         ? (JSON.parse(options.body as string) as Record<string, unknown>)
         : null;
       calls.push({ url: String(url), payload });
-      return Response.json(respond(payload));
+      const answer = respond(payload) as Record<string, unknown> | null;
+      if (payload?.action === 'quote-usd-target' && !answer?.quote)
+        return Response.json({ quote: usdQuote(), executionAllowed: false });
+      return Response.json(answer);
     }),
   );
 });
@@ -96,25 +100,20 @@ const button = (text: string) =>
     (b) => b.textContent?.trim() === text,
   )!;
 const settle = () => act(async () => new Promise((r) => setTimeout(r, 0)));
+const settleAuto = () =>
+  act(async () => new Promise((r) => setTimeout(r, 400)));
 
 it('estimates with the chosen settings and saves the session', async () => {
-  const seedPlan = (seed: string) =>
+  const seedPlan = (payload: Record<string, unknown>) =>
     planVolumeSession(
-      {
-        targetVolumeLamports: '1000000000',
-        durationSeconds: 1800,
-        delayMinMs: 5000,
-        delayMaxMs: 20000,
-        amount: { kind: 'auto' },
-        wave: 'tight',
-        wallets: [address],
-      },
+      payload.terms as never,
       [{ address, lamports: '10000000000' }],
-      seed,
+      payload.seed as string,
+      payload.usdQuoteId ? usdQuote() : undefined,
     );
   respond = (payload) =>
     payload?.action === 'estimate'
-      ? { plan: seedPlan(payload.seed as string) }
+      ? { plan: seedPlan(payload) }
       : payload?.action === 'create'
         ? { id: 's' }
         : { sessions: [] };
@@ -132,38 +131,35 @@ it('estimates with the chosen settings and saves the session', async () => {
   expect(mode.querySelector('details')!.open).toBe(false);
   expect(mode.textContent).toContain('local tip-budget preview');
   expect(calls.every((c) => c.payload === null)).toBe(true);
-  await act(async () =>
-    (
-      container.querySelector('input[type=checkbox]') as HTMLInputElement
-    ).click(),
-  );
-  await act(async () => button('Estimate').click());
+  await act(async () => (await walletCheckbox()).click());
+  await settleAuto();
   await vi.waitFor(() =>
-    expect(container.textContent).toContain('Round trips'),
+    expect(container.textContent).toContain('Round Trips'),
   );
   const estimate = calls.find((c) => c.payload?.action === 'estimate')!;
   expect(estimate.payload).toMatchObject({
     projectId: PROJECT,
     projectRevision: 2,
     terms: {
-      targetVolumeLamports: '1000000000',
+      targetVolumeLamports: '500000000',
+      endCondition: 'time',
       durationSeconds: 1800,
-      delayMinMs: 5000,
-      delayMaxMs: 20000,
-      amount: { kind: 'auto' },
       wave: 'tight',
       wallets: [address],
     },
   });
-  expect(container.textContent).toContain('1 SOL');
+  expect(container.textContent).toContain('0.5 SOL');
   expect(
     container.querySelector('[aria-label="Volume Bot estimate"]')?.textContent,
-  ).toContain('Execution modeScheduled swaps');
+  ).toContain('EstimationRound Trips');
   expect(container.textContent).toContain('Delivery: configured Solana RPC');
   expect(container.textContent).toContain(
     'does not request dedicated sandwich protection',
   );
-  await act(async () => button('Save session and reserve wallets').click());
+  await act(async () =>
+    ([...container.querySelectorAll('input[type=checkbox]')].at(-1) as HTMLInputElement).click(),
+  );
+  await act(async () => button('Run').click());
   await vi.waitFor(() =>
     expect(calls.some((c) => c.payload?.action === 'create')).toBe(true),
   );
@@ -274,9 +270,11 @@ it('signs an approved batch locally, registers it and sends each trade once', as
   ).toEqual([{ action: 'send', batchId: review.id, index: 0 }]);
 }, 30_000);
 
+let cachedQuote: ReturnType<typeof captureVolumeUsdTarget> | null = null;
 function usdQuote() {
+  if (cachedQuote) return cachedQuote;
   const at = new Date().toISOString();
-  return captureVolumeUsdTarget(
+  return (cachedQuote = captureVolumeUsdTarget(
     {
       id: '00000000-0000-4000-8000-000000000010',
       projectId: PROJECT,
@@ -306,7 +304,7 @@ function usdQuote() {
       ],
     },
     Date.now(),
-  );
+  ));
 }
 async function changeControl(
   element: HTMLInputElement | HTMLSelectElement,
@@ -326,6 +324,15 @@ async function changeControl(
     );
   });
 }
+/** The wallet selector checkbox, not the first checkbox in the form. */
+async function walletCheckbox() {
+  const field = [...container.querySelectorAll('fieldset')].find(
+    (f) => f.querySelector('legend')?.textContent === 'Wallets (optional)',
+  )!;
+  if (!field.querySelector('input[type=checkbox]'))
+    await act(async () => (field.querySelector('button') as HTMLButtonElement).click());
+  return field.querySelector('input[type=checkbox]') as HTMLInputElement;
+}
 async function openUsd() {
   await act(async () =>
     root.render(
@@ -334,18 +341,100 @@ async function openUsd() {
   );
   await act(async () => button('Open Volume Bot').click());
   await settle();
-  await changeControl(
-    Array.from(container.querySelectorAll('select')).find((select) =>
-      select.querySelector('option[value="USD"]'),
-    )!,
-    'USD',
-  );
   await act(async () =>
-    (
-      container.querySelector('input[type=checkbox]') as HTMLInputElement
-    ).click(),
+    container
+      .querySelector('[aria-label="Target currency"] button:last-of-type')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true })),
   );
+  await act(async () => (await walletCheckbox()).click());
 }
+it('opens the wallet picker as a dialog that Done and Escape close', async () => {
+  respond = () => ({ sessions: [] });
+  await act(async () =>
+    root.render(
+      <VolumeBotPanel project={project} wallets={[wallet()]} locked={false} />,
+    ),
+  );
+  await act(async () => button('Open Volume Bot').click());
+  await settle();
+  const pickerButton = () =>
+    [...container.querySelectorAll('fieldset')]
+      .find((f) => f.querySelector('legend')?.textContent === 'Wallets (optional)')!
+      .querySelector('button') as HTMLButtonElement;
+  await act(async () => pickerButton().click());
+  const dialog = container.querySelector('[role="dialog"]')!;
+  expect(dialog.getAttribute('aria-modal')).toBe('true');
+  expect(dialog.textContent).toContain('Select wallets');
+  await act(async () => button('Done').click());
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+  await act(async () => pickerButton().click());
+  await act(async () =>
+    container
+      .querySelector('[role="dialog"]')!
+      .dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+  );
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('warns under the form when no selected wallet can fund the schedule', async () => {
+  const quote = usdQuote();
+  respond = (payload) =>
+    payload?.action === 'quote-usd-target'
+      ? { quote, executionAllowed: false }
+      : payload?.action === 'estimate'
+        ? {
+            plan: planVolumeSession(
+              payload.terms as never,
+              [{ address, lamports: '1' }],
+              payload.seed as string,
+              quote,
+            ),
+          }
+        : { sessions: [] };
+  await act(async () =>
+    root.render(
+      <VolumeBotPanel project={project} wallets={[wallet()]} locked={false} />,
+    ),
+  );
+  await act(async () => button('Open Volume Bot').click());
+  await settle();
+  await act(async () => (await walletCheckbox()).click());
+  await vi.waitFor(() =>
+    expect(
+      calls.some(
+        (c) =>
+          c.payload?.action === 'estimate' &&
+          (c.payload.terms as { wallets?: string[] }).wallets?.length,
+      ),
+    ).toBe(true),
+  );
+  await settleAuto();
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain(
+      'No wallets have sufficient balance. Minimum required per wallet:',
+    ),
+  );
+  expect(container.textContent).toMatch(/per wallet: [\d.]+ SOL\./);
+});
+
+it('labels the fee target as an optional tip budget', async () => {
+  respond = () => ({ sessions: [] });
+  await act(async () =>
+    root.render(
+      <VolumeBotPanel project={project} wallets={[wallet()]} locked={false} />,
+    ),
+  );
+  await act(async () => button('Open Volume Bot').click());
+  await settle();
+  expect(container.textContent).toContain('Total tip budget for the session.');
+  const fee = container.querySelector(
+    '[aria-label="Fee target in SOL"]',
+  ) as HTMLInputElement;
+  expect(fee.getAttribute('placeholder')).toBe('0.05');
+});
+
 it('captures USD explicitly and requires an unchecked fixed-SOL acknowledgement before saving', async () => {
   const quote = usdQuote();
   respond = (payload) =>
@@ -364,16 +453,10 @@ it('captures USD explicitly and requires an unchecked fixed-SOL acknowledgement 
           ? { id: 's' }
           : { sessions: [] };
   await openUsd();
-  expect(button('Estimate').disabled).toBe(true);
-  expect(calls.some((c) => c.payload?.action === 'quote-usd-target')).toBe(
-    false,
-  );
-  await act(async () => button('Capture USD conversion').click());
+  await settleAuto();
   await settle();
   expect(container.textContent).toContain('$100 converts to 0.5 SOL');
-  await act(async () => button('Estimate').click());
-  await settle();
-  const save = button('Save session and reserve wallets');
+  const save = button('Run');
   expect(save.disabled).toBe(true);
   const ack = [...container.querySelectorAll('input[type=checkbox]')].at(
     -1,
@@ -392,35 +475,45 @@ it('captures USD explicitly and requires an unchecked fixed-SOL acknowledgement 
     ),
   ).toBe(false);
 });
-it('clears captured conversion when the target changes and refuses expired conversion', async () => {
+it('clears the shown conversion when the target changes and recaptures an expired one', async () => {
   const quote = usdQuote();
   respond = (p) =>
     p?.action === 'quote-usd-target'
       ? { quote, executionAllowed: false }
-      : { sessions: [] };
+      : p?.action === 'estimate'
+        ? {
+            plan: planVolumeSession(
+              p.terms as never,
+              [{ address, lamports: '10000000000' }],
+              p.seed as string,
+              usdQuote(),
+            ),
+          }
+        : { sessions: [] };
   await openUsd();
-  await act(async () => button('Capture USD conversion').click());
+  await settleAuto();
   await settle();
+  expect(container.textContent).toContain('$100 converts to 0.5 SOL');
   const input = container.querySelector(
     'input[inputmode=decimal]',
   ) as HTMLInputElement;
   await changeControl(input, '120');
   expect(container.textContent).not.toContain('$100 converts');
-  expect(button('Estimate').disabled).toBe(true);
-  await changeControl(input, '100');
-  await act(async () => button('Capture USD conversion').click());
-  await settle();
+  const before = calls.filter(
+    (c) => c.payload?.action === 'quote-usd-target',
+  ).length;
   const clock = vi
     .spyOn(Date, 'now')
     .mockReturnValue(Date.parse(quote.expiresAt));
   try {
-    await act(async () => button('Estimate').click());
+    await settleAuto();
     await settle();
-    expect(container.textContent).toContain('Capture a fresh USD conversion');
   } finally {
     clock.mockRestore();
   }
-  expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
+  expect(
+    calls.filter((c) => c.payload?.action === 'quote-usd-target').length,
+  ).toBeGreaterThan(before);
 });
 it('ignores a pending USD capture after the target draft changes', async () => {
   const quote = usdQuote();
@@ -448,7 +541,6 @@ it('ignores a pending USD capture after the target draft changes', async () => {
   await act(async () => resolve({ quote, executionAllowed: false }));
   await settle();
   expect(container.textContent).not.toContain('$100 converts');
-  expect(button('Estimate').disabled).toBe(true);
 });
 
 it('discards an in-flight estimate when settings change', async () => {
@@ -461,6 +553,8 @@ it('discards an in-flight estimate when settings change', async () => {
         resolve = r;
       });
     }
+    if (p?.action === 'quote-usd-target')
+      return { quote: usdQuote(), executionAllowed: false };
     return { sessions: [] };
   };
   vi.stubGlobal(
@@ -478,12 +572,8 @@ it('discards an in-flight estimate when settings change', async () => {
   );
   await act(async () => button('Open Volume Bot').click());
   await settle();
-  await act(async () =>
-    (
-      container.querySelector('input[type=checkbox]') as HTMLInputElement
-    ).click(),
-  );
-  await act(async () => button('Estimate').click());
+  await act(async () => (await walletCheckbox()).click());
+  await settleAuto();
   await changeControl(
     container.querySelector<HTMLInputElement>('input[inputmode=decimal]')!,
     '2',
@@ -495,12 +585,13 @@ it('discards an in-flight estimate when settings change', async () => {
         request.terms as never,
         [{ address, lamports: '10000000000' }],
         request.seed as string,
+        request.usdQuoteId ? usdQuote() : undefined,
       ),
     }),
   );
   await settle();
-  expect(container.textContent).not.toContain('Round trips');
-  expect(button('Save session and reserve wallets')).toBeUndefined();
+  expect(container.textContent).not.toContain('Round Trips');
+  expect(button('Run')).toBeUndefined();
 });
 
 async function openSolTiming() {
@@ -511,6 +602,7 @@ async function openSolTiming() {
             payload.terms as never,
             [{ address, lamports: '10000000000' }],
             payload.seed as string,
+            usdQuote(),
           ),
         }
       : { sessions: [] };
@@ -521,11 +613,7 @@ async function openSolTiming() {
   );
   await act(async () => button('Open Volume Bot').click());
   await settle();
-  await act(async () =>
-    (
-      container.querySelector('input[type=checkbox]') as HTMLInputElement
-    ).click(),
-  );
+  await act(async () => (await walletCheckbox()).click());
 }
 async function setSessionTime(hours: string, minutes: string, seconds: string) {
   for (const [unit, value] of [
@@ -541,6 +629,199 @@ async function setSessionTime(hours: string, minutes: string, seconds: string) {
     );
 }
 
+it('switches to Bundle mode, hides the wave control and sends no intensity', async () => {
+  await openSolTiming();
+  await act(async () => button('Delay').click());
+  expect(container.querySelector('[aria-label="Wave intensity"]')).not.toBeNull();
+  const bundle = container.querySelector<HTMLInputElement>(
+    'input[type="radio"][value="Bundle"]',
+  )!;
+  await act(async () => bundle.click());
+  expect(bundle.checked).toBe(true);
+  expect(container.querySelector('[aria-label="Wave intensity"]')).toBeNull();
+  expect(container.textContent).toContain('same block');
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Fixed amount in SOL"]')!,
+    '0.1',
+  );
+  await settleAuto();
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('buys and sells land in the same block'),
+  );
+  const estimated = calls.find((call) => call.payload?.action === 'estimate')!
+    .payload!.terms as Record<string, unknown>;
+  expect(estimated).toMatchObject({ mode: 'Bundle' });
+  expect(estimated.waveIntensityTenths).toBeUndefined();
+});
+
+it('sends a fee target only when one is entered', async () => {
+  await openSolTiming();
+  await settleAuto();
+  await vi.waitFor(() =>
+    expect(calls.some((call) => call.payload?.action === 'estimate')).toBe(true),
+  );
+  expect(
+    (
+      calls.find((call) => call.payload?.action === 'estimate')!.payload!
+        .terms as Record<string, unknown>
+    ).feeTargetLamports,
+  ).toBeUndefined();
+  await changeControl(
+    container.querySelector<HTMLInputElement>(
+      '[aria-label="Fee target in SOL"]',
+    )!,
+    '0.00025',
+  );
+  await settleAuto();
+  await vi.waitFor(() =>
+    expect(
+      calls.filter((call) => call.payload?.action === 'estimate').length,
+    ).toBeGreaterThan(1),
+  );
+  expect(
+    (
+      calls.filter((call) => call.payload?.action === 'estimate').at(-1)!
+        .payload!.terms as Record<string, unknown>
+    ).feeTargetLamports,
+  ).toBe('250000');
+});
+
+it('sends the amount per trade only in Delay mode, and requires it there', async () => {
+  await openSolTiming();
+  // Duration mode carries no amount at all, matching Proxima's payload.
+  expect(button('Fixed')).toBeUndefined();
+  await settleAuto();
+  await vi.waitFor(() =>
+    expect(calls.some((call) => call.payload?.action === 'estimate')).toBe(true),
+  );
+  const first = calls.find((call) => call.payload?.action === 'estimate')!
+    .payload!.terms as Record<string, unknown>;
+  expect(first).not.toHaveProperty('amount');
+  expect(first).not.toHaveProperty('delayMinMs');
+
+  // Delay mode reveals the control with Fixed already ticked, as Proxima does,
+  // and refuses to estimate on the empty field.
+  await act(async () => button('Delay').click());
+  const fixed = button('Fixed');
+  const random = button('Random');
+  expect(fixed.getAttribute('aria-pressed')).toBe('true');
+  expect(random.getAttribute('aria-pressed')).toBe('false');
+  await settleAuto();
+  await settle();
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain(
+      'Amount per trade must be greater than 0.',
+    ),
+  );
+
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Fixed amount in SOL"]')!,
+    '0.05',
+  );
+  await settleAuto();
+  await vi.waitFor(() =>
+    expect(
+      calls.filter((call) => call.payload?.action === 'estimate').length,
+    ).toBeGreaterThan(1),
+  );
+  expect(
+    (
+      calls.filter((call) => call.payload?.action === 'estimate').at(-1)!.payload!
+        .terms as Record<string, unknown>
+    ).amount,
+  ).toEqual({ kind: 'fixed', lamports: '50000000' });
+
+  await act(async () => random.click());
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Minimum amount in SOL"]')!,
+    '0.05',
+  );
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Maximum amount in SOL"]')!,
+    '0.15',
+  );
+  await settleAuto();
+  await vi.waitFor(() =>
+    expect(
+      calls.filter((call) => call.payload?.action === 'estimate').length,
+    ).toBeGreaterThan(2),
+  );
+  expect(
+    (
+      calls.filter((call) => call.payload?.action === 'estimate').at(-1)!.payload!
+        .terms as Record<string, unknown>
+    ).amount,
+  ).toEqual({ kind: 'range', minLamports: '50000000', maxLamports: '150000000' });
+});
+
+it('estimates on its own after the draft settles, without the button', async () => {
+  await openSolTiming();
+  expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
+  await settleAuto();
+  expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(true);
+  expect(container.textContent).toContain('Round Trips');
+});
+
+it('waits out the server gate and retries once instead of failing', async () => {
+  respond = (payload) =>
+    payload?.action === 'estimate'
+      ? { plan: planVolumeSession(payload.terms as never, [], 'a'.repeat(32)) }
+      : { sessions: [] };
+  const inner = globalThis.fetch;
+  let gated = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, options: RequestInit) => {
+      const payload = options.body ? JSON.parse(options.body as string) : null;
+      if (payload?.action === 'estimate' && gated++ === 0)
+        return Response.json({ error: 'Wait a few seconds.' }, { status: 429 });
+      return inner(url, options);
+    }),
+  );
+  await act(async () =>
+    root.render(
+      <VolumeBotPanel project={project} wallets={[wallet()]} locked={false} />,
+    ),
+  );
+  await act(async () => button('Open Volume Bot').click());
+  await settle();
+  await act(async () => (await walletCheckbox()).click());
+  await act(async () => new Promise((r) => setTimeout(r, 3_600)));
+  expect(gated).toBe(2);
+  expect(container.textContent).not.toContain('Wait a few seconds.');
+}, 10_000);
+
+it('disables Bundle in Duration mode and falls back to Organic', async () => {
+  await openSolTiming();
+  const bundle = container.querySelector<HTMLInputElement>(
+    'input[type="radio"][value="Bundle"]',
+  )!;
+  expect(bundle.disabled).toBe(true);
+  await act(async () => button('Delay').click());
+  await act(async () => bundle.click());
+  expect(bundle.checked).toBe(true);
+  await act(async () => button('Duration').click());
+  expect(bundle.disabled).toBe(true);
+  expect(
+    container.querySelector<HTMLInputElement>(
+      'input[type="radio"][value="Organic"]',
+    )!.checked,
+  ).toBe(true);
+});
+
+it('hides the wave control in Bundle mode', async () => {
+  await openSolTiming();
+  await act(async () => button('Delay').click());
+  expect(container.querySelector('[aria-label="Wave intensity"]')).not.toBeNull();
+  const bundle = container.querySelector<HTMLInputElement>(
+    'input[type="radio"][value="Bundle"]',
+  )!;
+  await act(async () => bundle.click());
+  expect(container.querySelector('[aria-label="Wave intensity"]')).toBeNull();
+  // The amount control belongs to the Delay end condition, not to the mode.
+  expect(button('Fixed')).toBeDefined();
+});
+
 it('reviews and saves the selected numeric wave, then invalidates review on another wave', async () => {
   await openSolTiming();
   const slider = container.querySelector<HTMLInputElement>(
@@ -551,9 +832,9 @@ it('reviews and saves the selected numeric wave, then invalidates review on anot
   expect(slider.step).toBe('0.1');
   await changeControl(slider, '0.7');
   expect(slider.getAttribute('aria-valuetext')).toBe('0.7');
-  await act(async () => button('Estimate').click());
+  await settleAuto();
   await vi.waitFor(() =>
-    expect(container.textContent).toContain('0.7 intensity'),
+    expect(container.textContent).toContain('Wave intensity: 0.7'),
   );
   const estimated = calls.find(
     (call) => call.payload?.action === 'estimate',
@@ -562,7 +843,10 @@ it('reviews and saves the selected numeric wave, then invalidates review on anot
     wave: 'big-waves',
     waveIntensityTenths: 7,
   });
-  await act(async () => button('Save session and reserve wallets').click());
+  await act(async () =>
+    ([...container.querySelectorAll('input[type=checkbox]')].at(-1) as HTMLInputElement).click(),
+  );
+  await act(async () => button('Run').click());
   await vi.waitFor(() =>
     expect(calls.some((call) => call.payload?.action === 'create')).toBe(true),
   );
@@ -570,16 +854,30 @@ it('reviews and saves the selected numeric wave, then invalidates review on anot
     calls.find((call) => call.payload?.action === 'create')!.payload!.terms,
   ).toEqual(estimated.terms);
   await changeControl(slider, '0.3');
-  expect(button('Save session and reserve wallets')).toBeUndefined();
+  expect(button('Run')).toBeUndefined();
   expect(
     calls.some((call) =>
       ['register', 'send'].includes(String(call.payload?.action)),
     ),
   ).toBe(false);
 });
-it('sends exact HMS seconds and exact millisecond delays, then invalidates even an equivalent raw edit', async () => {
+it('sends an exact duration, then an exact delay pair in Delay mode', async () => {
   await openSolTiming();
   await setSessionTime('1', '2', '3');
+  await settleAuto();
+  await settle();
+  const timed = calls.find((c) => c.payload?.action === 'estimate')?.payload
+    ?.terms as Record<string, unknown>;
+  expect(timed).toMatchObject({ endCondition: 'time', durationSeconds: 3723 });
+  expect(timed).not.toHaveProperty('delayMinMs');
+  expect(container.textContent).toContain('3,723 seconds total');
+  expect(container.textContent).toContain('3,723 seconds total');
+
+  // Delay mode swaps the duration for the pair and drops the duration field.
+  await act(async () => button('Delay').click());
+  expect(
+    container.querySelector('[aria-label="Session duration: minutes"]'),
+  ).toBeNull();
   await changeControl(
     container.querySelector<HTMLInputElement>('[aria-label="Minimum delay"]')!,
     '1.234',
@@ -588,27 +886,25 @@ it('sends exact HMS seconds and exact millisecond delays, then invalidates even 
     container.querySelector<HTMLInputElement>('[aria-label="Maximum delay"]')!,
     '2.345',
   );
-  await act(async () => button('Estimate').click());
-  await settle();
-  expect(
-    calls.find((c) => c.payload?.action === 'estimate')?.payload?.terms,
-  ).toMatchObject({
-    durationSeconds: 3723,
-    delayMinMs: 1234,
-    delayMaxMs: 2345,
-  });
-  expect(container.textContent).toContain('3,723 seconds total');
-  expect(container.textContent).toContain('1h 2m 3s');
-  expect(container.textContent).toContain('Schedule limit');
-  expect(container.textContent).toContain('Round trips');
+  await act(async () => button('Fixed').click());
   await changeControl(
-    container.querySelector<HTMLInputElement>(
-      '[aria-label="Session duration: minutes"]',
-    )!,
-    '02',
+    container.querySelector<HTMLInputElement>('[aria-label="Fixed amount in SOL"]')!,
+    '0.05',
   );
-  expect(container.textContent).not.toContain('Round trips');
-  expect(container.textContent).toContain('3,723 seconds total');
+  await settleAuto();
+  await settle();
+  const delayed = calls.filter((c) => c.payload?.action === 'estimate').at(-1)!
+    .payload!.terms as Record<string, unknown>;
+  expect(delayed).toMatchObject({ endCondition: 'delay', delayMinMs: 1234, delayMaxMs: 2345 });
+  expect(delayed).not.toHaveProperty('durationSeconds');
+
+  // Any edit drops the review.
+  expect(container.textContent).toContain('Round Trips');
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Minimum delay"]')!,
+    '1.5',
+  );
+  expect(container.textContent).not.toContain('Round Trips');
   expect(
     calls.some((c) =>
       ['create', 'register', 'send'].includes(String(c.payload?.action)),
@@ -627,8 +923,7 @@ it.each([
   async (hours, minutes, seconds) => {
     await openSolTiming();
     await setSessionTime(hours, minutes, seconds);
-    expect(button('Estimate').disabled).toBe(true);
-    await act(async () => button('Estimate').click());
+    await settleAuto();
     expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
     expect(
       container.querySelector<HTMLInputElement>(
@@ -645,8 +940,7 @@ it.each([
   async (hours, minutes, seconds, expected) => {
     await openSolTiming();
     await setSessionTime(String(hours), String(minutes), String(seconds));
-    expect(button('Estimate').disabled).toBe(false);
-    await act(async () => button('Estimate').click());
+      await settleAuto();
     await settle();
     expect(
       calls.find((c) => c.payload?.action === 'estimate')?.payload?.terms,
@@ -657,52 +951,68 @@ it.each(['1.0004', '1e0', '0.999', '600.001'])(
   'refuses unrepresentable/out-of-range delay %s instead of rounding it',
   async (delay) => {
     await openSolTiming();
+    await act(async () => button('Delay').click());
     await changeControl(
       container.querySelector<HTMLInputElement>(
         '[aria-label="Minimum delay"]',
       )!,
       delay,
     );
-    await act(async () => button('Estimate').click());
+    await settleAuto();
     await settle();
     expect(container.textContent).toContain(
-      'from 1 to 600 seconds with at most three decimal places',
+      'from 1 to 300 seconds with at most three decimal places',
     );
     expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
   },
 );
 it('refuses a reversed delay range locally before observing wallet balances', async () => {
   await openSolTiming();
+  await act(async () => button('Delay').click());
+  await act(async () => button('Fixed').click());
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Fixed amount in SOL"]')!,
+    '0.05',
+  );
   await changeControl(
     container.querySelector<HTMLInputElement>('[aria-label="Minimum delay"]')!,
     '21',
   );
-  await act(async () => button('Estimate').click());
+  await settleAuto();
   await settle();
   expect(container.textContent).toContain(
-    'maximum delay at or above the minimum',
+    'min delay and max delay that are positive with min <= max',
   );
   expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
 });
 it('keeps optional trade settings collapsed and provides an explicit error recovery path', async () => {
   await openSolTiming();
+  const slider = container.querySelector<HTMLInputElement>(
+    '[aria-label="Wave intensity"]',
+  )!;
+  const settings = slider.closest('details')!;
+  expect(settings.open).toBe(false);
+  expect((await walletCheckbox()).closest('details')).toBeNull();
+  // The end condition and amount live in the open form, not in the settings.
+  await act(async () => button('Delay').click());
   const minimum = container.querySelector<HTMLInputElement>(
     '[aria-label="Minimum delay"]',
   )!;
-  const settings = minimum.closest('details')!;
-  expect(settings.open).toBe(false);
-  expect(
-    container.querySelector('input[type=checkbox]')!.closest('details'),
-  ).toBeNull();
+  expect(minimum.closest('details')).toBeNull();
+  await act(async () => button('Fixed').click());
+  await changeControl(
+    container.querySelector<HTMLInputElement>('[aria-label="Fixed amount in SOL"]')!,
+    '0.05',
+  );
   await changeControl(minimum, '0');
-  await act(async () => button('Estimate').click());
+  await settleAuto();
   await settle();
   expect(calls.some((c) => c.payload?.action === 'estimate')).toBe(false);
   await act(async () => button('Edit trade settings').click());
   expect(settings.open).toBe(true);
   expect(document.activeElement).toBe(settings.querySelector('summary'));
   await changeControl(minimum, '5');
-  await act(async () => button('Estimate').click());
+  await settleAuto();
   await settle();
   expect(
     container.querySelector('[aria-label="Volume Bot estimate"]'),
@@ -746,9 +1056,7 @@ it('previews same-block tips locally, invalidates edits and returns to scheduled
       ?.textContent,
   ).toContain('10 bundles, 20 trades');
   expect(container.textContent).toContain('0.0001 SOL');
-  expect(container.textContent).not.toContain(
-    'Save session and reserve wallets',
-  );
+  expect(button('Run')).toBeUndefined();
   expect(calls.every((c) => c.payload === null)).toBe(true);
   const tips = Array.from(container.querySelectorAll('label')).find(
     (l) => l.textContent === 'Total session tip limit (SOL)',
