@@ -45,3 +45,10 @@ next-env.d.ts
 # Provider CLI skill installation is local tooling
 /.agents/
 /skills-lock.json
+
+# local runtime artefacts (dev server, build/test logs, scratch captures)
+*.log
+dev.db
+dev.db-*
+ord2.json
+tx.b64
