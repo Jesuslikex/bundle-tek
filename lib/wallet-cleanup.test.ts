@@ -15,6 +15,7 @@ import {
   cleanupMessage,
   cleanupTotals,
   inspectWalletCleanup,
+  isCleanupBuy,
   isCleanupSell,
   signWalletCleanupBatch,
   validatedWalletCleanup,
@@ -23,9 +24,11 @@ import {
 import {
   classifyCleanupAccount,
   cleanupSweep,
+  decodeWalletCleanupBuyReceipt,
   decodeWalletCleanupReceipt,
   decodeWalletCleanupSellReceipt,
   prepareWalletCleanup,
+  prepareWalletCleanupBuy,
   prepareWalletCleanupSells,
   recheckWalletCleanup,
 } from './wallet-cleanup-server';
@@ -536,10 +539,19 @@ describe('cleanup sells', () => {
       sells: 1,
       minimumSellOut: 995000n,
     });
+    // The packet must pay the paired buyer, not leave the proceeds on the seller.
+    expect(review.transferLamports).toBe(review.minimumOutLamports);
+    const packet = getTransactionDecoder().decode(
+      getBase64Encoder().encode(review.transaction),
+    );
+    const message = getCompiledTransactionMessageDecoder().decode(
+      packet.messageBytes,
+    );
+    expect(message.staticAccounts).toContain(review.destination);
   });
   it('reports a holding as unsellable when the simulation does not deliver the minimum or uses another account', async () => {
     const f = cleanupFixture();
-    f.sell.simulation.nativeChangeRaw = '1';
+    f.sell.simulation.nativeChangeRaw = '-4000000';
     expect((await sells(f)).errors[0].error).toMatch(/did not deliver/);
     f.sell.simulation.nativeChangeRaw = '995000';
     f.sell.simulation.source = fill(1);
@@ -567,6 +579,7 @@ describe('cleanup sells', () => {
     expect(ok).toMatchObject({
       kind: 'sell',
       soldRaw: '5',
+      deliveredLamports: '995000',
       nativeChangeLamports: '990000',
     });
     await expect(
@@ -581,6 +594,85 @@ describe('cleanup sells', () => {
       f.sell.receipt(signed.transaction, 0n, {
         InstructionError: [0, 'Custom'],
       }),
+      review,
+      signed.signature,
+      'rpc.test',
+    );
+    expect(failed).toMatchObject({ failed: true });
+  });
+});
+
+describe('cleanup buys', () => {
+  const buys = (f: ReturnType<typeof cleanupFixture>, lamports = 1_000_000n) =>
+    prepareWalletCleanupBuy(
+      { batchId, wallet: f.wallet, walletRevision: 1, mint: f.buy.mint, lamports },
+      'key',
+      AbortSignal.timeout(10000),
+      f.fetcher,
+      f.buy.deps,
+    );
+  it('buys the token back on the buyer with exactly the SOL the sell delivered', async () => {
+    const f = cleanupFixture();
+    const review = await buys(f);
+    expect(review).toMatchObject({
+      format: 'wallet-cleanup-buy-v1',
+      mint: f.buy.mint,
+      destination: f.buy.mint,
+      decimals: 6,
+      amountInLamports: '1000000',
+      expectedOutRaw: '5',
+      minimumOutRaw: '4',
+    });
+    expect(isCleanupBuy(review)).toBe(true);
+    const [signed] = await signWalletCleanupBatch(
+      await f.session(f.owner),
+      [review],
+      () => {},
+    );
+    await expect(
+      inspectWalletCleanup(review, signed.transaction, true),
+    ).resolves.toMatchObject({ signature: signed.signature });
+    expect(cleanupTotals([review])).toMatchObject({
+      buys: 1,
+      minimumBuyOut: 4n,
+    });
+  });
+  it('refuses a buy that spends more than the delivered SOL or simulates flat', async () => {
+    const f = cleanupFixture();
+    f.buy.simulation.nativeChangeRaw = '-9000000';
+    await expect(buys(f)).rejects.toThrow(/did not spend/);
+    f.buy.simulation.nativeChangeRaw = '0';
+    await expect(buys(f)).rejects.toThrow(/did not spend/);
+    f.buy.simulation.nativeChangeRaw = '-9000000';
+    f.buy.simulation.inputAmountMatches = null;
+    await expect(buys(f)).rejects.toThrow(/did not spend/);
+    await expect(buys(f, 0n)).rejects.toThrow(/no SOL/);
+  });
+  it('decodes finalized buy receipts and refuses a short fill', async () => {
+    const f = cleanupFixture();
+    const review = await buys(f);
+    const [signed] = await signWalletCleanupBatch(
+      await f.session(f.owner),
+      [review],
+      () => {},
+    );
+    const ok = await decodeWalletCleanupBuyReceipt(
+      f.buy.receipt(signed.transaction),
+      review,
+      signed.signature,
+      'rpc.test',
+    );
+    expect(ok).toMatchObject({ kind: 'buy', boughtRaw: '5' });
+    await expect(
+      decodeWalletCleanupBuyReceipt(
+        f.buy.receipt(signed.transaction, 0n),
+        review,
+        signed.signature,
+        'rpc.test',
+      ),
+    ).rejects.toThrow(/less than the minimum/);
+    const failed = await decodeWalletCleanupBuyReceipt(
+      f.buy.receipt(signed.transaction, 0n, { InstructionError: [0, 'Custom'] }),
       review,
       signed.signature,
       'rpc.test',

@@ -5,20 +5,26 @@ import { UUID } from '@/lib/wallet-operation';
 import { env } from '@/lib/server-env';
 import {
   CLEANUP_MAX_ROWS,
+  isCleanupBuy,
   isCleanupSell,
   type WalletCleanupDocument,
   cleanupInput,
+  cleanupRunInput,
   inspectWalletCleanup,
+  uint,
   validatedWalletCleanup,
   type WalletCleanup,
 } from '@/lib/wallet-cleanup';
 import {
   cleanupRpc,
+  decodeWalletCleanupBuyReceipt,
   decodeWalletCleanupReceipt,
   decodeWalletCleanupSellReceipt,
   prepareWalletCleanup,
+  prepareWalletCleanupBuy,
   prepareWalletCleanupSells,
   recheckWalletCleanup,
+  recheckWalletCleanupBuy,
   recheckWalletCleanupSell,
 } from '@/lib/wallet-cleanup-server';
 import { SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
@@ -45,11 +51,21 @@ const currentWalletSql =
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return json({ error: 'Sign in to view cleanups.' }, 401);
-  const batchId = new URL(request.url).searchParams.get('batchId');
+  const params = new URL(request.url).searchParams;
+  let batchId = params.get('batchId');
   if (batchId !== null && !UUID.test(batchId))
     return json({ error: 'Choose a valid cleanup batch.' }, 400);
   try {
     const db = getD1();
+    if (batchId === null && params.get('latest') !== null) {
+      const newest = await db
+        .prepare(
+          'SELECT batch_id AS batchId FROM wallet_cleanups WHERE owner_id=? ORDER BY created_at DESC LIMIT 1',
+        )
+        .bind(user.userId)
+        .first<{ batchId: string }>();
+      batchId = newest?.batchId ?? null;
+    }
     const result = batchId
       ? await db
           .prepare(
@@ -70,7 +86,8 @@ export async function GET(request: Request) {
         result.results.map((row) => validatedWalletCleanup(parse(row))),
       ),
     });
-  } catch {
+  } catch (err) {
+    console.error('cleanup GET', err);
     return json({ error: 'Cleanup history unavailable.' }, 503);
   }
 }
@@ -84,6 +101,7 @@ export async function POST(request: Request) {
     if (
       ![
         'prepare',
+        'run',
         'begin_signing',
         'reject_signing',
         'register',
@@ -117,6 +135,170 @@ export async function POST(request: Request) {
           .bind(user.userId, batchId)
           .all<Row>()
       ).results.map(parse);
+
+    if (body.action === 'run') {
+      let input: ReturnType<typeof cleanupRunInput>;
+      try {
+        input = cleanupRunInput(body);
+      } catch (error) {
+        return json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Choose cleanup wallets and a delay.',
+          },
+          400,
+        );
+      }
+      const apiKey = (env as unknown as Record<string, unknown>)
+        .JUPITER_API_KEY;
+      if (typeof apiKey !== 'string')
+        return json({ error: 'Jupiter sell routes are not configured.' }, 503);
+      const revisions = new Map<string, number>();
+      for (const address of new Set([
+        ...input.payload.input_wallet_pubkeys,
+        ...input.payload.output_wallet_pubkeys,
+      ])) {
+        const row = await db
+          .prepare(
+            "SELECT revision FROM workspace_wallets WHERE owner_id=? AND chain='Solana' AND address=? AND archived=0",
+          )
+          .bind(user.userId, address)
+          .first<{ revision: number }>();
+        if (!row)
+          return json(
+            {
+              error:
+                'A cleanup wallet changed or is archived. Reload the roster.',
+            },
+            400,
+          );
+        revisions.set(address, row.revision);
+      }
+      const batchId = crypto.randomUUID();
+      const cleanups: WalletCleanup[] = [],
+        errors: { wallet: string; mint?: string; error: string }[] = [],
+        empty: string[] = [];
+      let remaining = 0;
+      phase = 'provider';
+      for (const round of input.rounds) {
+        if (
+          await db
+            .prepare(
+              `SELECT 1 FROM solana_execution_reservations WHERE owner_id=? AND wallet_address=? UNION ALL SELECT 1 FROM wallet_cleanups WHERE owner_id=? AND wallet_address=? AND state IN ${ACTIVE} LIMIT 1`,
+            )
+            .bind(user.userId, round.seller, user.userId, round.seller)
+            .first()
+        ) {
+          errors.push({
+            wallet: round.seller,
+            error:
+              'Wallet has a retained approval. Finish or cancel it before cleanup.',
+          });
+          continue;
+        }
+        let sells: WalletCleanupDocument[];
+        try {
+          const result = await prepareWalletCleanupSells(
+            {
+              batchId,
+              wallet: round.seller,
+              walletRevision: revisions.get(round.seller) as number,
+              destination: round.buyer,
+            },
+            apiKey,
+            signal,
+          );
+          remaining += result.remaining;
+          for (const e of result.errors)
+            errors.push({
+              wallet: round.seller,
+              mint: e.mint,
+              error: e.error,
+            });
+          sells = result.sells;
+        } catch (error) {
+          errors.push({
+            wallet: round.seller,
+            error:
+              error instanceof Error && /^[\w .,'-]{1,120}$/.test(error.message)
+                ? error.message
+                : 'Cleanup checks unavailable for this wallet.',
+          });
+          continue;
+        }
+        if (!sells.length) {
+          if (!errors.some((e) => e.wallet === round.seller))
+            empty.push(round.seller);
+          continue;
+        }
+        for (const document of sells) {
+          if (cleanups.length >= CLEANUP_MAX_ROWS) {
+            remaining++;
+            continue;
+          }
+          const at = now();
+          try {
+            const retained = await db
+              .prepare(
+                "INSERT INTO wallet_cleanups (id,owner_id,batch_id,wallet_address,wallet_revision,destination,document,state,signature,receipt,failure,created_at,updated_at) SELECT ?,?,?,?,?,?,?,'awaiting_signature',NULL,NULL,NULL,?,? WHERE EXISTS(SELECT 1 FROM workspace_wallets WHERE owner_id=? AND chain='Solana' AND address=? AND revision=? AND archived=0) AND ?>? RETURNING id",
+              )
+              .bind(
+                document.id,
+                user.userId,
+                batchId,
+                document.wallet,
+                document.walletRevision,
+                document.destination,
+                JSON.stringify(document),
+                at,
+                at,
+                user.userId,
+                document.wallet,
+                document.walletRevision,
+                Date.parse(document.expiresAt),
+                Date.now(),
+              )
+              .first<{ id: string }>();
+            if (!retained) throw new Error('changed');
+          } catch (error) {
+            errors.push({
+              wallet: round.seller,
+              error:
+                error instanceof Error && /reserved/.test(error.message)
+                  ? 'Wallet is reserved by another approval or launch.'
+                  : 'Wallet or preparation changed before retention.',
+            });
+            break;
+          }
+          cleanups.push({
+            id: document.id,
+            batchId,
+            wallet: document.wallet,
+            walletRevision: document.walletRevision,
+            state: 'awaiting_signature',
+            signature: null,
+            document,
+            receipt: null,
+            failure: null,
+            createdAt: at,
+            updatedAt: at,
+          });
+        }
+      }
+      phase = 'storage';
+      return json({
+        batchId,
+        stage: 'sell',
+        plan: input.payload,
+        rounds: input.rounds,
+        cleanups,
+        errors,
+        empty,
+        remaining,
+      });
+    }
 
     if (body.action === 'prepare') {
       let input: ReturnType<typeof cleanupInput>;
@@ -301,9 +483,42 @@ export async function POST(request: Request) {
     if (body.action === 'begin_signing' || body.action === 'cancel') {
       if (typeof body.batchId !== 'string' || !UUID.test(body.batchId))
         return json({ error: 'Choose a saved cleanup batch.' }, 400);
-      const rows = await batchRows(body.batchId);
+      let rows = await batchRows(body.batchId);
       if (!rows.length)
         return json({ error: 'Cleanup batch unavailable.' }, 404);
+      // An expired buy-back is re-quoted in place before inspection: its sell
+      // already landed, so re-running the batch would sell from an emptied
+      // seller and lose the buy-back.
+      if (body.action === 'begin_signing') {
+        for (const row of rows) {
+          if (row.state !== 'awaiting_signature') continue;
+          if (!isCleanupBuy(row.document)) continue;
+          if (Date.parse(row.document.expiresAt) > Date.now()) continue;
+          const buyKey = (env as unknown as Record<string, unknown>)
+            .JUPITER_API_KEY;
+          const fresh = await prepareWalletCleanupBuy(
+            {
+              batchId: row.batchId,
+              wallet: row.wallet,
+              walletRevision: row.walletRevision,
+              mint: row.document.mint,
+              lamports: BigInt(row.document.amountInLamports),
+            },
+            typeof buyKey === 'string' ? buyKey : undefined,
+            signal,
+          );
+          // Keep the row's identity: the document is re-quoted in place.
+          fresh.id = row.id;
+          fresh.batchId = row.batchId;
+          await db
+            .prepare(
+              "UPDATE wallet_cleanups SET document=?,updated_at=? WHERE owner_id=? AND id=? AND state='awaiting_signature'",
+            )
+            .bind(JSON.stringify(fresh), now(), user.userId, row.id)
+            .run();
+        }
+        rows = await batchRows(body.batchId);
+      }
       for (const row of rows)
         await inspectWalletCleanup(
           row.document,
@@ -391,14 +606,16 @@ export async function POST(request: Request) {
         );
       await db
         .prepare(
-          "UPDATE wallet_cleanups SET state='cancelled',updated_at=? WHERE owner_id=? AND id=? AND state='signing' AND signature IS NULL",
+          isCleanupBuy(row.document)
+            ? "UPDATE wallet_cleanups SET state='awaiting_signature',updated_at=? WHERE owner_id=? AND id=? AND state='signing' AND signature IS NULL"
+            : "UPDATE wallet_cleanups SET state='cancelled',updated_at=? WHERE owner_id=? AND id=? AND state='signing' AND signature IS NULL",
         )
         .bind(now(), user.userId, row.id)
         .run();
     } else if (body.action === 'recover') {
       if (
         !row.signature ||
-        !['signed', 'submitted', 'failed'].includes(row.state) ||
+        !['signed', 'submitted', 'failed', 'finalized'].includes(row.state) ||
         (row.state === 'failed' && row.failure)
       )
         return json({ cleanup: row });
@@ -422,14 +639,21 @@ export async function POST(request: Request) {
           },
           409,
         );
-      const outcome = isCleanupSell(review)
-        ? await decodeWalletCleanupSellReceipt(
+      const outcome = isCleanupBuy(review)
+        ? await decodeWalletCleanupBuyReceipt(
             raw,
             review,
             row.signature,
             source,
           )
-        : await decodeWalletCleanupReceipt(raw, review, row.signature, source);
+        : isCleanupSell(review)
+          ? await decodeWalletCleanupSellReceipt(
+              raw,
+              review,
+              row.signature,
+              source,
+            )
+          : await decodeWalletCleanupReceipt(raw, review, row.signature, source);
       const failed = 'failed' in outcome;
       phase = 'storage';
       await db
@@ -446,6 +670,68 @@ export async function POST(request: Request) {
           row.signature,
         )
         .run();
+      // Buy-back leg: the paired buyer spends the SOL the sell just delivered.
+      if (
+        !failed &&
+        isCleanupSell(review) &&
+        'deliveredLamports' in outcome
+      ) {
+        const delivered = uint(outcome.deliveredLamports);
+        const alreadyBought = await db
+          .prepare(
+            "SELECT 1 FROM wallet_cleanups WHERE owner_id=? AND batch_id=? AND json_extract(document,'$.format')='wallet-cleanup-buy-v1' AND state NOT IN ('cancelled','failed') LIMIT 1",
+          )
+          .bind(user.userId, row.batchId)
+          .first();
+        if (delivered > 0n && !alreadyBought) {
+          const buyer = review.destination;
+          const buyerRow = await db
+            .prepare(
+              "SELECT revision FROM workspace_wallets WHERE owner_id=? AND chain='Solana' AND address=? AND archived=0",
+            )
+            .bind(user.userId, buyer)
+            .first<{ revision: number }>();
+          if (buyerRow) {
+            const buyKey = (env as unknown as Record<string, unknown>)
+              .JUPITER_API_KEY;
+            try {
+              const buy = await prepareWalletCleanupBuy(
+                {
+                  batchId: row.batchId,
+                  wallet: buyer,
+                  walletRevision: buyerRow.revision,
+                  mint: review.mint,
+                  lamports: delivered,
+                },
+                typeof buyKey === 'string' ? buyKey : undefined,
+                signal,
+              );
+              await db
+                .prepare(
+                  "INSERT INTO wallet_cleanups (id,owner_id,batch_id,wallet_address,wallet_revision,destination,document,state,signature,receipt,failure,created_at,updated_at) SELECT ?,?,?,?,?,?,?,'awaiting_signature',NULL,NULL,NULL,?,? WHERE EXISTS(SELECT 1 FROM workspace_wallets WHERE owner_id=? AND chain='Solana' AND address=? AND revision=? AND archived=0) RETURNING id",
+                )
+                .bind(
+                  buy.id,
+                  user.userId,
+                  row.batchId,
+                  buyer,
+                  buyerRow.revision,
+                  buy.mint,
+                  JSON.stringify(buy),
+                  now(),
+                  now(),
+                  user.userId,
+                  buyer,
+                  buyerRow.revision,
+                )
+                .first<{ id: string }>();
+            } catch (error) {
+              console.error('cleanup buy failed', error);
+              // The sell stands even when the buy-back cannot be prepared.
+            }
+          }
+        }
+      }
     } else {
       if (typeof body.transaction !== 'string')
         return json({ error: 'Exact signed cleanup packet required.' }, 400);
@@ -485,9 +771,11 @@ export async function POST(request: Request) {
             409,
           );
         phase = 'provider';
-        await (isCleanupSell(review)
-          ? recheckWalletCleanupSell(review, signal)
-          : recheckWalletCleanup(review, signal));
+        await (isCleanupBuy(review)
+          ? recheckWalletCleanupBuy(review, signal)
+          : isCleanupSell(review)
+            ? recheckWalletCleanupSell(review, signal)
+            : recheckWalletCleanup(review, signal));
         phase = 'storage';
         const armed = await db
           .prepare(
@@ -529,6 +817,7 @@ export async function POST(request: Request) {
     if (!latest) throw new Error();
     return json({ cleanup: latest });
   } catch (error) {
+    console.error('cleanup action failed', phase, error);
     if (
       error instanceof Error &&
       /reserved|Signature already registered/.test(error.message)

@@ -406,7 +406,75 @@ export function cleanupFixture(n = 7) {
       },
     }),
   };
+  const buy = {
+    simulation: {
+      succeeded: true,
+      status: 'Matched fields',
+      inputAmountMatches: true as boolean | null,
+      nativeChangeRaw: '-1000000' as string | null,
+    },
+    deps: {
+      prepare: (async (input: { wallet: string; amount: string }) => {
+        const packet = await v0Packet(input.wallet, 2);
+        return {
+          executionAllowed: false,
+          side: 'Buy',
+          inputMint: WRAPPED_SOL_MINT,
+          outputMint: mintB,
+          inAmount: (() => {
+            const [whole, frac = ''] = input.amount.split('.');
+            return (BigInt(whole) * 10n ** 9n + BigInt(frac.padEnd(9, '0'))).toString();
+          })(),
+          outAmount: '5',
+          minimumOutAmount: '4',
+          slippageBps: 50,
+          router: 'metis',
+          priceImpactPct: '0.1',
+          source: 'api.jup.ag',
+          observedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 30000).toISOString(),
+          preparation: {
+            ...packet,
+            lastValidBlockHeight: '200',
+            estimatedFeesLamports: '5000',
+          },
+        };
+      }) as never,
+      simulate: (async () => ({
+        succeeded: buy.simulation.succeeded,
+        routeAssessment: { status: buy.simulation.status, decoded: null },
+        inputAmountMatches: buy.simulation.inputAmountMatches,
+        nativeChangeRaw: buy.simulation.nativeChangeRaw,
+        networkFeeLamports: '5000',
+        simulationSlot: 100,
+        source: 'rpc.test',
+      })) as never,
+    },
+    mint: mintB,
+    /** Finalized v0 receipt buying the token back on the buyer. */
+    receipt: (transaction: string, boughtRaw = 5n, err: unknown = null) => ({
+      slot: '140',
+      blockTime: null,
+      version: 0,
+      transaction: [transaction, 'base64'],
+      meta: {
+        err,
+        fee: '5000',
+        preBalances: ['2000000', '1'],
+        postBalances: ['999000', '1'],
+        preTokenBalances: [],
+        postTokenBalances: [
+          {
+            mint: mintB,
+            owner: wallet,
+            uiTokenAmount: { amount: boughtRaw.toString() },
+          },
+        ],
+      },
+    }),
+  };
   return {
+    buy,
     sell,
     owner,
     wallet,

@@ -31,12 +31,16 @@ vi.mock('@/lib/wallet-balances', async (original) => {
 vi.mock('@/lib/warmup-swap-quote', async (original) => ({
   ...(await original<typeof import('@/lib/warmup-swap-quote')>()),
   prepareSolanaSwap: (...args: unknown[]) =>
-    (f.sell.deps.prepare as (...a: unknown[]) => unknown)(...args),
+    ((args[0] as { side?: string }).side === 'Buy'
+      ? (f.buy.deps.prepare as (...a: unknown[]) => unknown)
+      : (f.sell.deps.prepare as (...a: unknown[]) => unknown))(...args),
 }));
 vi.mock('@/lib/imported-swap-simulation', async (original) => ({
   ...(await original<typeof import('@/lib/imported-swap-simulation')>()),
   simulateImportedSwap: (...args: unknown[]) =>
-    (f.sell.deps.simulate as (...a: unknown[]) => unknown)(...args),
+    ((args[0] as { side?: string }).side === 'Buy'
+      ? (f.buy.deps.simulate as (...a: unknown[]) => unknown)
+      : (f.sell.deps.simulate as (...a: unknown[]) => unknown))(...args),
 }));
 import { GET, POST } from './route';
 import { env } from '@/lib/server-env';
@@ -84,6 +88,7 @@ beforeAll(async () => {
     '0047_shared_swap_reservations',
     '0049_native_withdrawals',
     '0094_wallet_cleanup',
+    '0156_wallet_cleanup_buy',
   ]) {
     const sql = await readFile(
       new URL(`../../../../drizzle/${name}.sql`, import.meta.url),
@@ -246,6 +251,10 @@ it('runs prepare, batch signing, registration, one submission and finalized reco
     ),
   );
   expect((await body(history)).cleanups[0].state).toBe('finalized');
+  const latest = await GET(
+    new Request('http://localhost/api/wallet-workspace/cleanup?latest=1'),
+  );
+  expect((await body(latest)).cleanups[0].batchId).toBe(batch.batchId);
   // Finalized cleanup releases the wallet for other flows.
   await mocks.db
     .prepare(
@@ -369,6 +378,23 @@ it('sells leftover tokens as their own reviewed batch, then allows close and swe
       kind: 'sell',
       soldRaw: '5',
     });
+    const listed = await body(
+      await GET(
+        new Request(
+          `http://localhost/api/wallet-workspace/cleanup?batchId=${row.batchId}`,
+        ),
+      ),
+    );
+    expect(
+      listed.cleanups.find(
+        (c: { document: { format: string } }) =>
+          c.document.format === 'wallet-cleanup-buy-v1',
+      )?.document,
+    ).toMatchObject({
+      wallet: f.destination,
+      mint: f.buy.mint,
+      amountInLamports: '995000',
+    });
     const closing = await body(await prepare());
     expect(closing.errors).toEqual([]);
     expect(closing.cleanups).toHaveLength(1);
@@ -380,4 +406,78 @@ it('sells leftover tokens as their own reviewed batch, then allows close and swe
 it('refuses the sell stage when Jupiter is not configured', async () => {
   const result = await prepare({ stage: 'sell' });
   expect(result.status).toBe(503);
+});
+
+const run = (extra: object = {}) =>
+  post({
+    action: 'run',
+    input_wallet_pubkeys: [f.wallet],
+    output_wallet_pubkeys: [f.destination],
+    min_delay_ms: 16000,
+    max_delay_ms: 16000,
+    double_buy_pct: 0,
+    fake_tip_pct: 0,
+    ...extra,
+  });
+
+it('runs Proxima\'s cleanup payload as one sell per round into the buyer', async () => {
+  env.JUPITER_API_KEY = 'test-key';
+  try {
+    const response = await run();
+    expect(response.status).toBe(200);
+    const batch = (await body(response)) as Body & {
+      plan: Record<string, unknown>;
+      rounds: { round: number; seller: string; buyer: string }[];
+    };
+    expect(batch.errors).toEqual([]);
+    expect(batch.cleanups).toHaveLength(1);
+    expect(batch.cleanups[0].document.format).toBe('wallet-cleanup-sell-v1');
+    expect(batch.cleanups[0].document.destination).toBe(f.destination);
+    expect(batch.plan).toEqual({
+      input_wallet_pubkeys: [f.wallet],
+      output_wallet_pubkeys: [f.destination],
+      min_delay_ms: 16000,
+      max_delay_ms: 16000,
+      double_buy_pct: 0,
+      fake_tip_pct: 0,
+    });
+    expect(batch.rounds).toEqual([
+      { round: 1, seller: f.wallet, buyer: f.destination },
+    ]);
+  } finally {
+    delete env.JUPITER_API_KEY;
+  }
+});
+
+it('rejects Proxima\'s payload with its own copy', async () => {
+  const slow = await run({ min_delay_ms: 400 });
+  expect(slow.status).toBe(400);
+  expect(await slow.json()).toEqual({
+    error: 'Min delay must be at least 0.5 seconds',
+  });
+  const noBuyer = await run({ output_wallet_pubkeys: [] });
+  expect(noBuyer.status).toBe(400);
+  expect(await noBuyer.json()).toEqual({
+    error: 'Please select at least one output wallet (buyer)',
+  });
+  const wide = await run({ min_delay_ms: 20000, max_delay_ms: 10000 });
+  expect(wide.status).toBe(400);
+  expect(await wide.json()).toEqual({
+    error: 'Min delay cannot be greater than max delay',
+  });
+});
+
+it('refuses a run for a wallet that is not on the roster', async () => {
+  env.JUPITER_API_KEY = 'test-key';
+  try {
+  const missing = await run({
+    input_wallet_pubkeys: ['9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'],
+  });
+  expect(missing.status).toBe(400);
+  expect(await missing.json()).toEqual({
+    error: 'A cleanup wallet changed or is archived. Reload the roster.',
+  });
+  } finally {
+    delete env.JUPITER_API_KEY;
+  }
 });

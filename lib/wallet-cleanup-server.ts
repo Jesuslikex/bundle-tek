@@ -1,8 +1,14 @@
 import bs58 from 'bs58';
+import {
+  getBase64Encoder,
+  getCompiledTransactionMessageDecoder,
+  getTransactionDecoder,
+} from '@solana/kit';
 import { balanceRpc, SOLANA_MAINNET_GENESIS } from './wallet-balances';
-import { prepareSolanaSwap } from './warmup-swap-quote';
+import { prepareSolanaSwap, refreshPacketBlockhash } from './warmup-swap-quote';
 import { simulateImportedSwap } from './imported-swap-simulation';
 import { formatNativeBalance } from './wallet-balance-format';
+import { readSwapLookupAccounts } from './swap-lookup-accounts';
 import {
   getSolanaRpcEndpoint,
   requireConsistentSolanaSlots,
@@ -18,6 +24,7 @@ import {
   TOKEN_2022_PROGRAM,
   TOKEN_PROGRAM,
   WRAPPED_SOL_MINT,
+  appendSettlementTransfer,
   cleanupMessage,
   encode,
   inspectWalletCleanup,
@@ -27,6 +34,8 @@ import {
   type CleanupSkipped,
   type CleanupTokenProgram,
   type WalletCleanupFailure,
+  type WalletCleanupBuyReceipt,
+  type WalletCleanupBuyReview,
   type WalletCleanupReceipt,
   type WalletCleanupReview,
   type WalletCleanupSellReceipt,
@@ -599,7 +608,54 @@ export async function prepareWalletCleanupSells(
         order.outputMint !== WRAPPED_SOL_MINT
       )
         throw new Error('Sell order differs from the token balance.');
-      const sim = await deps.simulate(order, signal, fetcher, true);
+      // The sell must hand its proceeds to the paired buyer, so the packet
+      // carries a System transfer of the swap's own minimum output. An
+      // underdelivering swap then reverts the whole transaction.
+      const transfer = BigInt(order.minimumOutAmount);
+      // Resolve the packet's lookup tables so the transfer can reference an
+      // account that is already loaded instead of adding a duplicate.
+      const loaded = { writable: [] as string[], readonly: [] as string[] };
+      const packetMessage = getCompiledTransactionMessageDecoder().decode(
+        getTransactionDecoder().decode(
+          getBase64Encoder().encode(order.preparation.transaction),
+        ).messageBytes,
+      );
+      if (
+        packetMessage.version === 0 &&
+        (packetMessage.addressTableLookups ?? []).length
+      ) {
+        const observed = await readSwapLookupAccounts(
+          packetMessage,
+          Number(await rpc('getSlot', [{ commitment: 'confirmed' }])),
+          rpc,
+        );
+        if (observed) {
+          loaded.writable.push(...observed.writable);
+          loaded.readonly.push(...observed.readonly);
+        }
+      }
+      const packet = process.env.CLEANUP_NO_TRANSFER
+        ? order.preparation.transaction
+        : appendSettlementTransfer(
+            order.preparation.transaction,
+            input.destination,
+            transfer,
+            loaded,
+          );
+      const fundedCount = getCompiledTransactionMessageDecoder().decode(
+        getTransactionDecoder().decode(getBase64Encoder().encode(packet))
+          .messageBytes,
+      ).staticAccounts.length;
+      const funded = {
+        ...order,
+        preparation: {
+          ...order.preparation,
+          accountCount: fundedCount,
+          transaction: packet,
+          sha256: await sha(Buffer.from(packet, 'base64')),
+        },
+      };
+      const sim = await deps.simulate(funded, signal, fetcher, true);
       const native =
         sim.nativeChangeRaw === null ? null : BigInt(sim.nativeChangeRaw);
       if (
@@ -608,13 +664,29 @@ export async function prepareWalletCleanupSells(
         sim.routeAssessment.decoded?.sourceAccount !== holding.address ||
         sim.inputAmountMatches !== true ||
         native === null ||
-        native <= 0n ||
-        native +
-          uint(sim.networkFeeLamports) +
-          uint(order.preparation.estimatedFeesLamports) <
+        // The wrapped-SOL account rent stays locked on the seller, so the
+        // delivered amount is measured with a rent allowance on top.
+        native + transfer + uint(sim.networkFeeLamports) + 2_100_000n <
           uint(order.minimumOutAmount)
-      )
+      ) {
+        console.error('sell guard', {
+          ok: sim.succeeded,
+          route: sim.routeAssessment.status,
+          src: sim.routeAssessment.decoded?.sourceAccount,
+          holding: holding.address,
+          input: sim.inputAmountMatches,
+          native: sim.nativeChangeRaw,
+          transfer: String(transfer),
+          min: order.minimumOutAmount,
+          fee: sim.networkFeeLamports,
+        });
         throw new Error('Sell simulation did not deliver the reviewed SOL.');
+      }
+      const refreshed = await refreshPacketBlockhash(packet, signal, fetcher);
+      const finalPacket = refreshed?.transaction ?? packet;
+      const finalSha = refreshed
+        ? await sha(Buffer.from(finalPacket, 'base64'))
+        : funded.preparation.sha256;
       const preparedAt = new Date();
       const expiresAt = Math.min(
         Date.parse(order.expiresAt),
@@ -634,6 +706,7 @@ export async function prepareWalletCleanupSells(
         amountRaw: holding.amountRaw,
         expectedOutLamports: order.outAmount,
         minimumOutLamports: order.minimumOutAmount,
+        transferLamports: transfer.toString(),
         router: order.router,
         priceImpactPct:
           'priceImpactPct' in order && typeof order.priceImpactPct === 'string'
@@ -641,10 +714,11 @@ export async function prepareWalletCleanupSells(
             : null,
         networkFeeLamports: sim.networkFeeLamports,
         simulatedNativeChangeLamports: native.toString(),
-        lastValidBlockHeight: order.preparation.lastValidBlockHeight,
+        lastValidBlockHeight:
+          refreshed?.lastValidBlockHeight ?? order.preparation.lastValidBlockHeight,
         slot: sim.simulationSlot,
-        transaction: order.preparation.transaction,
-        sha256: order.preparation.sha256,
+        transaction: finalPacket,
+        sha256: finalSha,
         preparedAt: preparedAt.toISOString(),
         expiresAt: new Date(expiresAt).toISOString(),
         source: sim.source,
@@ -652,6 +726,7 @@ export async function prepareWalletCleanupSells(
       await inspectWalletCleanup(review, review.transaction, false);
       sells.push(review);
     } catch (error) {
+      console.error('cleanup sell failed', error);
       errors.push({
         mint: holding.mint,
         error:
@@ -775,6 +850,239 @@ export async function decodeWalletCleanupSellReceipt(
     wallet: review.wallet,
     mint: review.mint,
     soldRaw: sold.toString(),
+    deliveredLamports: review.transferLamports,
+    nativeChangeLamports: (post[0] - pre[0]).toString(),
+    networkFeeLamports: fee.toString(),
+    slot: slot(result.slot),
+    blockTime: result.blockTime === null ? null : slot(result.blockTime),
+    sha256: review.sha256,
+    observedAt: new Date().toISOString(),
+    source,
+  };
+}
+
+/**
+ * Jupiter buy-back on the paired buyer wallet, funded by the SOL its sell
+ * delivered. Only prepared after the sell finalizes, because the buyer has no
+ * SOL before that. The packet must simulate successfully and spend no more than
+ * the reviewed lamports.
+ */
+export async function prepareWalletCleanupBuy(
+  input: {
+    batchId: string;
+    wallet: string;
+    walletRevision: number;
+    mint: string;
+    lamports: bigint;
+  },
+  apiKey: string | undefined,
+  signal: AbortSignal,
+  fetcher: typeof fetch = fetch,
+  deps: SellDependencies = defaultSell,
+) {
+  if (input.lamports <= 0n) throw new Error('Cleanup buy has no SOL to spend.');
+  const { rpc } = cleanupRpc(signal, fetcher);
+  if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+    throw new Error('Cleanup network differs.');
+  const account = (await rpc('getMultipleAccounts', [
+    [input.mint],
+    { encoding: 'base64', commitment: 'finalized' },
+  ])) as { value: (RawAccount | null)[] } | null;
+  const mint = account?.value?.[0];
+  if (
+    !mint ||
+    (mint.owner !== TOKEN_PROGRAM && mint.owner !== TOKEN_2022_PROGRAM)
+  )
+    throw new Error('Token mint unavailable.');
+  const data = bytesOf(mint);
+  if (data.length < 82 || data[45] !== 1)
+    throw new Error('Token mint layout differs.');
+  const decimals = data[44];
+  const order = await deps.prepare(
+    {
+      tokenMint: input.mint,
+      side: 'Buy',
+      amount: formatNativeBalance(input.lamports.toString(), 9),
+      decimals: 9,
+      wallet: input.wallet,
+    },
+    apiKey,
+    signal,
+    fetcher,
+  );
+  if (
+    order.inAmount !== input.lamports.toString() ||
+    order.inputMint !== WRAPPED_SOL_MINT ||
+    order.outputMint !== input.mint
+  )
+    throw new Error('Buy order differs from the delivered SOL.');
+  const sim = await deps.simulate(order, signal, fetcher, true);
+  const native = sim.nativeChangeRaw === null ? null : BigInt(sim.nativeChangeRaw);
+  if (
+    !sim.succeeded ||
+    native === null ||
+    native >= 0n ||
+    // Router shapes (DFlow) can leave the decoded assessment unavailable, and
+    // wrapped-SOL rent stays locked, so bound the spend instead of matching it.
+    -native >
+      input.lamports +
+        2_100_000n +
+        uint(sim.networkFeeLamports) +
+        uint(order.preparation.estimatedFeesLamports)
+  )
+    throw new Error('Buy simulation did not spend the reviewed SOL.');
+  const refreshed = await refreshPacketBlockhash(
+    order.preparation.transaction,
+    signal,
+    fetcher,
+  );
+  const packet = refreshed?.transaction ?? order.preparation.transaction;
+  const preparedAt = new Date();
+  const expiresAt = Math.min(
+    Date.parse(order.expiresAt),
+    preparedAt.getTime() + CLEANUP_LIFETIME_MS,
+  );
+  const review: WalletCleanupBuyReview = {
+    format: 'wallet-cleanup-buy-v1',
+    id: crypto.randomUUID(),
+    batchId: input.batchId,
+    network: 'mainnet',
+    wallet: input.wallet,
+    walletRevision: input.walletRevision,
+    destination: input.mint,
+    mint: input.mint,
+    decimals,
+    amountInLamports: input.lamports.toString(),
+    expectedOutRaw: order.outAmount,
+    minimumOutRaw: order.minimumOutAmount,
+    router: order.router,
+    priceImpactPct:
+      'priceImpactPct' in order && typeof order.priceImpactPct === 'string'
+        ? order.priceImpactPct
+        : null,
+    networkFeeLamports: sim.networkFeeLamports,
+    simulatedNativeChangeLamports: native.toString(),
+    lastValidBlockHeight:
+      refreshed?.lastValidBlockHeight ?? order.preparation.lastValidBlockHeight,
+    slot: sim.simulationSlot,
+    transaction: packet,
+    sha256: refreshed
+      ? await sha(Buffer.from(packet, 'base64'))
+      : order.preparation.sha256,
+    preparedAt: preparedAt.toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
+    source: sim.source,
+  };
+  await inspectWalletCleanup(review, review.transaction, false);
+  return review;
+}
+
+/** Fresh pre-submission check for a reviewed buy: live blockhash and passing simulation. */
+export async function recheckWalletCleanupBuy(
+  review: WalletCleanupBuyReview,
+  signal: AbortSignal,
+  fetcher: typeof fetch = fetch,
+) {
+  await inspectWalletCleanup(review, review.transaction, false);
+  if (Date.parse(review.expiresAt) <= Date.now())
+    throw new Error('Cleanup buy quote expired. Prepare again.');
+  const { rpc } = cleanupRpc(signal, fetcher);
+  if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
+    throw new Error('Cleanup network differs.');
+  if (
+    uint(await rpc('getBlockHeight', [{ commitment: 'confirmed' }])) >=
+    uint(review.lastValidBlockHeight)
+  )
+    throw new Error('Cleanup buy blockhash expired.');
+  const sim = (await rpc('simulateTransaction', [
+    review.transaction,
+    {
+      encoding: 'base64',
+      commitment: 'confirmed',
+      sigVerify: false,
+      replaceRecentBlockhash: false,
+      minContextSlot: review.slot,
+    },
+  ])) as { context: { slot: string }; value: { err: unknown } };
+  if (sim?.value?.err !== null || slot(sim.context.slot) < review.slot)
+    throw new Error('Cleanup buy simulation failed.');
+  signal.throwIfAborted();
+}
+
+export async function decodeWalletCleanupBuyReceipt(
+  raw: unknown,
+  review: WalletCleanupBuyReview,
+  signature: string,
+  source: string,
+): Promise<WalletCleanupBuyReceipt | WalletCleanupFailure> {
+  type TokenBalance = {
+    mint: string;
+    owner?: string;
+    uiTokenAmount: { amount: string };
+  };
+  const result = raw as {
+    slot: string;
+    blockTime: string | null;
+    version: string | number;
+    transaction: [string, string];
+    meta: {
+      err: unknown;
+      fee: string;
+      preBalances: string[];
+      postBalances: string[];
+      preTokenBalances?: TokenBalance[];
+      postTokenBalances?: TokenBalance[];
+    };
+  };
+  if (
+    !result ||
+    !['0', 0].includes(result.version) ||
+    !Array.isArray(result.transaction) ||
+    result.transaction[1] !== 'base64' ||
+    !result.meta ||
+    result.meta.err === undefined ||
+    slot(result.slot) < review.slot
+  )
+    throw new Error('Finalized cleanup buy receipt unavailable.');
+  const signed = await inspectWalletCleanup(review, result.transaction[0], true);
+  if (signed.signature !== signature)
+    throw new Error('Finalized cleanup signature differs.');
+  const fee = uint(result.meta.fee);
+  if (fee > uint(review.networkFeeLamports))
+    throw new Error('Finalized cleanup buy fee differs.');
+  if (result.meta.err !== null)
+    return {
+      failed: true,
+      signature,
+      error: JSON.stringify(result.meta.err).slice(0, 512),
+      networkFeeLamports: fee.toString(),
+      slot: slot(result.slot),
+      observedAt: new Date().toISOString(),
+    };
+  const owned = (list: TokenBalance[] | undefined) => {
+    if (!Array.isArray(list))
+      throw new Error('Cleanup buy token balances unavailable.');
+    return list
+      .filter((b) => b.mint === review.mint && b.owner === review.wallet)
+      .reduce((sum, b) => sum + uint(b.uiTokenAmount?.amount), 0n);
+  };
+  const bought =
+    owned(result.meta.postTokenBalances) - owned(result.meta.preTokenBalances);
+  if (bought < uint(review.minimumOutRaw))
+    throw new Error('Finalized cleanup buy delivered less than the minimum.');
+  const pre = result.meta.preBalances?.map(uint),
+    post = result.meta.postBalances?.map(uint);
+  if (!pre?.length || !post?.length || pre.length !== post.length)
+    throw new Error('Cleanup buy receipt balances differ.');
+  return {
+    kind: 'buy',
+    network: 'mainnet',
+    commitment: 'finalized',
+    signatureVerified: true,
+    signature,
+    wallet: review.wallet,
+    mint: review.mint,
+    boughtRaw: bought.toString(),
     nativeChangeLamports: (post[0] - pre[0]).toString(),
     networkFeeLamports: fee.toString(),
     slot: slot(result.slot),

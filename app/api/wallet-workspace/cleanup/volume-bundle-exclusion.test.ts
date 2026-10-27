@@ -6,6 +6,7 @@ import { cleanupFixture } from '../../../../test/wallet-cleanup-fixture';
 import {
   signWalletCleanupBatch,
   decode,
+  isCleanupBuy,
   isCleanupSell,
   type WalletCleanup,
 } from '@/lib/wallet-cleanup';
@@ -209,7 +210,7 @@ it('recovers the exact finalized cleanup receipt under a legacy held bundle, the
   expect(f.sqlite.prepare('SELECT state FROM wallet_cleanups').get()).toEqual({
     state: 'signed',
   });
-  if (isCleanupSell(row.document))
+  if (isCleanupSell(row.document) || isCleanupBuy(row.document))
     throw Error('Expected native cleanup fixture');
   finalizedReceipt = clean.receipt(row.document, signed.transaction);
   expect((await post({ action: 'recover', id: row.id })).status).toBe(200);
