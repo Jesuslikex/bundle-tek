@@ -325,6 +325,37 @@ export async function POST(request: Request) {
           id,
           revision,
         );
+    } else if (body.action === 'wallet.tag') {
+      if (
+        !Array.isArray(body.wallets) ||
+        !body.wallets.length ||
+        body.wallets.length > 100
+      )
+        throw new Error('Select 1 to 100 wallets to tag.');
+      const tags = walletTags(body.tags);
+      if (!tags.length) throw new Error('Add at least one tag.');
+      const wallets = body.wallets.map((raw: { address: unknown }) =>
+        walletAddress(raw?.address, chain),
+      );
+      if (new Set(wallets).size !== wallets.length)
+        throw new Error('Remove duplicate selected wallets.');
+      statement = db
+        .prepare(`WITH selected AS (SELECT json_extract(value,'$.address') address FROM json_each(?)),
+        incoming AS (SELECT value tag FROM json_each(?)),
+        merged AS (SELECT s.address,(SELECT json_group_array(DISTINCT value) FROM (SELECT value FROM json_each(COALESCE(w.tags,'[]')) UNION SELECT tag FROM incoming)) tags FROM selected s JOIN workspace_wallets w ON w.address=s.address AND w.owner_id=? AND w.chain=?)
+        UPDATE workspace_wallets SET tags=(SELECT tags FROM merged m WHERE m.address=workspace_wallets.address),
+          revision=revision+1,updated_at=?
+        WHERE owner_id=? AND chain=? AND address IN(SELECT address FROM selected)
+        AND tags<>(SELECT tags FROM merged m WHERE m.address=workspace_wallets.address)`)
+        .bind(
+          JSON.stringify(wallets.map((address: string) => ({ address }))),
+          JSON.stringify(tags),
+          owner,
+          chain,
+          now,
+          owner,
+          chain,
+        );
     } else if (body.action === 'wallet.folders') {
       if (
         !Array.isArray(body.wallets) ||
@@ -447,7 +478,10 @@ export async function POST(request: Request) {
     } else throw new Error('Invalid wallet workspace action.');
     storage = true;
     const result = await statement.run();
-    if (!result.meta.changes)
+    // Tagging is additive and idempotent: a wallet that already carries the
+    // tag is a success, not a conflict, so the import flow can tag rows it
+    // just found already present.
+    if (!result.meta.changes && body.action !== 'wallet.tag')
       return json(
         {
           error:

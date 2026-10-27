@@ -22,6 +22,7 @@ export function WalletFolderRow({
   onSelect,
   onEdit,
   onArchive,
+  onRestore,
   onDelete,
 }: {
   folder: WalletFolder;
@@ -31,23 +32,26 @@ export function WalletFolderRow({
   onSelect: () => void;
   onEdit: (folder: WalletFolder, trigger: HTMLButtonElement | null) => void;
   onArchive: (folder: WalletFolder) => void;
+  onRestore: (folder: WalletFolder) => void;
   onDelete: (folder: WalletFolder, trigger: HTMLButtonElement | null) => void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   return (
-    <div className={`wallet-folder-row ${selected ? 'selected' : ''}`}>
+    <div className={`wallet-folder-child ${selected ? 'selected' : ''}`}>
       <button
-        className="wallet-folder-select"
+        className="wallet-folder-name"
         disabled={busy}
         aria-current={selected ? 'page' : undefined}
         onClick={onSelect}
       >
         <Folder
-          size={16}
+          size={14}
           style={{ color: folder.color ?? DEFAULT_FOLDER_COLOR }}
         />
-        <span>{folder.name}</span>
-        <b>{count}</b>
+        <p>
+          <span>{folder.name}</span>
+          <span className="wallet-folder-count">({count})</span>
+        </p>
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -80,17 +84,22 @@ export function WalletFolderRow({
             disabled={busy}
             onClick={() => onEdit(folder, trigger.current)}
           >
-            <Pencil /> Edit folder
+            <Pencil /> Edit
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={busy} onClick={() => onArchive(folder)}>
-            <Archive /> Archive folder
+          <DropdownMenuItem
+            disabled={busy}
+            onClick={() =>
+              folder.archived ? onRestore(folder) : onArchive(folder)
+            }
+          >
+            <Archive /> {folder.archived ? 'Restore' : 'Archived'}
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
             disabled={busy}
             onClick={() => onDelete(folder, trigger.current)}
           >
-            <Trash2 /> Delete folder
+            <Trash2 /> Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

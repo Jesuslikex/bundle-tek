@@ -15,7 +15,28 @@ import {
   type WalletRosterSort,
 } from '@/lib/wallet-roster-view';
 
-import { Folder, Plus, Download, X } from 'lucide-react';
+import {
+  Archive,
+  ArrowDownToLine,
+  Folder,
+  MoreHorizontal,
+  Plus,
+  Download,
+  SlidersHorizontal,
+  Sparkles,
+  Ticket,
+  Trash2,
+  X,
+} from 'lucide-react';
+
+const FOLDER_SORTS = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'oldest', label: 'Oldest first' },
+  { key: 'most', label: 'Most wallets' },
+  { key: 'least', label: 'Less wallets' },
+] as const;
+
+type FolderSort = (typeof FOLDER_SORTS)[number]['key'];
 
 import { Button } from '@/components/ui/button';
 
@@ -43,6 +64,7 @@ import { resolveWarmupWorkspace } from '@/lib/warmup-workspace-handoff';
 import { WalletFolderEditor } from '@/components/wallet-folder-editor';
 
 import { ArchivedWalletFolders } from '@/components/archived-wallet-folders';
+
 
 import { EvmWalletConnection } from '@/components/evm-wallet-connection';
 
@@ -89,10 +111,12 @@ async function readWorkspace(signal?: AbortSignal): Promise<Workspace> {
 
 export function WalletWorkspace({
   onFunding,
+  onLaunch,
   initialWarmupId = '',
   initialWithdrawalWallet = '',
 }: {
   onFunding: () => void;
+  onLaunch: () => void;
   initialWarmupId?: string;
   initialWithdrawalWallet?: string;
 }) {
@@ -105,6 +129,14 @@ export function WalletWorkspace({
   const [managing, setManaging] = useState(false);
 
   const [folderQuery, setFolderQuery] = useState('');
+
+  const [showArchivedFolders, setShowArchivedFolders] = useState(false);
+
+  const [folderSort, setFolderSort] = useState<FolderSort>('newest');
+
+  const [folderSortOpen, setFolderSortOpen] = useState(false);
+
+  const [treeOpen, setTreeOpen] = useState(true);
 
   const [archived, setArchived] = useState(false);
 
@@ -310,7 +342,30 @@ export function WalletWorkspace({
 
   const activeFolders = folders.filter((f) => !f.archived);
 
-  const visibleFolders = archived ? [] : activeFolders;
+  const archivedFolders = folders.filter((f) => f.archived);
+
+  const folderPool = showArchivedFolders ? archivedFolders : activeFolders;
+
+  const folderCount = (id: string) =>
+    data.wallets.filter(
+      (wallet) => wallet.chain === chain && walletFolderIds(wallet).includes(id),
+    ).length;
+
+  const visibleFolders = archived
+    ? []
+    : [...folderPool].sort((a, b) => {
+        if (folderSort === 'most') return folderCount(b.id) - folderCount(a.id);
+
+        if (folderSort === 'least') return folderCount(a.id) - folderCount(b.id);
+
+        const left = a.updatedAt ?? '';
+
+        const right = b.updatedAt ?? '';
+
+        return folderSort === 'oldest'
+          ? left.localeCompare(right)
+          : right.localeCompare(left);
+      });
 
   const rows = data.wallets.filter(
     (w) =>
@@ -370,6 +425,26 @@ export function WalletWorkspace({
 
       .map((b) => [b.address, b]),
   );
+
+  const [tradeMetrics, setTradeMetrics] = useState<
+    Record<string, { volume: number; pnl: number; launches: number }>
+  >({});
+
+  useEffect(() => {
+    let live = true;
+    void fetch('/api/wallet-workspace/metrics')
+      .then((r) => (r.ok ? r.json() : { metrics: {} }))
+      .then((body) => {
+        const parsed = body as {
+          metrics?: Record<string, { volume: number; pnl: number; launches: number }>;
+        };
+        if (live) setTradeMetrics(parsed.metrics ?? {});
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [data.wallets.length]);
 
   const proofs = new Map(
     (data.proofs ?? [])
@@ -566,26 +641,7 @@ export function WalletWorkspace({
         EVM withdrawals remain unavailable.
       </details>
       <div className="wallet-roster-toolbar">
-        <label>
-          Wallet network
-          <select
-            value={chain}
-
-            disabled={busy}
-
-            onChange={(e) => {
-              setChain(e.target.value as LaunchChain);
-
-              setFolder('all');
-
-              resetSelection();
-            }}
-          >
-            {CHAINS.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
+        <span className="wallet-roster-network">{chain}</span>
         <Button
           variant="outline"
 
@@ -603,24 +659,6 @@ export function WalletWorkspace({
         >
           {archived ? 'Active wallets' : 'Archived wallets'}
         </Button>
-        <ArchivedWalletFolders
-          key={chain}
-          folders={folders}
-          wallets={data.wallets.filter((wallet) => wallet.chain === chain)}
-          busy={busy}
-          loading={loading}
-          error={error}
-          onRestore={(folder) =>
-            mutate(
-              {
-                action: 'folder.restore',
-                id: folder.id,
-                revision: folder.revision,
-              },
-              'Folder restored. Its wallets stay in the parent list.',
-            )
-          }
-        />
         <Input
           aria-label="Search workspace wallets"
 
@@ -706,6 +744,95 @@ export function WalletWorkspace({
       )}
       <div className="wallet-roster-layout">
         <aside className="wallet-folders" aria-label="Wallet folders">
+          <div className="wallet-networks">
+            <button
+              type="button"
+              className={`wallet-network${chain === 'Solana' ? ' is-active' : ''}`}
+              aria-pressed={chain === 'Solana'}
+              disabled={busy}
+              onClick={() => {
+                setChain('Solana');
+                setFolder('all');
+                resetSelection();
+              }}
+            >
+              <span className="wallet-network-icons">
+                <span className="wallet-network-icon">SOL</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`wallet-network${
+                chain === 'Robinhood' || chain === 'BNB' ? ' is-active' : ''
+              }`}
+              aria-pressed={chain === 'Robinhood' || chain === 'BNB'}
+              disabled={busy}
+              onClick={() => {
+                setChain('Robinhood');
+                setFolder('all');
+                resetSelection();
+              }}
+            >
+              <span className="wallet-network-icons">
+                <span className="wallet-network-icon">RH</span>
+                <span className="wallet-network-icon">BNB</span>
+              </span>
+            </button>
+          </div>
+          <div className="wallet-folders-head">
+            <p>{chain.toUpperCase()}</p>
+            <div className="wallet-folders-head-actions">
+              <button
+                type="button"
+                aria-label="Deleted wallets"
+                title="Deleted wallets"
+                aria-pressed={archived}
+                className={archived ? 'is-active' : ''}
+                onClick={() => {
+                  setArchived((value) => !value);
+                  setFolder('all');
+                  resetSelection();
+                }}
+              >
+                <Trash2 size={10} aria-hidden />
+              </button>
+              <button
+                type="button"
+                aria-label="Archived folders"
+                aria-pressed={showArchivedFolders}
+                className={showArchivedFolders ? 'is-active' : ''}
+                onClick={() => setShowArchivedFolders((value) => !value)}
+              >
+                <Archive size={11} aria-hidden />
+              </button>
+              <button
+                type="button"
+                aria-label="Sort folders"
+                aria-expanded={folderSortOpen}
+                onClick={() => setFolderSortOpen((value) => !value)}
+              >
+                <MoreHorizontal size={11} aria-hidden />
+              </button>
+            </div>
+          </div>
+          {folderSortOpen && (
+            <div className="wallet-folders-sort" role="menu">
+              {FOLDER_SORTS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={folderSort === option.key}
+                  onClick={() => {
+                    setFolderSort(option.key);
+                    setFolderSortOpen(false);
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             ref={rootFolderButton}
             className={folder === 'all' ? 'selected' : ''}
@@ -728,8 +855,28 @@ export function WalletWorkspace({
               }
             </b>
           </button>
-          {visibleFolders.map((f) => (
-            <WalletFolderRow
+          {visibleFolders.length === 0 && (
+            <p className="wallet-folders-empty">
+              {showArchivedFolders
+                ? 'No archived folders.'
+                : 'No folders yet.'}
+            </p>
+          )}
+          {visibleFolders.length > 0 && (
+            <div className="wallet-folder-tree">
+              <button
+                type="button"
+                className={`wallet-folder-parent${treeOpen ? ' is-open' : ''}`}
+                aria-expanded={treeOpen}
+                onClick={() => setTreeOpen((value) => !value)}
+              >
+                <span className="wallet-folder-circle" />
+                <p>{chain} Wallets</p>
+              </button>
+              {treeOpen && (
+                <div className="wallet-folder-children">
+                  {visibleFolders.map((f) => (
+                    <WalletFolderRow
               key={f.id}
               folder={f}
               count={
@@ -771,13 +918,27 @@ export function WalletWorkspace({
                   }
                 });
               }}
+              onRestore={(target) => {
+                void mutate(
+                  {
+                    action: 'folder.restore',
+                    id: target.id,
+                    revision: target.revision,
+                    chain: target.chain,
+                  },
+                  'Folder restored.',
+                );
+              }}
             />
-          ))}
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <Button
             variant="outline"
-
+            className="wallet-folders-create"
             disabled={busy || loading}
-
             onClick={(event) => {
               folderActionFocus.current = event.currentTarget;
               setFolderForm('new');
@@ -785,8 +946,16 @@ export function WalletWorkspace({
               setWalletForm(null);
             }}
           >
-            <Plus /> New folder
+            + Create New Folder
           </Button>
+          <a className="wallet-folders-promo" href="/marketplace">
+            <span className="wallet-folders-promo-title">
+              Marketplace <em>NEW</em>
+            </span>
+            <span className="wallet-folders-promo-sub">
+              Buy pre-funded wallets with history
+            </span>
+          </a>
         </aside>
         <div className="wallet-roster-content">
           <div className="wallet-roster-heading">
@@ -1341,9 +1510,15 @@ export function WalletWorkspace({
                     : undefined
                 }
                 onClose={() => setWarmupOpen(false)}
+                roster={rows.map((w) => ({
+                  address: w.address,
+                  label: w.label ?? '',
+                }))}
+                onSelect={setSelected}
               />
             )}
           {chain === 'Solana' && (
+            <div id="wallet-withdrawal">
             <NativeWithdrawalPanel
               key={withdrawalChoice?.id || 'manual-withdrawal'}
               wallets={data.wallets}
@@ -1362,10 +1537,18 @@ export function WalletWorkspace({
                   : undefined
               }
             />
+            </div>
           )}
           {chain === 'Solana' && <TokenToolsPanel wallets={data.wallets} />}
           {chain === 'Solana' && !archived && (
-            <WalletCleanupPanel wallets={data.wallets} selected={picks} />
+            <WalletCleanupPanel
+              wallets={data.wallets}
+              balances={data.balances}
+              folders={data.folders.filter(
+                (folder) => folder.chain === chain && !folder.archived,
+              )}
+              selected={picks}
+            />
           )}
           {chain === 'Solana' && (
             <CreatorFeeClaimPanel wallets={data.wallets} />
@@ -1531,11 +1714,11 @@ export function WalletWorkspace({
                     />
                   </th>
                   <th>Wallet</th>
-                  <th>Role</th>
-                  <th>Native balance</th>
-                  <th>Folder</th>
-                  <th>Ownership</th>
-                  <th>Actions</th>
+                  <th>Balance</th>
+                  <th>Volume</th>
+                  <th>P&amp;L</th>
+                  <th>Launches</th>
+                  <th>Funding</th>
                 </tr>
               </thead>
               <tbody>
@@ -1567,10 +1750,6 @@ export function WalletWorkspace({
                     </td>
                     <td>
                       <strong>{w.label || 'Unnamed wallet'}</strong>
-                      <WalletFundingProximityBadge
-                        check={fundingProximity}
-                        address={w.address}
-                      />
                       {!!w.tags?.length && (
                         <div aria-label="Wallet tags">
                           {w.tags.map((tag) => (
@@ -1581,8 +1760,25 @@ export function WalletWorkspace({
                         </div>
                       )}
                       <code title={w.address}>{w.address}</code>
+                      <small className="wallet-row-meta">
+                        {w.role} ·{' '}
+                        {folders
+                          .filter((f) => walletFolderIds(w).includes(f.id))
+                          .map((f) => f.name)
+                          .join(', ') || 'No folder'}
+                        {' · '}
+                        {proofs.has(w.address) ? (
+                          <span
+                            className="wallet-signature-verified"
+                            title={`Signature verified ${new Date(proofs.get(w.address)!).toLocaleString()}. Historical proof, not transaction approval.`}
+                          >
+                            Signature verified
+                          </span>
+                        ) : (
+                          <span className="wallet-unverified">Unverified</span>
+                        )}
+                      </small>
                     </td>
-                    <td>{w.role}</td>
                     <td className="wallet-native-balance">
                       {balances.has(w.address) ? (
                         <>
@@ -1603,46 +1799,100 @@ export function WalletWorkspace({
                         <span>Not observed</span>
                       )}
                     </td>
-                    <td>
-                      {folders
-                        .filter((f) => walletFolderIds(w).includes(f.id))
-                        .map((f) => f.name)
-                        .join(', ') || 'No folder'}
+                    <td className="wallet-metric">
+                      {tradeMetrics[w.address]
+                        ? `${(tradeMetrics[w.address].volume / 1e9).toFixed(4)} SOL`
+                        : '-'}
+                    </td>
+                    <td
+                      className={`wallet-metric${
+                        tradeMetrics[w.address]
+                          ? tradeMetrics[w.address].pnl < 0
+                            ? ' wallet-metric-down'
+                            : tradeMetrics[w.address].pnl > 0
+                              ? ' wallet-metric-up'
+                              : ''
+                          : ''
+                      }`}
+                    >
+                      {tradeMetrics[w.address]
+                        ? `${tradeMetrics[w.address].pnl > 0 ? '+' : ''}${(
+                            tradeMetrics[w.address].pnl / 1e9
+                          ).toFixed(4)} SOL`
+                        : '-'}
+                    </td>
+                    <td className="wallet-metric">
+                      {tradeMetrics[w.address]
+                        ? tradeMetrics[w.address].launches
+                        : '-'}
                     </td>
                     <td>
-                      {proofs.has(w.address) ? (
-                        <span
-                          className="wallet-signature-verified"
-
-                          title={`Signature verified ${new Date(proofs.get(w.address)!).toLocaleString()}. Historical proof, not transaction approval.`}
+                      <WalletFundingProximityBadge
+                        check={fundingProximity}
+                        address={w.address}
+                      />
+                    </td>
+                    <td className="wallet-row-actions-cell">
+                      <div className="wallet-row-actions">
+                        <button
+                          type="button"
+                          className="wallet-row-action"
+                          disabled={busy || loading || w.archived}
+                          aria-label={`Create launch with ${w.label || w.address}`}
+                          onClick={() => {
+                            setQuery('');
+                            setSelected([w.address]);
+                            onLaunch();
+                          }}
                         >
-                          Signature verified
-                          <small>
-                            {new Date(proofs.get(w.address)!).toLocaleString()}
-                          </small>
-                        </span>
-                      ) : (
-                        <span className="wallet-unverified">Unverified</span>
-                      )}
-                    </td>
-                    <td>
-                      <Button
-                        variant="outline"
-
-                        disabled={busy || w.archived}
-
-                        aria-label={`Edit ${w.label || w.address}`}
-
-                        onClick={() => editWallet(w)}
-                      >
-                        Edit
-                      </Button>
-                      {!w.archived && (
-                        <Button
-                          variant="outline"
-                          disabled={busy || loading}
+                          <Plus size={9} aria-hidden />
+                          Create
+                        </button>
+                        <button
+                          type="button"
+                          className="wallet-row-action"
+                          disabled={busy || loading || w.archived}
+                          aria-label={`Funding for ${w.label || w.address}`}
+                          onClick={() => {
+                            setQuery('');
+                            setSelected([w.address]);
+                            onFunding();
+                          }}
+                        >
+                          <Ticket size={9} aria-hidden />
+                          Funding
+                        </button>
+                        <button
+                          type="button"
+                          className="wallet-row-action"
+                          disabled={busy || loading || w.archived}
+                          aria-label={`Withdraw from ${w.label || w.address}`}
+                          onClick={() => {
+                            setWithdrawalChoice({
+                              id: w.address,
+                              wallet: w.address,
+                              mint: '',
+                              decimals: 9,
+                            });
+                            requestAnimationFrame(() =>
+                              document
+                                .getElementById('wallet-withdrawal')
+                                ?.scrollIntoView({
+                                  behavior: 'smooth',
+                                  block: 'start',
+                                }),
+                            );
+                          }}
+                        >
+                          <ArrowDownToLine size={9} aria-hidden />
+                          Withdraw
+                        </button>
+                        <button
+                          type="button"
+                          className="wallet-row-action"
+                          disabled={busy || loading || w.archived}
                           aria-label={
-                            'Open warmup for ' + (w.label || w.address)
+                            'Generate activity for ' + (w.label || w.address)
                           }
                           onClick={() => {
                             setQuery('');
@@ -1650,22 +1900,43 @@ export function WalletWorkspace({
                             setWarmupOpen(true);
                           }}
                         >
-                          Warmup
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-
-                        disabled={busy || loading}
-
-                        aria-label={
-                          'Token holdings for ' + (w.label || w.address)
-                        }
-
-                        onClick={() => setHoldingsAddress(w.address)}
-                      >
-                        Tokens
-                      </Button>
+                          <Sparkles size={9} aria-hidden />
+                          Generate Activity
+                        </button>
+                        <button
+                          type="button"
+                          className="wallet-row-action wallet-row-action-delete"
+                          disabled={busy || loading}
+                          aria-label={`${archived ? 'Restore' : 'Delete'} ${w.label || w.address}`}
+                          onClick={() =>
+                            void mutate({
+                              action: archived
+                                ? 'wallet.restore'
+                                : 'wallet.archive',
+                              wallets: [
+                                { address: w.address, revision: w.revision },
+                              ],
+                            },
+                            archived
+                              ? 'Wallet restored.'
+                              : 'Wallet archived.',
+                          )
+                          }
+                        >
+                          <Trash2 size={9} aria-hidden />
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          className="wallet-row-action"
+                          disabled={busy || w.archived}
+                          aria-label={`Manage ${w.label || w.address}`}
+                          onClick={() => editWallet(w)}
+                        >
+                          <SlidersHorizontal size={9} aria-hidden />
+                          Manage
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -63,6 +63,11 @@ const workspace = {
   ],
 };
 let host: HTMLDivElement, root: Root;
+const fundingCalls = (fetcher: { mock: { calls: unknown[][] } }) =>
+  fetcher.mock.calls.filter((c) => {
+    const url = String(c[0]);
+    return url === '/api/wallet-workspace' || url.endsWith('/funding-times');
+  }).length;
 it('compares all matching wallets across pages without selecting them or reading automatically', async () => {
   const wallets = Array.from({ length: 52 }, (_, i) => ({
     ...workspace.wallets[0],
@@ -100,7 +105,7 @@ it('compares all matching wallets across pages without selecting them or reading
     });
   });
   vi.stubGlobal('fetch', fetcher);
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   const scope = [...host.querySelectorAll('select')].find((s) =>
     [...s.options].some((o) => o.value === 'matching'),
   )!;
@@ -116,10 +121,10 @@ it('compares all matching wallets across pages without selecting them or reading
         .click();
     });
   await choose('matching');
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(fundingCalls(fetcher)).toBe(1));
   expect(host.textContent).toContain('52 wallets in this comparison');
   await click('Check recorded funding times');
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  await vi.waitFor(() => expect(fundingCalls(fetcher)).toBe(2));
   expect(host.querySelector('tbody summary')?.textContent).toBe(
     '24m 34s apart',
   );
@@ -138,7 +143,7 @@ it('compares all matching wallets across pages without selecting them or reading
   await choose('selected');
   await choose('matching');
   expect(host.querySelector('tbody summary')).toBeNull();
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  await vi.waitFor(() => expect(fundingCalls(fetcher)).toBe(2));
 });
 
 it('clears whole-roster funding evidence when the search changes, without altering the selection', async () => {
@@ -172,7 +177,7 @@ it('clears whole-roster funding evidence when the search changes, without alteri
     });
   });
   vi.stubGlobal('fetch', fetcher);
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   const scope = [...host.querySelectorAll('select')].find((s) =>
     [...s.options].some((o) => o.value === 'matching'),
   )!;
@@ -185,7 +190,7 @@ it('clears whole-roster funding evidence when the search changes, without alteri
       .find((b) => b.textContent === 'Check recorded funding times')!
       .click(),
   );
-  expect(host.querySelectorAll('tbody summary')).toHaveLength(2);
+  expect(host.querySelectorAll('tbody summary')).toHaveLength(4);
   const search = host.querySelector<HTMLInputElement>(
     '[aria-label="Search workspace wallets"]',
   )!;
@@ -198,7 +203,7 @@ it('clears whole-roster funding evidence when the search changes, without alteri
   });
   expect(host.textContent).toContain('1 wallet in this comparison');
   expect(host.querySelector('tbody summary')).toBeNull();
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  await vi.waitFor(() => expect(fundingCalls(fetcher)).toBe(2));
   expect(
     host.querySelector<HTMLInputElement>('tbody [data-wallet-selection]')!
       .checked,
@@ -216,7 +221,7 @@ it('keeps the 500-wallet funding-read cap for an oversized matching roster', asy
   }));
   const fetcher = vi.fn(async () => Response.json({ ...workspace, wallets }));
   vi.stubGlobal('fetch', fetcher);
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   const scope = [...host.querySelectorAll('select')].find(
     (element) =>
       element.getAttribute('aria-label') === 'Funding time comparison',
@@ -233,7 +238,7 @@ it('keeps the 500-wallet funding-read cap for an oversized matching roster', asy
   expect(host.textContent).toContain(
     'Narrow the folder or search to up to 500',
   );
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(fundingCalls(fetcher)).toBe(1));
 });
 
 it('mounts the selected-wallet funding check and exact gap badges in the real wallet table', async () => {
@@ -266,7 +271,7 @@ it('mounts the selected-wallet funding check and exact gap badges in the real wa
       });
     }),
   );
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
@@ -354,7 +359,7 @@ it('selects all 500 real roster rows across pages and keeps cross-batch clocks w
     });
   });
   vi.stubGlobal('fetch', fetcher);
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   const click = async (text: string) =>
     act(async () => {
       const button = [...host.querySelectorAll('button')].find(
@@ -423,7 +428,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 it('opens exactly the created active wallet from an archived and searched view', async () => {
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   const archived = [...host.querySelectorAll('button')].find(
     (button) => button.textContent === 'Archived wallets',
   )!;
@@ -452,7 +457,7 @@ it('opens exactly the created active wallet from an archived and searched view',
   ).toBe(true);
 });
 it('confirms an existing public address without another write and hands it to warmup', async () => {
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   let saved: boolean | void = false;
   await act(async () => {
     saved = await state.vault!.onAddPublic([address]);
@@ -467,9 +472,9 @@ it('confirms an existing public address without another write and hands it to wa
   );
 });
 it('clears a folder that does not contain the created wallet', async () => {
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   const folder = [
-    ...host.querySelectorAll<HTMLButtonElement>('.wallet-folder-select'),
+    ...host.querySelectorAll<HTMLButtonElement>('.wallet-folder-name'),
   ].find((button) => button.textContent?.includes('Other folder'))!;
   await act(async () => folder.click());
   expect(folder.getAttribute('aria-current')).toBe('page');
@@ -489,7 +494,7 @@ it('pages a large roster while preserving explicit selections and the 100-wallet
   vi.mocked(fetch).mockImplementation(() =>
     Promise.resolve(Response.json({ ...workspace, wallets })),
   );
-  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} />));
+  await act(async () => root.render(<WalletWorkspace onFunding={vi.fn()} onLaunch={vi.fn()} />));
   const rows = () => host.querySelectorAll('tbody tr');
   const click = async (text: string) =>
     act(async () => {

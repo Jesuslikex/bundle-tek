@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { Folder, Settings } from 'lucide-react';
+import { Folder } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { FOLDER_COLORS } from '@/lib/wallet-workspace';
 
@@ -22,7 +22,7 @@ export function WalletFolderColorPicker({
     custom || !FOLDER_COLORS.some((preset) => preset === color);
   return (
     <fieldset className="wallet-folder-color-picker" disabled={disabled}>
-      <legend>Folder style</legend>
+      <legend>Folder Style</legend>
       <div className="wallet-folder-color-options">
         {FOLDER_COLORS.map((preset) => (
           <button
@@ -40,18 +40,25 @@ export function WalletFolderColorPicker({
             <Folder size={20} />
           </button>
         ))}
-        <button
-          type="button"
-          disabled={disabled}
-          aria-label="Custom folder color"
-          aria-pressed={showCustom}
+        <label
+          className="wallet-folder-color-custom"
           style={
             showCustom && /^#[0-9A-F]{6}$/.test(color) ? { color } : undefined
           }
-          onClick={() => setCustom(true)}
+          title="Custom folder color"
         >
-          <Settings size={20} />
-        </button>
+          <input
+            type="color"
+            aria-label="Custom folder color"
+            value={/^#[0-9A-F]{6}$/.test(color) ? color : '#A6B1FF'}
+            disabled={disabled}
+            onChange={(event) => {
+              setCustom(true);
+              onChange(event.target.value.toUpperCase());
+            }}
+          />
+          <Folder size={20} />
+        </label>
       </div>
       {showCustom && (
         <label htmlFor={inputId}>

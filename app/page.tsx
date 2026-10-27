@@ -72,6 +72,7 @@ import {
   TrendingUp,
   TriangleAlert,
   Users,
+  Ticket,
   WalletCards,
   Waves,
   Zap,
@@ -105,6 +106,7 @@ import {
 import { WalletWorkspace } from '@/components/wallet-workspace';
 import { WalletTracker } from '@/components/wallet-tracker';
 import { WorkspaceActivity } from '@/components/workspace-activity';
+import { ReferralPanel } from '@/components/referral-panel';
 import { ImportedTokenProjects } from '@/components/imported-token-projects';
 import { useImportedProjects } from '@/components/use-imported-projects';
 import { PumpTokenWorkspaceNavigation } from '@/components/launch/pump-token-workspace-navigation';
@@ -143,6 +145,7 @@ type View =
   | 'archived'
   | 'wallets'
   | 'watchlist'
+  | 'referral'
   | 'activity'
   | 'imports'
   | 'chain'
@@ -1661,6 +1664,14 @@ export default function Home() {
             <b>NEW</b>
           </button>
           <button
+            onClick={() => changeView('referral')}
+            className={view === 'referral' ? 'feature-active' : ''}
+            aria-current={view === 'referral' ? 'page' : undefined}
+            title="Referrals"
+          >
+            <Ticket /> <span className="nav-label">Referrals</span>
+          </button>
+          <button
             onClick={() => changeView('archived')}
             className={view === 'archived' ? 'feature-active' : ''}
             aria-current={view === 'archived' ? 'page' : undefined}
@@ -1820,6 +1831,7 @@ export default function Home() {
             initialWarmupId={activityWarmupId}
             initialWithdrawalWallet={activityWithdrawalWallet}
             onFunding={() => changeView('funding')}
+            onLaunch={() => changeView('launch')}
           />
         ) : view === 'tracker' ? (
           <SupplyTracker />
@@ -1831,6 +1843,8 @@ export default function Home() {
             initialId={activityImportId}
             onProjectsChange={importedProjects.accept}
           />
+        ) : view === 'referral' ? (
+          <ReferralPanel />
         ) : view === 'activity' ? (
           <WorkspaceActivity
             projects={projects}

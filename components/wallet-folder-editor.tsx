@@ -55,18 +55,29 @@ export function WalletFolderEditor({
       }}
     >
       <DialogContent
-        className="wallet-folder-editor-dialog"
+        className={
+          folder === 'new'
+            ? 'wallet-folder-editor-dialog is-create'
+            : 'wallet-folder-editor-dialog'
+        }
         finalFocus={returnFocus}
         showCloseButton={!busy}
       >
         <DialogHeader>
           <DialogTitle className="wallet-folder-archive-title">
             <Folder size={18} />{' '}
-            {folder === 'new' ? 'Create new folder' : 'Edit folder'}
+            {folder === 'new' ? 'Create New Folder' : 'Edit folder'}
           </DialogTitle>
           <DialogDescription>
-            Group your wallets into folders so they are easier to find and
-            manage.
+            {folder === 'new' ? (
+              <>
+                Folders help you structure your wallets into clear groups.
+                <br />
+                They make it easier to manage your wallets.
+              </>
+            ) : (
+              'Group your wallets into folders so they are easier to find and manage.'
+            )}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -83,7 +94,7 @@ export function WalletFolderEditor({
             void onSave(name, color);
           }}
         >
-          <label htmlFor={inputId}>Folder name</label>
+          <label htmlFor={inputId}>Folder Name</label>
           <Input
             id={inputId}
             value={name}
@@ -110,15 +121,23 @@ export function WalletFolderEditor({
               {error}
             </p>
           )}
-          <div className="wallet-folder-editor-actions">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={onClose}
-            >
-              Cancel
-            </Button>
+          <div
+            className={
+              folder === 'new'
+                ? 'wallet-folder-editor-actions is-create'
+                : 'wallet-folder-editor-actions'
+            }
+          >
+            {folder !== 'new' && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+            )}
             <Button
               type="submit"
               disabled={
@@ -133,7 +152,7 @@ export function WalletFolderEditor({
                   ? 'Creating…'
                   : 'Saving…'
                 : folder === 'new'
-                  ? 'Create folder'
+                  ? '+ Create New Folder'
                   : 'Save changes'}
             </Button>
           </div>

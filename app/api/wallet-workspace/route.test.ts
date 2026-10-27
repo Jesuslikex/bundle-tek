@@ -63,7 +63,9 @@ const create = (id = 'a', chain = 'Solana') =>
   write({ action: 'folder.create', id, name: `Folder ${id}`, chain });
 const add = (
   folderId = 'a',
-  wallets = [{ address: address(), label: 'QA wallet', role: 'Recipient' }],
+  wallets: Record<string, unknown>[] = [
+    { address: address(), label: 'QA wallet', role: 'Recipient' },
+  ],
   chain = 'Solana',
 ) => write({ action: 'wallet.add', folderId, wallets, chain });
 const list = async () => (await (await GET()).json()) as WalletWorkspace;
@@ -343,6 +345,52 @@ describe('external wallet workspace', () => {
         })
       ).status,
     ).toBe(409); // stale wallet revision remains rejected
+  });
+  it('tags saved wallets, merges with existing tags and stays idempotent', async () => {
+    expect((await create()).status).toBe(200);
+    expect(
+      (
+        await add('a', [
+          { address: address(), label: 'Bought', role: 'Recipient', tags: ['keeper'] },
+        ])
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await write({
+          action: 'wallet.tag',
+          tags: ['purchased'],
+          wallets: [{ address: address() }],
+        })
+      ).status,
+    ).toBe(200);
+    let state = await list();
+    expect([...(state.wallets[0].tags ?? [])].sort()).toEqual([
+      'keeper',
+      'purchased',
+    ]);
+    expect(state.wallets[0].revision).toBe(2);
+    expect(
+      (
+        await write({
+          action: 'wallet.tag',
+          tags: ['purchased'],
+          wallets: [{ address: address() }],
+        })
+      ).status,
+    ).toBe(200);
+    state = await list();
+    expect(state.wallets[0].tags).toEqual(['keeper', 'purchased']);
+    expect(state.wallets[0].revision).toBe(2);
+    expect(
+      (
+        await write({
+          action: 'wallet.tag',
+          tags: [],
+          wallets: [{ address: address() }],
+        })
+      ).status,
+    ).toBe(400);
   });
   it('makes selected moves all-or-none and rejects stale revisions and foreign folders', async () => {
     await create();
