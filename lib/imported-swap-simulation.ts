@@ -99,7 +99,6 @@ export async function simulateImportedSwap(
     console.error('blockhash check', {
       blockHeight: blockHeight.toString(),
       lastValid: order.preparation.lastValidBlockHeight,
-      endpoint,
     });
     throw new SwapBlockhashExpiredError();
   }
@@ -270,23 +269,28 @@ export async function simulateImportedSwap(
         ? failure.InstructionError
         : [];
     const custom = instruction[1];
+    const safeInteger = (value: unknown, maximum: number) => {
+      const parsed =
+        typeof value === 'string' && /^(0|[1-9]\d{0,9})$/.test(value)
+          ? Number(value)
+          : value;
+      return typeof parsed === 'number' &&
+        Number.isInteger(parsed) && parsed >= 0 && parsed <= maximum
+        ? parsed
+        : null;
+    };
     console.error('Unsigned swap simulation failed', {
-      provider: source.hostname,
       kind:
-        typeof failure === 'string' && /^[A-Za-z]{1,64}$/.test(failure)
-          ? failure
-          : 'Instruction or transaction failure',
-      instructionIndex: Number.isSafeInteger(instruction[0])
-        ? instruction[0]
-        : null,
-      raw: JSON.stringify(failure).slice(0, 200),
-      logs: (result.value as any).logs?.slice(-4),
-      customCode:
-        custom &&
-        typeof custom === 'object' &&
-        Number.isSafeInteger(custom.Custom)
-          ? custom.Custom
-          : null,
+        failure === 'BlockhashNotFound'
+          ? 'BlockhashNotFound'
+          : instruction.length > 0
+            ? 'Instruction failure'
+            : 'Transaction failure',
+      instructionIndex: safeInteger(instruction[0], 255),
+      customCode: safeInteger(
+        custom && typeof custom === 'object' ? custom.Custom : null,
+        4294967295,
+      ),
     });
   }
   const units =

@@ -1,3 +1,4 @@
+import * as solanaRpc from './solana-rpc';
 import { expect, it, vi } from 'vitest';
 import { solanaTransferMessage } from './solana-funding';
 import { prepareSolanaSwap, WRAPPED_SOL } from './warmup-swap-quote';
@@ -449,4 +450,157 @@ it('checks wallet-attributed token output in the actual lossless RPC simulation 
     changeRaw: '994',
     accounts: [other],
   });
+});
+it('does not log a credential-bearing endpoint when block height has expired', async () => {
+  const prepared = await order();
+  const endpoint = 'https://rpc.synthetic.invalid/fixture-private-key';
+  const provider = vi
+    .spyOn(solanaRpc, 'getSolanaIndexerRpcEndpoint')
+    .mockReturnValue(endpoint);
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const rpc = fixture({ getBlockHeight: 121 });
+  try {
+    await expect(
+      simulateImportedSwap(
+        prepared,
+        AbortSignal.timeout(1000),
+        rpc as typeof fetch,
+      ),
+    ).rejects.toBeInstanceOf(SwapBlockhashExpiredError);
+    expect(rpc.mock.calls.every(([url]) => url === endpoint)).toBe(true);
+    const output = JSON.stringify([
+      ...error.mock.calls,
+      ...warn.mock.calls,
+      ...log.mock.calls,
+    ]);
+    expect(output).not.toContain(endpoint);
+    expect(output).not.toContain('fixture-private-key');
+    expect(error).toHaveBeenCalledWith('blockhash check', {
+      blockHeight: '121',
+      lastValid: '120',
+    });
+  } finally {
+    provider.mockRestore();
+    error.mockRestore();
+    warn.mockRestore();
+    log.mockRestore();
+  }
+});
+it('sanitizes simulation failure logs without changing the failed outcome', async () => {
+  const prepared = await order();
+  const endpoint =
+    'https://syntheticsecretalpha.rpc.invalid/private-credential';
+  const provider = vi
+    .spyOn(solanaRpc, 'getSolanaIndexerRpcEndpoint')
+    .mockReturnValue(endpoint);
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const rpc = fixture({
+      simulateTransaction: {
+        context: { slot: 101 },
+        value: {
+          err: 'SyntheticSecretAlpha',
+          unitsConsumed: 0,
+          logs: [endpoint, 'private-credential'],
+        },
+      },
+    });
+    const result = await simulateImportedSwap(
+      prepared,
+      AbortSignal.timeout(1000),
+      rpc as typeof fetch,
+    );
+    expect(result.succeeded).toBe(false);
+    expect(rpc.mock.calls.every(([url]) => url === endpoint)).toBe(true);
+    const output = JSON.stringify([
+      ...error.mock.calls,
+      ...warn.mock.calls,
+      ...log.mock.calls,
+    ]);
+    expect(output).not.toContain('syntheticsecretalpha');
+    expect(output).not.toContain('SyntheticSecretAlpha');
+    expect(output).not.toContain('private-credential');
+    expect(error).toHaveBeenCalledWith('Unsigned swap simulation failed', {
+      kind: 'Transaction failure',
+      instructionIndex: null,
+      customCode: null,
+    });
+    error.mockClear();
+    const instructionRpc = fixture({
+      simulateTransaction: {
+        context: { slot: 101 },
+        value: {
+          err: { InstructionError: [2, { Custom: 7 }] },
+          unitsConsumed: 0,
+          logs: [endpoint],
+        },
+      },
+    });
+    expect(
+      (
+        await simulateImportedSwap(
+          prepared,
+          AbortSignal.timeout(1000),
+          instructionRpc as typeof fetch,
+        )
+      ).succeeded,
+    ).toBe(false);
+    expect(error).toHaveBeenCalledWith('Unsigned swap simulation failed', {
+      kind: 'Instruction failure',
+      instructionIndex: 2,
+      customCode: 7,
+    });
+    expect(JSON.stringify(error.mock.calls)).not.toContain(
+      'syntheticsecretalpha',
+    );
+  } finally {
+    provider.mockRestore();
+    error.mockRestore();
+    warn.mockRestore();
+    log.mockRestore();
+  }
+});
+it('omits untrusted out-of-range instruction and custom codes', async () => {
+  const prepared = await order();
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    for (const [index, code] of [
+      [-1, -1],
+      [256, 4294967296],
+      ['01', '7secret'],
+    ] as const) {
+      const rpc = fixture({
+        simulateTransaction: {
+          context: { slot: 101 },
+          value: {
+            err: { InstructionError: [index, { Custom: code }] },
+            unitsConsumed: 0,
+          },
+        },
+      });
+      expect(
+        (
+          await simulateImportedSwap(
+            prepared,
+            AbortSignal.timeout(1000),
+            rpc as typeof fetch,
+          )
+        ).succeeded,
+      ).toBe(false);
+      expect(error).toHaveBeenLastCalledWith(
+        'Unsigned swap simulation failed',
+        {
+          kind: 'Instruction failure',
+          instructionIndex: null,
+          customCode: null,
+        },
+      );
+    }
+  } finally {
+    error.mockRestore();
+  }
 });
