@@ -5,7 +5,6 @@ import { solanaTokenAtoms } from './solana-token-amount';
 import { walletAddress } from './wallet-workspace';
 import { reviewUnsignedSwapOrder } from './unsigned-swap-order';
 import { getSolanaRpcEndpoint } from './solana-rpc';
-import bs58 from 'bs58';
 import {
   getBase64Decoder,
   getBase64Encoder,
@@ -199,12 +198,12 @@ async function quoteSolanaSwap(
     amount: amount.toString(),
     swapMode: 'ExactIn',
     slippageBps: String(slippage),
-    // jupiterz and okx cannot serve a wallet-bound order. dflow can, and is the
-    // only route that answers when Metis has none, so it stays available.
-    ...(input.taker
-      ? { excludeRouters: 'jupiterz,okx' }
-      : input.metisOnly
-        ? { excludeRouters: 'jupiterz,dflow,okx' }
+    // Pair review requires decoded Metis instructions. Ordinary wallet-bound
+    // swaps retain DFlow support; pair requests exclude it explicitly.
+    ...(input.metisOnly
+      ? { excludeRouters: 'jupiterz,dflow,okx' }
+      : input.taker
+        ? { excludeRouters: 'jupiterz,okx' }
         : {}),
     ...(input.taker
       ? {
@@ -340,11 +339,12 @@ async function quoteSolanaSwap(
       'Quote router is unsupported. Request a fresh quote from a supported route.',
       'UNSUPPORTED_ROUTER',
     );
-  // A wallet-bound order may ride Metis or DFlow. A quote-only pair call excludes
-  // DFlow, so a DFlow answer there means the exclusion was ignored.
+  // Ordinary wallet-bound orders may use DFlow. Pair requests must remain
+  // Metis-only even when the provider ignores the explicit exclusion.
   if (
-    (input.taker || input.metisOnly) &&
-    !(input.taker ? ['metis', 'dflow'] : ['metis']).includes(data.router)
+    input.metisOnly
+      ? data.router !== 'metis'
+      : input.taker && !['metis', 'dflow'].includes(data.router)
   )
     throw new WarmupQuoteError(
       'Pair quotes and wallet-bound preparations require a supported router.',
@@ -587,6 +587,7 @@ export async function prepareSolanaPair(
       amountRaw: input.amountRaw,
       side: input.side,
       taker,
+      metisOnly: true,
     },
     apiKey,
     signal,

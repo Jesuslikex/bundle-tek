@@ -6,9 +6,30 @@ import {
   quoteSolanaBuy,
   quoteSolanaSell,
   quoteSolanaPair,
+  prepareSolanaPair,
   WRAPPED_SOL,
 } from './warmup-swap-quote';
+import { solanaTransferMessage } from './solana-funding';
 const mint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const wallet = '4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi';
+const output = '8phnoC6V8nwYnNUwobNBoWzWAmyP1nj9GyYZaMbU8z4';
+const unsignedPacket = () =>
+  btoa(
+    String.fromCharCode(
+      ...Uint8Array.from([
+        1,
+        ...new Uint8Array(64),
+        128,
+        ...solanaTransferMessage(
+          wallet,
+          output,
+          '11111111111111111111111111111111',
+          1n,
+        ),
+        0,
+      ]),
+    ),
+  );
 it('cancels a rejected provider body without reading or exposing it', async () => {
   const cancel = vi.fn(),
     fetcher = vi.fn(
@@ -154,6 +175,103 @@ it.each(['metis', 'jupiterz', 'dflow', 'okx'] as const)(
     expect(fetcher).toHaveBeenCalledOnce();
   },
 );
+it.each([WRAPPED_SOL, mint])(
+  'requests a Metis-only unsigned pair packet and rejects an ignored DFlow exclusion for quote mint %s',
+  async (quoteMint) => {
+    for (const router of ['metis', 'dflow', 'jupiterz', 'okx'] as const) {
+      const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        if (init?.method === 'POST') return Response.json({ result: null });
+        return Response.json({
+          ...result,
+          inputMint: quoteMint,
+          outputMint: output,
+          router,
+          taker: wallet,
+          gasless: false,
+          transactionVersion: 0,
+          transaction: unsignedPacket(),
+          lastValidBlockHeight: '123456',
+          signatureFeeLamports: 5000,
+          signatureFeePayer: wallet,
+          prioritizationFeeLamports: 0,
+          prioritizationFeePayer: null,
+          rentFeeLamports: 0,
+          rentFeePayer: null,
+        });
+      });
+      const pending = prepareSolanaPair(
+        {
+          baseMint: output,
+          quoteMint,
+          amountRaw: '1000000',
+          side: 'Buy',
+          wallet,
+        },
+        'qa-key',
+        new AbortController().signal,
+        fetcher,
+      );
+      if (router === 'metis')
+        await expect(pending).resolves.toMatchObject({
+          router: 'metis',
+          inputMint: quoteMint,
+          outputMint: output,
+          minimumOutAmount: '995',
+          preparation: {
+            wallet,
+            executionAllowed: false,
+            instructionsVerified: false,
+          },
+        });
+      else
+        await expect(pending).rejects.toMatchObject({
+          code: 'UNSUPPORTED_ROUTER',
+        });
+      const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+      expect(url.searchParams.get('excludeRouters')).toBe('jupiterz,dflow,okx');
+      expect(url.searchParams.get('taker')).toBe(wallet);
+      expect(url.searchParams.get('slippageBps')).toBe('50');
+      if (router !== 'metis') expect(fetcher).toHaveBeenCalledOnce();
+    }
+  },
+);
+
+it('retains DFlow for ordinary wallet-bound swaps', async () => {
+  const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      if (typeof init.body !== 'string') throw Error('Expected RPC body.');
+      const body = JSON.parse(init.body);
+      return Response.json({
+        result: body.method === 'getBlockHeight' ? 1 : null,
+      });
+    }
+    return Response.json({
+      ...result,
+      router: 'dflow',
+      taker: wallet,
+      gasless: false,
+      transactionVersion: 0,
+      transaction: unsignedPacket(),
+      lastValidBlockHeight: '123456',
+      signatureFeeLamports: 5000,
+      signatureFeePayer: wallet,
+      prioritizationFeeLamports: 0,
+      prioritizationFeePayer: null,
+      rentFeeLamports: 0,
+      rentFeePayer: null,
+    });
+  });
+  const order = await prepareSolanaSwap(
+    { tokenMint: mint, side: 'Buy', amount: '0.001', decimals: 6, wallet },
+    'qa-key',
+    new AbortController().signal,
+    fetcher,
+  );
+  expect(order.router).toBe('dflow');
+  expect(order.preparation.executionAllowed).toBe(false);
+  const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+  expect(url.searchParams.get('excludeRouters')).toBe('jupiterz,okx');
+});
 it('preserves broader quote-only routing for the existing non-pair swap flow', async () => {
   const fetcher = vi.fn(async (_url: unknown) =>
     Response.json({ ...result, router: 'okx' }),
