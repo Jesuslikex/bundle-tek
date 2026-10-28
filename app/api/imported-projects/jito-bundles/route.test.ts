@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   database: vi.fn(),
   approvalRecover: vi.fn(),
   sequentialCheck: vi.fn(),
+  begin: vi.fn(),
+  readAttempt: vi.fn(),
+  listAttempts: vi.fn(),
 }));
 vi.mock('@/app/chatgpt-auth', () => ({
   getChatGPTUser: async () => mocks.user,
@@ -23,6 +26,12 @@ vi.mock('@/lib/jito-bundle-server', () => ({
   submitJitoBundle: mocks.submit,
   cancelJitoBundle: mocks.cancel,
   observeJitoBundleWithObservation: mocks.recover,
+}));
+vi.mock('@/lib/jito-sign-attempt-server', () => ({
+  beginJitoSignAttempt: mocks.begin,
+  readJitoSignAttempt: mocks.readAttempt,
+  listJitoSignAttempts: mocks.listAttempts,
+  registerJitoSignAttempt: mocks.register,
 }));
 vi.mock('@/lib/jito-sequential-check-server', () => ({
   checkJitoBundleSequential: mocks.sequentialCheck,
@@ -62,11 +71,13 @@ it('loads an exact bundle only within the verified owner, project and session', 
       bound.push(args);
       return {
         first: async () =>
-          sql.includes('FROM imported_trade_sessions')
-            ? { id }
-            : bundleOwned
+          sql.includes('FROM jito_bundle_protocol')
+            ? null
+            : sql.includes('FROM imported_trade_sessions')
               ? { id }
-              : null,
+              : bundleOwned
+                ? { id }
+                : null,
       };
     },
   }));
@@ -84,6 +95,7 @@ it('loads an exact bundle only within the verified owner, project and session', 
   expect(bound).toEqual([
     ['owner', id, id],
     ['owner', id, id, id],
+    ['owner', id],
   ]);
   expect(mocks.read).toHaveBeenCalledOnce();
   mocks.read.mockClear();
@@ -115,6 +127,27 @@ it('loads an exact bundle only within the verified owner, project and session', 
       )
     ).status,
   ).toBe(400);
+});
+it('marks a legacy bundle read-only for the owned v2 client', async () => {
+  const scope = await jitoOwnerScope('owner');
+  mocks.database.mockImplementation((sql: string) => ({
+    bind: () => ({
+      first: async () => (sql.includes('jito_bundle_protocol') ? null : { id }),
+    }),
+  }));
+  mocks.read.mockResolvedValue({ record: { manifest: { id } } });
+  mocks.listAttempts.mockResolvedValue([]);
+  const response = await GET(
+    new Request(
+      `http://localhost/api/imported-projects/jito-bundles?projectId=${id}&sessionId=${id}&bundleId=${id}`,
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope, 'x-jito-protocol': '2' } },
+    ),
+  );
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    legacyReadOnly: true,
+    attempts: [],
+  });
 });
 it('requires authentication, JSON, origin and explicit action-time approval before signing registration or submission', async () => {
   mocks.user = null;
@@ -149,6 +182,65 @@ it('requires authentication, JSON, origin and explicit action-time approval befo
   }
   expect(mocks.register).not.toHaveBeenCalled();
   expect(mocks.submit).not.toHaveBeenCalled();
+});
+it('requires v2, the current account scope and separate approval for a signing reservation', async () => {
+  const scope = await jitoOwnerScope('owner');
+  const body = {
+    action: 'begin-signing',
+    id,
+    sha256: 'ab'.repeat(32),
+    packet: 0,
+    attemptId: id,
+    approved: true,
+  };
+  expect((await POST(request(body, { 'x-jito-protocol': '2' }))).status).toBe(
+    400,
+  );
+  expect(
+    (await POST(request(body, { [JITO_OWNER_SCOPE_HEADER]: scope }))).status,
+  ).toBe(409);
+  expect(
+    (
+      await POST(
+        request(
+          { ...body, approved: false },
+          { [JITO_OWNER_SCOPE_HEADER]: scope, 'x-jito-protocol': '2' },
+        ),
+      )
+    ).status,
+  ).toBe(400);
+  expect(mocks.begin).not.toHaveBeenCalled();
+  mocks.begin.mockResolvedValue({
+    attempt: { state: 'unknown' },
+    mayInvokeSigner: true,
+  });
+  const response = await POST(
+    request(body, { [JITO_OWNER_SCOPE_HEADER]: scope, 'x-jito-protocol': '2' }),
+  );
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    attempt: { state: 'unknown' },
+    mayInvokeSigner: true,
+  });
+  expect(mocks.begin.mock.calls[0][1]).toBe('owner');
+});
+it('refuses an old client registration before the signer result reaches the writer', async () => {
+  const scope = await jitoOwnerScope('owner');
+  const response = await POST(
+    request(
+      {
+        action: 'register',
+        id,
+        sha256: 'ab'.repeat(32),
+        packet: 0,
+        transaction: 'fixture',
+        approved: true,
+      },
+      { [JITO_OWNER_SCOPE_HEADER]: scope },
+    ),
+  );
+  expect(response.status).toBe(400);
+  expect(mocks.register).not.toHaveBeenCalled();
 });
 it('bounds payloads and does not expose a raw arbitrary relay method', async () => {
   expect((await POST(request({ action: 'sendTransaction', id }))).status).toBe(
@@ -219,17 +311,22 @@ it('scopes history and mutations to the signed-in owner and saved session', asyn
     ).status,
   ).toBe(404);
   mocks.register.mockResolvedValue({ state: 'reviewed' });
+  const scope = await jitoOwnerScope('owner');
   expect(
     (
       await POST(
-        request({
-          action: 'register',
-          id,
-          sha256: 'ab'.repeat(32),
-          approved: true,
-          packet: 0,
-          transaction: 'fixture',
-        }),
+        request(
+          {
+            action: 'register',
+            id,
+            sha256: 'ab'.repeat(32),
+            approved: true,
+            packet: 0,
+            transaction: 'fixture',
+            attemptId: id,
+          },
+          { [JITO_OWNER_SCOPE_HEADER]: scope, 'x-jito-protocol': '2' },
+        ),
       )
     ).status,
   ).toBe(200);
@@ -253,8 +350,9 @@ it('returns only the verified account scope header on authenticated responses', 
         approved: true,
         packet: 0,
         transaction: 'fixture',
+        attemptId: id,
       },
-      { [JITO_OWNER_SCOPE_HEADER]: scope },
+      { [JITO_OWNER_SCOPE_HEADER]: scope, 'x-jito-protocol': '2' },
     ),
   );
   expect(response.status).toBe(200);
@@ -348,12 +446,15 @@ it('rate-limits provider work and leaves retained recovery state intact on failu
   expect(
     (
       await POST(
-        request({
-          action: 'submit',
-          id,
-          sha256: 'ab'.repeat(32),
-          approved: true,
-        }),
+        request(
+          {
+            action: 'submit',
+            id,
+            sha256: 'ab'.repeat(32),
+            approved: true,
+          },
+          { 'x-jito-protocol': '2' },
+        ),
       )
     ).status,
   ).toBe(429);

@@ -57,6 +57,7 @@ vi.mock('./wallet-balances', async (original) => {
   };
 });
 import { GET, POST } from '@/app/api/imported-projects/jito-bundles/route';
+import { JITO_OWNER_SCOPE_HEADER, jitoOwnerScope } from './jito-owner-scope';
 const databases: ReturnType<typeof jitoDatabase>[] = [];
 afterEach(() => {
   for (const d of databases.splice(0)) d.sqlite.close();
@@ -66,7 +67,7 @@ for (const token2022 of [false, true])
   for (const unknown of [false, true])
     it(`composes saved HTTP review, exact signatures, one real Jito wire and read-only recovery (unknown=${unknown}, Token2022=${token2022})`, async () => {
       const f = await jitoBundleFixture(1, token2022),
-        d = jitoDatabase(f.manifest);
+        d = jitoDatabase(f.manifest, true, true);
       databases.push(d);
       control.db = d.db;
       d.sqlite.exec(
@@ -136,6 +137,7 @@ for (const token2022 of [false, true])
           throw Error('Unexpected transport ' + b.method);
         }),
       );
+      const scope = await jitoOwnerScope('owner');
       const post = (body: object) =>
         POST(
           new Request('http://localhost/api/imported-projects/jito-bundles', {
@@ -143,6 +145,8 @@ for (const token2022 of [false, true])
             headers: {
               'content-type': 'application/json',
               origin: 'http://localhost',
+              'x-jito-protocol': '2',
+              [JITO_OWNER_SCOPE_HEADER]: scope,
             },
             body: JSON.stringify(body),
           }),
@@ -150,6 +154,12 @@ for (const token2022 of [false, true])
       const history = await GET(
         new Request(
           `http://localhost/api/imported-projects/jito-bundles?projectId=${f.manifest.projectId}&sessionId=${f.manifest.sessionId}`,
+          {
+            headers: {
+              'x-jito-protocol': '2',
+              [JITO_OWNER_SCOPE_HEADER]: scope,
+            },
+          },
         ),
       );
       expect(history.status).toBe(200);
@@ -163,11 +173,31 @@ for (const token2022 of [false, true])
         sha256: f.manifest.sha256,
         approved: true,
       };
-      for (const [packet, transaction] of packets.entries())
+      for (const [packet, transaction] of packets.entries()) {
+        const attemptId = crypto.randomUUID();
+        const begin = await post({
+          action: 'begin-signing',
+          ...identity,
+          packet,
+          attemptId,
+        });
+        expect(begin.status).toBe(200);
+        expect(await begin.json()).toMatchObject({
+          mayInvokeSigner: true,
+          attempt: { state: 'unknown' },
+        });
         expect(
-          (await post({ action: 'register', ...identity, packet, transaction }))
-            .status,
+          (
+            await post({
+              action: 'register',
+              ...identity,
+              packet,
+              attemptId,
+              transaction,
+            })
+          ).status,
         ).toBe(200);
+      }
       expect(calls).toEqual([]);
       const result = await post({ action: 'submit', ...identity });
       expect(result.status).toBe(200);

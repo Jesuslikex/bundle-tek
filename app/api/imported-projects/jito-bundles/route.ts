@@ -5,11 +5,16 @@ import { UUID } from '@/lib/wallet-operation';
 import {
   createJitoBundle,
   readJitoBundle,
-  registerJitoPacket,
   submitJitoBundle,
   cancelJitoBundle,
   observeJitoBundleWithObservation,
 } from '@/lib/jito-bundle-server';
+import {
+  beginJitoSignAttempt,
+  listJitoSignAttempts,
+  readJitoSignAttempt,
+  registerJitoSignAttempt,
+} from '@/lib/jito-sign-attempt-server';
 import { POST as recoverImportedApproval } from '../signing/route';
 import { prepareJitoBundle } from '@/lib/jito-bundle-preparation';
 import { JitoJsonError, readJitoJson } from '@/lib/jito-json';
@@ -68,6 +73,12 @@ export async function GET(request: Request) {
       .bind(user.userId, sessionId, projectId)
       .first();
     if (!owned) return reply({ error: 'Owned session unavailable.' }, 404);
+    if (bundleId === null && request.headers.get('x-jito-protocol') !== '2') {
+      const newer = await db.prepare(
+        'SELECT 1 AS present FROM jito_bundles b JOIN jito_bundle_protocol v ON v.owner_id=b.owner_id AND v.bundle_id=b.id WHERE b.owner_id=? AND b.project_id=? AND b.session_id=? LIMIT 1',
+      ).bind(user.userId, projectId, sessionId).first();
+      if (newer) return reply({ error: 'Bundle client update required to see complete bundle history.' }, 409);
+    }
     if (bundleId !== null) {
       const ownedBundle = await db
         .prepare(
@@ -77,14 +88,44 @@ export async function GET(request: Request) {
         .first();
       if (!ownedBundle)
         return reply({ error: 'Owned bundle unavailable.' }, 404);
+      const protocol = await db
+        .prepare(
+          'SELECT version FROM jito_bundle_protocol WHERE owner_id=? AND bundle_id=?',
+        )
+        .bind(user.userId, bundleId)
+        .first<{ version: number }>();
+      if (request.headers.get('x-jito-protocol') !== '2' && protocol)
+        return reply(
+          {
+            error: 'Bundle client update required before opening this bundle.',
+          },
+          409,
+        );
       const bundle = (await readJitoBundle(db, user.userId, bundleId)).record;
-      return reply({ projectId, sessionId, bundle });
+      const attempts =
+        request.headers.get('x-jito-protocol') === '2' &&
+        request.headers.get(JITO_OWNER_SCOPE_HEADER) === scoped.scope
+          ? await listJitoSignAttempts(db, user.userId, bundleId)
+          : undefined;
+      return reply({
+        projectId,
+        sessionId,
+        bundle,
+        ...(attempts
+          ? { attempts, legacyReadOnly: protocol?.version !== 2 }
+          : {}),
+      });
     }
     const { results } = await db
       .prepare(
-        'SELECT id FROM jito_bundles WHERE owner_id=? AND project_id=? AND session_id=? ORDER BY created_at DESC,id DESC LIMIT 20',
+        'SELECT b.id FROM jito_bundles b WHERE b.owner_id=? AND b.project_id=? AND b.session_id=? AND (?=2 OR NOT EXISTS(SELECT 1 FROM jito_bundle_protocol v WHERE v.owner_id=b.owner_id AND v.bundle_id=b.id)) ORDER BY b.created_at DESC,b.id DESC LIMIT 20',
       )
-      .bind(user.userId, projectId, sessionId)
+      .bind(
+        user.userId,
+        projectId,
+        sessionId,
+        request.headers.get('x-jito-protocol') === '2' ? 2 : 0,
+      )
       .all<{ id: string }>();
     const bundles = await Promise.all(
       results.map(
@@ -147,6 +188,7 @@ export async function POST(request: Request) {
     intentIds: string[];
     entries: number[];
     tipLamports: string;
+    attemptId: string;
     approved?: boolean;
   };
   try {
@@ -165,6 +207,8 @@ export async function POST(request: Request) {
         'recover',
         'cancel',
         'check-sequential',
+        'begin-signing',
+        'read-signing-attempt',
       ].includes(body.action)
     )
       throw new Error();
@@ -185,8 +229,21 @@ export async function POST(request: Request) {
     )
       throw new Error();
     if (
-      ['register', 'submit'].includes(body.action) &&
+      ['register', 'submit', 'begin-signing'].includes(body.action) &&
       (!/^[a-f0-9]{64}$/.test(body.sha256) || body.approved !== true)
+    )
+      throw new Error();
+    if (
+      ['begin-signing', 'read-signing-attempt', 'register'].includes(
+        body.action,
+      ) &&
+      (!UUID.test(body.attemptId) ||
+        request.headers.get(JITO_OWNER_SCOPE_HEADER) !== scoped.scope)
+    )
+      throw new Error();
+    if (
+      ['begin-signing', 'register'].includes(body.action) &&
+      (!Number.isSafeInteger(body.packet) || body.packet < 0)
     )
       throw new Error();
   } catch (error) {
@@ -194,6 +251,21 @@ export async function POST(request: Request) {
       return reply({ error: error.message }, error.status);
     return reply({ error: 'Invalid Jito bundle request.' }, 400);
   }
+  if (
+    [
+      'prepare',
+      'create',
+      'register',
+      'submit',
+      'begin-signing',
+      'read-signing-attempt',
+    ].includes(body.action) &&
+    request.headers.get('x-jito-protocol') !== '2'
+  )
+    return reply(
+      { error: 'Bundle client update required before this operation.' },
+      409,
+    );
   try {
     const db = getD1(),
       signal = AbortSignal.any([request.signal, AbortSignal.timeout(55000)]);
@@ -233,15 +305,37 @@ export async function POST(request: Request) {
         bundle = await createJitoBundle(db, user.userId, body, signal);
         break;
       case 'register':
-        bundle = await registerJitoPacket(
+        bundle = await registerJitoSignAttempt(
           db,
           user.userId,
           body.id,
           body.sha256,
           body.packet,
+          body.attemptId,
           body.transaction,
         );
         break;
+      case 'begin-signing':
+        return reply(
+          await beginJitoSignAttempt(
+            db,
+            user.userId,
+            body.id,
+            body.sha256,
+            body.packet,
+            body.attemptId,
+          ),
+        );
+      case 'read-signing-attempt': {
+        const attempt = await readJitoSignAttempt(
+          db,
+          user.userId,
+          body.attemptId,
+        );
+        if (!attempt || attempt.bundleId !== body.id)
+          return reply({ error: 'Owned bundle attempt unavailable.' }, 404);
+        return reply({ attempt });
+      }
       case 'submit':
         bundle = await submitJitoBundle(
           db,

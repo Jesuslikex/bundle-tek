@@ -1,7 +1,11 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import type { JitoBundleManifest } from '../lib/jito-bundle';
-export function jitoDatabase(manifest: JitoBundleManifest, withEvents = true) {
+export function jitoDatabase(
+  manifest: JitoBundleManifest,
+  withEvents = true,
+  withV2 = false,
+) {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(`CREATE TABLE warmup_signing_intents(id TEXT,owner_id TEXT,preparation_id TEXT,wallet_address TEXT,document TEXT,state TEXT,signature TEXT);
     CREATE TABLE imported_swap_preparations(id TEXT,owner_id TEXT,project_id TEXT,project_revision INTEGER,wallet_revision INTEGER,wallet_address TEXT,document TEXT,created_at TEXT);
@@ -12,12 +16,18 @@ export function jitoDatabase(manifest: JitoBundleManifest, withEvents = true) {
   sqlite.exec(
     readFileSync('drizzle/0047_shared_swap_reservations.sql', 'utf8'),
   );
+  if (withV2)
+    sqlite.exec(readFileSync('drizzle/0049_native_withdrawals.sql', 'utf8'));
   sqlite.exec(
     readFileSync('drizzle/0068_remarkable_frightful_four.sql', 'utf8'),
   );
   if (withEvents)
     sqlite.exec(readFileSync('drizzle/0069_amusing_viper.sql', 'utf8'));
   sqlite.exec(readFileSync('drizzle/0070_overjoyed_betty_ross.sql', 'utf8'));
+  if (withV2)
+    sqlite.exec(
+      readFileSync('drizzle/0163_jito_signing_reservations.sql', 'utf8'),
+    );
   sqlite
     .prepare('INSERT INTO imported_token_projects VALUES(?,?,?,?,?,?)')
     .run(
@@ -124,6 +134,10 @@ export function jitoDatabase(manifest: JitoBundleManifest, withEvents = true) {
           manifest.createdAt,
           manifest.createdAt,
         );
+      if (withV2)
+        sqlite
+          .prepare('INSERT INTO jito_bundle_protocol VALUES(?,?,2,?,?)')
+          .run('owner', manifest.id, manifest.sha256, manifest.createdAt);
       for (let i = 0; i <= manifest.swaps.length; i++)
         sqlite
           .prepare('INSERT INTO jito_bundle_packets VALUES(?,?,?,?,NULL,NULL)')

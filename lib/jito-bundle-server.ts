@@ -309,6 +309,11 @@ export async function createJitoBundle(
         manifest.createdAt,
         manifest.createdAt,
       ),
+    db
+      .prepare(
+        'INSERT INTO jito_bundle_protocol(owner_id,bundle_id,version,manifest_sha256,created_at) VALUES(?,?,2,?,?)',
+      )
+      .bind(owner, manifest.id, manifest.sha256, manifest.createdAt),
     ...[...reviews.map((r) => r.id), null].map((id, i) =>
       db
         .prepare('INSERT INTO jito_bundle_packets VALUES(?,?,?,?,NULL,NULL)')
