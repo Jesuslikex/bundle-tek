@@ -24,6 +24,19 @@ recovery-only. It is not connected to a wallet or UI; its caller must hold the
 journal lock, enforce the current consent and context, and independently verify
 any recovered signed packet.
 
+Local verification of the frozen migration and server draft: 145 tests across
+12 focused Jito files; 10 local engine/schema tests covering D1, SQLite and a
+Turso-compatible local engine; and the complete 162-migration chain through
+Wrangler's whole-file local migration command. TypeScript and scoped typed lint
+also passed. The independent one-shot adapter and journal tests passed 43 cases.
+These are local synthetic checks; they are not a funded or hosted proof.
+
+The detached exact-bundle snapshot validator binds server evidence to the
+signed-in owner and reviewed manifest. It preserves legacy records as read-only
+and does not turn a missing historical finalization receipt into proof.
+Callers must independently verify the exact signed packet before using any
+registered attempt. Nine focused snapshot tests pass.
+
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,
 cancel and submit path; preserve separately unchecked approval; test rejected
