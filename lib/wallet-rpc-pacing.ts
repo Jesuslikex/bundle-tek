@@ -1,6 +1,12 @@
 import { env } from '@/lib/server-env';
 
 const nextReads = new Map<string, number>();
+// Public endpoints 429 well below the paid budget, so they get their own floor.
+const PUBLIC_HOSTS = new Set([
+  'api.mainnet-beta.solana.com',
+  'solana-rpc.publicnode.com',
+]);
+export const PUBLIC_QUALIFICATION_METHOD_BUDGET = 5;
 /** Rolling methods/second for explicit qualification. Only the configured stock
  * runtime endpoint may raise it via SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND. */
 export function stockQualificationMethodBudget(
@@ -10,7 +16,10 @@ export function stockQualificationMethodBudget(
   runtime = (env as unknown as Record<string, unknown>)
     .SOLANA_STOCK_RUNTIME_RPC_URL,
 ) {
-  if (configured === undefined || configured === '') return 9;
+  if (configured === undefined || configured === '')
+    return PUBLIC_HOSTS.has(new URL(endpoint).hostname)
+      ? PUBLIC_QUALIFICATION_METHOD_BUDGET
+      : 9;
   if (typeof configured !== 'string' || !/^[1-9]\d?$/.test(configured))
     throw new Error('Invalid stock runtime RPC method budget.');
   return typeof runtime === 'string' &&
