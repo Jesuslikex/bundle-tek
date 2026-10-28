@@ -112,7 +112,13 @@ export async function collectPumpProgramIdentities(
       value.value.length !== keys.length
     )
       throw new Error(
-        `Program identity bank/mapping differs: min=${minimumSlot}, latest=${Math.max(...slots)}, got=${slot}, accounts=${value.value?.length ?? -1}/${keys.length}, reads=${reads}.`,
+        `Program identity read refused (${
+          !Number.isSafeInteger(slot)
+            ? 'no context slot'
+            : slot < requestedFloor
+              ? 'behind the requested floor'
+              : 'outside the 32-slot span'
+        }): min=${minimumSlot}, latest=${Math.max(...slots)}, got=${slot}, accounts=${value.value?.length ?? -1}/${keys.length}, reads=${reads}.`,
       );
     slots.push(slot);
     return value.value.map((raw) => {
