@@ -423,6 +423,19 @@ function JitoAtomicBundleForContext({
         'Bundle approval or signed-in account changed. Reload saved history.',
       );
   }
+  async function beforePacketImport(
+    manifest: JitoBundleManifest,
+    packet: number,
+  ) {
+    const record = await readExactBundle(manifest.id);
+    if (
+      !isContextCurrent() ||
+      record.state !== 'reviewed' ||
+      record.manifest.sha256 !== manifest.sha256 ||
+      record.signatures[packet] !== null
+    )
+      throw new Error('Bundle changed. Reload saved history before importing.');
+  }
   async function loadOriginal(id: string) {
     if (running.current || !historyVerified) return;
     running.current = true;
@@ -685,7 +698,7 @@ function JitoAtomicBundleForContext({
         {bundles.map((bundle) => {
           const m = bundle.manifest,
             expired = Date.parse(m.expiresAt) <= now;
-          const canSign =
+          const canRegister =
             Boolean(ownerScope) &&
             !coordinator.operationActive() &&
             !busy &&
@@ -694,6 +707,12 @@ function JitoAtomicBundleForContext({
             m.sessionRevision === session.revision &&
             bundle.state === 'reviewed' &&
             !expired;
+          const hasPendingPacket =
+            Boolean(ownerScope) &&
+            Array.from({ length: m.swaps.length + 1 }, (_, packet) =>
+              coordinator.has(ownerScope!, m.id, packet),
+            ).some(Boolean);
+          const canSign = canRegister && !hasPendingPacket;
           const complete = bundle.signatures.every(Boolean);
           return (
             <article key={m.id} className="space-y-3 rounded-md border p-3">
@@ -793,7 +812,7 @@ function JitoAtomicBundleForContext({
                       coordinator={coordinator}
                       revision={memoryRevision}
                       registrationAllowed={
-                        canSign && !bundle.signatures[packet]
+                        canRegister && !bundle.signatures[packet]
                       }
                       serverSignature={bundle.signatures[packet]}
                       isContextCurrent={isContextCurrent}
@@ -822,6 +841,16 @@ function JitoAtomicBundleForContext({
                         coordinator={coordinator}
                         isContextCurrent={isContextCurrent}
                         beforeSign={() => beforePacketSign(m, i)}
+                        beforeImport={() => beforePacketImport(m, i)}
+                        recoveryDisabled={
+                          !ownerScope ||
+                          !historyVerified ||
+                          busy ||
+                          coordinator.operationActive() ||
+                          Boolean(
+                            ownerScope && coordinator.has(ownerScope, m.id, i),
+                          )
+                        }
                         register={(transaction, token) =>
                           registerPacket(m, i, transaction, token)
                         }
@@ -844,6 +873,17 @@ function JitoAtomicBundleForContext({
                   coordinator={coordinator}
                   isContextCurrent={isContextCurrent}
                   beforeSign={() => beforePacketSign(m, m.swaps.length)}
+                  beforeImport={() => beforePacketImport(m, m.swaps.length)}
+                  recoveryDisabled={
+                    !ownerScope ||
+                    !historyVerified ||
+                    busy ||
+                    coordinator.operationActive() ||
+                    Boolean(
+                      ownerScope &&
+                      coordinator.has(ownerScope, m.id, m.swaps.length),
+                    )
+                  }
                   register={(transaction, token) =>
                     registerPacket(m, m.swaps.length, transaction, token)
                   }

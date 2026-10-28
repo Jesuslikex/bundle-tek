@@ -42,6 +42,8 @@ export function JitoPacketSigning({
   coordinator,
   isContextCurrent,
   beforeSign,
+  beforeImport,
+  recoveryDisabled,
 }: {
   manifest: JitoBundleManifest;
   packet: number;
@@ -51,6 +53,8 @@ export function JitoPacketSigning({
   coordinator: JitoMemorySignatureRecovery;
   isContextCurrent: () => boolean;
   beforeSign: () => Promise<void>;
+  beforeImport: () => Promise<void>;
+  recoveryDisabled: boolean;
 }) {
   const field = useId(),
     mounted = useRef(true),
@@ -91,9 +95,20 @@ export function JitoPacketSigning({
     if (!accepted || disabled || running.current || pending) return;
     let operation: JitoOperationToken;
     try {
+      if (
+        !ownerScope ||
+        Array.from({ length: manifest.swaps.length + 1 }, (_, index) =>
+          coordinator.has(ownerScope, manifest.id, index),
+        ).some(Boolean)
+      )
+        throw Error('A Jito signing outcome is still pending.');
       operation = coordinator.startOperation(ownerScope, manifest.id, packet);
-    } catch {
-      setError('Another Jito action is in progress.');
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : 'Another Jito action is in progress.',
+      );
       return;
     }
     running.current = true;
@@ -275,11 +290,23 @@ export function JitoPacketSigning({
     }
   }
   async function importRecovery(file: File) {
-    if (running.current || pending) return;
+    if (running.current || pending || recoveryDisabled || !ownerScope) return;
+    let operation: JitoOperationToken;
+    try {
+      operation = coordinator.startOperation(ownerScope);
+    } catch {
+      setError('Another Jito action is in progress.');
+      return;
+    }
     running.current = true;
     setBusy(true);
     setError('');
     try {
+      const assertCurrent = () => {
+        if (!mounted.current || !isContextCurrent())
+          throw new Error('Bundle context changed. Reload saved history.');
+      };
+      assertCurrent();
       if (file.size > JITO_RECOVERY_FILE_MAX_BYTES)
         throw new Error('Recovery file exceeds the packet limit.');
       const record = await readJitoPacketRecovery(
@@ -287,8 +314,19 @@ export function JitoPacketSigning({
         manifest,
         packet,
       );
+      assertCurrent();
+      // Recheck the authenticated exact record after file and signature work.
+      await beforeImport();
+      assertCurrent();
+      await coordinator.retainImported(
+        ownerScope,
+        manifest,
+        packet,
+        record.transaction,
+        operation,
+        assertCurrent,
+      );
       if (mounted.current) {
-        setPending(record.transaction);
         setAccepted(false);
         setPassword('');
       }
@@ -300,6 +338,7 @@ export function JitoPacketSigning({
             : 'Recovery import unavailable.',
         );
     } finally {
+      coordinator.finishOperation(operation);
       running.current = false;
       if (mounted.current) setBusy(false);
     }
@@ -406,8 +445,8 @@ export function JitoPacketSigning({
           <p>
             Import the recovery file for this exact bundle and packet. Import
             verifies it locally and does not sign, register or submit. Then
-            choose registration only. Keep recovery files private because they
-            contain signed transactions.
+            choose registration only after a separate approval. Keep recovery
+            files private because they contain signed transactions.
           </p>
           <label htmlFor={`${field}-recovery`}>
             Signed packet recovery file
@@ -416,7 +455,7 @@ export function JitoPacketSigning({
             id={`${field}-recovery`}
             type="file"
             accept="application/json,.json"
-            disabled={busy}
+            disabled={busy || recoveryDisabled}
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = '';

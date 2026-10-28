@@ -295,6 +295,61 @@ export function createJitoMemorySignatureRecovery(capacity = 100) {
       slot.capturing = false;
     }
   }
+  /** Retain an already signed packet, without starting a wallet or sending it. */
+  async function retainImported(
+    ownerScope: string,
+    input: JitoBundleManifest,
+    packet: number,
+    transaction: string,
+    operationToken: JitoOperationToken,
+    assertCurrent: () => void,
+  ) {
+    if (typeof assertCurrent !== 'function')
+      throw Error('Jito recovery context guard required.');
+    const requireOperation = () => {
+      assertCurrent();
+      if (
+        !operation ||
+        operation.token !== operationToken ||
+        operation.kind !== 'mutation' ||
+        operation.owner !== ownerScope
+      )
+        throw Error('Jito recovery operation context differs.');
+    };
+    requireOperation();
+    const { identity, manifest } = await context(
+      ownerScope,
+      input,
+      packet,
+      false,
+    );
+    requireOperation();
+    const key = slotKey(identity);
+    if (slots.has(key))
+      throw Error('Original Jito packet recovery is pending.');
+    if (slots.size >= capacity) throw Error('Jito recovery capacity reached.');
+    const checked = await createJitoPacketRecovery(
+      manifest,
+      packet,
+      transaction,
+    );
+    requireOperation();
+    // Do not replace a started or retained outcome, including one that
+    // arrived while the imported signature was being verified.
+    if (slots.has(key))
+      throw Error('Original Jito packet recovery is pending.');
+    if (slots.size >= capacity) throw Error('Jito recovery capacity reached.');
+    const token = Object.freeze({});
+    slots.set(key, {
+      identity,
+      token,
+      state: 'retained',
+      signature: checked.signature,
+      capturing: false,
+    });
+    tokens.set(token, key);
+    notify();
+  }
   async function inspect(
     ownerScope: string,
     input: JitoBundleManifest,
@@ -379,6 +434,7 @@ export function createJitoMemorySignatureRecovery(capacity = 100) {
     releaseUnstarted,
     releaseRejected,
     capture,
+    retainImported,
     inspect,
     acknowledge,
   });

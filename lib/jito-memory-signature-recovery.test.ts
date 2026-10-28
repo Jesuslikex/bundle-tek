@@ -6,6 +6,136 @@ import { bundleFingerprint } from './jito-bundle';
 
 const alice = 'a'.repeat(64),
   bob = 'b'.repeat(64);
+it('retains an exact imported signature only under the owner operation and never replaces an existing outcome', async () => {
+  const f = await jitoBundleFixture(),
+    cache = createJitoMemorySignatureRecovery(1);
+  const operation = cache.startOperation(alice);
+  await expect(
+    cache.retainImported(
+      bob,
+      f.manifest,
+      0,
+      f.swap.signed.transaction,
+      operation,
+      () => {},
+    ),
+  ).rejects.toThrow('operation context');
+  await cache.retainImported(
+    alice,
+    f.manifest,
+    0,
+    f.swap.signed.transaction,
+    operation,
+    () => {},
+  );
+  expect((await cache.inspect(alice, f.manifest, 0)).status).toBe('retained');
+  await expect(
+    cache.retainImported(
+      alice,
+      f.manifest,
+      0,
+      f.swap.signed.transaction,
+      operation,
+      () => {},
+    ),
+  ).rejects.toThrow('pending');
+  await expect(
+    cache.retainImported(
+      alice,
+      f.manifest,
+      1,
+      f.tip.signed.transaction,
+      operation,
+      () => {},
+    ),
+  ).rejects.toThrow('capacity');
+  cache.finishOperation(operation);
+});
+it('keeps a started unknown outcome and refuses an imported replacement', async () => {
+  const f = await jitoBundleFixture(),
+    cache = createJitoMemorySignatureRecovery();
+  const reservation = await cache.reserve(alice, f.manifest, 0);
+  cache.markStarted(reservation);
+  const operation = cache.startOperation(alice);
+  await expect(
+    cache.retainImported(
+      alice,
+      f.manifest,
+      0,
+      f.swap.signed.transaction,
+      operation,
+      () => {},
+    ),
+  ).rejects.toThrow('pending');
+  expect((await cache.inspect(alice, f.manifest, 0)).status).toBe('started');
+  cache.finishOperation(operation);
+});
+it('refuses a forged imported signature without retaining a packet', async () => {
+  const f = await jitoBundleFixture(),
+    cache = createJitoMemorySignatureRecovery();
+  const operation = cache.startOperation(alice);
+  const bytes = Uint8Array.from(atob(f.swap.signed.transaction), (c) =>
+    c.charCodeAt(0),
+  );
+  bytes[1] ^= 1;
+  try {
+    await expect(
+      cache.retainImported(
+        alice,
+        f.manifest,
+        0,
+        btoa(String.fromCharCode(...bytes)),
+        operation,
+        () => {},
+      ),
+    ).rejects.toThrow();
+    expect((await cache.inspect(alice, f.manifest, 0)).status).toBe('absent');
+  } finally {
+    cache.finishOperation(operation);
+  }
+});
+it('does not retain an imported signature after context changes during verification', async () => {
+  const f = await jitoBundleFixture(),
+    cache = createJitoMemorySignatureRecovery();
+  const operation = cache.startOperation(alice);
+  let current = true;
+  const result = cache.retainImported(
+    alice,
+    f.manifest,
+    0,
+    f.swap.signed.transaction,
+    operation,
+    () => {
+      if (!current) throw Error('Context changed');
+    },
+  );
+  current = false;
+  await expect(result).rejects.toThrow('Context changed');
+  expect((await cache.inspect(alice, f.manifest, 0)).status).toBe('absent');
+  cache.finishOperation(operation);
+});
+it('retains an exact expired packet for export without granting registration authority', async () => {
+  const f = await jitoBundleFixture(),
+    cache = createJitoMemorySignatureRecovery();
+  const operation = cache.startOperation(alice);
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Date.parse(f.manifest.expiresAt) + 1000);
+  try {
+    await cache.retainImported(
+      alice,
+      f.manifest,
+      0,
+      f.swap.signed.transaction,
+      operation,
+      () => {},
+    );
+    expect((await cache.inspect(alice, f.manifest, 0)).status).toBe('retained');
+  } finally {
+    clock.mockRestore();
+    cache.finishOperation(operation);
+  }
+});
 it('serializes mutations and prompts and only accepts the originating sign token for its own packet', async () => {
   const f = await jitoBundleFixture(),
     cache = createJitoMemorySignatureRecovery();

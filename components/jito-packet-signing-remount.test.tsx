@@ -13,6 +13,7 @@ import {
 } from '@/lib/jito-owner-scope';
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
+import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
 
 const context = vi.hoisted(() => ({
   wallets: [] as unknown[],
@@ -367,6 +368,209 @@ async function startPrompt(
         throw Error('Prompt unavailable: ' + container.textContent);
     });
 }
+async function importPacket(
+  f: Awaited<ReturnType<typeof fixture>>,
+  packet = 0,
+) {
+  const signed = packet === 0 ? f.f.swap.signed : f.f.tip.signed;
+  const text = JSON.stringify(
+    await createJitoPacketRecovery(f.f.manifest, packet, signed.transaction),
+  );
+  const file = new File([text], 'synthetic-recovery.json', {
+    type: 'application/json',
+  });
+  Object.defineProperty(file, 'text', { value: async () => text });
+  const input = [...container.querySelectorAll('input[type="file"]')][
+    packet
+  ] as HTMLInputElement;
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  await act(async () =>
+    input.dispatchEvent(new Event('change', { bubbles: true })),
+  );
+}
+it.each([0, 1])(
+  'retains imported packet %s in the coordinator and blocks unsigned cancellation until explicit registration',
+  async (packet) => {
+    const f = await fixture();
+    await f.render();
+    await click('Load bundle approvals');
+    await until('Signer for swap 1');
+    await importPacket(f, packet);
+    await until('original verified signature is retained');
+    expect(button('Cancel unsigned bundle').disabled).toBe(true);
+    expect(f.posts).toEqual([]);
+    expect(f.sign).not.toHaveBeenCalled();
+    const label = [...container.querySelectorAll('label')].find((node) =>
+      node.textContent?.includes(
+        'I approve registering this exact retained packet only',
+      ),
+    )!;
+    expect(label.querySelector('input')!.checked).toBe(false);
+    expect(button('Register retained packet only').disabled).toBe(true);
+    await f.render(true);
+    await f.render(false);
+    await click('Load bundle approvals');
+    await until('original verified signature is retained');
+    expect(button('Cancel unsigned bundle').disabled).toBe(true);
+    expect(f.posts).toEqual([]);
+  },
+);
+it('blocks cancellation during imported-file validation and refuses a changed context', async () => {
+  const f = await fixture();
+  await f.render();
+  await click('Load bundle approvals');
+  await until('Signer for swap 1');
+  f.delayExact();
+  await importPacket(f);
+  await act(async () => f.exactFetchStarted);
+  expect(button('Cancel unsigned bundle').disabled).toBe(true);
+  expect(f.posts).toEqual([]);
+  await f.render(true);
+  await act(async () => f.resolveExact());
+  await f.render(false);
+  await click('Load bundle approvals');
+  expect(container.textContent).not.toContain(
+    'original verified signature is retained',
+  );
+  expect(f.sign).not.toHaveBeenCalled();
+  expect(f.posts).toEqual([]);
+});
+it('registers an imported exact packet only after a separate unchecked approval', async () => {
+  const f = await fixture();
+  await f.render();
+  await click('Load bundle approvals');
+  await until('Signer for swap 1');
+  const tipSelect = [...container.querySelectorAll('select')][1];
+  await act(async () => {
+    tipSelect.value = 'Synthetic fixture';
+    tipSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const tipApproval = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes('I approve signing Jito tip'),
+  )!;
+  await act(async () => tipApproval.querySelector('input')!.click());
+  expect(button('Sign Jito tip only').disabled).toBe(false);
+  await importPacket(f);
+  await until('original verified signature is retained');
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes(
+      'I approve registering this exact retained packet only',
+    ),
+  )!;
+  const checkbox = label.querySelector('input')!;
+  expect(checkbox.checked).toBe(false);
+  expect(button('Sign Jito tip only').disabled).toBe(true);
+  expect(f.posts).toEqual([]);
+  await act(async () => checkbox.click());
+  await click('Register retained packet only');
+  await vi.waitFor(() => expect(f.posts).toEqual(['register']));
+  expect(f.bundle.signatures[0]).toBe(f.f.swap.signed.signature);
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('Sign Jito tip only').disabled).toBe(false);
+  });
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('blocks a stale cross-packet sign handler synchronously before any wallet prompt', async () => {
+  const f = await fixture();
+  const original = memoryModule.createJitoMemorySignatureRecovery;
+  let cache: ReturnType<typeof original> | undefined;
+  vi.spyOn(
+    memoryModule,
+    'createJitoMemorySignatureRecovery',
+  ).mockImplementation(() => {
+    cache = original();
+    // Suppress coordinator-driven parent renders to model a stale UI callback.
+    return {
+      ...cache,
+      subscribe: () => () => {},
+      subscribeOperations: () => () => {},
+    };
+  });
+  await f.render();
+  await click('Load bundle approvals');
+  await until('Signer for swap 1');
+  const tipSelect = [...container.querySelectorAll('select')][1];
+  await act(async () => {
+    tipSelect.value = 'Synthetic fixture';
+    tipSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes('I approve signing Jito tip'),
+  )!;
+  await act(async () => label.querySelector('input')!.click());
+  expect(button('Sign Jito tip only').disabled).toBe(false);
+  await importPacket(f);
+  const scope = await jitoOwnerScope('alice');
+  await vi.waitFor(() =>
+    expect(cache!.has(scope, f.f.manifest.id, 0)).toBe(true),
+  );
+  expect(button('Sign Jito tip only').disabled).toBe(false);
+  await click('Sign Jito tip only');
+  await until('A Jito signing outcome is still pending.');
+  expect(f.sign).not.toHaveBeenCalled();
+  expect(f.posts).toEqual([]);
+});
+it('blocks all new signing and submission while a prior wallet outcome remains unknown', async () => {
+  const f = await fixture();
+  await startPrompt(f, 0);
+  await act(async () =>
+    f.rejectWallet(Error('Synthetic wallet outcome unknown')),
+  );
+  await until('original wallet signing outcome is still unknown');
+  expect(button('Sign swap 1 only').disabled).toBe(true);
+  expect(button('Sign Jito tip only').disabled).toBe(true);
+  expect(button('Cancel unsigned bundle').disabled).toBe(true);
+  expect(f.posts).toEqual([]);
+  // Even a later history response containing both signatures cannot enable
+  // submit while the original local outcome has not been resolved.
+  f.bundle.signatures[0] = f.f.swap.signed.signature;
+  f.bundle.signatures[1] = f.f.tip.signed.signature;
+  await click('Load bundle approvals');
+  await until('I approve submitting all');
+  const submitLabel = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes('I approve submitting all'),
+  )!;
+  expect(submitLabel.querySelector('input')!.disabled).toBe(true);
+  expect(button('Submit complete Jito bundle').disabled).toBe(true);
+  expect(f.posts).toEqual([]);
+});
+it('refuses an imported packet if the server owner changes before its exact read', async () => {
+  const f = await fixture();
+  await f.render();
+  await click('Load bundle approvals');
+  await until('Signer for swap 1');
+  f.serverOwner('bob');
+  await importPacket(f);
+  await until('Signed-in account changed. Reload bundle history.');
+  expect(container.textContent).not.toContain(
+    'original verified signature is retained',
+  );
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('allows a verified expired import for export only, without registration, signing or sending', async () => {
+  const f = await fixture();
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Date.parse(f.f.manifest.expiresAt) + 1000);
+  try {
+    await f.render();
+    await click('Load bundle approvals');
+    await until('Signer for swap 1');
+    await importPacket(f);
+    await until('original verified signature is retained');
+    expect(container.textContent).toContain('Registration is unavailable');
+    expect(container.textContent).not.toContain(
+      'Register retained packet only',
+    );
+    expect(button('Cancel unsigned bundle').disabled).toBe(true);
+    expect(f.posts).toEqual([]);
+    expect(f.sign).not.toHaveBeenCalled();
+  } finally {
+    clock.mockRestore();
+  }
+});
 it.each([0, 1])(
   'registers packet %s after an unchanged external wallet finishes its final check',
   async (packet) => {
