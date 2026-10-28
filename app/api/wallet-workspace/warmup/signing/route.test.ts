@@ -183,6 +183,30 @@ const lock = () =>
     )
     .bind('alice', f.wallet)
     .first();
+it('does not log or return a provider exception disguised as signing guidance', async () => {
+  const secret = 'https://rpc.example.invalid/private-test-token';
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    mocks.rpc.mockRejectedValue(
+      new Error(`Signing requires ${secret}`, {
+        cause: new Error('synthetic-private-cause'),
+      }),
+    );
+    const response = await recover();
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      error: 'Approval recovery unavailable. Keep the registered signature and check its outcome without resending.',
+    });
+    expect(logged.mock.calls).toEqual([
+      ['Warmup approval failed', { stage: 'saved approval' }],
+    ]);
+    expect(JSON.stringify(logged.mock.calls)).not.toContain(secret);
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('synthetic-private-cause');
+    expect(await lock()).toEqual({ state: 'signed' });
+  } finally {
+    logged.mockRestore();
+  }
+});
 it('atomically retains failure fee and captured event, releases reservation once and isolates owners', async () => {
   expect(await lock()).toEqual({ state: 'signed' });
   const response = await recover();

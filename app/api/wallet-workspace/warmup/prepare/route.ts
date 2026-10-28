@@ -317,7 +317,6 @@ export async function POST(request: Request) {
     if (error instanceof SwapBlockhashExpiredError) {
       console.error('Warmup blockhash expired', {
         stage,
-        message: (error as Error).message,
       });
       return json(
         {
@@ -329,7 +328,6 @@ export async function POST(request: Request) {
     }
     console.error('Warmup preparation failed', {
       stage,
-      message: error instanceof Error ? error.message : String(error),
     });
     if (error instanceof WalletRpcError)
       return json(

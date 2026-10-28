@@ -985,6 +985,24 @@ async function saveSolWarmup() {
     ).status,
   ).toBe(200);
 }
+it('does not log or return provider exception text during warmup preparation', async () => {
+  await saveSolWarmup();
+  testEnv.JUPITER_API_KEY = 'synthetic-test-key';
+  const secret = 'https://rpc.example.invalid/private-test-token';
+  const thrown = new Error(secret, { cause: new Error('synthetic-private-cause') });
+  vi.spyOn(swapQuotes, 'prepareSolanaSwap').mockRejectedValue(thrown);
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const response = await prepareRequest();
+  expect(response.status).toBe(502);
+  expect(await response.json()).toEqual({
+    error: 'Warmup preparation unavailable. No execution clearance.',
+  });
+  expect(logged.mock.calls).toEqual([
+    ['Warmup preparation failed', { stage: 'provider order' }],
+  ]);
+  expect(JSON.stringify(logged.mock.calls)).not.toContain(secret);
+  expect(JSON.stringify(logged.mock.calls)).not.toContain('synthetic-private-cause');
+});
 it('warmup sell inventory requires owned saved context but no Jupiter key', async () => {
   await saveSolWarmup();
   const inventory = vi

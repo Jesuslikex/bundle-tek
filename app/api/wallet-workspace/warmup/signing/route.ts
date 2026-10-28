@@ -799,8 +799,6 @@ export async function POST(request: Request) {
     }
     console.error('Warmup approval failed', {
       stage,
-      status: err instanceof WalletRpcError ? err.status : null,
-      message: err instanceof Error ? err.message : String(err),
     });
     if (err instanceof WalletRpcError)
       return json(
@@ -815,11 +813,8 @@ export async function POST(request: Request) {
     return json(
       {
         error:
-          err instanceof Error &&
-          /Signing requires|Additional transfers|Network debit|Simulated swap|Unrelated token|Reviewed packet/.test(
-            err.message,
-          )
-            ? err.message
+          body.action === 'recover'
+            ? 'Approval recovery unavailable. Keep the registered signature and check its outcome without resending.'
             : 'Approval checks unavailable. No automatic signature or submission.',
       },
       502,
