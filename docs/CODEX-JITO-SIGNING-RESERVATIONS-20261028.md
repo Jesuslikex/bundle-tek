@@ -17,6 +17,13 @@ than being assumed unsigned. This is not proof that a wallet never signed, nor
 does it prevent already-open older clients from signing bytes they obtained
 before an upgrade.
 
+The standalone browser attempt adapter validates the authenticated response
+against the exact expected identity and issues a single-use local signer permit
+only for a newly inserted attempt. A lost response and all later reads remain
+recovery-only. It is not connected to a wallet or UI; its caller must hold the
+journal lock, enforce the current consent and context, and independently verify
+any recovered signed packet.
+
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,
 cancel and submit path; preserve separately unchecked approval; test rejected
