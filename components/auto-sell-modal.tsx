@@ -38,6 +38,8 @@ import type { AutoSellRunRestore } from '@/lib/auto-sell-run-restore';
 import {
   autoSellRunEnrollmentScope,
   loadAutoSellRunEnrollmentReminder,
+  recordAutoSellRunEnrollment,
+  reviewAutoSellRunEnrollmentProfile,
 } from '@/lib/auto-sell-run-enrollment-client';
 import { loadAutoSellRunRestore } from '@/lib/auto-sell-run-restore';
 import { createAuthClient } from 'better-auth/react';
@@ -248,6 +250,18 @@ function AutoSellContext({
     reminder: { runId: string; profileSha256: string };
   } | null>(null);
   const [restoreNotice, setRestoreNotice] = useState('');
+  const [journalOpen, setJournalOpen] = useState(false);
+  const [journalProfiles, setJournalProfiles] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [journalProfileId, setJournalProfileId] = useState('');
+  const [journalReview, setJournalReview] = useState<SavedAutoSellProfile | null>(
+    null,
+  );
+  const [journalConsent, setJournalConsent] = useState(false);
+  const [journalBusy, setJournalBusy] = useState(false);
+  const [journalError, setJournalError] = useState('');
+  const [journalRunId, setJournalRunId] = useState('');
   const { data: session } = auth.useSession();
   const dialog = useRef<HTMLDialogElement>(null);
   const advanced = useRef<HTMLDetailsElement>(null);
@@ -662,6 +676,88 @@ function AutoSellContext({
     setStrategies((list) =>
       list.map((s) => (s.id === id ? { ...s, ...patch } : s)),
     );
+  }
+
+  async function openJournal() {
+    setJournalOpen(true);
+    setJournalError('');
+    if (journalProfiles.length || !session?.user?.id) return;
+    try {
+      const response = await fetch(
+        '/api/imported-projects/auto-sell-profiles?projectId=' +
+          encodeURIComponent(project.id),
+        { cache: 'no-store' },
+      );
+      if (!response.ok) throw Error('Saved configurations could not be read.');
+      const body = (await response.json()) as {
+        profiles?: { id: string; name: string }[];
+      };
+      setJournalProfiles(body.profiles ?? []);
+    } catch (e) {
+      setJournalError(
+        e instanceof Error ? e.message : 'Saved configurations unavailable.',
+      );
+    }
+  }
+  async function reviewJournal() {
+    if (!journalProfileId || !session?.user?.id) return;
+    setJournalBusy(true);
+    setJournalError('');
+    setJournalReview(null);
+    setJournalConsent(false);
+    try {
+      const ownerScope = await autoSellRunEnrollmentScope(session.user.id);
+      setJournalReview(
+        await reviewAutoSellRunEnrollmentProfile(
+          {
+            ownerScope,
+            projectId: project.id,
+            profileSaveId: journalProfileId,
+            profileSha256: '',
+          },
+          new AbortController().signal,
+        ),
+      );
+    } catch (e) {
+      setJournalError(
+        e instanceof Error ? e.message : 'The configuration could not be read.',
+      );
+    } finally {
+      setJournalBusy(false);
+    }
+  }
+  async function recordJournal() {
+    if (!journalReview || !journalConsent || !session?.user?.id) return;
+    setJournalBusy(true);
+    setJournalError('');
+    try {
+      const ownerScope = await autoSellRunEnrollmentScope(session.user.id);
+      const result = await recordAutoSellRunEnrollment(
+        {
+          ownerScope,
+          projectId: project.id,
+          profileSaveId: journalProfileId,
+          profileSha256: journalReview.sha256,
+          profile: journalReview,
+          approved: true,
+          mode: 'new',
+        },
+        new AbortController().signal,
+      );
+      setJournalRunId(result.run.id);
+      journalRef.current = {
+        runId: result.run.id,
+        sequence: 0,
+        headSha256: result.run.sha256,
+        chain: Promise.resolve(),
+      };
+    } catch (e) {
+      setJournalError(
+        e instanceof Error ? e.message : 'The run could not be recorded.',
+      );
+    } finally {
+      setJournalBusy(false);
+    }
   }
 
   async function run() {
@@ -1524,7 +1620,82 @@ function AutoSellContext({
               </Button>
             )}
             {restoreNotice && !running && (
-              <p role='status'>{restoreNotice}</p>
+              <p role="status">{restoreNotice}</p>
+            )}
+            {!running && !journalRunId && (
+              <details
+                open={journalOpen}
+                onToggle={(e) => {
+                  if (e.currentTarget.open) void openJournal();
+                  else setJournalOpen(false);
+                }}
+              >
+                <summary>Journal this run for recovery</summary>
+                <p>
+                  Records the saved configuration as an immutable run so a
+                  reload can restore it. This does not approve or start trades.
+                </p>
+                {journalProfiles.length ? (
+                  <label>
+                    Saved configuration
+                    <select
+                      value={journalProfileId}
+                      disabled={journalBusy}
+                      onChange={(e) => {
+                        setJournalProfileId(e.target.value);
+                        setJournalReview(null);
+                        setJournalConsent(false);
+                      }}
+                    >
+                      <option value="">Choose one</option>
+                      {journalProfiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <p>No saved configuration for this token yet.</p>
+                )}
+                <button
+                  disabled={journalBusy || !journalProfileId || !!journalReview}
+                  onClick={() => void reviewJournal()}
+                >
+                  Review saved configuration
+                </button>
+                {journalReview && (
+                  <>
+                    <p>
+                      Reviewed saved configuration version{' '}
+                      {journalReview.version}. Recording keeps these exact
+                      terms.
+                    </p>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={journalConsent}
+                        disabled={journalBusy}
+                        onChange={(e) => setJournalConsent(e.target.checked)}
+                      />{' '}
+                      Record this exact configuration as the run journal.
+                    </label>
+                    <button
+                      disabled={journalBusy || !journalConsent}
+                      onClick={() => void recordJournal()}
+                    >
+                      Record run
+                    </button>
+                  </>
+                )}
+                {journalError && <p role="alert">{journalError}</p>}
+              </details>
+            )}
+            {journalRunId && !running && (
+              <p role="status">
+                Run journalled as <code>{journalRunId}</code>. Sells are
+                recorded against it.
+              </p>
             )}
           </footer>
         </dialog>
