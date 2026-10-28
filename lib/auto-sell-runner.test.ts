@@ -27,6 +27,12 @@ function setup(
     signature: 'sig',
     wallet: OWN,
   })),
+  onSold?: (entry: {
+    strategyId: string;
+    wallet: string;
+    soldRaw: bigint;
+    signature: string;
+  }) => void,
 ) {
   let feed: AutoSellObservedTrade[] = [];
   let now = 0;
@@ -42,6 +48,7 @@ function setup(
     readTrades: async () => feed,
     sell,
     onUpdate: () => {},
+    ...(onSold ? { onSold } : {}),
     now: () => now,
     random: () => 0,
     setTimer: () => null,
@@ -166,4 +173,33 @@ describe('AutoSellRunner', () => {
     expect(t.runner.snapshot().marketCapUsd).toBeNull();
     expect(t.runner.snapshot().states.a.inRange).toBe(false);
   });
+});
+
+it('reports each landed sell to the journalling hook and survives a throwing one', async () => {
+  const sold: { strategyId: string; wallet: string; soldRaw: bigint }[] = [];
+  const t = setup(
+    {},
+    vi.fn(async (amount: bigint) => ({
+      soldRaw: amount,
+      signature: 'sig',
+      wallet: OWN,
+    })),
+    (entry) => {
+      sold.push(entry);
+      throw Error('journal down');
+    },
+  );
+  t.push(buy('1000'));
+  t.runner.start();
+  await flush();
+  t.push(buy('1000'));
+  await t.runner.tick();
+  await flush();
+  // Both harness strategies fire; each landed sell is reported once.
+  expect(sold).toHaveLength(2);
+  const first = sold.find((e) => e.strategyId === 'a')!;
+  expect(first).toMatchObject({ wallet: OWN });
+  expect(first.soldRaw).toBe(500_000_000n);
+  // The throw must not have failed the sell.
+  expect(t.runner.snapshot().states.a.soldRaw).toBe(500_000_000n);
 });

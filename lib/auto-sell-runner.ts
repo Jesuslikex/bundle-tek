@@ -88,6 +88,13 @@ export type AutoSellRunnerDeps = {
     outcome?: AutoSellOutcomeReference;
   }>;
   onUpdate: (snapshot: AutoSellSnapshot) => void;
+  /** Called after a sell lands so a caller can journal the charged units. */
+  onSold?: (entry: {
+    strategyId: string;
+    wallet: string;
+    soldRaw: bigint;
+    signature: string;
+  }) => void;
   session?: AutoSellSessionRules;
   now?: () => number;
   random?: () => number;
@@ -876,6 +883,17 @@ export class AutoSellRunner {
           this.failures = 0;
           const current = this.states.get(s.id)!;
           const sold = soldRaw < amount ? soldRaw : amount;
+          if (sold > 0n)
+            try {
+              this.deps.onSold?.({
+                strategyId: s.id,
+                wallet,
+                soldRaw: sold,
+                signature,
+              });
+            } catch {
+              // Journalling must never fail a sell that already landed.
+            }
           this.states.set(s.id, {
             ...current,
             inFlightRaw: current.inFlightRaw - amount,
