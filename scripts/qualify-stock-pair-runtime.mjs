@@ -573,9 +573,12 @@ try {
           'Public reference activity changed; qualification refused.';
       }
       if (receipt.runtime) {
+        // The bound is on the pipeline. The post-attempt audit necessarily lands
+        // later, so it is recorded separately rather than charged to the same
+        // window.
         receipt.qualificationElapsedSlots =
-          Math.max(observedSlot, receipt.runtime.maximumSlot) -
-          receipt.runtime.minimumSlot;
+          receipt.runtime.maximumSlot - receipt.runtime.minimumSlot;
+        receipt.auditElapsedSlots = observedSlot - receipt.runtime.minimumSlot;
         if (receipt.qualificationElapsedSlots > 32) {
           if (receipt.passed)
             receipt.diagnosis = {
