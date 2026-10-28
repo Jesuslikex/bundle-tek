@@ -32,6 +32,11 @@ import {
   releaseMarketplaceReservation,
 } from '@/lib/marketplace-reservation-storage';
 import { admitReservationHistory } from '@/lib/marketplace-reservation-history';
+import { marketplacePaymentSignature } from '@/lib/marketplace-payment';
+const PAY_SIGNATURE = '5'.repeat(88);
+const PAY_TRANSACTION = Buffer.from(
+  Uint8Array.from([1, ...new Uint8Array(64).fill(9), ...new Uint8Array(80)]),
+).toString('base64');
 const mocks = vi.hoisted(() => ({
   user: { userId: 'buyer' } as { userId: string } | null,
   db: null as unknown as D1Database,
@@ -158,9 +163,32 @@ beforeEach(async () => {
     );
   }
   vi.stubEnv('MARKETPLACE_OPERATOR_USER_IDS', '["operator"]');
+  process.env.MARKETPLACE_SELLER_WALLET =
+    'So11111111111111111111111111111111111111112';
+  // Only the payment path talks to an RPC; everything else must stay offline.
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => {
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        method?: string;
+      };
+      if (body.method === 'getLatestBlockhash')
+        return Response.json({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            value: {
+              blockhash: '11111111111111111111111111111111',
+              lastValidBlockHeight: 1,
+            },
+          },
+        });
+      if (body.method === 'sendTransaction')
+        return Response.json({
+          jsonrpc: '2.0',
+          id: 1,
+          result: marketplacePaymentSignature(PAY_TRANSACTION),
+        });
       throw Error('No provider calls');
     }),
   );
@@ -496,13 +524,16 @@ it('settles a held reservation into the buyer workspace once, idempotently', asy
   const addresses = held.reservation.record.review.items.map(
     (e) => e.listing.address,
   );
-  const asking = held.reservation.record.review.askingPriceLamports;
+  const prepared = await post({
+    action: 'pay-prepare',
+    id: selected.id,
+    from: '7gAmms23jNJW17V8PnbRm4FwXW5UxGc4abFiDAcSFUx9',
+  });
+  expect(prepared.status).toBe(200);
   const paid = await post({
     action: 'pay',
     id: selected.id,
-    signature: '5'.repeat(88),
-    lamports: asking,
-    sellerWallet: 'So11111111111111111111111111111111111111112',
+    transaction: PAY_TRANSACTION,
   });
   expect(paid.status).toBe(200);
   const first = await post({ action: 'settle', id: selected.id });
@@ -550,32 +581,41 @@ it('refuses to settle a released or unknown reservation', async () => {
   expect(missing.status).toBe(404);
 });
 
-it('records the exact reviewed payment once and refuses an underpayment', async () => {
+it('prepares the exact reviewed total and records the payment once', async () => {
   const selected = await input();
   const held = await reservationBody(await post(selected));
   const asking = held.reservation.record.review.askingPriceLamports;
-  const pay = (lamports: string) =>
-    post({
-      action: 'pay',
-      id: selected.id,
-      signature: '5'.repeat(88),
-      lamports,
-      sellerWallet: 'So11111111111111111111111111111111111111112',
-    });
 
-  const short = await pay(String(BigInt(asking) - 1n));
-  expect(short.status).toBe(409);
-  expect(await short.text()).toMatch(/below the reviewed total/);
+  const prepared = await post({
+    action: 'pay-prepare',
+    id: selected.id,
+    from: '7gAmms23jNJW17V8PnbRm4FwXW5UxGc4abFiDAcSFUx9',
+  });
+  expect(prepared.status).toBe(200);
+  const terms = (await prepared.json()) as {
+    payment: { transaction: string; blockhash: string; expiresAt: string };
+  };
+  expect(terms.payment.blockhash).toBe('11111111111111111111111111111111');
+  expect(Date.parse(terms.payment.expiresAt)).toBeGreaterThan(Date.now());
 
-  const first = await pay(asking);
+  const first = await post({
+    action: 'pay',
+    id: selected.id,
+    transaction: PAY_TRANSACTION,
+  });
   expect(first.status).toBe(200);
   const body = (await first.json()) as {
     payment: { signature: string; lamports: string; paidAt: string };
   };
   expect(body.payment.lamports).toBe(asking);
+  expect(body.payment.signature).toBe(marketplacePaymentSignature(PAY_TRANSACTION));
 
   // A replay returns the stored record rather than writing a second one.
-  const again = await pay(asking);
+  const again = await post({
+    action: 'pay',
+    id: selected.id,
+    transaction: PAY_TRANSACTION,
+  });
   expect(again.status).toBe(200);
   expect(((await again.json()) as typeof body).payment.paidAt).toBe(
     body.payment.paidAt,
@@ -584,6 +624,19 @@ it('records the exact reviewed payment once and refuses an underpayment', async 
     .prepare('SELECT count(*) AS n FROM marketplace_reservation_payments')
     .first<{ n: number }>();
   expect(rows?.n).toBe(1);
+});
+
+it('refuses a payment when the seller payout address is not configured', async () => {
+  const selected = await input();
+  await post(selected);
+  delete process.env.MARKETPLACE_SELLER_WALLET;
+  const prepared = await post({
+    action: 'pay-prepare',
+    id: selected.id,
+    from: '7gAmms23jNJW17V8PnbRm4FwXW5UxGc4abFiDAcSFUx9',
+  });
+  expect(prepared.status).toBe(503);
+  expect(await prepared.text()).toMatch(/payout address is not configured/);
 });
 
 it('refuses a payment on a released reservation and an unknown one', async () => {
@@ -598,9 +651,7 @@ it('refuses a payment on a released reservation and an unknown one', async () =>
   const released = await post({
     action: 'pay',
     id: selected.id,
-    signature: '5'.repeat(88),
-    lamports: held.reservation.record.review.askingPriceLamports,
-    sellerWallet: 'So11111111111111111111111111111111111111112',
+    transaction: PAY_TRANSACTION,
   });
   expect(released.status).toBe(409);
   expect(await released.text()).toMatch(/released/);
@@ -608,9 +659,7 @@ it('refuses a payment on a released reservation and an unknown one', async () =>
   const missing = await post({
     action: 'pay',
     id: crypto.randomUUID(),
-    signature: '5'.repeat(88),
-    lamports: '1',
-    sellerWallet: 'So11111111111111111111111111111111111111112',
+    transaction: PAY_TRANSACTION,
   });
   expect(missing.status).toBe(404);
 });

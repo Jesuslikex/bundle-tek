@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { marketplaceSellerWallet } from '@/lib/marketplace-seller-wallet';
+import {
+  marketplacePaymentSignature,
+  prepareMarketplacePayment,
+  submitMarketplacePayment,
+} from '@/lib/marketplace-payment';
 import { getD1 } from '@/db';
 import { walletRequest } from '@/lib/wallet-request';
 import { operatorDraftId } from '@/lib/marketplace-operator-draft-view';
@@ -33,11 +39,16 @@ const actions = z.discriminatedUnion('action', [
   z.object({ action: z.literal('settle'), id: operatorDraftId }).strict(),
   z
     .object({
+      action: z.literal('pay-prepare'),
+      id: operatorDraftId,
+      from: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/),
+    })
+    .strict(),
+  z
+    .object({
       action: z.literal('pay'),
       id: operatorDraftId,
-      signature: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{64,100}$/),
-      lamports: z.string().regex(/^[1-9]\d{0,19}$/),
-      sellerWallet: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/),
+      transaction: z.string().min(100).max(4096),
     })
     .strict(),
 ]);
@@ -112,9 +123,25 @@ export async function GET(request: Request) {
       id!,
       request.signal,
     );
-    return reservation
-      ? json({ reservation })
-      : json({ error: 'Reservation not found for this buyer.' }, 404);
+    if (!reservation)
+      return json({ error: 'Reservation not found for this buyer.' }, 404);
+    const sellerWallet = marketplaceSellerWallet();
+    const paid = await getD1()
+      .prepare(
+        'SELECT paid_at AS paidAt FROM marketplace_reservation_payments WHERE buyer_id=? AND reservation_id=?',
+      )
+      .bind(user.userId, id!)
+      .first<{ paidAt: string }>();
+    return json({
+      reservation,
+      payment: sellerWallet
+        ? {
+            sellerWallet,
+            lamports: reservation.record.review.askingPriceLamports,
+            paidAt: paid?.paidAt ?? null,
+          }
+        : null,
+    });
   } catch (error) {
     return failure(error, request);
   }
@@ -162,8 +189,17 @@ export async function POST(request: Request) {
           request.signal,
         ),
       });
-    if (input.action === 'pay') {
+    if (input.action === 'pay-prepare' || input.action === 'pay') {
       const pay = input;
+      const sellerWallet = marketplaceSellerWallet();
+      if (!sellerWallet)
+        return json(
+          {
+            error:
+              'The seller payout address is not configured, so this hold cannot be paid.',
+          },
+          503,
+        );
       const reservation = await readMarketplaceReservation(
         db,
         user.userId,
@@ -193,15 +229,22 @@ export async function POST(request: Request) {
         return json({ error: 'This reservation was released.' }, 409);
       if (Date.parse(reservation.record.expiresAt) <= Date.now())
         return json({ error: 'This reservation expired.' }, 409);
-      // The transfer must cover the exact reviewed total; overpaying is the
-      // buyer's choice, underpaying is not a purchase.
-      const asking = reservation.record.review.askingPriceLamports;
-      if (BigInt(pay.lamports) < BigInt(asking))
+      const lamports = reservation.record.review.askingPriceLamports;
+      if (pay.action === 'pay-prepare')
+        return json({
+          payment: await prepareMarketplacePayment(
+            pay.from,
+            sellerWallet,
+            BigInt(lamports),
+          ),
+        });
+      const signature = marketplacePaymentSignature(pay.transaction);
+      const relayed = await submitMarketplacePayment(pay.transaction);
+      // The relay must echo the packet we hold, not a different one.
+      if (relayed !== signature)
         return json(
-          {
-            error: `The payment is below the reviewed total of ${asking} lamports.`,
-          },
-          409,
+          { error: 'The relayed payment signature differs from the packet.' },
+          502,
         );
       await db
         .prepare(
@@ -210,9 +253,9 @@ export async function POST(request: Request) {
         .bind(
           user.userId,
           pay.id,
-          pay.signature,
-          pay.lamports,
-          pay.sellerWallet,
+          signature,
+          lamports,
+          sellerWallet,
           new Date().toISOString(),
         )
         .run();
@@ -228,8 +271,7 @@ export async function POST(request: Request) {
           paidAt: string;
         }>();
       return json({ payment });
-    }
-    if (action === 'settle') {
+    }    if (action === 'settle') {
       const reservation = await readMarketplaceReservation(
         db,
         user.userId,
