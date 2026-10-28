@@ -139,7 +139,7 @@ it.each(['header', 'truncated', 'floor'] as const)(
         ? 'header changed'
         : mode === 'truncated'
           ? 'Truncated'
-          : 'bank/mapping',
+          : 'outside the 32-slot span',
     );
   },
 );
