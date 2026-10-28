@@ -86,7 +86,12 @@ export async function admitOperatorDraft(
     created >= at + OPERATOR_REVIEW_WINDOW_MS ||
     Date.parse(review.reviewExpiresAt) !== at + OPERATOR_REVIEW_WINDOW_MS
   )
-    throw Error('Saved listing draft chronology differs.');
+    throw Error(
+      'Saved listing draft chronology differs. ' +
+        `now=${now} reviewedAt=${review.reviewedAt} ` +
+        `sourceObservedAt=${record.sourceObservedAt} createdAt=${record.createdAt} ` +
+        `reviewExpiresAt=${review.reviewExpiresAt} window=${OPERATOR_REVIEW_WINDOW_MS}`,
+    );
   // Only derived age is rebased. Historical wallet, proof and activity timestamps remain unchanged.
   const evidence = {
     ...review.evidence,
