@@ -1121,6 +1121,13 @@
       "when": 1794860000022,
       "tag": "0161_marketplace_reservation_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 160,
+      "version": "6",
+      "when": 1794860000023,
+      "tag": "0162_marketplace_listing_keys",
+      "breakpoints": true
     }
   ]
 }

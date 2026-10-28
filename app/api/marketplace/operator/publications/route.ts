@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { sealMarketplaceKey } from '@/lib/marketplace-key-delivery';
 import { getD1 } from '@/db';
 import { isMarketplaceOperator } from '@/lib/marketplace-operator-policy';
 import { operatorDraftId } from '@/lib/marketplace-operator-draft-view';
@@ -21,7 +22,11 @@ const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const actions = z.discriminatedUnion('action', [
   z.object({ action: z.literal('review'), draftId: operatorDraftId }).strict(),
-  publicationRequest.extend({ action: z.literal('publish') }),
+  publicationRequest.extend({
+    action: z.literal('publish'),
+    // Optional: the wallet's private key, sealed for delivery after payment.
+    privateKey: z.string().min(32).max(128).optional(),
+  }),
   withdrawalRequest.extend({ action: z.literal('withdraw') }),
 ]);
 async function auth() {
@@ -122,15 +127,27 @@ export async function POST(request: Request) {
       );
       return json({ preview: result.preview });
     }
-    if (action === 'publish')
-      return json({
-        publication: await publishListing(
-          getD1(),
-          user.userId,
-          publicationRequest.parse(payload),
-          request.signal,
-        ),
-      });
+    if (action === 'publish') {
+      const { privateKey, ...request_ } = payload as {
+        privateKey?: string;
+      } & Record<string, unknown>;
+      const publication = await publishListing(
+        getD1(),
+        user.userId,
+        publicationRequest.parse(request_),
+        request.signal,
+      );
+      if (privateKey) {
+        const sealed = await sealMarketplaceKey(privateKey);
+        await getD1()
+          .prepare(
+            'INSERT OR REPLACE INTO marketplace_listing_keys(publication_id,sealed,created_at) VALUES(?,?,?)',
+          )
+          .bind(publication.id, sealed, new Date().toISOString())
+          .run();
+      }
+      return json({ publication, keySealed: Boolean(privateKey) });
+    }
     return json({
       publication: await withdrawListing(
         getD1(),
