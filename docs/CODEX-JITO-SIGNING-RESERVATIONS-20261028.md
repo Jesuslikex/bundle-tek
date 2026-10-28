@@ -102,6 +102,11 @@ submission. The current submission path does not require a fresh full
 same-bank qualification of the exact signed vector. That is an outstanding
 release blocker; individual packet simulations do not establish the requested
 sequential-bundle evidence. Do not treat this draft as fully qualified.
+An unmounted signed-vector evidence constructor now verifies each registered
+swap and tip signature and binds the ordered exact bytes to the owner and
+bundle. It grants no source, provider, runtime, signing or execution authority;
+future use must authenticate its input and recheck mutable bytes at the final
+boundary. Its focused tests and the snapshot tests pass 17 synthetic cases.
 
 No deployment, hosted database migration, provider or credential change,
 funded transaction, real-wallet signing, or live bundle submission is
