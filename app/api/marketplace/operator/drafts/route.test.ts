@@ -30,11 +30,13 @@ vi.mock('@/app/chatgpt-auth', () => ({
 vi.mock('@/db', () => ({ getD1: () => mocks.db }));
 import { GET, POST } from './route';
 let mf: Miniflare, db: D1Database, queries: string[];
-const migrations = readFileSync(
+const migrations = [
   'drizzle/0118_marketplace_operator_drafts.sql',
-  'utf8',
-)
-  .split('--> statement-breakpoint')
+  // Later migrations that replace the insert guard must be applied too, or the
+  // test asserts against a trigger the app no longer ships.
+  'drizzle/0160_marketplace_operator_draft_review_window.sql',
+]
+  .flatMap((path) => readFileSync(path, 'utf8').split('--> statement-breakpoint'))
   .map((s) => s.trim())
   .filter(Boolean);
 beforeAll(async () => {
@@ -362,7 +364,7 @@ it('refuses expiry, cancellation, missing schema and corrupted stored evidence w
       'operator',
       input,
       signal(),
-      () => Date.now() + 60000,
+      () => Date.now() + 180000,
     ),
   ).rejects.toThrow('expired');
   const controller = new AbortController();

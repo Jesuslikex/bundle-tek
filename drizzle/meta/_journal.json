@@ -1086,6 +1086,34 @@
       "when": 1794860000017,
       "tag": "0156_wallet_cleanup_buy",
       "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "6",
+      "when": 1794860000018,
+      "tag": "0157_wallet_cleanup_requote",
+      "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "6",
+      "when": 1794860000019,
+      "tag": "0158_wallet_cleanup_buy_retry",
+      "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "6",
+      "when": 1794860000020,
+      "tag": "0159_marketplace_reservation_settlement",
+      "breakpoints": true
+    },
+    {
+      "idx": 158,
+      "version": "6",
+      "when": 1794860000021,
+      "tag": "0160_marketplace_operator_draft_review_window",
+      "breakpoints": true
     }
   ]
 }
