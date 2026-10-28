@@ -74,6 +74,7 @@ beforeEach(async () => {
   for (const file of [
     '0118_marketplace_operator_drafts',
     '0160_marketplace_operator_draft_review_window',
+    '0161_marketplace_reservation_payments',
     '0119_marketplace_publications',
     '0120_marketplace_reservations',
     '0121_marketplace_reservation_history',
@@ -495,6 +496,15 @@ it('settles a held reservation into the buyer workspace once, idempotently', asy
   const addresses = held.reservation.record.review.items.map(
     (e) => e.listing.address,
   );
+  const asking = held.reservation.record.review.askingPriceLamports;
+  const paid = await post({
+    action: 'pay',
+    id: selected.id,
+    signature: '5'.repeat(88),
+    lamports: asking,
+    sellerWallet: 'So11111111111111111111111111111111111111112',
+  });
+  expect(paid.status).toBe(200);
   const first = await post({ action: 'settle', id: selected.id });
   expect(first.status).toBe(200);
   const body = (await first.json()) as {
@@ -537,5 +547,70 @@ it('refuses to settle a released or unknown reservation', async () => {
   expect(released.status).toBe(409);
   expect(await released.text()).toMatch(/released/);
   const missing = await post({ action: 'settle', id: crypto.randomUUID() });
+  expect(missing.status).toBe(404);
+});
+
+it('records the exact reviewed payment once and refuses an underpayment', async () => {
+  const selected = await input();
+  const held = await reservationBody(await post(selected));
+  const asking = held.reservation.record.review.askingPriceLamports;
+  const pay = (lamports: string) =>
+    post({
+      action: 'pay',
+      id: selected.id,
+      signature: '5'.repeat(88),
+      lamports,
+      sellerWallet: 'So11111111111111111111111111111111111111112',
+    });
+
+  const short = await pay(String(BigInt(asking) - 1n));
+  expect(short.status).toBe(409);
+  expect(await short.text()).toMatch(/below the reviewed total/);
+
+  const first = await pay(asking);
+  expect(first.status).toBe(200);
+  const body = (await first.json()) as {
+    payment: { signature: string; lamports: string; paidAt: string };
+  };
+  expect(body.payment.lamports).toBe(asking);
+
+  // A replay returns the stored record rather than writing a second one.
+  const again = await pay(asking);
+  expect(again.status).toBe(200);
+  expect(((await again.json()) as typeof body).payment.paidAt).toBe(
+    body.payment.paidAt,
+  );
+  const rows = await db
+    .prepare('SELECT count(*) AS n FROM marketplace_reservation_payments')
+    .first<{ n: number }>();
+  expect(rows?.n).toBe(1);
+});
+
+it('refuses a payment on a released reservation and an unknown one', async () => {
+  const selected = await input();
+  const held = await reservationBody(await post(selected));
+  await post({
+    action: 'release',
+    id: selected.id,
+    contextSha256: held.reservation.record.contextSha256,
+    acknowledgement: RESERVATION_CANCEL_ACK,
+  });
+  const released = await post({
+    action: 'pay',
+    id: selected.id,
+    signature: '5'.repeat(88),
+    lamports: held.reservation.record.review.askingPriceLamports,
+    sellerWallet: 'So11111111111111111111111111111111111111112',
+  });
+  expect(released.status).toBe(409);
+  expect(await released.text()).toMatch(/released/);
+
+  const missing = await post({
+    action: 'pay',
+    id: crypto.randomUUID(),
+    signature: '5'.repeat(88),
+    lamports: '1',
+    sellerWallet: 'So11111111111111111111111111111111111111112',
+  });
   expect(missing.status).toBe(404);
 });

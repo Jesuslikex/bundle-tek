@@ -31,6 +31,15 @@ const actions = z.discriminatedUnion('action', [
   reservationRequest.extend({ action: z.literal('reserve') }),
   reservationCancel.extend({ action: z.literal('release') }),
   z.object({ action: z.literal('settle'), id: operatorDraftId }).strict(),
+  z
+    .object({
+      action: z.literal('pay'),
+      id: operatorDraftId,
+      signature: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{64,100}$/),
+      lamports: z.string().regex(/^[1-9]\d{0,19}$/),
+      sellerWallet: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/),
+    })
+    .strict(),
 ]);
 function failure(error: unknown, request: Request) {
   if (request.signal.aborted)
@@ -153,6 +162,73 @@ export async function POST(request: Request) {
           request.signal,
         ),
       });
+    if (input.action === 'pay') {
+      const pay = input;
+      const reservation = await readMarketplaceReservation(
+        db,
+        user.userId,
+        pay.id,
+        request.signal,
+      );
+      if (!reservation) return json({ error: 'Reservation not found.' }, 404);
+      const paid = await db
+        .prepare(
+          'SELECT signature,lamports,seller_wallet AS sellerWallet,paid_at AS paidAt FROM marketplace_reservation_payments WHERE buyer_id=? AND reservation_id=?',
+        )
+        .bind(user.userId, pay.id)
+        .first<{
+          signature: string;
+          lamports: string;
+          sellerWallet: string;
+          paidAt: string;
+        }>();
+      if (paid) return json({ payment: paid });
+      const released = await db
+        .prepare(
+          'SELECT released_at AS releasedAt FROM marketplace_reservation_releases WHERE buyer_id=? AND reservation_id=?',
+        )
+        .bind(user.userId, pay.id)
+        .first<{ releasedAt: string }>();
+      if (released)
+        return json({ error: 'This reservation was released.' }, 409);
+      if (Date.parse(reservation.record.expiresAt) <= Date.now())
+        return json({ error: 'This reservation expired.' }, 409);
+      // The transfer must cover the exact reviewed total; overpaying is the
+      // buyer's choice, underpaying is not a purchase.
+      const asking = reservation.record.review.askingPriceLamports;
+      if (BigInt(pay.lamports) < BigInt(asking))
+        return json(
+          {
+            error: `The payment is below the reviewed total of ${asking} lamports.`,
+          },
+          409,
+        );
+      await db
+        .prepare(
+          'INSERT INTO marketplace_reservation_payments(buyer_id,reservation_id,signature,lamports,seller_wallet,paid_at) VALUES(?,?,?,?,?,?)',
+        )
+        .bind(
+          user.userId,
+          pay.id,
+          pay.signature,
+          pay.lamports,
+          pay.sellerWallet,
+          new Date().toISOString(),
+        )
+        .run();
+      const payment = await db
+        .prepare(
+          'SELECT signature,lamports,seller_wallet AS sellerWallet,paid_at AS paidAt FROM marketplace_reservation_payments WHERE buyer_id=? AND reservation_id=?',
+        )
+        .bind(user.userId, pay.id)
+        .first<{
+          signature: string;
+          lamports: string;
+          sellerWallet: string;
+          paidAt: string;
+        }>();
+      return json({ payment });
+    }
     if (action === 'settle') {
       const reservation = await readMarketplaceReservation(
         db,
@@ -179,6 +255,17 @@ export async function POST(request: Request) {
         return json({ error: 'This reservation was released.' }, 409);
       if (Date.parse(reservation.record.expiresAt) <= Date.now())
         return json({ error: 'This reservation expired.' }, 409);
+      const payment = await db
+        .prepare(
+          'SELECT signature FROM marketplace_reservation_payments WHERE buyer_id=? AND reservation_id=?',
+        )
+        .bind(user.userId, payload.id)
+        .first<{ signature: string }>();
+      if (!payment)
+        return json(
+          { error: 'Pay the reviewed total before settling this reservation.' },
+          409,
+        );
       const addresses = reservation.record.review.items.map(
         (e) => e.listing.address,
       );
