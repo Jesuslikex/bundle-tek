@@ -19,6 +19,7 @@ import {
   VAULT_MIN_PASSWORD_LENGTH,
 } from './browser-wallet-vault';
 import { UUID } from './wallet-operation';
+import type { JitoAttempt } from './jito-sign-attempt-client';
 
 /** Unintegrated same-origin foundation. No server reservation, owner
  * authentication, wallet signing, submission, network request or UI action is
@@ -49,7 +50,13 @@ type Reservation = {
   identity: JournalIdentity;
   entry: JournalEntry;
   key: CryptoKey;
+  importedEvidence?: Readonly<{ transaction: string; signature: string }>;
 };
+type FreshImportedEvidence = () => Promise<{
+  ownerScope: string;
+  record: JitoBundleRecord;
+  attempt: JitoAttempt;
+}>;
 const locks = new WeakMap<JitoJournalLock, LockState>();
 const reservations = new WeakMap<JitoJournalReservation, Reservation>();
 const domain = 'PulseForge/JitoRecoveryJournal/v1';
@@ -531,6 +538,116 @@ export function reserveJitoRecoveryUnknown(
   });
 }
 
+/** Reserve local storage for an already signed imported packet, without
+ * granting signer or submission authority. `readFreshEvidence` is trusted app
+ * code and must authenticate the exact response scope and validate the whole
+ * owned v2 snapshot before selecting its attempt. A failed or ambiguous insert
+ * always leaves any UNKNOWN marker for explicit recovery. */
+export function reserveJitoImportedEvidence(
+  token: JitoJournalLock,
+  input: JitoBundleManifest,
+  packet: number,
+  password: string,
+  transaction: string,
+  expectedAttemptId: string,
+  readFreshEvidence: FreshImportedEvidence,
+): Promise<JitoJournalReservation> {
+  return queue(token, async (state) => {
+    if (
+      !UUID.test(expectedAttemptId) ||
+      typeof readFreshEvidence !== 'function'
+    )
+      return failure();
+    const { identity, manifest } = await context(
+      state.owner,
+      input,
+      packet,
+      false,
+    );
+    guard(state);
+    const checked = await createJitoPacketRecovery(
+      manifest,
+      packet,
+      transaction,
+    );
+    guard(state);
+    const requireUnknown = async () => {
+      // Own one response snapshot before any asynchronous validation; callers
+      // cannot mutate an in-flight attempt or record after this point.
+      const fresh = structuredClone(await readFreshEvidence());
+      guard(state);
+      const current = await requireFresh(state, identity, async () => fresh);
+      const attempt = fresh?.attempt;
+      if (
+        current.record.state !== 'reviewed' ||
+        current.record.signatures[packet] !== null ||
+        !attempt ||
+        attempt.attemptId !== expectedAttemptId ||
+        attempt.bundleId !== identity.bundleId ||
+        attempt.manifestSha256 !== identity.digest ||
+        attempt.packet !== packet ||
+        attempt.signer !== identity.wallet ||
+        attempt.intentId !== (manifest.swaps[packet]?.id ?? null) ||
+        attempt.state !== 'unknown' ||
+        attempt.signature !== null ||
+        attempt.transaction !== null
+      )
+        return failure();
+    };
+    await requireUnknown();
+    const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+    const nonce = hex(crypto.getRandomValues(new Uint8Array(16)));
+    const key = await derive(password, salt);
+    guard(state);
+    const checkIv = crypto.getRandomValues(new Uint8Array(12));
+    const check = await crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: checkIv,
+        additionalData: associated(identity, nonce, 'key-check'),
+        tagLength: 128,
+      },
+      key,
+      checkPlain,
+    );
+    guard(state);
+    await requireUnknown();
+    const stored: JournalEntry = {
+      version: 1,
+      key: entryKey(identity),
+      identity,
+      nonce,
+      salt,
+      checkIv: hex(checkIv),
+      check: hex(new Uint8Array(check)),
+      state: 'unknown',
+      iv: null,
+      ciphertext: null,
+    };
+    await insertJournalUnknown(stored);
+    guard(state);
+    const inserted = entry(await readJournalEntry(stored.key), identity);
+    guard(state);
+    if (JSON.stringify(inserted) !== JSON.stringify(stored)) return failure();
+    // A changed server attempt or owner cannot turn the committed marker into
+    // authority. Leave it UNKNOWN if this final recheck is ambiguous.
+    await requireUnknown();
+    const reservation = Object.freeze({});
+    reservations.set(reservation, {
+      lock: token,
+      identity,
+      entry: stored,
+      key,
+      importedEvidence: Object.freeze({
+        transaction,
+        signature: checked.signature,
+      }),
+    });
+    state.reservations.add(reservation);
+    return reservation;
+  });
+}
+
 /** Reopen an UNKNOWN marker only for a separately supplied exact signed packet.
  * This never releases it or establishes that a wallet did not sign. */
 export function resumeJitoRecoveryUnknown(
@@ -604,6 +721,12 @@ export function retainJitoRecoverySignature(
         identity.packet,
         transaction,
       );
+      if (
+        reserved.importedEvidence &&
+        (reserved.importedEvidence.transaction !== transaction ||
+          reserved.importedEvidence.signature !== checked.signature)
+      )
+        return failure();
       guard(state, false, true);
       const signature = Uint8Array.from(bs58.decode(checked.signature));
       if (

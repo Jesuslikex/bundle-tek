@@ -45,6 +45,13 @@ list empty, including some Phantom configurations, cannot sign through this
 path until it can provide a verifiable current account. A returned exact packet
 is retained before an account-change error, never automatically submitted.
 
+An evidence-only journal helper can retain an exact already-signed recovery
+packet, including after expiry, only against an authenticated matching UNKNOWN
+attempt. It checks the original attempt before and after storage and does not
+grant a signer permit or submit authority. Its caller must enforce the same
+owner lock and authenticate the exact server snapshot. Thirty-eight journal
+tests pass; the recovery-file user interface is not yet connected.
+
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,
 cancel and submit path; preserve separately unchecked approval; test rejected

@@ -1,6 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import type { JitoBundleRecord } from './jito-bundle';
+import { bundleFingerprint } from './jito-bundle';
+import type { JitoAttempt } from './jito-sign-attempt-client';
 
 // This tests journal state/crypto with a fault-injectable transaction double.
 // It is not a substitute for a real-browser IndexedDB/Web Locks integration run.
@@ -56,6 +58,7 @@ import {
   listJitoRecoveryJournalPending,
   resumeJitoRecoveryUnknown,
   reserveJitoRecoveryUnknown,
+  reserveJitoImportedEvidence,
   retainJitoRecoverySignature,
   withJitoRecoveryJournalLock,
   type JitoJournalLock,
@@ -110,6 +113,298 @@ async function fixture() {
   return { ...f, record, fresh };
 }
 const guard = () => {};
+
+function importedAttempt(
+  f: Awaited<ReturnType<typeof fixture>>,
+  packet = 0,
+): JitoAttempt {
+  return {
+    bundleId: f.manifest.id,
+    manifestSha256: f.manifest.sha256,
+    packet,
+    attemptId: '11111111-1111-4111-8111-111111111111',
+    signer: f.manifest.swaps[packet]?.wallet ?? f.manifest.tip.wallet,
+    intentId: f.manifest.swaps[packet]?.id ?? null,
+    state: 'unknown',
+    signature: null,
+    transaction: null,
+  };
+}
+
+describe('imported signed evidence reservation', () => {
+  it('binds a tip evidence import to its null intent and tip payer', async () => {
+    const f = await fixture(),
+      attempt = importedAttempt(f, 1);
+    await withJitoRecoveryJournalLock(alice, guard, async (token) => {
+      const reservation = await reserveJitoImportedEvidence(
+        token,
+        f.manifest,
+        1,
+        password,
+        f.tip.signed.transaction,
+        attempt.attemptId,
+        async () => ({ ownerScope: alice, record: f.record, attempt }),
+      );
+      await retainJitoRecoverySignature(
+        token,
+        reservation,
+        f.manifest,
+        f.tip.signed.transaction,
+      );
+      expect(
+        (
+          await inspectJitoRecoveryJournal(
+            token,
+            f.manifest,
+            1,
+            password,
+            f.fresh,
+          )
+        ).status,
+      ).toBe('retained');
+    });
+  });
+  it('rejects a callback result mutated before the awaited response is owned', async () => {
+    const f = await fixture(),
+      attempt = importedAttempt(f);
+    const shared = {
+      ownerScope: alice,
+      record: f.record,
+      attempt: { ...attempt },
+    };
+    await expect(
+      withJitoRecoveryJournalLock(alice, guard, (token) =>
+        reserveJitoImportedEvidence(
+          token,
+          f.manifest,
+          0,
+          password,
+          f.swap.signed.transaction,
+          attempt.attemptId,
+          async () => {
+            queueMicrotask(() => {
+              shared.attempt.signer = f.tip.recipient;
+            });
+            return shared;
+          },
+        ),
+      ),
+    ).rejects.toThrow();
+    expect(mock.rows.size).toBe(0);
+  });
+  it('accepts a verified expired packet for an exact existing UNKNOWN without authorizing signing', async () => {
+    const f = await fixture();
+    const { sha256: _old, ...terms } = f.manifest;
+    terms.expiresAt = new Date(Date.now() - 1000).toISOString();
+    f.manifest = { ...terms, sha256: await bundleFingerprint(terms) };
+    f.record.manifest = f.manifest;
+    const attempt = importedAttempt(f);
+    const read = async () => ({
+      ownerScope: alice,
+      record: structuredClone(f.record),
+      attempt: structuredClone(attempt),
+    });
+    await withJitoRecoveryJournalLock(alice, guard, async (token) => {
+      const reservation = await reserveJitoImportedEvidence(
+        token,
+        f.manifest,
+        0,
+        password,
+        f.swap.signed.transaction,
+        attempt.attemptId,
+        read,
+      );
+      await retainJitoRecoverySignature(
+        token,
+        reservation,
+        f.manifest,
+        f.swap.signed.transaction,
+      );
+      expect(
+        (
+          await inspectJitoRecoveryJournal(
+            token,
+            f.manifest,
+            0,
+            password,
+            f.fresh,
+          )
+        ).status,
+      ).toBe('retained');
+    });
+    expect(mock.rows.size).toBe(1);
+  });
+  it('refuses wrong nonce, identity, absent attempt, registered state and different packet before writing', async () => {
+    const f = await fixture(),
+      original = importedAttempt(f);
+    const cases = [
+      { ...original, attemptId: '22222222-2222-4222-8222-222222222222' },
+      { ...original, signer: f.tip.recipient },
+      { ...original, intentId: null },
+      { ...original, bundleId: crypto.randomUUID() },
+      { ...original, manifestSha256: 'ff'.repeat(32) },
+      { ...original, packet: 1 },
+      { ...original, state: 'registered' },
+      null,
+    ];
+    for (const attempt of cases) {
+      await expect(
+        withJitoRecoveryJournalLock(alice, guard, (token) =>
+          reserveJitoImportedEvidence(
+            token,
+            f.manifest,
+            0,
+            password,
+            f.swap.signed.transaction,
+            original.attemptId,
+            async () => ({
+              ownerScope: alice,
+              record: f.record,
+              attempt: attempt as JitoAttempt,
+            }),
+          ),
+        ),
+      ).rejects.toThrow();
+      expect(mock.rows.size).toBe(0);
+    }
+    await expect(
+      withJitoRecoveryJournalLock(alice, guard, (token) =>
+        reserveJitoImportedEvidence(
+          token,
+          f.manifest,
+          0,
+          password,
+          f.tip.signed.transaction,
+          original.attemptId,
+          async () => ({
+            ownerScope: alice,
+            record: f.record,
+            attempt: original,
+          }),
+        ),
+      ),
+    ).rejects.toThrow();
+    expect(mock.rows.size).toBe(0);
+  });
+  it.each(['insert-before', 'insert-after'])(
+    'fails closed for %s and preserves any ambiguous marker',
+    async (fault) => {
+      const f = await fixture(),
+        attempt = importedAttempt(f);
+      mock.fault = fault;
+      await expect(
+        withJitoRecoveryJournalLock(alice, guard, (token) =>
+          reserveJitoImportedEvidence(
+            token,
+            f.manifest,
+            0,
+            password,
+            f.swap.signed.transaction,
+            attempt.attemptId,
+            async () => ({ ownerScope: alice, record: f.record, attempt }),
+          ),
+        ),
+      ).rejects.toThrow();
+      expect(mock.rows.size).toBe(fault === 'insert-after' ? 1 : 0);
+      if (fault === 'insert-after')
+        expect([...mock.rows.values()][0]).toMatchObject({ state: 'unknown' });
+    },
+  );
+  it.each(['unknown', 'retained'])(
+    'never overwrites an existing %s entry',
+    async (state) => {
+      const f = await fixture(),
+        attempt = importedAttempt(f);
+      await withJitoRecoveryJournalLock(alice, guard, async (token) => {
+        const reserved = await reserveJitoRecoveryUnknown(
+          token,
+          f.manifest,
+          0,
+          password,
+          f.fresh,
+        );
+        if (state === 'retained')
+          await retainJitoRecoverySignature(
+            token,
+            reserved,
+            f.manifest,
+            f.swap.signed.transaction,
+          );
+      });
+      const before = structuredClone([...mock.rows.values()][0]);
+      await expect(
+        withJitoRecoveryJournalLock(alice, guard, (token) =>
+          reserveJitoImportedEvidence(
+            token,
+            f.manifest,
+            0,
+            password,
+            f.swap.signed.transaction,
+            attempt.attemptId,
+            async () => ({ ownerScope: alice, record: f.record, attempt }),
+          ),
+        ),
+      ).rejects.toThrow();
+      expect([...mock.rows.values()][0]).toEqual(before);
+    },
+  );
+  it.each(['owner', 'attempt', 'registered'])(
+    'retains UNKNOWN if %s changes during the insert',
+    async (changed) => {
+      const f = await fixture(),
+        attempt = importedAttempt(f);
+      const response = {
+        ownerScope: alice,
+        record: f.record,
+        attempt: { ...attempt },
+      };
+      mock.beforeInsert = async () => {
+        if (changed === 'owner') response.ownerScope = 'b'.repeat(64);
+        if (changed === 'attempt')
+          response.attempt.attemptId = crypto.randomUUID();
+        if (changed === 'registered') response.attempt.state = 'registered';
+      };
+      await expect(
+        withJitoRecoveryJournalLock(alice, guard, (token) =>
+          reserveJitoImportedEvidence(
+            token,
+            f.manifest,
+            0,
+            password,
+            f.swap.signed.transaction,
+            '11111111-1111-4111-8111-111111111111',
+            async () => response,
+          ),
+        ),
+      ).rejects.toThrow();
+      expect([...mock.rows.values()][0]).toMatchObject({ state: 'unknown' });
+    },
+  );
+  it('binds a returned reservation to the exact verified transaction', async () => {
+    const f = await fixture(),
+      attempt = importedAttempt(f);
+    await expect(
+      withJitoRecoveryJournalLock(alice, guard, async (token) => {
+        const reservation = await reserveJitoImportedEvidence(
+          token,
+          f.manifest,
+          0,
+          password,
+          f.swap.signed.transaction,
+          attempt.attemptId,
+          async () => ({ ownerScope: alice, record: f.record, attempt }),
+        );
+        await retainJitoRecoverySignature(
+          token,
+          reservation,
+          f.manifest,
+          f.tip.signed.transaction,
+        );
+      }),
+    ).rejects.toThrow();
+    expect([...mock.rows.values()][0]).toMatchObject({ state: 'unknown' });
+  });
+});
 
 describe('unintegrated same-origin recovery journal', () => {
   it('only acknowledges an exact retained signature independently registered on the server', async () => {
