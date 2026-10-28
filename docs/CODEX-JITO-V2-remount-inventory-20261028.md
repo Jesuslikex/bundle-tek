@@ -2,15 +2,17 @@
 
 This is a conservative mapping of the 65 expanded cases collected from `components/jito-packet-signing-remount.test.tsx`. Numbering is the exact collection order from `vitest list`. Listing tests does not run them. No existing tests were skipped, deleted, or replaced to produce this inventory. The existing remount suite is not claimed to pass against the current v2 UI. Earlier passing v2 evidence is listed below; re-run it against the final frozen source.
 
-- **A: Passing equivalent (28).** A v2 test or a combination of separately passing UI and database checks addresses the same essential safety behavior. This does not imply identical end-to-end coverage.
-- **B: Recovery-file coverage needed (27).** Preserve the original scenario when migrating it to the v2 file flow. Recent bundles now have an authenticated per-packet recovery-file panel; older bundles omitted from the 20-item history still cannot be opened through a file locator. Some terminal component or journal primitives have partial isolated coverage.
+- **A: Passing equivalent (32).** A v2 test or a combination of separately passing UI and database checks addresses the same essential safety behavior. This does not imply identical end-to-end coverage.
+- **B: Recovery-file coverage needed (23).** Preserve the original scenario when migrating it to the v2 file flow. Recent bundles have an authenticated per-packet recovery-file panel, and the new locator opens an older bundle separately from the 20-item history. Some terminal component or journal primitives have partial isolated coverage.
 - **C: Intentionally changed behavior (6).** Replace the unsafe or superseded expectation with the stated v2 behavior while preserving its safety purpose.
 - **D: Other v2 coverage needed (4).** Lower-level checks may exist, but the specified parent/remount scenario is not yet established by the inspected v2 tests.
 
 ## Already covered or deliberately changed
 
+- **1 and 2:** Synthetic real-parent locator tests open the 21st bundle without evicting the 20 recent records and exercise separately approved exact packet registration. The user currently selects the same recovery file again in the packet panel after locating the bundle.
+- **7 and 18:** Synthetic real-parent locator tests reject an owner change during exact reads and a session revision change during a pending exact read, with no older record or signature published. These do not establish signed-in browser behavior.
 - **11:** `jito-packet-signing-v2` tests acknowledgment of a matching exact server receipt after a lost response without registering again.
-- **10:** `jito-parent-file-v2` verifies a file against an already registered packet and confirms no additional write. The old top-level file locator remains unavailable.
+- **10:** `jito-parent-file-v2` verifies a file against an already registered packet and confirms no additional write. The older-bundle locator now opens records separately from recent history.
 - **31:** `jito-parent-file-v2` verifies and retains a packet before offering a separately unchecked approval for exact registration. The old test's additional cross-packet interaction still needs a dedicated integration case.
 - **34:** `jito-parent-file-v2` refuses to retain or register when the authenticated server owner changes while the file read is pending.
 - **33:** The v2 parent test blocks signing and cancellation on an exact UNKNOWN snapshot, while migration tests block submission and release. This is combined UI and database evidence, not one end-to-end test.
@@ -29,17 +31,17 @@ This is a conservative mapping of the 65 expanded cases collected from `componen
 - **63:** Encrypted local recovery replaces memory-only recovery. Browser storage loss, eviction, profile reset, and password loss still limit recovery.
 - **64:** An explicitly rejected wallet prompt does not prove no signature exists; v2 retains UNKNOWN and does not reprompt.
 
-The 36-case v2 child suite passed on the current source and was independently rerun. The newly mapped cases use synthetic wallet, storage, server, and lock doubles, including component remounts. They are meaningful child-level regressions, not proof of the complete parent flow, actual IndexedDB/Web Locks behavior in a browser, or funded execution. Parent, snapshot, terminal, journal, and SQL tests were run separately during development. The seven recent-bundle parent/file cases passed with synthetic storage and server doubles, and were independently rerun. The parent-race suite now has eight synthetic tests; seven were independently rerun before the distinct changed-server-session case was added, and all eight passed in the author's rerun. The full 65-case legacy remount suite still fails against the changed v2 contract and is not included in those counts; no old test has been skipped, removed, or replaced.
+The 36-case v2 child suite passed on the current source and was independently rerun. The mapped cases use synthetic wallet, storage, server, and lock doubles, including component remounts. They are meaningful child-level regressions, not proof of the complete parent flow, actual IndexedDB/Web Locks behavior in a browser, or funded execution. Parent, snapshot, terminal, journal, and SQL tests were run separately during development. The recent-bundle parent/file and older-bundle parent/locator cases use synthetic storage and server doubles. The parent-race suite now has eight synthetic tests; seven were independently rerun before the distinct changed-server-session case was added, and all eight passed in the author's rerun. The full 65-case legacy remount suite is not claimed to pass against the changed v2 contract and is not included in those counts; no old test has been skipped, removed, or replaced as part of this inventory.
 
 ## Complete numbered inventory
 
-1. **B** — finds an older reviewed bundle from one local file and requires history plus separate registration approval
-2. **B** — finds the omitted 21st bundle while twenty distinct recent bundles are listed
+1. **A** — finds an older reviewed bundle from one local file and requires history plus separate registration approval
+2. **A** — finds the omitted 21st bundle while twenty distinct recent bundles are listed
 3. **B** — uses an owned immutable file snapshot even if the original buffer changes during locator parsing
 4. **B** — refuses duplicate keys or a different project/session before any exact-record request
 5. **B** — refuses a record whose saved state changes between the two exact reads
 6. **B** — preserves an unknown original outcome rather than replacing it from a file
-7. **B** — refuses an older bundle when the authenticated server owner has changed
+7. **A** — refuses an older bundle when the authenticated server owner has changed
 8. **B** — finds an older cancelled record for export only, with a fresh check before download
 9. **B** — finds an older expired record for export only, with a fresh check before download
 10. **A** — discloses an already registered matching signature without offering another registration
@@ -50,7 +52,7 @@ The 36-case v2 child suite passed on the current source and was independently re
 15. **B** — keeps a retained packet export-only when refreshed history reports a terminal state
 16. **B** — keeps the original pending if account context changes during saved-signature confirmation
 17. **B** — refuses a conflicting saved signature rather than displaying the imported packet
-18. **B** — does not publish a lookup result if the context changes during the owner-scoped read
+18. **A** — does not publish a lookup result if the context changes during the owner-scoped read
 19. **B** — synchronously blocks a stale cancel while lookup is reading the exact record
 20. **B** — does not close a stale recovery view during a pending export
 21. **B** — refuses stale registration after an in-flight history refresh fails
@@ -101,5 +103,5 @@ The 36-case v2 child suite passed on the current source and was independently re
 
 ## Remaining test work
 
-Complete the older-bundle locator and remaining file recovery cases against authenticated exact v2 snapshots, then migrate the B cases with their original ownership, race, and consent assertions. Recent-bundle swap and tip file tests verify retention and approval, but cases 28–29 still need their complete retained-on-remount and cancellation assertions in the integrated flow. Implement the D cases, including both swap and tip variants where listed. Update the C cases to assert the new fail-closed semantics; do not silently remove their safety coverage. Re-run the entire migrated suite together, plus the Jito UI, journal, server, and migration suites, before considering release. No deployment, remote migration, wallet signing, or funded test is authorized by this inventory.
+Complete the remaining file recovery cases against authenticated exact v2 snapshots, then migrate the B cases with their original ownership, race, and consent assertions. Case 3 still needs its original mutation-during-parser timing; a standalone locator test currently changes the source buffer during the later fetch. Recent-bundle swap and tip file tests verify retention and approval, but cases 28–29 still need their complete retained-on-remount and cancellation assertions in the integrated flow. Implement the D cases, including both swap and tip variants where listed. Update the C cases to assert the new fail-closed semantics; do not silently remove their safety coverage. Re-run the entire migrated suite together, plus the Jito UI, journal, server, and migration suites, before considering release. No deployment, remote migration, wallet signing, or funded test is authorized by this inventory.
 

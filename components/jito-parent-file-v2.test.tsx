@@ -230,7 +230,10 @@ async function setup(packet = 0, expired = false, legacy = false) {
     await createJitoPacketRecovery(f.manifest, packet, signed.transaction),
   );
   const choose = async (text: () => Promise<string> = async () => fileText) => {
-    const label = [...container.querySelectorAll('label')].filter(
+    const article = [...container.querySelectorAll('article')].find((node) =>
+      node.textContent?.includes(f.manifest.id),
+    )!;
+    const label = [...article.querySelectorAll('label')].filter(
       (item) => item.textContent === 'Signed packet recovery file',
     )[packet]!;
     const input = document.getElementById(label.htmlFor) as HTMLInputElement;
@@ -247,7 +250,10 @@ async function setup(packet = 0, expired = false, legacy = false) {
     );
   };
   const password = async () => {
-    const label = [...container.querySelectorAll('label')].filter(
+    const article = [...container.querySelectorAll('article')].find((node) =>
+      node.textContent?.includes(f.manifest.id),
+    )!;
+    const label = [...article.querySelectorAll('label')].filter(
       (item) => item.textContent === 'Vault password for recovery',
     )[packet]!;
     const input = document.getElementById(label.htmlFor) as HTMLInputElement;
@@ -405,7 +411,10 @@ it('saves only approved exact evidence after expiry without signing or submittin
 it('keeps file import disabled for a legacy read-only bundle', async () => {
   const f = await setup(0, false, true);
   expect(f.button('Verify and retain swap 1 file').disabled).toBe(true);
-  const label = [...container.querySelectorAll('label')].find(
+  const article = [...container.querySelectorAll('article')].find((node) =>
+    node.textContent?.includes(f.f.manifest.id),
+  )!;
+  const label = [...article.querySelectorAll('label')].find(
     (item) => item.textContent === 'Signed packet recovery file',
   )!;
   expect(

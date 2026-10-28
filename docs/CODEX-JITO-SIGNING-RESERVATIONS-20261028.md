@@ -55,8 +55,10 @@ lost-response recovery and unresolved-memory guidance. In this draft it is
 connected for bundles shown in the recent history, with additional parent and
 panel tests. A separate older-bundle locator validates a bounded recovery file
 and two owner-scoped exact reads, with 15 synthetic tests including deadline
-expiry during verification. It is not yet connected to the parent; looking up
-an older bundle outside the recent history remains unavailable in the UI.
+expiry during verification. In the draft it is connected to the parent and
+keeps the recent 20 records intact. Users reselect the file in the packet panel
+and separately approve any evidence registration. See
+`CODEX-JITO-V2-OLDER-LOCATOR-20261028.md` for synthetic checks and limitations.
 
 The draft browser wiring supports the browser vault and external wallets that
 publish a verifiable current account. It holds the owner lock around signing
