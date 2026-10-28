@@ -34,6 +34,14 @@ import {
   type AutoSellStrategy,
 } from '@/lib/auto-sell';
 import { AutoSellRunner, type AutoSellSnapshot } from '@/lib/auto-sell-runner';
+import type { AutoSellRunRestore } from '@/lib/auto-sell-run-restore';
+import {
+  autoSellRunEnrollmentScope,
+  loadAutoSellRunEnrollmentReminder,
+} from '@/lib/auto-sell-run-enrollment-client';
+import { loadAutoSellRunRestore } from '@/lib/auto-sell-run-restore';
+import { createAuthClient } from 'better-auth/react';
+const auth = createAuthClient();
 import { AUTO_SELL_COUNTER_MAX_AGE_MS } from '@/lib/auto-sell-counter-time';
 import { autoSellSessionCap } from '@/lib/auto-sell-session';
 import { autoSellStartCapError } from '@/lib/auto-sell-start-cap';
@@ -226,6 +234,15 @@ function AutoSellContext({
   onOpened: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  // A saved run for this exact project, loaded ahead of Run so the start path
+  // stays synchronous. Null means "start clean".
+  const restoreRef = useRef<AutoSellRunRestore | null>(null);
+  const savedRun = useRef<{
+    ownerScope: string;
+    reminder: { runId: string; profileSha256: string };
+  } | null>(null);
+  const [restoreNotice, setRestoreNotice] = useState('');
+  const { data: session } = auth.useSession();
   const dialog = useRef<HTMLDialogElement>(null);
   const advanced = useRef<HTMLDetailsElement>(null);
   const walletOptions = useRef<HTMLFieldSetElement>(null);
@@ -248,6 +265,32 @@ function AutoSellContext({
         previous.focus();
     };
   }, [open, triggerRef, onContextClosed]);
+  // Note a journaled run for this project without touching the network: opening
+  // the dialog stays offline, and the restore itself loads on Run.
+  useEffect(() => {
+    if (!open || !session?.user?.id) return;
+    const controller = new AbortController();
+    restoreRef.current = null;
+    savedRun.current = null;
+    setRestoreNotice('');
+    void (async () => {
+      try {
+        const ownerScope = await autoSellRunEnrollmentScope(session.user.id);
+        const reminder = loadAutoSellRunEnrollmentReminder(
+          ownerScope,
+          project.id,
+        );
+        if (!reminder || controller.signal.aborted) return;
+        savedRun.current = { ownerScope, reminder };
+        setRestoreNotice(
+          `Saved run ${reminder.runId} found. Run restores its charged counters; the live queue, skipped triggers and random draws are not durable.`,
+        );
+      } catch {
+        if (!controller.signal.aborted) savedRun.current = null;
+      }
+    })();
+    return () => controller.abort();
+  }, [open, project.id, session?.user?.id]);
   const [strategies, setStrategies] = useState<AutoSellStrategy[]>(() => [
     newAutoSellStrategy(0),
   ]);
@@ -755,7 +798,27 @@ function AutoSellContext({
       runner.current = instance;
       releaseLock.current = releaseThisRun;
       release = null;
-      instance.start();
+      // A saved run loads here, not on open, so the dialog stays offline until
+      // the user actually starts something. A failed load starts clean.
+      const saved = savedRun.current;
+      if (saved && !restoreRef.current) {
+        try {
+          restoreRef.current = await loadAutoSellRunRestore(
+            {
+              ownerScope: saved.ownerScope,
+              projectId: project.id,
+              runId: saved.reminder.runId,
+              runSha256: saved.reminder.profileSha256,
+              minimum: { sequence: 0, accountedRaw: '0', stopped: false },
+            },
+            new AbortController().signal,
+          );
+        } catch {
+          restoreRef.current = null;
+        }
+        if (!current()) return;
+      }
+      instance.start(restoreRef.current ?? undefined);
     } catch (e) {
       if (unlocked) unlocked.payload.wallets = [];
       if (vault.current === unlocked) vault.current = null;
@@ -1395,6 +1458,9 @@ function AutoSellContext({
                   ? 'Unlocking…'
                   : `Run ${strategies.length} Strateg${strategies.length === 1 ? 'y' : 'ies'}`}
               </Button>
+            )}
+            {restoreNotice && !running && (
+              <p role='status'>{restoreNotice}</p>
             )}
           </footer>
         </dialog>

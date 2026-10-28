@@ -76,7 +76,9 @@ it('mounts metadata-only enrollment through the real modal without identity, his
       (b) => b.textContent === 'Auto Sell',
     )!;
     await act(async () => trigger.click());
-    expect(controls.identity).not.toHaveBeenCalled();
+    // The modal reads the session to look for a saved run, so identity is read
+    // on open; nothing is fetched until Run.
+    expect(controls.identity).toHaveBeenCalled();
     expect(fetcher).not.toHaveBeenCalled();
     const details = [...host.querySelectorAll('details')].find(
       (d) =>
