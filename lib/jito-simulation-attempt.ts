@@ -249,8 +249,9 @@ export async function collectJitoSimulationAttempt(input: {
       sentSimulationBody,
       ...authority,
     };
-  } catch (error) {
-    // Same as the coherent attempt: keep which step threw, not just the reason.
+  } catch {
+    // Transport and parser exceptions can include provider credentials. Keep
+    // only a fixed category; private raw captures are handled separately.
     return {
       ...refuse(
         deadline.aborted
@@ -259,7 +260,11 @@ export async function collectJitoSimulationAttempt(input: {
             ? 'transport-unavailable'
             : 'plan-refused',
       ),
-      detail: error instanceof Error ? error.message.slice(0, 300) : 'unknown',
+      detail: deadline.aborted
+        ? 'interrupted'
+        : planReady
+          ? 'transport or validation unavailable'
+          : 'plan unavailable',
     };
   } finally {
     owner.abort();

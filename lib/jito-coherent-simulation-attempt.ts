@@ -400,13 +400,9 @@ export async function collectJitoCoherentSimulationAttempt(input: {
       feeProjection,
       ...authority,
     };
-  } catch (error) {
-    // The reason alone says nothing about which step threw; keep the message.
-    // These are our own refusal strings, not provider bodies.
-    if (process.env.JITO_DEBUG)
-      console.log('ERR', error instanceof Error ? error.message : 'unknown');
-    const detail =
-      error instanceof Error ? error.message.slice(0, 300) : 'unknown';
+  } catch {
+    // Transport and parser exceptions can include provider credentials. Keep
+    // only a fixed category; private raw captures are handled separately.
     return {
       ...refuse(
         deadline.aborted
@@ -415,7 +411,11 @@ export async function collectJitoCoherentSimulationAttempt(input: {
             ? 'transport-unavailable'
             : 'plan-refused',
       ),
-      detail,
+      detail: deadline.aborted
+        ? 'interrupted'
+        : planReady
+          ? 'transport or validation unavailable'
+          : 'plan unavailable',
     };
   } finally {
     owner.abort();

@@ -462,3 +462,69 @@ it.each([0, 1, 2, 3])(
     falseAuthority(output);
   },
 );
+for (const phase of ['fees', 'simulation'] as const)
+  it(`redacts synthetic credential-bearing transport errors in ${phase}`, async () => {
+    const f = await fixture();
+    const secret = 'https://rpc.synthetic.invalid/private-fixture-key';
+    const send = vi.fn(async (r: JitoSimulationRead) => {
+      if (phase === 'simulation' && r.phase === 'fees')
+        return new Response(fees(f, r));
+      throw Error(`provider failure ${secret}`);
+    });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {}),
+      error = vi.spyOn(console, 'error').mockImplementation(() => {}),
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const result = await collectJitoSimulationAttempt(policy(f, send));
+      expect(result.status).toBe('refused');
+      if (result.status !== 'refused') throw Error('Expected refusal');
+      expect(result.reason).toBe('transport-unavailable');
+      expect('detail' in result ? result.detail : undefined).toBe(
+        'transport or validation unavailable',
+      );
+      expect(send).toHaveBeenCalledTimes(phase === 'simulation' ? 2 : 1);
+      expect(
+        JSON.stringify([
+          log.mock.calls,
+          error.mock.calls,
+          warn.mock.calls,
+          'detail' in result ? result.detail : undefined,
+        ]),
+      ).not.toContain('private-fixture-key');
+    } finally {
+      log.mockRestore();
+      error.mockRestore();
+      warn.mockRestore();
+    }
+  });
+it('uses a fixed fee refusal category for an untrusted provider error message', async () => {
+  const f = await fixture();
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const send = vi.fn(async (r: JitoSimulationRead) => {
+      const requests = JSON.parse(r.body) as { id: string }[];
+      return new Response(
+        f.body(
+          requests.map((q) => ({
+            jsonrpc: '2.0',
+            id: q.id,
+            error: { code: -32000n, message: 'private-provider-message' },
+          })),
+        ),
+      );
+    });
+    const result = await collectJitoSimulationAttempt(policy(f, send));
+    expect(result.status).toBe('refused');
+    if (result.status !== 'refused') throw Error('Expected refusal');
+    expect(result.reason).toBe('fees-refused');
+    expect(
+      JSON.stringify([
+        log.mock.calls,
+        'detail' in result ? result.detail : undefined,
+      ]),
+    ).not.toContain('private-provider-message');
+    expect(send).toHaveBeenCalledOnce();
+  } finally {
+    log.mockRestore();
+  }
+});

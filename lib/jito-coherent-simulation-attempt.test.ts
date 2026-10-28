@@ -442,3 +442,71 @@ for (const phase of ['discovery', 'batch'] as const)
       });
       expect(send).toHaveBeenCalledTimes(phase === 'discovery' ? 1 : 2);
     });
+for (const phase of ['discovery', 'batch'] as const)
+  it(`redacts synthetic credential-bearing transport errors in ${phase}`, async () => {
+    const f = await jitoRawResponseFixture();
+    const secret = 'https://rpc.synthetic.invalid/private-fixture-key';
+    const send = vi.fn(async (r: JitoCoherentSimulationRead) => {
+      if (phase === 'batch' && r.phase === 'discovery')
+        return new Response(f.wire(discovery(f)));
+      throw Error(`provider failure ${secret}`);
+    });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {}),
+      error = vi.spyOn(console, 'error').mockImplementation(() => {}),
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubEnv('JITO_DEBUG', '1');
+    try {
+      const result = await collectJitoCoherentSimulationAttempt(input(f, send));
+      expect(result.status).toBe('refused');
+      if (result.status !== 'refused') throw Error('Expected refusal');
+      expect(result.reason).toBe('transport-unavailable');
+      expect('detail' in result ? result.detail : undefined).toBe(
+        'transport or validation unavailable',
+      );
+      expect(send).toHaveBeenCalledTimes(phase === 'batch' ? 2 : 1);
+      expect(
+        JSON.stringify([
+          log.mock.calls,
+          error.mock.calls,
+          warn.mock.calls,
+          'detail' in result ? result.detail : undefined,
+        ]),
+      ).not.toContain('private-fixture-key');
+    } finally {
+      log.mockRestore();
+      error.mockRestore();
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+it('uses a fixed refusal category for an untrusted provider error message', async () => {
+  const f = await jitoRawResponseFixture();
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.stubEnv('JITO_DEBUG', '1');
+  try {
+    const send = vi.fn(
+      async () =>
+        new Response(
+          f.wire({
+            jsonrpc: '2.0',
+            id: 'jito-test:discovery',
+            error: { code: -32000n, message: 'private-provider-message' },
+          }),
+        ),
+    );
+    const result = await collectJitoCoherentSimulationAttempt(input(f, send));
+    expect(result.status).toBe('refused');
+    if (result.status !== 'refused') throw Error('Expected refusal');
+    expect(result.reason).toBe('transport-unavailable');
+    expect(
+      JSON.stringify([
+        log.mock.calls,
+        'detail' in result ? result.detail : undefined,
+      ]),
+    ).not.toContain('private-provider-message');
+    expect(send).toHaveBeenCalledOnce();
+  } finally {
+    log.mockRestore();
+    vi.unstubAllEnvs();
+  }
+});
