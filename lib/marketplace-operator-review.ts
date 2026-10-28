@@ -5,6 +5,10 @@ import {
   type MarketplaceOwnedInventory,
 } from './marketplace-owned-inventory';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
+// How long a listing review stays usable. The save re-reads the inventory and
+// compares both hashes anyway, so this is a coarse staleness bound, not the
+// correctness check — 60s was too tight to click through three checks by hand.
+export const OPERATOR_REVIEW_WINDOW_MS = 180000;
 const price = z
   .string()
   .regex(/^[1-9]\d{0,19}$/)
@@ -54,7 +58,7 @@ export async function reviewOperatorListing(
   if (
     !Number.isSafeInteger(reviewedAt) ||
     reviewedAt > now ||
-    now - reviewedAt >= 60000
+    now - reviewedAt >= OPERATOR_REVIEW_WINDOW_MS
   )
     throw Error('Listing review expired. Request a fresh review.');
   const current = admitMarketplaceOwnedInventory(inventory, now),
@@ -81,7 +85,7 @@ export async function reviewOperatorListing(
     format: 'bundle-operator-listing-review-v1',
     sellerModel: 'bundle-operated',
     reviewedAt: new Date(reviewedAt).toISOString(),
-    reviewExpiresAt: new Date(reviewedAt + 60000).toISOString(),
+    reviewExpiresAt: new Date(reviewedAt + OPERATOR_REVIEW_WINDOW_MS).toISOString(),
     requestSha256,
     evidenceSha256,
     selection,
@@ -104,7 +108,7 @@ export async function admitOperatorListingReview(
     expires = Date.parse(actual.reviewExpiresAt);
   if (
     !Number.isSafeInteger(now) ||
-    expires - at !== 60000 ||
+    expires - at !== OPERATOR_REVIEW_WINDOW_MS ||
     expires <= now ||
     at > now
   )

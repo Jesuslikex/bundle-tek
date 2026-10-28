@@ -70,7 +70,7 @@ it.each([
   if (kind === 'hash') review.requestSha256 = '0'.repeat(64);
   if (kind === 'gate') Object.assign(review, { listingAllowed: true });
   if (kind === 'expiry')
-    review.reviewExpiresAt = new Date(now + 61000).toISOString();
+    review.reviewExpiresAt = new Date(now + 181000).toISOString();
   await expect(
     admitOperatorListingReview(review, f.inventory, f.selection, now),
   ).rejects.toThrow();
@@ -90,6 +90,6 @@ it('refuses unknown/stale wallets, unsupported prices, extra client claims and e
     ).rejects.toThrow();
   const review = await reviewOperatorListing(f.inventory, f.selection, now);
   await expect(
-    admitOperatorListingReview(review, f.inventory, f.selection, now + 60000),
+    admitOperatorListingReview(review, f.inventory, f.selection, now + 180000),
   ).rejects.toThrow();
 });

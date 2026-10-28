@@ -94,11 +94,11 @@ it.each([
   if (kind === 'hash') r.reviewSha256 = '0'.repeat(64);
   if (kind === 'gate') Object.assign(r, { publicationAllowed: true });
   if (kind === 'expiry')
-    r.review.reviewExpiresAt = new Date(now + 61000).toISOString();
+    r.review.reviewExpiresAt = new Date(now + 181000).toISOString();
   if (kind === 'source-time')
     r.sourceObservedAt = new Date(now - 1).toISOString();
   if (kind === 'created-time')
-    r.createdAt = new Date(now + 60000).toISOString();
+    r.createdAt = new Date(now + 180000).toISOString();
   if (kind === 'id') r.id = crypto.randomUUID();
   if (kind === 'extra') Object.assign(r, { privateKey: 'forbidden' });
   await expect(
@@ -111,6 +111,6 @@ it('refuses expired or future historical review replay even with a fresh invento
     reviewOperatorListing(f.inventory, f.selection, now, now + 1),
   ).rejects.toThrow();
   await expect(
-    reviewOperatorListing(f.inventory, f.selection, now + 60000, now),
+    reviewOperatorListing(f.inventory, f.selection, now + 180000, now),
   ).rejects.toThrow();
 });

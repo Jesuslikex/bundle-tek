@@ -1,5 +1,8 @@
 import { readMarketplaceOwnedInventory } from './marketplace-owned-inventory-server';
-import { reviewOperatorListing } from './marketplace-operator-review';
+import {
+  reviewOperatorListing,
+  OPERATOR_REVIEW_WINDOW_MS,
+} from './marketplace-operator-review';
 import { walletWarmupSessionDigest as digest } from './wallet-warmup-session-digest';
 import {
   admitOperatorDraft,
@@ -126,7 +129,7 @@ export async function saveOperatorDraft(
   }
   const at = Date.parse(selection.reviewedAt),
     now = clock();
-  if (at > now || now - at >= 60000)
+  if (at > now || now - at >= OPERATOR_REVIEW_WINDOW_MS)
     fail('Listing review expired. Request a fresh review.');
   const inventory = await readMarketplaceOwnedInventory(db, owner, signal);
   signal.throwIfAborted();
@@ -168,7 +171,7 @@ export async function saveOperatorDraft(
   if (new TextEncoder().encode(document).byteLength > 16384)
     fail('Listing draft exceeds storage capacity.');
   signal.throwIfAborted();
-  if (clock() >= at + 60000)
+  if (clock() >= at + OPERATOR_REVIEW_WINDOW_MS)
     fail('Listing review expired. Request a fresh review.');
   try {
     await db

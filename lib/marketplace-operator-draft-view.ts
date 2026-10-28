@@ -3,6 +3,7 @@ import {
   operatorListingReview,
   operatorListingSelection,
   reviewOperatorListing,
+  OPERATOR_REVIEW_WINDOW_MS,
   type OperatorListingReview,
 } from './marketplace-operator-review';
 import { marketplaceOwnedInventoryResult } from './marketplace-owned-inventory';
@@ -82,8 +83,8 @@ export async function admitOperatorDraft(
     at > observed ||
     observed > created ||
     created > now ||
-    created >= at + 60000 ||
-    Date.parse(review.reviewExpiresAt) !== at + 60000
+    created >= at + OPERATOR_REVIEW_WINDOW_MS ||
+    Date.parse(review.reviewExpiresAt) !== at + OPERATOR_REVIEW_WINDOW_MS
   )
     throw Error('Saved listing draft chronology differs.');
   // Only derived age is rebased. Historical wallet, proof and activity timestamps remain unchanged.

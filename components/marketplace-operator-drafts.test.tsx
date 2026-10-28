@@ -267,8 +267,8 @@ it('disables saving and says so once the review expires', async () => {
   await check();
   expect(button('Save unpublished draft').disabled).toBe(false);
   await act(async () => {
-    vi.setSystemTime(now + 61000);
-    await vi.advanceTimersByTimeAsync(61000);
+    vi.setSystemTime(now + 181000);
+    await vi.advanceTimersByTimeAsync(181000);
   });
   expect(host.textContent).toContain('This review expired at');
   expect(button('Save unpublished draft').disabled).toBe(true);
@@ -290,7 +290,7 @@ it('does not renew expired review consent or auto-save during recovery', async (
   vi.stubGlobal('fetch', vi.fn());
   await mount();
   await check();
-  vi.setSystemTime(now + 60000);
+  vi.setSystemTime(now + 180000);
   await click('Save unpublished draft');
   expect(fetch).not.toHaveBeenCalled();
   expect(sessionStorage.getItem(key)).toBeNull();
