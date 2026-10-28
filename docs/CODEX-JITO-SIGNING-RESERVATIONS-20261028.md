@@ -127,6 +127,14 @@ conservative expiry and the original 32-slot span. It copies bounded raw bytes
 before asynchronous work and rejects shared-backed buffers. It explicitly does
 not authenticate caller-supplied data or authorize submission; trusted direct
 provider capture and a final signed-vector gate remain to be built and proven.
+An unmounted DB-only reader now checks a registered vector against exact
+receipts, both reservations and current project, session, preparation,
+acquisition and fee data. A real-reader synthetic SQLite sell test covers
+stale receipt, session, wallet and project refusal. The process-local handle
+retains a bounded hash, not packet bytes. Its caller still must authenticate
+the owner; repeated reads are not an atomic database snapshot and do not grant
+provider, currentness, signing or execution authority. Four focused suites
+passed 29 synthetic tests.
 
 No deployment, hosted database migration, provider or credential change,
 funded transaction, real-wallet signing, or live bundle submission is
