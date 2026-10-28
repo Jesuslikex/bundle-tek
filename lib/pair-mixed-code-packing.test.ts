@@ -100,6 +100,30 @@ it('packs mixed-loader bytes into fewer code calls with identical complete ident
     expect(call.rawBytes).toBeLessThanOrEqual(1024 * 1024);
   }
 });
+it('keeps the exact mixed-loader stock slice plan and preserves the 45-byte deployment header', async () => {
+  const f = fixture(3 * 1024 * 1024);
+  const result = await f.run(4);
+  expect(f.calls.filter((c) => c.length > 45)).toEqual([
+    {
+      keys: [f.legacy, f.dataKey],
+      offset: 0,
+      length: 737280,
+      rawBytes: 868352,
+    },
+    { keys: [f.dataKey], offset: 737280, length: 737280, rawBytes: 737280 },
+    { keys: [f.dataKey], offset: 1474560, length: 737280, rawBytes: 737280 },
+    { keys: [f.dataKey], offset: 2211840, length: 737280, rawBytes: 737280 },
+    { keys: [f.dataKey], offset: 2949120, length: 737280, rawBytes: 196653 },
+  ]);
+  expect(result.programs[1]).toMatchObject({
+    codeBytes: f.upgradeCode.length,
+    deploymentSlot: '90',
+    upgradeAuthority: bs58.encode(new Uint8Array(32).fill(54)),
+    codeSha256: Buffer.from(
+      await crypto.subtle.digest('SHA-256', f.upgradeCode),
+    ).toString('hex'),
+  });
+});
 it('retains the old loader-separated path when declared lengths are unavailable', async () => {
   const f = fixture(300000, false);
   await f.run(4);
@@ -158,6 +182,119 @@ it('stops after the first bounded batch when mixed reads are rate limited', asyn
   await expect(f.run(4, rpc)).rejects.toBe(error);
   expect(reads).toBe(4);
 });
+
+it.each(['failure', 'cancel'] as const)(
+  'never dispatches another planned slice after observed %s, even when in-flight reads complete late',
+  async (mode) => {
+    const f = fixture(5 * 1024 * 1024),
+      abort = new AbortController();
+    let calls = 0,
+      ready!: () => void;
+    const firstFour = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const pendingReads: {
+      resolve: () => void;
+      reject: (error: Error) => void;
+    }[] = [];
+    const rpc: PumpLaunchRpc = async (method, params, signal) => {
+      const config = params[1] as
+        | { dataSlice?: { length: number } }
+        | undefined;
+      if ((config?.dataSlice?.length ?? 0) > 45) {
+        calls++;
+        await new Promise<void>((resolve, reject) => {
+          pendingReads.push({ resolve, reject });
+          if (pendingReads.length === 4) ready();
+        });
+      }
+      return f.rpc(method, params, signal);
+    };
+    const pending = collectPumpProgramIdentities(
+      [f.legacy, f.upgraded],
+      100,
+      abort.signal,
+      rpc,
+      4,
+    );
+    const error = new WalletRpcError(429);
+    const assertion =
+      mode === 'failure'
+        ? expect(pending).rejects.toBe(error)
+        : expect(pending).rejects.toThrow(/cancelled|timed out/);
+    await firstFour;
+    if (mode === 'failure') pendingReads[0].reject(error);
+    else abort.abort();
+    await assertion;
+    for (const read of pendingReads) read.resolve();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(calls).toBe(4);
+  },
+);
+
+it.each(['failure', 'cancel'] as const)(
+  'aborts and settles every signal-aware in-flight read before returning on %s',
+  async (mode) => {
+    const f = fixture(5 * 1024 * 1024),
+      abort = new AbortController();
+    let calls = 0,
+      settled = 0,
+      aborted = 0,
+      ready!: () => void;
+    let rejectFirst!: (error: Error) => void;
+    const firstFour = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const rpc: PumpLaunchRpc = async (method, params, signal) => {
+      const config = params[1] as
+        | { dataSlice?: { length: number } }
+        | undefined;
+      if ((config?.dataSlice?.length ?? 0) <= 45)
+        return f.rpc(method, params, signal);
+      const ordinal = calls++;
+      try {
+        await new Promise<void>((_resolve, reject) => {
+          const onAbort = () => {
+            aborted++;
+            reject(new Error('read aborted'));
+          };
+          signal.addEventListener('abort', onAbort, { once: true });
+          if (signal.aborted) onAbort();
+          if (ordinal === 0)
+            rejectFirst = (error) => {
+              signal.removeEventListener('abort', onAbort);
+              reject(error);
+            };
+          if (calls === 4) ready();
+        });
+      } finally {
+        settled++;
+      }
+      return f.rpc(method, params, signal);
+    };
+    const pending = collectPumpProgramIdentities(
+      [f.legacy, f.upgraded],
+      100,
+      abort.signal,
+      rpc,
+      4,
+    );
+    const failure = new WalletRpcError(429);
+    const assertion =
+      mode === 'failure'
+        ? expect(pending).rejects.toBe(failure)
+        : expect(pending).rejects.toThrow(/cancelled|timed out/);
+    await firstFour;
+    if (mode === 'failure') rejectFirst(failure);
+    else abort.abort();
+    await assertion;
+    expect(calls).toBe(4);
+    expect(settled).toBe(4);
+    expect(aborted).toBe(mode === 'failure' ? 3 : 4);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(calls).toBe(4);
+  },
+);
 
 it.each(['complete', 'cancel'] as const)(
   'keeps mixed batches at four and preserves ordered bytes with reversed completion: %s',

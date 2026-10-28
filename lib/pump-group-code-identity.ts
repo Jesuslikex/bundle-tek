@@ -49,7 +49,12 @@ export async function collectPumpProgramIdentities(
   )
     throw new Error('Program identity scope differs.');
   programs.forEach(address);
-  const deadline = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
+  const invocation = new AbortController();
+  const deadline = AbortSignal.any([
+    signal,
+    AbortSignal.timeout(30000),
+    invocation.signal,
+  ]);
   let reads = 0,
     totalBytes = 0;
   const slots = [minimumSlot];
@@ -197,6 +202,119 @@ export async function collectPumpProgramIdentities(
       ? profiles
       : profiles.filter((item) => item.start === start);
     if (!selected.length) continue;
+    // The stock profile has declared lengths, so the same slice plan can be
+    // scheduled as a bounded window rather than waiting for each four-read
+    // batch's slowest response. The group and unknown-size paths stay serial.
+    if (
+      maxConcurrentCodeReads === 4 &&
+      maximumAccountsPerRead === 100 &&
+      selected.every((item) => item.space !== null)
+    ) {
+      type Plan = { offset: number; chunkSize: number; items: typeof selected };
+      const plan: Plan[] = [];
+      let nextOffset = 0;
+      while (true) {
+        const items = selected.filter(
+          (item) => nextOffset < item.space! - start,
+        );
+        if (!items.length) break;
+        let chunkSize = Math.min(
+          720 * 1024,
+          Math.floor(1048576 / items.length / 4096) * 4096,
+        );
+        for (let size = 720 * 1024; size > chunkSize; size -= 4096) {
+          if (
+            items.reduce(
+              (sum, item) =>
+                sum + Math.min(size, item.space! - start - nextOffset),
+              0,
+            ) <= 1048576
+          ) {
+            chunkSize = size;
+            break;
+          }
+        }
+        plan.push({ offset: nextOffset, chunkSize, items });
+        nextOffset += chunkSize;
+      }
+      const pieces = new Map<string, { offset: number; bytes: Uint8Array }[]>();
+      let next = 0;
+      let stopped = false;
+      let firstFailure: unknown;
+      const worker = async () => {
+        while (!stopped && next < plan.length) {
+          const batch = plan[next++];
+          try {
+            const parts = await accounts(
+              batch.items.map((item) => item.dataKey),
+              start + batch.offset,
+              batch.chunkSize,
+            );
+            for (const [i, item] of batch.items.entries()) {
+              const part = parts[i];
+              if (
+                !part ||
+                part.owner !== item.header.owner ||
+                part.executable !== item.header.executable ||
+                part.lamports !== item.header.lamports ||
+                String((part as typeof part & { space?: unknown }).space) !==
+                  String(item.declared)
+              )
+                throw new Error('Program identity changed during code read.');
+              const chunk = Uint8Array.from(
+                Buffer.from(part.data[0], 'base64'),
+              );
+              if (
+                chunk.length > batch.chunkSize ||
+                chunk.length !==
+                  Math.min(batch.chunkSize, item.space! - start - batch.offset)
+              )
+                throw new Error('Truncated program code.');
+              let bytes = chunk;
+              if (mixedDeclared && item.start === 45 && batch.offset === 0) {
+                const headerBytes = pumpAccountBytes(item.header);
+                if (
+                  headerBytes.length !== 45 ||
+                  chunk.length < 49 ||
+                  headerBytes.some((byte, j) => chunk[j] !== byte)
+                )
+                  throw new Error(
+                    'Program deployment header changed during code read.',
+                  );
+                bytes = chunk.slice(45);
+              }
+              item.size += bytes.length;
+              totalBytes += bytes.length;
+              if (item.size > 10 * 1024 * 1024 || totalBytes > 32 * 1024 * 1024)
+                throw new Error('Program code size exceeds bounds.');
+              if (!pieces.has(item.key)) pieces.set(item.key, []);
+              pieces.get(item.key)!.push({ offset: batch.offset, bytes });
+            }
+            deadline.throwIfAborted();
+          } catch (error) {
+            if (!stopped) {
+              stopped = true;
+              firstFailure = error;
+              invocation.abort(error);
+            }
+            throw error;
+          }
+        }
+      };
+      await Promise.allSettled(
+        Array.from({ length: Math.min(4, plan.length) }, worker),
+      );
+      if (stopped) throw firstFailure;
+      for (const item of selected) {
+        const ordered = (pieces.get(item.key) ?? []).sort(
+          (a, b) => a.offset - b.offset,
+        );
+        if (item.size !== item.space! - item.start)
+          throw new Error('Truncated program code.');
+        code.get(item.key)!.push(...ordered.map((part) => part.bytes));
+      }
+      continue;
+    }
     for (let offset = 0; selected.some((item) => !item.done);) {
       const active = selected.filter((item) => !item.done);
       // Known declared sizes let independent slices run in a bounded batch.

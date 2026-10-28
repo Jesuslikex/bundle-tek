@@ -250,6 +250,72 @@ it('stops after one bounded four-slice batch when the provider rate limits code 
   ).rejects.toBe(failure);
   expect(slices).toBe(4);
 });
+it('advances declared stock slices past a straggler with at most four reads and ordered bytes', async () => {
+  const f = fixture('binary', true, 3 * 1024 * 1024);
+  let active = 0,
+    maximum = 0;
+  const slices: { offset: number; length: number }[] = [];
+  let releaseFirst!: () => void;
+  const firstHeld = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let fifthStarted!: () => void;
+  const fifth = new Promise<void>((resolve) => {
+    fifthStarted = resolve;
+  });
+  const rpc: PumpLaunchRpc = async (method, params, signal) => {
+    const slice = (
+      params[1] as
+        | { dataSlice?: { offset: number; length: number } }
+        | undefined
+    )?.dataSlice;
+    if (
+      method !== 'getMultipleAccounts' ||
+      !slice ||
+      slice.offset < 45 ||
+      slice.length <= 45
+    )
+      return f.rpc(method, params, signal);
+    slices.push({ ...slice });
+    active++;
+    maximum = Math.max(maximum, active);
+    if (slices.length === 5) fifthStarted();
+    try {
+      if (slice.offset === 45) await firstHeld;
+      return await f.rpc(method, params, signal);
+    } finally {
+      active--;
+    }
+  };
+  const pending = collectPumpProgramIdentities(
+    [program],
+    100,
+    new AbortController().signal,
+    rpc,
+    4,
+  );
+  let fifthArrived = false;
+  try {
+    fifthArrived = await Promise.race([
+      fifth.then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
+    ]);
+  } finally {
+    releaseFirst();
+  }
+  expect(fifthArrived).toBe(true);
+  const report = await pending;
+  expect(maximum).toBeLessThanOrEqual(4);
+  expect(slices).toEqual(
+    [0, 1, 2, 3, 4].map((i) => ({
+      offset: 45 + i * 720 * 1024,
+      length: 720 * 1024,
+    })),
+  );
+  expect(report.programs[0].codeSha256).toBe(
+    Buffer.from(await crypto.subtle.digest('SHA-256', f.code)).toString('hex'),
+  );
+});
 it.each(['ok', 'cancel', 'truncate'] as const)(
   'bounds parallel code slices and retains exact ordered bytes: %s',
   async (mode) => {
