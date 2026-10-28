@@ -80,6 +80,8 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
   verifySignatures: boolean;
   signal: AbortSignal;
   transport: (request: Read) => Promise<Response>;
+  /** Optional diagnostics only; never used to admit evidence or authorize execution. */
+  diagnosticTiming?: boolean;
 }) {
   const read = <K extends keyof typeof input>(key: K): (typeof input)[K] => {
     const descriptor = Object.getOwnPropertyDescriptor(input, key);
@@ -108,6 +110,51 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
   )
     throw Error('Jito simulation attempt policy or signal differs.');
   const owner = new AbortController();
+  // A data-property boolean is the only opt-in. Never invoke a diagnostic
+  // callback or a timing option getter from the collector.
+  let timingsEnabled = false;
+  try {
+    const option = Object.getOwnPropertyDescriptor(input, 'diagnosticTiming');
+    timingsEnabled =
+      !!option && Object.hasOwn(option, 'value') && option.value === true;
+  } catch {
+    // An unavailable diagnostic must not affect admission.
+  }
+  // Diagnostic boundaries: batchBodyReadAndParseMs includes waiting for the
+  // streamed provider body and parsing that batch, not merely local CPU.
+  // discoveryParseMs reads/parses the derived in-memory discovery member;
+  // envelope/context checks follow it. feeValidationMs includes the derived
+  // fee projection, fee parser and same-bank checks. exactBuildMs covers the
+  // exact request construction and serialization, excluding its later send.
+  // Null means the phase did not finish or the ambient clock was unavailable.
+  const timings: Record<
+    | 'batchBodyReadAndParseMs'
+    | 'discoveryParseMs'
+    | 'feeValidationMs'
+    | 'exactBuildMs',
+    number | null
+  > = {
+    batchBodyReadAndParseMs: null,
+    discoveryParseMs: null,
+    feeValidationMs: null,
+    exactBuildMs: null,
+  };
+  const now = (): number | null => {
+    if (!timingsEnabled) return null;
+    try {
+      const value = performance.now();
+      return Number.isFinite(value) && value >= 0 ? value : null;
+    } catch {
+      return null;
+    }
+  };
+  const markDuration = (key: keyof typeof timings, start: number | null) => {
+    const end = now();
+    if (start !== null && end !== null && end >= start)
+      timings[key] = end - start;
+  };
+  const timingOutput = () =>
+    timingsEnabled ? { diagnosticTimings: { ...timings } } : {};
   const deadline = AbortSignal.any([
     signal,
     owner.signal,
@@ -154,6 +201,7 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
     feeProjection,
     batchBody,
     sentSimulationBody,
+    ...timingOutput(),
     ...authority,
   });
   async function send(body: string, methodCount: number) {
@@ -233,20 +281,24 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
       { length: prepared.packetBindings.length },
       (_, i) => `${feeIdPrefix}:${i}`,
     );
+    const batchParseStart = now();
     batch = await readJitoRpcBatchCapture(
       responseField(first, 'body'),
       deadline,
       [...ids, discoveryId],
     );
+    markDuration('batchBodyReadAndParseMs', batchParseStart);
     if (rateLimited(batch.rawResponse?.value)) return refuse('rate-limited');
     if (batch.status !== 'captured') return refuse('simulation-refused');
     const discoveryBytes = Uint8Array.from(batch.members.at(-1)!.rawBody);
+    const discoveryParseStart = now();
     discovery = await readJitoSimulationPayload(
       new Response(discoveryBytes).body,
       deadline,
       4194304,
       { allowDecimalTokens: true },
     );
+    markDuration('discoveryParseMs', discoveryParseStart);
     const envelope = object(discovery.value);
     exact(envelope, ['jsonrpc', 'id', 'result']);
     if (envelope.jsonrpc !== '2.0' || envelope.id !== discoveryId)
@@ -277,6 +329,7 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
     )
       return refuse('simulation-refused');
     const bank = Number(context.slot);
+    const feeValidationStart = now();
     const bytes = batch.members.slice(0, -1).map((member) => member.rawBody);
     const derived = new Uint8Array(
       2 + bytes.reduce((n, b) => n + b.byteLength, 0) + bytes.length - 1,
@@ -304,12 +357,16 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
           fee.slot < minimumSlot ||
           fee.slot - minimumSlot > 32,
       )
-    )
+    ) {
+      markDuration('feeValidationMs', feeValidationStart);
       return {
         ...refuse('fees-refused'),
         // Derived only from validated numeric contexts, never provider text.
         detail: `discovery bank ${bank}; observed fee banks ${fees.fees.map((fee) => fee.slot).join(',') || 'none'}`,
       };
+    }
+    markDuration('feeValidationMs', feeValidationStart);
+    const exactBuildStart = now();
     const exactRequest = await buildJitoBundleSimulationRequest(
       prepared.packetBindings,
       bank,
@@ -321,6 +378,7 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
       method: exactRequest.method,
       params: exactRequest.params,
     });
+    markDuration('exactBuildMs', exactBuildStart);
     phase = 'exact';
     const response = await send(sentSimulationBody, 1);
     if (!response)
@@ -364,6 +422,7 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
       feeProjection,
       batchBody,
       sentSimulationBody,
+      ...timingOutput(),
       ...authority,
     };
   } catch {

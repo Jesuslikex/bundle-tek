@@ -435,6 +435,7 @@ export async function runNativeJitoCampaign({
           simulationRpcId: `native-exact:${index}`,
           verifySignatures: false,
           signal: deadline,
+          ...(profile === 'prefee' ? { diagnosticTiming: true } : {}),
           transport: async (request) => {
             if (
               request.signal.aborted ||
@@ -476,6 +477,43 @@ export async function runNativeJitoCampaign({
           },
         }),
       );
+      // Timing is optional and untrusted. Copy only bounded scalar data from
+      // own data properties; it never affects admission or the request plan.
+      if (profile === 'prefee') {
+        try {
+          const property = Object.getOwnPropertyDescriptor(
+            result,
+            'diagnosticTimings',
+          );
+          const value =
+            property && Object.hasOwn(property, 'value')
+              ? property.value
+              : null;
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const safe = {};
+            for (const key of [
+              'batchBodyReadAndParseMs',
+              'discoveryParseMs',
+              'feeValidationMs',
+              'exactBuildMs',
+            ]) {
+              const field = Object.getOwnPropertyDescriptor(value, key);
+              const sample =
+                field && Object.hasOwn(field, 'value') ? field.value : null;
+              safe[key] =
+                typeof sample === 'number' &&
+                Number.isFinite(sample) &&
+                sample >= 0 &&
+                sample <= 30000
+                  ? sample
+                  : null;
+            }
+            attempt.prefeeDiagnosticTimings = safe;
+          }
+        } catch {
+          // A broken diagnostic must not affect a qualification outcome.
+        }
+      }
       if (result.discovery && profile === 'legacy')
         retain(
           runtimeReads.find((r) => r.phase === 'discovery').read,

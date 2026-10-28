@@ -48,6 +48,100 @@ function transport(
       ),
   );
 }
+it('records opt-in non-authoritative timing without changing requests or evidence', async () => {
+  const f = await jitoRawResponseFixture();
+  const baselineTransport = transport(f),
+    timedTransport = transport(f);
+  const baseline = await collectJitoCoherentPrefeeAttempt(
+    input(f, baselineTransport),
+  );
+  const timed = await collectJitoCoherentPrefeeAttempt(
+    input(f, timedTransport, { diagnosticTiming: true }),
+  );
+  expect(baseline.status).toBe('captured');
+  expect(timed.status).toBe(baseline.status);
+  expect(
+    timedTransport.mock.calls.map(([r]) => [r.phase, r.methodCount, r.body]),
+  ).toEqual(
+    baselineTransport.mock.calls.map(([r]) => [r.phase, r.methodCount, r.body]),
+  );
+  expect(baseline).not.toHaveProperty('diagnosticTimings');
+  expect(timed).toHaveProperty('diagnosticTimings');
+  const { diagnosticTimings, ...timedEvidence } = timed;
+  expect(timedEvidence).toEqual(baseline);
+  for (const n of Object.values(diagnosticTimings!))
+    expect(
+      n === null || (typeof n === 'number' && Number.isFinite(n) && n >= 0),
+    ).toBe(true);
+  expect(timed).toMatchObject({
+    providerQualified: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+});
+it('does not call a diagnostic option getter and preserves a refused request sequence', async () => {
+  const f = await jitoRawResponseFixture();
+  const send = transport(f, (rows) => {
+    (rows[0] as { result: { context: { slot: bigint } } }).result.context.slot =
+      102n;
+    return rows;
+  });
+  const getter = vi.fn(() => true);
+  const config = input(f, send);
+  Object.defineProperty(config, 'diagnosticTiming', { get: getter });
+  const result = await collectJitoCoherentPrefeeAttempt(config);
+  expect(getter).not.toHaveBeenCalled();
+  expect(result).toMatchObject({
+    status: 'refused',
+    reason: 'fees-refused',
+    signingAllowed: false,
+  });
+  expect(result).not.toHaveProperty('diagnosticTimings');
+  expect(send).toHaveBeenCalledTimes(1);
+});
+it('retains completed timing phases on a mixed-bank refusal without an extra request', async () => {
+  const f = await jitoRawResponseFixture();
+  const send = transport(f, (rows) => {
+    (rows[0] as { result: { context: { slot: bigint } } }).result.context.slot =
+      102n;
+    return rows;
+  });
+  const result = await collectJitoCoherentPrefeeAttempt(
+    input(f, send, { diagnosticTiming: true }),
+  );
+  expect(result).toMatchObject({
+    status: 'refused',
+    reason: 'fees-refused',
+    diagnosticTimings: { exactBuildMs: null },
+  });
+  expect(send).toHaveBeenCalledTimes(1);
+});
+it('does not change admission or request count when the diagnostic clock throws', async () => {
+  const f = await jitoRawResponseFixture();
+  const send = transport(f);
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => {
+    throw Error('untrusted clock error');
+  });
+  let result: Awaited<ReturnType<typeof collectJitoCoherentPrefeeAttempt>>;
+  try {
+    result = await collectJitoCoherentPrefeeAttempt(
+      input(f, send, { diagnosticTiming: true }),
+    );
+  } finally {
+    clock.mockRestore();
+  }
+  expect(result).toMatchObject({
+    status: 'captured',
+    diagnosticTimings: {
+      batchBodyReadAndParseMs: null,
+      discoveryParseMs: null,
+      feeValidationMs: null,
+      exactBuildMs: null,
+    },
+    signingAllowed: false,
+  });
+  expect(send).toHaveBeenCalledTimes(2);
+});
 for (const [side, wallets, token2022, lookup] of [
   ['Buy', 1, false, false],
   ['Sell', 2, true, true],

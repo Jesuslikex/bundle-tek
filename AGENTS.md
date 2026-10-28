@@ -35,6 +35,10 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 COMPLETE, claim released: opt-in read-only Jito prefee timing instrumentation. See docs/CODEX-JITO-PREFEE-PHASE-TIMING-20261028.md. No extra RPC, retry, check, authority or provider changes.
+
+- Codex + helper, 28 October 2026 ACTIVE: native withdrawal account-scoped exact-history inspection and cancelled-packet export in components/native-withdrawal-panel.tsx, app/api/wallet-workspace/withdrawals/route.ts, new lib/native-withdrawal-owner-scope.ts and focused tests. Require authenticated owner/session fencing and exact validated saved packet; explicit export only, no signing, registration or submission.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: native withdrawal panel retains verified signed packets before final wallet checks and only registers after they succeed. See docs/CODEX-NATIVE-WITHDRAWAL-RECOVERY-20261028.md. No real wallet action, send, provider change or deployment.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: Jito external-wallet final signer recheck before registration. See docs/CODEX-JITO-WALLET-RECHECK-20261028.md for validation and limitations. No real wallet/signing, automatic retry, send, provider setting or deploy.

@@ -203,8 +203,10 @@ function harness(options = {}) {
 }
 
 void test('opt-in prefee campaign accounts for every method and keeps actual batch and exact wire parents', async () => {
+  let getterCalls = 0;
   const h = harness({
     async prefeeCollect(input) {
+      assert.equal(input.diagnosticTiming, true);
       const simulation = {
         jsonrpc: '2.0',
         id: input.simulationRpcId,
@@ -274,6 +276,20 @@ void test('opt-in prefee campaign accounts for every method and keeps actual bat
         discovery: capture({ derived: true }),
         batch: { status: 'captured', rawResponse: parent, members },
         sentSimulationBody: exactBody,
+        diagnosticTimings: Object.defineProperty(
+          {
+            batchBodyReadAndParseMs: 1.25,
+            discoveryParseMs: -1,
+            feeValidationMs: 30001,
+          },
+          'exactBuildMs',
+          {
+            get() {
+              getterCalls++;
+              throw Error('diagnostic getter must not run');
+            },
+          },
+        ),
         ...flags,
       };
     },
@@ -283,11 +299,18 @@ void test('opt-in prefee campaign accounts for every method and keeps actual bat
   assert.equal(result.nativeCapturedCount, 3);
   assert.equal(result.nativeProfileConsistent, true);
   assert.equal(result.providerQualified, false);
+  assert.equal(getterCalls, 0);
   assert.equal(h.pacing.length, 24);
   for (const a of result.attempts) {
     assert.equal(a.httpRequests, 6);
     assert.equal(a.logicalMethods, 8);
     assert.equal(a.executionAllowed, false);
+    assert.deepEqual(a.prefeeDiagnosticTimings, {
+      batchBodyReadAndParseMs: 1.25,
+      discoveryParseMs: null,
+      feeValidationMs: null,
+      exactBuildMs: null,
+    });
     assert.ok(h.files.has(`attempt-${a.index}/3.response.bin`));
     assert.ok(h.files.has(`attempt-${a.index}/4.response.bin`));
     const manifest = JSON.parse(
