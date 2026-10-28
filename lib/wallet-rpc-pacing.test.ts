@@ -7,6 +7,9 @@ import {
 } from './wallet-rpc-pacing';
 afterEach(() => {
   delete (env as Record<string, unknown>).SOLANA_RPC_MIN_INTERVAL_MS;
+  delete (env as Record<string, unknown>)
+    .SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND;
+  delete (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_RPC_URL;
   vi.useRealTimers();
 });
 
@@ -128,6 +131,135 @@ it('counts actual single and double qualification admissions under nine methods 
   }
   expect(sent[1].at - sent[0].at).toBe(125);
   expect(sent[2].at - sent[1].at).toBe(250);
+});
+it('expires weighted admissions only after the entire guarded window and makes progress', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(1_000_000);
+  const endpoint = 'https://validator.example.test/guarded-weighted-window';
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_RPC_URL = endpoint;
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND =
+    '3';
+  const signal = new AbortController().signal;
+  await paceWalletRpc(endpoint, signal, 2, 'stock-runtime-evidence');
+  const times = [Date.now()];
+  let done = false;
+  const second = paceWalletRpc(
+    endpoint,
+    signal,
+    2,
+    'stock-runtime-evidence',
+  ).then(() => {
+    times.push(Date.now());
+    done = true;
+  });
+  await vi.advanceTimersByTimeAsync(1024);
+  expect(done).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await second;
+  expect(times[1] - times[0]).toBe(1025);
+
+  // Previously accumulated old admissions must not block later operations.
+  await vi.advanceTimersByTimeAsync(30_000);
+  await paceWalletRpc(endpoint, signal, 2, 'stock-runtime-evidence');
+  const last = Date.now();
+  const fourth = paceWalletRpc(endpoint, signal, 2, 'stock-runtime-evidence');
+  await vi.advanceTimersByTimeAsync(1025);
+  await fourth;
+  expect(Date.now() - last).toBe(1025);
+});
+
+it('rejects a batch larger than the configured qualification budget without queuing', async () => {
+  vi.useFakeTimers();
+  const endpoint = 'https://validator.example.test/one-method-budget';
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_RPC_URL = endpoint;
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND =
+    '1';
+  const signal = new AbortController().signal;
+  await expect(
+    paceWalletRpc(endpoint, signal, 2, 'stock-runtime-evidence'),
+  ).rejects.toThrow('exceeds the configured method budget');
+  await expect(
+    paceWalletRpc(endpoint, signal, 1, 'stock-runtime-evidence'),
+  ).resolves.toBeUndefined();
+});
+
+it('cancels a guarded-window waiter without consuming its method units', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(2_000_000);
+  const endpoint = 'https://validator.example.test/guarded-cancellation';
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_RPC_URL = endpoint;
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND =
+    '3';
+  const active = new AbortController();
+  await paceWalletRpc(endpoint, active.signal, 2, 'stock-runtime-evidence');
+  const queued = new AbortController();
+  const rejected = expect(
+    paceWalletRpc(endpoint, queued.signal, 2, 'stock-runtime-evidence'),
+  ).rejects.toThrow('cancelled guarded request');
+  await vi.advanceTimersByTimeAsync(1000);
+  queued.abort(new Error('cancelled guarded request'));
+  await rejected;
+  const now = Date.now();
+  await paceWalletRpc(endpoint, active.signal, 1, 'stock-runtime-evidence');
+  expect(Date.now()).toBe(now);
+});
+
+it('waits for as many weighted admissions to expire as the request requires', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(3_000_000);
+  const endpoint = 'https://validator.example.test/multiple-expiries';
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_RPC_URL = endpoint;
+  (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND =
+    '5';
+  const signal = new AbortController().signal;
+  await paceWalletRpc(endpoint, signal, 1, 'stock-runtime-evidence');
+  for (const units of [1, 1, 2]) {
+    const next = paceWalletRpc(
+      endpoint,
+      signal,
+      units,
+      'stock-runtime-evidence',
+    );
+    await vi.advanceTimersByTimeAsync(250);
+    await next;
+  }
+  let admitted = false;
+  const waiting = paceWalletRpc(
+    endpoint,
+    signal,
+    2,
+    'stock-runtime-evidence',
+  ).then(() => {
+    admitted = true;
+  });
+  await vi.advanceTimersByTimeAsync(524);
+  expect(admitted).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await waiting;
+  expect(Date.now()).toBe(3_001_275);
+});
+
+it('keeps concurrent qualification budgets and delays isolated by endpoint', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(4_000_000);
+  const signal = new AbortController().signal;
+  const a = 'https://validator.example.test/independent-a';
+  const b = 'https://validator.example.test/independent-b';
+  await paceWalletRpc(a, signal, 2, 'stock-runtime-evidence');
+  let aDone = false;
+  const delayedA = paceWalletRpc(a, signal, 2, 'stock-runtime-evidence').then(
+    () => {
+      aDone = true;
+    },
+  );
+  await paceWalletRpc(b, signal, 1, 'stock-runtime-evidence');
+  const admittedB = paceWalletRpc(b, signal, 1, 'stock-runtime-evidence');
+  await vi.advanceTimersByTimeAsync(125);
+  await admittedB;
+  expect(aDone).toBe(false);
+  await vi.advanceTimersByTimeAsync(125);
+  await delayedA;
+  expect(aDone).toBe(true);
 });
 it('rechecks admission time after delayed timers and never sends a cancelled qualification read', async () => {
   vi.useFakeTimers();
@@ -259,3 +391,26 @@ it('raises the qualification budget only for the configured stock runtime endpoi
     delete (env as Record<string, unknown>).SOLANA_STOCK_RUNTIME_RPC_URL;
   }
 });
+
+it.each([
+  'https://api.mainnet-beta.solana.com/',
+  'https://solana-rpc.publicnode.com/',
+])(
+  'preserves the public budget for an unrelated runtime setting: %s',
+  (publicEndpoint) => {
+    const runtime = 'https://validator.example.test/stock';
+    expect(stockQualificationMethodBudget(publicEndpoint, '16', runtime)).toBe(
+      5,
+    );
+    expect(
+      stockQualificationMethodBudget(publicEndpoint, '16', publicEndpoint),
+    ).toBe(16);
+    expect(
+      stockQualificationMethodBudget(
+        'https://private.example.test/',
+        '16',
+        runtime,
+      ),
+    ).toBe(9);
+  },
+);

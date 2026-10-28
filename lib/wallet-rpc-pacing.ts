@@ -16,17 +16,18 @@ export function stockQualificationMethodBudget(
   runtime = (env as unknown as Record<string, unknown>)
     .SOLANA_STOCK_RUNTIME_RPC_URL,
 ) {
-  if (configured === undefined || configured === '')
-    return PUBLIC_HOSTS.has(new URL(endpoint).hostname)
+  const fallbackBudget = () =>
+    PUBLIC_HOSTS.has(new URL(endpoint).hostname)
       ? PUBLIC_QUALIFICATION_METHOD_BUDGET
       : 9;
+  if (configured === undefined || configured === '') return fallbackBudget();
   if (typeof configured !== 'string' || !/^[1-9]\d?$/.test(configured))
     throw new Error('Invalid stock runtime RPC method budget.');
   return typeof runtime === 'string' &&
     runtime !== '' &&
     new URL(runtime).href === new URL(endpoint).href
     ? Number(configured)
-    : 9;
+    : fallbackBudget();
 }
 type Admission = { at: number; units: number };
 const qualification = new Map<
@@ -108,15 +109,21 @@ export async function paceWalletRpc(
       qualificationScope === 'stock-runtime-evidence'
         ? stockQualificationMethodBudget(endpoint)
         : 9;
+    if (units > budget)
+      throw Error(
+        'Qualification request exceeds the configured method budget.',
+      );
     const pending = profile.tail.then(async () => {
       for (;;) {
         signal.throwIfAborted();
         const now = Date.now();
-        // A 25 ms guard: the qualifier measures the same window from the request\n        // start, and a boundary-straddling entry otherwise lets a 10th through.\n        profile.sent = profile.sent.filter((entry) => entry.at > now - 1025);
+        // A 25 ms guard: the qualifier measures the same window from the request
+        // start, and a boundary-straddling entry otherwise lets a 10th through.
+        profile.sent = profile.sent.filter((entry) => entry.at > now - 1025);
         const budgetAt =
           profile.sent.reduce((sum, entry) => sum + entry.units, 0) + units >
           budget
-            ? profile.sent[0].at + 1000
+            ? profile.sent[0].at + 1025
             : now;
         const at = Math.max(now, profile.nextRead, budgetAt);
         if (at > now) {
