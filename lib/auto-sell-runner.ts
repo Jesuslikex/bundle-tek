@@ -2,6 +2,7 @@ import {
   AutoSellReviewRecoveryError,
   type AutoSellReviewReference,
 } from './auto-sell-review-recovery';
+import type { AutoSellRunRestore } from './auto-sell-run-restore';
 import {
   applyAutoSellTrade,
   checkAutoSellEnd,
@@ -65,6 +66,8 @@ export type AutoSellSnapshot = {
   outcomeOverflow?: boolean;
   reviewRecovery?: AutoSellReviewReference | null;
   reviewRecoveryConflict?: boolean;
+  /** Set when the run was rebuilt from its journal rather than started fresh. */
+  restored?: { unavailable: readonly string[] } | null;
 };
 
 export type AutoSellRunnerDeps = {
@@ -153,6 +156,7 @@ export class AutoSellRunner {
   private retiredIds = new Set<string>();
   private pendingEdit: { review: AutoSellEditReview; evidence: string } | null =
     null;
+  private restored: AutoSellRunRestore | null = null;
 
   constructor(deps: AutoSellRunnerDeps) {
     this.deps = {
@@ -179,23 +183,42 @@ export class AutoSellRunner {
       endCapRaw(strategy, deps.totalSupplyRaw, deps.decimals);
   }
 
-  start() {
+  start(restore?: AutoSellRunRestore) {
     if (this.running) return;
     this.running = true;
     const now = this.deps.now();
-    this.activeAt = now + (this.deps.session?.startDelaySeconds ?? 0) * 1000;
+    this.activeAt = restore?.activeAt ?? now + (this.deps.session?.startDelaySeconds ?? 0) * 1000;
     this.counterNotBefore = this.activeAt;
     for (const s of this.deps.strategies)
-      this.states.set(s.id, initialAutoSellState(this.activeAt));
+      this.states.set(
+        s.id,
+        restore?.states.get(s.id) ?? initialAutoSellState(this.activeAt),
+      );
+    if (restore) {
+      this.restored = restore;
+      this.paused = restore.paused;
+      if (restore.stoppedReason) {
+        this.running = false;
+        this.paused = false;
+        this.note(
+          null,
+          'info',
+          `Restored a stopped run. ${restore.unavailable.length} kinds of live state are not durable.`,
+        );
+        return;
+      }
+    }
     if (this.deps.session?.endDurationSeconds)
       this.endTimer = this.deps.setTimer(
         () => this.stop('Session duration reached.'),
-        this.activeAt - now + this.deps.session.endDurationSeconds * 1000,
+        Math.max(0, this.activeAt - now) + this.deps.session.endDurationSeconds * 1000,
       );
     this.note(
       null,
       'info',
-      `Started ${this.deps.strategies.length} strateg${this.deps.strategies.length === 1 ? 'y' : 'ies'}. Watching for buys.`,
+      restore
+        ? `Restored ${this.deps.strategies.length} strateg${this.deps.strategies.length === 1 ? 'y' : 'ies'} from the journal. The live queue, skipped triggers and random draws are not durable.`
+        : `Started ${this.deps.strategies.length} strateg${this.deps.strategies.length === 1 ? 'y' : 'ies'}. Watching for buys.`,
     );
     void this.tick();
   }
@@ -537,6 +560,9 @@ export class AutoSellRunner {
       outcomeOverflow: this.outcomeOverflow,
       reviewRecovery: this.reviewRecovery,
       reviewRecoveryConflict: this.reviewRecoveryConflict,
+      restored: this.restored
+        ? { unavailable: this.restored.unavailable }
+        : null,
     };
   }
 
