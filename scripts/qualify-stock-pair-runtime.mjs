@@ -184,6 +184,7 @@ try {
     throw Error('Configured provider settings unavailable.');
   const methods = new Set([
     'getGenesisHash',
+    'getLatestBlockhash',
     'getSlot',
     'getMultipleAccounts',
     'getBlockHeight',
@@ -215,7 +216,10 @@ try {
         batch.length > 2 ||
         batch.some((r) => !methods.has(r.method))
       )
-        throw Error('Non-read-only RPC method rejected.');
+        throw Error(
+          'Non-read-only RPC method rejected: ' +
+            JSON.stringify(batch.map((r) => r.method)),
+        );
       if (
         batch.some(
           (r) =>

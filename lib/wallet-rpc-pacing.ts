@@ -103,7 +103,7 @@ export async function paceWalletRpc(
       for (;;) {
         signal.throwIfAborted();
         const now = Date.now();
-        profile.sent = profile.sent.filter((entry) => entry.at > now - 1000);
+        // A 25 ms guard: the qualifier measures the same window from the request\n        // start, and a boundary-straddling entry otherwise lets a 10th through.\n        profile.sent = profile.sent.filter((entry) => entry.at > now - 1025);
         const budgetAt =
           profile.sent.reduce((sum, entry) => sum + entry.units, 0) + units >
           budget
@@ -118,7 +118,10 @@ export async function paceWalletRpc(
         profile.nextRead =
           now +
           Math.max(
-            (budget === 9 ? 112 : Math.ceil(1000 / budget)) * units,
+            // 1000/budget is one interval too fast: the window is closed at both
+            // ends, so the first admission's units count too. budget-1 intervals
+            // is what actually keeps a rolling second at or under the budget.
+            Math.ceil(1000 / Math.max(1, budget - 1)) * units,
             interval > 200 ? interval : 0,
           );
         return;

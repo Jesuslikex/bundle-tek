@@ -126,8 +126,8 @@ it('counts actual single and double qualification admissions under nine methods 
         .reduce((sum, entry) => sum + entry.units, 0),
     ).toBeLessThanOrEqual(9);
   }
-  expect(sent[1].at - sent[0].at).toBe(112);
-  expect(sent[2].at - sent[1].at).toBe(224);
+  expect(sent[1].at - sent[0].at).toBe(125);
+  expect(sent[2].at - sent[1].at).toBe(250);
 });
 it('rechecks admission time after delayed timers and never sends a cancelled qualification read', async () => {
   vi.useFakeTimers();
@@ -148,7 +148,7 @@ it('rechecks admission time after delayed timers and never sends a cancelled qua
   await pending;
   const at = Date.now();
   const next = paceWalletRpc(endpoint, signal, 1);
-  await vi.advanceTimersByTimeAsync(111);
+  await vi.advanceTimersByTimeAsync(124);
   let done = false;
   void next.then(() => {
     done = true;
@@ -157,7 +157,7 @@ it('rechecks admission time after delayed timers and never sends a cancelled qua
   expect(done).toBe(false);
   await vi.advanceTimersByTimeAsync(1);
   await next;
-  expect(Date.now() - at).toBe(112);
+  expect(Date.now() - at).toBe(125);
 });
 it('rejects an unsupported qualification provider or invalid method count', async () => {
   for (const [endpoint, units] of [
@@ -185,7 +185,7 @@ it('does not enroll ordinary reads in an existing qualification profile without 
   const qualified = paceWalletRpc(endpoint, signal, 1).then(() => {
     admitted = true;
   });
-  await vi.advanceTimersByTimeAsync(223);
+  await vi.advanceTimersByTimeAsync(249);
   expect(admitted).toBe(false);
   await vi.advanceTimersByTimeAsync(1);
   await qualified;
