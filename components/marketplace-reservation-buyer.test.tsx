@@ -4,6 +4,17 @@ import { createRoot, type Root } from 'react-dom/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { marketplacePublicationFixture } from '../test/marketplace-publication-fixture';
+const vault = vi.hoisted(() => ({
+  unlock: vi.fn(),
+  sign: vi.fn(),
+}));
+vi.mock('@/lib/browser-wallet-vault', () => ({
+  VAULT_STORAGE_KEY: 'buyer-test-vault',
+  unlockVault: vault.unlock,
+}));
+vi.mock('@/lib/marketplace-payment-sign', () => ({
+  signMarketplacePayment: vault.sign,
+}));
 import {
   buildCartRequest,
   reviewMarketplaceCart,
@@ -508,4 +519,71 @@ it('offers the reviewed payment after a hold instead of pretending it is a purch
   )!;
   expect(pay).toBeDefined();
   expect(pay.disabled).toBe(true);
+});
+it('pays from the vault, imports, then reveals the delivered keys', async () => {
+  localStorage.setItem('buyer-test-vault', 'SYNTHETIC');
+  vault.unlock.mockResolvedValue({
+    payload: { wallets: [{ family: 'solana', address: 'Payer111' }] },
+  });
+  vault.sign.mockReturnValue({ signature: 'SIG', transaction: 'SIGNED' });
+  const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+    const parsed = init?.body
+      ? (JSON.parse(init.body as string) as {
+          action?: string;
+        } & Record<string, unknown>)
+      : {};
+    const { action, ...payload } = parsed;
+    if (action === 'reserve') saved = await makeReservation(payload);
+    if (action === 'settle')
+      return Response.json({ settled: { walletCount: 1 } });
+    if (action === 'pay') return Response.json({ payment: { paidAt: 'now' } });
+    if (_url.includes('/delivery'))
+      return Response.json({
+        keys: [{ address: 'Wallet111', privateKey: 'KEY111' }],
+        missing: ['Wallet222'],
+      });
+    const base = (await response().json()) as { reservation: unknown };
+    return Response.json({
+      ...base,
+      payment: {
+        sellerWallet: 'So11111111111111111111111111111111111111112',
+        lamports: '50000000',
+        paidAt: null,
+        transaction: 'PREPARED',
+      },
+    });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Fixture hold review');
+  await check(RESERVATION_ACK);
+  await click('Hold these wallets');
+  for (let i = 0; i < 40; i += 1) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+    if (document.body.textContent?.includes('Pay the reviewed total')) break;
+  }
+  const password = document.querySelector<HTMLInputElement>(
+    'input[type=password]',
+  )!;
+  expect(password).toBeTruthy();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(password, 'passphrase');
+    password.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('Pay and import');
+  for (let i = 0; i < 40; i += 1) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+    if (document.body.textContent?.includes('Delivered keys')) break;
+  }
+  expect(vault.sign).toHaveBeenCalledTimes(1);
+  expect(document.body.textContent).toContain('Delivered keys (1)');
+  expect(document.body.textContent).toContain('KEY111');
+  expect(document.body.textContent).toContain('Wallet222');
 });

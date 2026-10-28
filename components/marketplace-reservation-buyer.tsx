@@ -69,7 +69,11 @@ export function MarketplaceReservationBuyer({
       paidAt: string | null;
     } | null>(null),
     [payPassword, setPayPassword] = useState(''),
-    [paying, setPaying] = useState(false);
+    [paying, setPaying] = useState(false),
+    [delivered, setDelivered] = useState<
+      { address: string; privateKey: string }[] | null
+    >(null),
+    [missingKeys, setMissingKeys] = useState<string[]>([]);
   const pending = useRef<AbortController | null>(null),
     expected = useRef<ReservationRequest | undefined>(undefined),
     recoveryButton = useRef<HTMLButtonElement | null>(null),
@@ -181,8 +185,21 @@ export function MarketplaceReservationBuyer({
       if (!settled.ok || !done.settled)
         throw Error(done.error ?? 'The paid wallets could not be imported.');
       setMessage(
-        `Paid and imported ${done.settled.walletCount ?? 0} wallet(s) to My wallets. Key delivery is still manual.`,
+        `Paid and imported ${done.settled.walletCount ?? 0} wallet(s) to My wallets.`,
       );
+      // Delivery is the last step and may legitimately be partial.
+      const delivery = await fetch(
+        '/api/marketplace/delivery?id=' + encodeURIComponent(activeId),
+        { cache: 'no-store' },
+      ).catch(() => null);
+      const keys = delivery?.ok
+        ? ((await delivery.json()) as {
+            keys?: { address: string; privateKey: string }[];
+            missing?: string[];
+          })
+        : null;
+      if (keys?.keys?.length) setDelivered(keys.keys);
+      if (keys?.missing?.length) setMissingKeys(keys.missing);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The payment failed.');
     } finally {
@@ -678,6 +695,29 @@ export function MarketplaceReservationBuyer({
               </button>
             </div>
           )}
+          {delivered?.length ? (
+            <details open>
+              <summary>Delivered keys ({delivered.length})</summary>
+              <p>
+                Import these into the vault. A previous copy may still exist
+                with the seller.
+              </p>
+              {delivered.map((k) => (
+                <p key={k.address}>
+                  <code>{k.address}</code>
+                  <br />
+                  <code>{k.privateKey}</code>
+                </p>
+              ))}
+            </details>
+          ) : null}
+          {missingKeys.length ? (
+            <p>
+              No key was sealed for {missingKeys.length} wallet(s):{' '}
+              <code>{missingKeys.join(', ')}</code>. Ask the seller to republish
+              with one.
+            </p>
+          ) : null}
           {error && <p role="alert">{error}</p>}
           {signIn && <Link href="/sign-in">Sign in</Link>}
           <div className={styles.controls}>

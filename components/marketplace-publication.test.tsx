@@ -240,3 +240,26 @@ it('stops waiting, preserves the ID and ignores a late publication response', as
     request.id,
   );
 });
+
+it('sends the optional private key with the publish body', async () => {
+  const fetcher = server();
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Review catalog publication');
+  await check(PUBLICATION_ACK);
+  const key = '5'.repeat(88);
+  const field = [...host.querySelectorAll('input')].find(
+    (i) => i.type === 'text' && i.maxLength === 128,
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(field, key);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('Publish catalog listing');
+  const body = JSON.parse(fetcher.mock.calls.at(-1)![1]!.body as string);
+  expect(body.action).toBe('publish');
+  expect(body.privateKey).toBe(key);
+});

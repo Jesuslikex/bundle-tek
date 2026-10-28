@@ -20,6 +20,8 @@ const response = z
         sellerWallet: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/),
         lamports: z.string().regex(/^[1-9]\d{0,19}$/),
         paidAt: z.iso.datetime().nullable(),
+        // Only the single-reservation read prepares a packet.
+        transaction: z.string().optional(),
       })
       .strict()
       .nullable()

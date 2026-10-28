@@ -18,7 +18,12 @@ import styles from './marketplace-owned-wallets.module.css';
 import controls from './marketplace-operator-drafts.module.css';
 const reminder = z.discriminatedUnion('kind', [
   z
-    .object({ kind: z.literal('publish'), request: publicationRequest })
+    .object({
+      kind: z.literal('publish'),
+      request: publicationRequest,
+      // Kept in the reminder so a lost response can be retried with the same key.
+      privateKey: z.string().min(32).max(128).optional(),
+    })
     .strict(),
   z
     .object({ kind: z.literal('withdraw'), request: withdrawalRequest })
@@ -53,7 +58,8 @@ export function MarketplacePublication({
     [approved, setApproved] = useState(''),
     [withdrawApproved, setWithdrawApproved] = useState(''),
     [error, setError] = useState(''),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    [privateKey, setPrivateKey] = useState('');
   const unresolved = Boolean(marker && !resolved);
   useEffect(() => {
     let mounted = true;
@@ -181,6 +187,7 @@ export function MarketplacePublication({
           contextSha256: preview.contextSha256,
           acknowledgement: PUBLICATION_ACK,
         }),
+        ...(privateKey.trim() ? { privateKey: privateKey.trim() } : {}),
       };
     } else {
       if (!record || record.withdrawnAt || withdrawApproved !== record.id)
@@ -211,7 +218,13 @@ export function MarketplacePublication({
       const response = await fetch('/api/marketplace/operator/publications', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: kind, ...input.request }),
+        body: JSON.stringify({
+          action: kind,
+          ...input.request,
+          ...(input.kind === 'publish' && input.privateKey
+            ? { privateKey: input.privateKey }
+            : {}),
+        }),
         cache: 'no-store',
         signal: AbortSignal.any([c.signal, AbortSignal.timeout(10000)]),
       });
@@ -418,6 +431,22 @@ export function MarketplacePublication({
             />
             <span>{PUBLICATION_ACK}</span>
           </label>
+          <label className={controls.recovery}>
+            Private key for delivery (optional)
+            <input
+              value={privateKey}
+              maxLength={128}
+              autoComplete="off"
+              spellCheck={false}
+              disabled={busy || unresolved}
+              onChange={(e) => setPrivateKey(e.target.value)}
+            />
+          </label>
+          <p>
+            Sealed with the deployment secret and revealed only to the buyer
+            after payment. Without it the listing still sells, but the buyer
+            gets no key.
+          </p>
           <div className={styles.controls}>
             <button
               disabled={
