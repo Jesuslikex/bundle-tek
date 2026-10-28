@@ -1,0 +1,10 @@
+{
+  "format": "stock-public-reference-fixture-v1",
+  "readOnly": true,
+  "references": {
+    "SOL": "GRm8X46adZ3KZXUbTnkPc1SZwRtN3DUE8CKcqKjEz6x2"
+  },
+  "referenceHashes": {
+    "SOL": "7dabbb00bdaeff1ab5cb14b5104780c019b44e7faaed5a27ee4ed4ab0e11266f"
+  }
+}

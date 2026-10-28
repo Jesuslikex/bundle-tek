@@ -233,7 +233,12 @@ async function inspectPairRuntime(
   const top = reviewSwapInstructions(message, lookups ?? undefined);
   const route = assessJupiterRoute(top, candidate.order);
   if (route.status !== 'Matched fields' || !route.decoded)
-    throw Error('Pair runtime route fields differ.');
+    throw Error(
+      'Pair runtime route fields differ: ' +
+        route.status +
+        (route.issues.length ? ' � ' + route.issues.join('; ') : '') +
+        (route.decoded ? '' : ' (route undecoded)'),
+    );
   async function read(
     keys: string[],
     sliced: boolean,
