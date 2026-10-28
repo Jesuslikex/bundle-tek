@@ -53,7 +53,10 @@ owner lock and authenticate the exact server snapshot. Thirty-eight journal
 tests pass. A separate recovery-file panel has 13 synthetic tests, including
 lost-response recovery and unresolved-memory guidance. In this draft it is
 connected for bundles shown in the recent history, with additional parent and
-panel tests. Looking up an older bundle outside that history remains disabled.
+panel tests. A separate older-bundle locator validates a bounded recovery file
+and two owner-scoped exact reads, with 15 synthetic tests including deadline
+expiry during verification. It is not yet connected to the parent; looking up
+an older bundle outside the recent history remains unavailable in the UI.
 
 The draft browser wiring supports the browser vault and external wallets that
 publish a verifiable current account. It holds the owner lock around signing
