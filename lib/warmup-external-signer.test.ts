@@ -8,12 +8,99 @@ import {
 import {
   connectWarmupExternalWallet,
   matchingWarmupExternalAccount,
+  resolveWarmupExternalAccount,
   onWarmupExternalWalletChange,
   signApprovedExternalWarmupPacket,
   supportsWarmupExternalWallet,
   type WarmupExternalWallet,
 } from './warmup-external-signer';
 import { WalletSigningRejected } from './wallet-signing-rejection';
+
+it('connects without publishing diagnostics and refuses an empty account list even with a provider key', async () => {
+  const f = await fixture();
+  const globals = globalThis as unknown as Record<string, unknown>;
+  const names = ['__acc', '__acc2', '__key'];
+  const descriptors = names.map((name) =>
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  );
+  try {
+    for (const name of names)
+      Object.defineProperty(globalThis, name, {
+        value: 'unchanged',
+        writable: true,
+        configurable: true,
+      });
+    await connectWarmupExternalWallet(f.wallet, f.review.wallet);
+    const wallet = {
+      ...f.wallet,
+      accounts: [],
+      publicKey: {
+        toString: () => f.review.wallet,
+        toBytes: () => f.account.publicKey,
+      },
+    } as unknown as WarmupExternalWallet;
+    const resolved = await resolveWarmupExternalAccount(
+      wallet,
+      f.review.wallet,
+    );
+    expect(resolved).toBeUndefined();
+    for (const name of names) expect(globals[name]).toBe('unchanged');
+  } finally {
+    names.forEach((name, index) => {
+      if (descriptors[index])
+        Object.defineProperty(globalThis, name, descriptors[index]!);
+      else delete globals[name];
+    });
+  }
+});
+
+it('refuses a matching public key string with different bytes and no selected account', async () => {
+  const f = await fixture();
+  const wallet = {
+    ...f.wallet,
+    accounts: [],
+    publicKey: {
+      toString: () => f.review.wallet,
+      toBytes: () => new Uint8Array(32).fill(99),
+    },
+  } as unknown as WarmupExternalWallet;
+  expect(
+    await resolveWarmupExternalAccount(wallet, f.review.wallet),
+  ).toBeUndefined();
+  await expect(
+    signApprovedExternalWarmupPacket(wallet, f.review, () => {}),
+  ).rejects.toThrow('differs');
+  expect(f.sign).not.toHaveBeenCalled();
+});
+
+it('refuses if the selected account disappears before signing', async () => {
+  const f = await fixture();
+  const onSignerStart = vi.fn();
+  await expect(
+    signApprovedExternalWarmupPacket(f.wallet, f.review, () => {}, undefined, {
+      beforeSign: async () => {
+        f.wallet.accounts = [];
+      },
+      onSignerStart,
+    }),
+  ).rejects.toThrow('account');
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(f.sign).not.toHaveBeenCalled();
+});
+
+it('retains the exact signed packet but refuses completion if the selected account disappears during signing', async () => {
+  const f = await fixture();
+  const retain = vi.fn(async () => {});
+  f.sign.mockImplementation(async () => {
+    f.wallet.accounts = [];
+    return [{ signedTransaction: f.bytes }];
+  });
+  await expect(
+    signApprovedExternalWarmupPacket(f.wallet, f.review, () => {}, retain),
+  ).rejects.toThrow('account');
+  expect(retain).toHaveBeenCalledTimes(1);
+  expect(retain).toHaveBeenCalledWith(f.f.signed);
+});
 
 async function fixture(side: 'Buy' | 'Sell' = 'Buy') {
   const f = await nativeWarmupFixture({ side, v2: true, fee: 2, lookup: true });

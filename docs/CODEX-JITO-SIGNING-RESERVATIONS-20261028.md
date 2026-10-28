@@ -37,6 +37,14 @@ and does not turn a missing historical finalization receipt into proof.
 Callers must independently verify the exact signed packet before using any
 registered attempt. Nine focused snapshot tests pass.
 
+The shared warmup external signer now requires a currently published Wallet
+Standard account with the exact reviewed public-key bytes. It no longer writes
+wallet diagnostics to page globals or treats an empty account list as proof.
+This is a deliberate compatibility change: a provider that leaves the account
+list empty, including some Phantom configurations, cannot sign through this
+path until it can provide a verifiable current account. A returned exact packet
+is retained before an account-change error, never automatically submitted.
+
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,
 cancel and submit path; preserve separately unchecked approval; test rejected

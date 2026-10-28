@@ -80,63 +80,25 @@ export function matchingWarmupExternalAccount(
       bs58.encode(new Uint8Array(account.publicKey)) === address,
   );
 }
-// Phantom keeps wallet.accounts stale for a moment after a network switch and
-// empties it outside a live prompt, so fall back to the wallet's own publicKey.
+// Allow the registry a short time to publish the exact selected account.
+// An empty list or string-only provider key is not proof of the account.
 export async function resolveWarmupExternalAccount(
   wallet: WarmupExternalWallet,
   address: string,
-): Promise<any> {
+): Promise<Account | undefined> {
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const hit: any = matchingWarmupExternalAccount(wallet, address);
+    const hit = matchingWarmupExternalAccount(wallet, address);
     if (hit) return hit;
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
-  // Phantom exposes the selected account on publicKey; the wallet-standard
-  // object itself often has none, so fall back to the injected provider.
-  const key =
-    (wallet as any).publicKey ??
-    (globalThis as any).phantom?.solana?.publicKey ??
-    null;
-  (globalThis as any).__key = JSON.stringify({
-    w: String((wallet as any).publicKey ?? null),
-    g: String((globalThis as any).phantom?.solana?.publicKey ?? null),
-    a: address,
-  });
-  if (!key || key.toString?.() !== address) return undefined;
-  return {
-    address,
-    publicKey: new Uint8Array(key.toBytes()),
-    chains: ['solana:mainnet'],
-    features: ['solana:signTransaction'],
-    label: address,
-  } as any;
+  return undefined;
 }
 export async function connectWarmupExternalWallet(
   wallet: WarmupExternalWallet,
   address: string,
 ) {
   await features(wallet).connect.connect();
-  (globalThis as any).__acc = JSON.stringify(
-    wallet.accounts.map((a) => ({
-      c: a.chains,
-      f: a.features,
-      l: a.publicKey.length,
-      m: bs58.encode(new Uint8Array(a.publicKey)),
-    })),
-  );
   const hit = await resolveWarmupExternalAccount(wallet, address);
-  (globalThis as any).__acc2 = JSON.stringify({
-    hit: !!hit,
-    address,
-    n: wallet.accounts.length,
-    cmp: wallet.accounts.map((a) => [
-      String(a.address),
-      a.address === address,
-      a.chains.includes('solana:mainnet'),
-      a.features.includes('solana:signTransaction'),
-      a.publicKey.length,
-    ]),
-  });
   if (!hit)
     throw new Error(
       'Connect the exact wallet shown in this preparation on Solana mainnet.',
@@ -170,23 +132,11 @@ export async function signApprovedExternalWarmupPacket(
   const signer = sign.signTransaction;
   const requireCurrent = () => {
     assertCurrent();
-    // Phantom rebuilds its feature object on each access, so compare the
-    // account, the signer function and the expiry rather than the feature
-    // object identity.
+    // Compare the exact currently present account and signing function.
     const swapped = features(wallet).sign?.signTransaction !== signer;
-    // Phantom empties wallet.accounts outside a live prompt, so fall back to
-    // the account captured when the approval was taken.
-    const matched = matchingWarmupExternalAccount(wallet, review.wallet);
-    const current =
-      matched ||
-      ((wallet as any).publicKey?.toString?.() === review.wallet
-        ? account
-        : undefined);
+    const current = matchingWarmupExternalAccount(wallet, review.wallet);
     const why = [
-      (wallet.accounts.length > 0 && !matched) ||
-      (current && current !== account)
-        ? 'account'
-        : '',
+      !current || current !== account ? 'account' : '',
       swapped ? 'feature' : '',
       Date.parse(review.expiresAt) <= Date.now() ? 'expired' : '',
     ]
