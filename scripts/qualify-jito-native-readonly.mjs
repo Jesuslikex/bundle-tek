@@ -117,14 +117,24 @@ export async function runNativeJitoCampaign({
   pace = adapter?.paceWalletRpc,
   signal,
   attemptTimeoutMs = 45000,
+  profile = 'legacy',
 }) {
   const pinnedEndpoint = validateEndpoint(endpoint);
   if (typeof pace !== 'function')
     throw failure('configuration-refused: adapter has no pacing function');
+  if (
+    !['legacy', 'prefee'].includes(profile) ||
+    (profile === 'prefee' &&
+      typeof adapter?.collectJitoCoherentPrefeeAttempt !== 'function')
+  )
+    throw failure('configuration-refused: invalid native profile');
   if (attemptTimeoutMs !== 45000)
     throw failure('configuration-refused: attempt timeout must be 45000 ms');
   const report = {
-    profile: 'unsigned-native-zero-transfer-only',
+    profile:
+      profile === 'prefee'
+        ? 'unsigned-native-prefee-zero-transfer-only'
+        : 'unsigned-native-zero-transfer-only',
     endpointHost: new URL(pinnedEndpoint).hostname,
     plannedAttempts: 3,
     attempts: [],
@@ -276,6 +286,16 @@ export async function runNativeJitoCampaign({
       );
       retain(read, capture);
       const value = capture.value;
+      const replies = Array.isArray(value) ? value : [value];
+      if (
+        replies.some(
+          (reply) =>
+            reply && typeof reply === 'object' && reply.error?.code === 429n,
+        )
+      ) {
+        rateLimited = true;
+        throw failure('rate-limited');
+      }
       if (
         !value ||
         value.jsonrpc !== '2.0' ||
@@ -342,7 +362,9 @@ export async function runNativeJitoCampaign({
       phase = 'runtime';
       const runtimeReads = [];
       const result = await bounded(
-        adapter.collectJitoCoherentSimulationAttempt({
+        (profile === 'prefee'
+          ? adapter.collectJitoCoherentPrefeeAttempt
+          : adapter.collectJitoCoherentSimulationAttempt)({
           packets,
           minimumSlot: attempt.originalFloor,
           minimumReadSlot: attempt.accountSlot,
@@ -353,14 +375,19 @@ export async function runNativeJitoCampaign({
           transport: async (request) => {
             if (
               request.signal.aborted ||
-              !['discovery', 'batch'].includes(request.phase)
+              !(
+                profile === 'prefee'
+                  ? ['discovery-batch', 'exact']
+                  : ['discovery', 'batch']
+              ).includes(request.phase)
             )
               throw failure('request-refused');
             const rows = JSON.parse(request.body);
             const members = Array.isArray(rows) ? rows : [rows];
             if (
               members.length !== request.methodCount ||
-              members.length !== (request.phase === 'batch' ? 3 : 1)
+              members.length !==
+                (['batch', 'discovery-batch'].includes(request.phase) ? 3 : 1)
             )
               throw failure('request-refused');
             const simulations = members.filter(
@@ -369,7 +396,7 @@ export async function runNativeJitoCampaign({
             if (
               simulations.length !== 1 ||
               members.filter((m) => m.method === 'getFeeForMessage').length !==
-                (request.phase === 'batch' ? 2 : 0)
+                (['batch', 'discovery-batch'].includes(request.phase) ? 2 : 0)
             )
               throw failure('request-refused');
             const params = simulations[0].params;
@@ -386,14 +413,20 @@ export async function runNativeJitoCampaign({
           },
         }),
       );
-      if (result.discovery)
+      if (result.discovery && profile === 'legacy')
         retain(
           runtimeReads.find((r) => r.phase === 'discovery').read,
           result.discovery,
         );
       if (result.batch?.rawResponse) {
         const parent = result.batch.rawResponse;
-        retain(runtimeReads.find((r) => r.phase === 'batch').read, parent);
+        retain(
+          runtimeReads.find(
+            (r) =>
+              r.phase === (profile === 'prefee' ? 'discovery-batch' : 'batch'),
+          ).read,
+          parent,
+        );
         const members = (
           result.batch.status === 'captured' ? result.batch.members : []
         ).map((m) => {
@@ -410,9 +443,22 @@ export async function runNativeJitoCampaign({
             parentSha256: parent.rawSha256,
             members,
             feeProjectionIsDerivedNotWireBody: true,
+            ...(profile === 'prefee' && result.discovery && members.length
+              ? {
+                  discoveryMember: {
+                    kind: 'derived-batch-member-not-wire-response',
+                    ...members.at(-1),
+                  },
+                }
+              : {}),
           }),
         );
       }
+      if (profile === 'prefee' && result.simulation?.rawResponse)
+        retain(
+          runtimeReads.find((r) => r.phase === 'exact').read,
+          result.simulation.rawResponse,
+        );
       if (result.feeProjection?.rawBody)
         keep('derived-fees-not-wire.bin', result.feeProjection.rawBody);
       if (result.sentSimulationBody)
@@ -515,14 +561,17 @@ export async function runNativeJitoCampaign({
   ).length;
   // Three captures is the provider claim; the other flags stay false because
   // economics, runtime privileges and signing are separate gates.
-  report.providerQualified = report.nativeCapturedCount === 3;
+  report.providerQualified =
+    profile === 'legacy' && report.nativeCapturedCount === 3;
+  if (profile === 'prefee')
+    report.nativeProfileConsistent = report.nativeCapturedCount === 3;
   saveReport();
   return report;
 }
 
 const ENTRY_NAME = 'native-qualification-entry.ts';
 const ENTRY_SOURCE =
-  "export {collectJitoCoherentSimulationAttempt} from './lib/jito-coherent-simulation-attempt';export {readJitoSimulationPayload} from './lib/jito-simulation-json';export {paceWalletRpc} from './lib/wallet-rpc-pacing';";
+  "export {collectJitoCoherentSimulationAttempt} from './lib/jito-coherent-simulation-attempt';export {collectJitoCoherentPrefeeAttempt} from './lib/jito-coherent-prefee-attempt';export {readJitoSimulationPayload} from './lib/jito-simulation-json';export {paceWalletRpc} from './lib/wallet-rpc-pacing';";
 
 export function nativeSourceIdentity(
   inputs,
@@ -652,6 +701,7 @@ export async function compileNativeAdapter({
   const adapter = await import(pathToFileURL(artifact).href);
   if (
     typeof adapter.collectJitoCoherentSimulationAttempt !== 'function' ||
+    typeof adapter.collectJitoCoherentPrefeeAttempt !== 'function' ||
     typeof adapter.readJitoSimulationPayload !== 'function' ||
     typeof adapter.paceWalletRpc !== 'function'
   )
@@ -661,9 +711,10 @@ export async function compileNativeAdapter({
 
 export async function main(args = process.argv.slice(2)) {
   if (
-    args.length !== 2 ||
+    ![2, 3].includes(args.length) ||
     !args.includes('--live-readonly') ||
-    !args.some((a) => a.startsWith('--output-dir='))
+    !args.some((a) => a.startsWith('--output-dir=')) ||
+    (args.length === 3 && !args.includes('--prefee'))
   )
     throw failure('arguments-refused');
   const folder = resolve(
@@ -689,7 +740,9 @@ export async function main(args = process.argv.slice(2)) {
   persist(
     'startup.json',
     encoded({
-      profile: 'unsigned-native-zero-transfer-only',
+      profile: args.includes('--prefee')
+        ? 'unsigned-native-prefee-zero-transfer-only'
+        : 'unsigned-native-zero-transfer-only',
       plannedAttempts: 3,
       status: 'starting',
       ...authority,
@@ -721,6 +774,7 @@ export async function main(args = process.argv.slice(2)) {
       adapter,
       fetcher: fetch,
       persist,
+      profile: args.includes('--prefee') ? 'prefee' : 'legacy',
     });
     console.log(
       encoded({

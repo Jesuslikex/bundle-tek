@@ -39,6 +39,11 @@ function harness(options = {}) {
   let runtime = 0,
     genesis = 0;
   const adapter = {
+    async collectJitoCoherentPrefeeAttempt(input) {
+      runtime++;
+      if (!options.prefeeCollect) throw Error('Unexpected prefee profile.');
+      return options.prefeeCollect(input, runtime);
+    },
     async readJitoSimulationPayload(body) {
       const rawBody = new Uint8Array(await new Response(body).arrayBuffer());
       return {
@@ -46,7 +51,8 @@ function harness(options = {}) {
         byteLength: rawBody.length,
         rawSha256: digest(rawBody),
         value: JSON.parse(Buffer.from(rawBody).toString(), (key, value) =>
-          ['slot', 'lamports'].includes(key) && typeof value === 'number'
+          ['slot', 'lamports', 'code'].includes(key) &&
+          typeof value === 'number'
             ? BigInt(value)
             : value,
         ),
@@ -138,6 +144,20 @@ function harness(options = {}) {
     if (options.rateAt === requests.length)
       return new Response('secret provider error ' + endpoint, { status: 429 });
     const req = JSON.parse(init.body);
+    if (options.rpc429At === requests.length)
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'unmatched',
+          error: { code: 429, message: 'private provider message' },
+        }),
+      );
+    if (Array.isArray(req))
+      return new Response(
+        JSON.stringify(
+          req.map((row) => ({ jsonrpc: '2.0', id: row.id, result: 'opaque' })),
+        ),
+      );
     const result =
       req.method === 'getGenesisHash'
         ? ++genesis === 2 && options.wrongFinal
@@ -179,6 +199,134 @@ function harness(options = {}) {
     });
   return { run, files, requests, pacing };
 }
+
+void test('opt-in prefee campaign accounts for every method and keeps actual batch and exact wire parents', async () => {
+  const h = harness({
+    async prefeeCollect(input) {
+      const simulation = {
+        jsonrpc: '2.0',
+        id: input.simulationRpcId,
+        method: 'simulateBundle',
+        params: [
+          { encodedTransactions: input.packets.map((p) => p.transaction) },
+          { skipSigVerify: true, replaceRecentBlockhash: false },
+        ],
+      };
+      const feeRows = [0, 1].map((i) => ({
+        jsonrpc: '2.0',
+        id: `fee:${i}`,
+        method: 'getFeeForMessage',
+        params: [],
+      }));
+      const response = await input.transport({
+        phase: 'discovery-batch',
+        methodCount: 3,
+        body: JSON.stringify([...feeRows, simulation]),
+        signal: input.signal,
+      });
+      const raw = Buffer.from(await response.arrayBuffer());
+      const parent = {
+        rawBody: raw,
+        rawSha256: digest(raw),
+        byteLength: raw.length,
+        value: JSON.parse(raw.toString()),
+      };
+      let start = 1;
+      const members = parent.value.map((value) => {
+        const rawBody = Buffer.from(JSON.stringify(value));
+        const member = {
+          id: value.id,
+          start,
+          end: start + rawBody.length,
+          sha256: digest(rawBody),
+          rawBody,
+        };
+        start += rawBody.length + 1;
+        return member;
+      });
+      const exactBody = JSON.stringify(simulation);
+      const exact = await input.transport({
+        phase: 'exact',
+        methodCount: 1,
+        body: exactBody,
+        signal: input.signal,
+      });
+      const exactRaw = Buffer.from(await exact.arrayBuffer());
+      return {
+        status: 'captured',
+        fees: {
+          simulationBankSlot: 102,
+          fees: [
+            { slot: 102, feeLamports: '5000' },
+            { slot: 102, feeLamports: '5000' },
+          ],
+        },
+        simulation: {
+          frames: { slot: 102, frames: [{}, {}] },
+          rawResponse: {
+            rawBody: exactRaw,
+            rawSha256: digest(exactRaw),
+            byteLength: exactRaw.length,
+          },
+        },
+        discovery: capture({ derived: true }),
+        batch: { status: 'captured', rawResponse: parent, members },
+        sentSimulationBody: exactBody,
+        ...flags,
+      };
+    },
+  });
+  const result = await h.run({ profile: 'prefee' });
+  assert.equal(result.attempts.length, 3);
+  assert.equal(result.nativeCapturedCount, 3);
+  assert.equal(result.nativeProfileConsistent, true);
+  assert.equal(result.providerQualified, false);
+  assert.equal(h.pacing.length, 24);
+  for (const a of result.attempts) {
+    assert.equal(a.httpRequests, 6);
+    assert.equal(a.logicalMethods, 8);
+    assert.equal(a.executionAllowed, false);
+    assert.ok(h.files.has(`attempt-${a.index}/3.response.bin`));
+    assert.ok(h.files.has(`attempt-${a.index}/4.response.bin`));
+    const manifest = JSON.parse(
+      h.files.get(`attempt-${a.index}/batch-members.json`),
+    );
+    const parent = h.files.get(`attempt-${a.index}/3.response.bin`);
+    assert.equal(manifest.members.length, 3);
+    assert.equal(
+      manifest.discoveryMember.kind,
+      'derived-batch-member-not-wire-response',
+    );
+    assert.equal(manifest.discoveryMember.id, manifest.members.at(-1).id);
+    assert.equal(
+      manifest.discoveryMember.sha256,
+      manifest.members.at(-1).sha256,
+    );
+    for (const member of manifest.members)
+      assert.equal(
+        digest(parent.subarray(member.start, member.end)),
+        member.sha256,
+      );
+  }
+});
+
+for (const [name, at] of [
+  ['setup', 1],
+  ['final-genesis', 6],
+])
+  void test(`HTTP 200 JSON-RPC 429 at ${name} stops the whole campaign without leaking the body`, async () => {
+    const h = harness({ rpc429At: at });
+    const result = await h.run();
+    assert.equal(result.attempts.length, 1);
+    assert.equal(result.attempts[0].reason, 'rate-limited');
+    assert.equal(h.requests.length, at);
+    assert.equal(result.nativeCapturedCount, 0);
+    assert.equal(result.providerQualified, false);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /private provider message|PRIVATE-TEST-ONLY/,
+    );
+  });
 
 void test('campaign refuses mixed fee banks including a member beyond the original 32-slot span', async () => {
   const h = harness({ bank: 132, feeSlots: [132, 133] });
@@ -435,7 +583,7 @@ void test('unknown virtual entries, a missing explicit entry and changed entry b
 
 void test('source identity binds compiled snapshot bytes and refuses same-size post-build edits without editing the checkout', () => {
   const entry =
-    "export {collectJitoCoherentSimulationAttempt} from './lib/jito-coherent-simulation-attempt';export {readJitoSimulationPayload} from './lib/jito-simulation-json';export {paceWalletRpc} from './lib/wallet-rpc-pacing';";
+    "export {collectJitoCoherentSimulationAttempt} from './lib/jito-coherent-simulation-attempt';export {collectJitoCoherentPrefeeAttempt} from './lib/jito-coherent-prefee-attempt';export {readJitoSimulationPayload} from './lib/jito-simulation-json';export {paceWalletRpc} from './lib/wallet-rpc-pacing';";
   const path = 'lib/jito-coherent-simulation-attempt.ts';
   const absolute = resolve(path);
   const bytes = Uint8Array.from(readFileSync(absolute));
