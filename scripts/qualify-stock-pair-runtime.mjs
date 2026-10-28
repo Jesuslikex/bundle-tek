@@ -897,6 +897,7 @@ try {
   receipt.diagnosis = {
     check: d?.check ?? 'unclassified-refusal',
     valuesAvailable: Boolean(d?.comparisons?.length),
+    ...(d?.comparisons?.length ? { comparisons: d.comparisons } : {}),
     classification: !d
       ? 'evidence-unavailable'
       : d.check === 'chain-clock'
