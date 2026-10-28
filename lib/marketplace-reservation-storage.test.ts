@@ -54,6 +54,7 @@ beforeEach(async () => {
     await db.prepare(sql).run();
   for (const file of [
     '0118_marketplace_operator_drafts',
+    '0160_marketplace_operator_draft_review_window',
     '0119_marketplace_publications',
     '0120_marketplace_reservations',
   ])
