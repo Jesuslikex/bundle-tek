@@ -43,7 +43,7 @@ import {
   type JitoV2Snapshot,
 } from '@/lib/jito-v2-snapshot';
 import { JitoMemoryRecovery } from './jito-memory-recovery';
-import { JitoTerminalRecoveryImport } from './jito-terminal-recovery-import';
+import { JitoTerminalRecoveryV2 } from './jito-terminal-recovery-v2';
 import { JitoRecoveryFileV2 } from './jito-recovery-file-v2';
 import { JitoRecoveryLocatorV2 } from './jito-recovery-locator-v2';
 import { JitoChainObservationView } from './jito-chain-observation';
@@ -615,10 +615,6 @@ function JitoAtomicBundleForContext({
   const run = (body?: object) => {
     void action(body).catch(() => {});
   };
-  async function readExactBundle(id: string) {
-    if (mounted.current && isContextCurrent()) setChainObservation(null);
-    return (await readExactSnapshot(id)).bundle;
-  }
   async function readExactSnapshot(id: string, expectedDigest?: string) {
     if (!ownerScope || !ownerId || !isContextCurrent())
       throw new Error('Sign in to review this bundle.');
@@ -717,23 +713,6 @@ function JitoAtomicBundleForContext({
       throw new Error(
         'Bundle approval or signed-in account changed. Reload saved history.',
       );
-  }
-  async function terminalPacketSignature(
-    manifest: JitoBundleManifest,
-    packet: number,
-    state: 'cancelled' | 'expired',
-  ) {
-    const record = await readExactBundle(manifest.id);
-    if (
-      !isContextCurrent() ||
-      record.state !== state ||
-      record.manifest.sha256 !== manifest.sha256 ||
-      !Number.isInteger(packet) ||
-      packet < 0 ||
-      packet >= record.signatures.length
-    )
-      throw new Error('Bundle changed. Reload saved history before recovery.');
-    return record.signatures[packet];
   }
   async function loadOriginal(id: string) {
     if (running.current || !historyVerified) return;
@@ -1265,10 +1244,8 @@ function JitoAtomicBundleForContext({
               )}
               {bundle.state === 'expired' && (
                 <p>
-                  All packet validity windows ended at the finalized chain
-                  height, with no outcome found by the configured RPC. This is
-                  an expiry observation, not a guarantee of complete historical
-                  coverage.
+                  This bundle was recorded as expired. This record alone does
+                  not establish whether a signed packet landed.
                 </p>
               )}
               <p>
@@ -1325,27 +1302,28 @@ function JitoAtomicBundleForContext({
                   ) : null,
                 )}
               {historyVerified &&
+                ownerId &&
                 ownerScope &&
                 (bundle.state === 'cancelled' ||
-                  bundle.state === 'expired') && (
+                  bundle.state === 'expired' ||
+                  bundle.state === 'finalized') && (
                   <details>
                     <summary>Inspect saved signed packet recovery</summary>
                     {Array.from({ length: m.swaps.length + 1 }, (_, packet) => (
-                      <JitoTerminalRecoveryImport
+                      <JitoTerminalRecoveryV2
                         key={`${m.id}:terminal:${packet}`}
+                        ownerId={ownerId}
+                        ownerScope={ownerScope}
                         manifest={m}
                         packet={packet}
-                        ownerScope={ownerScope}
-                        coordinator={coordinator}
-                        disabled
-                        isContextCurrent={isContextCurrent}
-                        readTerminalSignature={() =>
-                          terminalPacketSignature(
-                            m,
-                            packet,
-                            bundle.state as 'cancelled' | 'expired',
-                          )
+                        state={
+                          bundle.state as 'cancelled' | 'expired' | 'finalized'
                         }
+                        coordinator={coordinator}
+                        disabled={
+                          busy || !verified || coordinator.operationActive()
+                        }
+                        isContextCurrent={isContextCurrent}
                       />
                     ))}
                   </details>
