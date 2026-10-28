@@ -2,10 +2,10 @@
 
 This is a conservative mapping of the 65 expanded cases collected from `components/jito-packet-signing-remount.test.tsx`. Numbering is the exact collection order from `vitest list`. Listing tests does not run them. No existing tests were skipped, deleted, or replaced to produce this inventory. The existing remount suite is not claimed to pass against the current v2 UI. Earlier passing v2 evidence is listed below; re-run it against the final frozen source.
 
-- **A: Passing equivalent (22).** A v2 test or a combination of separately passing UI and database checks addresses the same essential safety behavior. This does not imply identical end-to-end coverage.
+- **A: Passing equivalent (28).** A v2 test or a combination of separately passing UI and database checks addresses the same essential safety behavior. This does not imply identical end-to-end coverage.
 - **B: Recovery-file coverage needed (27).** Preserve the original scenario when migrating it to the v2 file flow. Recent bundles now have an authenticated per-packet recovery-file panel; older bundles omitted from the 20-item history still cannot be opened through a file locator. Some terminal component or journal primitives have partial isolated coverage.
 - **C: Intentionally changed behavior (6).** Replace the unsafe or superseded expectation with the stated v2 behavior while preserving its safety purpose.
-- **D: Other v2 coverage needed (10).** Lower-level checks may exist, but the specified parent/remount scenario is not yet established by the inspected v2 tests.
+- **D: Other v2 coverage needed (4).** Lower-level checks may exist, but the specified parent/remount scenario is not yet established by the inspected v2 tests.
 
 ## Already covered or deliberately changed
 
@@ -21,6 +21,7 @@ This is a conservative mapping of the 65 expanded cases collected from `componen
 - **56–57:** The v2 child tests retaining vault-signed swap and tip packets when expiry occurs during durable capture, without registration.
 - **59:** The v2 child tests external swap and tip responses arriving after expiry; the exact packet is retained without automatic registration.
 - **60:** The v2 child tests an unresolved external prompt across a remount and verifies that no second prompt or begin occurs.
+- **14, 49–52 and 61:** `jito-parent-races-v2` checks duplicate history identities while preserving a retained packet, owner A→B→A isolation with a fresh A-scoped read, changed server owner and session, session revision change during a held exact read, an aborted short read, and cancellation blocking a wallet prompt. The timeout uses an already-aborted synthetic signal; it does not measure an actual five-second wait. A separate test checks the visible cross-packet and cancellation controls while a prompt is unresolved, but does not invoke a captured stale handler, so **32 remains partial**.
 - **65:** The v2 child tests retaining a packet when the registration response lacks an exact authenticated receipt.
 - **35 and 55:** Expired signed evidence may be registered only through a separate explicit evidence approval; this never enables signing or submission. `jito-parent-file-v2` now tests the file-to-parent path with a synthetic expired packet, separate approval, exact registration, and no swap or tip signer calls.
 - **38:** Empty external accounts after the prompt now retain a verified returned signature and refuse registration rather than accepting the old fallback. A new v2 test covers the swap case; the tip case is also covered.
@@ -28,7 +29,7 @@ This is a conservative mapping of the 65 expanded cases collected from `componen
 - **63:** Encrypted local recovery replaces memory-only recovery. Browser storage loss, eviction, profile reset, and password loss still limit recovery.
 - **64:** An explicitly rejected wallet prompt does not prove no signature exists; v2 retains UNKNOWN and does not reprompt.
 
-The 36-case v2 child suite passed on the current source and was independently rerun. The newly mapped cases use synthetic wallet, storage, server, and lock doubles, including component remounts. They are meaningful child-level regressions, not proof of the complete parent flow, actual IndexedDB/Web Locks behavior in a browser, or funded execution. Parent, snapshot, terminal, journal, and SQL tests were run separately during development. The seven recent-bundle parent/file cases passed with synthetic storage and server doubles, and were independently rerun. The full 65-case legacy remount suite still fails against the changed v2 contract and is not included in those counts; no old test has been skipped, removed, or replaced.
+The 36-case v2 child suite passed on the current source and was independently rerun. The newly mapped cases use synthetic wallet, storage, server, and lock doubles, including component remounts. They are meaningful child-level regressions, not proof of the complete parent flow, actual IndexedDB/Web Locks behavior in a browser, or funded execution. Parent, snapshot, terminal, journal, and SQL tests were run separately during development. The seven recent-bundle parent/file cases passed with synthetic storage and server doubles, and were independently rerun. The parent-race suite now has eight synthetic tests; seven were independently rerun before the distinct changed-server-session case was added, and all eight passed in the author's rerun. The full 65-case legacy remount suite still fails against the changed v2 contract and is not included in those counts; no old test has been skipped, removed, or replaced.
 
 ## Complete numbered inventory
 
@@ -45,7 +46,7 @@ The 36-case v2 child suite passed on the current source and was independently re
 11. **A** — reconciles an exact signature observed in refreshed history without another registration
 12. **B** — retains the original and blocks registration when refreshed history reports a different signature
 13. **B** — blocks registration if refreshed history reports a different fingerprint for the same bundle
-14. **D** — refuses duplicate bundle IDs in history without discarding the retained packet
+14. **A** — refuses duplicate bundle IDs in history without discarding the retained packet
 15. **B** — keeps a retained packet export-only when refreshed history reports a terminal state
 16. **B** — keeps the original pending if account context changes during saved-signature confirmation
 17. **B** — refuses a conflicting saved signature rather than displaying the imported packet
@@ -80,10 +81,10 @@ The 36-case v2 child suite passed on the current source and was independently re
 46. **A** — retains packet 1 but never registers when the external different account changes during the prompt
 47. **A** — recovers packet 0 after keyed remount only after a fresh scoped history read and explicit registration
 48. **A** — recovers packet 1 after keyed remount only after a fresh scoped history read and explicit registration
-49. **D** — does not reveal owner A recovery under B or after A returns without a new A-scoped GET
-50. **D** — refuses to open a wallet prompt when the server session changes before the fresh exact read
-51. **D** — refuses to open a wallet prompt when the context changes during the fresh exact read
-52. **D** — does not open a wallet prompt when the short exact-read fence times out
+49. **A** — does not reveal owner A recovery under B or after A returns without a new A-scoped GET
+50. **A** — refuses to open a wallet prompt when the server session changes before the fresh exact read
+51. **A** — refuses to open a wallet prompt when the context changes during the fresh exact read
+52. **A** — does not open a wallet prompt when the short exact-read fence times out (simulated aborted signal)
 53. **D** — lists omitted pending metadata after scoped history and loads the exact original only on request
 54. **D** — says when a fenced signer is being prepared before any prompt starts
 55. **C** — offers export only after expiry, without reopening signing or submitting
@@ -92,7 +93,7 @@ The 36-case v2 child suite passed on the current source and was independently re
 58. **C** — offers export only if the bundle was cancelled outside this panel while the prompt was open
 59. **A** — retains an external wallet response arriving after expiry without registration
 60. **A** — does not allow a duplicate signature while the original wallet prompt is unresolved after a remount
-61. **D** — blocks wallet signing while a cancel mutation is in flight
+61. **A** — blocks wallet signing while a cancel mutation is in flight
 62. **D** — rejects a history response for a different server account before publishing any bundle
 63. **C** — says that recovery is memory-only and cannot restore after the outer panel unmounts
 64. **C** — releases only an explicitly rejected wallet prompt without registering or submitting
