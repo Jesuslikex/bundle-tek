@@ -44,8 +44,11 @@ const authority = {
 // refusal has one.
 const refusedDetail = (refused: { reason: string; detail?: string }) =>
   Error(refused.detail ? refused.reason + ': ' + refused.detail : refused.reason);
+// Which stage refused. Module scope so fail() can name it; the campaign is
+// sequential, so one shared value is enough.
+let stage = 'setup';
 const fail = (): never => {
-  throw Error('Jito read-only qualification refused.');
+  throw Error('Jito read-only qualification refused at ' + stage);
 };
 /** Private server-only diagnostic. Full newly captured baseline evidence is
  * mandatory; saved scalar summaries and arbitrary caller-created proof objects
@@ -168,7 +171,7 @@ export async function collectJitoReadOnlyQualification(
       control,
       dependencies,
     );
-  let stage = 'network';
+  stage = 'network';
   let beforeAssets: Awaited<ReturnType<typeof readJitoAssetEvidence>> | null =
       null,
     afterAssets: Awaited<ReturnType<typeof readJitoAssetEvidence>> | null =

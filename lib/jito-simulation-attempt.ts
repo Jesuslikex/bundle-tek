@@ -173,9 +173,12 @@ export async function collectJitoSimulationAttempt(input: {
     deadline.throwIfAborted();
     const feeResponse = await send(plan.body);
     if (!feeResponse)
-      return refuse(
-        reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
-      );
+      return {
+        ...refuse(
+          reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
+        ),
+        detail: 'status ' + String(reads.at(-1)?.status ?? 'none'),
+      };
     fees = await readJitoFeeBatchResponse(
       plan,
       responseField(feeResponse, 'body'),
@@ -198,9 +201,12 @@ export async function collectJitoSimulationAttempt(input: {
     });
     const response = await send(sentSimulationBody);
     if (!response)
-      return refuse(
-        reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
-      );
+      return {
+        ...refuse(
+          reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
+        ),
+        detail: 'status ' + String(reads.at(-1)?.status ?? 'none'),
+      };
     // Reuse the exact private fee-derived packet vector and the original floor.
     // No caller mutation, later bank, renewed floor or old template fee enters.
     simulation = await readJitoSimulationResponse({
