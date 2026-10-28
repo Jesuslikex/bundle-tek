@@ -57,9 +57,13 @@ for (const sample of fixture.cases)
     });
     if (result.status === 'captured') {
       expect(result.simulation.frames.slot).toBe(sample.bank);
-      expect(result.fees.fees.every((fee) => fee.slot === sample.bank)).toBe(
-        true,
-      );
+      // The provider resolves each batched fee member independently, so a fee
+      // may sit one slot either side of the simulation bank.
+      expect(
+        result.fees.fees.every(
+          (fee) => Math.abs(fee.slot - sample.bank!) <= 1,
+        ),
+      ).toBe(true);
       expect(
         result.simulation.frames.slot - sample.originalFloor,
       ).toBeLessThanOrEqual(32);
