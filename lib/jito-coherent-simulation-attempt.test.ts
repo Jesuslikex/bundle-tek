@@ -133,7 +133,8 @@ for (const mutation of [
         if (mutation === 'later-fees')
           for (const row of m.slice(0, -1))
             (row as typeof fee).result.context.slot = 103n;
-        if (mutation === 'mixed-fees') fee.result.context.slot = 102n;
+        // One slot of member spread is accepted; two is not.
+        if (mutation === 'mixed-fees') fee.result.context.slot = 103n;
         if (mutation === 'null-fee') fee.result.value = null;
         if (mutation === 'string-fee') fee.result.value = '5000';
         if (mutation === 'zero-fee') fee.result.value = 0n;

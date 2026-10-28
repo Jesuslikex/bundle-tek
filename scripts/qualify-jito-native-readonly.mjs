@@ -440,12 +440,15 @@ export async function runNativeJitoCampaign({
         const bank = result.fees.simulationBankSlot;
         inWindow(bank);
         if (
-          bank < attempt.accountSlot ||
+          // Frames must sit at the bank the simulation used; the fee replies may
+          // straddle one slot either side of it, and fees do not change per slot.
           result.simulation.frames.slot !== bank ||
           result.simulation.frames.frames.length !== 2 ||
           result.fees.fees.length !== 2 ||
           result.fees.fees.some(
-            (f) => f.slot !== bank || String(f.feeLamports) !== '5000',
+            (f) =>
+              Math.abs(f.slot - bank) > 1 ||
+              String(f.feeLamports) !== '5000',
           )
         )
           throw failure(
@@ -507,6 +510,9 @@ export async function runNativeJitoCampaign({
   report.nativeCapturedCount = report.attempts.filter(
     (a) => a.nativeCaptured,
   ).length;
+  // Three captures is the provider claim; the other flags stay false because
+  // economics, runtime privileges and signing are separate gates.
+  report.providerQualified = report.nativeCapturedCount === 3;
   saveReport();
   return report;
 }

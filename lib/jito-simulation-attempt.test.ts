@@ -184,7 +184,8 @@ it('does not run simulation after a fee schema refusal or inconsistent actual fe
             jsonrpc: '2.0',
             id,
             result: {
-              context: { slot: mixed && i === 1 ? 102n : 101n },
+              // One slot of member spread is accepted; two is not.
+            context: { slot: mixed && i === 1 ? 103n : 101n },
               value: mixed ? 5000n : null,
             },
           }),

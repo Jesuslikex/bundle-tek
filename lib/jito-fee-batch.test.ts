@@ -224,7 +224,8 @@ for (const variant of [
         rows.forEach((r) => (r.result.context.slot = 99n));
       if (variant === 'above-span')
         rows.forEach((r) => (r.result.context.slot = 133n));
-      if (variant === 'mixed-bank') rows[1].result.context.slot = 102n;
+      // A one-slot member spread is accepted; two is not.
+      if (variant === 'mixed-bank') rows[1].result.context.slot = 103n;
       if (variant === 'quoted-slot')
         Object.assign(rows[0].result.context, { slot: '101' });
       if (variant === 'unknown-envelope')
