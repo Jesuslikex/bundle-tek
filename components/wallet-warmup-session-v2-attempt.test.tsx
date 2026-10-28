@@ -46,8 +46,20 @@ let f: Awaited<ReturnType<typeof warmupReadClientFixture>>,
 const at = Date.parse('2026-10-21T12:00:00.000Z');
 const key = () => 'bundle:warmup-attempt-v2:' + f.journal.id;
 async function flush() {
-  for (let i = 0; i < 60; i++)
+  // Poll until the DOM stops changing instead of counting a fixed number of
+  // turns: under parallel load a fetch chain can need far more than five.
+  let previous = '';
+  let stable = 0;
+  for (let i = 0; i < 200; i++) {
     await new Promise<void>((resolve) => nextTurn(resolve));
+    const current = host.innerHTML;
+    if (current === previous) {
+      if (++stable >= 3) return;
+    } else {
+      stable = 0;
+      previous = current;
+    }
+  }
 }
 async function render(disabled = false, now = at, invalidated = false) {
   await act(async () => {
@@ -72,31 +84,16 @@ const button = (text: string) => {
 };
 async function click(text: string) {
   await act(async () => {
-    // A remount or mode change can render the control a turn later.
-    for (let i = 0; i < 20; i++) {
-      const target = [...host.querySelectorAll('button')].find(
-        (b) => b.textContent?.trim() === text,
-      );
-      if (target && !target.disabled) {
-        target.click();
-        break;
-      }
-      await flush();
-    }
+    button(text).click();
     await flush();
   });
 }
 async function check(text = 'Request this exact unsigned quote') {
   await act(async () => {
-    let input: HTMLInputElement | null = null;
-    for (let i = 0; i < 20; i++) {
-      const label = [...host.querySelectorAll('label')].find((l) =>
-        l.textContent?.includes(text),
-      );
-      input = label?.querySelector('input') ?? null;
-      if (input && !input.disabled) break;
-      await flush();
-    }
+    const label = [...host.querySelectorAll('label')].find((l) =>
+      l.textContent?.includes(text),
+    );
+    const input = label?.querySelector('input');
     if (!input) throw Error('Missing checkbox');
     input.click();
     await flush();
