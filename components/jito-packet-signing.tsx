@@ -118,8 +118,7 @@ export function JitoPacketSigning({
       assertCurrent();
       reservation = await coordinator.reserve(ownerScope, manifest, packet);
       assertCurrent();
-      let transaction: string,
-        registered = false;
+      let transaction: string;
       const hooks = {
         beforeSign,
         onSignerStart: () => {
@@ -131,19 +130,10 @@ export function JitoPacketSigning({
           await coordinator.capture(reservation!, manifest, signed.transaction);
         },
       };
-      const retainAndRegister = async (signed: { transaction: string }) => {
+      // Capture the verified output before the helper's final wallet check.
+      // Registration must wait until that check has succeeded.
+      const retainOnly = async (signed: { transaction: string }) => {
         await coordinator.capture(reservation!, manifest, signed.transaction);
-        if (
-          !mounted.current ||
-          !isContextCurrent() ||
-          Date.parse(manifest.expiresAt) <= Date.now()
-        )
-          throw new Error(
-            'Bundle context changed. Reload saved history to recover the signed packet.',
-          );
-        setPending(signed.transaction);
-        await register(signed.transaction, operation);
-        registered = true;
       };
       if (choice === 'vault') {
         const encrypted = localStorage.getItem(VAULT_STORAGE_KEY);
@@ -185,7 +175,7 @@ export function JitoPacketSigning({
               external,
               swap,
               assertCurrent,
-              retainAndRegister,
+              retainOnly,
               hooks,
             )
           ).transaction;
@@ -197,7 +187,7 @@ export function JitoPacketSigning({
               external,
               manifest.tip,
               assertCurrent,
-              retainAndRegister,
+              retainOnly,
               hooks,
             )
           ).transaction;
@@ -212,7 +202,7 @@ export function JitoPacketSigning({
           'Bundle context changed. Reload saved history to recover the signed packet.',
         );
       setPending(transaction);
-      if (!registered) await register(transaction, operation);
+      await register(transaction, operation);
       if (mounted.current) {
         setPending(null);
         setAccepted(false);

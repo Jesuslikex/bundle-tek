@@ -94,6 +94,33 @@ it('refuses external withdrawal metadata changed during the async owner fence', 
   expect(onSignerStart).not.toHaveBeenCalled();
   expect(sign).not.toHaveBeenCalled();
 });
+it('refuses an in-place signer replacement during the async owner fence before prompting', async () => {
+  const f = await nativeWithdrawalFixture();
+  const sign = vi.fn(async () => []);
+  const w = wallet(f.wallet, sign);
+  const feature = w.features['solana:signTransaction'] as unknown as {
+    signTransaction: typeof sign;
+  };
+  const replacement = vi.fn(async () => []);
+  const onSignerStart = vi.fn();
+  await expect(
+    signExternalNativeWithdrawal(
+      w,
+      f.review,
+      () => {},
+      async () => {},
+      {
+        beforeSign: async () => {
+          feature.signTransaction = replacement;
+        },
+        onSignerStart,
+      },
+    ),
+  ).rejects.toThrow('Withdrawal wallet differs or approval expired.');
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(sign).not.toHaveBeenCalled();
+  expect(replacement).not.toHaveBeenCalled();
+});
 it.each([false, true])(
   'does not introduce a pre-prompt rejection for a rebuilt feature wrapper with a stable signer, hooks=%s',
   async (useHooks) => {

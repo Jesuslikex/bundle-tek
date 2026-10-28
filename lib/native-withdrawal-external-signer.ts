@@ -105,6 +105,7 @@ export async function signExternalNativeWithdrawal(
       false,
     ),
     sign = features(wallet).sign,
+    signer = sign.signTransaction,
     account = matchingNativeWithdrawalAccount(wallet, review.wallet);
   assertCurrent();
   if (!account || Date.parse(review.expiresAt) <= Date.now())
@@ -126,7 +127,7 @@ export async function signExternalNativeWithdrawal(
       throw new Error('Withdrawal packet changed during signer preparation.');
     assertCurrent();
     if (
-      features(wallet).sign.signTransaction !== sign.signTransaction ||
+      features(wallet).sign.signTransaction !== signer ||
       matchingNativeWithdrawalAccount(wallet, review.wallet) !== account ||
       Date.parse(review.expiresAt) <= Date.now()
     )
@@ -164,6 +165,7 @@ export async function signExternalNativeWithdrawal(
   assertCurrent();
   if (
     features(wallet).sign !== sign ||
+    features(wallet).sign.signTransaction !== signer ||
     matchingNativeWithdrawalAccount(wallet, review.wallet) !== account
   )
     throw new Error(

@@ -238,6 +238,45 @@ async function fixture() {
     session,
     bundle,
     sign,
+    replaceSigner: () => {
+      const wallet = context.wallets[0] as {
+        features: {
+          'solana:signTransaction': { signTransaction: typeof sign };
+        };
+      };
+      wallet.features['solana:signTransaction'] = {
+        ...wallet.features['solana:signTransaction'],
+        signTransaction: vi.fn(async () => []),
+      };
+    },
+    mutateSigner: () => {
+      const wallet = context.wallets[0] as {
+        features: {
+          'solana:signTransaction': { signTransaction: typeof sign };
+        };
+      };
+      wallet.features['solana:signTransaction'].signTransaction = vi.fn(
+        async () => [],
+      );
+    },
+    replaceAccount: () => {
+      const wallet = context.wallets[0] as { accounts: (typeof account)[] };
+      wallet.accounts = [{ ...account }];
+    },
+    replaceWithDifferentAccount: () => {
+      const wallet = context.wallets[0] as { accounts: (typeof account)[] };
+      wallet.accounts = [
+        {
+          ...account,
+          address: '11111111111111111111111111111111',
+          publicKey: new Uint8Array(32),
+        },
+      ];
+    },
+    clearAccounts: () => {
+      const wallet = context.wallets[0] as { accounts: (typeof account)[] };
+      wallet.accounts = [];
+    },
     started,
     exactFetchStarted,
     cancelStarted,
@@ -328,6 +367,65 @@ async function startPrompt(
         throw Error('Prompt unavailable: ' + container.textContent);
     });
 }
+it.each([0, 1])(
+  'registers packet %s after an unchanged external wallet finishes its final check',
+  async (packet) => {
+    const f = await fixture();
+    await startPrompt(f, packet);
+    await act(async () => f.resolveWallet(packet));
+    await vi.waitFor(async () => {
+      await act(async () => {});
+      expect(f.posts).toEqual(['register']);
+      expect(f.bundle.signatures[packet]).toBeTruthy();
+    });
+    expect(f.sign).toHaveBeenCalledOnce();
+  },
+);
+it('preserves the empty-account-list fallback after an external swap prompt', async () => {
+  const f = await fixture();
+  await startPrompt(f, 0);
+  f.clearAccounts();
+  await act(async () => f.resolveWallet(0));
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(f.posts).toEqual(['register']);
+  });
+});
+it.each([
+  [0, 'signer'],
+  [0, 'mutated signer'],
+  [0, 'account'],
+  [0, 'different account'],
+  [1, 'signer'],
+  [1, 'mutated signer'],
+  [1, 'account'],
+  [1, 'different account'],
+] as const)(
+  'retains packet %s but never registers when the external %s changes during the prompt',
+  async (packet, change) => {
+    const f = await fixture();
+    await startPrompt(f, packet);
+    if (change === 'signer') f.replaceSigner();
+    else if (change === 'mutated signer') f.mutateSigner();
+    else if (change === 'account') f.replaceAccount();
+    else f.replaceWithDifferentAccount();
+    await act(async () => f.resolveWallet(packet));
+    await until('original verified signature is retained');
+    await until('changed');
+    expect(f.posts).toEqual([]);
+    expect(f.bundle.signatures[packet]).toBeNull();
+    expect(f.sign).toHaveBeenCalledOnce();
+    const approval = [...container.querySelectorAll('label')]
+      .find((node) =>
+        node.textContent?.includes(
+          'I approve registering this exact retained packet only',
+        ),
+      )!
+      .querySelector('input')!;
+    expect(approval.checked).toBe(false);
+    expect(button('Register retained packet only').disabled).toBe(true);
+  },
+);
 it.each([0, 1])(
   'recovers packet %s after keyed remount only after a fresh scoped history read and explicit registration',
   async (packet) => {

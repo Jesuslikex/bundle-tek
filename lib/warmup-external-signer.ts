@@ -176,13 +176,17 @@ export async function signApprovedExternalWarmupPacket(
     const swapped = features(wallet).sign?.signTransaction !== signer;
     // Phantom empties wallet.accounts outside a live prompt, so fall back to
     // the account captured when the approval was taken.
+    const matched = matchingWarmupExternalAccount(wallet, review.wallet);
     const current =
-      matchingWarmupExternalAccount(wallet, review.wallet) ||
+      matched ||
       ((wallet as any).publicKey?.toString?.() === review.wallet
         ? account
         : undefined);
     const why = [
-      current && current !== account ? 'account' : '',
+      (wallet.accounts.length > 0 && !matched) ||
+      (current && current !== account)
+        ? 'account'
+        : '',
       swapped ? 'feature' : '',
       Date.parse(review.expiresAt) <= Date.now() ? 'expired' : '',
     ]

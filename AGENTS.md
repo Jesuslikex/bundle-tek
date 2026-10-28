@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 COMPLETE, claim released: Jito external-wallet final signer recheck before registration. See docs/CODEX-JITO-WALLET-RECHECK-20261028.md for validation and limitations. No real wallet/signing, automatic retry, send, provider setting or deploy.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: offline esbuild output-write repair for exchange and warmup probes. See docs/CODEX-OFFLINE-COMPILER-WRITES-20261028.md. Focused tests and a stable-source 88/88 script snapshot passed. No provider or wallet actions.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: optional exact pre-sign and post-sign retention hooks for Jito recovery. See docs/CODEX-JITO-MEMORY-RECOVERY-20261028.md. Existing default signer behavior and post-sign guards preserved; no real signing, send, provider change or deploy.
