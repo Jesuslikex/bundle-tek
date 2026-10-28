@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 COMPLETE, claim released: one-file lookup of older Jito recovery records. See docs/CODEX-JITO-OLDER-RECOVERY-LOOKUP-20261028.md. Uses strict local parsing and exact authenticated records; registration requires existing consent, with no automatic signing, submission, provider changes or deployment.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: strict local Jito recovery-file locator. See docs/CODEX-JITO-RECOVERY-LOCATOR-20261028.md. It returns only bounded context identifiers and grants no signing, submission or provider authority; UI integration remains separate.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: Jito terminal-state recovery-file inspection and private export only. See docs/CODEX-JITO-TERMINAL-FILE-RECOVERY-20261028.md. Requires exact owner-scoped record and signature verification; no registration, signing, submission, provider changes or deployment.

@@ -14,6 +14,8 @@ import {
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
 import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
+import * as locatorModule from '@/lib/jito-recovery-locator';
+import { bundleFingerprint } from '@/lib/jito-bundle';
 
 const context = vi.hoisted(() => ({
   wallets: [] as unknown[],
@@ -38,6 +40,12 @@ beforeEach(() => {
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
   vi.stubGlobal('crypto', webcrypto);
+  // Vitest supplies Node AbortSignal alongside JSDOM EventTarget; use the
+  // signal's native EventTarget prototype for the strict local parser.
+  vi.stubGlobal(
+    'EventTarget',
+    Object.getPrototypeOf(AbortSignal.prototype).constructor,
+  );
   vi.stubGlobal('fetch', fetcher);
   fetcher.mockReset();
   context.wallets = [];
@@ -328,6 +336,9 @@ async function fixture() {
     omitFromHistory: () => {
       history.bundles = [];
     },
+    replaceHistory: (records: typeof history.bundles) => {
+      history.bundles = records;
+    },
     resolveExact: async () => {
       const scope = await jitoOwnerScope('alice');
       resolveExact(
@@ -380,9 +391,17 @@ async function importPacket(
     type: 'application/json',
   });
   Object.defineProperty(file, 'text', { value: async () => text });
-  const input = [...container.querySelectorAll('input[type="file"]')][
-    packet
-  ] as HTMLInputElement;
+  const terminal = [...container.querySelectorAll('label')].find((label) =>
+    label.textContent?.includes(
+      `Verify saved recovery file for packet ${packet + 1}`,
+    ),
+  );
+  const signer = [...container.querySelectorAll('label')].filter((label) =>
+    label.textContent?.includes('Signed packet recovery file'),
+  )[packet];
+  const input = document.getElementById(
+    (terminal || signer)!.htmlFor,
+  ) as HTMLInputElement;
   Object.defineProperty(input, 'files', { configurable: true, value: [file] });
   await act(async () =>
     input.dispatchEvent(new Event('change', { bubbles: true })),
@@ -398,6 +417,579 @@ async function openTerminalRecovery() {
   await act(async () => summary.click());
   expect(disclosure.open).toBe(true);
 }
+async function lookupFile(text: string, onRead?: (bytes: Uint8Array) => void) {
+  const summary = [...container.querySelectorAll('summary')].find((node) =>
+    node.textContent?.includes('Find an older bundle from a recovery file'),
+  )!;
+  if (!(summary.parentElement as HTMLDetailsElement).open)
+    await act(async () => summary.click());
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes('Signed Jito recovery file'),
+  )!;
+  const input = document.getElementById(label.htmlFor) as HTMLInputElement;
+  const file = new File([text], 'synthetic-lookup.json', {
+    type: 'application/json',
+  });
+  const source = new TextEncoder().encode(text);
+  const read = vi.fn(async () => {
+    onRead?.(source);
+    return source.buffer;
+  });
+  Object.defineProperty(file, 'arrayBuffer', { value: read });
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  await act(async () =>
+    input.dispatchEvent(new Event('change', { bubbles: true })),
+  );
+  return { source, read };
+}
+async function lookupText(f: Awaited<ReturnType<typeof fixture>>) {
+  return JSON.stringify(
+    await createJitoPacketRecovery(
+      f.f.manifest,
+      0,
+      f.f.swap.signed.transaction,
+    ),
+  );
+}
+it('finds an older reviewed bundle from one local file and requires history plus separate registration approval', async () => {
+  const f = await fixture();
+  f.omitFromHistory();
+  await f.render();
+  const selected = await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  expect(selected.read).toHaveBeenCalledOnce();
+  expect(container.textContent).not.toContain(
+    'I approve registering this exact retained packet only',
+  );
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+  const reads = fetcher.mock.calls.filter(([url]) =>
+    String(url).includes('bundleId='),
+  );
+  expect(reads).toHaveLength(2);
+  for (const [url, init] of reads) {
+    expect(String(url)).toContain(encodeURIComponent(f.f.manifest.id));
+    expect(String(url)).not.toContain(f.f.swap.signed.transaction);
+    expect(String(url)).not.toContain(f.f.swap.signed.signature);
+    expect((init as RequestInit).body).toBeUndefined();
+  }
+  await click('Load bundle approvals');
+  await until('I approve registering this exact retained packet only');
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes(
+      'I approve registering this exact retained packet only',
+    ),
+  )!;
+  expect(label.querySelector('input')!.checked).toBe(false);
+  expect(button('Register retained packet only').disabled).toBe(true);
+  await act(async () => label.querySelector('input')!.click());
+  await click('Register retained packet only');
+  await vi.waitFor(() => expect(f.posts).toEqual(['register']));
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('finds the omitted 21st bundle while twenty distinct recent bundles are listed', async () => {
+  const f = await fixture();
+  const recent = await Promise.all(
+    Array.from({ length: 20 }, async (_, i) => {
+      const { sha256: _original, ...terms } = f.f.manifest;
+      const changed = {
+        ...terms,
+        id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+      };
+      return {
+        ...f.bundle,
+        manifest: { ...changed, sha256: await bundleFingerprint(changed) },
+        signatures: [null, null],
+      };
+    }),
+  );
+  f.replaceHistory(recent);
+  await f.render();
+  await click('Load bundle approvals');
+  await until('00000000-0000-4000-8000-000000000020');
+  expect(container.textContent).not.toContain(`Bundle ${f.f.manifest.id}`);
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  await until('I approve registering this exact retained packet only');
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes(
+      'I approve registering this exact retained packet only',
+    ),
+  )!;
+  expect(label.querySelector('input')!.checked).toBe(false);
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('uses an owned immutable file snapshot even if the original buffer changes during locator parsing', async () => {
+  const f = await fixture();
+  await f.render();
+  const original = locatorModule.readJitoRecoveryLocator;
+  let source: Uint8Array | undefined;
+  vi.spyOn(locatorModule, 'readJitoRecoveryLocator').mockImplementation(
+    async (bytes) => {
+      source!.fill(0);
+      return original(bytes);
+    },
+  );
+  const selected = await lookupFile(await lookupText(f), (bytes) => {
+    source = bytes;
+  });
+  await until('Exact signed packet found');
+  expect(selected.read).toHaveBeenCalledOnce();
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('refuses duplicate keys or a different project/session before any exact-record request', async () => {
+  const f = await fixture();
+  await f.render();
+  const text = await lookupText(f);
+  const parsed = JSON.parse(text) as {
+    projectId: string;
+    sessionId: string;
+    bundleId: string;
+  };
+  const duplicate = text.replace(
+    `"bundleId":"${parsed.bundleId}"`,
+    `"bundleId":"${parsed.bundleId}","bundleId":"${parsed.bundleId}"`,
+  );
+  await lookupFile(duplicate);
+  await until('Recovery file is unavailable or invalid.');
+  await lookupFile(
+    JSON.stringify({
+      ...JSON.parse(text),
+      projectId: '00000000-0000-4000-8000-000000000000',
+    }),
+  );
+  await until('Recovery file belongs to a different project or session.');
+  await lookupFile(
+    JSON.stringify({
+      ...JSON.parse(text),
+      sessionId: '00000000-0000-4000-8000-000000000000',
+    }),
+  );
+  await until('Recovery file belongs to a different project or session.');
+  await lookupFile('x'.repeat(4097));
+  await until('Recovery file is unavailable or invalid.');
+  expect(
+    fetcher.mock.calls.filter(([url]) => String(url).includes('bundleId=')),
+  ).toHaveLength(0);
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('refuses a record whose saved state changes between the two exact reads', async () => {
+  const f = await fixture();
+  await f.render();
+  const implementation = fetcher.getMockImplementation()!;
+  let exactReads = 0;
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (!init?.method && url.includes('bundleId=') && ++exactReads === 2)
+      f.bundle.state = 'cancelled';
+    return implementation(url, init);
+  });
+  await lookupFile(await lookupText(f));
+  await until('Bundle changed. Reload saved history before recovery.');
+  expect(exactReads).toBe(2);
+  expect(container.textContent).not.toContain('Exact signed packet found');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('preserves an unknown original outcome rather than replacing it from a file', async () => {
+  const f = await fixture();
+  await startPrompt(f, 0);
+  await act(async () => f.rejectWallet(Error('Synthetic outcome unknown')));
+  await until('original wallet signing outcome is still unknown');
+  fetcher.mockClear();
+  await lookupFile(await lookupText(f));
+  await until('Original Jito packet recovery is pending.');
+  expect(
+    fetcher.mock.calls.filter(([url]) => String(url).includes('bundleId=')),
+  ).toHaveLength(0);
+  expect(f.posts).toEqual([]);
+  expect(f.sign).toHaveBeenCalledOnce();
+});
+it('refuses an older bundle when the authenticated server owner has changed', async () => {
+  const f = await fixture();
+  await f.render();
+  f.serverOwner('bob');
+  await lookupFile(await lookupText(f));
+  await until('Signed-in account changed. Reload bundle history.');
+  expect(container.textContent).not.toContain('Exact signed packet found');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it.each(['cancelled', 'expired'] as const)(
+  'finds an older %s record for export only, with a fresh check before download',
+  async (state) => {
+    const f = await fixture();
+    f.bundle.state = state;
+    f.omitFromHistory();
+    await f.render();
+    const create = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:synthetic');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const download = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {});
+    await lookupFile(await lookupText(f));
+    await until('This saved bundle is cancelled or expired.');
+    expect(container.textContent).not.toContain(
+      'Register retained packet only',
+    );
+    await click('Download verified packet privately');
+    await vi.waitFor(() => expect(download).toHaveBeenCalledOnce());
+    expect(create).toHaveBeenCalledOnce();
+    expect(
+      fetcher.mock.calls.filter(([url]) => String(url).includes('bundleId=')),
+    ).toHaveLength(3);
+    expect(f.posts).toEqual([]);
+    expect(f.sign).not.toHaveBeenCalled();
+  },
+);
+it('discloses an already registered matching signature without offering another registration', async () => {
+  const f = await fixture();
+  f.bundle.signatures[0] = f.f.swap.signed.signature;
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('This exact signature is already registered.');
+  expect(container.textContent).not.toContain('Register retained packet only');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('reconciles an exact signature observed in refreshed history without another registration', async () => {
+  const f = await fixture();
+  const original = memoryModule.createJitoMemorySignatureRecovery;
+  let coordinator: ReturnType<typeof original> | undefined;
+  vi.spyOn(
+    memoryModule,
+    'createJitoMemorySignatureRecovery',
+  ).mockImplementation(() => {
+    coordinator = original();
+    return coordinator;
+  });
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  const scope = await jitoOwnerScope('alice');
+  expect(coordinator!.has(scope, f.f.manifest.id, 0)).toBe(true);
+  f.bundle.signatures[0] = f.f.swap.signed.signature;
+  await click('Load bundle approvals');
+  await until('Saved history already contains this exact signature.');
+  expect(container.textContent).not.toContain(
+    'I approve registering this exact retained packet only',
+  );
+  expect(f.posts).toEqual([]);
+  await click('Confirm saved signature');
+  await until('This exact signature is already registered.');
+  expect(coordinator!.has(scope, f.f.manifest.id, 0)).toBe(false);
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('retains the original and blocks registration when refreshed history reports a different signature', async () => {
+  const f = await fixture();
+  const original = memoryModule.createJitoMemorySignatureRecovery;
+  let coordinator: ReturnType<typeof original> | undefined;
+  vi.spyOn(
+    memoryModule,
+    'createJitoMemorySignatureRecovery',
+  ).mockImplementation(() => {
+    coordinator = original();
+    return coordinator;
+  });
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  f.bundle.signatures[0] = f.f.tip.signed.signature;
+  await click('Load bundle approvals');
+  await until('Saved history contains a different signature.');
+  expect(container.textContent).not.toContain(
+    'I approve registering this exact retained packet only',
+  );
+  expect(
+    coordinator!.has(await jitoOwnerScope('alice'), f.f.manifest.id, 0),
+  ).toBe(true);
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('blocks registration if refreshed history reports a different fingerprint for the same bundle', async () => {
+  const f = await fixture();
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  const { sha256: _old, ...terms } = f.f.manifest;
+  const changed = {
+    ...terms,
+    createdAt: new Date(Date.parse(terms.createdAt) - 1000).toISOString(),
+  };
+  f.bundle.manifest = { ...changed, sha256: await bundleFingerprint(changed) };
+  await click('Load bundle approvals');
+  await until('Saved history contains a different bundle fingerprint.');
+  expect(container.textContent).not.toContain(
+    'I approve registering this exact retained packet only',
+  );
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('refuses duplicate bundle IDs in history without discarding the retained packet', async () => {
+  const f = await fixture();
+  const original = memoryModule.createJitoMemorySignatureRecovery;
+  let coordinator: ReturnType<typeof original> | undefined;
+  vi.spyOn(
+    memoryModule,
+    'createJitoMemorySignatureRecovery',
+  ).mockImplementation(() => {
+    coordinator = original();
+    return coordinator;
+  });
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  f.replaceHistory([f.bundle, f.bundle]);
+  await click('Load bundle approvals');
+  await until('Session bundle history differs.');
+  expect(
+    coordinator!.has(await jitoOwnerScope('alice'), f.f.manifest.id, 0),
+  ).toBe(true);
+  expect(container.textContent).not.toContain(
+    'I approve registering this exact retained packet only',
+  );
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('keeps a retained packet export-only when refreshed history reports a terminal state', async () => {
+  const f = await fixture();
+  const original = memoryModule.createJitoMemorySignatureRecovery;
+  let coordinator: ReturnType<typeof original> | undefined;
+  vi.spyOn(
+    memoryModule,
+    'createJitoMemorySignatureRecovery',
+  ).mockImplementation(() => {
+    coordinator = original();
+    return coordinator;
+  });
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  f.bundle.state = 'cancelled';
+  await click('Load bundle approvals');
+  await until('The saved bundle state changed.');
+  expect(container.textContent).not.toContain(
+    'I approve registering this exact retained packet only',
+  );
+  expect(
+    coordinator!.has(await jitoOwnerScope('alice'), f.f.manifest.id, 0),
+  ).toBe(true);
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('keeps the original pending if account context changes during saved-signature confirmation', async () => {
+  const f = await fixture();
+  const original = memoryModule.createJitoMemorySignatureRecovery;
+  let coordinator: ReturnType<typeof original> | undefined;
+  vi.spyOn(
+    memoryModule,
+    'createJitoMemorySignatureRecovery',
+  ).mockImplementation(() => {
+    coordinator = original();
+    return coordinator;
+  });
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  f.bundle.signatures[0] = f.f.swap.signed.signature;
+  await click('Load bundle approvals');
+  await until('Saved history already contains this exact signature.');
+  f.delayExact();
+  await click('Confirm saved signature');
+  await act(async () => f.exactFetchStarted);
+  await f.render(true);
+  await act(async () => f.resolveExact());
+  expect(
+    coordinator!.has(await jitoOwnerScope('alice'), f.f.manifest.id, 0),
+  ).toBe(true);
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('refuses a conflicting saved signature rather than displaying the imported packet', async () => {
+  const f = await fixture();
+  f.bundle.signatures[0] = f.f.tip.signed.signature;
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Saved bundle signature differs from this recovery file.');
+  expect(container.textContent).not.toContain(
+    'This exact signature is already registered.',
+  );
+  expect(f.posts).toEqual([]);
+});
+it('does not publish a lookup result if the context changes during the owner-scoped read', async () => {
+  const f = await fixture();
+  await f.render();
+  f.delayExact();
+  await lookupFile(await lookupText(f));
+  await act(async () => f.exactFetchStarted);
+  await f.render(true);
+  await act(async () => f.resolveExact());
+  expect(container.textContent).not.toContain('Exact signed packet found');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('synchronously blocks a stale cancel while lookup is reading the exact record', async () => {
+  const f = await fixture();
+  await f.render();
+  await click('Load bundle approvals');
+  await until('Signer for swap 1');
+  const cancel = button('Cancel unsigned bundle');
+  const key = Object.keys(cancel).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (cancel as unknown as Record<string, { onClick: () => void }>)[
+    key
+  ].onClick;
+  f.delayExact();
+  await lookupFile(await lookupText(f));
+  await act(async () => f.exactFetchStarted);
+  await act(async () => stale());
+  expect(f.posts).toEqual([]);
+  await f.render(true);
+  await act(async () => f.resolveExact());
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('does not close a stale recovery view during a pending export', async () => {
+  const f = await fixture();
+  f.bundle.state = 'cancelled';
+  await f.render();
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:synthetic');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  await lookupFile(await lookupText(f));
+  await until('This saved bundle is cancelled or expired.');
+  const close = button('Close recovery view');
+  const key = Object.keys(close).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (close as unknown as Record<string, { onClick: () => void }>)[
+    key
+  ].onClick;
+  f.delayExact();
+  await click('Download verified packet privately');
+  await act(async () => f.exactFetchStarted);
+  await act(async () => stale());
+  expect(container.textContent).toContain(
+    'This saved bundle is cancelled or expired.',
+  );
+  await act(async () => f.resolveExact());
+  expect(f.posts).toEqual([]);
+});
+it('refuses stale registration after an in-flight history refresh fails', async () => {
+  const f = await fixture();
+  f.omitFromHistory();
+  const original = memoryModule.createJitoMemorySignatureRecovery;
+  let delay = false,
+    release!: () => void,
+    markStarted!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  vi.spyOn(
+    memoryModule,
+    'createJitoMemorySignatureRecovery',
+  ).mockImplementation(() => {
+    const coordinator = original();
+    return {
+      ...coordinator,
+      inspect: async (...args: Parameters<typeof coordinator.inspect>) => {
+        if (delay) {
+          delay = false;
+          markStarted();
+          await gate;
+        }
+        return coordinator.inspect(...args);
+      },
+    };
+  });
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  await click('Load bundle approvals');
+  await until('I approve registering this exact retained packet only');
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes(
+      'I approve registering this exact retained packet only',
+    ),
+  )!;
+  await act(async () => label.querySelector('input')!.click());
+  delay = true;
+  await click('Register retained packet only');
+  await act(async () => started);
+  const scope = await jitoOwnerScope('alice');
+  fetcher.mockResolvedValueOnce(
+    Response.json(
+      { error: 'History unavailable.' },
+      { status: 503, headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    ),
+  );
+  await click('Load bundle approvals');
+  await until('History unavailable.');
+  await act(async () => release());
+  await until('Registration was not confirmed.');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('refuses stale registration when refreshed history records the signature before the POST', async () => {
+  const f = await fixture();
+  const original = memoryModule.createJitoMemorySignatureRecovery;
+  let delay = false,
+    release!: () => void,
+    markStarted!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  vi.spyOn(
+    memoryModule,
+    'createJitoMemorySignatureRecovery',
+  ).mockImplementation(() => {
+    const coordinator = original();
+    return {
+      ...coordinator,
+      inspect: async (...args: Parameters<typeof coordinator.inspect>) => {
+        if (delay) {
+          delay = false;
+          markStarted();
+          await gate;
+        }
+        return coordinator.inspect(...args);
+      },
+    };
+  });
+  await f.render();
+  await lookupFile(await lookupText(f));
+  await until('Exact signed packet found');
+  await click('Load bundle approvals');
+  await until('I approve registering this exact retained packet only');
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes(
+      'I approve registering this exact retained packet only',
+    ),
+  )!;
+  await act(async () => label.querySelector('input')!.click());
+  delay = true;
+  await click('Register retained packet only');
+  await act(async () => started);
+  f.bundle.signatures[0] = f.f.swap.signed.signature;
+  await click('Load bundle approvals');
+  await until('Saved history already contains this exact signature.');
+  await act(async () => release());
+  await until('Registration was not confirmed.');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
 it.each(['cancelled', 'expired'] as const)(
   'inspects a %s bundle recovery file through the owner-scoped exact record without signing or submission',
   async (state) => {

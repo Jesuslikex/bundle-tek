@@ -36,6 +36,10 @@ import {
 import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
 import { JitoMemoryRecovery } from './jito-memory-recovery';
 import { JitoTerminalRecoveryImport } from './jito-terminal-recovery-import';
+import {
+  JitoRecoveryLookup,
+  type JitoLocatedRecovery,
+} from './jito-recovery-lookup';
 
 async function checkedRecord(
   value: JitoBundleRecord,
@@ -158,9 +162,12 @@ function JitoAtomicBundleForContext({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [now, setNow] = useState(() => Date.now()),
-    [historyVerified, setHistoryVerified] = useState(false);
+    [historyVerified, setHistoryVerified] = useState(false),
+    [lookupView, setLookupView] = useState<JitoLocatedRecovery | null>(null);
   const mounted = useRef(true),
     running = useRef(false),
+    historyVerifiedNow = useRef(false),
+    historyRecordsNow = useRef<JitoBundleRecord[]>([]),
     abort = useRef<AbortController | null>(null);
   const isContextCurrent = useCallback(() => mounted.current, []);
   useLayoutEffect(() => {
@@ -168,6 +175,8 @@ function JitoAtomicBundleForContext({
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       mounted.current = false;
+      historyVerifiedNow.current = false;
+      historyRecordsNow.current = [];
       abort.current?.abort();
       clearInterval(timer);
     };
@@ -216,9 +225,12 @@ function JitoAtomicBundleForContext({
     const invalidateHistory = (reason: string) => {
       if (mounted.current && isContextCurrent()) {
         setHistoryVerified(false);
+        historyVerifiedNow.current = false;
+        historyRecordsNow.current = [];
         setBundles([]);
         setEligible([]);
         setAcceptedSubmit(null);
+        setLookupView(null);
         setError(reason);
       }
     };
@@ -307,7 +319,11 @@ function JitoAtomicBundleForContext({
     setBusy(true);
     setError('');
     setAcceptedSubmit(null);
-    if (!body) setHistoryVerified(false);
+    if (!body) {
+      historyVerifiedNow.current = false;
+      historyRecordsNow.current = [];
+      setHistoryVerified(false);
+    }
     const submission = body as { action?: unknown; id?: unknown } | undefined;
     if (submission?.action === 'submit')
       setBundles((prior) =>
@@ -332,6 +348,13 @@ function JitoAtomicBundleForContext({
             'Signature registration did not match. Reload saved history.',
           );
         if (mounted.current && isContextCurrent()) {
+          if (historyVerifiedNow.current)
+            historyRecordsNow.current = [
+              bundle,
+              ...historyRecordsNow.current.filter(
+                (item) => item.manifest.id !== bundle.manifest.id,
+              ),
+            ].slice(0, 20);
           setBundles((prior) =>
             [
               bundle,
@@ -355,6 +378,11 @@ function JitoAtomicBundleForContext({
           data.bundles.map((b) => checkedRecord(b, projectId, session)),
         );
         if (
+          new Set(checked.map((bundle) => bundle.manifest.id)).size !==
+          checked.length
+        )
+          throw new Error('Session bundle history differs.');
+        if (
           data.eligible.some(
             (r) =>
               !r.session ||
@@ -370,10 +398,12 @@ function JitoAtomicBundleForContext({
         )
           throw new Error('Available approval terms differ.');
         if (mounted.current && isContextCurrent()) {
+          historyRecordsNow.current = checked;
           setBundles(checked);
           setEligible(data.eligible);
           setSelected([]);
           setAcceptedSubmit(null);
+          historyVerifiedNow.current = true;
           setHistoryVerified(true);
         }
       }
@@ -392,6 +422,29 @@ function JitoAtomicBundleForContext({
   const run = (body?: object) => {
     void action(body).catch(() => {});
   };
+  function beginRecoveryLookup() {
+    if (
+      !mounted.current ||
+      !isContextCurrent() ||
+      !ownerScope ||
+      running.current
+    )
+      throw new Error(
+        'Bundle context changed or another operation is in progress.',
+      );
+    const token = coordinator.startOperation(ownerScope);
+    running.current = true;
+    setBusy(true);
+    return token;
+  }
+  function finishRecoveryLookup(token: JitoOperationToken) {
+    try {
+      coordinator.finishOperation(token);
+    } finally {
+      running.current = false;
+      if (mounted.current && isContextCurrent()) setBusy(false);
+    }
+  }
   async function readExactBundle(id: string) {
     const data = await request(undefined, id, 5000);
     if (
@@ -462,6 +515,13 @@ function JitoAtomicBundleForContext({
     try {
       const record = await readExactBundle(id);
       if (!isContextCurrent()) throw Error('Bundle context changed.');
+      if (historyVerifiedNow.current)
+        historyRecordsNow.current = [
+          record,
+          ...historyRecordsNow.current.filter(
+            (item) => item.manifest.id !== id,
+          ),
+        ].slice(0, 20);
       setBundles((prior) =>
         [record, ...prior.filter((item) => item.manifest.id !== id)].slice(
           0,
@@ -481,8 +541,15 @@ function JitoAtomicBundleForContext({
     packet: number,
     transaction: string,
     signingOperation?: JitoOperationToken,
+    assertAdditionalCurrent?: () => void,
   ) {
-    if (!ownerScope || !isContextCurrent() || manifestExpired(manifest))
+    assertAdditionalCurrent?.();
+    if (
+      !ownerScope ||
+      !isContextCurrent() ||
+      manifestExpired(manifest) ||
+      (!signingOperation && !historyVerifiedNow.current)
+    )
       throw new Error(
         'Signed-in account or bundle changed. Reload saved history.',
       );
@@ -491,7 +558,12 @@ function JitoAtomicBundleForContext({
       packet,
       transaction,
     );
-    if (!isContextCurrent() || manifestExpired(manifest))
+    assertAdditionalCurrent?.();
+    if (
+      !isContextCurrent() ||
+      manifestExpired(manifest) ||
+      (!signingOperation && !historyVerifiedNow.current)
+    )
       throw new Error(
         'Signed-in account or bundle changed. Reload saved history.',
       );
@@ -542,6 +614,20 @@ function JitoAtomicBundleForContext({
       );
     }
   }
+  function assertLookupRegistration(record: JitoBundleRecord, packet: number) {
+    if (!historyVerifiedNow.current)
+      throw new Error('Reload bundle history before registering this packet.');
+    const observed = historyRecordsNow.current.find(
+      (item) => item.manifest.id === record.manifest.id,
+    );
+    if (
+      observed &&
+      (observed.manifest.sha256 !== record.manifest.sha256 ||
+        observed.state !== 'reviewed' ||
+        observed.signatures[packet] !== null)
+    )
+      throw new Error('Saved bundle changed. Reload history before recovery.');
+  }
   return (
     <details className="space-y-3 rounded-md border p-3">
       <summary>Jito atomic bundle · up to 4 wallet swaps</summary>
@@ -586,9 +672,51 @@ function JitoAtomicBundleForContext({
         >
           Load bundle approvals and history
         </Button>
+        <JitoRecoveryLookup
+          projectId={projectId}
+          sessionId={session.id}
+          ownerScope={ownerScope}
+          coordinator={coordinator}
+          revision={memoryRevision}
+          disabled={busy || !ownerScope || coordinator.operationActive()}
+          isContextCurrent={isContextCurrent}
+          readExactBundle={readExactBundle}
+          canRegister={(record) =>
+            Boolean(ownerScope) &&
+            historyVerified &&
+            !busy &&
+            !coordinator.operationActive() &&
+            !locked &&
+            session.state === 'active' &&
+            session.revision === record.manifest.sessionRevision &&
+            record.state === 'reviewed' &&
+            !manifestExpired(record.manifest)
+          }
+          registerPacket={(record, packet, transaction) =>
+            registerPacket(
+              record.manifest,
+              packet,
+              transaction,
+              undefined,
+              () => assertLookupRegistration(record, packet),
+            ).then(() => {})
+          }
+          beginOperation={beginRecoveryLookup}
+          finishOperation={finishRecoveryLookup}
+          observedRecord={
+            historyVerified && lookupView
+              ? (bundles.find(
+                  (record) =>
+                    record.manifest.id === lookupView.record.manifest.id,
+                ) ?? null)
+              : null
+          }
+          view={lookupView}
+          setView={setLookupView}
+        />
         <p>
-          History lists up to 20 recent bundles. Older bundles appear only when
-          this panel has a pending in-memory recovery.
+          History lists up to 20 recent bundles. Use a recovery file to find an
+          older saved bundle.
         </p>
         {historyVerified &&
           ownerScope &&
@@ -825,7 +953,12 @@ function JitoAtomicBundleForContext({
               {historyVerified &&
                 ownerScope &&
                 Array.from({ length: m.swaps.length + 1 }, (_, packet) =>
-                  coordinator.has(ownerScope, m.id, packet) ? (
+                  coordinator.has(ownerScope, m.id, packet) &&
+                  !(
+                    lookupView?.kind === 'retained' &&
+                    lookupView.record.manifest.id === m.id &&
+                    lookupView.packet === packet
+                  ) ? (
                     <JitoMemoryRecovery
                       key={`${m.id}:memory:${packet}:${memoryRevision}:${bundle.signatures[packet] ?? ''}`}
                       ownerScope={ownerScope}
