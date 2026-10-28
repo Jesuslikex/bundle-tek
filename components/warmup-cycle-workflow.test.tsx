@@ -72,14 +72,24 @@ async function click(text: string) {
   await act(async () => button(text).click());
 }
 // The approval hash is a real crypto.subtle digest, so the review lands a few
-// microtasks after the click rather than synchronously. Drain microtasks and
-// zero-delay timers until it settles instead of guessing a fixed tick count.
+// microtasks after the click rather than synchronously. Poll until the DOM is
+// stable for three turns instead of guessing a fixed tick count: under parallel
+// load a fetch chain needs far more than a fixed budget.
 async function flush() {
-  for (let i = 0; i < 20; i += 1) {
+  let previous = '';
+  let stable = 0;
+  for (let i = 0; i < 200; i += 1) {
     await act(async () => {
       await Promise.resolve();
       await vi.advanceTimersByTimeAsync(0);
     });
+    const current = container.innerHTML;
+    if (current === previous) {
+      if (++stable >= 3) return;
+    } else {
+      stable = 0;
+      previous = current;
+    }
   }
 }
 async function check(fragment: string) {

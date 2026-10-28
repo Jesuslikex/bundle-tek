@@ -46,15 +46,16 @@ let f: Awaited<ReturnType<typeof warmupReadClientFixture>>,
 const at = Date.parse('2026-10-21T12:00:00.000Z');
 const key = () => 'bundle:warmup-attempt-v2:' + f.journal.id;
 async function flush() {
-  // Poll until the DOM stops changing instead of counting a fixed number of
-  // turns: under parallel load a fetch chain can need far more than five.
+  // Always give the first turns unconditionally, then poll until the DOM stops
+  // changing: under parallel load a fetch chain can need far more than five,
+  // but a stability check alone bails before the first commit lands.
   let previous = '';
   let stable = 0;
   for (let i = 0; i < 200; i++) {
     await new Promise<void>((resolve) => nextTurn(resolve));
     const current = host.innerHTML;
     if (current === previous) {
-      if (++stable >= 3) return;
+      if (++stable >= 3 && i >= 6) return;
     } else {
       stable = 0;
       previous = current;
