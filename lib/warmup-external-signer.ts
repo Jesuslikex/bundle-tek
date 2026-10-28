@@ -166,11 +166,13 @@ export async function signApprovedExternalWarmupPacket(
       assertCurrent,
     ),
     reviewedMessage = Uint8Array.from(tx.messageBytes);
+  const signer = sign.signTransaction;
   const requireCurrent = () => {
     assertCurrent();
     // Phantom rebuilds its feature object on each access, so compare the
-    // account and expiry rather than the feature identity.
-    features(wallet);
+    // account, the signer function and the expiry rather than the feature
+    // object identity.
+    const swapped = features(wallet).sign?.signTransaction !== signer;
     // Phantom empties wallet.accounts outside a live prompt, so fall back to
     // the account captured when the approval was taken.
     const current =
@@ -180,6 +182,7 @@ export async function signApprovedExternalWarmupPacket(
         : undefined);
     const why = [
       current && current !== account ? 'account' : '',
+      swapped ? 'feature' : '',
       Date.parse(review.expiresAt) <= Date.now() ? 'expired' : '',
     ]
       .filter(Boolean)

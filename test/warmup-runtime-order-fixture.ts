@@ -24,7 +24,7 @@ export async function warmupRuntimeOrderFixture(
     clock = { now: Math.floor(Date.now() / 1000) * 1000 };
   order.observedAt = new Date(now()).toISOString();
   order.expiresAt = new Date(now() + 30000).toISOString();
-  order.preparation.lastValidBlockHeight = '180';
+  order.preparation.lastValidBlockHeight = '1100';
   // The route's exact decoded account positions vary between v1 and v2. Use the
   // real instruction decoder to establish the map.
   const { reviewSwapInstructions } =
@@ -155,7 +155,21 @@ export async function warmupRuntimeOrderFixture(
       case 'getSlot':
         return String(slot);
       case 'getBlockHeight':
-        return '100';
+        // Finalized reads are the quote's freshness probe; confirmed reads are
+        // the collector's window check. Keeping them apart lets a fixture packet
+        // clear the 900-block margin and still sit inside the 200-block window.
+        return (params[0] as { commitment?: string } | undefined)?.commitment ===
+          'finalized'
+          ? '100'
+          : '1000';
+      case 'getLatestBlockhash':
+        return {
+          context: { slot: String(slot) },
+          value: {
+            blockhash: '11111111111111111111111111111111',
+            lastValidBlockHeight: 1100,
+          },
+        };
       case 'getFeeForMessage':
         return { context: { slot: String(slot) }, value: '5000' };
       case 'isBlockhashValid':

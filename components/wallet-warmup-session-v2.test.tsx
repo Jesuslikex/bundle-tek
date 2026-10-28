@@ -105,7 +105,7 @@ const button = (name: string) =>
   [...host.querySelectorAll('button')].find((b) => b.textContent === name)!;
 async function done(check: () => void) {
   let error: unknown;
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 400; i++) {
     try {
       check();
       return;

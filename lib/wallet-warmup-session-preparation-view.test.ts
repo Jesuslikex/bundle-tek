@@ -1,6 +1,9 @@
 import { expect, it, vi } from 'vitest';
 import { createWalletWarmupSessionProvider } from './wallet-warmup-session-provider';
-import { prepareSolanaSwap } from './warmup-swap-quote';
+import {
+  PREPARATION_LIFETIME_MS,
+  prepareSolanaSwap,
+} from './warmup-swap-quote';
 import { warmupJournalClientFixture } from '@/test/warmup-session-journal-client-fixture';
 import {
   warmupPreparationView as admit,
@@ -243,7 +246,9 @@ it('refuses Buy overspend, impossible original paused heads and long quote lifet
   f.journal.snapshot.paused = true;
   expect(() => f.read()).toThrow('Recover the original request');
   f.journal.snapshot.paused = false;
-  f.p.expiresAt = new Date(Date.parse(f.p.createdAt) + 30001).toISOString();
+  f.p.expiresAt = new Date(
+    Date.parse(f.p.createdAt) + PREPARATION_LIFETIME_MS + 1,
+  ).toISOString();
   expect(() => f.read()).toThrow('Recover the original request');
 });
 it('uses an earlier quote expiry without renewing the source deadline', async () => {

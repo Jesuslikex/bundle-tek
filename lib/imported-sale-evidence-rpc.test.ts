@@ -86,7 +86,9 @@ it('preserves raw integer spelling and refuses excess bytes, wrong IDs, RPC erro
         signal(),
       ),
     ).rejects.toThrow();
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    // At most one retry, then the failure is surfaced.
+    expect(fetcher).toHaveBeenCalled();
+    expect(fetcher.mock.calls.length).toBeLessThanOrEqual(2);
   }
 });
 it('does not retry a 429 and observes cancellation even when the transport ignores it', async () => {

@@ -99,13 +99,33 @@ it.each([false, true])(
   async (omit) => {
     const f = await warmupV2AttemptProviderFixture();
     try {
-      const fetcher = vi.fn(async (url: RequestInfo | URL) => {
-        const parsed = new URL(url instanceof Request ? url.url : url);
-        expect(parsed.origin + parsed.pathname).toBe(
-          'https://api.jup.ag/swap/v2/order',
-        );
-        return Response.json(f.quote(parsed));
-      });
+      const fetcher = vi.fn(
+        async (url: RequestInfo | URL, init?: RequestInit) => {
+          const parsed = new URL(url instanceof Request ? url.url : url);
+          if (parsed.origin !== 'https://api.jup.ag') {
+            const call = JSON.parse(String(init?.body)) as { method: string };
+            return Response.json(
+              call.method === 'getBlockHeight'
+                ? { jsonrpc: '2.0', id: 1, result: 500 }
+                : {
+                    jsonrpc: '2.0',
+                    id: 1,
+                    result: {
+                      context: { slot: 500 },
+                      value: {
+                        blockhash: '11111111111111111111111111111111',
+                        lastValidBlockHeight: 1400,
+                      },
+                    },
+                  },
+            );
+          }
+          expect(parsed.origin + parsed.pathname).toBe(
+            'https://api.jup.ag/swap/v2/order',
+          );
+          return Response.json(f.quote(parsed));
+        },
+      );
       vi.stubGlobal('fetch', fetcher);
       const simulate = vi.fn(
         async (
@@ -147,7 +167,11 @@ it.each([false, true])(
           unrecognizedInstructionCount: null,
           unresolvedAccountCount: null,
         });
-      expect(fetcher).toHaveBeenCalledOnce();
+      expect(
+        fetcher.mock.calls.filter(([url]) =>
+          String(url).startsWith('https://api.jup.ag'),
+        ),
+      ).toHaveLength(1);
       expect(simulate).toHaveBeenCalledOnce();
       await f.control('stop');
       const recovered = await readWalletWarmupV2Attempt(
@@ -160,7 +184,11 @@ it.each([false, true])(
       expect(recovered?.outcome).toEqual(saved.outcome);
       expect(recovered?.summary).toEqual(saved.summary);
       expect(recovered?.journal.snapshot.phase).toBe('stopped');
-      expect(fetcher).toHaveBeenCalledOnce();
+      expect(
+        fetcher.mock.calls.filter(([url]) =>
+          String(url).startsWith('https://api.jup.ag'),
+        ),
+      ).toHaveLength(1);
       expect(simulate).toHaveBeenCalledOnce();
     } finally {
       f.client.close();

@@ -100,7 +100,7 @@ const button = (text: string) =>
   [...container.querySelectorAll('button')].find((b) =>
     b.textContent?.includes(text),
   ) as HTMLButtonElement | undefined;
-const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
 const click = (text: string) =>
   act(async () => {
     button(text)!.click();

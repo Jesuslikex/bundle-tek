@@ -203,6 +203,9 @@ it.each(['account', 'feature', 'expiry', 'scope'] as const)(
       if (kind === 'feature')
         f.wallet.features['solana:signTransaction'] = {
           ...f.wallet.features['solana:signTransaction'],
+          signTransaction: vi.fn(async (...args: Parameters<typeof f.sign>) =>
+            f.sign(...args),
+          ),
         };
       if (kind === 'expiry') f.review.expiresAt = new Date(0).toISOString();
       if (kind === 'scope') current = false;
@@ -238,6 +241,9 @@ it.each(['account', 'feature', 'expiry', 'scope'] as const)(
       if (kind === 'feature')
         f.wallet.features['solana:signTransaction'] = {
           ...f.wallet.features['solana:signTransaction'],
+          signTransaction: vi.fn(async (...args: Parameters<typeof f.sign>) =>
+            f.sign(...args),
+          ),
         };
       if (kind === 'expiry') f.review.expiresAt = new Date(0).toISOString();
       if (kind === 'scope') current = false;

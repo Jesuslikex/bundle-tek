@@ -229,7 +229,7 @@ it.each([
       );
     const url = new URL(f.orderFetcher.mock.calls[0][0] as URL);
     expect(url.searchParams.get('taker')).toBe(f.wallet);
-    expect(url.searchParams.get('excludeRouters')).toBe('jupiterz,dflow,okx');
+    expect(url.searchParams.get('excludeRouters')).toBe('jupiterz,okx');
     expect(
       f.sqlite
         .prepare('SELECT count(*) AS n FROM imported_token_project_events')

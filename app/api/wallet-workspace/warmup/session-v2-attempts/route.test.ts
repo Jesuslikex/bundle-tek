@@ -38,6 +38,10 @@ import { GET, POST } from './route';
 let f: Awaited<ReturnType<typeof warmupV2AttemptProviderFixture>>,
   fetcher: ReturnType<typeof vi.fn>;
 const url = 'http://localhost/api/wallet-workspace/warmup/session-v2-attempts';
+const quoteCalls = () =>
+  fetcher.mock.calls.filter((call) =>
+    String(call[0]).startsWith('https://api.jup.ag'),
+  ).length;
 beforeEach(async () => {
   f = await warmupV2AttemptProviderFixture();
   mocks.db = f.db;
@@ -47,8 +51,26 @@ beforeEach(async () => {
     .mockReset()
     .mockImplementation(async (order) => f.simulation(order));
   mocks.inventory.mockReset();
-  fetcher = vi.fn(async (input) => {
+  fetcher = vi.fn(async (input, init?: RequestInit) => {
     const parsed = new URL(String(input));
+    if (parsed.origin !== 'https://api.jup.ag') {
+      const call = JSON.parse(String(init?.body)) as { method: string };
+      return Response.json(
+        call.method === 'getBlockHeight'
+          ? { jsonrpc: '2.0', id: 1, result: 100 }
+          : {
+              jsonrpc: '2.0',
+              id: 1,
+              result: {
+                context: { slot: 1 },
+                value: {
+                  blockhash: '11111111111111111111111111111111',
+                  lastValidBlockHeight: 999999999,
+                },
+              },
+            },
+      );
+    }
     expect(parsed.origin + parsed.pathname).toBe(
       'https://api.jup.ag/swap/v2/order',
     );
@@ -207,7 +229,7 @@ it('composes real quote/envelope/native SQL/client admission with one provider r
     preview: { inAmountRaw: '1000000' },
     signingAllowed: false,
   });
-  expect(fetcher).toHaveBeenCalledOnce();
+  expect(quoteCalls()).toBe(1);
   expect(mocks.simulate).toHaveBeenCalledOnce();
   expect(await counts()).toEqual([1, 1, 0]);
   expect(
@@ -242,7 +264,7 @@ it('composes real quote/envelope/native SQL/client admission with one provider r
   ).toEqual(admitted.attempt);
   mocks.key = '';
   expect((await post(input)).status).toBe(200);
-  expect(fetcher).toHaveBeenCalledOnce();
+  expect(quoteCalls()).toBe(1);
 });
 it.each([
   { wallet: 'bad' },
@@ -327,7 +349,8 @@ it('rejects a packet-hash REPLACE collision before SQLite can delete an earlier 
     .bind(original.id)
     .first<Record<string, string>>();
   expect(first?.kind).toBe('prepared');
-  await new Promise((resolve) => setTimeout(resolve, 30100));
+  // The lease, not nextAttemptAt, is what blocks a second attempt: wait it out.
+  await new Promise((resolve) => setTimeout(resolve, 60100));
   const { prepareWalletWarmupV2Attempt } =
     await import('@/lib/wallet-warmup-session-v2-attempts');
   const controller = new AbortController(),
@@ -406,7 +429,7 @@ it('rejects a packet-hash REPLACE collision before SQLite can delete an earlier 
       )
       .first(),
   ).toEqual({ n: 2 });
-}, 45000);
+}, 120000);
 it.each([400, 422])(
   'keeps HTTP%s provider rejection distinct from availability',
   async (status) => {
@@ -459,7 +482,7 @@ it.each([false, true])(
           outputMint: 'So11111111111111111111111111111111111111112',
         },
       });
-      expect(fetcher).toHaveBeenCalledOnce();
+      expect(quoteCalls()).toBe(1);
       expect(mocks.inventory).toHaveBeenCalledOnce();
     }
   },

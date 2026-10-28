@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PREPARATION_LIFETIME_MS } from './warmup-swap-quote';
 import type {
   WarmupJournalContext,
   WarmupJournalView,
@@ -139,7 +140,8 @@ export function warmupPreparationView(
       Date.parse(p.createdAt) < Date.parse(journal.createdAt) ||
       Date.parse(p.createdAt) < Date.parse(a.scheduledAt) ||
       Date.parse(p.expiresAt) <= Date.parse(p.createdAt) ||
-      Date.parse(p.expiresAt) - Date.parse(p.createdAt) > 30000 ||
+      Date.parse(p.expiresAt) - Date.parse(p.createdAt) >
+        PREPARATION_LIFETIME_MS ||
       Date.parse(p.createdAt) >= expectedDeadline ||
       BigInt(p.minimumOutRaw) > BigInt(p.quotedOutRaw) ||
       BigInt(p.minimumOutRaw) < (BigInt(p.quotedOutRaw) * 9950n) / 10000n ||

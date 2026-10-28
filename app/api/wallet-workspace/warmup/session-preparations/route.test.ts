@@ -48,8 +48,25 @@ beforeEach(async () => {
     .mockReset()
     .mockImplementation(async (order) => f.simulation(order));
   mocks.inventory.mockReset();
-  fetcher = vi.fn(async (input) => {
+  fetcher = vi.fn(async (input, init) => {
     const request = new URL(String(input));
+    if (request.origin !== 'https://api.jup.ag') {
+      const call = JSON.parse(String(init?.body)) as { method: string };
+      return Response.json(
+        call.method === 'getBlockHeight'
+          ? { jsonrpc: '2.0', id: 1, result: 500 }
+          : {
+              jsonrpc: '2.0',
+              id: 1,
+              result: {
+                value: {
+                  blockhash: '11111111111111111111111111111111',
+                  lastValidBlockHeight: 1400,
+                },
+              },
+            },
+      );
+    }
     expect(request.origin + request.pathname).toBe(
       'https://api.jup.ag/swap/v2/order',
     );
@@ -57,6 +74,11 @@ beforeEach(async () => {
   });
   vi.stubGlobal('fetch', fetcher);
 });
+/** Only the Jupiter order calls; the blockhash refresh is a separate RPC call. */
+const quotes = () =>
+  fetcher.mock.calls.filter((call) =>
+    String(call[0]).startsWith('https://api.jup.ag'),
+  ).length;
 afterEach(() => {
   f?.client.close();
   vi.restoreAllMocks();
@@ -114,7 +136,7 @@ it('uses the real quote/envelope parsers and native SQL to retain one exact unsi
   expect(Object.keys(value.preparation)).not.toContain('transaction');
   expect(response.headers.get('cache-control')).toBe('no-store');
   expect(await f.count()).toEqual([1, 1, 1]);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
   expect(mocks.simulate).toHaveBeenCalledTimes(1);
   const retained = await readWalletWarmupSessionPreparation(
     f.db,
@@ -131,7 +153,7 @@ it('uses the real quote/envelope parsers and native SQL to retain one exact unsi
   expect(recovered.status).toBe(200);
   expect(await recovered.json()).toEqual(value);
   expect((await post(input)).status).toBe(200);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
 });
 it('requires sign-in before storage or providers and isolates owner recovery', async () => {
   const input = f.input();
@@ -142,7 +164,7 @@ it('requires sign-in before storage or providers and isolates owner recovery', a
   mocks.user = null;
   expect((await post(input)).status).toBe(401);
   expect((await GET(new Request(url + '?id=' + input.id))).status).toBe(401);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
 });
 it.each([
   { headers: {}, status: 403 },
@@ -158,7 +180,7 @@ it.each([
   'refuses origin/media admission %j without a provider call',
   async ({ headers, status }) => {
     expect((await post(f.input(), headers)).status).toBe(status);
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(quotes()).toBe(0);
   },
 );
 it.each([
@@ -175,7 +197,7 @@ it.each([
   if (extra && Object.keys(extra).length === 0 && !Array.isArray(extra))
     delete (body as Record<string, unknown>).prepareRequested;
   expect((await post(body)).status).toBe(400);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(quotes()).toBe(0);
 });
 it('bounds streamed JSON and refuses duplicate or unrelated GET parameters', async () => {
   expect((await post({ ...f.input(), padding: 'x'.repeat(2200) })).status).toBe(
@@ -187,7 +209,7 @@ it('bounds streamed JSON and refuses duplicate or unrelated GET parameters', asy
     'id=' + crypto.randomUUID() + '&extra=x',
   ])
     expect((await GET(new Request(url + '?' + query))).status).toBe(400);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(quotes()).toBe(0);
 });
 it('a competing request is held by the owner cooldown, while exact saved-ID recovery bypasses providers', async () => {
   let release!: (r: Response) => void;
@@ -199,7 +221,7 @@ it('a competing request is held by the owner cooldown, while exact saved-ID reco
   );
   const input = f.input(),
     first = post(input);
-  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+  await vi.waitFor(() => expect(quotes()).toBe(1));
   const second = await post(input);
   expect(second.status).toBe(429);
   expect(second.headers.get('retry-after')).toBe('30');
@@ -208,7 +230,7 @@ it('a competing request is held by the owner cooldown, while exact saved-ID reco
   release(Response.json(f.quote(request)));
   expect((await first).status).toBe(200);
   expect((await post(input)).status).toBe(200);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
   expect(await f.count()).toEqual([1, 1, 1]);
 });
 it('returns the first committed result after the database reply is lost, with no second quote', async () => {
@@ -223,7 +245,7 @@ it('returns the first committed result after the database reply is lost, with no
   expect((await post(input)).status).toBe(200);
   expect((await post(input)).status).toBe(200);
   expect(await f.count()).toEqual([1, 1, 1]);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
 });
 it.each(['pause', 'stop'] as const)(
   'rolls back the whole preparation when %s changes the head during simulation',
@@ -289,7 +311,7 @@ it.each(['swap', 'execution'] as const)(
     const response = await post();
     expect(response.status).toBe(409);
     expect(await response.text()).toContain('active transaction work');
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(quotes()).toBe(0);
     expect(mocks.simulate).not.toHaveBeenCalled();
     expect(
       await f.db
@@ -321,7 +343,7 @@ it.each(['quote', 'simulation'] as const)(
     const response = await post();
     expect(response.status).toBe(409);
     expect(await response.text()).toContain('active transaction work');
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(quotes()).toBe(1);
     expect(mocks.simulate).toHaveBeenCalledTimes(stage === 'quote' ? 0 : 1);
     expect(await f.count()).toEqual([0, 0, 0]);
   },
@@ -356,7 +378,7 @@ it('fails before providers when key, guard or exact current plan is unavailable'
   mocks.key = 'synthetic-key';
   await f.db.prepare('DROP TRIGGER wallet_warmup_session_packet_finish').run();
   expect((await post()).status).toBe(503);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(quotes()).toBe(0);
 });
 it('sanitizes provider HTML/errors and keeps pre-aborted requests away from providers', async () => {
   fetcher.mockRejectedValueOnce(Error('PRIVATE_URL_TOKEN HTML <html>'));
@@ -368,7 +390,7 @@ it('sanitizes provider HTML/errors and keeps pre-aborted requests away from prov
   const c = new AbortController();
   c.abort();
   expect((await post(f.input(), undefined, c.signal)).status).toBe(408);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
 });
 it('returns a competing preparation recovery ID and preserves the database signing refusal', async () => {
   const input = f.input();
@@ -394,7 +416,7 @@ it('returns a competing preparation recovery ID and preserves the database signi
       )
       .run(),
   ).rejects.toThrow('Session-bound signing is not enabled');
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
 });
 async function sellInput() {
   f.client.close();
@@ -445,7 +467,7 @@ it('prepares the exact remaining Sell lot after synthetic finalized Buy evidence
     '0.000101',
   );
   expect(await f.count()).toEqual([1, 2, 1]);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
 });
 it('refuses a changed lot before fetching a new order', async () => {
   const input = await sellInput();
@@ -453,7 +475,7 @@ it('refuses a changed lot before fetching a new order', async () => {
     .prepare("UPDATE warmup_buy_receipts SET remaining_raw='100'")
     .run();
   expect((await post(input)).status).toBe(409);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(quotes()).toBe(0);
   expect(mocks.inventory).not.toHaveBeenCalled();
   expect(await f.count()).toEqual([0, 1, 0]);
 });
@@ -469,7 +491,7 @@ it.each(['frozen', 'decimals', 'amount'] as const)(
       return result;
     });
     expect((await post(input)).status).toBe(409);
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(quotes()).toBe(0);
     expect(await f.count()).toEqual([0, 1, 0]);
   },
 );
@@ -486,7 +508,7 @@ it('the atomic write refuses lot consumption after the final provider source rea
   } as D1Database;
   expect((await post(input)).status).toBe(409);
   expect(await f.count()).toEqual([0, 1, 0]);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
 });
 it('aborts an open quote body without saving or retrying', async () => {
   const c = new AbortController(),
@@ -504,11 +526,11 @@ it('aborts an open quote body without saving or retrying', async () => {
       ),
   );
   const pending = post(f.input(), undefined, c.signal);
-  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+  await vi.waitFor(() => expect(quotes()).toBe(1));
   c.abort();
   expect((await pending).status).toBe(408);
   expect(await f.count()).toEqual([0, 0, 0]);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
   expect(cancel).toHaveBeenCalledTimes(1);
 });
 it.each([
@@ -591,7 +613,7 @@ it('refuses a NULL current lot before consuming cooldown or fetching providers',
   const input = await sellInput();
   await f.db.prepare('UPDATE warmup_buy_receipts SET remaining_raw=NULL').run();
   expect((await post(input)).status).toBe(409);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(quotes()).toBe(0);
   expect(mocks.inventory).not.toHaveBeenCalled();
   expect(
     await f.db
@@ -653,7 +675,7 @@ it('the cooperative request deadline cancels a stalled incoming body before stor
   deadline.abort(new DOMException('Synthetic deadline', 'TimeoutError'));
   expect((await response).status).toBe(408);
   expect(cancel).toHaveBeenCalledTimes(1);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(quotes()).toBe(0);
   expect(await f.count()).toEqual([0, 0, 0]);
 });
 it('publishes exactly the allowed review keys and fixed limitations', async () => {
@@ -707,5 +729,5 @@ it('reports corrupt retained records as storage integrity failure rather than a 
     .prepare('UPDATE wallet_warmup_session_preparations SET review_version=-1')
     .run();
   expect((await GET(new Request(url + '?id=' + input.id))).status).toBe(503);
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(quotes()).toBe(1);
 });

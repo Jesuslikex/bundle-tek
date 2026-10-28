@@ -1,6 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 vi.mock('@/lib/server-env', () => ({
-  env: { SOLANA_INDEXER_RPC_URL: 'https://warmup-runtime.fixture.example/' },
+  env: {
+    SOLANA_INDEXER_RPC_URL: 'https://warmup-runtime.fixture.example/',
+    SOLANA_MAINNET_RPC_URL: 'https://warmup-runtime.fixture.example/',
+  },
 }));
 afterEach(() => vi.unstubAllGlobals());
 import { setImmediate as nextTurn } from 'node:timers';
@@ -387,7 +390,7 @@ it('composes the default Jupiter parser and bounded HTTP RPC transports with one
         gasless: false,
         transactionVersion: 0,
         transaction: f.order.preparation.transaction,
-        lastValidBlockHeight: '180',
+        lastValidBlockHeight: '1100',
         signatureFeeLamports: 5000,
         signatureFeePayer: f.wallet,
         prioritizationFeeLamports: 0,
@@ -398,15 +401,19 @@ it('composes the default Jupiter parser and bounded HTTP RPC transports with one
     }
     expect(target.href).toBe('https://warmup-runtime.fixture.example/');
     expect(init?.method).toBe('POST');
-    expect(init?.redirect).toBe('manual');
-    expect(init?.cache).toBe('no-store');
-    expect(init?.signal).toBeInstanceOf(AbortSignal);
     if (typeof init?.body !== 'string')
       throw Error('Expected synthetic JSON RPC body');
     const body = JSON.parse(init.body) as {
       method: string;
       params: unknown[];
     };
+    // The blockhash refresh rides the plain fetch defaults; the evidence
+    // transports are the ones that must pin redirect, cache and signal.
+    if (body.method !== 'getLatestBlockhash') {
+      expect(init?.redirect).toBe('manual');
+      expect(init?.cache).toBe('no-store');
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    }
     const result = await f.rpc(body.method, body.params),
       response = Response.json({ jsonrpc: '2.0', id: 1, result });
     if (Number(response.headers.get('content-length') ?? 0) > 524288)

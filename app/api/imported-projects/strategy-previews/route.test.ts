@@ -176,7 +176,8 @@ beforeEach(async () => {
         const query = new URL(String(url)).searchParams;
         expect(query.get('taker')).toBe(f.wallet);
         expect(query.get('amount')).toBe(f.order.inAmount);
-        expect(query.get('excludeRouters')).toBe('jupiterz,dflow,okx');
+        // dflow stays available for wallet-bound orders; it is the only fallback when Metis is empty.
+        expect(query.get('excludeRouters')).toBe('jupiterz,okx');
         return Response.json({
           inputMint: f.order.inputMint,
           outputMint: f.order.outputMint,
@@ -461,7 +462,11 @@ it('rejects provider-returned signed packet bytes before simulation and does not
   expect(JSON.stringify(await response.json())).not.toContain(
     f.signed.transaction,
   );
-  expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
+  expect(
+    vi.mocked(fetch).mock.calls.filter((call) =>
+      String(call[0]).startsWith('https://api.jup.ag'),
+    ),
+  ).toHaveLength(1);
 });
 it('retains an explicitly quoted platform fee independently of the network fee', async () => {
   f = await nativeWarmupFixture({ fee: 10 });

@@ -43,6 +43,8 @@ export class WarmupQuoteError extends Error {
  * a caller believe a trade ran tighter than it did.
  */
 export const MAX_SWAP_SLIPPAGE_BPS = 50;
+/** How long an unsigned preparation stays reviewable. The blockhash is the real bound. */
+export const PREPARATION_LIFETIME_MS = 600_000;
 export function swapSlippageBps(value: unknown) {
   if (value === undefined) return MAX_SWAP_SLIPPAGE_BPS;
   if (
@@ -350,7 +352,7 @@ async function quoteSolanaSwap(
     );
   // The blockhash is the real bound; this local window only has to outlast the
   // review, eligibility and signing steps. The height check catches a dead hash.
-  let expiry = Date.now() + 600000;
+  let expiry = Date.now() + PREPARATION_LIFETIME_MS;
   if (data.expireAt !== undefined) {
     if (
       typeof data.expireAt !== 'string' ||

@@ -474,6 +474,17 @@ export async function nativeWarmupFixture(
       case 'getBlockHeight':
         result = 100;
         break;
+      // Same lifetime token the synthetic message already carries, so the
+      // refresh rewrites identical bytes and the fixture stays byte-stable.
+      case 'getLatestBlockhash':
+        result = {
+          context: { slot: origin },
+          value: {
+            blockhash: '11111111111111111111111111111111',
+            lastValidBlockHeight: 999999999,
+          },
+        };
+        break;
       case 'getFeeForMessage':
         result = { context: { slot: origin }, value: 5000 };
         break;

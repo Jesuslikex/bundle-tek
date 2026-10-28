@@ -225,6 +225,11 @@ async function reviewedBatch() {
     button('Run').click();
     await settle();
   });
+  // The review body arrives a turn after Run, so settle before reading it.
+  for (let i = 0; i < 20; i++) {
+    if (container.querySelector('input[type=password]')) break;
+    await act(async () => settle());
+  }
   const inputs = Array.from(container.querySelectorAll('input'));
   const checkbox = inputs.filter((i) => i.type === 'checkbox').at(-1)!;
   const password = inputs.find((i) => i.type === 'password')!;

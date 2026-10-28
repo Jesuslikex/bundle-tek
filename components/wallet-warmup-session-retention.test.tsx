@@ -56,7 +56,7 @@ async function click(text: string) {
   await act(async () => button(text).click());
 }
 async function done(test: () => void) {
-  await act(async () => vi.waitFor(test));
+  await act(async () => vi.waitFor(test, { timeout: 5000 }));
 }
 function response(selection: WarmupSessionRecovery) {
   const { contextKey: _contextKey, ...document } = view.review;

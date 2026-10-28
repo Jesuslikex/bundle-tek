@@ -2397,7 +2397,8 @@ it.each(['vault', 'external', 'vault restored', 'external restored'] as const)(
     const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
       if (String(url).startsWith('https://api.jup.ag/swap/v2/order')) {
         const query = new URL(String(url)).searchParams;
-        expect(query.get('excludeRouters')).toBe('jupiterz,dflow,okx');
+        // dflow stays available for wallet-bound orders.
+        expect(query.get('excludeRouters')).toBe('jupiterz,okx');
         expect(query.get('amount')).toBe(current.order.inAmount);
         return Response.json({
           ...current.order,
@@ -2519,10 +2520,14 @@ it.each(['vault', 'external', 'vault restored', 'external restored'] as const)(
           preparationId: prep.id,
           transaction: current.order.preparation.transaction,
         });
-        expect(waiting.status).toBe(429);
-        const gate = (await waiting.json()) as { reviewWaitMs: number };
-        expect(gate.reviewWaitMs).toBeGreaterThan(0);
-        expect(gate.reviewWaitMs).toBeLessThanOrEqual(15000);
+        // The review re-simulates an order the prepare already read for, so it
+        // does not queue behind the 15s wallet read gate.
+        const reviewed = (await waiting.json()) as { error?: string };
+        expect(waiting.status, JSON.stringify(reviewed)).toBe(200);
+        // Drop the intent the first review opened so the next review starts
+        // from a clean wallet, the way a fresh prepare would.
+        await mocks.db.exec('DELETE FROM solana_swap_reservations');
+        await mocks.db.exec('DELETE FROM warmup_signing_intents');
       }
       await mocks.db.exec('DELETE FROM wallet_balance_gates');
       if (current.order.side === 'Buy') {

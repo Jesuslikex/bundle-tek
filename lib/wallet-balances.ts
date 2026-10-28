@@ -103,8 +103,18 @@ export async function balanceRpc(
     // A JSON-RPC level error is usually the provider throttling a burst; retry
     // briefly before surfacing it as an invalid response.
     if (result && result.jsonrpc === '2.0' && result.error && attempt < 2) {
-      console.error('rpc retry', method, JSON.stringify(result.error).slice(0, 160));
-      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+      // Keep the whole ladder inside a one second caller budget, and stop
+      // sleeping as soon as the caller aborts.
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(done, 250 * (attempt + 1));
+        function done() {
+          clearTimeout(timer);
+          signal.removeEventListener('abort', done);
+          resolve();
+        }
+        signal.addEventListener('abort', done, { once: true });
+      });
+      signal.throwIfAborted();
       continue;
     }
     if (

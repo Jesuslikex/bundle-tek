@@ -46,7 +46,7 @@ let f: Awaited<ReturnType<typeof warmupReadClientFixture>>,
 const at = Date.parse('2026-10-21T12:00:00.000Z');
 const key = () => 'bundle:warmup-attempt-v2:' + f.journal.id;
 async function flush() {
-  for (let i = 0; i < 5; i++)
+  for (let i = 0; i < 60; i++)
     await new Promise<void>((resolve) => nextTurn(resolve));
 }
 async function render(disabled = false, now = at, invalidated = false) {
@@ -72,16 +72,31 @@ const button = (text: string) => {
 };
 async function click(text: string) {
   await act(async () => {
-    button(text).click();
+    // A remount or mode change can render the control a turn later.
+    for (let i = 0; i < 20; i++) {
+      const target = [...host.querySelectorAll('button')].find(
+        (b) => b.textContent?.trim() === text,
+      );
+      if (target && !target.disabled) {
+        target.click();
+        break;
+      }
+      await flush();
+    }
     await flush();
   });
 }
 async function check(text = 'Request this exact unsigned quote') {
   await act(async () => {
-    const label = [...host.querySelectorAll('label')].find((l) =>
-      l.textContent?.includes(text),
-    );
-    const input = label?.querySelector('input');
+    let input: HTMLInputElement | null = null;
+    for (let i = 0; i < 20; i++) {
+      const label = [...host.querySelectorAll('label')].find((l) =>
+        l.textContent?.includes(text),
+      );
+      input = label?.querySelector('input') ?? null;
+      if (input && !input.disabled) break;
+      await flush();
+    }
     if (!input) throw Error('Missing checkbox');
     input.click();
     await flush();

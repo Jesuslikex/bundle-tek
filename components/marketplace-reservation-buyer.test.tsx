@@ -100,12 +100,24 @@ function response() {
     },
   });
 }
+/** Hold traffic only; the automatic settle POST is a separate follow-up. */
+function holds(fetcher: ReturnType<typeof server>) {
+  return fetcher.mock.calls.filter(([, init]) => {
+    const body = init?.body;
+    return (
+      typeof body !== 'string' ||
+      (JSON.parse(body) as { action?: string }).action !== 'settle'
+    );
+  }).length;
+}
 function server() {
   return vi.fn(async (_url: string, init?: RequestInit) => {
     if (init?.method === 'POST') {
       const { action, ...payload } = JSON.parse(init.body as string);
       if (action === 'reserve') saved = await makeReservation(payload);
-      else releasedAt = new Date().toISOString();
+      else if (action === 'release') releasedAt = new Date().toISOString();
+      else if (action === 'settle')
+        return Response.json({ settled: { walletCount: 1 } });
     }
     return response();
   });
@@ -115,12 +127,12 @@ it('requires fresh separate hold and release approvals, preserves exact totals a
   vi.stubGlobal('fetch', fetcher);
   await mount();
   await click('Fixture hold review');
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(holds(fetcher)).toBe(0);
   expect(button('Hold these wallets').disabled).toBe(true);
   expect(document.body.textContent).toContain('0.05 SOL');
   await check(RESERVATION_ACK);
   await click('Hold these wallets');
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(holds(fetcher)).toBe(1);
   expect(document.body.textContent).toContain('Held · payment unavailable');
   const payload = JSON.parse(fetcher.mock.calls[0][1]!.body as string);
   expect(payload.review).toEqual(review);
@@ -138,7 +150,7 @@ it('requires fresh separate hold and release approvals, preserves exact totals a
   ).toBe(false);
   await check(RESERVATION_CANCEL_ACK);
   await click('Release this hold');
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(holds(fetcher)).toBe(2);
   expect(document.body.textContent).toContain('Hold released.');
   await click('Clear local recovery ID');
   expect(sessionStorage.getItem(key)).toBeNull();
@@ -162,9 +174,9 @@ it('retains the exact unknown-write ID across remount and only recovers manually
   root = createRoot(host);
   await mount();
   await click('Recover wallet hold');
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(holds(fetcher)).toBe(1);
   await click('Recover this hold');
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(holds(fetcher)).toBe(2);
   expect(fetcher.mock.calls[1][0]).toContain(id!);
   expect(fetcher.mock.calls[1][1]?.method).not.toBe('POST');
   expect(document.body.textContent).toContain('Held · payment unavailable');
@@ -213,7 +225,7 @@ it('expires the review before any write and expires a held receipt locally witho
   await check(RESERVATION_ACK);
   await act(async () => vi.advanceTimersByTime(60000));
   expect(button('Hold these wallets').disabled).toBe(true);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(holds(fetcher)).toBe(0);
   await click('Close hold window');
   vi.setSystemTime(now);
   await click('Fixture hold review');
@@ -222,7 +234,7 @@ it('expires the review before any write and expires a held receipt locally witho
   await act(async () => vi.advanceTimersByTime(300000));
   expect(button('Release this hold')).toBeUndefined();
   expect(document.body.textContent).toContain('Expired');
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(holds(fetcher)).toBe(1);
 });
 it('stops waiting, aborts the request and ignores late committed results without another write', async () => {
   let finish!: (r: Response) => void;
@@ -242,7 +254,7 @@ it('stops waiting, aborts the request and ignores late committed results without
   expect(init.signal!.aborted).toBe(true);
   await act(async () => finish(response()));
   expect(document.body.textContent).not.toContain('Held · payment unavailable');
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(holds(fetcher)).toBe(1);
   expect(sessionStorage.getItem(key)).toBe(saved.id);
 });
 it('recovers a release whose response was lost before allowing local cleanup', async () => {
@@ -262,7 +274,7 @@ it('recovers a release whose response was lost before allowing local cleanup', a
   expect(button('Clear local recovery ID')).toBeUndefined();
   await click('Recover this hold');
   expect(document.body.textContent).toContain('Hold released.');
-  expect(fetcher).toHaveBeenCalledTimes(3);
+  expect(holds(fetcher)).toBe(3);
 });
 it('requires recovery of a retained ID and handles sign-out without creating a second hold', async () => {
   sessionStorage.setItem(key, crypto.randomUUID());
@@ -273,11 +285,11 @@ it('requires recovery of a retained ID and handles sign-out without creating a s
   await mount();
   await click('Fixture hold review');
   expect(button('Hold these wallets')).toBeUndefined();
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(holds(fetcher)).toBe(0);
   await click('Recover this hold');
   expect(document.querySelector('a[href="/sign-in"]')).not.toBeNull();
   expect(button('Clear local recovery ID')).toBeUndefined();
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(holds(fetcher)).toBe(1);
 });
 it.each([false, true])(
   'invalidates background availability on a hold attempt, including unknown outcome %s',
@@ -318,7 +330,7 @@ it.each([false, true])(
     );
     expect(host.textContent).not.toContain('Selection checked · not reserved');
     expect(button('Review selected wallets').disabled).toBe(true);
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(holds(fetcher)).toBe(3);
   },
 );
 function historyPage(records: ReservationRecord[]): ReservationHistoryPage {
@@ -358,7 +370,7 @@ it('discovers a saved hold without a local ID, then recovers its full receipt be
   vi.stubGlobal('fetch', fetcher);
   await mount();
   await click('Recover wallet hold');
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(holds(fetcher)).toBe(0);
   await click('Find my saved holds');
   expect(document.body.textContent).toContain('Saved wallet holds');
   expect(document.body.textContent).not.toContain(
@@ -370,7 +382,7 @@ it('discovers a saved hold without a local ID, then recovers its full receipt be
   expect(
     document.querySelector('section[aria-label="Saved wallet holds"]'),
   ).toBeNull();
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(holds(fetcher)).toBe(2);
   expect(fetcher.mock.calls.every((call) => call[1]?.method !== 'POST')).toBe(
     true,
   );
@@ -444,7 +456,7 @@ it('pages saved summaries manually without automatically recovering or writing a
     encodeURIComponent(last.createdAt),
   );
   await click('Latest saved holds');
-  expect(fetcher).toHaveBeenCalledTimes(3);
+  expect(holds(fetcher)).toBe(3);
   expect(fetcher.mock.calls.every((call) => call[1]?.method !== 'POST')).toBe(
     true,
   );
