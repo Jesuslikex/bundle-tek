@@ -1,6 +1,7 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { ImportedPairQuoteError } from '@/lib/imported-pair-quote-service';
+import { PairOrderQuoteBoundsError } from '@/lib/pair-order-quote-bounds';
 import {
   pairOrderFirstRequest,
   prepareOwnedPairOrderFirstReview,
@@ -81,12 +82,14 @@ export async function POST(request: Request) {
     return json({ error: 'JSON required.' }, 415);
   if (new URL(request.url).searchParams.size)
     return json({ error: 'Unexpected query parameters.' }, 400);
+  let preparing = false;
   try {
     const body = await readBody(request);
     if (
       body.action === 'prepare' &&
       Object.keys(body).sort().join(',') === 'action,request'
-    )
+    ) {
+      preparing = true;
       return json({
         ...(await prepareOwnedPairOrderFirstReview(
           getD1(),
@@ -97,6 +100,7 @@ export async function POST(request: Request) {
         // Display hint only; every server action rechecks the server flag itself.
         stockSigningEnabled: pairStockSigningPolicy().qualified,
       });
+    }
     if (
       body.action === 'approve' &&
       Object.keys(body).sort().join(',') === 'action,consent,id' &&
@@ -156,6 +160,26 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof ImportedPairQuoteError)
       return json({ error: error.message }, error.status);
+    if (preparing && error instanceof PairOrderQuoteBoundsError) {
+      // Diagnostics are internal; disclose only a fixed, actionable reason.
+      const diagnostic = Object.getOwnPropertyDescriptor(
+        error,
+        'pairDiagnostic',
+      )?.value;
+      if (
+        diagnostic &&
+        typeof diagnostic === 'object' &&
+        Object.getOwnPropertyDescriptor(diagnostic, 'check')?.value ===
+          'minimum-output'
+      )
+        return json(
+          {
+            error:
+              'The order minimum is below the required quote bound. Request a fresh quote; no signature or submission was made.',
+          },
+          409,
+        );
+    }
     return json(
       {
         error:

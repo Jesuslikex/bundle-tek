@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 COMPLETE, claim released: minimum-output refusal guidance in pair order review, with fixed text only for tagged minimum failures during preparation. See docs/CODEX-PAIR-MINIMUM-REFUSAL-20261028.md. Manual fresh review and unchecked consent are preserved; no guard, signing, deployment, provider, migration or funded-action changes.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: stock JSON-RPC 429 stop, bounded refusal diagnostics and source identity. See docs/CODEX-STOCK-RPC-429-20261028.md. Fixed six-attempt Alchemy sample: SOL 2/3, USDC 2/3; remaining two correctly refused the original minimum. No signing qualification, deploy or funded action.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: pair-only Metis routing in 3b23338. See docs/CODEX-STOCK-ALCHEMY-ROUTING-20261028.md. Ordinary warmup DFlow and all minimum/signing checks are unchanged; live repeatability remains open.

@@ -14,6 +14,8 @@ vi.mock('@/lib/pair-order-first-service', () => ({
   approveOwnedPairOrderFirstReview: mocks.approve,
 }));
 import { ImportedPairQuoteError } from '@/lib/imported-pair-quote-service';
+import { PairOrderQuoteBoundsError } from '@/lib/pair-order-quote-bounds';
+import { pairReviewDiagnostic } from '@/lib/pair-review-diagnostic';
 import { POST } from './route';
 beforeEach(() => {
   vi.resetAllMocks();
@@ -77,6 +79,22 @@ it.each([
   expect(mocks.approve).not.toHaveBeenCalled();
   expect(mocks.prepare).not.toHaveBeenCalled();
 });
+it('keeps a tagged minimum failure on approval generic, without implying a preparation outcome', async () => {
+  mocks.approve.mockRejectedValue(
+    pairReviewDiagnostic(
+      new PairOrderQuoteBoundsError('SECRET_DO_NOT_EXPOSE'),
+      'minimum-output',
+    ),
+  );
+  const r = await POST(
+    request({ action: 'approve', id: 'review', consent: {} }),
+  );
+  expect(r.status).toBe(409);
+  expect(await r.json()).toEqual({
+    error:
+      'Order review unavailable or changed. Request a new review. No signature or submission was made.',
+  });
+});
 it('rejects cross-origin, non-JSON, oversized and malformed bodies', async () => {
   expect(
     (await POST(request({}, { origin: 'https://other.test' }))).status,
@@ -102,6 +120,43 @@ it('preserves backoff without exposing provider errors', async () => {
   expect(r.status).toBe(429);
   expect(r.headers.get('retry-after')).toBe('15');
 });
+it.each(['strict', 'fresh-reference'])(
+  'returns a fixed actionable refusal for a %s minimum failure without leaking diagnostics',
+  async (mode) => {
+    const error = pairReviewDiagnostic(
+      new PairOrderQuoteBoundsError('SECRET_DO_NOT_EXPOSE'),
+      'minimum-output',
+      { mode, secret: 'SECRET_DO_NOT_EXPOSE' },
+    );
+    mocks.prepare.mockRejectedValue(error);
+    const r = await POST(request({ action: 'prepare', request: {} }));
+    expect(r.status).toBe(409);
+    expect(await r.json()).toEqual({
+      error:
+        'The order minimum is below the required quote bound. Request a fresh quote; no signature or submission was made.',
+    });
+    expect(mocks.prepare).toHaveBeenCalledTimes(1);
+    expect(mocks.approve).not.toHaveBeenCalled();
+  },
+);
+it.each([
+  new PairOrderQuoteBoundsError('SECRET_DO_NOT_EXPOSE'),
+  pairReviewDiagnostic(
+    new PairOrderQuoteBoundsError('SECRET_DO_NOT_EXPOSE'),
+    'different-check',
+  ),
+])(
+  'keeps other bounds failures generic without exposing their text',
+  async (error) => {
+    mocks.prepare.mockRejectedValue(error);
+    const r = await POST(request({ action: 'prepare', request: {} }));
+    expect(r.status).toBe(409);
+    expect(await r.json()).toEqual({
+      error:
+        'Order review unavailable or changed. Request a new review. No signature or submission was made.',
+    });
+  },
+);
 it('reports the server signing flag only as a display hint on preparation', async () => {
   vi.stubEnv('SOLANA_STOCK_SIGNING_ENABLED', 'true');
   const on = await POST(request({ action: 'prepare', request: { id: 'p' } }));

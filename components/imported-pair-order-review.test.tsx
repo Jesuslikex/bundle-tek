@@ -177,6 +177,41 @@ it('shows friendly HTML errors, without retries', async () => {
   );
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+it('shows a minimum-bound refusal and only requotes after a separate manual click', async () => {
+  const saved = await pairReviewUiFixture(now);
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json(
+        {
+          error:
+            'The order minimum is below the required quote bound. Request a fresh quote; no signature or submission was made.',
+        },
+        { status: 409 },
+      ),
+    )
+    .mockResolvedValueOnce(Response.json(saved));
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () =>
+    root.render(<ImportedPairOrderReview request={pairReviewUiRequest} />),
+  );
+  await click(button('Prepare order review'));
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    'below the required quote bound',
+  );
+  expect(checks()).toHaveLength(0);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  await click(button('Prepare order review'));
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(checks().length).toBeGreaterThan(0);
+  expect(checks().every((box) => !box.checked)).toBe(true);
+  expect(button('Request signing authorization').disabled).toBe(true);
+  expect(
+    fetcher.mock.calls.every(
+      (call) => JSON.parse(call[1].body).action === 'prepare',
+    ),
+  ).toBe(true);
+});
 it('blocks authorization when price impact is unavailable', async () => {
   const saved = await pairReviewUiFixture(now);
   saved.review.priceImpactPct = null;
