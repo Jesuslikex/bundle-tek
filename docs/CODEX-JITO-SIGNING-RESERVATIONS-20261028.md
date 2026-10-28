@@ -112,6 +112,12 @@ the existing frame and economic checks while leaving the unsigned API intact.
 It does not authenticate a provider request, response, baseline or runtime
 capture, and grants no provider or execution authority. Five focused suites
 passed 201 synthetic tests.
+An unmounted offline Clock/lifetime decoder checks exact Clock equality, the
+30-second wall-time bound, duplicate reads, network values, blockhash validity,
+conservative expiry and the original 32-slot span. It copies bounded raw bytes
+before asynchronous work and rejects shared-backed buffers. It explicitly does
+not authenticate caller-supplied data or authorize submission; trusted direct
+provider capture and a final signed-vector gate remain to be built and proven.
 
 No deployment, hosted database migration, provider or credential change,
 funded transaction, real-wallet signing, or live bundle submission is
