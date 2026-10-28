@@ -51,8 +51,18 @@ attempt. It checks the original attempt before and after storage and does not
 grant a signer permit or submit authority. Its caller must enforce the same
 owner lock and authenticate the exact server snapshot. Thirty-eight journal
 tests pass. A separate recovery-file panel has 13 synthetic tests, including
-lost-response recovery and unresolved-memory guidance. It is not yet connected
-to the parent and depends on the parent supplying authenticated exact snapshots.
+lost-response recovery and unresolved-memory guidance. In this draft it is
+connected for bundles shown in the recent history, with additional parent and
+panel tests. Looking up an older bundle outside that history remains disabled.
+
+The draft browser wiring supports the browser vault and external wallets that
+publish a verifiable current account. It holds the owner lock around signing
+and exact recovery, and keeps a separate unchecked evidence approval. Synthetic
+tests cover remounts and external account changes; real browser extension and
+provider behavior remain unverified. The existing 65-case legacy remount suite
+still fails against the v2 contract and has not been skipped, deleted or
+replaced. See `CODEX-JITO-V2-remount-inventory-20261028.md` for remaining
+coverage. This branch must not be merged or deployed as a completed flow.
 
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,

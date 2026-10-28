@@ -35,7 +35,9 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
-- Codex + helper, 28 October 2026 ACTIVE: local Jito v2 durable server signing-reservation migration 0163, metadata journal, Jito server/API writers and focused tests. Preserve old data, quarantine legacy ambiguity, exact cryptographic registration and all existing consent/one-send safeguards. No hosted SQL, provider settings, real wallet, funded action or deployment. Not release-ready until browser integration and validation complete.
+- Codex, 28 October 2026 ACTIVE: Jito v2 browser integration, recovery, compatibility and remount test migration on draft branch `codex/jito-v2-reservations-20261028`. See `docs/CODEX-JITO-SIGNING-RESERVATIONS-20261028.md` and `docs/CODEX-JITO-V2-remount-inventory-20261028.md`. The draft is not release-ready and must not be merged or deployed until the remaining coverage and rollout issues are resolved. No provider settings, hosted SQL, real-wallet or funded actions.
+
+- Codex + helper, 28 October 2026: local Jito v2 durable server signing-reservation migration 0163, metadata journal and server/API draft are checkpointed on the same draft branch. Preserve old data, quarantine legacy ambiguity, exact cryptographic registration and all existing consent/one-send safeguards. Migration numbering must be rechecked before any merge; no hosted SQL, provider settings, real wallet, funded action or deployment.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: browser-only encrypted Jito recovery journal foundation. See docs/CODEX-JITO-ENCRYPTED-JOURNAL-FOUNDATION-20261028.md. It is not yet integrated or a cross-device/server reservation; no wallet, signing, provider, database migration or deployment changes.
 

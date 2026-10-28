@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { webcrypto } from 'node:crypto';
-import { act } from 'react';
+import { act, Activity, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import type { TradeSession } from '@/lib/imported-trade-session';
+import type { JitoBundleRecord } from '@/lib/jito-bundle';
+import { bundleFingerprint } from '@/lib/jito-bundle';
 import {
   JITO_OWNER_SCOPE_HEADER,
   jitoOwnerScope,
@@ -16,11 +18,90 @@ vi.mock('better-auth/react', () => ({
   }),
 }));
 vi.mock('./jito-packet-signing', () => ({
-  JitoPacketSigning: () => <p>Explicit packet signing</p>,
+  JitoPacketSigning: ({
+    disabled,
+    packet,
+    ownerScope,
+    manifest,
+    coordinator,
+    registerEvidence,
+  }: {
+    disabled: boolean;
+    packet: number;
+    ownerScope: string;
+    manifest: JitoBundleRecord['manifest'];
+    coordinator: {
+      startOperation: (owner: string, id: string, packet: number) => object;
+      finishOperation: (token: object) => void;
+    };
+    registerEvidence: (
+      transaction: string,
+      attemptId: string,
+      token: object,
+    ) => Promise<void>;
+  }) => (
+    <p data-testid="mock-signer" data-disabled={String(disabled)}>
+      Explicit packet signing
+      {packet === 0 && journal.evidence && (
+        <button
+          onClick={() => {
+            const token = coordinator.startOperation(
+              ownerScope,
+              manifest.id,
+              packet,
+            );
+            void registerEvidence(
+              journal.evidence!.transaction,
+              journal.evidence!.attemptId,
+              token,
+            )
+              .catch(() => {
+                journal.evidenceFailed = true;
+              })
+              .finally(() => coordinator.finishOperation(token));
+          }}
+        >
+          Register mock evidence
+        </button>
+      )}
+    </p>
+  ),
+}));
+const journal = vi.hoisted(() => ({
+  pending: [] as Array<{
+    bundleId: string;
+    packet: number;
+    status: 'unknown' | 'retained';
+  }>,
+  evidence: null as null | { transaction: string; attemptId: string },
+  evidenceFailed: false,
+}));
+vi.mock('@/lib/jito-recovery-journal', () => ({
+  withJitoRecoveryJournalLock: async (
+    _owner: string,
+    guard: () => void,
+    body: (lock: object) => Promise<unknown>,
+  ) => {
+    guard();
+    return body({});
+  },
+  listJitoRecoveryJournalPending: async (
+    _lock: object,
+    _project: string,
+    _session: string,
+    readOwner: () => Promise<string>,
+  ) => {
+    await readOwner();
+    await readOwner();
+    return journal.pending;
+  },
 }));
 let root: Root, container: HTMLDivElement;
 const fetcher = vi.fn();
 beforeEach(() => {
+  journal.pending = [];
+  journal.evidence = null;
+  journal.evidenceFailed = false;
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -64,12 +145,13 @@ async function fixture() {
       ],
     },
   };
-  const bundle = {
+  const bundle: JitoBundleRecord = {
     manifest: f.manifest,
     state: 'reviewed',
     bundleId: null,
     signatures: [f.swap.signed.signature, f.tip.signed.signature],
     updatedAt: f.manifest.createdAt,
+    finalization: null,
   };
   const history = {
     projectId: f.manifest.projectId,
@@ -78,6 +160,42 @@ async function fixture() {
     bundles: [bundle],
   };
   return { f, session, bundle, history };
+}
+function exact(
+  f: Awaited<ReturnType<typeof jitoBundleFixture>>,
+  bundle: JitoBundleRecord,
+) {
+  return {
+    projectId: bundle.manifest.projectId,
+    sessionId: bundle.manifest.sessionId,
+    bundle,
+    legacyReadOnly: false,
+    attempts: bundle.signatures.flatMap((signature, packet) =>
+      signature
+        ? [
+            {
+              bundleId: bundle.manifest.id,
+              manifestSha256: bundle.manifest.sha256,
+              packet,
+              attemptId:
+                packet === 0
+                  ? '11111111-1111-4111-8111-111111111111'
+                  : '22222222-2222-4222-8222-222222222222',
+              signer:
+                bundle.manifest.swaps[packet]?.wallet ??
+                bundle.manifest.tip.wallet,
+              intentId: bundle.manifest.swaps[packet]?.id ?? null,
+              transaction:
+                packet === 0
+                  ? f.swap.signed.transaction
+                  : f.tip.signed.transaction,
+              signature,
+              state: 'registered',
+            },
+          ]
+        : [],
+    ),
+  };
 }
 async function render(session: TradeSession, locked = false) {
   await act(async () =>
@@ -112,14 +230,17 @@ async function click(text: string) {
   await act(async () => button(text).click());
 }
 it('requires separate unchecked submission approval, then a lost response recovers without another send', async () => {
-  const { session, bundle, history } = await fixture();
+  const { f, session, bundle, history } = await fixture();
   const scope = await jitoOwnerScope('alice');
   const posts: string[] = [];
-  fetcher.mockImplementation(async (_url, init) => {
+  fetcher.mockImplementation(async (url, init) => {
     if (!init?.method)
-      return Response.json(history, {
-        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
-      });
+      return Response.json(
+        String(url).includes('bundleId=') ? exact(f, bundle) : history,
+        {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+        },
+      );
     const action = JSON.parse(init.body).action;
     posts.push(action);
     if (action === 'submit') {
@@ -143,19 +264,25 @@ it('requires separate unchecked submission approval, then a lost response recove
     .find((l) => l.textContent?.includes('I approve submitting'))!
     .querySelector('input')!;
   expect(approval.checked).toBe(false);
+  await vi.waitFor(() => expect(approval.disabled).toBe(false));
   await act(async () => approval.click());
   await click('Submit complete Jito bundle');
-  expect(posts).toEqual(['submit']);
+  await vi.waitFor(() => expect(posts).toEqual(['submit']));
   expect(container.textContent).not.toContain('Submit complete Jito bundle');
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(button('Check chain outcomes').disabled).toBe(false),
+  );
   await click('Check chain outcomes');
-  expect(posts).toEqual(['submit', 'recover']);
+  await vi.waitFor(() => expect(posts).toEqual(['submit', 'recover']));
   expect(container.textContent).toContain('Submission outcome unknown');
   expect(container.textContent).not.toContain('Submit complete Jito bundle');
 });
 
 it('shows only bound provider-reported packet outcomes, then clears them on history refresh', async () => {
-  const { session, bundle, history } = await fixture();
+  const { f, session, bundle, history } = await fixture();
   bundle.state = 'submitted';
+  bundle.bundleId = 'ab'.repeat(32);
   const scope = await jitoOwnerScope('alice');
   const posts: string[] = [];
   const chainObservation = {
@@ -179,11 +306,14 @@ it('shows only bound provider-reported packet outcomes, then clears them on hist
       },
     ],
   };
-  fetcher.mockImplementation(async (_url, init) => {
+  fetcher.mockImplementation(async (url, init) => {
     if (!init?.method)
-      return Response.json(history, {
-        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
-      });
+      return Response.json(
+        String(url).includes('bundleId=') ? exact(f, bundle) : history,
+        {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+        },
+      );
     posts.push(JSON.parse(init.body).action);
     return Response.json(
       { bundle, chainObservation },
@@ -193,7 +323,7 @@ it('shows only bound provider-reported packet outcomes, then clears them on hist
   await render(session);
   await click('Load bundle approvals');
   await vi.waitFor(() =>
-    expect(container.textContent).toContain('Check chain outcomes'),
+    expect(button('Check chain outcomes').disabled).toBe(false),
   );
   await click('Check chain outcomes');
   await vi.waitFor(() =>
@@ -214,14 +344,18 @@ it('shows only bound provider-reported packet outcomes, then clears them on hist
 });
 
 it('does not display a provider report rebound to another packet or bundle', async () => {
-  const { session, bundle, history } = await fixture();
+  const { f, session, bundle, history } = await fixture();
   bundle.state = 'submitted';
+  bundle.bundleId = 'ab'.repeat(32);
   const scope = await jitoOwnerScope('alice');
-  fetcher.mockImplementation(async (_url, init) => {
+  fetcher.mockImplementation(async (url, init) => {
     if (!init?.method)
-      return Response.json(history, {
-        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
-      });
+      return Response.json(
+        String(url).includes('bundleId=') ? exact(f, bundle) : history,
+        {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+        },
+      );
     return Response.json(
       {
         bundle,
@@ -253,7 +387,7 @@ it('does not display a provider report rebound to another packet or bundle', asy
   await render(session);
   await click('Load bundle approvals');
   await vi.waitFor(() =>
-    expect(container.textContent).toContain('Check chain outcomes'),
+    expect(button('Check chain outcomes').disabled).toBe(false),
   );
   await click('Check chain outcomes');
   await vi.waitFor(() =>
@@ -268,15 +402,18 @@ it('does not display a provider report rebound to another packet or bundle', asy
 });
 
 it('says outcome details are unavailable when an active signed recovery has no report', async () => {
-  const { session, bundle, history } = await fixture();
+  const { f, session, bundle, history } = await fixture();
   bundle.state = 'submitting';
   const scope = await jitoOwnerScope('alice');
   const actions: string[] = [];
-  fetcher.mockImplementation(async (_url, init) => {
+  fetcher.mockImplementation(async (url, init) => {
     if (!init?.method)
-      return Response.json(history, {
-        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
-      });
+      return Response.json(
+        String(url).includes('bundleId=') ? exact(f, bundle) : history,
+        {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+        },
+      );
     actions.push(JSON.parse(init.body).action);
     return Response.json(
       { bundle },
@@ -286,7 +423,7 @@ it('says outcome details are unavailable when an active signed recovery has no r
   await render(session);
   await click('Load bundle approvals');
   await vi.waitFor(() =>
-    expect(container.textContent).toContain('Check chain outcomes'),
+    expect(button('Check chain outcomes').disabled).toBe(false),
   );
   await click('Check chain outcomes');
   await vi.waitFor(() =>
@@ -302,12 +439,13 @@ it('says outcome details are unavailable when an active signed recovery has no r
 });
 
 it('clears a previously shown provider report when the signed-in owner no longer matches', async () => {
-  const { session, bundle, history } = await fixture();
+  const { f, session, bundle, history } = await fixture();
   bundle.state = 'submitted';
+  bundle.bundleId = 'ab'.repeat(32);
   const scope = await jitoOwnerScope('alice');
   const otherScope = await jitoOwnerScope('bob');
   let changed = false;
-  fetcher.mockImplementation(async (_url, init) => {
+  fetcher.mockImplementation(async (url, init) => {
     if (changed)
       return Response.json(
         { error: 'Signed-in account changed.' },
@@ -317,9 +455,12 @@ it('clears a previously shown provider report when the signed-in owner no longer
         },
       );
     if (!init?.method)
-      return Response.json(history, {
-        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
-      });
+      return Response.json(
+        String(url).includes('bundleId=') ? exact(f, bundle) : history,
+        {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+        },
+      );
     return Response.json(
       {
         bundle,
@@ -351,7 +492,7 @@ it('clears a previously shown provider report when the signed-in owner no longer
   await render(session);
   await click('Load bundle approvals');
   await vi.waitFor(() =>
-    expect(container.textContent).toContain('Check chain outcomes'),
+    expect(button('Check chain outcomes').disabled).toBe(false),
   );
   await click('Check chain outcomes');
   await vi.waitFor(() =>
@@ -392,6 +533,112 @@ it('aborts old history on session revision changes and ignores a late response',
   expect(container.textContent).not.toContain('Submit complete Jito bundle');
   expect(container.textContent).not.toContain('Explicit packet signing');
 });
+it('ignores an exact snapshot that arrives after the session changes', async () => {
+  const { f, session, bundle, history } = await fixture();
+  const scope = await jitoOwnerScope('alice');
+  let resolve!: (response: Response) => void;
+  let exactSignal!: AbortSignal;
+  fetcher.mockImplementation((url, init) => {
+    if (!String(url).includes('bundleId='))
+      return Promise.resolve(
+        Response.json(history, {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+        }),
+      );
+    exactSignal = init.signal;
+    return new Promise<Response>((done) => {
+      resolve = done;
+    });
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() => expect(exactSignal).toBeDefined());
+  await render({ ...session, revision: session.revision + 1 });
+  expect(exactSignal.aborted).toBe(true);
+  await act(async () =>
+    resolve(
+      Response.json(exact(f, bundle), {
+        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+      }),
+    ),
+  );
+  expect(container.textContent).not.toContain(bundle.manifest.id);
+  expect(container.textContent).not.toContain('Submit complete Jito bundle');
+});
+it('rejects all late exact snapshots after StrictMode effect cleanup and re-setup', async () => {
+  const { f, session, bundle, history } = await fixture();
+  bundle.signatures = [null, null];
+  const second = structuredClone(bundle);
+  const { sha256: _old, ...terms } = second.manifest;
+  terms.id = crypto.randomUUID();
+  second.manifest = { ...terms, sha256: await bundleFingerprint(terms) };
+  history.bundles.push(second);
+  const scope = await jitoOwnerScope('alice');
+  const pending: Array<{
+    id: string;
+    signal: AbortSignal;
+    resolve: (value: Response) => void;
+  }> = [];
+  fetcher.mockImplementation((url, init) => {
+    if (!String(url).includes('bundleId='))
+      return Promise.resolve(
+        Response.json(history, {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+        }),
+      );
+    return new Promise<Response>((resolve) =>
+      pending.push({
+        id: new URL(String(url), 'http://localhost').searchParams.get(
+          'bundleId',
+        )!,
+        signal: init.signal,
+        resolve,
+      }),
+    );
+  });
+  const show = async (mode: 'hidden' | 'visible') =>
+    act(async () =>
+      root.render(
+        <StrictMode>
+          <Activity mode={mode}>
+            <JitoAtomicBundle
+              projectId={session.terms.projectId}
+              session={session}
+              locked={false}
+            />
+          </Activity>
+        </StrictMode>,
+      ),
+    );
+  await show('visible');
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('Load bundle approvals').disabled).toBe(false);
+  });
+  await click('Load bundle approvals');
+  await vi.waitFor(() => expect(pending).toHaveLength(2));
+  await show('hidden');
+  await show('visible');
+  expect(pending.some((item) => !item.signal.aborted)).toBe(true);
+  await act(async () => {
+    for (const item of pending)
+      item.resolve(
+        Response.json(
+          exact(f, item.id === bundle.manifest.id ? bundle : second),
+          { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+        ),
+      );
+  });
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('Bundle details need verification');
+  });
+  const signers = container.querySelectorAll('[data-testid="mock-signer"]');
+  expect(signers.length).toBeGreaterThan(0);
+  expect(
+    [...signers].every((node) => node.getAttribute('data-disabled') === 'true'),
+  ).toBe(true);
+});
 for (const kind of ['html', 'oversized', 'unauthenticated'])
   it(`shows safe recovery guidance for ${kind} responses`, async () => {
     const { session } = await fixture();
@@ -417,3 +664,196 @@ for (const kind of ['html', 'oversized', 'unauthenticated'])
     expect(container.textContent).not.toContain('private parser stack');
     expect(container.textContent).not.toContain('Submit complete Jito bundle');
   });
+
+it('blocks signing and cancellation when an exact owned snapshot reports UNKNOWN', async () => {
+  const { f, session, bundle, history } = await fixture();
+  bundle.signatures = [null, null];
+  const scope = await jitoOwnerScope('alice');
+  const attempt = {
+    bundleId: bundle.manifest.id,
+    manifestSha256: bundle.manifest.sha256,
+    packet: 0,
+    attemptId: '11111111-1111-4111-8111-111111111111',
+    signer: f.review.wallet,
+    intentId: f.review.id,
+    state: 'unknown',
+    signature: null,
+    transaction: null,
+  };
+  fetcher.mockImplementation(async (url, init) => {
+    expect(init.headers['x-jito-protocol']).toBe('2');
+    expect(init.headers[JITO_OWNER_SCOPE_HEADER]).toBe(scope);
+    return Response.json(
+      String(url).includes('bundleId=')
+        ? { ...exact(f, bundle), attempts: [attempt] }
+        : history,
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('A signing outcome is unknown'),
+  );
+  expect(button('Cancel unsigned bundle').disabled).toBe(true);
+  expect(button('Prepare and review selected Jito swaps').disabled).toBe(true);
+  expect(
+    container.querySelectorAll('[data-testid="mock-signer"]').length,
+  ).toBeGreaterThan(0);
+  expect(
+    [...container.querySelectorAll('[data-testid="mock-signer"]')].every(
+      (el) => el.getAttribute('data-disabled') === 'true',
+    ),
+  ).toBe(true);
+});
+
+it('keeps legacy unsigned bundles read-only, including cancellation', async () => {
+  const { f, session, bundle, history } = await fixture();
+  bundle.signatures = [null, null];
+  const scope = await jitoOwnerScope('alice');
+  fetcher.mockImplementation(async (url) =>
+    Response.json(
+      String(url).includes('bundleId=')
+        ? { ...exact(f, bundle), legacyReadOnly: true }
+        : history,
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    ),
+  );
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('This older bundle is read-only'),
+  );
+  expect(button('Cancel unsigned bundle').disabled).toBe(true);
+  expect(
+    container.querySelectorAll('[data-testid="mock-signer"]').length,
+  ).toBeGreaterThan(0);
+  expect(
+    [...container.querySelectorAll('[data-testid="mock-signer"]')].every(
+      (el) => el.getAttribute('data-disabled') === 'true',
+    ),
+  ).toBe(true);
+});
+
+it('rechecks the locked local journal before cancelling a bundle', async () => {
+  const { f, session, bundle, history } = await fixture();
+  bundle.signatures = [null, null];
+  journal.pending = [
+    { bundleId: bundle.manifest.id, packet: 0, status: 'unknown' },
+  ];
+  const scope = await jitoOwnerScope('alice');
+  let posts = 0;
+  fetcher.mockImplementation(async (url, init) => {
+    if (init?.method) posts++;
+    return Response.json(
+      String(url).includes('bundleId=') ? exact(f, bundle) : history,
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(button('Cancel unsigned bundle').disabled).toBe(false),
+  );
+  await click('Cancel unsigned bundle');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain(
+      'A Jito signing outcome is still pending',
+    ),
+  );
+  expect(posts).toBe(0);
+});
+
+it('fails closed if a registered receipt contains a different signed transaction', async () => {
+  const { f, session, bundle, history } = await fixture();
+  const scope = await jitoOwnerScope('alice');
+  fetcher.mockImplementation(async (url) => {
+    const payload = exact(f, bundle);
+    payload.attempts[0].transaction = f.tip.signed.transaction;
+    return Response.json(
+      String(url).includes('bundleId=') ? payload : history,
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('Bundle details need verification'),
+  );
+  expect(button('Submit complete Jito bundle').disabled).toBe(true);
+});
+
+it('records only exact preexisting evidence after expiry and never signs or submits', async () => {
+  const { f, session, bundle, history } = await fixture();
+  const { sha256: _old, ...terms } = bundle.manifest;
+  terms.expiresAt = new Date(Date.now() - 1000).toISOString();
+  bundle.manifest = { ...terms, sha256: await bundleFingerprint(terms) };
+  f.manifest = bundle.manifest;
+  bundle.signatures = [null, null];
+  const scope = await jitoOwnerScope('alice');
+  const attemptId = '11111111-1111-4111-8111-111111111111';
+  const attempt = {
+    bundleId: bundle.manifest.id,
+    manifestSha256: bundle.manifest.sha256,
+    packet: 0,
+    attemptId,
+    signer: f.review.wallet,
+    intentId: f.review.id,
+    state: 'unknown',
+    signature: null as string | null,
+    transaction: null as string | null,
+  };
+  journal.evidence = { transaction: f.tip.signed.transaction, attemptId };
+  const actions: string[] = [];
+  fetcher.mockImplementation(async (url, init) => {
+    if (init?.method) {
+      const body = JSON.parse(init.body);
+      actions.push(body.action);
+      expect(body).toMatchObject({
+        action: 'register',
+        id: bundle.manifest.id,
+        packet: 0,
+        attemptId,
+        approved: true,
+      });
+      bundle.signatures[0] = f.swap.signed.signature;
+      attempt.state = 'registered';
+      attempt.signature = f.swap.signed.signature;
+      attempt.transaction = f.swap.signed.transaction;
+      return Response.json(
+        { bundle },
+        { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+      );
+    }
+    return Response.json(
+      String(url).includes('bundleId=')
+        ? { ...exact(f, bundle), attempts: [attempt] }
+        : history,
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('A signing outcome is unknown'),
+  );
+  await click('Register mock evidence');
+  await vi.waitFor(() => expect(journal.evidenceFailed).toBe(true));
+  expect(actions).toEqual([]);
+  journal.evidenceFailed = false;
+  journal.evidence = { transaction: f.swap.signed.transaction, attemptId };
+  await click('Register mock evidence');
+  await vi.waitFor(() => expect(actions).toEqual(['register']));
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain(f.swap.signed.signature),
+  );
+  await vi.waitFor(() =>
+    expect(container.textContent).not.toContain(
+      'Another Jito action is in progress.',
+    ),
+  );
+  await click('Register mock evidence');
+  await vi.waitFor(() => expect(actions).toEqual(['register', 'register']));
+  expect(actions).not.toContain('submit');
+  expect(actions).not.toContain('begin-signing');
+});

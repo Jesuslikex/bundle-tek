@@ -1,15 +1,17 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
+import bs58 from 'bs58';
+import nacl from 'tweetnacl';
 import { getWallets } from '@wallet-standard/app';
 import { unlockVault, VAULT_STORAGE_KEY } from '@/lib/browser-wallet-vault';
 import { signApprovedWarmupPacket } from '@/lib/warmup-signing';
+import { signNativeWithdrawal } from '@/lib/native-withdrawal';
 import {
   signApprovedExternalWarmupPacket,
   supportsWarmupExternalWallet,
   connectWarmupExternalWallet,
   type WarmupExternalWallet,
 } from '@/lib/warmup-external-signer';
-import { signNativeWithdrawal } from '@/lib/native-withdrawal';
 import {
   signExternalNativeWithdrawal,
   supportsNativeWithdrawalWallet,
@@ -18,20 +20,39 @@ import {
 import {
   requireJitoManifest,
   type JitoBundleManifest,
+  type JitoBundleRecord,
 } from '@/lib/jito-bundle';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
 import {
-  createJitoPacketRecovery,
-  readJitoPacketRecovery,
-  JITO_RECOVERY_FILE_MAX_BYTES,
-} from '@/lib/jito-packet-recovery';
-import { WalletSigningRejected } from '@/lib/wallet-signing-rejection';
+  acknowledgeJitoRecoveryRegistered,
+  inspectJitoRecoveryJournal,
+  listJitoRecoveryJournalPending,
+  reserveJitoRecoveryUnknown,
+  retainJitoRecoverySignature,
+  withJitoRecoveryJournalLock,
+} from '@/lib/jito-recovery-journal';
+import {
+  createJitoSignAttemptClient,
+  type JitoAttempt,
+} from '@/lib/jito-sign-attempt-client';
 import type {
   JitoMemoryReservation,
   JitoMemorySignatureRecovery,
   JitoOperationToken,
 } from '@/lib/jito-memory-signature-recovery';
+import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+
+/** Parent supplies freshly authenticated exact records and validated attempt
+ * identities. A snapshot cannot itself authorize a signing invocation. */
+export type JitoPacketV2Snapshot = {
+  ownerScope: string;
+  projectId: string;
+  sessionId: string;
+  bundle: JitoBundleRecord;
+  attempts: JitoAttempt[];
+  legacyReadOnly: boolean;
+};
 
 export function JitoPacketSigning({
   manifest,
@@ -42,19 +63,31 @@ export function JitoPacketSigning({
   coordinator,
   isContextCurrent,
   beforeSign,
-  beforeImport,
+  readSnapshot,
+  recoveryOnly = false,
   recoveryDisabled,
+  registerEvidence,
 }: {
   manifest: JitoBundleManifest;
   packet: number;
   disabled: boolean;
-  register: (transaction: string, token?: JitoOperationToken) => Promise<void>;
+  register: (
+    transaction: string,
+    attemptId: string,
+    token?: JitoOperationToken,
+  ) => Promise<void>;
   ownerScope: string;
   coordinator: JitoMemorySignatureRecovery;
   isContextCurrent: () => boolean;
-  beforeSign: () => Promise<void>;
-  beforeImport: () => Promise<void>;
+  beforeSign: (attemptId: string) => Promise<void>;
+  readSnapshot: () => Promise<JitoPacketV2Snapshot>;
+  recoveryOnly?: boolean;
   recoveryDisabled: boolean;
+  registerEvidence: (
+    transaction: string,
+    attemptId: string,
+    token?: JitoOperationToken,
+  ) => Promise<void>;
 }) {
   const field = useId(),
     mounted = useRef(true),
@@ -65,44 +98,69 @@ export function JitoPacketSigning({
     [wallets, setWallets] = useState<WarmupExternalWallet[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [pending, setPending] = useState<string | null>(null);
+    [pending, setPending] = useState<string | null>(null),
+    [recoveryPassword, setRecoveryPassword] = useState(''),
+    [recoveryApproved, setRecoveryApproved] = useState(false),
+    [recoveryMessage, setRecoveryMessage] = useState(''),
+    [recoveryView, setRecoveryView] = useState<{
+      attemptId: string;
+      signature: string;
+    } | null>(null);
   const swap = manifest.swaps[packet],
     wallet = swap?.wallet ?? manifest.tip.wallet;
   const label = swap ? `swap ${packet + 1}` : 'Jito tip';
   useEffect(() => {
     mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const isSwap = Boolean(swap);
+  useEffect(() => {
     const registry = getWallets();
     const refresh = () =>
       setWallets(
         registry
           .get()
-          .filter((w) =>
-            swap
-              ? supportsWarmupExternalWallet(w)
-              : supportsNativeWithdrawalWallet(w),
+          .filter((entry) =>
+            isSwap
+              ? supportsWarmupExternalWallet(entry)
+              : supportsNativeWithdrawalWallet(entry),
           ),
       );
     refresh();
     const removeRegister = registry.on('register', refresh),
       removeUnregister = registry.on('unregister', refresh);
     return () => {
-      mounted.current = false;
       removeRegister();
       removeUnregister();
     };
-  }, [swap]);
+  }, [isSwap]);
+
   async function sign() {
-    if (!accepted || disabled || running.current || pending) return;
+    if (
+      recoveryOnly ||
+      !accepted ||
+      !password ||
+      disabled ||
+      running.current ||
+      pending
+    )
+      return;
     let operation: JitoOperationToken;
+    let approved: JitoBundleManifest;
+    let approvedTerms: string;
     try {
+      approved = structuredClone(manifest);
+      approvedTerms = JSON.stringify(approved);
       if (
         !ownerScope ||
-        Array.from({ length: manifest.swaps.length + 1 }, (_, index) =>
-          coordinator.has(ownerScope, manifest.id, index),
+        Array.from({ length: approved.swaps.length + 1 }, (_, index) =>
+          coordinator.has(ownerScope, approved.id, index),
         ).some(Boolean)
       )
         throw Error('A Jito signing outcome is still pending.');
-      operation = coordinator.startOperation(ownerScope, manifest.id, packet);
+      operation = coordinator.startOperation(ownerScope, approved.id, packet);
     } catch (failure) {
       setError(
         failure instanceof Error
@@ -115,150 +173,420 @@ export function JitoPacketSigning({
     setBusy(true);
     setError('');
     const passphrase = password;
+    const external =
+      choice === 'vault'
+        ? null
+        : wallets.find((value) => value.name === choice);
     setPassword('');
+    const approvedSwap = approved.swaps[packet];
+    const approvedWallet = approvedSwap?.wallet ?? approved.tip.wallet;
     const assertCurrent = () => {
       if (
         !mounted.current ||
         !isContextCurrent() ||
-        Date.parse(manifest.expiresAt) <= Date.now()
+        Date.parse(approved.expiresAt) <= Date.now() ||
+        JSON.stringify(manifest) !== approvedTerms
       )
-        throw new Error(
+        throw Error(
           'Bundle changed or expired. Keep any signature for recovery.',
         );
     };
-    let reservation: JitoMemoryReservation | null = null;
-    let started = false;
+    let memory: JitoMemoryReservation | null = null;
+    // Set before a potentially ambiguous durable insert, not after it returns.
+    let durableInsertStarted = false;
+    let vault: Awaited<ReturnType<typeof unlockVault>> | null = null;
     try {
-      await requireJitoManifest(manifest);
+      await requireJitoManifest(approved);
       assertCurrent();
-      reservation = await coordinator.reserve(ownerScope, manifest, packet);
+      const encrypted = localStorage.getItem(VAULT_STORAGE_KEY);
+      if (!encrypted)
+        throw Error(
+          'Create or import this wallet in the encrypted browser vault first.',
+        );
+      // Validate the normal vault password before persisting UNKNOWN. External
+      // wallets use it only for the encrypted local recovery journal.
+      vault = await unlockVault(encrypted, passphrase);
       assertCurrent();
-      let transaction: string;
-      const hooks = {
-        beforeSign,
-        onSignerStart: () => {
-          assertCurrent();
-          coordinator.markStarted(reservation!);
-          started = true;
-        },
-        retainSigned: async (signed: { transaction: string }) => {
-          await coordinator.capture(reservation!, manifest, signed.transaction);
-        },
-      };
-      // Capture the verified output before the helper's final wallet check.
-      // Registration must wait until that check has succeeded.
-      const retainOnly = async (signed: { transaction: string }) => {
-        await coordinator.capture(reservation!, manifest, signed.transaction);
-      };
       if (choice === 'vault') {
-        const encrypted = localStorage.getItem(VAULT_STORAGE_KEY);
-        if (!encrypted)
-          throw new Error(
-            'Create or import this wallet in the encrypted browser vault first.',
-          );
-        let session = await unlockVault(encrypted, passphrase);
+        const item = vault.payload.wallets.find(
+          (w) => w.family === 'solana' && w.address === approvedWallet,
+        );
+        if (!item || !/^[a-f0-9]{64}$/.test(item.seed))
+          throw Error('Reviewed wallet is not in this vault.');
+        const seed = Uint8Array.from(item.seed.match(/../g)!, (v) =>
+          parseInt(v, 16),
+        );
+        const pair = nacl.sign.keyPair.fromSeed(seed);
         try {
-          assertCurrent();
-          const signed = swap
-            ? await signApprovedWarmupPacket(
-                session,
-                swap,
-                assertCurrent,
-                hooks,
-              )
-            : await signNativeWithdrawal(
-                session,
-                manifest.tip,
-                assertCurrent,
-                hooks,
-              );
-          transaction = signed.transaction;
+          if (bs58.encode(pair.publicKey) !== approvedWallet)
+            throw Error('Reviewed wallet is not in this vault.');
         } finally {
-          // Drop decrypted seeds as soon as this one explicit signing action ends.
-          for (const item of session.payload.wallets) item.seed = '';
-          session = null as unknown as typeof session;
+          seed.fill(0);
+          pair.secretKey.fill(0);
         }
       } else {
-        const external = wallets.find((w) => w.name === choice);
-        if (!external)
-          throw new Error('Selected external wallet is unavailable.');
-        if (swap) {
-          await connectWarmupExternalWallet(external, wallet);
-          assertCurrent();
-          transaction = (
-            await signApprovedExternalWarmupPacket(
-              external,
-              swap,
-              assertCurrent,
-              retainOnly,
-              hooks,
-            )
-          ).transaction;
-        } else {
-          await connectNativeWithdrawalWallet(external, wallet);
-          assertCurrent();
-          transaction = (
-            await signExternalNativeWithdrawal(
-              external,
-              manifest.tip,
-              assertCurrent,
-              retainOnly,
-              hooks,
-            )
-          ).transaction;
-        }
+        // No decrypted vault material may survive an extension connection or prompt.
+        for (const item of vault.payload.wallets) item.seed = '';
+        vault = null;
+        if (!external) throw Error('Selected external wallet is unavailable.');
+        if (approvedSwap)
+          await connectWarmupExternalWallet(external, approvedWallet);
+        else await connectNativeWithdrawalWallet(external, approvedWallet);
       }
-      if (
-        !mounted.current ||
-        !isContextCurrent() ||
-        Date.parse(manifest.expiresAt) <= Date.now()
-      )
-        throw new Error(
-          'Bundle context changed. Reload saved history to recover the signed packet.',
-        );
-      setPending(transaction);
-      await register(transaction, operation);
-      if (mounted.current) {
-        setPending(null);
-        setAccepted(false);
-      }
-    } catch (e) {
-      if (reservation) {
+      assertCurrent();
+      await withJitoRecoveryJournalLock(
+        ownerScope,
+        assertCurrent,
+        async (lock) => {
+          const snapshot = async () => {
+            const result = await readSnapshot();
+            assertCurrent();
+            if (
+              !result ||
+              result.ownerScope !== ownerScope ||
+              result.projectId !== approved.projectId ||
+              result.sessionId !== approved.sessionId ||
+              result.legacyReadOnly ||
+              result.bundle.manifest.id !== approved.id ||
+              result.bundle.manifest.sha256 !== approved.sha256 ||
+              !Array.isArray(result.attempts)
+            )
+              throw Error('Bundle context changed. Reload saved history.');
+            return result;
+          };
+          const readFresh = async () => ({
+            ownerScope,
+            record: (await snapshot()).bundle,
+          });
+          const pendingLocal = await listJitoRecoveryJournalPending(
+            lock,
+            approved.projectId,
+            approved.sessionId,
+            async () => (await snapshot()).ownerScope,
+          );
+          if (pendingLocal.some((entry) => entry.bundleId === approved.id))
+            throw Error('A Jito signing outcome is still pending.');
+          const original = await snapshot();
+          if (
+            original.bundle.state !== 'reviewed' ||
+            original.bundle.signatures[packet] !== null ||
+            original.attempts.some((attempt) => attempt.state === 'unknown')
+          )
+            throw Error('A Jito signing outcome is still pending.');
+          memory = await coordinator.reserve(ownerScope, approved, packet);
+          assertCurrent();
+          durableInsertStarted = true;
+          const durable = await reserveJitoRecoveryUnknown(
+            lock,
+            approved,
+            packet,
+            passphrase,
+            readFresh,
+          );
+          assertCurrent();
+          // Exactly one begin request. A timeout or replay never permits signing.
+          const attemptId = crypto.randomUUID();
+          const client = createJitoSignAttemptClient({
+            identity: {
+              ownerScope,
+              bundleId: approved.id,
+              digest: approved.sha256,
+              packet,
+              signer: approvedWallet,
+              intentId: approvedSwap?.id ?? null,
+              attemptId,
+            },
+            assertCurrent,
+          });
+          const begun = await client.begin(true);
+          if (!begun.permit)
+            throw Error(
+              'Signing outcome is unknown. Open recovery before another action.',
+            );
+          await begun.permit.invokeOnce(async () => {
+            const hooks = {
+              beforeSign: async () => {
+                await requireJitoManifest(approved);
+                assertCurrent();
+                await beforeSign(attemptId);
+                await requireJitoManifest(approved);
+                assertCurrent();
+              },
+              onSignerStart: () => {
+                assertCurrent();
+                coordinator.markStarted(memory!);
+              },
+              retainSigned: async (signed: { transaction: string }) => {
+                // Both independent attempts run even when the UI unmounted. A
+                // failed durable write prevents registration and keeps UNKNOWN.
+                if (vault)
+                  for (const item of vault.payload.wallets) item.seed = '';
+                const retained = await Promise.allSettled([
+                  coordinator.capture(memory!, approved, signed.transaction),
+                  retainJitoRecoverySignature(
+                    lock,
+                    durable,
+                    approved,
+                    signed.transaction,
+                  ),
+                ]);
+                if (retained.some((result) => result.status === 'rejected'))
+                  throw Error('Signed packet recovery needs attention.');
+              },
+            };
+            const signed = external
+              ? approvedSwap
+                ? await signApprovedExternalWarmupPacket(
+                    external,
+                    approvedSwap,
+                    assertCurrent,
+                    hooks.retainSigned,
+                    hooks,
+                  )
+                : await signExternalNativeWithdrawal(
+                    external,
+                    approved.tip,
+                    assertCurrent,
+                    hooks.retainSigned,
+                    hooks,
+                  )
+              : approvedSwap
+                ? await signApprovedWarmupPacket(
+                    vault!,
+                    approvedSwap,
+                    assertCurrent,
+                    hooks,
+                  )
+                : await signNativeWithdrawal(
+                    vault!,
+                    approved.tip,
+                    assertCurrent,
+                    hooks,
+                  );
+            assertCurrent();
+            if (mounted.current) setPending(signed.transaction);
+            await register(signed.transaction, attemptId, operation);
+            assertCurrent();
+            await acknowledgeJitoRecoveryRegistered(
+              lock,
+              approved,
+              packet,
+              passphrase,
+              readFresh,
+            );
+            if (mounted.current) {
+              setPending(null);
+              setAccepted(false);
+            }
+          });
+        },
+      );
+    } catch (failure) {
+      if (memory && !durableInsertStarted) {
         try {
-          if (!started) coordinator.releaseUnstarted(reservation);
-          else if (e instanceof WalletSigningRejected)
-            coordinator.releaseRejected(reservation, e);
+          coordinator.releaseUnstarted(memory);
         } catch {
-          // Keep any started or retained reservation for explicit recovery.
+          /* retain on ambiguity */
         }
       }
       if (mounted.current)
-        setError(e instanceof Error ? e.message : 'Signing did not complete.');
+        setError(
+          durableInsertStarted
+            ? 'This signing attempt needs recovery before another action. Do not sign or submit it again.'
+            : failure instanceof Error
+              ? failure.message
+              : 'Signing did not complete.',
+        );
+    } finally {
+      if (vault) for (const item of vault.payload.wallets) item.seed = '';
+      coordinator.finishOperation(operation);
+      running.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  }
+
+  /** Read and re-verify the locally retained exact packet; this never signs,
+   * registers, clears, or submits. No entry is evidence of no signing. */
+  async function recover(registerApproved: boolean) {
+    if (
+      running.current ||
+      recoveryDisabled ||
+      !ownerScope ||
+      !recoveryPassword ||
+      (registerApproved && (!recoveryApproved || !recoveryView))
+    )
+      return;
+    let operation: JitoOperationToken;
+    let approved: JitoBundleManifest;
+    let approvedTerms: string;
+    try {
+      approved = structuredClone(manifest);
+      approvedTerms = JSON.stringify(approved);
+      operation = coordinator.startOperation(ownerScope, approved.id, packet);
+    } catch {
+      setError('Recovery is unavailable. Reload saved bundle history.');
+      return;
+    }
+    const expectedView = recoveryView;
+    const passphrase = recoveryPassword;
+    setRecoveryPassword('');
+    setRecoveryApproved(false);
+    setError('');
+    setRecoveryMessage('');
+    running.current = true;
+    setBusy(true);
+    const assertCurrent = () => {
+      if (
+        !mounted.current ||
+        !isContextCurrent() ||
+        JSON.stringify(manifest) !== approvedTerms
+      )
+        throw Error('Recovery context changed. Reload saved history.');
+    };
+    try {
+      await requireJitoManifest(approved, false);
+      assertCurrent();
+      await withJitoRecoveryJournalLock(
+        ownerScope,
+        assertCurrent,
+        async (lock) => {
+          const snapshot = async () => {
+            const current = await readSnapshot();
+            assertCurrent();
+            if (
+              !current ||
+              current.ownerScope !== ownerScope ||
+              current.projectId !== approved.projectId ||
+              current.sessionId !== approved.sessionId ||
+              current.legacyReadOnly ||
+              current.bundle.manifest.id !== approved.id ||
+              current.bundle.manifest.sha256 !== approved.sha256 ||
+              !Array.isArray(current.attempts)
+            )
+              throw Error('Recovery context changed. Reload saved history.');
+            return current;
+          };
+          const readFresh = async () => ({
+            ownerScope,
+            record: (await snapshot()).bundle,
+          });
+          const inspected = await inspectJitoRecoveryJournal(
+            lock,
+            approved,
+            packet,
+            passphrase,
+            readFresh,
+          );
+          if (inspected.status !== 'retained') {
+            if (mounted.current) {
+              setRecoveryView(null);
+              setRecoveryMessage(
+                inspected.status === 'unknown'
+                  ? 'The signing outcome is unknown and no signed packet is available here. Keep this attempt blocked.'
+                  : 'No retained packet was found in this browser. That does not prove no signing occurred.',
+              );
+            }
+            return;
+          }
+          const current = await snapshot();
+          const matches = current.attempts.filter((a) => a.packet === packet);
+          if (matches.length !== 1)
+            throw Error('Exact signing attempt unavailable.');
+          const attempt = matches[0];
+          const signer = approved.swaps[packet]?.wallet ?? approved.tip.wallet;
+          if (
+            attempt.bundleId !== approved.id ||
+            attempt.manifestSha256 !== approved.sha256 ||
+            attempt.signer !== signer ||
+            attempt.intentId !== (approved.swaps[packet]?.id ?? null) ||
+            (attempt.state === 'registered' &&
+              (attempt.signature !== inspected.signature ||
+                attempt.transaction !== inspected.transaction ||
+                current.bundle.signatures[packet] !== inspected.signature)) ||
+            (attempt.state === 'unknown' &&
+              (attempt.signature !== null ||
+                attempt.transaction !== null ||
+                current.bundle.signatures[packet] !== null))
+          )
+            throw Error('Exact signing attempt differs.');
+          if (!registerApproved) {
+            if (mounted.current) {
+              setRecoveryView({
+                attemptId: attempt.attemptId,
+                signature: inspected.signature,
+              });
+              setRecoveryMessage(
+                'Exact retained packet verified locally. Review it before separately approving registration.',
+              );
+            }
+            return;
+          }
+          if (
+            !expectedView ||
+            expectedView.attemptId !== attempt.attemptId ||
+            expectedView.signature !== inspected.signature
+          )
+            throw Error('Retained packet changed. Review it again.');
+          if (attempt.state === 'unknown') {
+            await registerEvidence(
+              inspected.transaction,
+              attempt.attemptId,
+              operation,
+            );
+            assertCurrent();
+          }
+          const memory = await coordinator.inspect(
+            ownerScope,
+            approved,
+            packet,
+          );
+          if (memory.status === 'retained') {
+            if (memory.signature !== inspected.signature)
+              throw Error('Retained packet differs.');
+          } else if (memory.status !== 'absent') {
+            throw Error('Pending memory recovery needs attention.');
+          }
+          // This independently fetches the exact authenticated registered record
+          // and deletes only the matching retained envelope after confirmation.
+          await acknowledgeJitoRecoveryRegistered(
+            lock,
+            approved,
+            packet,
+            passphrase,
+            readFresh,
+          );
+          if (memory.status === 'retained') {
+            await coordinator.acknowledge(
+              ownerScope,
+              approved,
+              packet,
+              inspected.signature,
+              assertCurrent,
+            );
+          }
+          if (mounted.current) {
+            setRecoveryView(null);
+            setPending(null);
+            setRecoveryMessage(
+              'Exact registration confirmed. Local retained entry acknowledged.',
+            );
+          }
+        },
+      );
+    } catch {
+      if (mounted.current) {
+        setRecoveryView(null);
+        setError(
+          'Recovery could not be verified. Keep the attempt blocked and reload saved history.',
+        );
+      }
     } finally {
       coordinator.finishOperation(operation);
       running.current = false;
       if (mounted.current) setBusy(false);
     }
   }
-  async function retryRegistration() {
-    if (!pending || running.current) return;
-    running.current = true;
-    setBusy(true);
-    setError('');
-    try {
-      await register(pending);
-      if (mounted.current) {
-        setPending(null);
-        setAccepted(false);
-      }
-    } catch (e) {
-      if (mounted.current)
-        setError(e instanceof Error ? e.message : 'Registration unavailable.');
-    } finally {
-      running.current = false;
-      if (mounted.current) setBusy(false);
-    }
-  }
+
   async function exportRecovery() {
     if (!pending || running.current) return;
     running.current = true;
@@ -277,97 +605,49 @@ export function JitoPacketSigning({
       anchor.download = `bundle-${manifest.id}-packet-${packet + 1}-recovery.json`;
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (failure) {
-      if (mounted.current)
-        setError(
-          failure instanceof Error
-            ? failure.message
-            : 'Recovery export unavailable.',
-        );
-    } finally {
-      running.current = false;
-      if (mounted.current) setBusy(false);
-    }
-  }
-  async function importRecovery(file: File) {
-    if (running.current || pending || recoveryDisabled || !ownerScope) return;
-    let operation: JitoOperationToken;
-    try {
-      operation = coordinator.startOperation(ownerScope);
     } catch {
-      setError('Another Jito action is in progress.');
-      return;
-    }
-    running.current = true;
-    setBusy(true);
-    setError('');
-    try {
-      const assertCurrent = () => {
-        if (!mounted.current || !isContextCurrent())
-          throw new Error('Bundle context changed. Reload saved history.');
-      };
-      assertCurrent();
-      if (file.size > JITO_RECOVERY_FILE_MAX_BYTES)
-        throw new Error('Recovery file exceeds the packet limit.');
-      const record = await readJitoPacketRecovery(
-        await file.text(),
-        manifest,
-        packet,
-      );
-      assertCurrent();
-      // Recheck the authenticated exact record after file and signature work.
-      await beforeImport();
-      assertCurrent();
-      await coordinator.retainImported(
-        ownerScope,
-        manifest,
-        packet,
-        record.transaction,
-        operation,
-        assertCurrent,
-      );
-      if (mounted.current) {
-        setAccepted(false);
-        setPassword('');
-      }
-    } catch (failure) {
-      if (mounted.current)
-        setError(
-          failure instanceof Error
-            ? failure.message
-            : 'Recovery import unavailable.',
-        );
+      if (mounted.current) setError('Recovery export unavailable.');
     } finally {
-      coordinator.finishOperation(operation);
       running.current = false;
       if (mounted.current) setBusy(false);
     }
   }
+
   return (
     <div className="space-y-2 rounded-md border p-3">
       <p>
         Signer for {label}: <code>{wallet}</code>. This action signs one packet.
         It does not submit it.
       </p>
-      <label htmlFor={`${field}-signer`}>Signing method for {label}</label>
-      <select
-        id={`${field}-signer`}
-        value={choice}
-        disabled={busy || Boolean(pending) || disabled}
-        onChange={(e) => {
-          setChoice(e.target.value);
-          setAccepted(false);
-        }}
-      >
-        <option value="vault">Encrypted browser vault</option>
-        {wallets.map((w) => (
-          <option key={w.name} value={w.name}>
-            {w.name}
-          </option>
-        ))}
-      </select>
-      {choice === 'vault' && (
+      <p>
+        A browser vault and its password are required to protect recovery,
+        including when signing with an external wallet. To import a signed
+        packet file, use the bundle's file recovery section.
+      </p>
+      <p>
+        External wallets must expose the selected mainnet account and its exact
+        public key throughout signing. Wallets that hide the account, including
+        some Phantom configurations, cannot be used for this flow.
+      </p>
+      {!recoveryOnly && (
         <>
+          <label htmlFor={`${field}-signer`}>Signing method for {label}</label>
+          <select
+            id={`${field}-signer`}
+            value={choice}
+            disabled={busy || disabled || Boolean(pending)}
+            onChange={(event) => {
+              setChoice(event.target.value);
+              setAccepted(false);
+            }}
+          >
+            <option value="vault">Encrypted browser vault</option>
+            {wallets.map((entry) => (
+              <option key={entry.name} value={entry.name}>
+                {entry.name}
+              </option>
+            ))}
+          </select>
           <label htmlFor={`${field}-password`}>
             Vault password for {label}
           </label>
@@ -379,32 +659,28 @@ export function JitoPacketSigning({
             disabled={busy || disabled || Boolean(pending)}
             onChange={(e) => setPassword(e.target.value)}
           />
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={accepted}
+              disabled={busy || disabled || Boolean(pending)}
+              onChange={(e) => setAccepted(e.target.checked)}
+            />
+            <span className="min-w-0 flex-1 break-words">
+              I approve signing {label} in bundle {manifest.id}, with the
+              displayed order, amounts and tip.
+            </span>
+          </label>
+          <Button
+            disabled={
+              disabled || busy || !accepted || Boolean(pending) || !password
+            }
+            onClick={() => void sign()}
+          >
+            Sign {label} only
+          </Button>
         </>
       )}
-      <label className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          checked={accepted}
-          disabled={busy || disabled || Boolean(pending)}
-          onChange={(e) => setAccepted(e.target.checked)}
-        />
-        <span className="min-w-0 flex-1 break-words">
-          I approve signing {label} in bundle {manifest.id}, with the displayed
-          order, amounts and tip.
-        </span>
-      </label>
-      <Button
-        disabled={
-          disabled ||
-          busy ||
-          !accepted ||
-          Boolean(pending) ||
-          (choice === 'vault' && !password)
-        }
-        onClick={() => void sign()}
-      >
-        Sign {label} only
-      </Button>
       {pending && (
         <>
           <label htmlFor={`${field}-retained`}>
@@ -419,9 +695,8 @@ export function JitoPacketSigning({
             className="w-full break-all rounded-md border p-2 font-mono text-xs"
           />
           <p>
-            Registration has not completed. Keep this exact packet for recovery
-            before leaving this page. It is a signed transaction; sharing it can
-            allow submission. Retrying registration does not sign or submit.
+            Registration or acknowledgement needs attention. Keep this exact
+            signed packet private. Opening recovery does not sign or submit.
           </p>
           <Button
             disabled={busy}
@@ -430,40 +705,71 @@ export function JitoPacketSigning({
           >
             Download signed packet recovery file
           </Button>
-          <Button
-            disabled={busy}
-            variant="outline"
-            onClick={() => void retryRegistration()}
-          >
-            Retry signature registration only
-          </Button>
         </>
       )}
-      {!pending && (
-        <details>
-          <summary>Recover an already signed {label} packet</summary>
-          <p>
-            Import the recovery file for this exact bundle and packet. Import
-            verifies it locally and does not sign, register or submit. Then
-            choose registration only after a separate approval. Keep recovery
-            files private because they contain signed transactions.
-          </p>
-          <label htmlFor={`${field}-recovery`}>
-            Signed packet recovery file
-          </label>
-          <input
-            id={`${field}-recovery`}
-            type="file"
-            accept="application/json,.json"
-            disabled={busy || recoveryDisabled}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (file) void importRecovery(file);
-            }}
-          />
-        </details>
-      )}
+      <details>
+        <summary>Recover retained {label} packet</summary>
+        <p>
+          Use the vault password that was active when this packet was signed,
+          even if you changed it later. Recovery never signs or submits a
+          transaction. Browser data can be lost.
+        </p>
+        <label htmlFor={`${field}-recovery-password`}>
+          Vault password for recovery
+        </label>
+        <Input
+          id={`${field}-recovery-password`}
+          type="password"
+          autoComplete="off"
+          value={recoveryPassword}
+          disabled={busy || recoveryDisabled}
+          onChange={(event) => {
+            setRecoveryPassword(event.target.value);
+            setRecoveryApproved(false);
+          }}
+        />
+        <Button
+          variant="outline"
+          disabled={busy || recoveryDisabled || !recoveryPassword}
+          onClick={() => void recover(false)}
+        >
+          Inspect retained {label} packet
+        </Button>
+        {recoveryView && (
+          <>
+            <p>
+              Verified retained signature: <code>{recoveryView.signature}</code>
+            </p>
+            <p>
+              Re-enter the same vault password to register this exact signed
+              packet or acknowledge its existing receipt.
+            </p>
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={recoveryApproved}
+                disabled={busy || recoveryDisabled}
+                onChange={(event) => setRecoveryApproved(event.target.checked)}
+              />
+              I approve registering only this exact retained {label} packet or
+              acknowledging its matching receipt. This does not sign or submit.
+            </label>
+            <Button
+              variant="outline"
+              disabled={
+                busy ||
+                recoveryDisabled ||
+                !recoveryPassword ||
+                !recoveryApproved
+              }
+              onClick={() => void recover(true)}
+            >
+              Confirm retained {label} registration only
+            </Button>
+          </>
+        )}
+        {recoveryMessage && <output>{recoveryMessage}</output>}
+      </details>
       {error && <p role="alert">{error}</p>}
     </div>
   );
