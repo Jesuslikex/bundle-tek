@@ -532,6 +532,13 @@ export function WalletCleanupPanel({
       setOpen(true);
     })();
   }, []);
+  // The launch settings Cleanup card links here with #cleanup; open on arrival
+  // so the card reaches the dialog rather than the top of the page.
+  useEffect(() => {
+    if (window.location.hash !== '#cleanup') return;
+    setOpen(true);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
   const byAddress = new Map(active.map((w) => [w.address, w]));
   const rows = batch?.cleanups ?? [];
   const pending = rows.filter((r) => r.state === 'awaiting_signature');

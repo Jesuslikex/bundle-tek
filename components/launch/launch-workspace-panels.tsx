@@ -64,7 +64,13 @@ export function LaunchWorkspacePanels({
           sell→buy rounds on the market. Rounds run on a fixed or random delay.
         </p>
         <div className="launch-ws-panel-actions">
-          <Button variant="outline" onClick={onOpenWallets}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              window.location.hash = 'cleanup';
+              onOpenWallets();
+            }}
+          >
             Configure
           </Button>
         </div>

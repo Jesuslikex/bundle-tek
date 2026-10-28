@@ -33,6 +33,8 @@ test('renders the four panels and links to existing flows', () => {
   act(() => buttons.find((b) => b.textContent === 'Fund wallets')?.click());
   act(() => buttons.find((b) => b.textContent === 'My wallets')?.click());
   act(() => buttons.find((b) => b.textContent === 'Configure')?.click());
+  // The card leaves a hash so the wallet workspace opens the dialog on arrival.
+  expect(window.location.hash).toBe('#cleanup');
   expect(onFund).toHaveBeenCalledOnce();
   // Both the wallet link and the Cleanup card route to the wallet workspace.
   expect(onOpenWallets).toHaveBeenCalledTimes(2);
