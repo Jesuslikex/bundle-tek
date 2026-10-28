@@ -47,10 +47,14 @@ const slot = (value) => {
   return Number(value);
 };
 
-export function validateEndpoint(value) {
+export function validateEndpoint(value, providerMode = 'default') {
+  if (!['default', 'helius'].includes(providerMode))
+    throw failure('configuration-refused: invalid provider selection');
   if (!value)
     throw failure(
-      'configuration-refused: set SOLANA_HOLDER_RPC_URL or SOLANA_MAINNET_RPC_URL',
+      providerMode === 'helius'
+        ? 'configuration-refused: set SOLANA_MAINNET_RPC_URL for the Helius sample'
+        : 'configuration-refused: set SOLANA_HOLDER_RPC_URL or SOLANA_MAINNET_RPC_URL',
     );
   try {
     const url = new URL(value);
@@ -58,9 +62,11 @@ export function validateEndpoint(value) {
     // campaign can run at all, and the receipt records which host was used.
     if (
       url.protocol !== 'https:' ||
-      !['solana-mainnet.g.alchemy.com', 'api.mainnet-beta.solana.com'].includes(
-        url.hostname,
-      ) ||
+      !(
+        providerMode === 'helius'
+          ? ['mainnet.helius-rpc.com']
+          : ['solana-mainnet.g.alchemy.com', 'api.mainnet-beta.solana.com']
+      ).includes(url.hostname) ||
       url.port ||
       url.username ||
       url.password ||
@@ -73,6 +79,15 @@ export function validateEndpoint(value) {
   } catch {
     throw failure('configuration-refused: endpoint is not a valid URL');
   }
+}
+
+/** Explicit sample selection; never switch providers after a refusal. */
+export function selectNativeEndpoint(local, providerMode = 'default') {
+  const value =
+    providerMode === 'helius'
+      ? local.SOLANA_MAINNET_RPC_URL
+      : (local.SOLANA_HOLDER_RPC_URL ?? local.SOLANA_MAINNET_RPC_URL);
+  return validateEndpoint(value, providerMode);
 }
 
 function packetsFor(payer, blockhash) {
@@ -118,8 +133,9 @@ export async function runNativeJitoCampaign({
   signal,
   attemptTimeoutMs = 45000,
   profile = 'legacy',
+  providerMode = 'default',
 }) {
-  const pinnedEndpoint = validateEndpoint(endpoint);
+  const pinnedEndpoint = validateEndpoint(endpoint, providerMode);
   if (typeof pace !== 'function')
     throw failure('configuration-refused: adapter has no pacing function');
   if (
@@ -136,6 +152,7 @@ export async function runNativeJitoCampaign({
         ? 'unsigned-native-prefee-zero-transfer-only'
         : 'unsigned-native-zero-transfer-only',
     endpointHost: new URL(pinnedEndpoint).hostname,
+    providerMode,
     plannedAttempts: 3,
     attempts: [],
     signaturesCreated: 0,
@@ -562,7 +579,9 @@ export async function runNativeJitoCampaign({
   // Three captures is the provider claim; the other flags stay false because
   // economics, runtime privileges and signing are separate gates.
   report.providerQualified =
-    profile === 'legacy' && report.nativeCapturedCount === 3;
+    providerMode === 'default' &&
+    profile === 'legacy' &&
+    report.nativeCapturedCount === 3;
   if (profile === 'prefee')
     report.nativeProfileConsistent = report.nativeCapturedCount === 3;
   saveReport();
@@ -711,10 +730,15 @@ export async function compileNativeAdapter({
 
 export async function main(args = process.argv.slice(2)) {
   if (
-    ![2, 3].includes(args.length) ||
+    ![2, 3, 4].includes(args.length) ||
+    new Set(args).size !== args.length ||
     !args.includes('--live-readonly') ||
-    !args.some((a) => a.startsWith('--output-dir=')) ||
-    (args.length === 3 && !args.includes('--prefee'))
+    args.filter((a) => a.startsWith('--output-dir=')).length !== 1 ||
+    args.some(
+      (a) =>
+        !['--live-readonly', '--prefee', '--helius'].includes(a) &&
+        !a.startsWith('--output-dir='),
+    )
   )
     throw failure('arguments-refused');
   const folder = resolve(
@@ -754,9 +778,8 @@ export async function main(args = process.argv.slice(2)) {
     const local = parseEnv(readFileSync('.env.local', 'utf8'));
     // Alchemy is preferred; the public endpoint keeps the campaign runnable
     // without one. The receipt records which variable supplied it.
-    const endpoint = validateEndpoint(
-      local.SOLANA_HOLDER_RPC_URL ?? local.SOLANA_MAINNET_RPC_URL,
-    );
+    const providerMode = args.includes('--helius') ? 'helius' : 'default';
+    const endpoint = selectNativeEndpoint(local, providerMode);
     const interval = local.SOLANA_RPC_MIN_INTERVAL_MS;
     if (interval !== undefined) {
       if (
@@ -775,6 +798,7 @@ export async function main(args = process.argv.slice(2)) {
       fetcher: fetch,
       persist,
       profile: args.includes('--prefee') ? 'prefee' : 'legacy',
+      providerMode,
     });
     console.log(
       encoded({

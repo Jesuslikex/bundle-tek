@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import {
   runNativeJitoCampaign,
   validateEndpoint,
+  selectNativeEndpoint,
   REFERENCES,
   GENESIS,
   main,
@@ -35,6 +36,7 @@ const capture = (value) => {
 function harness(options = {}) {
   const files = new Map(),
     requests = [];
+  const selectedEndpoint = options.endpoint ?? endpoint;
   const pacing = [];
   let runtime = 0,
     genesis = 0;
@@ -138,7 +140,7 @@ function harness(options = {}) {
     },
   };
   const fetcher = async (url, init) => {
-    assert.equal(url, endpoint);
+    assert.equal(url, selectedEndpoint);
     requests.push(JSON.parse(init.body));
     if (options.fetcher) return options.fetcher(url, init, requests.length);
     if (options.rateAt === requests.length)
@@ -184,12 +186,12 @@ function harness(options = {}) {
   };
   const run = (extra = {}) =>
     runNativeJitoCampaign({
-      endpoint,
+      endpoint: selectedEndpoint,
       adapter,
       fetcher,
       pace: (...args) => {
         assert.equal(args.length, 2);
-        assert.equal(args[0], endpoint);
+        assert.equal(args[0], selectedEndpoint);
         assert.ok(args[1] instanceof AbortSignal);
         pacing.push(args);
         return options.pace ? options.pace(...args) : Promise.resolve();
@@ -484,8 +486,100 @@ void test('HTTP endpoint, unexpected host and URL userinfo are refused before an
   ])
     assert.throws(() => validateEndpoint(url), /configuration-refused/);
 });
+void test('Helius requires explicit selection, uses only the configured mainnet endpoint and never falls back', () => {
+  const helius = 'https://mainnet.helius-rpc.com/?api-key=PRIVATE-TEST-HELIUS';
+  const local = {
+    SOLANA_HOLDER_RPC_URL: endpoint,
+    SOLANA_MAINNET_RPC_URL: helius,
+  };
+  assert.equal(selectNativeEndpoint(local), endpoint);
+  assert.equal(selectNativeEndpoint(local, 'helius'), helius);
+  assert.throws(() => validateEndpoint(helius), /configuration-refused/);
+  assert.throws(
+    () => selectNativeEndpoint({ SOLANA_HOLDER_RPC_URL: endpoint }, 'helius'),
+    /configuration-refused/,
+  );
+  for (const value of [
+    endpoint,
+    'https://evil.helius-rpc.com/?api-key=x',
+    'http://mainnet.helius-rpc.com/',
+    'https://x:y@mainnet.helius-rpc.com/',
+    'https://mainnet.helius-rpc.com:444/',
+    'https://mainnet.helius-rpc.com/#secret',
+  ])
+    assert.throws(
+      () => validateEndpoint(value, 'helius'),
+      /configuration-refused/,
+    );
+  assert.throws(
+    () => validateEndpoint(helius, 'other'),
+    /configuration-refused/,
+  );
+});
+void test('explicit Helius native sample preserves method pacing, no retry, and false authority', async () => {
+  const helius = 'https://mainnet.helius-rpc.com/?api-key=PRIVATE-TEST-HELIUS';
+  const h = harness({ endpoint: helius });
+  const result = await h.run({ providerMode: 'helius' });
+  assert.equal(result.attempts.length, 3);
+  assert.equal(result.nativeCapturedCount, 3);
+  assert.equal(result.providerMode, 'helius');
+  assert.equal(result.providerQualified, false);
+  assert.equal(result.signaturesCreated, 0);
+  assert.equal(result.broadcasts, 0);
+  assert.equal(result.signingAllowed, false);
+  assert.equal(result.executionAllowed, false);
+  assert.equal(h.requests.length, 18);
+  assert.equal(h.pacing.length, 24);
+  assert.ok(!h.files.get('campaign.json').includes('PRIVATE-TEST-HELIUS'));
+});
+void test('explicit Helius prefee sample stops the full campaign at the first 429', async () => {
+  const helius = 'https://mainnet.helius-rpc.com/?api-key=PRIVATE-TEST-HELIUS';
+  const h = harness({
+    endpoint: helius,
+    rpc429At: 1,
+    prefeeCollect: async () => {
+      throw Error('unexpected');
+    },
+  });
+  const result = await h.run({ providerMode: 'helius', profile: 'prefee' });
+  assert.equal(result.attempts.length, 1);
+  assert.equal(result.attempts[0].reason, 'rate-limited');
+  assert.equal(result.signingAllowed, false);
+  assert.equal(h.requests.length, 1);
+  assert.ok(!h.files.get('campaign.json').includes('PRIVATE-TEST-HELIUS'));
+});
+void test('explicit Helius prefee profile never promotes native consistency to provider authority', async () => {
+  const helius = 'https://mainnet.helius-rpc.com/?api-key=PRIVATE-TEST-HELIUS';
+  let called = 0;
+  const h = harness({
+    endpoint: helius,
+    prefeeCollect: async (input) => {
+      called++;
+      assert.equal(input.verifySignatures, false);
+      assert.equal(input.minimumSlot, 100);
+      assert.equal(input.minimumReadSlot, 101);
+      return { status: 'refused', reason: 'fees-refused', ...flags };
+    },
+  });
+  const result = await h.run({ providerMode: 'helius', profile: 'prefee' });
+  assert.equal(called, 3);
+  assert.equal(result.attempts.length, 3);
+  assert.equal(result.providerQualified, false);
+  assert.equal(result.nativeProfileConsistent, false);
+  assert.equal(result.signingAllowed, false);
+  assert.equal(result.executionAllowed, false);
+  assert.ok(!h.files.get('campaign.json').includes('PRIVATE-TEST-HELIUS'));
+});
 void test('CLI refuses missing explicit live flag and output path without reading settings', async () => {
   await assert.rejects(main([]), /arguments-refused/);
+  await assert.rejects(
+    main(['--live-readonly', '--output-dir=.', '--helius', '--helius']),
+    /arguments-refused/,
+  );
+  await assert.rejects(
+    main(['--live-readonly', '--output-dir=.', '--helius', '--unknown']),
+    /arguments-refused/,
+  );
   await assert.rejects(
     main(['--live-readonly', '--output-dir=.']),
     /output-refused/,
