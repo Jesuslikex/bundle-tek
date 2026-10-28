@@ -319,6 +319,27 @@ test('rejects wallet actions, excessive pacing and inconsistent 429 accounting',
   }
 });
 
+test('recognizes RPC 429 without inventing it for historical receipts', () => {
+  const historical = samples();
+  assert.equal(
+    summarizeStockRepeatability(historical).repeatableInThisSample,
+    true,
+  );
+  const limited = structuredClone(historical);
+  limited[0].rpcRateLimited = true;
+  assert.throws(() => summarizeStockRepeatability(limited));
+  const invalid = structuredClone(historical);
+  invalid[0].rpcRateLimited = 'false';
+  assert.throws(() => summarizeStockRepeatability(invalid));
+  const refused = structuredClone(historical);
+  refused[0].passed = false;
+  refused[0].rpcRateLimited = true;
+  refused[0].rateLimited = true;
+  const result = summarizeStockRepeatability(refused);
+  assert.equal(result.repeatableInThisSample, false);
+  assert.equal(result.attempts[0].rpcRateLimited, true);
+});
+
 test('applies a configured stock runtime method budget per endpoint', () => {
   const ok = samples();
   for (const r of ok) {

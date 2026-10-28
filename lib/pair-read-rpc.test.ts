@@ -464,6 +464,89 @@ it('preserves a provider 429 and trips the request circuit instead of retrying',
   });
   expect(f.fetcher).toHaveBeenCalledOnce();
 });
+it.each(['batch-member', 'top-level', 'unmatched-id'] as const)(
+  'stops on HTTP 200 JSON-RPC 429 from %s without leaking provider text',
+  async (shape) => {
+    const f = fixture();
+    f.fetcher.mockImplementation(async (_url, init) => {
+      const body = JSON.parse(requestBody(init));
+      const requests = Array.isArray(body) ? body : [body];
+      const refusal = {
+        jsonrpc: '2.0',
+        id: shape === 'unmatched-id' ? 'unknown' : null,
+        error: { code: 429, message: 'private-provider-secret' },
+      };
+      return Response.json(
+        shape === 'top-level'
+          ? refusal
+          : [
+              { jsonrpc: '2.0', id: requests[0].id, result: 'genesis' },
+              refusal,
+            ],
+      );
+    });
+    const results = await Promise.allSettled([
+      f.reader.rpc('getGenesisHash', []),
+      f.reader.rpc('getBlockHeight', [{}]),
+    ]);
+    for (const result of results) {
+      expect(result.status).toBe('rejected');
+      if (result.status === 'rejected') {
+        expect(result.reason).toMatchObject({
+          status: 429,
+          rpcRateLimited: true,
+        });
+        expect(String(result.reason)).not.toContain('private-provider-secret');
+      }
+    }
+    await expect(f.reader.rpc('getGenesisHash', [])).rejects.toMatchObject({
+      status: 429,
+      rpcRateLimited: true,
+    });
+    expect(f.fetcher).toHaveBeenCalledOnce();
+  },
+);
+it.each([
+  'mapping',
+  'rpc-error',
+  'context',
+  'body-invalid',
+  'byte-limit',
+  'transport',
+] as const)(
+  'reports only the fixed %s diagnostic for a failed RPC response',
+  async (kind) => {
+    const f = fixture();
+    f.fetcher.mockImplementation(async (_url, init) => {
+      const request = JSON.parse(requestBody(init));
+      if (kind === 'transport') throw Error('private-provider-secret');
+      if (kind === 'body-invalid')
+        return new Response('private-provider-secret');
+      if (kind === 'byte-limit') return new Response('x'.repeat(524289));
+      if (kind === 'mapping')
+        return Response.json({ jsonrpc: '2.0', id: 'unknown', result: '123' });
+      if (kind === 'rpc-error')
+        return Response.json({
+          jsonrpc: '2.0',
+          id: request.id,
+          error: { code: -32000, message: 'private-provider-secret' },
+        });
+      return Response.json({ jsonrpc: '2.0', id: request.id, result: 99 });
+    });
+    const pending = f.reader.rpc('getSlot', [{ minContextSlot: 100 }]);
+    try {
+      await pending;
+      throw Error('Expected refusal.');
+    } catch (error) {
+      expect(error).toMatchObject({
+        message: 'Pair RPC batch read failed.',
+        rpcDiagnostic: kind,
+      });
+      expect(String(error)).not.toContain('private-provider-secret');
+    }
+    expect(f.fetcher).toHaveBeenCalledOnce();
+  },
+);
 it('cancels a fetch that ignores abort and refuses subsequent reads', async () => {
   const f = fixture();
   let started = () => {};

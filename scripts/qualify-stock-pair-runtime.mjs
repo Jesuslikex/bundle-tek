@@ -7,6 +7,10 @@ import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { requireStockQualificationRuntime } from './stock-qualification-runtime.mjs';
 import {
+  markStockRpcRateLimit,
+  auditStockReferenceRpc,
+} from './stock-rpc-rate-limit.mjs';
+import {
   referenceActivity,
   unchangedQuietReference,
 } from './stock-reference-activity.mjs';
@@ -81,6 +85,7 @@ const files = [
   'lib/pair-read-rpc.ts',
   'lib/pair-account-partitions.ts',
   'lib/pair-partition-observation.ts',
+  'lib/wallet-balances.ts',
   'lib/wallet-rpc-pacing.ts',
   'lib/pair-order-state.ts',
   'lib/pair-rent-evidence.ts',
@@ -91,10 +96,12 @@ const files = [
   'lib/pair-order-quote-bounds.ts',
   'scripts/qualify-stock-pair-runtime.mjs',
   'scripts/run-stock-repeatability.mjs',
+  'scripts/summarize-stock-repeatability.mjs',
   'scripts/stock-reference-activity.mjs',
   'scripts/stock-reference-fixture.mjs',
   'scripts/stock-provider-timing.mjs',
   'scripts/stock-clock-wire.mjs',
+  'scripts/stock-rpc-rate-limit.mjs',
   'scripts/stock-qualification-runtime.mjs',
 ];
 const sourceFiles = Object.fromEntries(
@@ -150,6 +157,8 @@ const receipt = {
   privateKeys: 0,
   signatures: 0,
   broadcasts: 0,
+  rateLimited: false,
+  rpcRateLimited: false,
   signingAllowed: false,
   executionAllowed: false,
   signingGate: false,
@@ -379,10 +388,18 @@ try {
     } catch (error) {
       row.returned = false;
       row.status = typeof error.status === 'number' ? error.status : null;
-      if (error.status === 429) {
-        receipt.rateLimited = true;
-        stop.abort(Error('RPC rate limit; no retry.'));
-      }
+      if (
+        [
+          'transport',
+          'body-invalid',
+          'byte-limit',
+          'mapping',
+          'rpc-error',
+          'context',
+        ].includes(error.rpcDiagnostic)
+      )
+        row.rpcDiagnostic = error.rpcDiagnostic;
+      markStockRpcRateLimit(error, receipt, stop);
       throw error;
     } finally {
       row.elapsedMs = clock() - row.startMs;
@@ -549,8 +566,15 @@ try {
           .filter(Number.isSafeInteger),
       );
       const audit = (method, params) =>
-        lib.balanceRpc(endpoint, method, params, signal, (url, init) =>
-          fetcher(url, init, true),
+        auditStockReferenceRpc(
+          lib.balanceRpc,
+          endpoint,
+          method,
+          params,
+          signal,
+          (url, init) => fetcher(url, init, true),
+          receipt,
+          stop,
         );
       const signatures = await audit('getSignaturesForAddress', [
         publicKey,
@@ -927,6 +951,15 @@ try {
                 ? 'economic-minimum-output'
                 : 'instruction-or-account-review',
   };
+  const rpcDiagnostic = receipt.logicalReads.find(
+    (row) => row.rpcDiagnostic,
+  )?.rpcDiagnostic;
+  if (!d && rpcDiagnostic)
+    receipt.diagnosis = {
+      check: 'pair-rpc-' + rpcDiagnostic,
+      valuesAvailable: false,
+      classification: 'provider-read-refused',
+    };
 } finally {
   receipt.pipelineMs =
     pipelineStart === undefined ? null : clock() - pipelineStart;
@@ -961,12 +994,11 @@ try {
     (r) => r.method === 'simulateTransaction',
   ).length;
   receipt.http429 = receipt.requests.filter((r) => r.status === 429).length;
-  if (receipt.http429 > 0)
+  if (receipt.http429 > 0 || receipt.rpcRateLimited)
     receipt.diagnosis = {
       check: 'provider-rate-limit',
       classification: 'provider-rate-limit',
-      valuesAvailable: true,
-      comparisons: [{ field: 'httpStatus', before: '200', after: '429' }],
+      valuesAvailable: false,
     };
   // Each endpoint has its own pacing budget, so measure each endpoint alone.
   const rolling = (rows) =>
@@ -1029,6 +1061,7 @@ try {
       inputUiAmount: receipt.inputUiAmount,
       httpRequests: receipt.requests.length,
       http429: receipt.http429,
+      rpcRateLimited: receipt.rpcRateLimited,
       maximumRollingRpcMethods: receipt.maximumRollingRpcMethods,
       simulationCount: receipt.simulationCount,
       firstCodeReads: receipt.firstCodeReads,

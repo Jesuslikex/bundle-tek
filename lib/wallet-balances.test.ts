@@ -4,7 +4,15 @@ import {
   observeWalletBalances,
   SOLANA_MAINNET_GENESIS,
   parseBalanceJson,
+  balanceRpc,
+  WalletRpcJsonRateLimitError,
 } from './wallet-balances';
+import {
+  auditStockReferenceRpc,
+  markStockRpcRateLimit,
+} from '../scripts/stock-rpc-rate-limit.mjs';
+import { runStockRepeatability } from '../scripts/run-stock-repeatability.mjs';
+import { createPairReadRpc } from './pair-read-rpc';
 import { combinedWalletBalance } from './wallet-balance-format';
 const sol = [
   '4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi',
@@ -15,6 +23,81 @@ const evm = [
   '0x2222222222222222222222222222222222222222',
 ];
 const blockHash = `0x${'ab'.repeat(32)}`;
+it.each(['setup', 'audit', 'runtime'] as const)(
+  'stops the fixed campaign without retry when %s gets HTTP 200 JSON-RPC 429',
+  async (phase) => {
+    const fetcher = vi.fn(async () =>
+      Response.json({
+        jsonrpc: '2.0',
+        id: null,
+        error: { code: 429, message: 'private-provider-secret' },
+      }),
+    );
+    const attempts: string[] = [];
+    const outcome = await runStockRepeatability(
+      async ({ asset }: { asset: string }) => {
+        attempts.push(asset);
+        const stop = new AbortController();
+        const receipt = { rateLimited: false, rpcRateLimited: false };
+        let captured: unknown;
+        try {
+          if (phase === 'audit') {
+            await auditStockReferenceRpc(
+              balanceRpc,
+              'https://rpc.example.test/',
+              'getSlot',
+              [],
+              stop.signal,
+              fetcher as typeof fetch,
+              receipt,
+              stop,
+            );
+          } else if (phase === 'runtime') {
+            const reader = createPairReadRpc(
+              'https://rpc.example.test/',
+              stop.signal,
+              fetcher as typeof fetch,
+            );
+            try {
+              await reader.rpc('getGenesisHash', []);
+            } catch (error) {
+              markStockRpcRateLimit(error, receipt, stop);
+              throw error;
+            } finally {
+              reader.close();
+            }
+          } else {
+            try {
+              await balanceRpc(
+                'https://rpc.example.test/',
+                'getSlot',
+                [],
+                stop.signal,
+                fetcher as typeof fetch,
+              );
+            } catch (error) {
+              markStockRpcRateLimit(error, receipt, stop);
+              throw error;
+            }
+          }
+        } catch (error) {
+          captured = error;
+        }
+        expect(captured).toBeInstanceOf(WalletRpcJsonRateLimitError);
+        expect(String(captured)).not.toContain('private-provider-secret');
+        expect(receipt).toEqual({ rateLimited: true, rpcRateLimited: true });
+        expect(stop.signal.aborted).toBe(true);
+        return { passed: false, http429: 0, ...receipt };
+      },
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(attempts).toEqual(['SOL']);
+    expect(outcome).toMatchObject({
+      complete: false,
+      stoppedForRateLimit: true,
+    });
+  },
+);
 const envelope = (result: unknown) =>
   Response.json({ jsonrpc: '2.0', id: 1, result });
 const rpcBody = (init?: RequestInit) => {

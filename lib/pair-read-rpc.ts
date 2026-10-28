@@ -1,4 +1,9 @@
-import { parseBalanceJson, WalletRpcError } from './wallet-balances';
+import {
+  parseBalanceJson,
+  WalletRpcError,
+  WalletRpcJsonRateLimitError,
+  hasWalletRpcRateLimit,
+} from './wallet-balances';
 import { paceWalletRpc } from './wallet-rpc-pacing';
 type Pending = {
   children?: Pending[];
@@ -11,6 +16,18 @@ type Pending = {
 };
 const NORMAL = 524288,
   CODE = 2097152;
+type PairRpcDiagnostic =
+  | 'transport'
+  | 'body-invalid'
+  | 'byte-limit'
+  | 'mapping'
+  | 'rpc-error'
+  | 'context';
+class PairRpcDiagnosticError extends Error {
+  constructor(readonly rpcDiagnostic: PairRpcDiagnostic) {
+    super('Pair RPC batch read failed.');
+  }
+}
 const METHODS = new Set([
   'getGenesisHash',
   'getSlot',
@@ -45,7 +62,7 @@ async function boundedBody(
   signal: AbortSignal,
 ) {
   const reader = response.body?.getReader();
-  if (!reader) throw Error('Empty pair RPC response.');
+  if (!reader) throw new PairRpcDiagnosticError('body-invalid');
   let size = 0,
     text = '';
   const decoder = new TextDecoder('utf-8', { fatal: true });
@@ -61,7 +78,7 @@ async function boundedBody(
       size += part.value.byteLength;
       if (size > bound) {
         void reader.cancel().catch(() => {});
-        throw Error('Pair RPC response exceeds bounds.');
+        throw new PairRpcDiagnosticError('byte-limit');
       }
       text += decoder.decode(part.value, { stream: true });
     }
@@ -125,7 +142,9 @@ export function createPairReadRpc(
         ? error
         : outerSignal.aborted
           ? new DOMException('Pair RPC read cancelled.', 'AbortError')
-          : Error('Pair RPC batch read failed.');
+          : error instanceof PairRpcDiagnosticError
+            ? error
+            : Error('Pair RPC batch read failed.');
     controller.abort();
     for (const item of queue.splice(0)) item.reject(terminal);
     for (const batch of active) for (const item of batch) item.reject(terminal);
@@ -325,34 +344,50 @@ export function createPairReadRpc(
       method: item.method,
       params: item.params,
     }));
-    const response = await cancellable(
-      fetcher(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        redirect: 'manual',
-        cache: 'no-store',
+    let response: Response;
+    try {
+      response = await cancellable(
+        fetcher(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          redirect: 'manual',
+          cache: 'no-store',
+          signal,
+          body: JSON.stringify(batch.length === 1 ? messages[0] : messages),
+        }).then((response) => {
+          if (signal.aborted) void response.body?.cancel().catch(() => {});
+          return response;
+        }),
         signal,
-        body: JSON.stringify(batch.length === 1 ? messages[0] : messages),
-      }).then((response) => {
-        if (signal.aborted) void response.body?.cancel().catch(() => {});
-        return response;
-      }),
-      signal,
-    );
+      );
+    } catch (error) {
+      if (signal.aborted) throw error;
+      throw new PairRpcDiagnosticError('transport');
+    }
     if (!response.ok) {
       void response.body?.cancel().catch(() => {});
       throw new WalletRpcError(response.status);
     }
-    const parsed = parseBalanceJson(
-      await boundedBody(
-        response,
-        Math.min(...batch.map((item) => item.maxBytes)),
-        signal,
-      ),
-    );
+    let parsed: unknown;
+    try {
+      parsed = parseBalanceJson(
+        await boundedBody(
+          response,
+          Math.min(...batch.map((item) => item.maxBytes)),
+          signal,
+        ),
+      );
+    } catch (error) {
+      if (signal.aborted || error instanceof PairRpcDiagnosticError)
+        throw error;
+      throw new PairRpcDiagnosticError('body-invalid');
+    }
+    // A provider may report rate limits in a 200 envelope, including an error
+    // with no usable ID. Stop the circuit before interpreting any members.
+    if (hasWalletRpcRateLimit(parsed)) throw new WalletRpcJsonRateLimitError();
     const replies = batch.length === 1 ? [parsed] : parsed;
     if (!Array.isArray(replies) || replies.length !== batch.length)
-      throw Error('Pair RPC response mapping differs.');
+      throw new PairRpcDiagnosticError('mapping');
     const results = new Map<string, unknown>();
     for (const [index, raw] of replies.entries()) {
       const reply = raw as {
@@ -368,10 +403,12 @@ export function createPairReadRpc(
         reply.id !== batch[index].id ||
         !batch.some((item) => item.id === reply.id) ||
         results.has(reply.id) ||
-        reply.error ||
         reply.result === undefined
       )
-        throw Error('Pair RPC response mapping differs.');
+        throw new PairRpcDiagnosticError(
+          reply?.error ? 'rpc-error' : 'mapping',
+        );
+      if (reply.error) throw new PairRpcDiagnosticError('rpc-error');
       const item = batch[index];
       const config = item.params[
         ['getSlot', 'getBlockHeight'].includes(item.method) ? 0 : 1
@@ -398,7 +435,7 @@ export function createPairReadRpc(
           Number(rawSlot) < config.minContextSlot ||
           Number(rawSlot) > config.minContextSlot + 32
         )
-          throw Error('Pair RPC response context differs.');
+          throw new PairRpcDiagnosticError('context');
       }
       results.set(reply.id, reply.result);
     }
@@ -420,7 +457,7 @@ export function createPairReadRpc(
           )
             rawBytes += Buffer.byteLength(data[0], 'base64');
           if (rawBytes > 1024 * 1024)
-            throw Error('Pair RPC raw response exceeds bounds.');
+            throw new PairRpcDiagnosticError('byte-limit');
         }
       }
     }

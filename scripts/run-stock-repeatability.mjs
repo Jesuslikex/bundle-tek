@@ -12,7 +12,7 @@ export async function runStockRepeatability(attempt) {
     for (const asset of ['SOL', 'USDC']) {
       const result = await attempt({ round, asset });
       results.push(result);
-      if (result.http429 > 0)
+      if (result.http429 > 0 || result.rpcRateLimited === true)
         return { complete: false, stoppedForRateLimit: true, results };
     }
   }
@@ -99,7 +99,8 @@ if (
             receipt.signatures !== 0 ||
             receipt.broadcasts !== 0 ||
             !Number.isInteger(receipt.http429) ||
-            receipt.http429 < 0
+            receipt.http429 < 0 ||
+            typeof receipt.rpcRateLimited !== 'boolean'
           )
             throw Error();
           accept({
@@ -108,6 +109,7 @@ if (
             receipt: row.receipt,
             passed: receipt.passed,
             http429: receipt.http429,
+            rpcRateLimited: receipt.rpcRateLimited,
           });
         } catch {
           reject(

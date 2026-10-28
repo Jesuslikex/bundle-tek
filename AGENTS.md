@@ -35,6 +35,14 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 COMPLETE, claim released: stock JSON-RPC 429 stop, bounded refusal diagnostics and source identity. See docs/CODEX-STOCK-RPC-429-20261028.md. Fixed six-attempt Alchemy sample: SOL 2/3, USDC 2/3; remaining two correctly refused the original minimum. No signing qualification, deploy or funded action.
+
+- Codex + helper, 28 October 2026 COMPLETE, claim released: pair-only Metis routing in 3b23338. See docs/CODEX-STOCK-ALCHEMY-ROUTING-20261028.md. Ordinary warmup DFlow and all minimum/signing checks are unchanged; live repeatability remains open.
+
+- Codex + helpers, 28 October 2026 COMPLETE, claim released: opt-in native fee-first and Helius diagnostics, commits 3646d93 and a91e91f. See docs/CODEX-JITO-PREFEE-EXPERIMENT-20261028.md and docs/CODEX-JITO-HELIUS-NATIVE-20261028.md. Native Helius 2/3 with one bank mismatch; Alchemy 0/3. No full swap qualification or signing authority.
+
+- Codex + helpers, 28 October 2026 COMPLETE, claim released: guarded rolling RPC accounting and public fallback in 2ad9b88. Existing pacing budgets remain; no endpoint or authority change.
+
 - Codex + helpers, 28 October 2026 COMPLETE, claim released: stock-only bounded sliding code-read window and invocation-local Jito diagnostic stages. Read docs/CODEX-STOCK-JITO-REPEATABILITY-20261028.md for exact paths and evidence. Fixed unsigned SOL sample refused at 41 slots; USDC then hit 429 and the campaign stopped. Three native Jito samples refused mismatched fee banks. Full qualification and signing remain open, not successful. No deployment, provider settings, hosted SQL, wallet signing or funded trades. Original checkout and unrelated agent files preserved.
 
 - Codex + helpers, 28 October 2026 COMPLETE, claim released: stock quote/order latency and Jito exact-bank guard repair. See docs/CODEX-STOCK-JITO-CHECKPOINT-20261028.md. One unsigned USDC sample passed the early minimum guard but failed the unchanged 32-slot window at 42 slots; this is not qualification. The Jito mixed-fee-bank regression is closed with offline tests; full live qualification remains open. No signing, funded trades, deployment or provider settings changes. Original checkout and unrelated work untouched.

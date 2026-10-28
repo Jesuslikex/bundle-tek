@@ -83,6 +83,9 @@ export function summarizeStockRepeatability(receipts) {
       !Array.isArray(r.requests) ||
       !Array.isArray(r.logicalReads) ||
       !Number.isInteger(r.http429) ||
+      (r.rpcRateLimited !== undefined &&
+        typeof r.rpcRateLimited !== 'boolean') ||
+      (r.rpcRateLimited === true && r.rateLimited === false) ||
       r.http429 !== r.requests.filter((x) => x.status === 429).length
     )
       throw Error(
@@ -188,6 +191,7 @@ export function summarizeStockRepeatability(receipts) {
         r.runtime.signingAllowed !== false ||
         r.runtime.executionAllowed !== false ||
         r.http429 !== 0 ||
+        r.rpcRateLimited === true ||
         r.requests.some((x) => x.status !== 200))
     )
       throw Error(
@@ -262,6 +266,9 @@ export function summarizeStockRepeatability(receipts) {
       firstCodeReads: r.firstCodeReads,
       finalCodeReads: r.finalCodeReads,
       http429: r.http429,
+      ...(r.rpcRateLimited === undefined
+        ? {}
+        : { rpcRateLimited: r.rpcRateLimited }),
       maximumRollingRpcMethods: r.maximumRollingRpcMethods,
       phases,
     };

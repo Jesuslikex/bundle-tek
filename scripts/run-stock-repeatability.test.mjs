@@ -34,6 +34,20 @@ test('stops the entire campaign on a rate limit without another asset, retry or 
   assert.equal(result.stoppedForRateLimit, true);
   assert.equal(result.results.length, 2);
 });
+test('stops the fixed campaign on a parsed RPC 429 with HTTP 200', async () => {
+  const calls = [];
+  const result = await runStockRepeatability(async (input) => {
+    calls.push(input);
+    return { passed: false, http429: 0, rpcRateLimited: calls.length === 2 };
+  });
+  assert.deepEqual(calls, [
+    { round: 1, asset: 'SOL' },
+    { round: 1, asset: 'USDC' },
+  ]);
+  assert.equal(result.complete, false);
+  assert.equal(result.stoppedForRateLimit, true);
+  assert.equal(result.results.length, 2);
+});
 test('keeps ordinary refusals in a fixed alternating six-attempt denominator', async () => {
   const result = await runStockRepeatability(async (input) => ({
     ...input,

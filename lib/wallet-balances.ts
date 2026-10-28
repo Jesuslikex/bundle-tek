@@ -48,6 +48,25 @@ export class WalletRpcError extends Error {
     super('Balance provider unavailable.');
   }
 }
+/** Only the fixed code is retained; provider message/data and IDs stay private. */
+export class WalletRpcJsonRateLimitError extends WalletRpcError {
+  readonly rpcRateLimited = true;
+  constructor() {
+    super(429);
+  }
+}
+export function hasWalletRpcRateLimit(value: unknown): boolean {
+  const replies = Array.isArray(value) ? value : [value];
+  return replies.some((reply) => {
+    if (!reply || typeof reply !== 'object' || Array.isArray(reply))
+      return false;
+    const error = (reply as { error?: unknown }).error;
+    if (!error || typeof error !== 'object' || Array.isArray(error))
+      return false;
+    const code = (error as { code?: unknown }).code;
+    return code === 429 || code === '429';
+  });
+}
 export async function balanceRpc(
   endpoint: string,
   method: string,
@@ -100,6 +119,7 @@ export async function balanceRpc(
       result?: unknown;
       error?: unknown;
     };
+    if (hasWalletRpcRateLimit(result)) throw new WalletRpcJsonRateLimitError();
     // A JSON-RPC level error is usually the provider throttling a burst; retry
     // briefly before surfacing it as an invalid response.
     if (result && result.jsonrpc === '2.0' && result.error && attempt < 2) {
