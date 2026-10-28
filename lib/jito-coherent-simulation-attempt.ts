@@ -389,6 +389,8 @@ export async function collectJitoCoherentSimulationAttempt(input: {
   } catch (error) {
     // The reason alone says nothing about which step threw; keep the message.
     // These are our own refusal strings, not provider bodies.
+    if (process.env.JITO_DEBUG)
+      console.log('ERR', error instanceof Error ? error.message : 'unknown');
     const detail =
       error instanceof Error ? error.message.slice(0, 300) : 'unknown';
     return {

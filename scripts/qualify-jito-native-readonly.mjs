@@ -244,7 +244,11 @@ export async function runNativeJitoCampaign({
       if (response.status === 429) rateLimited = true;
       if (!response.ok) {
         cancel(response);
-        throw failure(rateLimited ? 'rate-limited' : 'http-refused');
+        throw failure(
+          (rateLimited ? 'rate-limited' : 'http-refused') +
+            ' status ' +
+            response.status,
+        );
       }
       return { response, read };
     }

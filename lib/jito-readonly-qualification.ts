@@ -43,7 +43,12 @@ const authority = {
 // The reason alone hides which step and which status; carry the detail when the
 // refusal has one.
 const refusedDetail = (refused: { reason: string; detail?: string }) =>
-  Error(refused.detail ? refused.reason + ': ' + refused.detail : refused.reason);
+  Error(
+    refused.reason +
+      ' at ' +
+      stage +
+      (refused.detail ? ': ' + refused.detail : ''),
+  );
 // Which stage refused. Module scope so fail() can name it; the campaign is
 // sequential, so one shared value is enough.
 let stage = 'setup';

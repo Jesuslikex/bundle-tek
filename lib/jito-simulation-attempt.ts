@@ -245,14 +245,18 @@ export async function collectJitoSimulationAttempt(input: {
       sentSimulationBody,
       ...authority,
     };
-  } catch {
-    return refuse(
-      deadline.aborted
-        ? 'interrupted'
-        : planReady
-          ? 'transport-unavailable'
-          : 'plan-refused',
-    );
+  } catch (error) {
+    // Same as the coherent attempt: keep which step threw, not just the reason.
+    return {
+      ...refuse(
+        deadline.aborted
+          ? 'interrupted'
+          : planReady
+            ? 'transport-unavailable'
+            : 'plan-refused',
+      ),
+      detail: error instanceof Error ? error.message.slice(0, 300) : 'unknown',
+    };
   } finally {
     owner.abort();
     // Readers normally drain/cancel their own acquired bodies. Also close a
