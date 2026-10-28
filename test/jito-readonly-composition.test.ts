@@ -4,7 +4,10 @@
 import { expect, it, vi } from 'vitest';
 import { jitoRawResponseFixture } from './jito-raw-response-fixture';
 import { captureJitoSwapSimulation } from '../lib/jito-swap-simulation-capture';
-import { collectJitoReadOnlyQualification } from '../lib/jito-readonly-qualification';
+import {
+  collectJitoReadOnlyQualification,
+  collectJitoReadOnlyPrefeeExperiment,
+} from '../lib/jito-readonly-qualification';
 import { SOLANA_MAINNET_GENESIS } from '../lib/wallet-balances';
 import { PAIR_RENT } from '../lib/pair-rent-evidence';
 const doubles = vi.hoisted(() => ({
@@ -141,9 +144,11 @@ async function fixture(
     );
   const capsule = capsules[0];
   const methods: string[] = [];
+  const requests: unknown[] = [];
   let observed = false;
   const fetcher: typeof fetch = async (_url, init) => {
     const r = fixtureBody(init);
+    requests.push(structuredClone(r));
     methods.push(Array.isArray(r) ? 'batch' : r.method);
     if (Array.isArray(r)) {
       observed = true;
@@ -219,7 +224,7 @@ async function fixture(
     runtimeAttested: false,
     fixtureOnly: true,
   });
-  return { f, e, capsule, capsules, fetcher, methods };
+  return { f, e, capsule, capsules, fetcher, methods, requests };
 }
 for (const side of ['Buy', 'Sell'] as const)
   for (const lookup of [false, true])
@@ -252,6 +257,322 @@ for (const side of ['Buy', 'Sell'] as const)
         expect(doubles.check).toHaveBeenCalledTimes(1);
         expect(x.methods.filter((m) => m === 'batch')).toHaveLength(1);
       });
+
+for (const side of ['Buy', 'Sell'] as const)
+  for (const lookup of [false, true])
+    it(`composes the diagnostic prefee ${side} swap with ALT=${lookup} and a declared runtime double`, async () => {
+      const x = await fixture({ side, lookup });
+      const pace = vi.fn(async () => {});
+      const result = await collectJitoReadOnlyPrefeeExperiment(
+        x.e.manifest,
+        [x.capsule],
+        new AbortController().signal,
+        { fetcher: x.fetcher, pace },
+      );
+      expect(result).toMatchObject({
+        status: 'checks-passed',
+        diagnosticProfile: 'prefee-experiment',
+        minimumSlot: 100,
+        rawSimulationChecksPassed: true,
+        readOnlyLocalChecksPassed: true,
+        fullProviderQualification: false,
+        providerQualified: false,
+        sourceCurrent: false,
+        signatureVerified: false,
+        receiptVerified: false,
+        signingAllowed: false,
+        executionAllowed: false,
+        automaticExecutionAllowed: false,
+        runtimePrivilegesVerified: false,
+        runtimeAttested: false,
+      });
+      if (result.status !== 'checks-passed') throw Error('Expected checks');
+      expect(result.runtimeProof).toHaveProperty('fixtureOnly', true);
+      expect(result.economic.frameEconomicChecksPassed).toBe(true);
+      expect(doubles.scans).toHaveBeenCalledTimes(2);
+      expect(doubles.check).toHaveBeenCalledTimes(1);
+      expect(doubles.attempt).not.toHaveBeenCalled();
+      const batch = x.requests.find(Array.isArray) as {
+        id: string;
+        method: string;
+        params: unknown[];
+      }[];
+      expect(batch.map((r) => r.method)).toEqual([
+        'getFeeForMessage',
+        'getFeeForMessage',
+        'simulateBundle',
+      ]);
+      expect(batch.at(-1)!.id).toBe('jito-qualified-exact:discovery');
+      expect(
+        (batch.at(-1)!.params[1] as { simulationBank: unknown }).simulationBank,
+      ).toEqual({
+        commitment: { commitment: 'confirmed' },
+      });
+      const exact = x.requests.find(
+        (r) =>
+          !Array.isArray(r) &&
+          (r as { id?: string }).id === 'jito-qualified-exact',
+      ) as { params: unknown[] };
+      expect(
+        (exact.params[1] as { simulationBank: unknown }).simulationBank,
+      ).toEqual({ slot: 101 });
+      const attempt = result.evidence.attempt;
+      expect(attempt).toMatchObject({
+        status: 'captured',
+        discoverySource: 'derived-batch-member-not-wire-response',
+        feeProjection: { kind: 'derived-member-array-not-wire' },
+        signingAllowed: false,
+        providerQualified: false,
+      });
+      const bundle = result.evidence.transports.find(
+        (t) => t.summary.stage === 'bundle',
+      )!;
+      expect(bundle.summary.httpReads).toBeLessThanOrEqual(12);
+      expect(bundle.summary.methodUnits).toBeLessThanOrEqual(18);
+      expect(bundle.summary.httpReads).toBe(bundle.captures.length);
+      expect(bundle.summary.methodUnits).toBe(
+        bundle.captures.reduce((total, capture) => {
+          const body = JSON.parse(capture.requestBody) as unknown;
+          return total + (Array.isArray(body) ? body.length : 1);
+        }, 0),
+      );
+      expect(pace).toHaveBeenCalledTimes(
+        result.evidence.transports.reduce(
+          (total, t) => total + t.summary.methodUnits,
+          0,
+        ),
+      );
+      expect(result.maximumSlot - result.minimumSlot).toBeLessThanOrEqual(32);
+    });
+
+it('keeps the five-packet prefee batch within the original request budget', async () => {
+  const x = await fixture({ wallets: 4, lookup: true, token2022: true });
+  const pace = vi.fn(async () => {});
+  const result = await collectJitoReadOnlyPrefeeExperiment(
+    x.e.manifest,
+    x.capsules,
+    new AbortController().signal,
+    { fetcher: x.fetcher, pace },
+  );
+  expect(result).toMatchObject({
+    status: 'checks-passed',
+    diagnosticProfile: 'prefee-experiment',
+    fullProviderQualification: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  if (result.status !== 'checks-passed') throw Error('Expected checks');
+  const batch = x.requests.find(Array.isArray) as { method: string }[];
+  expect(batch).toHaveLength(6);
+  expect(batch.filter((row) => row.method === 'getFeeForMessage')).toHaveLength(
+    5,
+  );
+  expect(batch.at(-1)?.method).toBe('simulateBundle');
+  const bundle = result.evidence.transports.find(
+    (t) => t.summary.stage === 'bundle',
+  )!;
+  expect(bundle.summary.httpReads).toBeLessThanOrEqual(12);
+  expect(bundle.summary.methodUnits).toBeLessThanOrEqual(18);
+  expect(pace).toHaveBeenCalledTimes(
+    result.evidence.transports.reduce(
+      (total, t) => total + t.summary.methodUnits,
+      0,
+    ),
+  );
+  expect(doubles.scans).toHaveBeenCalledTimes(2);
+  expect(doubles.check).toHaveBeenCalledOnce();
+});
+
+it('keeps the original qualification entry point on its legacy ordering', async () => {
+  const x = await fixture();
+  const attemptedProfileOverride = {
+    fetcher: x.fetcher,
+    pace: async () => {},
+    profile: 'prefee',
+  };
+  const result = await collectJitoReadOnlyQualification(
+    x.e.manifest,
+    [x.capsule],
+    new AbortController().signal,
+    attemptedProfileOverride,
+  );
+  expect(result.status).toBe('checks-passed');
+  expect(result).not.toHaveProperty('diagnosticProfile');
+  expect(doubles.attempt).toHaveBeenCalledOnce();
+  const beforeBatch = x.requests.findIndex(Array.isArray);
+  const discovery = x.requests.findIndex(
+    (r) =>
+      !Array.isArray(r) &&
+      (r as { id?: string }).id === 'jito-qualified-exact:discovery',
+  );
+  expect(discovery).toBeGreaterThanOrEqual(0);
+  expect(discovery).toBeLessThan(beforeBatch);
+});
+
+for (const fault of [
+  'fee-bank',
+  'reordered',
+  'missing',
+  'duplicate',
+  'wrong-id',
+  'http-429',
+  'rpc-429',
+  'exact-bank',
+  'bank-unavailable',
+  'late-slot',
+] as const)
+  it(`the diagnostic prefee path refuses ${fault} without retry or authority`, async () => {
+    const x = await fixture(
+      { lookup: true },
+      fault === 'late-slot' ? 'late-slot' : 'none',
+    );
+    const qualificationCalls: { method?: string; batch?: string[] }[] = [];
+    const fetcher: typeof fetch = async (url, init) => {
+      const request = fixtureBody(init);
+      if (Array.isArray(request)) {
+        qualificationCalls.push({ batch: request.map((r) => r.method) });
+        if (fault === 'http-429') return new Response(null, { status: 429 });
+        if (
+          [
+            'fee-bank',
+            'reordered',
+            'missing',
+            'duplicate',
+            'wrong-id',
+            'rpc-429',
+          ].includes(fault)
+        ) {
+          let rows: Record<string, unknown>[] = request.map((r) =>
+            r.method === 'getFeeForMessage'
+              ? {
+                  jsonrpc: '2.0',
+                  id: r.id,
+                  result: {
+                    context: { slot: fault === 'fee-bank' ? 102n : 101n },
+                    value: 5000n,
+                  },
+                }
+              : { ...x.f.envelope, id: r.id },
+          );
+          if (fault === 'reordered') rows = rows.reverse();
+          if (fault === 'missing') rows = rows.slice(0, -1);
+          if (fault === 'duplicate') rows[1] = { ...rows[1], id: rows[0].id };
+          if (fault === 'wrong-id') rows[0] = { ...rows[0], id: 'unexpected' };
+          if (fault === 'rpc-429')
+            rows[0] = {
+              jsonrpc: '2.0',
+              id: rows[0].id,
+              error: { code: 429n, message: 'limited' },
+            };
+          return new Response(x.f.wire(rows));
+        }
+      } else {
+        qualificationCalls.push({ method: request.method });
+        if (request.id === 'jito-qualified-exact') {
+          if (fault === 'bank-unavailable')
+            return new Response(
+              x.f.wire({
+                jsonrpc: '2.0',
+                id: request.id,
+                error: {
+                  code: -32602n,
+                  message: 'bank not found for the provided slot: 101',
+                },
+              }),
+            );
+          if (fault === 'exact-bank')
+            return new Response(
+              x.f.wire({
+                ...x.f.envelope,
+                id: request.id,
+                result: { ...x.f.envelope.result, context: { slot: 102n } },
+              }),
+            );
+        }
+      }
+      return x.fetcher(url, init);
+    };
+    const result = await collectJitoReadOnlyPrefeeExperiment(
+      x.e.manifest,
+      [x.capsule],
+      new AbortController().signal,
+      { fetcher, pace: async () => {} },
+    );
+    expect(result).toMatchObject({
+      status: 'refused',
+      diagnosticProfile: 'prefee-experiment',
+      minimumSlot: 100,
+      readOnlyLocalChecksPassed: false,
+      fullProviderQualification: false,
+      signingAllowed: false,
+      executionAllowed: false,
+      automaticExecutionAllowed: false,
+      providerQualified: false,
+      sourceCurrent: false,
+      signatureVerified: false,
+      runtimePrivilegesVerified: false,
+      runtimeAttested: false,
+      receiptVerified: false,
+    });
+    expect(qualificationCalls.filter((r) => r.batch)).toHaveLength(1);
+    const exactCalls = qualificationCalls.filter(
+      (r) => r.method === 'simulateBundle',
+    );
+    expect(exactCalls).toHaveLength(
+      ['exact-bank', 'bank-unavailable', 'late-slot'].includes(fault) ? 1 : 0,
+    );
+    const bundle = result.evidence.transports.find(
+      (t) => t.summary.stage === 'bundle',
+    )!;
+    expect(bundle.summary.httpReads).toBeLessThanOrEqual(12);
+    expect(bundle.summary.methodUnits).toBeLessThanOrEqual(18);
+    if (fault === 'http-429' || fault === 'rpc-429')
+      expect(bundle.summary.rateLimited).toBe(true);
+    if (fault !== 'late-slot') expect(doubles.scans).toHaveBeenCalledTimes(1);
+    expect(doubles.check).not.toHaveBeenCalled();
+  });
+
+it('aborts an in-flight exact prefee request without a retry or final scan', async () => {
+  const x = await fixture();
+  const entered = deferred<void>();
+  const owner = new AbortController();
+  let exactCalls = 0;
+  let exactSignal: AbortSignal | undefined;
+  const fetcher: typeof fetch = async (url, init) => {
+    const request = fixtureBody(init);
+    if (!Array.isArray(request) && request.id === 'jito-qualified-exact') {
+      exactCalls++;
+      exactSignal = init?.signal ?? undefined;
+      entered.resolve();
+      return new Promise<Response>((_resolve, reject) => {
+        const stop = () => reject(Error('Synthetic exact request aborted'));
+        if (exactSignal?.aborted) stop();
+        else exactSignal?.addEventListener('abort', stop, { once: true });
+      });
+    }
+    return x.fetcher(url, init);
+  };
+  const pending = collectJitoReadOnlyPrefeeExperiment(
+    x.e.manifest,
+    [x.capsule],
+    owner.signal,
+    { fetcher, pace: async () => {} },
+  );
+  await entered.promise;
+  owner.abort();
+  const result = await pending;
+  expect(result).toMatchObject({
+    status: 'refused',
+    readOnlyLocalChecksPassed: false,
+    fullProviderQualification: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(exactSignal?.aborted).toBe(true);
+  expect(exactCalls).toBe(1);
+  expect(doubles.scans).toHaveBeenCalledOnce();
+  expect(doubles.check).not.toHaveBeenCalled();
+});
 for (const failure of ['rent-change', 'late-slot'])
   it(`refuses ${failure} with no signing clearance or renewed floor`, async () => {
     const x = await fixture({ lookup: true }, failure);

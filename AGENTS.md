@@ -35,6 +35,10 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 ACTIVE: retain exact imported signed Jito recovery packets in the existing memory coordinator so bundle controls cannot mistake them for unsigned, in lib/jito-memory-signature-recovery.ts/.test.ts, components/jito-packet-signing.tsx, components/jito-atomic-bundle.tsx and focused tests. Preserve manual consent, exact owner/context checks and all signing/submit gates; no real wallet action, provider settings or deployment.
+
+- Codex + helper, 28 October 2026 COMPLETE, claim released: explicit diagnostic-only Jito prefee qualification composition. See docs/CODEX-JITO-PREFEE-COMPOSITION-20261028.md. Legacy default and all policy, custody, economic, slot, pacing and authority safeguards stay unchanged; no production caller, provider request, signing or deployment.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: synthetic Jito qualification/runtime policy-refusal composition test. See docs/CODEX-JITO-RUNTIME-POLICY-COMPOSITION-20261028.md. No provider requests, policy changes, signing or deployment.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: fence native withdrawal history and panel actions to the current signed-in owner. See docs/CODEX-WITHDRAWAL-OWNER-FENCE-20261028.md. Legacy API compatibility and withdrawal approvals remain; no signing, provider, migration or deployment changes.

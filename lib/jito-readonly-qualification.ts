@@ -19,6 +19,7 @@ import {
 } from './jito-runtime-evidence';
 import { createJitoQualificationTransport } from './jito-qualification-transport';
 import { collectJitoCoherentSimulationAttempt } from './jito-coherent-simulation-attempt';
+import { collectJitoCoherentPrefeeAttempt } from './jito-coherent-prefee-attempt';
 import { buildJitoBundleSimulationRequest } from './jito-bundle-simulation-frames';
 import { verifyJitoBundleEconomicObservation } from './jito-bundle-economics';
 import {
@@ -46,11 +47,50 @@ const authority = {
  * authority is created. Existing UI/HTTP signing diagnostics are unchanged.
  * Independent bounded asset/runtime stages ADD work; they do not increase the
  * existing bundle transport's 12HTTP/18method limit. Every stage shares F..F+32. */
+type QualificationDependencies = {
+  fetcher?: typeof fetch;
+  pace?: typeof paceWalletRpc;
+};
+
 export async function collectJitoReadOnlyQualification(
   manifestInput: JitoBundleManifest,
   capsulesInput: JitoSwapSimulationCapture[],
   signal: AbortSignal,
-  dependencies: { fetcher?: typeof fetch; pace?: typeof paceWalletRpc } = {},
+  dependencies: QualificationDependencies = {},
+) {
+  return collectQualification(
+    manifestInput,
+    capsulesInput,
+    signal,
+    dependencies,
+    'legacy',
+  );
+}
+
+/** Explicit server-only research entry point. No app route or environment
+ * setting selects this profile, and it never grants provider or signing authority. */
+export async function collectJitoReadOnlyPrefeeExperiment(
+  manifestInput: JitoBundleManifest,
+  capsulesInput: JitoSwapSimulationCapture[],
+  signal: AbortSignal,
+  dependencies: QualificationDependencies = {},
+) {
+  const result = await collectQualification(
+    manifestInput,
+    capsulesInput,
+    signal,
+    dependencies,
+    'prefee',
+  );
+  return { ...result, diagnosticProfile: 'prefee-experiment' as const };
+}
+
+async function collectQualification(
+  manifestInput: JitoBundleManifest,
+  capsulesInput: JitoSwapSimulationCapture[],
+  signal: AbortSignal,
+  dependencies: QualificationDependencies,
+  profile: 'legacy' | 'prefee',
 ) {
   // Each invocation owns its diagnostics, including when campaigns overlap.
   let stage = 'setup';
@@ -183,9 +223,10 @@ export async function collectJitoReadOnlyQualification(
     > | null = null,
     afterCode: Awaited<ReturnType<typeof collectJitoRuntimeEvidence>> | null =
       null;
-  let attempt: Awaited<
-    ReturnType<typeof collectJitoCoherentSimulationAttempt>
-  > | null = null;
+  let attempt:
+    | Awaited<ReturnType<typeof collectJitoCoherentSimulationAttempt>>
+    | Awaited<ReturnType<typeof collectJitoCoherentPrefeeAttempt>>
+    | null = null;
   const evidence = (terminal: 'finish' | 'refused') => {
     mark('collector', terminal);
     const timing = snapshotJitoEvidence({
@@ -363,7 +404,11 @@ export async function collectJitoReadOnlyQualification(
     floor();
     stage = 'exact-simulation';
     mark('exact-simulation', 'begin');
-    attempt = await collectJitoCoherentSimulationAttempt({
+    const runAttempt =
+      profile === 'prefee'
+        ? collectJitoCoherentPrefeeAttempt
+        : collectJitoCoherentSimulationAttempt;
+    attempt = await runAttempt({
       packets,
       minimumSlot,
       minimumReadSlot: floor(),
