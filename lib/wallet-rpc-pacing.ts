@@ -6,7 +6,7 @@ const PUBLIC_HOSTS = new Set([
   'api.mainnet-beta.solana.com',
   'solana-rpc.publicnode.com',
 ]);
-export const PUBLIC_QUALIFICATION_METHOD_BUDGET = 6;
+export const PUBLIC_QUALIFICATION_METHOD_BUDGET = 5;
 /** Rolling methods/second for explicit qualification. Only the configured stock
  * runtime endpoint may raise it via SOLANA_STOCK_RUNTIME_METHODS_PER_SECOND. */
 export function stockQualificationMethodBudget(
