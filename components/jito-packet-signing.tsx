@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
 import { getWallets } from '@wallet-standard/app';
@@ -117,6 +117,53 @@ export function JitoPacketSigning({
       attemptId: string;
       signature: string;
     } | null>(null);
+  const [inputGeneration, setInputGeneration] = useState(0);
+  const inputGenerationNow = useRef(0);
+  const [fieldGeneration, setFieldGeneration] = useState({
+    choice: 0,
+    password: 0,
+    accepted: 0,
+    recoveryPassword: 0,
+    recoveryApproved: 0,
+  });
+  const fieldGenerationNow = useRef(fieldGeneration);
+  const invalidateInput = (...fields: (keyof typeof fieldGeneration)[]) => {
+    inputGenerationNow.current += 1;
+    setInputGeneration(inputGenerationNow.current);
+    const next = { ...fieldGenerationNow.current };
+    for (const field of fields.length
+      ? fields
+      : (Object.keys(next) as (keyof typeof next)[]))
+      next[field]++;
+    fieldGenerationNow.current = next;
+    setFieldGeneration(next);
+  };
+  const actionContextNow = useRef({
+    manifest,
+    packet,
+    ownerScope,
+    coordinator,
+    isContextCurrent,
+  });
+  useLayoutEffect(() => {
+    actionContextNow.current = {
+      manifest,
+      packet,
+      ownerScope,
+      coordinator,
+      isContextCurrent,
+    };
+  }, [manifest, packet, ownerScope, coordinator, isContextCurrent]);
+  const disabledNow = useRef(disabled),
+    recoveryDisabledNow = useRef(recoveryDisabled),
+    recoveryOnlyNow = useRef(recoveryOnly),
+    pendingNow = useRef(pending);
+  useLayoutEffect(() => {
+    disabledNow.current = disabled;
+    recoveryDisabledNow.current = recoveryDisabled;
+    recoveryOnlyNow.current = recoveryOnly;
+    pendingNow.current = pending;
+  }, [disabled, recoveryDisabled, recoveryOnly, pending]);
   const swap = manifest.swaps[packet],
     wallet = swap?.wallet ?? manifest.tip.wallet;
   const label = swap ? `swap ${packet + 1}` : 'Jito tip';
@@ -147,9 +194,26 @@ export function JitoPacketSigning({
       removeUnregister();
     };
   }, [isSwap]);
+  const canChange = (recovery: boolean) =>
+    mounted.current &&
+    !running.current &&
+    !coordinator.operationActive() &&
+    isContextCurrent() &&
+    actionContextNow.current.isContextCurrent() &&
+    actionContextNow.current.manifest === manifest &&
+    actionContextNow.current.packet === packet &&
+    actionContextNow.current.ownerScope === ownerScope &&
+    actionContextNow.current.coordinator === coordinator &&
+    (recovery
+      ? !recoveryDisabledNow.current
+      : !disabledNow.current &&
+        !recoveryOnlyNow.current &&
+        !pendingNow.current);
 
   async function sign() {
     if (
+      !canChange(false) ||
+      inputGeneration !== inputGenerationNow.current ||
       recoveryOnly ||
       !accepted ||
       !password ||
@@ -189,6 +253,7 @@ export function JitoPacketSigning({
       choice === 'vault'
         ? null
         : wallets.find((value) => value.name === choice);
+    invalidateInput();
     setPassword('');
     const approvedSwap = approved.swaps[packet];
     const approvedWallet = approvedSwap?.wallet ?? approved.tip.wallet;
@@ -430,7 +495,8 @@ export function JitoPacketSigning({
    * registers, clears, or submits. No entry is evidence of no signing. */
   async function recover(registerApproved: boolean) {
     if (
-      running.current ||
+      !canChange(true) ||
+      inputGeneration !== inputGenerationNow.current ||
       recoveryDisabled ||
       !ownerScope ||
       !recoveryPassword ||
@@ -450,6 +516,7 @@ export function JitoPacketSigning({
     }
     const expectedView = recoveryView;
     const passphrase = recoveryPassword;
+    invalidateInput();
     setRecoveryPassword('');
     setRecoveryApproved(false);
     setError('');
@@ -618,7 +685,8 @@ export function JitoPacketSigning({
    * invalidate evidence, and this path never signs, registers or submits. */
   async function exportRetained() {
     if (
-      running.current ||
+      !canChange(true) ||
+      inputGeneration !== inputGenerationNow.current ||
       recoveryDisabled ||
       !ownerScope ||
       !recoveryPassword ||
@@ -638,6 +706,7 @@ export function JitoPacketSigning({
     }
     const expected = recoveryView,
       passphrase = recoveryPassword;
+    invalidateInput();
     setRecoveryPassword('');
     setRecoveryApproved(false);
     setError('');
@@ -757,14 +826,31 @@ export function JitoPacketSigning({
   }
 
   async function exportRecovery() {
-    if (!pending || running.current) return;
+    const current = () =>
+      mounted.current &&
+      isContextCurrent() &&
+      actionContextNow.current.isContextCurrent() &&
+      actionContextNow.current.ownerScope === ownerScope &&
+      actionContextNow.current.packet === packet &&
+      actionContextNow.current.manifest === manifest &&
+      actionContextNow.current.coordinator === coordinator &&
+      pendingNow.current === pending;
+    if (
+      !pending ||
+      running.current ||
+      coordinator.operationActive() ||
+      !current()
+    )
+      return;
+    const detached = structuredClone(manifest);
+    const terms = JSON.stringify(detached);
     running.current = true;
     setBusy(true);
     setProgress('recovery-exporting');
     setError('');
     try {
-      const record = await createJitoPacketRecovery(manifest, packet, pending);
-      if (!mounted.current) return;
+      const record = await createJitoPacketRecovery(detached, packet, pending);
+      if (!current() || JSON.stringify(manifest) !== terms) return;
       const url = URL.createObjectURL(
         new Blob([JSON.stringify(record, null, 2)], {
           type: 'application/json',
@@ -772,7 +858,7 @@ export function JitoPacketSigning({
       );
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `bundle-${manifest.id}-packet-${packet + 1}-recovery.json`;
+      anchor.download = `bundle-${detached.id}-packet-${packet + 1}-recovery.json`;
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
@@ -834,6 +920,12 @@ export function JitoPacketSigning({
             value={choice}
             disabled={busy || disabled || Boolean(pending)}
             onChange={(event) => {
+              if (
+                !canChange(false) ||
+                fieldGeneration.choice !== fieldGenerationNow.current.choice
+              )
+                return;
+              invalidateInput('choice', 'accepted');
               setChoice(event.target.value);
               setAccepted(false);
             }}
@@ -854,14 +946,32 @@ export function JitoPacketSigning({
             autoComplete="off"
             value={password}
             disabled={busy || disabled || Boolean(pending)}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              if (
+                canChange(false) &&
+                fieldGeneration.password === fieldGenerationNow.current.password
+              ) {
+                invalidateInput('password', 'accepted');
+                setAccepted(false);
+                setPassword(e.target.value);
+              }
+            }}
           />
           <label className="flex items-start gap-2">
             <input
               type="checkbox"
               checked={accepted}
               disabled={busy || disabled || Boolean(pending)}
-              onChange={(e) => setAccepted(e.target.checked)}
+              onChange={(e) => {
+                if (
+                  canChange(false) &&
+                  fieldGeneration.accepted ===
+                    fieldGenerationNow.current.accepted
+                ) {
+                  invalidateInput('accepted');
+                  setAccepted(e.target.checked);
+                }
+              }}
             />
             <span className="min-w-0 flex-1 break-words">
               I approve signing {label} in bundle {manifest.id}, with the
@@ -921,6 +1031,13 @@ export function JitoPacketSigning({
           value={recoveryPassword}
           disabled={busy || recoveryDisabled}
           onChange={(event) => {
+            if (
+              !canChange(true) ||
+              fieldGeneration.recoveryPassword !==
+                fieldGenerationNow.current.recoveryPassword
+            )
+              return;
+            invalidateInput('recoveryPassword', 'recoveryApproved');
             setRecoveryPassword(event.target.value);
             setRecoveryApproved(false);
           }}
@@ -957,7 +1074,16 @@ export function JitoPacketSigning({
                 type="checkbox"
                 checked={recoveryApproved}
                 disabled={busy || recoveryDisabled}
-                onChange={(event) => setRecoveryApproved(event.target.checked)}
+                onChange={(event) => {
+                  if (
+                    canChange(true) &&
+                    fieldGeneration.recoveryApproved ===
+                      fieldGenerationNow.current.recoveryApproved
+                  ) {
+                    invalidateInput('recoveryApproved');
+                    setRecoveryApproved(event.target.checked);
+                  }
+                }}
               />
               I approve registering only this exact retained {label} packet or
               acknowledging its matching receipt. This does not sign or submit.

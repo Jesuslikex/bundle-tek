@@ -1,37 +1,17 @@
 # Jito v2 remount coverage inventory, 28 October 2026
 
-This is a conservative mapping of the 65 expanded cases collected from `components/jito-packet-signing-remount.test.tsx`. Numbering is the exact collection order from `vitest list`. Listing tests does not run them. No existing tests were skipped, deleted, or replaced to produce this inventory. The existing remount suite is not claimed to pass against the current v2 UI. Earlier passing v2 evidence is listed below; re-run it against the final frozen source.
+The migrated `components/jito-packet-signing-remount.test.tsx` suite now passes all 65 expanded cases. On the unchanged source used for final verification, the combined Jito run passed 222 tests, including those 65. The original numbered inventory below is retained verbatim as a historical mapping of the previous 65 collected case names, not a claim that every current test keeps its former wording or old behavior.
 
-- **A: Passing equivalent (32).** A v2 test or a combination of separately passing UI and database checks addresses the same essential safety behavior. This does not imply identical end-to-end coverage.
-- **B: Recovery-file coverage needed (23).** Preserve the original scenario when migrating it to the v2 file flow. Recent bundles have an authenticated per-packet recovery-file panel, and the new locator opens an older bundle separately from the 20-item history. Some terminal component or journal primitives have partial isolated coverage.
-- **C: Intentionally changed behavior (6).** Replace the unsafe or superseded expectation with the stated v2 behavior while preserving its safety purpose.
-- **D: Other v2 coverage needed (4).** Lower-level checks may exist, but the specified parent/remount scenario is not yet established by the inspected v2 tests.
+The earlier A/B/C/D markers record the original inventory's classifications, not remaining work counts. Cases that were marked B or D have since been migrated and executed. No case was silently dropped to obtain the 65-case run. Migration updated fixtures and assertions to the v2 contract, including deliberate changes below.
 
-## Already covered or deliberately changed
+- **Expired evidence (historical cases 35 and 55):** exact already-signed evidence can be registered after expiry only after separate explicit approval, or privately exported. Neither action enables signing or submission.
+- **Disappearing external wallet account (38):** a returned exact packet is retained, but registration is refused when the expected account is no longer visible; there is no empty-account fallback.
+- **Cancellation while outcome is unknown (58):** the impossible cancellation is refused and the signed evidence is retained. Terminal record inspection/export is separately read-only.
+- **Recovery storage (63):** encrypted local journal recovery replaces the former memory-only expectation. A fresh owner-scoped exact read and explicit consent are required; lost browser storage or password remains a limitation.
+- **Rejected prompt (64):** an explicit rejection does not prove no signature was produced. The durable attempt remains UNKNOWN and is not automatically retried.
+- **Historical cases 15 and 20:** the migrated assertions now test conflicting terminal state while UNKNOWN and preservation of the recovery view during export, respectively. These changed names are intentionally disclosed here.
 
-- **1 and 2:** Synthetic real-parent locator tests open the 21st bundle without evicting the 20 recent records and exercise separately approved exact packet registration. The user currently selects the same recovery file again in the packet panel after locating the bundle.
-- **7 and 18:** Synthetic real-parent locator tests reject an owner change during exact reads and a session revision change during a pending exact read, with no older record or signature published. These do not establish signed-in browser behavior.
-- **11:** `jito-packet-signing-v2` tests acknowledgment of a matching exact server receipt after a lost response without registering again.
-- **10:** `jito-parent-file-v2` verifies a file against an already registered packet and confirms no additional write. The older-bundle locator now opens records separately from recent history.
-- **31:** `jito-parent-file-v2` verifies and retains a packet before offering a separately unchecked approval for exact registration. The old test's additional cross-packet interaction still needs a dedicated integration case.
-- **34:** `jito-parent-file-v2` refuses to retain or register when the authenticated server owner changes while the file read is pending.
-- **33:** The v2 parent test blocks signing and cancellation on an exact UNKNOWN snapshot, while migration tests block submission and release. This is combined UI and database evidence, not one end-to-end test.
-- **36 and 37:** V2 child tests exercise successful external swap and tip registration after durable UNKNOWN and retention.
-- **47:** The v2 child tests retained swap evidence after reload, with fresh snapshot checks and separate unchecked approval.
-- **39–46:** The v2 child tests separately cover signer replacement, signer mutation, account-object replacement and a different account during both swap and tip prompts. Each retains the verified exact packet and refuses registration.
-- **48:** The v2 child tests retained external tip recovery after remount with a fresh read and separate unchecked approval.
-- **56–57:** The v2 child tests retaining vault-signed swap and tip packets when expiry occurs during durable capture, without registration.
-- **59:** The v2 child tests external swap and tip responses arriving after expiry; the exact packet is retained without automatic registration.
-- **60:** The v2 child tests an unresolved external prompt across a remount and verifies that no second prompt or begin occurs.
-- **14, 49–52 and 61:** `jito-parent-races-v2` checks duplicate history identities while preserving a retained packet, owner A→B→A isolation with a fresh A-scoped read, changed server owner and session, session revision change during a held exact read, an aborted short read, and cancellation blocking a wallet prompt. The timeout uses an already-aborted synthetic signal; it does not measure an actual five-second wait. A separate test checks the visible cross-packet and cancellation controls while a prompt is unresolved, but does not invoke a captured stale handler, so **32 remains partial**.
-- **65:** The v2 child tests retaining a packet when the registration response lacks an exact authenticated receipt.
-- **35 and 55:** Expired signed evidence may be registered only through a separate explicit evidence approval; this never enables signing or submission. `jito-parent-file-v2` now tests the file-to-parent path with a synthetic expired packet, separate approval, exact registration, and no swap or tip signer calls.
-- **38:** Empty external accounts after the prompt now retain a verified returned signature and refuse registration rather than accepting the old fallback. A new v2 test covers the swap case; the tip case is also covered.
-- **58:** Cancellation must be blocked while an UNKNOWN attempt exists. Historical terminal inspection is a separate path and remains to be integrated.
-- **63:** Encrypted local recovery replaces memory-only recovery. Browser storage loss, eviction, profile reset, and password loss still limit recovery.
-- **64:** An explicitly rejected wallet prompt does not prove no signature exists; v2 retains UNKNOWN and does not reprompt.
-
-The 36-case v2 child suite passed on the current source and was independently rerun. The mapped cases use synthetic wallet, storage, server, and lock doubles, including component remounts. They are meaningful child-level regressions, not proof of the complete parent flow, actual IndexedDB/Web Locks behavior in a browser, or funded execution. Parent, snapshot, terminal, journal, and SQL tests were run separately during development. The recent-bundle parent/file and older-bundle parent/locator cases use synthetic storage and server doubles. The parent-race suite now has eight synthetic tests; seven were independently rerun before the distinct changed-server-session case was added, and all eight passed in the author's rerun. The full 65-case legacy remount suite is not claimed to pass against the changed v2 contract and is not included in those counts; no old test has been skipped, removed, or replaced as part of this inventory.
+These are synthetic tests using wallet, storage, network, time or Web Lock doubles. They do not establish actual browser IndexedDB/Web Locks behavior, live RPC or Jito behavior, chain settlement, or funded execution. The run is evidence for the tested source at the time of verification, not by itself authorization to deploy or trade.
 
 ## Complete numbered inventory
 
@@ -101,7 +81,8 @@ The 36-case v2 child suite passed on the current source and was independently re
 64. **C** — releases only an explicitly rejected wallet prompt without registering or submitting
 65. **A** — retains the original signature and does not publish a mismatched registration response
 
-## Remaining test work
+## Remaining work and boundaries
 
-Complete the remaining file recovery cases against authenticated exact v2 snapshots, then migrate the B cases with their original ownership, race, and consent assertions. Case 3 still needs its original mutation-during-parser timing; a standalone locator test currently changes the source buffer during the later fetch. Recent-bundle swap and tip file tests verify retention and approval, but cases 28–29 still need their complete retained-on-remount and cancellation assertions in the integrated flow. Implement the D cases, including both swap and tip variants where listed. Update the C cases to assert the new fail-closed semantics; do not silently remove their safety coverage. Re-run the entire migrated suite together, plus the Jito UI, journal, server, and migration suites, before considering release. No deployment, remote migration, wallet signing, or funded test is authorized by this inventory.
+Perform signed-in real-browser verification of the integrated v2 flows, including actual browser storage, owner changes, remounts, Web Locks and timeout behavior. Verify any provider-specific qualification separately without weakening checks. Review rollout for legacy bundles and clients already loaded before a migration: legacy records remain read-only where exact signing state is ambiguous, and a cached older client may already have opened a wallet prompt. Do not infer a no-signature outcome from UNKNOWN or from missing local evidence.
 
+The 222-test combined run is synthetic and does not prove live Jito delivery, finalized on-chain outcomes, successful recovery from every browser-storage loss, or a funded end-to-end launch. Any remote migration, production deployment, real signing, submission or funded test requires its own authorized release and verification process. Preserve the existing consent and fail-closed safeguards.

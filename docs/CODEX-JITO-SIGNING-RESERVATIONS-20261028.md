@@ -64,10 +64,12 @@ The draft browser wiring supports the browser vault and external wallets that
 publish a verifiable current account. It holds the owner lock around signing
 and exact recovery, and keeps a separate unchecked evidence approval. Synthetic
 tests cover remounts and external account changes; real browser extension and
-provider behavior remain unverified. The existing 65-case legacy remount suite
-still fails against the v2 contract and has not been skipped, deleted or
-replaced. See `CODEX-JITO-V2-remount-inventory-20261028.md` for remaining
-coverage. This branch must not be merged or deployed as a completed flow.
+provider behavior remain unverified. The existing 65-case remount suite has
+been migrated to v2 without skipping or deleting tests. All 65 passed within a
+222-test combined synthetic run whose source hashes were unchanged. See
+`CODEX-JITO-V2-remount-inventory-20261028.md` for intentionally changed
+expectations and remaining limitations. This branch must not be merged or
+deployed as a completed flow before whole-project, browser and rollout checks.
 
 The signing panel now distinguishes preparation before a signature is
 requested, the wallet response, local retention and registration, and its
@@ -80,6 +82,11 @@ Its 17 synthetic tests cover the owner lock, stale context and terminal state;
 it is connected to the parent in the draft but has not been checked as a real
 browser download. Missing historical receipts are not treated as proof of
 finality; an expired label alone is not proof that a packet did not land.
+
+Signing, recovery and submission controls also reject stale callbacks and
+revoked or replaced consent. Changing a signing password clears its approval.
+The server, journal and exact owned receipt checks remain authoritative; these
+UI guards do not prove that an unknown wallet outcome was unsigned.
 
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,

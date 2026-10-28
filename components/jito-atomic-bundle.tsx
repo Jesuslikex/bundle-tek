@@ -172,7 +172,11 @@ function JitoAtomicBundleForContext({
     [entries, setEntries] = useState<number[]>([]),
     [tip, setTip] = useState('1000'),
     [bundles, setBundles] = useState<JitoBundleRecord[]>([]),
-    [acceptedSubmit, setAcceptedSubmit] = useState<string | null>(null),
+    [acceptedSubmit, setAcceptedSubmit] = useState<{
+      id: string;
+      digest: string;
+      snapshot: JitoV2Snapshot;
+    } | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [now, setNow] = useState(() => Date.now()),
@@ -198,6 +202,24 @@ function JitoAtomicBundleForContext({
       snapshot: JitoV2Snapshot | null;
     } | null>(null);
   const isContextCurrent = useCallback(() => mounted.current, []);
+  const actionRenderToken = {};
+  const latestActionRender = useRef<object | null>(null);
+  useLayoutEffect(() => {
+    latestActionRender.current = actionRenderToken;
+    return () => {
+      if (latestActionRender.current === actionRenderToken)
+        latestActionRender.current = null;
+    };
+  });
+  const actionIsCurrent = () =>
+    mounted.current &&
+    isContextCurrent() &&
+    !running.current &&
+    !coordinator.operationActive() &&
+    latestActionRender.current === actionRenderToken;
+  const consumeActionRender = () => {
+    latestActionRender.current = null;
+  };
   const invalidatePendingSnapshots = useCallback(() => {
     snapshotEpoch.current++;
   }, []);
@@ -993,9 +1015,15 @@ function JitoAtomicBundleForContext({
             .map((item) => (
               <Button
                 key={`${item.bundleId}:${item.packet}`}
-                disabled={busy}
+                disabled={
+                  busy || !historyVerified || coordinator.operationActive()
+                }
                 variant="outline"
-                onClick={() => void loadOriginal(item.bundleId)}
+                onClick={() => {
+                  if (!actionIsCurrent() || busy || !historyVerified) return;
+                  consumeActionRender();
+                  void loadOriginal(item.bundleId);
+                }}
               >
                 Load original bundle {item.bundleId}, packet {item.packet + 1}
               </Button>
@@ -1010,13 +1038,22 @@ function JitoAtomicBundleForContext({
                 locked ||
                 (!entries.includes(e.entry) && entries.length >= 4)
               }
-              onChange={(event) =>
+              onChange={(event) => {
+                if (
+                  !actionIsCurrent() ||
+                  busy ||
+                  locked ||
+                  (!entries.includes(e.entry) && entries.length >= 4)
+                )
+                  return;
+                consumeActionRender();
+                const checked = event.target.checked;
                 setEntries((prior) =>
-                  event.target.checked
+                  checked
                     ? [...prior, e.entry]
                     : prior.filter((n) => n !== e.entry),
-                )
-              }
+                );
+              }}
             />
             <span className="min-w-0 flex-1 break-words">
               Session entry {e.entry}: {e.wallet}, {e.amount}{' '}
@@ -1034,13 +1071,22 @@ function JitoAtomicBundleForContext({
                 locked ||
                 (!selected.includes(r.id) && selected.length >= 4)
               }
-              onChange={(e) =>
+              onChange={(e) => {
+                if (
+                  !actionIsCurrent() ||
+                  busy ||
+                  locked ||
+                  (!selected.includes(r.id) && selected.length >= 4)
+                )
+                  return;
+                consumeActionRender();
+                const checked = e.target.checked;
                 setSelected((prior) =>
-                  e.target.checked
+                  checked
                     ? [...prior, r.id]
                     : prior.filter((id) => id !== r.id),
-                )
-              }
+                );
+              }}
             />
             <span className="min-w-0 flex-1 break-words">
               Entry {r.session!.entry}: {r.wallet}. Input {r.inputRaw} atomic
@@ -1057,7 +1103,11 @@ function JitoAtomicBundleForContext({
           inputMode="numeric"
           value={tip}
           disabled={busy || locked}
-          onChange={(e) => setTip(e.target.value)}
+          onChange={(e) => {
+            if (!actionIsCurrent() || busy || locked) return;
+            consumeActionRender();
+            setTip(e.target.value);
+          }}
         />
         <Button
           disabled={
@@ -1068,7 +1118,17 @@ function JitoAtomicBundleForContext({
             session.state !== 'active' ||
             !entries.length
           }
-          onClick={() =>
+          onClick={() => {
+            if (
+              !actionIsCurrent() ||
+              busy ||
+              sessionSnapshotBlocked ||
+              locked ||
+              session.state !== 'active' ||
+              !entries.length
+            )
+              return;
+            consumeActionRender();
             run({
               action: 'prepare',
               projectId,
@@ -1076,8 +1136,8 @@ function JitoAtomicBundleForContext({
               sessionRevision: session.revision,
               entries,
               tipLamports: tip,
-            })
-          }
+            });
+          }}
         >
           Prepare and review selected Jito swaps
         </Button>
@@ -1091,6 +1151,16 @@ function JitoAtomicBundleForContext({
             !selected.length
           }
           onClick={() => {
+            if (
+              !actionIsCurrent() ||
+              busy ||
+              sessionSnapshotBlocked ||
+              locked ||
+              session.state !== 'active' ||
+              !selected.length
+            )
+              return;
+            consumeActionRender();
             try {
               jitoIntentSelection(selected);
               run({
@@ -1143,6 +1213,24 @@ function JitoAtomicBundleForContext({
               coordinator.has(ownerScope!, m.id, packet),
             ).some(Boolean);
           const canSign = canRegister && !hasPendingPacket && !unresolved;
+          const snapshotStillCurrent = () => {
+            const activeSnapshot = isLocated
+              ? locatedNow.current?.snapshot
+              : snapshotsNow.current[m.id];
+            const activeRecord = isLocated
+              ? locatedNow.current?.record
+              : historyRecordsNow.current.find(
+                  (item) => item.manifest.id === m.id,
+                );
+            return (
+              historyVerifiedNow.current &&
+              activeSnapshot === snapshot &&
+              activeRecord?.manifest.sha256 === m.sha256 &&
+              activeRecord.state === bundle.state &&
+              JSON.stringify(activeRecord.signatures) ===
+                JSON.stringify(bundle.signatures)
+            );
+          };
           const complete = bundle.signatures.every(Boolean);
           let currentObservation: JitoChainObservation | null = null;
           if (chainObservation) {
@@ -1177,7 +1265,17 @@ function JitoAtomicBundleForContext({
                   disabled={
                     busy || !historyVerified || coordinator.operationActive()
                   }
-                  onClick={() => void loadOriginal(m.id)}
+                  onClick={() => {
+                    if (
+                      !actionIsCurrent() ||
+                      busy ||
+                      !historyVerified ||
+                      verified
+                    )
+                      return;
+                    consumeActionRender();
+                    void loadOriginal(m.id);
+                  }}
                 >
                   Verify bundle details
                 </Button>
@@ -1490,26 +1588,63 @@ function JitoAtomicBundleForContext({
                   <label className="flex items-start gap-2">
                     <input
                       type="checkbox"
-                      checked={acceptedSubmit === m.id}
-                      disabled={!canSign}
-                      onChange={(e) =>
-                        setAcceptedSubmit(e.target.checked ? m.id : null)
+                      checked={
+                        acceptedSubmit?.id === m.id &&
+                        acceptedSubmit.digest === m.sha256 &&
+                        acceptedSubmit.snapshot === snapshot
                       }
+                      disabled={!canSign}
+                      onChange={(e) => {
+                        if (
+                          !actionIsCurrent() ||
+                          !canSign ||
+                          !snapshotStillCurrent() ||
+                          manifestExpired(m)
+                        )
+                          return;
+                        consumeActionRender();
+                        setAcceptedSubmit(
+                          e.target.checked
+                            ? {
+                                id: m.id,
+                                digest: m.sha256,
+                                snapshot: snapshot!,
+                              }
+                            : null,
+                        );
+                      }}
                     />
                     I approve submitting all {bundle.signatures.length} exact
                     signed transactions in this order, including the displayed
                     tip.
                   </label>
                   <Button
-                    disabled={!canSign || acceptedSubmit !== m.id}
-                    onClick={() =>
+                    disabled={
+                      !canSign ||
+                      acceptedSubmit?.id !== m.id ||
+                      acceptedSubmit.digest !== m.sha256 ||
+                      acceptedSubmit.snapshot !== snapshot
+                    }
+                    onClick={() => {
+                      if (
+                        !actionIsCurrent() ||
+                        !canSign ||
+                        acceptedSubmit?.id !== m.id ||
+                        acceptedSubmit.digest !== m.sha256 ||
+                        acceptedSubmit.snapshot !== snapshot ||
+                        !complete ||
+                        !snapshotStillCurrent() ||
+                        manifestExpired(m)
+                      )
+                        return;
+                      consumeActionRender();
                       run({
                         action: 'submit',
                         id: m.id,
                         sha256: m.sha256,
                         approved: true,
-                      })
-                    }
+                      });
+                    }}
                   >
                     Submit complete Jito bundle
                   </Button>
@@ -1527,7 +1662,22 @@ function JitoAtomicBundleForContext({
                       snapshot!.legacyReadOnly
                     }
                     variant="outline"
-                    onClick={() => run({ action: 'recover', id: m.id })}
+                    onClick={() => {
+                      if (
+                        !actionIsCurrent() ||
+                        busy ||
+                        !verified ||
+                        snapshot!.legacyReadOnly ||
+                        !snapshotStillCurrent() ||
+                        !bundle.signatures.some(Boolean) ||
+                        ['finalized', 'cancelled', 'expired'].includes(
+                          bundle.state,
+                        )
+                      )
+                        return;
+                      consumeActionRender();
+                      run({ action: 'recover', id: m.id });
+                    }}
                   >
                     Check chain outcomes
                   </Button>
@@ -1551,7 +1701,22 @@ function JitoAtomicBundleForContext({
                       )
                     }
                     variant="outline"
-                    onClick={() => run({ action: 'cancel', id: m.id })}
+                    onClick={() => {
+                      if (
+                        !actionIsCurrent() ||
+                        busy ||
+                        !verified ||
+                        snapshot!.legacyReadOnly ||
+                        unresolved ||
+                        hasPendingPacket ||
+                        !snapshotStillCurrent() ||
+                        bundle.state !== 'reviewed' ||
+                        bundle.signatures.some(Boolean)
+                      )
+                        return;
+                      consumeActionRender();
+                      run({ action: 'cancel', id: m.id });
+                    }}
                   >
                     Cancel unsigned bundle
                   </Button>

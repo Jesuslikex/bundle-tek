@@ -373,6 +373,50 @@ it('does not publish a late result after account context changes', async () => {
   expect(container.textContent).not.toContain('verified signature');
 });
 
+it('ignores a stale file-change handler while opening a verified bundle', async () => {
+  const f = await setup();
+  await f.choose();
+  await f.wait('verified signature');
+  const input = container.querySelector('input[type=file]') as HTMLInputElement;
+  const key = Object.getOwnPropertyNames(input).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (
+    input as unknown as Record<string, { onChange: (event: unknown) => void }>
+  )[key].onChange;
+  const original = f.fetcher.getMockImplementation()!;
+  let release!: () => void, started!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const began = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  f.fetcher.mockImplementationOnce(async (url, init) => {
+    started();
+    await blocked;
+    return original(url, init);
+  });
+  await f.click();
+  await act(async () => {
+    await began;
+  });
+  await act(async () =>
+    stale({
+      target: {
+        files: [new File(['replacement'], 'replacement.json')],
+        value: 'ignored',
+      },
+    }),
+  );
+  expect(container.textContent).toContain('verified signature');
+  await act(async () => {
+    release();
+  });
+  await vi.waitFor(() => expect(f.opened).toHaveBeenCalledOnce());
+  expect(f.opened.mock.calls[0][0].locator.bundleId).toBe(f.f.manifest.id);
+});
+
 it.each(['initial lookup', 'explicit open'] as const)(
   'never publishes %s when its signal expires during the final async snapshot check',
   async (phase) => {
@@ -464,3 +508,73 @@ it.each(['initial lookup', 'explicit open'] as const)(
       expect(container.textContent).not.toContain('verified signature');
   },
 );
+
+it('does not open a previously verified bundle from a stale click after a replacement file is selected', async () => {
+  const f = await setup();
+  await f.choose();
+  await f.wait('verified signature');
+  const button = [...container.querySelectorAll('button')].find((node) =>
+    node.textContent?.includes('Open original bundle'),
+  )!;
+  const key = Object.getOwnPropertyNames(button).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (button as unknown as Record<string, { onClick: () => void }>)[
+    key
+  ].onClick;
+  await f.choose(new TextEncoder().encode('invalid'));
+  await f.wait('could not be verified');
+  const before = f.fetcher.mock.calls.length;
+  await act(async () => stale());
+  expect(f.opened).not.toHaveBeenCalled();
+  expect(f.fetcher).toHaveBeenCalledTimes(before);
+});
+
+it('ignores a stale file handler after the parent changes the current coordinator', async () => {
+  const f = await setup();
+  await f.choose();
+  await f.wait('verified signature');
+  const input = container.querySelector('input[type=file]') as HTMLInputElement;
+  const key = Object.getOwnPropertyNames(input).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (
+    input as unknown as Record<string, { onChange: (event: unknown) => void }>
+  )[key].onChange;
+  await f.render();
+  await act(async () =>
+    stale({
+      target: {
+        files: [new File(['replacement'], 'replacement.json')],
+        value: 'ignored',
+      },
+    }),
+  );
+  expect(container.textContent).toContain('verified signature');
+});
+
+it('ignores an old file-selection handler after a newer file is verified', async () => {
+  const f = await setup();
+  const input = container.querySelector('input[type=file]') as HTMLInputElement;
+  const key = Object.getOwnPropertyNames(input).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (
+    input as unknown as Record<string, { onChange: (event: unknown) => void }>
+  )[key].onChange;
+  await f.choose();
+  await f.wait('verified signature');
+  const calls = f.fetcher.mock.calls.length;
+  await act(async () =>
+    stale({
+      target: {
+        files: [new File(['replacement'], 'replacement.json')],
+        value: 'ignored',
+      },
+    }),
+  );
+  expect(container.textContent).toContain('verified signature');
+  expect(f.fetcher).toHaveBeenCalledTimes(calls);
+  await f.click();
+  await vi.waitFor(() => expect(f.opened).toHaveBeenCalledOnce());
+});

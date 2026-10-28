@@ -341,6 +341,14 @@ it('opens the older packet panel and requires separate consent before exact evid
   const fileLabel = labels.find(
     (node) => node.textContent === 'Signed packet recovery file',
   )!;
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    const input = document.getElementById(
+      fileLabel.htmlFor,
+    ) as HTMLInputElement;
+    expect(input).toBeTruthy();
+    expect(input.disabled).toBe(false);
+  });
   await f.choose(
     document.getElementById(fileLabel.htmlFor) as HTMLInputElement,
   );

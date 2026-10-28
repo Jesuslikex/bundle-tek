@@ -597,3 +597,26 @@ it('rejects a stale export click after a replacement has been independently veri
   await f.download();
   await vi.waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
 });
+it('rejects an old file-change handler after a newer file has been verified', async () => {
+  const f = await setup();
+  const input = container.querySelector('input[type=file]') as HTMLInputElement;
+  const key = Object.getOwnPropertyNames(input).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (
+    input as unknown as Record<string, { onChange: (event: unknown) => void }>
+  )[key].onChange;
+  await f.choose();
+  await f.wait('Exact signed packet verified');
+  const reads = f.calls.length;
+  await act(async () =>
+    stale({
+      target: { files: [new File(['replacement'], 'old.json')], value: 'old' },
+    }),
+  );
+  expect(container.textContent).toContain('Exact signed packet verified');
+  expect(f.calls).toHaveLength(reads);
+  expect(f.writes).toEqual([]);
+  await f.download();
+  await vi.waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+});

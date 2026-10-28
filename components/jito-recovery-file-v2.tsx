@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { unlockVault, VAULT_STORAGE_KEY } from '@/lib/browser-wallet-vault';
 import {
   requireJitoManifest,
@@ -54,6 +54,26 @@ export function JitoRecoveryFileV2({
   const field = useId(),
     mounted = useRef(true),
     running = useRef(false);
+  const actionContextNow = useRef({
+    manifest,
+    packet,
+    ownerScope,
+    coordinator,
+    isContextCurrent,
+  });
+  useLayoutEffect(() => {
+    actionContextNow.current = {
+      manifest,
+      packet,
+      ownerScope,
+      coordinator,
+      isContextCurrent,
+    };
+  }, [manifest, packet, ownerScope, coordinator, isContextCurrent]);
+  const disabledNow = useRef(disabled);
+  useLayoutEffect(() => {
+    disabledNow.current = disabled;
+  }, [disabled]);
   const [file, setFile] = useState<File | null>(null),
     [password, setPassword] = useState(''),
     [approved, setApproved] = useState(false),
@@ -63,6 +83,25 @@ export function JitoRecoveryFileV2({
     [view, setView] = useState<{ attemptId: string; signature: string } | null>(
       null,
     );
+  const [inputGeneration, setInputGeneration] = useState(0);
+  const inputGenerationNow = useRef(0);
+  const [fieldGeneration, setFieldGeneration] = useState({
+    file: 0,
+    password: 0,
+    approved: 0,
+  });
+  const fieldGenerationNow = useRef(fieldGeneration);
+  const invalidateInput = (...fields: (keyof typeof fieldGeneration)[]) => {
+    inputGenerationNow.current += 1;
+    setInputGeneration(inputGenerationNow.current);
+    const next = { ...fieldGenerationNow.current };
+    for (const field of fields.length
+      ? fields
+      : (Object.keys(next) as (keyof typeof next)[]))
+      next[field]++;
+    fieldGenerationNow.current = next;
+    setFieldGeneration(next);
+  };
   const label = manifest.swaps[packet] ? `swap ${packet + 1}` : 'Jito tip';
   useEffect(() => {
     mounted.current = true;
@@ -70,10 +109,22 @@ export function JitoRecoveryFileV2({
       mounted.current = false;
     };
   }, []);
+  const canChange = () =>
+    mounted.current &&
+    !running.current &&
+    !disabledNow.current &&
+    !coordinator.operationActive() &&
+    isContextCurrent() &&
+    actionContextNow.current.isContextCurrent() &&
+    actionContextNow.current.manifest === manifest &&
+    actionContextNow.current.packet === packet &&
+    actionContextNow.current.ownerScope === ownerScope &&
+    actionContextNow.current.coordinator === coordinator;
 
   async function run(register: boolean) {
     if (
-      running.current ||
+      !canChange() ||
+      inputGeneration !== inputGenerationNow.current ||
       disabled ||
       !ownerScope ||
       !password ||
@@ -94,6 +145,7 @@ export function JitoRecoveryFileV2({
     const chosen = file,
       passphrase = password,
       expected = view;
+    invalidateInput();
     setPassword('');
     setApproved(false);
     setError('');
@@ -378,6 +430,12 @@ export function JitoRecoveryFileV2({
         accept="application/json,.json"
         disabled={busy || disabled}
         onChange={(event) => {
+          if (
+            !canChange() ||
+            fieldGeneration.file !== fieldGenerationNow.current.file
+          )
+            return;
+          invalidateInput('file', 'approved');
           setFile(event.target.files?.[0] ?? null);
           setView(null);
           setApproved(false);
@@ -391,6 +449,12 @@ export function JitoRecoveryFileV2({
         value={password}
         disabled={busy || disabled}
         onChange={(event) => {
+          if (
+            !canChange() ||
+            fieldGeneration.password !== fieldGenerationNow.current.password
+          )
+            return;
+          invalidateInput('password', 'approved');
           setPassword(event.target.value);
           setApproved(false);
         }}
@@ -420,7 +484,16 @@ export function JitoRecoveryFileV2({
               type="checkbox"
               checked={approved}
               disabled={busy || disabled}
-              onChange={(event) => setApproved(event.target.checked)}
+              onChange={(event) => {
+                if (
+                  canChange() &&
+                  fieldGeneration.approved ===
+                    fieldGenerationNow.current.approved
+                ) {
+                  invalidateInput('approved');
+                  setApproved(event.target.checked);
+                }
+              }}
             />
             I approve registering only this exact retained packet or
             acknowledging its matching receipt. This does not sign or submit.

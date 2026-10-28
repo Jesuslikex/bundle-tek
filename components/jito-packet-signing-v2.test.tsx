@@ -17,6 +17,7 @@ import {
   jitoOwnerScope,
 } from '@/lib/jito-owner-scope';
 import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
+import * as packetRecovery from '@/lib/jito-packet-recovery';
 import type { JitoAttempt } from '@/lib/jito-sign-attempt-client';
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import {
@@ -258,15 +259,16 @@ async function setup(useExternal = false, packet = 0) {
         packet === 0 ? 'Sign swap 1 only' : 'Sign Jito tip only',
       ),
     )!;
-  const approve = async () =>
-    act(async () => {
+  const approve = async () => {
+    await act(async () => {
       Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
         'value',
       )!.set!.call(input, 'synthetic-password');
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      checkbox.click();
     });
+    await act(async () => checkbox.click());
+  };
   const sign = async () =>
     act(async () => {
       button().click();
@@ -391,8 +393,9 @@ it('keeps external-wallet rejection UNKNOWN and never opens a second signing pro
       'value',
     )!.set!.call(f.input, 'synthetic-password');
     f.input.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(f.checkbox.checked).toBe(true);
   });
+  expect(f.checkbox.checked).toBe(false);
+  await act(async () => f.checkbox.click());
   await f.sign();
   expect(f.externalSign).toHaveBeenCalledTimes(1);
   expect(f.begin).toHaveBeenCalledTimes(1);
@@ -477,6 +480,59 @@ it('retains but does not register if the external account list becomes empty dur
   expect(f.register).not.toHaveBeenCalled();
   expect(f.begin).toHaveBeenCalledTimes(1);
   expect(f.externalSign).toHaveBeenCalledTimes(1);
+});
+
+it('ignores stale signer-selection and consent handlers while a wallet prompt is pending', async () => {
+  const f = await setup(true);
+  let release!: (
+      value: { signedTransaction: Uint8Array<ArrayBuffer> }[],
+    ) => void,
+    started!: () => void;
+  const blocked = new Promise<{ signedTransaction: Uint8Array<ArrayBuffer> }[]>(
+    (resolve) => {
+      release = resolve;
+    },
+  );
+  const began = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  f.externalSign.mockImplementation(async () => {
+    started();
+    return blocked;
+  });
+  await chooseExternal();
+  await f.approve();
+  const select = container.querySelector('select') as HTMLSelectElement;
+  const checkbox = f.checkbox;
+  const getChange = (element: object) => {
+    const key = Object.getOwnPropertyNames(element).find((name) =>
+      name.startsWith('__reactProps$'),
+    )!;
+    return (
+      element as unknown as Record<
+        string,
+        { onChange: (event: unknown) => void }
+      >
+    )[key].onChange;
+  };
+  const staleSelection = getChange(select),
+    staleConsent = getChange(checkbox);
+  await f.sign();
+  await act(async () => {
+    await began;
+  });
+  await act(async () => {
+    staleSelection({ target: { value: 'vault' } });
+    staleConsent({ target: { checked: false } });
+  });
+  expect(select.value).toBe('Synthetic external');
+  expect(checkbox.checked).toBe(true);
+  expect(f.externalSign).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    release([{ signedTransaction: f.externalBytes }]);
+  });
+  await waitFor(() => expect(storage.rows.size).toBe(0));
+  expect(f.register).toHaveBeenCalledTimes(1);
 });
 
 it('signs and registers the exact external legacy Jito tip after durable UNKNOWN and retention', async () => {
@@ -1750,3 +1806,197 @@ it.each(['normal response', 'lost response'] as const)(
     expect(vaultSession.payload.wallets[0].seed).toBe('');
   },
 );
+
+it.each([
+  'revoked consent',
+  'changed password',
+  'restored consent',
+  'disabled',
+  'context changed',
+])('does not let a stale sign click revive %s', async (change) => {
+  const f = await setup();
+  await f.approve();
+  const button = f.button();
+  const key = Object.getOwnPropertyNames(button).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (button as unknown as Record<string, { onClick: () => void }>)[
+    key
+  ].onClick;
+  if (change === 'disabled' || change === 'context changed') {
+    await act(async () =>
+      root.render(
+        <JitoPacketSigning
+          manifest={f.f.manifest}
+          packet={0}
+          disabled={change === 'disabled'}
+          ownerScope={owner}
+          coordinator={f.coordinator}
+          isContextCurrent={() => change !== 'context changed'}
+          beforeSign={f.beforeSign}
+          register={f.register}
+          readSnapshot={f.readSnapshot}
+          recoveryDisabled={false}
+          registerEvidence={f.registerEvidence}
+        />,
+      ),
+    );
+  } else if (change === 'changed password') {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )!.set!.call(f.input, 'another-password');
+      f.input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  } else {
+    await act(async () => f.checkbox.click());
+    if (change === 'restored consent')
+      await act(async () => f.checkbox.click());
+  }
+  await act(async () => stale());
+  expect(f.begin).not.toHaveBeenCalled();
+  expect(f.signer).not.toHaveBeenCalled();
+  expect(storage.rows.size).toBe(0);
+});
+
+it('does not register retained evidence from a stale approval click', async () => {
+  const f = await setup();
+  f.register.mockRejectedValueOnce(Error('lost registration response'));
+  await f.approve();
+  await f.sign();
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'Registration or acknowledgement needs attention',
+    ),
+  );
+  await enterRecoveryPassword();
+  await clickText('Inspect retained swap 1 packet');
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'Exact retained packet verified locally',
+    ),
+  );
+  await approveRecovery();
+  const button = [...container.querySelectorAll('button')].find((node) =>
+    node.textContent?.includes('Confirm retained swap 1 registration only'),
+  )!;
+  const key = Object.getOwnPropertyNames(button).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (button as unknown as Record<string, { onClick: () => void }>)[
+    key
+  ].onClick;
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes('I approve registering only'),
+  )!;
+  const checkbox = label.querySelector('input')!;
+  await act(async () => checkbox.click());
+  await act(async () => checkbox.click());
+  await act(async () => stale());
+  expect(f.registerEvidence).not.toHaveBeenCalled();
+  expect(storage.rows.size).toBe(1);
+});
+
+it('does not download an in-memory signed packet when context changes during cryptographic preparation', async () => {
+  const f = await setup();
+  f.register.mockRejectedValueOnce(Error('lost registration response'));
+  await f.approve();
+  await f.sign();
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'Registration or acknowledgement needs attention',
+    ),
+  );
+  let release!: () => void, started!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const began = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const original = packetRecovery.createJitoPacketRecovery;
+  vi.spyOn(packetRecovery, 'createJitoPacketRecovery').mockImplementation(
+    async (...args) => {
+      started();
+      await waiting;
+      return original(...args);
+    },
+  );
+  const create = vi.fn();
+  vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: vi.fn() });
+  await clickText('Download signed packet recovery file');
+  await act(async () => {
+    await began;
+  });
+  await act(async () =>
+    root.render(
+      <JitoPacketSigning
+        manifest={f.f.manifest}
+        packet={0}
+        disabled={false}
+        ownerScope={owner}
+        coordinator={f.coordinator}
+        isContextCurrent={() => false}
+        beforeSign={f.beforeSign}
+        register={f.register}
+        readSnapshot={f.readSnapshot}
+        recoveryDisabled={false}
+        registerEvidence={f.registerEvidence}
+      />,
+    ),
+  );
+  await act(async () => {
+    release();
+  });
+  await waitFor(() =>
+    expect(container.textContent).not.toContain('Preparing the recovery'),
+  );
+  expect(create).not.toHaveBeenCalled();
+  expect(storage.rows.size).toBe(1);
+});
+
+it('does not let a stale checkbox handler reapprove signing after consent was revoked', async () => {
+  const f = await setup();
+  await f.approve();
+  const key = Object.getOwnPropertyNames(f.checkbox).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (
+    f.checkbox as unknown as Record<
+      string,
+      { onChange: (event: unknown) => void }
+    >
+  )[key].onChange;
+  await act(async () => f.checkbox.click());
+  await act(async () => stale({ target: { checked: true } }));
+  expect(f.checkbox.checked).toBe(false);
+  await f.sign();
+  expect(f.begin).not.toHaveBeenCalled();
+  expect(storage.rows.size).toBe(0);
+});
+
+it('does not accept a stale signing-consent handler after the password changes', async () => {
+  const f = await setup();
+  const key = Object.getOwnPropertyNames(f.checkbox).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (
+    f.checkbox as unknown as Record<
+      string,
+      { onChange: (event: unknown) => void }
+    >
+  )[key].onChange;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(f.input, 'synthetic-password');
+    f.input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => stale({ target: { checked: true } }));
+  expect(f.checkbox.checked).toBe(false);
+  await f.sign();
+  expect(f.begin).not.toHaveBeenCalled();
+  expect(storage.rows.size).toBe(0);
+});

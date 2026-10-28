@@ -78,6 +78,8 @@ function TerminalForContext({
     abort = useRef<AbortController | null>(null);
   const disabledNow = useRef(disabled),
     verifiedView = useRef<View | null>(null);
+  const [selectionGeneration, setSelectionGeneration] = useState(0);
+  const selectionGenerationNow = useRef(0);
   useLayoutEffect(() => {
     disabledNow.current = disabled;
   }, [disabled]);
@@ -333,9 +335,9 @@ function TerminalForContext({
         disabled={busy || disabled}
         onChange={(event) => {
           const file = event.target.files?.[0];
-          event.target.value = '';
           if (
             file &&
+            selectionGeneration === selectionGenerationNow.current &&
             mounted.current &&
             !running.current &&
             !disabledNow.current &&
@@ -348,6 +350,9 @@ function TerminalForContext({
               );
               return;
             }
+            selectionGenerationNow.current++;
+            setSelectionGeneration(selectionGenerationNow.current);
+            event.target.value = '';
             bytes.current?.fill(0);
             bytes.current = null;
             verifiedView.current = null;

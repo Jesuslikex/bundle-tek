@@ -381,6 +381,62 @@ it('keeps the exact retained packet if registration returns without an authentic
   );
 });
 
+it('ignores a stale file-change handler while exact registration is in flight', async () => {
+  const f = await setup();
+  await f.setFile(f.file);
+  await f.setPassword();
+  await f.click('Verify and retain');
+  await until(() =>
+    expect(container.textContent).toContain(
+      'Exact signed packet verified and retained',
+    ),
+  );
+  const input = container.querySelector('input[type=file]') as HTMLInputElement;
+  const key = Object.getOwnPropertyNames(input).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (
+    input as unknown as Record<string, { onChange: (event: unknown) => void }>
+  )[key].onChange;
+  let release!: () => void, started!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const began = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const original = f.registerEvidence.getMockImplementation()!;
+  f.registerEvidence.mockImplementation(async (transaction, id) => {
+    started();
+    await blocked;
+    return original(transaction, id);
+  });
+  await f.setPassword();
+  await act(async () =>
+    (
+      container.querySelector('input[type=checkbox]') as HTMLInputElement
+    ).click(),
+  );
+  await f.click('Confirm exact registration only');
+  await act(async () => {
+    await began;
+  });
+  await act(async () =>
+    stale({
+      target: { files: [new File(['replacement'], 'replacement.json')] },
+    }),
+  );
+  expect(container.textContent).toContain(
+    `Verified signature: ${f.checked.signature}`,
+  );
+  await act(async () => {
+    release();
+  });
+  await until(() => expect(store.rows.size).toBe(0));
+  expect(f.registerEvidence).toHaveBeenCalledTimes(1);
+  expect(f.attempt.signature).toBe(f.checked.signature);
+});
+
 it('preserves the retained file and asks for reload before registering when a memory outcome is unresolved', async () => {
   const f = await setup();
   const memory = await f.coordinator.reserve(owner, f.manifest, 0);
@@ -592,4 +648,75 @@ it('does not retain or register if context changes while the recovery file is lo
   );
   expect(store.rows.size).toBe(0);
   expect(f.registerEvidence).not.toHaveBeenCalled();
+});
+
+it.each(['unchecked', 'password changed', 'approval restored'])(
+  'does not register from a stale file confirmation after %s',
+  async (change) => {
+    const f = await setup();
+    await f.setFile(f.file);
+    await f.setPassword();
+    await f.click('Verify and retain');
+    await until(() =>
+      expect(container.textContent).toContain(
+        'Exact signed packet verified and retained',
+      ),
+    );
+    await f.setPassword();
+    const checkbox = container.querySelector(
+      'input[type=checkbox]',
+    ) as HTMLInputElement;
+    await act(async () => checkbox.click());
+    const button = [...container.querySelectorAll('button')].find((node) =>
+      node.textContent?.includes('Confirm exact registration only'),
+    )!;
+    const key = Object.getOwnPropertyNames(button).find((name) =>
+      name.startsWith('__reactProps$'),
+    )!;
+    const stale = (
+      button as unknown as Record<string, { onClick: () => void }>
+    )[key].onClick;
+    if (change === 'password changed')
+      await f.setPassword('different-password');
+    else {
+      await act(async () => checkbox.click());
+      if (change === 'approval restored')
+        await act(async () => checkbox.click());
+    }
+    await act(async () => stale());
+    expect(f.registerEvidence).not.toHaveBeenCalled();
+    expect(store.rows.size).toBe(1);
+  },
+);
+
+it('does not let a stale checkbox handler reapprove a file registration after consent was revoked', async () => {
+  const f = await setup();
+  await f.setFile(f.file);
+  await f.setPassword();
+  await f.click('Verify and retain');
+  await until(() =>
+    expect(container.textContent).toContain(
+      'Exact signed packet verified and retained',
+    ),
+  );
+  await f.setPassword();
+  const checkbox = container.querySelector(
+    'input[type=checkbox]',
+  ) as HTMLInputElement;
+  await act(async () => checkbox.click());
+  const key = Object.getOwnPropertyNames(checkbox).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (
+    checkbox as unknown as Record<
+      string,
+      { onChange: (event: unknown) => void }
+    >
+  )[key].onChange;
+  await act(async () => checkbox.click());
+  await act(async () => stale({ target: { checked: true } }));
+  expect(checkbox.checked).toBe(false);
+  await f.click('Confirm exact registration only');
+  expect(f.registerEvidence).not.toHaveBeenCalled();
+  expect(store.rows.size).toBe(1);
 });

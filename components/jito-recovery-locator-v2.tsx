@@ -1,5 +1,12 @@
 'use client';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from './ui/button';
 import {
   JITO_OWNER_SCOPE_HEADER,
@@ -76,9 +83,48 @@ function JitoRecoveryLocatorV2ForContext({
     running = useRef(false);
   const ownedFile = useRef<Uint8Array | null>(null),
     controller = useRef<AbortController | null>(null);
+  const actionContextNow = useRef({
+    ownerId,
+    ownerScope,
+    projectId,
+    sessionId,
+    coordinator,
+    isContextCurrent,
+    onOpen,
+  });
+  useLayoutEffect(() => {
+    actionContextNow.current = {
+      ownerId,
+      ownerScope,
+      projectId,
+      sessionId,
+      coordinator,
+      isContextCurrent,
+      onOpen,
+    };
+  }, [
+    ownerId,
+    ownerScope,
+    projectId,
+    sessionId,
+    coordinator,
+    isContextCurrent,
+    onOpen,
+  ]);
+  const disabledNow = useRef(disabled);
+  useLayoutEffect(() => {
+    disabledNow.current = disabled;
+  }, [disabled]);
   const [busy, setBusy] = useState(false),
     [view, setView] = useState<View | null>(null),
     [error, setError] = useState('');
+  const viewNow = useRef<View | null>(null);
+  const [selectionGeneration, setSelectionGeneration] = useState(0);
+  const selectionGenerationNow = useRef(0);
+  const invalidateSelection = () => {
+    selectionGenerationNow.current++;
+    setSelectionGeneration(selectionGenerationNow.current);
+  };
   const invalidate = useCallback(() => {
     epoch.current++;
   }, []);
@@ -94,7 +140,13 @@ function JitoRecoveryLocatorV2ForContext({
   }, [invalidate]);
   const assertCurrent = (generation: number, signal: AbortSignal) => {
     signal.throwIfAborted();
-    if (!mounted.current || epoch.current !== generation || !isContextCurrent())
+    if (
+      !mounted.current ||
+      epoch.current !== generation ||
+      !isContextCurrent() ||
+      !actionContextNow.current.isContextCurrent() ||
+      actionContextNow.current.coordinator !== coordinator
+    )
       throw Error('Recovery context changed.');
   };
   async function exact(
@@ -186,7 +238,19 @@ function JitoRecoveryLocatorV2ForContext({
     return { locator, signature: packet.signature, snapshot: second };
   }
   async function perform(file?: File) {
-    if (running.current || disabled || !ownerScope) return;
+    if (
+      !mounted.current ||
+      running.current ||
+      disabledNow.current ||
+      !isContextCurrent() ||
+      !actionContextNow.current.isContextCurrent() ||
+      actionContextNow.current.coordinator !== coordinator ||
+      actionContextNow.current.onOpen !== onOpen ||
+      coordinator.operationActive() ||
+      !ownerScope ||
+      (!file && (!view || viewNow.current !== view))
+    )
+      return;
     let operation: JitoOperationToken;
     try {
       operation = coordinator.startOperation(ownerScope);
@@ -237,6 +301,7 @@ function JitoRecoveryLocatorV2ForContext({
         ownedFile.current?.fill(0);
         ownedFile.current = next;
         next = null;
+        viewNow.current = result;
         setView(result);
       } else {
         if (
@@ -249,10 +314,15 @@ function JitoRecoveryLocatorV2ForContext({
         )
           throw Error('Recovery record changed.');
         assertCurrent(generation, signal);
-        onOpen({ locator: result.locator, snapshot: result.snapshot });
+        actionContextNow.current.onOpen({
+          locator: result.locator,
+          snapshot: result.snapshot,
+        });
         assertCurrent(generation, signal);
         ownedFile.current?.fill(0);
         ownedFile.current = null;
+        invalidateSelection();
+        viewNow.current = null;
         setView(null);
       }
     } catch {
@@ -283,11 +353,25 @@ function JitoRecoveryLocatorV2ForContext({
         accept="application/json,.json"
         disabled={disabled || busy}
         onChange={(event) => {
+          if (
+            !mounted.current ||
+            running.current ||
+            selectionGeneration !== selectionGenerationNow.current ||
+            disabledNow.current ||
+            coordinator.operationActive() ||
+            !isContextCurrent() ||
+            !actionContextNow.current.isContextCurrent() ||
+            actionContextNow.current.coordinator !== coordinator ||
+            actionContextNow.current.onOpen !== onOpen
+          )
+            return;
           const file = event.target.files?.[0];
           event.target.value = '';
           if (file) {
+            invalidateSelection();
             ownedFile.current?.fill(0);
             ownedFile.current = null;
+            viewNow.current = null;
             setView(null);
             void perform(file);
           }
