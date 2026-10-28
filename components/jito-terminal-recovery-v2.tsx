@@ -1,5 +1,12 @@
 'use client';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from './ui/button';
 import {
   JITO_OWNER_SCOPE_HEADER,
@@ -69,6 +76,11 @@ function TerminalForContext({
     running = useRef(false);
   const bytes = useRef<Uint8Array | null>(null),
     abort = useRef<AbortController | null>(null);
+  const disabledNow = useRef(disabled),
+    verifiedView = useRef<View | null>(null);
+  useLayoutEffect(() => {
+    disabledNow.current = disabled;
+  }, [disabled]);
   const [busy, setBusy] = useState(false),
     [view, setView] = useState<View | null>(null),
     [error, setError] = useState('');
@@ -83,6 +95,7 @@ function TerminalForContext({
       abort.current?.abort();
       bytes.current?.fill(0);
       bytes.current = null;
+      verifiedView.current = null;
     };
   }, [invalidate]);
   const current = (
@@ -188,8 +201,17 @@ function TerminalForContext({
       snapshot: second,
     };
   }
-  async function run(file?: File) {
-    if (running.current || disabled || !ownerScope) return;
+  async function run(file?: File, expectedView?: View) {
+    if (
+      running.current ||
+      disabledNow.current ||
+      !mounted.current ||
+      !isContextCurrent() ||
+      !ownerScope ||
+      coordinator.operationActive() ||
+      (!file && (!expectedView || verifiedView.current !== expectedView))
+    )
+      return;
     const manifestJson = JSON.stringify(manifest);
     const approved = JSON.parse(manifestJson) as JitoBundleManifest;
     let operation: JitoOperationToken;
@@ -252,6 +274,7 @@ function TerminalForContext({
             bytes.current?.fill(0);
             bytes.current = owned;
             owned = null;
+            verifiedView.current = result;
             setView(result);
           } else {
             if (
@@ -311,9 +334,23 @@ function TerminalForContext({
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = '';
-          if (file) {
+          if (
+            file &&
+            mounted.current &&
+            !running.current &&
+            !disabledNow.current &&
+            isContextCurrent() &&
+            ownerScope
+          ) {
+            if (coordinator.operationActive()) {
+              setError(
+                'Recovery is unavailable while another Jito action is pending.',
+              );
+              return;
+            }
             bytes.current?.fill(0);
             bytes.current = null;
+            verifiedView.current = null;
             setView(null);
             void run(file);
           }
@@ -339,7 +376,7 @@ function TerminalForContext({
           <Button
             variant="outline"
             disabled={busy || disabled}
-            onClick={() => void run()}
+            onClick={() => void run(undefined, view)}
           >
             Download verified packet privately
           </Button>

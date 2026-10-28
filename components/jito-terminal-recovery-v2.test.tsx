@@ -140,20 +140,22 @@ async function setup(
   const swapSigner = vi.spyOn(warmup, 'signApprovedWarmupPacket');
   const tipSigner = vi.spyOn(nativeWithdrawal, 'signNativeWithdrawal');
   const coordinator = createJitoMemorySignatureRecovery();
-  await act(async () =>
-    root.render(
-      <JitoTerminalRecoveryV2
-        ownerId="alice"
-        ownerScope={ownerScope}
-        manifest={f.manifest}
-        packet={packet}
-        state={state}
-        coordinator={coordinator}
-        disabled={false}
-        isContextCurrent={() => active}
-      />,
-    ),
-  );
+  const render = async (disabled = false) =>
+    act(async () =>
+      root.render(
+        <JitoTerminalRecoveryV2
+          ownerId="alice"
+          ownerScope={ownerScope}
+          manifest={f.manifest}
+          packet={packet}
+          state={state}
+          coordinator={coordinator}
+          disabled={disabled}
+          isContextCurrent={() => active}
+        />,
+      ),
+    );
+  await render();
   const button = (text: string) =>
     [...container.querySelectorAll('button')].find((node) =>
       node.textContent?.includes(text),
@@ -203,6 +205,7 @@ async function setup(
     swapSigner,
     tipSigner,
     coordinator,
+    render,
     button,
     choose,
     wait,
@@ -474,4 +477,123 @@ it('refuses an in-place manifest mutation while inspection is pending', async ()
   expect(f.writes).toEqual([]);
   expect(createObjectURL).not.toHaveBeenCalled();
   expect(container.textContent).not.toContain('Exact signed packet verified');
+});
+
+it('ignores a stale file-change event during export without clearing verified evidence', async () => {
+  const f = await setup();
+  await f.choose();
+  await f.wait('Exact signed packet verified');
+  const original = snapshotModule.requireJitoV2Snapshot;
+  let started!: () => void, release!: () => void;
+  const began = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  vi.spyOn(snapshotModule, 'requireJitoV2Snapshot').mockImplementation(
+    async (...args) => {
+      const snapshot = await original(...args);
+      if (++calls === 1) {
+        started();
+        await blocked;
+      }
+      return snapshot;
+    },
+  );
+  await f.download();
+  await act(async () => {
+    await began;
+  });
+  await f.choose('stale event should not replace evidence');
+  expect(container.textContent).toContain('Exact signed packet verified');
+  await act(async () => {
+    release();
+  });
+  await vi.waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+  expect(container.textContent).toContain('Exact signed packet verified');
+  expect(f.calls).toHaveLength(4);
+  expect(f.writes).toEqual([]);
+  expect(f.swapSigner).not.toHaveBeenCalled();
+  expect(f.tipSigner).not.toHaveBeenCalled();
+});
+
+function capturedDownload() {
+  const button = [...container.querySelectorAll('button')].find((node) =>
+    node.textContent?.includes('Download verified packet privately'),
+  )!;
+  const key = Object.getOwnPropertyNames(button).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  return (
+    button as unknown as Record<string, { onClick: (event: unknown) => void }>
+  )[key].onClick;
+}
+it('rejects a stale export click after the live parent disables recovery', async () => {
+  const f = await setup();
+  await f.choose();
+  await f.wait('Exact signed packet verified');
+  const stale = capturedDownload();
+  const reads = f.calls.length;
+  await f.render(true);
+  await act(async () => stale({}));
+  expect(f.calls).toHaveLength(reads);
+  expect(createObjectURL).not.toHaveBeenCalled();
+  expect(f.writes).toEqual([]);
+});
+it('rejects a stale export click while a replacement file is being read', async () => {
+  const f = await setup();
+  await f.choose();
+  await f.wait('Exact signed packet verified');
+  const stale = capturedDownload();
+  let release!: (value: ArrayBuffer) => void, started!: () => void;
+  const blocked = new Promise<ArrayBuffer>((resolve) => {
+    release = resolve;
+  });
+  const began = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  await f.choose(f.fileText, () => {
+    started();
+    return blocked;
+  });
+  await act(async () => {
+    await began;
+  });
+  const reads = f.calls.length;
+  await act(async () => stale({}));
+  expect(f.calls).toHaveLength(reads);
+  expect(createObjectURL).not.toHaveBeenCalled();
+  await act(async () => release(new TextEncoder().encode(f.fileText).buffer));
+  await f.wait('Exact signed packet verified');
+  expect(f.writes).toEqual([]);
+});
+it('rejects a stale export click after a replacement file clears the verified view', async () => {
+  const f = await setup();
+  await f.choose();
+  await f.wait('Exact signed packet verified');
+  const stale = capturedDownload();
+  await f.choose('invalid replacement');
+  await f.wait('could not be verified');
+  const reads = f.calls.length;
+  await act(async () => stale({}));
+  expect(f.calls).toHaveLength(reads);
+  expect(createObjectURL).not.toHaveBeenCalled();
+  expect(f.writes).toEqual([]);
+});
+it('rejects a stale export click after a replacement has been independently verified', async () => {
+  const f = await setup();
+  await f.choose();
+  await f.wait('Exact signed packet verified');
+  const stale = capturedDownload();
+  await f.choose();
+  await f.wait('Exact signed packet verified');
+  const reads = f.calls.length;
+  await act(async () => stale({}));
+  expect(f.calls).toHaveLength(reads);
+  expect(createObjectURL).not.toHaveBeenCalled();
+  expect(f.writes).toEqual([]);
+  await f.download();
+  await vi.waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
 });
