@@ -263,6 +263,14 @@ export async function signApprovedWarmupPacket(
   session: VaultSession,
   review: WarmupSigningReview,
   assertCurrent: () => void,
+  hooks?: {
+    beforeSign?: () => Promise<void>;
+    onSignerStart?: () => void;
+    retainSigned?: (signed: {
+      signature: string;
+      transaction: string;
+    }) => Promise<void>;
+  },
 ) {
   const { tx } = await requireApprovedWarmupPacket(review, assertCurrent);
   const wallet = session.payload.wallets.find(
@@ -270,6 +278,28 @@ export async function signApprovedWarmupPacket(
   );
   if (!wallet || !/^[a-f0-9]{64}$/.test(wallet.seed))
     throw new Error('Reviewed wallet is not in this vault.');
+  if (hooks?.beforeSign) {
+    const originalReview = JSON.stringify(review);
+    await hooks.beforeSign();
+    assertCurrent();
+    const rechecked = await requireApprovedWarmupPacket(review, assertCurrent);
+    if (
+      JSON.stringify(review) !== originalReview ||
+      rechecked.tx.messageBytes.length !== tx.messageBytes.length ||
+      rechecked.tx.messageBytes.some(
+        (byte, index) => byte !== tx.messageBytes[index],
+      )
+    )
+      throw new Error('Approved packet changed during signer preparation.');
+    assertCurrent();
+    if (
+      session.payload.wallets.find(
+        (value) => value.family === 'solana' && value.address === review.wallet,
+      ) !== wallet ||
+      !/^[a-f0-9]{64}$/.test(wallet.seed)
+    )
+      throw new Error('Reviewed wallet is not in this vault.');
+  }
   const seed = Uint8Array.from(wallet.seed.match(/../g)!, (value) =>
       parseInt(value, 16),
     ),
@@ -281,6 +311,7 @@ export async function signApprovedWarmupPacket(
       Date.parse(review.expiresAt) <= Date.now()
     )
       throw new Error('Approval changed or expired.');
+    hooks?.onSignerStart?.();
     const signature = nacl.sign.detached(
       Uint8Array.from(tx.messageBytes),
       pair.secretKey,
@@ -289,11 +320,17 @@ export async function signApprovedWarmupPacket(
       ...tx,
       signatures: { [address(review.wallet)]: signature },
     });
-    assertCurrent();
-    return {
+    const result = {
       signature: bs58.encode(signature),
       transaction: getBase64Decoder().decode(signed),
     };
+    if (hooks?.retainSigned) {
+      seed.fill(0);
+      pair.secretKey.fill(0);
+      await hooks.retainSigned({ ...result });
+    }
+    assertCurrent();
+    return result;
   } finally {
     seed.fill(0);
     pair.secretKey.fill(0);

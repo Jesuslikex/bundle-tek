@@ -13,22 +13,52 @@ import {
 import { POST as recoverImportedApproval } from '../signing/route';
 import { prepareJitoBundle } from '@/lib/jito-bundle-preparation';
 import { JitoJsonError, readJitoJson } from '@/lib/jito-json';
+import {
+  JITO_OWNER_SCOPE_HEADER,
+  jitoOwnerScope,
+} from '@/lib/jito-owner-scope';
 export const dynamic = 'force-dynamic';
-const json = (value: unknown, status = 200) =>
-  Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
+const json = (value: unknown, status = 200, ownerScope?: string) =>
+  Response.json(value, {
+    status,
+    headers: {
+      'cache-control': 'no-store',
+      ...(ownerScope ? { [JITO_OWNER_SCOPE_HEADER]: ownerScope } : {}),
+    },
+  });
+async function scopeFor(request: Request, ownerId: string) {
+  const scope = await jitoOwnerScope(ownerId);
+  const expected = request.headers.get(JITO_OWNER_SCOPE_HEADER);
+  return { scope, matches: expected === null || expected === scope };
+}
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return json({ error: 'Sign in to review Jito bundles.' }, 401);
+  let scoped: Awaited<ReturnType<typeof scopeFor>>;
+  try {
+    scoped = await scopeFor(request, user.userId);
+  } catch {
+    return json({ error: 'Jito account scope unavailable.' }, 503);
+  }
+  const reply = (value: unknown, status = 200) =>
+    json(value, status, scoped.scope);
+  if (!scoped.matches)
+    return reply(
+      { error: 'Signed-in account changed. Reload bundle history.' },
+      409,
+    );
   const params = new URL(request.url).searchParams;
   const projectId = params.get('projectId'),
-    sessionId = params.get('sessionId');
+    sessionId = params.get('sessionId'),
+    bundleId = params.get('bundleId');
   if (
     !projectId ||
     !UUID.test(projectId) ||
     !sessionId ||
-    !UUID.test(sessionId)
+    !UUID.test(sessionId) ||
+    (bundleId !== null && !UUID.test(bundleId))
   )
-    return json({ error: 'Choose a saved project and session.' }, 400);
+    return reply({ error: 'Choose a saved project and session.' }, 400);
   try {
     const db = getD1();
     const owned = await db
@@ -37,7 +67,19 @@ export async function GET(request: Request) {
       )
       .bind(user.userId, sessionId, projectId)
       .first();
-    if (!owned) return json({ error: 'Owned session unavailable.' }, 404);
+    if (!owned) return reply({ error: 'Owned session unavailable.' }, 404);
+    if (bundleId !== null) {
+      const ownedBundle = await db
+        .prepare(
+          'SELECT id FROM jito_bundles WHERE owner_id=? AND project_id=? AND session_id=? AND id=?',
+        )
+        .bind(user.userId, projectId, sessionId, bundleId)
+        .first();
+      if (!ownedBundle)
+        return reply({ error: 'Owned bundle unavailable.' }, 404);
+      const bundle = (await readJitoBundle(db, user.userId, bundleId)).record;
+      return reply({ projectId, sessionId, bundle });
+    }
     const { results } = await db
       .prepare(
         'SELECT id FROM jito_bundles WHERE owner_id=? AND project_id=? AND session_id=? ORDER BY created_at DESC,id DESC LIMIT 20',
@@ -55,31 +97,44 @@ export async function GET(request: Request) {
       )
       .bind(user.userId, projectId, sessionId)
       .all<{ document: string }>();
-    return json({
+    return reply({
       projectId,
       sessionId,
       bundles,
       eligible: eligible.map((r) => JSON.parse(r.document)),
     });
   } catch {
-    return json({ error: 'Jito bundle history unavailable.' }, 503);
+    return reply({ error: 'Jito bundle history unavailable.' }, 503);
   }
 }
 export async function POST(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return json({ error: 'Sign in to use Jito bundles.' }, 401);
+  let scoped: Awaited<ReturnType<typeof scopeFor>>;
+  try {
+    scoped = await scopeFor(request, user.userId);
+  } catch {
+    return json({ error: 'Jito account scope unavailable.' }, 503);
+  }
+  const reply = (value: unknown, status = 200) =>
+    json(value, status, scoped.scope);
+  if (!scoped.matches)
+    return reply(
+      { error: 'Signed-in account changed. Reload bundle history.' },
+      409,
+    );
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin
   )
-    return json({ error: 'Cross-origin request rejected.' }, 403);
+    return reply({ error: 'Cross-origin request rejected.' }, 403);
   if (
     !request.headers
       .get('content-type')
       ?.toLowerCase()
       .startsWith('application/json')
   )
-    return json({ error: 'JSON required.' }, 415);
+    return reply({ error: 'JSON required.' }, 415);
   let body: {
     action: string;
     id: string;
@@ -136,8 +191,8 @@ export async function POST(request: Request) {
       throw new Error();
   } catch (error) {
     if (error instanceof JitoJsonError)
-      return json({ error: error.message }, error.status);
-    return json({ error: 'Invalid Jito bundle request.' }, 400);
+      return reply({ error: error.message }, error.status);
+    return reply({ error: 'Invalid Jito bundle request.' }, 400);
   }
   try {
     const db = getD1(),
@@ -155,7 +210,7 @@ export async function POST(request: Request) {
         .bind(user.userId, now + 15000, now)
         .run();
       if (!gate.meta.changes)
-        return json(
+        return reply(
           { error: 'Wait 15 seconds between bundle provider reviews.' },
           429,
         );
@@ -163,7 +218,7 @@ export async function POST(request: Request) {
     let bundle;
     switch (body.action) {
       case 'check-sequential':
-        return json({
+        return reply({
           sequentialCheck: await checkJitoBundleSequential(
             db,
             user.userId,
@@ -224,7 +279,7 @@ export async function POST(request: Request) {
           },
         );
     }
-    return json({ bundle });
+    return reply({ bundle });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     // Only bounded app-authored validation messages leave the server. Never provider payloads/URLs.
@@ -234,7 +289,7 @@ export async function POST(request: Request) {
         message,
       ) &&
         message.length <= 250);
-    return json(
+    return reply(
       {
         error: safe
           ? message

@@ -1,9 +1,18 @@
 'use client';
 import { TransactionDeliveryNotice } from '@/components/transaction-delivery-notice';
-import { useEffect, useId, useRef, useState } from 'react';
+import { createAuthClient } from 'better-auth/react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   requireJitoManifest,
   jitoIntentSelection,
+  type JitoBundleManifest,
   type JitoBundleRecord,
 } from '@/lib/jito-bundle';
 import type { WarmupSigningReview } from '@/lib/warmup-signing';
@@ -16,6 +25,16 @@ import { requireJitoFinalization } from '@/lib/jito-finalization';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
+import {
+  JITO_OWNER_SCOPE_HEADER,
+  jitoOwnerScope,
+} from '@/lib/jito-owner-scope';
+import {
+  createJitoMemorySignatureRecovery,
+  type JitoOperationToken,
+} from '@/lib/jito-memory-signature-recovery';
+import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
+import { JitoMemoryRecovery } from './jito-memory-recovery';
 
 async function checkedRecord(
   value: JitoBundleRecord,
@@ -61,14 +80,73 @@ type JitoAtomicBundleProps = {
   session: TradeSession;
   locked: boolean;
 };
+const auth = createAuthClient();
+function manifestExpired(manifest: JitoBundleManifest) {
+  return Date.parse(manifest.expiresAt) <= Date.now();
+}
 export function JitoAtomicBundle(props: JitoAtomicBundleProps) {
-  return <JitoAtomicBundleForContext key={JSON.stringify(props)} {...props} />;
+  const { data, isPending } = auth.useSession();
+  const owner =
+    !isPending && typeof data?.user?.id === 'string' ? data.user.id : null;
+  const [verifiedScope, setVerifiedScope] = useState<{
+    owner: string;
+    value: string;
+  } | null>(null);
+  const [memoryRevision, setMemoryRevision] = useState(0);
+  const [, setOperationRevision] = useState(0);
+  const [coordinator] = useState(createJitoMemorySignatureRecovery);
+  const contextKey = JSON.stringify([props, owner, isPending]);
+  useEffect(() => {
+    return coordinator.subscribe(() => setMemoryRevision((value) => value + 1));
+  }, [coordinator]);
+  useEffect(() => {
+    return coordinator.subscribeOperations(() =>
+      setOperationRevision((value) => value + 1),
+    );
+  }, [coordinator]);
+  useEffect(() => {
+    let active = true;
+    if (owner)
+      void jitoOwnerScope(owner)
+        .then((value) => {
+          if (active) setVerifiedScope({ owner, value });
+        })
+        .catch(() => {
+          if (active) setVerifiedScope(null);
+        });
+    return () => {
+      active = false;
+    };
+  }, [owner, isPending]);
+  const ownerScope =
+    owner && verifiedScope?.owner === owner && !isPending
+      ? verifiedScope.value
+      : null;
+  return (
+    <JitoAtomicBundleForContext
+      key={contextKey}
+      {...props}
+      ownerScope={ownerScope}
+      identityPending={isPending || Boolean(owner && !ownerScope)}
+      coordinator={coordinator}
+      memoryRevision={memoryRevision}
+    />
+  );
 }
 function JitoAtomicBundleForContext({
   projectId,
   session,
   locked,
-}: JitoAtomicBundleProps) {
+  ownerScope,
+  identityPending,
+  coordinator,
+  memoryRevision,
+}: JitoAtomicBundleProps & {
+  ownerScope: string | null;
+  identityPending: boolean;
+  coordinator: ReturnType<typeof createJitoMemorySignatureRecovery>;
+  memoryRevision: number;
+}) {
   const tipId = useId();
   const [eligible, setEligible] = useState<WarmupSigningReview[]>([]),
     [selected, setSelected] = useState<string[]>([]),
@@ -78,11 +156,13 @@ function JitoAtomicBundleForContext({
     [acceptedSubmit, setAcceptedSubmit] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [now, setNow] = useState(() => Date.now());
+    [now, setNow] = useState(() => Date.now()),
+    [historyVerified, setHistoryVerified] = useState(false);
   const mounted = useRef(true),
     running = useRef(false),
     abort = useRef<AbortController | null>(null);
-  useEffect(() => {
+  const isContextCurrent = useCallback(() => mounted.current, []);
+  useLayoutEffect(() => {
     mounted.current = true;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => {
@@ -91,34 +171,65 @@ function JitoAtomicBundleForContext({
       clearInterval(timer);
     };
   }, []);
-  async function request(body?: object) {
-    if (!mounted.current)
+  async function request(body?: object, bundleId?: string, timeoutMs = 60000) {
+    if (!mounted.current || !isContextCurrent())
       throw new Error('Bundle context changed. Reload saved history.');
+    if (!ownerScope)
+      throw new Error(
+        'Sign in and reload bundle history to verify the current account.',
+      );
     const controller = new AbortController();
     abort.current = controller;
     const signal = AbortSignal.any([
       controller.signal,
-      AbortSignal.timeout(60000),
+      AbortSignal.timeout(timeoutMs),
     ]);
-    const response = await fetch(
-      body
-        ? '/api/imported-projects/jito-bundles'
-        : `/api/imported-projects/jito-bundles?projectId=${encodeURIComponent(projectId)}&sessionId=${encodeURIComponent(session.id)}`,
-      {
-        ...(body
-          ? {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify(body),
-            }
-          : {}),
-        cache: 'no-store',
-        signal,
-      },
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        body
+          ? '/api/imported-projects/jito-bundles'
+          : `/api/imported-projects/jito-bundles?projectId=${encodeURIComponent(projectId)}&sessionId=${encodeURIComponent(session.id)}${bundleId ? `&bundleId=${encodeURIComponent(bundleId)}` : ''}`,
+        {
+          ...(body
+            ? {
+                method: 'POST',
+                headers: {
+                  'content-type': 'application/json',
+                  [JITO_OWNER_SCOPE_HEADER]: ownerScope,
+                },
+                body: JSON.stringify(body),
+              }
+            : { headers: { [JITO_OWNER_SCOPE_HEADER]: ownerScope } }),
+          credentials: 'same-origin',
+          redirect: 'error',
+          cache: 'no-store',
+          signal,
+        },
+      );
+    } catch {
+      throw new Error(
+        'Bundle response unavailable. Reload saved history before another action.',
+      );
+    }
+    const invalidateHistory = (reason: string) => {
+      if (mounted.current && isContextCurrent()) {
+        setHistoryVerified(false);
+        setBundles([]);
+        setEligible([]);
+        setAcceptedSubmit(null);
+        setError(reason);
+      }
+    };
     if (response.status === 401) {
       void response.body?.cancel().catch(() => {});
+      invalidateHistory('Sign in to recover saved bundles.');
       throw new Error('Sign in to recover saved bundles.');
+    }
+    if (response.headers.get(JITO_OWNER_SCOPE_HEADER) !== ownerScope) {
+      void response.body?.cancel().catch(() => {});
+      invalidateHistory('Signed-in account changed. Reload bundle history.');
+      throw new Error('Signed-in account changed. Reload bundle history.');
     }
     let value: unknown;
     try {
@@ -128,7 +239,7 @@ function JitoAtomicBundleForContext({
         'Bundle response unavailable. Reload saved history before another action.',
       );
     }
-    if (!mounted.current || signal.aborted)
+    if (!mounted.current || !isContextCurrent() || signal.aborted)
       throw new Error('Bundle context changed. Reload saved history.');
     if (!value || typeof value !== 'object' || Array.isArray(value))
       throw new Error('Bundle response unavailable. Reload saved history.');
@@ -144,15 +255,58 @@ function JitoAtomicBundleForContext({
       throw new Error(data.error || 'Bundle operation unavailable.');
     return data;
   }
-  async function action(body?: object) {
-    if (!mounted.current)
+  async function action(
+    body?: object,
+    expectedRegistration?: {
+      id: string;
+      digest: string;
+      packet: number;
+      signature: string;
+    },
+    signingOperation?: JitoOperationToken,
+  ) {
+    if (!mounted.current || !isContextCurrent())
       throw new Error('Bundle context changed. Reload saved history.');
     if (running.current)
       throw new Error('Wait for the current bundle operation.');
+    let mutationOperation: JitoOperationToken | null = null;
+    if (body) {
+      if (!ownerScope) throw new Error('Sign in to review Jito bundles.');
+      const payload = body as {
+        action?: unknown;
+        id?: unknown;
+        packet?: unknown;
+      };
+      if (
+        (payload.action === 'cancel' || payload.action === 'submit') &&
+        coordinator
+          .pending(ownerScope, projectId, session.id)
+          .some((item) => item.bundleId === payload.id)
+      )
+        throw new Error('A Jito signing outcome is still pending.');
+      if (signingOperation) {
+        if (
+          payload.action !== 'register' ||
+          !expectedRegistration ||
+          payload.id !== expectedRegistration.id ||
+          payload.packet !== expectedRegistration.packet
+        )
+          throw new Error('Jito signing operation context differs.');
+        coordinator.requireRegistration(
+          signingOperation,
+          ownerScope,
+          expectedRegistration.id,
+          expectedRegistration.packet,
+        );
+      } else {
+        mutationOperation = coordinator.startOperation(ownerScope);
+      }
+    }
     running.current = true;
     setBusy(true);
     setError('');
     setAcceptedSubmit(null);
+    if (!body) setHistoryVerified(false);
     const submission = body as { action?: unknown; id?: unknown } | undefined;
     if (submission?.action === 'submit')
       setBundles((prior) =>
@@ -166,7 +320,17 @@ function JitoAtomicBundleForContext({
       const data = await request(body);
       if (data.bundle) {
         const bundle = await checkedRecord(data.bundle, projectId, session);
-        if (mounted.current) {
+        if (
+          expectedRegistration &&
+          (bundle.manifest.id !== expectedRegistration.id ||
+            bundle.manifest.sha256 !== expectedRegistration.digest ||
+            bundle.signatures[expectedRegistration.packet] !==
+              expectedRegistration.signature)
+        )
+          throw new Error(
+            'Signature registration did not match. Reload saved history.',
+          );
+        if (mounted.current && isContextCurrent()) {
           setBundles((prior) =>
             [
               bundle,
@@ -175,6 +339,7 @@ function JitoAtomicBundleForContext({
           );
           setAcceptedSubmit(null);
         }
+        return bundle;
       } else {
         if (
           data.projectId !== projectId ||
@@ -203,27 +368,149 @@ function JitoAtomicBundleForContext({
           )
         )
           throw new Error('Available approval terms differ.');
-        if (mounted.current) {
+        if (mounted.current && isContextCurrent()) {
           setBundles(checked);
           setEligible(data.eligible);
           setSelected([]);
           setAcceptedSubmit(null);
+          setHistoryVerified(true);
         }
       }
     } catch (e) {
-      if (mounted.current)
+      if (mounted.current && isContextCurrent())
         setError(
           e instanceof Error ? e.message : 'Bundle operation unavailable.',
         );
       throw e;
     } finally {
+      if (mutationOperation) coordinator.finishOperation(mutationOperation);
       running.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current && isContextCurrent()) setBusy(false);
     }
   }
   const run = (body?: object) => {
     void action(body).catch(() => {});
   };
+  async function readExactBundle(id: string) {
+    const data = await request(undefined, id, 5000);
+    if (
+      data.projectId !== projectId ||
+      data.sessionId !== session.id ||
+      !data.bundle
+    )
+      throw new Error('Original bundle unavailable.');
+    const record = await checkedRecord(data.bundle, projectId, session);
+    if (!isContextCurrent() || record.manifest.id !== id)
+      throw new Error('Original bundle changed.');
+    return record;
+  }
+  async function beforePacketSign(
+    manifest: JitoBundleManifest,
+    packet: number,
+  ) {
+    const record = await readExactBundle(manifest.id);
+    if (
+      !isContextCurrent() ||
+      locked ||
+      session.state !== 'active' ||
+      session.revision !== manifest.sessionRevision ||
+      manifestExpired(manifest) ||
+      record.state !== 'reviewed' ||
+      record.manifest.sha256 !== manifest.sha256 ||
+      record.signatures[packet] !== null
+    )
+      throw new Error(
+        'Bundle approval or signed-in account changed. Reload saved history.',
+      );
+  }
+  async function loadOriginal(id: string) {
+    if (running.current || !historyVerified) return;
+    running.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const record = await readExactBundle(id);
+      if (!isContextCurrent()) throw Error('Bundle context changed.');
+      setBundles((prior) =>
+        [record, ...prior.filter((item) => item.manifest.id !== id)].slice(
+          0,
+          20,
+        ),
+      );
+    } catch {
+      if (isContextCurrent())
+        setError('Original saved bundle unavailable. Reload history.');
+    } finally {
+      running.current = false;
+      if (isContextCurrent()) setBusy(false);
+    }
+  }
+  async function registerPacket(
+    manifest: JitoBundleManifest,
+    packet: number,
+    transaction: string,
+    signingOperation?: JitoOperationToken,
+  ) {
+    if (!ownerScope || !isContextCurrent() || manifestExpired(manifest))
+      throw new Error(
+        'Signed-in account or bundle changed. Reload saved history.',
+      );
+    const checked = await createJitoPacketRecovery(
+      manifest,
+      packet,
+      transaction,
+    );
+    if (!isContextCurrent() || manifestExpired(manifest))
+      throw new Error(
+        'Signed-in account or bundle changed. Reload saved history.',
+      );
+    const record = await action(
+      {
+        action: 'register',
+        id: manifest.id,
+        sha256: manifest.sha256,
+        approved: true,
+        packet,
+        transaction,
+      },
+      {
+        id: manifest.id,
+        digest: manifest.sha256,
+        packet,
+        signature: checked.signature,
+      },
+      signingOperation,
+    );
+    if (
+      !isContextCurrent() ||
+      !record ||
+      record.manifest.sha256 !== manifest.sha256 ||
+      record.manifest.id !== manifest.id ||
+      record.signatures[packet] !== checked.signature
+    )
+      throw new Error(
+        'Signature registration did not match. Reload saved history.',
+      );
+    const retained = await coordinator.inspect(ownerScope, manifest, packet);
+    if (!isContextCurrent())
+      throw new Error(
+        'Signed-in account or bundle changed. Reload saved history.',
+      );
+    if (retained.status === 'retained') {
+      if (retained.signature !== checked.signature)
+        throw new Error('Retained signature differs.');
+      await coordinator.acknowledge(
+        ownerScope,
+        manifest,
+        packet,
+        checked.signature,
+        () => {
+          if (!isContextCurrent())
+            throw new Error('Signed-in account or bundle changed.');
+        },
+      );
+    }
+  }
   return (
     <details className="space-y-3 rounded-md border p-3">
       <summary>Jito atomic bundle · up to 4 wallet swaps</summary>
@@ -231,6 +518,18 @@ function JitoAtomicBundleForContext({
         aria-label="Jito atomic bundle"
         className="min-w-0 space-y-3 break-words"
       >
+        {!ownerScope && (
+          <output>
+            {identityPending
+              ? 'Checking the signed-in account…'
+              : 'Sign in and reload bundle history to verify the current account.'}
+          </output>
+        )}
+        <p>
+          Signed-packet recovery remains only in memory while this bundle panel
+          stays mounted. Closing or reloading the page may lose it. If the
+          signature cannot be verified, it cannot be recovered here.
+        </p>
         <p>
           Choose one to four due session entries, prepare fresh swaps together,
           then review the complete bundle before signing. The final transaction
@@ -246,9 +545,34 @@ function JitoAtomicBundleForContext({
           bundle.
         </p>
         <TransactionDeliveryNotice transport="jito-bundle" />
-        <Button disabled={busy} variant="outline" onClick={() => run()}>
+        {coordinator.operationActive() && (
+          <p>Another Jito action is in progress.</p>
+        )}
+        <Button
+          disabled={busy || !ownerScope}
+          variant="outline"
+          onClick={() => run()}
+        >
           Load bundle approvals and history
         </Button>
+        {historyVerified &&
+          ownerScope &&
+          coordinator
+            .pending(ownerScope, projectId, session.id)
+            .filter(
+              (item) =>
+                !bundles.some((bundle) => bundle.manifest.id === item.bundleId),
+            )
+            .map((item) => (
+              <Button
+                key={`${item.bundleId}:${item.packet}`}
+                disabled={busy}
+                variant="outline"
+                onClick={() => void loadOriginal(item.bundleId)}
+              >
+                Load original bundle {item.bundleId}, packet {item.packet + 1}
+              </Button>
+            ))}
         {session.terms.entries.map((e) => (
           <label key={e.entry} className="flex items-start gap-2">
             <input
@@ -310,7 +634,11 @@ function JitoAtomicBundleForContext({
         />
         <Button
           disabled={
-            busy || locked || session.state !== 'active' || !entries.length
+            busy ||
+            coordinator.operationActive() ||
+            locked ||
+            session.state !== 'active' ||
+            !entries.length
           }
           onClick={() =>
             run({
@@ -327,7 +655,11 @@ function JitoAtomicBundleForContext({
         </Button>
         <Button
           disabled={
-            busy || locked || session.state !== 'active' || !selected.length
+            busy ||
+            coordinator.operationActive() ||
+            locked ||
+            session.state !== 'active' ||
+            !selected.length
           }
           onClick={() => {
             try {
@@ -354,6 +686,8 @@ function JitoAtomicBundleForContext({
           const m = bundle.manifest,
             expired = Date.parse(m.expiresAt) <= now;
           const canSign =
+            Boolean(ownerScope) &&
+            !coordinator.operationActive() &&
             !busy &&
             !locked &&
             session.state === 'active' &&
@@ -368,6 +702,7 @@ function JitoAtomicBundleForContext({
               <JitoSequentialCheck
                 key={m.sha256}
                 manifest={m}
+                ownerScope={ownerScope ?? ''}
                 disabled={!canSign || bundle.signatures.some(Boolean)}
               />
               <p>
@@ -446,43 +781,72 @@ function JitoAtomicBundleForContext({
                   Jito bundle ID: <code>{bundle.bundleId}</code>.
                 </p>
               )}
-              {bundle.state === 'reviewed' &&
-                m.swaps.concat([]).map((_, i) =>
-                  bundle.signatures[i] ? null : (
-                    <JitoPacketSigning
-                      key={`${m.id}:${i}`}
+              {historyVerified &&
+                ownerScope &&
+                Array.from({ length: m.swaps.length + 1 }, (_, packet) =>
+                  coordinator.has(ownerScope, m.id, packet) ? (
+                    <JitoMemoryRecovery
+                      key={`${m.id}:memory:${packet}:${memoryRevision}:${bundle.signatures[packet] ?? ''}`}
+                      ownerScope={ownerScope}
                       manifest={m}
-                      packet={i}
-                      disabled={!canSign}
-                      register={async (transaction) => {
-                        await action({
-                          action: 'register',
-                          id: m.id,
-                          sha256: m.sha256,
-                          approved: true,
-                          packet: i,
-                          transaction,
-                        });
-                      }}
+                      packet={packet}
+                      coordinator={coordinator}
+                      revision={memoryRevision}
+                      registrationAllowed={
+                        canSign && !bundle.signatures[packet]
+                      }
+                      serverSignature={bundle.signatures[packet]}
+                      isContextCurrent={isContextCurrent}
+                      register={(transaction) =>
+                        registerPacket(m, packet, transaction)
+                      }
                     />
-                  ),
+                  ) : null,
                 )}
+              {bundle.state === 'reviewed' &&
+                m.swaps
+                  .concat([])
+                  .map((_, i) =>
+                    bundle.signatures[i] ? null : (
+                      <JitoPacketSigning
+                        key={`${m.id}:${i}`}
+                        manifest={m}
+                        packet={i}
+                        disabled={
+                          !canSign ||
+                          Boolean(
+                            ownerScope && coordinator.has(ownerScope, m.id, i),
+                          )
+                        }
+                        ownerScope={ownerScope!}
+                        coordinator={coordinator}
+                        isContextCurrent={isContextCurrent}
+                        beforeSign={() => beforePacketSign(m, i)}
+                        register={(transaction, token) =>
+                          registerPacket(m, i, transaction, token)
+                        }
+                      />
+                    ),
+                  )}
               {bundle.state === 'reviewed' && !bundle.signatures.at(-1) && (
                 <JitoPacketSigning
                   key={`${m.id}:tip`}
                   manifest={m}
                   packet={m.swaps.length}
-                  disabled={!canSign}
-                  register={async (transaction) => {
-                    await action({
-                      action: 'register',
-                      id: m.id,
-                      sha256: m.sha256,
-                      approved: true,
-                      packet: m.swaps.length,
-                      transaction,
-                    });
-                  }}
+                  disabled={
+                    !canSign ||
+                    Boolean(
+                      ownerScope &&
+                      coordinator.has(ownerScope, m.id, m.swaps.length),
+                    )
+                  }
+                  ownerScope={ownerScope!}
+                  coordinator={coordinator}
+                  isContextCurrent={isContextCurrent}
+                  beforeSign={() => beforePacketSign(m, m.swaps.length)}
+                  register={(transaction, token) =>
+                    registerPacket(m, m.swaps.length, transaction, token)
+                  }
                 />
               )}
               {bundle.state === 'reviewed' && complete && (
@@ -520,7 +884,7 @@ function JitoAtomicBundleForContext({
                   bundle.state,
                 ) && (
                   <Button
-                    disabled={busy}
+                    disabled={busy || coordinator.operationActive()}
                     variant="outline"
                     onClick={() => run({ action: 'recover', id: m.id })}
                   >
@@ -530,7 +894,18 @@ function JitoAtomicBundleForContext({
               {!bundle.signatures.some(Boolean) &&
                 bundle.state === 'reviewed' && (
                   <Button
-                    disabled={busy}
+                    disabled={
+                      busy ||
+                      coordinator.operationActive() ||
+                      Boolean(
+                        ownerScope &&
+                        Array.from(
+                          { length: m.swaps.length + 1 },
+                          (_, packet) =>
+                            coordinator.has(ownerScope, m.id, packet),
+                        ).some(Boolean),
+                      )
+                    }
                     variant="outline"
                     onClick={() => run({ action: 'cancel', id: m.id })}
                   >

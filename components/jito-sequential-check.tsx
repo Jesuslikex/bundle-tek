@@ -9,6 +9,7 @@ import {
   type JitoSequentialCheckResult,
 } from '@/lib/jito-sequential-check-result';
 import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
+import { JITO_OWNER_SCOPE_HEADER } from '@/lib/jito-owner-scope';
 import { Button } from './ui/button';
 
 const refusedText: Record<JitoSequentialCheckResult['reason'], string> = {
@@ -28,6 +29,7 @@ const refusedText: Record<JitoSequentialCheckResult['reason'], string> = {
 export function JitoSequentialCheck(props: {
   manifest: JitoBundleManifest;
   disabled: boolean;
+  ownerScope: string;
 }) {
   return (
     <JitoSequentialCheckForContext key={JSON.stringify(props)} {...props} />
@@ -36,9 +38,11 @@ export function JitoSequentialCheck(props: {
 function JitoSequentialCheckForContext({
   manifest,
   disabled,
+  ownerScope,
 }: {
   manifest: JitoBundleManifest;
   disabled: boolean;
+  ownerScope: string;
 }) {
   const [result, setResult] = useState<JitoSequentialCheckResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -71,6 +75,7 @@ function JitoSequentialCheckForContext({
         signal.aborted ||
         !mounted.current ||
         disabled ||
+        !/^[a-f0-9]{64}$/.test(ownerScope) ||
         Date.parse(snapshot.expiresAt) <= Date.now()
       )
         throw Error('Sequential check context changed.');
@@ -84,13 +89,18 @@ function JitoSequentialCheckForContext({
         redirect: 'error',
         cache: 'no-store',
         signal,
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          [JITO_OWNER_SCOPE_HEADER]: ownerScope,
+        },
         body: JSON.stringify({
           action: 'check-sequential',
           id: snapshot.id,
           sha256: snapshot.sha256,
         }),
       });
+      if (response.headers.get(JITO_OWNER_SCOPE_HEADER) !== ownerScope)
+        throw Error('Signed-in account changed.');
       const value = await readBoundedPanelJson(response, signal);
       assertCurrent();
       if (response.status === 429) {

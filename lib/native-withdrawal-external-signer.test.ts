@@ -32,6 +32,105 @@ function wallet(
     },
   } as unknown as NativeWithdrawalExternalWallet;
 }
+it('does not invoke the external withdrawal signer if the optional owner fence fails', async () => {
+  const f = await nativeWithdrawalFixture();
+  const sign = vi.fn(async () => [
+    {
+      signedTransaction: Uint8Array.from(atob(f.signed.transaction), (c) =>
+        c.charCodeAt(0),
+      ),
+    },
+  ]);
+  const beforeSign = vi.fn(async (): Promise<void> => {
+    throw Error('fence');
+  });
+  const onSignerStart = vi.fn();
+  const register = vi.fn(async () => {});
+  await expect(
+    signExternalNativeWithdrawal(
+      wallet(f.wallet, sign),
+      f.review,
+      () => {},
+      register,
+      { beforeSign, onSignerStart },
+    ),
+  ).rejects.toThrow('fence');
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(sign).not.toHaveBeenCalled();
+  beforeSign.mockResolvedValue();
+  await signExternalNativeWithdrawal(
+    wallet(f.wallet, sign),
+    f.review,
+    () => {},
+    register,
+    { beforeSign, onSignerStart },
+  );
+  expect(onSignerStart).toHaveBeenCalledOnce();
+  expect(sign).toHaveBeenCalledOnce();
+  expect(onSignerStart.mock.invocationCallOrder[0]).toBeLessThan(
+    sign.mock.invocationCallOrder[0],
+  );
+});
+it('refuses external withdrawal metadata changed during the async owner fence', async () => {
+  const f = await nativeWithdrawalFixture();
+  const sign = vi.fn(async () => []);
+  const onSignerStart = vi.fn();
+  await expect(
+    signExternalNativeWithdrawal(
+      wallet(f.wallet, sign),
+      f.review,
+      () => {},
+      async () => {},
+      {
+        beforeSign: async () => {
+          f.review.expiresAt = new Date(
+            Date.parse(f.review.expiresAt) + 1000,
+          ).toISOString();
+        },
+        onSignerStart,
+      },
+    ),
+  ).rejects.toThrow();
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(sign).not.toHaveBeenCalled();
+});
+it.each([false, true])(
+  'does not introduce a pre-prompt rejection for a rebuilt feature wrapper with a stable signer, hooks=%s',
+  async (useHooks) => {
+    const f = await nativeWithdrawalFixture();
+    const sign = vi.fn(async () => [
+      {
+        signedTransaction: Uint8Array.from(atob(f.signed.transaction), (c) =>
+          c.charCodeAt(0),
+        ),
+      },
+    ]);
+    const w = wallet(f.wallet, sign),
+      features = w.features;
+    Object.defineProperty(w, 'features', {
+      get: () => ({
+        ...features,
+        'solana:signTransaction': {
+          ...(features['solana:signTransaction'] as object),
+        },
+      }),
+    });
+    const retain = vi.fn(async () => {}),
+      onSignerStart = vi.fn();
+    await expect(
+      signExternalNativeWithdrawal(
+        w,
+        f.review,
+        () => {},
+        retain,
+        useHooks ? { beforeSign: async () => {}, onSignerStart } : undefined,
+      ),
+    ).rejects.toThrow('Wallet changed after signing');
+    expect(sign).toHaveBeenCalledOnce();
+    expect(retain).toHaveBeenCalledOnce();
+    expect(onSignerStart).toHaveBeenCalledTimes(useHooks ? 1 : 0);
+  },
+);
 it.each([false, true])(
   'uses legacy mainnet sign-only and retains returned signatures before account-change checks with Token-2022 fee=%s',
   async (fee) => {

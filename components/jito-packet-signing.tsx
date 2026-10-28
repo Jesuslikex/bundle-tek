@@ -26,17 +26,31 @@ import {
   readJitoPacketRecovery,
   JITO_RECOVERY_FILE_MAX_BYTES,
 } from '@/lib/jito-packet-recovery';
+import { WalletSigningRejected } from '@/lib/wallet-signing-rejection';
+import type {
+  JitoMemoryReservation,
+  JitoMemorySignatureRecovery,
+  JitoOperationToken,
+} from '@/lib/jito-memory-signature-recovery';
 
 export function JitoPacketSigning({
   manifest,
   packet,
   disabled,
   register,
+  ownerScope,
+  coordinator,
+  isContextCurrent,
+  beforeSign,
 }: {
   manifest: JitoBundleManifest;
   packet: number;
   disabled: boolean;
-  register: (transaction: string) => Promise<void>;
+  register: (transaction: string, token?: JitoOperationToken) => Promise<void>;
+  ownerScope: string;
+  coordinator: JitoMemorySignatureRecovery;
+  isContextCurrent: () => boolean;
+  beforeSign: () => Promise<void>;
 }) {
   const field = useId(),
     mounted = useRef(true),
@@ -75,22 +89,62 @@ export function JitoPacketSigning({
   }, [swap]);
   async function sign() {
     if (!accepted || disabled || running.current || pending) return;
+    let operation: JitoOperationToken;
+    try {
+      operation = coordinator.startOperation(ownerScope, manifest.id, packet);
+    } catch {
+      setError('Another Jito action is in progress.');
+      return;
+    }
     running.current = true;
     setBusy(true);
     setError('');
     const passphrase = password;
     setPassword('');
     const assertCurrent = () => {
-      if (!mounted.current || Date.parse(manifest.expiresAt) <= Date.now())
+      if (
+        !mounted.current ||
+        !isContextCurrent() ||
+        Date.parse(manifest.expiresAt) <= Date.now()
+      )
         throw new Error(
           'Bundle changed or expired. Keep any signature for recovery.',
         );
     };
+    let reservation: JitoMemoryReservation | null = null;
+    let started = false;
     try {
       await requireJitoManifest(manifest);
       assertCurrent();
+      reservation = await coordinator.reserve(ownerScope, manifest, packet);
+      assertCurrent();
       let transaction: string,
         registered = false;
+      const hooks = {
+        beforeSign,
+        onSignerStart: () => {
+          assertCurrent();
+          coordinator.markStarted(reservation!);
+          started = true;
+        },
+        retainSigned: async (signed: { transaction: string }) => {
+          await coordinator.capture(reservation!, manifest, signed.transaction);
+        },
+      };
+      const retainAndRegister = async (signed: { transaction: string }) => {
+        await coordinator.capture(reservation!, manifest, signed.transaction);
+        if (
+          !mounted.current ||
+          !isContextCurrent() ||
+          Date.parse(manifest.expiresAt) <= Date.now()
+        )
+          throw new Error(
+            'Bundle context changed. Reload saved history to recover the signed packet.',
+          );
+        setPending(signed.transaction);
+        await register(signed.transaction, operation);
+        registered = true;
+      };
       if (choice === 'vault') {
         const encrypted = localStorage.getItem(VAULT_STORAGE_KEY);
         if (!encrypted)
@@ -99,9 +153,20 @@ export function JitoPacketSigning({
           );
         let session = await unlockVault(encrypted, passphrase);
         try {
+          assertCurrent();
           const signed = swap
-            ? await signApprovedWarmupPacket(session, swap, assertCurrent)
-            : await signNativeWithdrawal(session, manifest.tip, assertCurrent);
+            ? await signApprovedWarmupPacket(
+                session,
+                swap,
+                assertCurrent,
+                hooks,
+              )
+            : await signNativeWithdrawal(
+                session,
+                manifest.tip,
+                assertCurrent,
+                hooks,
+              );
           transaction = signed.transaction;
         } finally {
           // Drop decrypted seeds as soon as this one explicit signing action ends.
@@ -120,11 +185,8 @@ export function JitoPacketSigning({
               external,
               swap,
               assertCurrent,
-              async (signed) => {
-                if (mounted.current) setPending(signed.transaction);
-                await register(signed.transaction);
-                registered = true;
-              },
+              retainAndRegister,
+              hooks,
             )
           ).transaction;
         } else {
@@ -135,25 +197,40 @@ export function JitoPacketSigning({
               external,
               manifest.tip,
               assertCurrent,
-              async (signed) => {
-                if (mounted.current) setPending(signed.transaction);
-                await register(signed.transaction);
-                registered = true;
-              },
+              retainAndRegister,
+              hooks,
             )
           ).transaction;
         }
       }
-      if (mounted.current) setPending(transaction);
-      if (!registered) await register(transaction);
+      if (
+        !mounted.current ||
+        !isContextCurrent() ||
+        Date.parse(manifest.expiresAt) <= Date.now()
+      )
+        throw new Error(
+          'Bundle context changed. Reload saved history to recover the signed packet.',
+        );
+      setPending(transaction);
+      if (!registered) await register(transaction, operation);
       if (mounted.current) {
         setPending(null);
         setAccepted(false);
       }
     } catch (e) {
+      if (reservation) {
+        try {
+          if (!started) coordinator.releaseUnstarted(reservation);
+          else if (e instanceof WalletSigningRejected)
+            coordinator.releaseRejected(reservation, e);
+        } catch {
+          // Keep any started or retained reservation for explicit recovery.
+        }
+      }
       if (mounted.current)
         setError(e instanceof Error ? e.message : 'Signing did not complete.');
     } finally {
+      coordinator.finishOperation(operation);
       running.current = false;
       if (mounted.current) setBusy(false);
     }

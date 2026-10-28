@@ -332,6 +332,14 @@ export async function signNativeWithdrawal(
   session: VaultSession,
   review: NativeWithdrawalReview,
   assertCurrent: () => void,
+  hooks?: {
+    beforeSign?: () => Promise<void>;
+    onSignerStart?: () => void;
+    retainSigned?: (signed: {
+      signature: string;
+      transaction: string;
+    }) => Promise<void>;
+  },
 ) {
   const { message } = await inspectNativeWithdrawal(
     review,
@@ -344,6 +352,30 @@ export async function signNativeWithdrawal(
   );
   if (!wallet || !/^[a-f0-9]{64}$/.test(wallet.seed))
     throw new Error('Reviewed wallet is not in this vault.');
+  if (hooks?.beforeSign) {
+    const originalReview = JSON.stringify(review);
+    await hooks.beforeSign();
+    assertCurrent();
+    const rechecked = await inspectNativeWithdrawal(
+      review,
+      review.transaction,
+      false,
+    );
+    if (
+      JSON.stringify(review) !== originalReview ||
+      rechecked.message.length !== message.length ||
+      rechecked.message.some((byte, index) => byte !== message[index])
+    )
+      throw new Error('Withdrawal packet changed during signer preparation.');
+    assertCurrent();
+    if (
+      session.payload.wallets.find(
+        (w) => w.family === 'solana' && w.address === review.wallet,
+      ) !== wallet ||
+      !/^[a-f0-9]{64}$/.test(wallet.seed)
+    )
+      throw new Error('Reviewed wallet is not in this vault.');
+  }
   const seed = Uint8Array.from(wallet.seed.match(/../g)!, (s) =>
       parseInt(s, 16),
     ),
@@ -355,10 +387,17 @@ export async function signNativeWithdrawal(
       bs58.encode(pair.publicKey) !== review.wallet
     )
       throw new Error('Withdrawal approval expired or changed.');
+    hooks?.onSignerStart?.();
     const signature = nacl.sign.detached(message, pair.secretKey);
     const transaction = encode(Uint8Array.from([1, ...signature, ...message]));
+    const result = { signature: bs58.encode(signature), transaction };
+    if (hooks?.retainSigned) {
+      seed.fill(0);
+      pair.secretKey.fill(0);
+      await hooks.retainSigned({ ...result });
+    }
     assertCurrent();
-    return { signature: bs58.encode(signature), transaction };
+    return result;
   } finally {
     seed.fill(0);
     pair.secretKey.fill(0);

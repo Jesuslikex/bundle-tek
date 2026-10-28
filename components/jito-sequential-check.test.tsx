@@ -9,9 +9,16 @@ import {
   JITO_SEQUENTIAL_CHECK_AUTHORITY,
   type JitoSequentialCheckResult,
 } from '@/lib/jito-sequential-check-result';
+import { JITO_OWNER_SCOPE_HEADER } from '@/lib/jito-owner-scope';
 import type { JitoBundleManifest } from '@/lib/jito-bundle';
 let root: Root | null, container: HTMLDivElement;
 const fetcher = vi.fn();
+const scope = 'ab'.repeat(32);
+const scopedJson = (value: unknown, init?: ResponseInit) =>
+  Response.json(value, {
+    ...init,
+    headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+  });
 beforeEach(() => {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -33,7 +40,11 @@ const button = () => container.querySelector('button')!;
 async function render(manifest: JitoBundleManifest, disabled = false) {
   await act(async () => {
     root!.render(
-      <JitoSequentialCheck manifest={manifest} disabled={disabled} />,
+      <JitoSequentialCheck
+        manifest={manifest}
+        disabled={disabled}
+        ownerScope={scope}
+      />,
     );
   });
 }
@@ -91,7 +102,7 @@ it('performs no automatic read and explains unsigned-only availability', async (
 it('sends only the explicit saved identity and renders an exact-bank refusal without wallet access', async () => {
   const { manifest } = await jitoBundleFixture();
   const storage = vi.spyOn(Storage.prototype, 'getItem');
-  fetcher.mockResolvedValue(Response.json({ sequentialCheck: dto(manifest) }));
+  fetcher.mockResolvedValue(scopedJson({ sequentialCheck: dto(manifest) }));
   await render(manifest);
   act(() => button().click());
   await until(() => Boolean(container.querySelector('output')));
@@ -109,6 +120,9 @@ it('sends only the explicit saved identity and renders an exact-bank refusal wit
     redirect: 'error',
     cache: 'no-store',
   });
+  expect(
+    (init.headers as Record<string, string>)[JITO_OWNER_SCOPE_HEADER],
+  ).toBe(scope);
   expect(container.textContent).toContain(
     'exact simulation bank is unavailable',
   );
@@ -121,10 +135,45 @@ it('sends only the explicit saved identity and renders an exact-bank refusal wit
   expect(container.textContent).toContain('never signs, sends or retries');
   expect(storage).not.toHaveBeenCalled();
 });
+it.each([null, 'cd'.repeat(32)])(
+  'refuses a missing or mismatched response scope',
+  async (returnedScope) => {
+    const { manifest } = await jitoBundleFixture();
+    fetcher.mockResolvedValue(
+      Response.json(
+        { sequentialCheck: dto(manifest) },
+        {
+          headers: returnedScope
+            ? { [JITO_OWNER_SCOPE_HEADER]: returnedScope }
+            : {},
+        },
+      ),
+    );
+    await render(manifest);
+    act(() => button().click());
+    await until(() => Boolean(container.querySelector('[role="alert"]')));
+    expect(container.querySelector('output')).toBeNull();
+  },
+);
+it('does not issue a diagnostic request without an authenticated owner scope', async () => {
+  const { manifest } = await jitoBundleFixture();
+  await act(async () =>
+    root!.render(
+      <JitoSequentialCheck
+        manifest={manifest}
+        disabled={false}
+        ownerScope=""
+      />,
+    ),
+  );
+  act(() => button().click());
+  await until(() => Boolean(container.querySelector('[role="alert"]')));
+  expect(fetcher).not.toHaveBeenCalled();
+});
 it('labels successful frame checks as diagnostic and unqualified', async () => {
   const { manifest } = await jitoBundleFixture();
   fetcher.mockResolvedValue(
-    Response.json({ sequentialCheck: dto(manifest, true) }),
+    scopedJson({ sequentialCheck: dto(manifest, true) }),
   );
   await render(manifest);
   act(() => button().click());
@@ -146,7 +195,7 @@ it.each(['authority', 'binding', 'raw'])(
     if (kind === 'authority') result.signingAllowed = true;
     else if (kind === 'binding') result.manifestSha256 = '00'.repeat(32);
     else result.rawResponse = 'FAKE_PRIVATE_RAW_SECRET';
-    fetcher.mockResolvedValue(Response.json({ sequentialCheck: result }));
+    fetcher.mockResolvedValue(scopedJson({ sequentialCheck: result }));
     await render(manifest);
     act(() => button().click());
     await until(() => Boolean(container.querySelector('[role="alert"]')));
@@ -186,7 +235,7 @@ it('allows only one in-flight explicit read', async () => {
   await until(() => fetcher.mock.calls.length === 1);
   expect(button().disabled).toBe(true);
   await act(async () => {
-    resolve(Response.json({ sequentialCheck: dto(manifest) }));
+    resolve(scopedJson({ sequentialCheck: dto(manifest) }));
   });
   await until(() => !button().disabled);
   expect(fetcher).toHaveBeenCalledOnce();
@@ -214,7 +263,7 @@ it.each(['context', 'disabled', 'unmount'])(
     }
     expect(signal.aborted).toBe(true);
     await act(async () => {
-      resolve(Response.json({ sequentialCheck: dto(manifest) }));
+      resolve(scopedJson({ sequentialCheck: dto(manifest) }));
     });
     expect(container.querySelector('output')).toBeNull();
     expect(fetcher).toHaveBeenCalledOnce();
@@ -232,7 +281,7 @@ it('refuses an expired review before the read starts', async () => {
 it('explains the existing owner review gate without showing server text or retrying', async () => {
   const { manifest } = await jitoBundleFixture();
   fetcher.mockResolvedValue(
-    Response.json({ error: 'FAKE_RATE_PRIVATE_TEXT' }, { status: 429 }),
+    scopedJson({ error: 'FAKE_RATE_PRIVATE_TEXT' }, { status: 429 }),
   );
   await render(manifest);
   act(() => button().click());

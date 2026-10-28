@@ -156,6 +156,7 @@ export async function signApprovedExternalWarmupPacket(
     signature: string;
     transaction: string;
   }) => Promise<void>,
+  hooks?: { beforeSign?: () => Promise<void>; onSignerStart?: () => void },
 ) {
   const sign = features(wallet).sign,
     account = await resolveWarmupExternalAccount(wallet, review.wallet);
@@ -193,6 +194,20 @@ export async function signApprovedExternalWarmupPacket(
       );
   };
   requireCurrent();
+  if (hooks?.beforeSign) {
+    const originalReview = JSON.stringify(review);
+    await hooks.beforeSign();
+    requireCurrent();
+    const rechecked = await requireApprovedWarmupPacket(review, assertCurrent);
+    if (
+      JSON.stringify(review) !== originalReview ||
+      rechecked.bytes.length !== bytes.length ||
+      rechecked.bytes.some((byte, index) => byte !== bytes[index])
+    )
+      throw new Error('Approved packet changed during signer preparation.');
+    requireCurrent();
+  }
+  hooks?.onSignerStart?.();
   let outputs;
   try {
     outputs = await sign.signTransaction({

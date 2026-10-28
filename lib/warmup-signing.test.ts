@@ -1,4 +1,4 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import { solanaTransferMessage } from './solana-funding';
@@ -53,6 +53,42 @@ async function fixture() {
   } as VaultSession;
   return { review, session, message, bytes };
 }
+it('invokes the optional local boundary only after preflight and refuses a failed fence', async () => {
+  const f = await fixture();
+  const derive = vi.spyOn(nacl.sign.keyPair, 'fromSeed');
+  const beforeSign = vi.fn(async (): Promise<void> => {
+    throw Error('fence');
+  });
+  const onSignerStart = vi.fn();
+  const empty = {
+    ...f.session,
+    payload: { ...f.session.payload, wallets: [] },
+  };
+  await expect(
+    signApprovedWarmupPacket(empty, f.review, () => {}, {
+      beforeSign,
+      onSignerStart,
+    }),
+  ).rejects.toThrow();
+  expect(beforeSign).not.toHaveBeenCalled();
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(derive).not.toHaveBeenCalled();
+  await expect(
+    signApprovedWarmupPacket(f.session, f.review, () => {}, {
+      beforeSign,
+      onSignerStart,
+    }),
+  ).rejects.toThrow('fence');
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(derive).not.toHaveBeenCalled();
+  beforeSign.mockResolvedValue();
+  await signApprovedWarmupPacket(f.session, f.review, () => {}, {
+    beforeSign,
+    onSignerStart,
+  });
+  expect(onSignerStart).toHaveBeenCalledOnce();
+  derive.mockRestore();
+});
 it('signs only the immutable approved envelope using the matching local vault key', async () => {
   const f = await fixture();
   const signed = await signApprovedWarmupPacket(f.session, f.review, () => {});
@@ -81,6 +117,62 @@ it('signs only the immutable approved envelope using the matching local vault ke
       throw new Error('changed');
     }),
   ).rejects.toThrow('changed');
+});
+it('refuses local review metadata changed during the async owner fence', async () => {
+  const f = await fixture();
+  const onSignerStart = vi.fn();
+  await expect(
+    signApprovedWarmupPacket(f.session, f.review, () => {}, {
+      beforeSign: async () => {
+        f.review.expiresAt = new Date(
+          Date.parse(f.review.expiresAt) + 1000,
+        ).toISOString();
+      },
+      onSignerStart,
+    }),
+  ).rejects.toThrow();
+  expect(onSignerStart).not.toHaveBeenCalled();
+});
+it('retains the exact local signature before a post-sign context refusal and never submits it', async () => {
+  const f = await fixture();
+  let changed = false;
+  let retained: { signature: string; transaction: string } | null = null;
+  const retainSigned = vi.fn(
+    async (value: { signature: string; transaction: string }) => {
+      retained = value;
+      changed = true;
+    },
+  );
+  await expect(
+    signApprovedWarmupPacket(
+      f.session,
+      f.review,
+      () => {
+        if (changed) throw Error('expired');
+      },
+      { retainSigned },
+    ),
+  ).rejects.toThrow('expired');
+  expect(retainSigned).toHaveBeenCalledOnce();
+  const bytes = Uint8Array.from(atob(retained!.transaction), (c) =>
+    c.charCodeAt(0),
+  );
+  expect(bytes.slice(65)).toEqual(f.message);
+  expect(bs58.encode(bytes.slice(1, 65))).toBe(retained!.signature);
+  expect(
+    nacl.sign.detached.verify(
+      f.message,
+      bytes.slice(1, 65),
+      bs58.decode(f.review.wallet),
+    ),
+  ).toBe(true);
+  await expect(
+    signApprovedWarmupPacket(f.session, f.review, () => {}, {
+      retainSigned: async () => {
+        throw Error('retention failed');
+      },
+    }),
+  ).rejects.toThrow('retention failed');
 });
 it('restores server-owned quote fields and refuses changed or expired packets', async () => {
   const f = await fixture();

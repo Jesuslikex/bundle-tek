@@ -97,6 +97,7 @@ export async function signExternalNativeWithdrawal(
     signature: string;
     transaction: string;
   }) => Promise<void>,
+  hooks?: { beforeSign?: () => Promise<void>; onSignerStart?: () => void },
 ) {
   const { bytes } = await inspectNativeWithdrawal(
       review,
@@ -108,6 +109,30 @@ export async function signExternalNativeWithdrawal(
   assertCurrent();
   if (!account || Date.parse(review.expiresAt) <= Date.now())
     throw new Error('Withdrawal wallet differs or approval expired.');
+  if (hooks?.beforeSign) {
+    const originalReview = JSON.stringify(review);
+    await hooks.beforeSign();
+    assertCurrent();
+    const rechecked = await inspectNativeWithdrawal(
+      review,
+      review.transaction,
+      false,
+    );
+    if (
+      JSON.stringify(review) !== originalReview ||
+      rechecked.bytes.length !== bytes.length ||
+      rechecked.bytes.some((byte, index) => byte !== bytes[index])
+    )
+      throw new Error('Withdrawal packet changed during signer preparation.');
+    assertCurrent();
+    if (
+      features(wallet).sign.signTransaction !== sign.signTransaction ||
+      matchingNativeWithdrawalAccount(wallet, review.wallet) !== account ||
+      Date.parse(review.expiresAt) <= Date.now()
+    )
+      throw new Error('Withdrawal wallet differs or approval expired.');
+  }
+  hooks?.onSignerStart?.();
   let outputs;
   try {
     outputs = await sign.signTransaction({

@@ -6,6 +6,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import type { TradeSession } from '@/lib/imported-trade-session';
+import {
+  JITO_OWNER_SCOPE_HEADER,
+  jitoOwnerScope,
+} from '@/lib/jito-owner-scope';
+vi.mock('better-auth/react', () => ({
+  createAuthClient: () => ({
+    useSession: () => ({ data: { user: { id: 'alice' } }, isPending: false }),
+  }),
+}));
 vi.mock('./jito-packet-signing', () => ({
   JitoPacketSigning: () => <p>Explicit packet signing</p>,
 }));
@@ -80,6 +89,16 @@ async function render(session: TradeSession, locked = false) {
       />,
     ),
   );
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).not.toContain(
+      'Sign in and reload bundle history to verify the current account.',
+    );
+    expect(container.textContent).not.toContain(
+      'Checking the signed-in account',
+    );
+    expect(button('Load bundle approvals').disabled).toBe(false);
+  });
 }
 function button(text: string) {
   const value = [...container.querySelectorAll('button')].find((b) =>
@@ -94,16 +113,23 @@ async function click(text: string) {
 }
 it('requires separate unchecked submission approval, then a lost response recovers without another send', async () => {
   const { session, bundle, history } = await fixture();
+  const scope = await jitoOwnerScope('alice');
   const posts: string[] = [];
   fetcher.mockImplementation(async (_url, init) => {
-    if (!init?.method) return Response.json(history);
+    if (!init?.method)
+      return Response.json(history, {
+        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+      });
     const action = JSON.parse(init.body).action;
     posts.push(action);
     if (action === 'submit') {
       bundle.state = 'submitting';
       throw Error('Lost reply');
     }
-    return Response.json({ bundle });
+    return Response.json(
+      { bundle },
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
   });
   await render(session);
   expect(fetcher).not.toHaveBeenCalled();
@@ -128,6 +154,7 @@ it('requires separate unchecked submission approval, then a lost response recove
 });
 it('aborts old history on session revision changes and ignores a late response', async () => {
   const { session, history } = await fixture();
+  const scope = await jitoOwnerScope('alice');
   let resolve!: (r: Response) => void;
   let oldSignal!: AbortSignal;
   fetcher.mockImplementation((_url, init) => {
@@ -140,18 +167,27 @@ it('aborts old history on session revision changes and ignores a late response',
   await click('Load bundle approvals');
   await render({ ...session, revision: session.revision + 1 });
   expect(oldSignal.aborted).toBe(true);
-  await act(async () => resolve(Response.json(history)));
+  await act(async () =>
+    resolve(
+      Response.json(history, { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } }),
+    ),
+  );
   expect(container.textContent).not.toContain('Submit complete Jito bundle');
   expect(container.textContent).not.toContain('Explicit packet signing');
 });
 for (const kind of ['html', 'oversized', 'unauthenticated'])
   it(`shows safe recovery guidance for ${kind} responses`, async () => {
     const { session } = await fixture();
+    const scope = await jitoOwnerScope('alice');
     fetcher.mockResolvedValue(
       kind === 'oversized'
-        ? Response.json({ padding: 'x'.repeat(1048577) })
+        ? Response.json(
+            { padding: 'x'.repeat(1048577) },
+            { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+          )
         : new Response('<html>private parser stack</html>', {
             status: kind === 'unauthenticated' ? 401 : 502,
+            headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
           }),
     );
     await render(session);

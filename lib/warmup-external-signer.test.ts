@@ -71,6 +71,50 @@ async function fixture(side: 'Buy' | 'Sell' = 'Buy') {
   };
   return { f, review, account, wallet, sign, connect, on, bytes };
 }
+it('does not invoke the external signer if the optional owner fence fails', async () => {
+  const f = await fixture();
+  const beforeSign = vi.fn(async (): Promise<void> => {
+    throw Error('fence');
+  });
+  const onSignerStart = vi.fn();
+  await expect(
+    signApprovedExternalWarmupPacket(f.wallet, f.review, () => {}, undefined, {
+      beforeSign,
+      onSignerStart,
+    }),
+  ).rejects.toThrow('fence');
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(f.sign).not.toHaveBeenCalled();
+  beforeSign.mockResolvedValue();
+  await signApprovedExternalWarmupPacket(
+    f.wallet,
+    f.review,
+    () => {},
+    undefined,
+    { beforeSign, onSignerStart },
+  );
+  expect(onSignerStart).toHaveBeenCalledOnce();
+  expect(f.sign).toHaveBeenCalledOnce();
+  expect(onSignerStart.mock.invocationCallOrder[0]).toBeLessThan(
+    f.sign.mock.invocationCallOrder[0],
+  );
+});
+it('refuses external warmup review metadata changed during the async owner fence', async () => {
+  const f = await fixture();
+  const onSignerStart = vi.fn();
+  await expect(
+    signApprovedExternalWarmupPacket(f.wallet, f.review, () => {}, undefined, {
+      beforeSign: async () => {
+        f.review.expiresAt = new Date(
+          Date.parse(f.review.expiresAt) + 1000,
+        ).toISOString();
+      },
+      onSignerStart,
+    }),
+  ).rejects.toThrow();
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(f.sign).not.toHaveBeenCalled();
+});
 it.each(['Buy', 'Sell'] as const)(
   'signs the exact reviewed native %s route with Wallet Standard mainnet signing only',
   async (side) => {

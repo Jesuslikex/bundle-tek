@@ -1,4 +1,5 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
+import nacl from 'tweetnacl';
 import { nativeWithdrawalFixture } from '../test/native-withdrawal-fixture';
 import {
   inspectNativeWithdrawal,
@@ -15,6 +16,91 @@ import {
   getBase64Encoder,
   getCompiledTransactionMessageDecoder,
 } from '@solana/kit';
+it('runs the optional withdrawal boundary only after preflight and a successful fence', async () => {
+  const f = await nativeWithdrawalFixture();
+  const derive = vi.spyOn(nacl.sign.keyPair, 'fromSeed');
+  const beforeSign = vi.fn(async (): Promise<void> => {
+    throw Error('fence');
+  });
+  const onSignerStart = vi.fn();
+  const empty = {
+    ...f.session,
+    payload: { ...f.session.payload, wallets: [] },
+  };
+  await expect(
+    signNativeWithdrawal(empty, f.review, () => {}, {
+      beforeSign,
+      onSignerStart,
+    }),
+  ).rejects.toThrow();
+  expect(beforeSign).not.toHaveBeenCalled();
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(derive).not.toHaveBeenCalled();
+  await expect(
+    signNativeWithdrawal(f.session, f.review, () => {}, {
+      beforeSign,
+      onSignerStart,
+    }),
+  ).rejects.toThrow('fence');
+  expect(onSignerStart).not.toHaveBeenCalled();
+  expect(derive).not.toHaveBeenCalled();
+  beforeSign.mockResolvedValue();
+  await signNativeWithdrawal(f.session, f.review, () => {}, {
+    beforeSign,
+    onSignerStart,
+  });
+  expect(onSignerStart).toHaveBeenCalledOnce();
+  derive.mockRestore();
+});
+it('refuses withdrawal metadata changed during the async owner fence', async () => {
+  const f = await nativeWithdrawalFixture();
+  const onSignerStart = vi.fn();
+  await expect(
+    signNativeWithdrawal(f.session, f.review, () => {}, {
+      beforeSign: async () => {
+        f.review.expiresAt = new Date(
+          Date.parse(f.review.expiresAt) + 1000,
+        ).toISOString();
+      },
+      onSignerStart,
+    }),
+  ).rejects.toThrow();
+  expect(onSignerStart).not.toHaveBeenCalled();
+});
+it('retains the exact local withdrawal before the unchanged post-sign context guard', async () => {
+  const f = await nativeWithdrawalFixture();
+  let changed = false;
+  let retained: { signature: string; transaction: string } | null = null;
+  const retainSigned = vi.fn(
+    async (value: { signature: string; transaction: string }) => {
+      retained = value;
+      changed = true;
+    },
+  );
+  await expect(
+    signNativeWithdrawal(
+      f.session,
+      f.review,
+      () => {
+        if (changed) throw Error('expired');
+      },
+      { retainSigned },
+    ),
+  ).rejects.toThrow('expired');
+  expect(retainSigned).toHaveBeenCalledOnce();
+  expect(retained).toEqual(f.signed);
+  expect(
+    (await inspectNativeWithdrawal(f.review, retained!.transaction, true))
+      .signature,
+  ).toBe(retained!.signature);
+  await expect(
+    signNativeWithdrawal(f.session, f.review, () => {}, {
+      retainSigned: async () => {
+        throw Error('retention failed');
+      },
+    }),
+  ).rejects.toThrow('retention failed');
+});
 it('prepares and independently decodes one exact legacy transfer with real Ed25519 signing', async () => {
   const f = await nativeWithdrawalFixture();
   expect(

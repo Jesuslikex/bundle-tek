@@ -32,6 +32,10 @@ vi.mock('@/lib/jito-bundle-preparation', () => ({
 }));
 vi.mock('../signing/route', () => ({ POST: mocks.approvalRecover }));
 import { GET, POST } from './route';
+import {
+  JITO_OWNER_SCOPE_HEADER,
+  jitoOwnerScope,
+} from '@/lib/jito-owner-scope';
 const id = '11111111-1111-4111-8111-111111111111';
 const request = (body: unknown, headers: Record<string, string> = {}) =>
   new Request('http://localhost/api/imported-projects/jito-bundles', {
@@ -48,6 +52,69 @@ beforeEach(() => {
       run: async () => ({ meta: { changes: 1 } }),
     }),
   }));
+});
+it('loads an exact bundle only within the verified owner, project and session', async () => {
+  const scope = await jitoOwnerScope('owner');
+  const bound: unknown[][] = [];
+  let bundleOwned = true;
+  mocks.database.mockImplementation((sql: string) => ({
+    bind: (...args: unknown[]) => {
+      bound.push(args);
+      return {
+        first: async () =>
+          sql.includes('FROM imported_trade_sessions')
+            ? { id }
+            : bundleOwned
+              ? { id }
+              : null,
+      };
+    },
+  }));
+  mocks.read.mockResolvedValue({ record: { manifest: { id } } });
+  const url = `http://localhost/api/imported-projects/jito-bundles?projectId=${id}&sessionId=${id}&bundleId=${id}`;
+  const result = await GET(
+    new Request(url, { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } }),
+  );
+  expect(result.status).toBe(200);
+  expect(await result.json()).toEqual({
+    projectId: id,
+    sessionId: id,
+    bundle: { manifest: { id } },
+  });
+  expect(bound).toEqual([
+    ['owner', id, id],
+    ['owner', id, id, id],
+  ]);
+  expect(mocks.read).toHaveBeenCalledOnce();
+  mocks.read.mockClear();
+  bundleOwned = false;
+  expect(
+    (
+      await GET(
+        new Request(url, { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } }),
+      )
+    ).status,
+  ).toBe(404);
+  expect(mocks.read).not.toHaveBeenCalled();
+  expect(
+    (
+      await GET(
+        new Request(url, {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: await jitoOwnerScope('other') },
+        }),
+      )
+    ).status,
+  ).toBe(409);
+  expect(mocks.read).not.toHaveBeenCalled();
+  expect(
+    (
+      await GET(
+        new Request(url.replace(`bundleId=${id}`, 'bundleId=bad'), {
+          headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+        }),
+      )
+    ).status,
+  ).toBe(400);
 });
 it('requires authentication, JSON, origin and explicit action-time approval before signing registration or submission', async () => {
   mocks.user = null;
@@ -167,6 +234,112 @@ it('scopes history and mutations to the signed-in owner and saved session', asyn
     ).status,
   ).toBe(200);
   expect(mocks.register.mock.calls[0][1]).toBe('owner');
+});
+it('returns only the verified account scope header on authenticated responses', async () => {
+  const scope = await jitoOwnerScope('owner');
+  const invalid = await GET(
+    new Request('http://localhost/api/imported-projects/jito-bundles'),
+  );
+  expect(invalid.status).toBe(400);
+  expect(invalid.headers.get(JITO_OWNER_SCOPE_HEADER)).toBe(scope);
+  expect(invalid.headers.get(JITO_OWNER_SCOPE_HEADER)).not.toContain('owner');
+  mocks.register.mockResolvedValue({ state: 'reviewed' });
+  const response = await POST(
+    request(
+      {
+        action: 'register',
+        id,
+        sha256: 'ab'.repeat(32),
+        approved: true,
+        packet: 0,
+        transaction: 'fixture',
+      },
+      { [JITO_OWNER_SCOPE_HEADER]: scope },
+    ),
+  );
+  expect(response.status).toBe(200);
+  expect(response.headers.get(JITO_OWNER_SCOPE_HEADER)).toBe(scope);
+  expect(await response.json()).toEqual({ bundle: { state: 'reviewed' } });
+  expect(mocks.register).toHaveBeenCalledOnce();
+});
+it('rejects another owner scope before history, action or rate-gate database access', async () => {
+  const originalScope = await jitoOwnerScope('owner');
+  mocks.user = { userId: 'another-owner' };
+  const otherScope = await jitoOwnerScope('another-owner');
+  const headers = { [JITO_OWNER_SCOPE_HEADER]: originalScope };
+  const history = await GET(
+    new Request(
+      `http://localhost/api/imported-projects/jito-bundles?projectId=${id}&sessionId=${id}`,
+      { headers },
+    ),
+  );
+  expect(history.status).toBe(409);
+  expect(history.headers.get(JITO_OWNER_SCOPE_HEADER)).toBe(otherScope);
+  for (const action of [
+    'prepare',
+    'create',
+    'register',
+    'submit',
+    'recover',
+    'cancel',
+    'check-sequential',
+  ]) {
+    const response = await POST(
+      request(
+        {
+          action,
+          id,
+          projectId: id,
+          sessionId: id,
+          sessionRevision: 1,
+          sha256: 'ab'.repeat(32),
+          approved: true,
+        },
+        headers,
+      ),
+    );
+    expect(response.status).toBe(409);
+    expect(response.headers.get(JITO_OWNER_SCOPE_HEADER)).toBe(otherScope);
+  }
+  expect(mocks.database).not.toHaveBeenCalled();
+  for (const handler of [
+    mocks.prepare,
+    mocks.create,
+    mocks.register,
+    mocks.submit,
+    mocks.recover,
+    mocks.cancel,
+    mocks.sequentialCheck,
+  ])
+    expect(handler).not.toHaveBeenCalled();
+});
+it.each(['', 'x', 'A'.repeat(64), '0'.repeat(64) + ', ' + '0'.repeat(64)])(
+  'rejects a malformed requested scope %j before provider or database work',
+  async (scope) => {
+    const response = await POST(
+      request({ action: 'submit', id }, { [JITO_OWNER_SCOPE_HEADER]: scope }),
+    );
+    expect(response.status).toBe(409);
+    expect(mocks.database).not.toHaveBeenCalled();
+    expect(mocks.submit).not.toHaveBeenCalled();
+  },
+);
+it('does not return an account scope when signed out', async () => {
+  mocks.user = null;
+  const response = await GET(
+    new Request('http://localhost/api/imported-projects/jito-bundles'),
+  );
+  expect(response.status).toBe(401);
+  expect(response.headers.has(JITO_OWNER_SCOPE_HEADER)).toBe(false);
+});
+it('fails closed for invalid authenticated identity without touching the database', async () => {
+  mocks.user = { userId: '\ud800' };
+  const response = await GET(
+    new Request('http://localhost/api/imported-projects/jito-bundles'),
+  );
+  expect(response.status).toBe(503);
+  expect(response.headers.has(JITO_OWNER_SCOPE_HEADER)).toBe(false);
+  expect(mocks.database).not.toHaveBeenCalled();
 });
 it('rate-limits provider work and leaves retained recovery state intact on failures', async () => {
   mocks.database.mockImplementation(() => ({
