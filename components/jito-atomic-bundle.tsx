@@ -1397,6 +1397,13 @@ function JitoAtomicBundleForContext({
                 {bundle.signatures.length} signed packets. Approval expires{' '}
                 {m.expiresAt}.
               </p>
+              {bundle.state === 'reviewed' && (
+                <p>
+                  Submission is unavailable until these exact signed transactions
+                  pass runtime qualification. Saved signing and recovery evidence
+                  remains available.
+                </p>
+              )}
               {bundle.state === 'submitting' && (
                 <p>
                   Submission outcome unknown. The transport attempt was reserved
@@ -1719,12 +1726,7 @@ function JitoAtomicBundleForContext({
                     tip.
                   </label>
                   <Button
-                    disabled={
-                      !canSign ||
-                      acceptedSubmit?.id !== m.id ||
-                      acceptedSubmit.digest !== m.sha256 ||
-                      acceptedSubmit.snapshot !== snapshot
-                    }
+                    disabled
                     onClick={() => {
                       if (
                         !actionIsCurrent() ||

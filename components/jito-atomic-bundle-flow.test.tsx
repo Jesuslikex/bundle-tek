@@ -229,7 +229,7 @@ function button(text: string) {
 async function click(text: string) {
   await act(async () => button(text).click());
 }
-it('requires separate unchecked submission approval, then a lost response recovers without another send', async () => {
+it('disables unqualified submission and still recovers a prior ambiguous outcome', async () => {
   const { f, session, bundle, history } = await fixture();
   const scope = await jitoOwnerScope('alice');
   const posts: string[] = [];
@@ -266,15 +266,18 @@ it('requires separate unchecked submission approval, then a lost response recove
   expect(approval.checked).toBe(false);
   await vi.waitFor(() => expect(approval.disabled).toBe(false));
   await act(async () => approval.click());
+  expect(container.textContent).toContain('Submission is unavailable until these exact signed transactions');
+  expect(button('Submit complete Jito bundle').disabled).toBe(true);
   await click('Submit complete Jito bundle');
-  await vi.waitFor(() => expect(posts).toEqual(['submit']));
-  expect(container.textContent).not.toContain('Submit complete Jito bundle');
+  expect(posts).toEqual([]);
+  // A submitting record may predate this gate; it remains recoverable.
+  bundle.state = 'submitting';
   await click('Load bundle approvals');
   await vi.waitFor(() =>
     expect(button('Check chain outcomes').disabled).toBe(false),
   );
   await click('Check chain outcomes');
-  await vi.waitFor(() => expect(posts).toEqual(['submit', 'recover']));
+  await vi.waitFor(() => expect(posts).toEqual(['recover']));
   expect(container.textContent).toContain('Submission outcome unknown');
   expect(container.textContent).not.toContain('Submit complete Jito bundle');
 });

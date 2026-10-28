@@ -448,7 +448,7 @@ it('rate-limits provider work and leaves retained recovery state intact on failu
       await POST(
         request(
           {
-            action: 'submit',
+            action: 'recover',
             id,
             sha256: 'ab'.repeat(32),
             approved: true,
@@ -459,6 +459,18 @@ it('rate-limits provider work and leaves retained recovery state intact on failu
     ).status,
   ).toBe(429);
   expect(mocks.submit).not.toHaveBeenCalled();
+});
+it('refuses approved v2 submission before database or sender work', async () => {
+  const response = await POST(request(
+    { action: 'submit', id, sha256: 'ab'.repeat(32), approved: true },
+    { 'x-jito-protocol': '2', [JITO_OWNER_SCOPE_HEADER]: await jitoOwnerScope('owner') },
+  ));
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({ error: 'Jito bundle submission is unavailable until the exact signed transactions pass runtime qualification.' });
+  expect(mocks.database).not.toHaveBeenCalled();
+  expect(mocks.submit).not.toHaveBeenCalled();
+  expect(mocks.register).not.toHaveBeenCalled();
+  expect(mocks.recover).not.toHaveBeenCalled();
 });
 it('forwards finalized receipt evidence to bundle recovery instead of reducing it to a boolean', async () => {
   const receipt = {

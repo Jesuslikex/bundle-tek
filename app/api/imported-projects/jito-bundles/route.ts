@@ -266,6 +266,14 @@ export async function POST(request: Request) {
       { error: 'Bundle client update required before this operation.' },
       409,
     );
+  // The current sequential check is unsigned and does not qualify the exact
+  // registered signed vector at its simulation bank. Do not enter the sender
+  // until a separate, verified qualification is wired here.
+  if (body.action === 'submit')
+    return reply(
+      { error: 'Jito bundle submission is unavailable until the exact signed transactions pass runtime qualification.' },
+      409,
+    );
   try {
     const db = getD1(),
       signal = AbortSignal.any([request.signal, AbortSignal.timeout(55000)]);

@@ -11,6 +11,11 @@ import {
   JITO_OWNER_SCOPE_HEADER,
   jitoOwnerScope,
 } from '@/lib/jito-owner-scope';
+// The underlying consent handler is exercised directly in this suite. The
+// real button remains disabled and its DOM behavior is checked separately.
+vi.mock('./ui/button', () => ({
+  Button: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} />,
+}));
 vi.mock('better-auth/react', () => ({
   createAuthClient: () => ({
     useSession: () => ({ data: { user: { id: 'alice' } }, isPending: false }),
@@ -298,9 +303,8 @@ function consentCheck() {
 }
 async function approve() {
   await act(async () => consentCheck().click());
-  await vi.waitFor(() =>
-    expect(button('Submit complete Jito bundle').disabled).toBe(false),
-  );
+  await vi.waitFor(() => expect(consentCheck().checked).toBe(true));
+  expect(button('Submit complete Jito bundle').disabled).toBe(true);
 }
 it('rejects a stale submit click after consent is unchecked and rechecked', async () => {
   const f = await setupConsent();
@@ -310,7 +314,9 @@ it('rejects a stale submit click after consent is unchecked and rechecked', asyn
   await approve();
   await act(async () => stale({}));
   expect(f.posts).toEqual([]);
-  await click('Submit complete Jito bundle');
+  // Exercise the retained consent handler separately from the disabled DOM
+  // control; the real API rejects all submission while qualification is off.
+  await act(async () => captured(button('Submit complete Jito bundle'), 'onClick')({}));
   await vi.waitFor(() => expect(f.posts).toEqual(['submit']));
 });
 it('rejects a stale submit click after the parent is locked', async () => {

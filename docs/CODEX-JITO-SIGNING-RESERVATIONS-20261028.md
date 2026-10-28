@@ -107,10 +107,14 @@ a retry or release by itself. Migration 0163 is a draft number and must be
 rechecked against the target branch before merge.
 
 The existing sequential simulation check is diagnostic and does not authorize
-submission. The current submission path does not require a fresh full
-same-bank qualification of the exact signed vector. That is an outstanding
-release blocker; individual packet simulations do not establish the requested
-sequential-bundle evidence. Do not treat this draft as fully qualified.
+submission. The internal one-send function does not yet require a fresh full
+same-bank qualification of the exact signed vector. The draft API route now
+returns 409 before database or sender work for every submit request, and the
+UI disables submission with a visible explanation. Repository search found no
+other non-test caller of that internal function at this checkpoint; the route
+gate is not a guard inside the function itself. Wiring and proving the full
+qualification is an outstanding release blocker. Individual packet
+simulations do not establish the requested sequential-bundle evidence.
 An unmounted signed-vector evidence constructor now verifies each registered
 swap and tip signature and binds the ordered exact bytes to the owner and
 bundle. It grants no source, provider, runtime, signing or execution authority;
