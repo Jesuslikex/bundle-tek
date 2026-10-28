@@ -1434,7 +1434,7 @@ it('keeps UNKNOWN and does not re-prompt when the begin response is lost', async
   await clickText('Inspect retained swap 1 packet');
   await waitFor(() =>
     expect(container.textContent).toContain(
-      'signing outcome is unknown and no signed packet is available',
+      'no matching server attempt is visible',
     ),
   );
   expect(f.registerEvidence).not.toHaveBeenCalled();
@@ -1999,4 +1999,64 @@ it('does not accept a stale signing-consent handler after the password changes',
   await f.sign();
   expect(f.begin).not.toHaveBeenCalled();
   expect(storage.rows.size).toBe(0);
+});
+
+it('distinguishes a visible server attempt from a missing one while keeping the local UNKNOWN blocked', async () => {
+  const f = await setup(true);
+  f.externalSign.mockRejectedValue({ code: 4001 });
+  await chooseExternal();
+  await f.approve();
+  await f.sign();
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'needs recovery before another action',
+    ),
+  );
+  expect(f.attempts).toHaveLength(1);
+  expect(f.attempts[0].state).toBe('unknown');
+  await enterRecoveryPassword();
+  await clickText('Inspect retained swap 1 packet');
+  await waitFor(() =>
+    expect(container.textContent).toContain('The signing outcome is unknown'),
+  );
+  expect(container.textContent).not.toContain(
+    'no matching server attempt is visible',
+  );
+  expect(container.textContent).toContain(
+    'do not sign, cancel or submit it again',
+  );
+  expect(f.externalSign).toHaveBeenCalledTimes(1);
+  expect(f.registerEvidence).not.toHaveBeenCalled();
+  expect(([...storage.rows.values()][0] as { state: string }).state).toBe(
+    'unknown',
+  );
+});
+
+it('does not claim a server attempt is missing when the fresh exact read fails', async () => {
+  const f = await setup();
+  f.begin.mockRejectedValue(Error('lost response'));
+  await f.approve();
+  await f.sign();
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'needs recovery before another action',
+    ),
+  );
+  const original = f.readSnapshot.getMockImplementation()!;
+  f.readSnapshot
+    .mockImplementationOnce(original)
+    .mockRejectedValueOnce(Error('read unavailable'));
+  await enterRecoveryPassword();
+  await clickText('Inspect retained swap 1 packet');
+  await waitFor(() =>
+    expect(container.textContent).toContain('Recovery could not be verified'),
+  );
+  expect(container.textContent).not.toContain(
+    'no matching server attempt is visible',
+  );
+  expect(f.signer).not.toHaveBeenCalled();
+  expect(f.registerEvidence).not.toHaveBeenCalled();
+  expect(([...storage.rows.values()][0] as { state: string }).state).toBe(
+    'unknown',
+  );
 });

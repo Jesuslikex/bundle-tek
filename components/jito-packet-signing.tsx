@@ -569,11 +569,18 @@ export function JitoPacketSigning({
             readFresh,
           );
           if (inspected.status !== 'retained') {
+            // Distinguish only what a fresh, owner-scoped exact bundle read
+            // actually shows. A missing attempt never proves an unsigned outcome.
+            const noServerAttempt =
+              inspected.status === 'unknown' &&
+              !(await snapshot()).attempts.some((a) => a.packet === packet);
             if (mounted.current) {
               setRecoveryView(null);
               setRecoveryMessage(
                 inspected.status === 'unknown'
-                  ? 'The signing outcome is unknown and no signed packet is available here. Keep this attempt blocked.'
+                  ? noServerAttempt
+                    ? 'A local recovery marker exists, but no signed packet is available here and no matching server attempt is visible in the latest verified bundle record. This does not prove no signing occurred. Keep this attempt blocked; do not sign, cancel or submit it again. Preserve this browser data and any recovery file.'
+                    : 'A local recovery marker exists, but no signed packet is available here. The signing outcome is unknown. Keep this attempt blocked; do not sign, cancel or submit it again. Preserve this browser data and any recovery file.'
                   : 'No retained packet was found in this browser. That does not prove no signing occurred.',
               );
             }
