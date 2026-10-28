@@ -1,10 +1,9 @@
 # Jito signing reservation draft
 
-This is a local, non-deployable draft for durable Jito signing attempts. The
-existing browser client does not yet use the v2 protocol: deploying the API or
-applying migration 0163 before integrating the client would interrupt the
-current signing flow. Keep this work on a draft branch until the complete flow
-and migration numbering are checked together.
+This is a non-deployable draft for durable Jito signing attempts. The draft
+browser client now uses the v2 protocol, but old clients and historical
+records need a controlled rollout and recovery plan. Keep the work on a draft
+branch until the complete flow and migration numbering are checked together.
 
 The draft records an immutable owner, bundle, packet, signer, manifest digest
 and attempt identity before opening a wallet. An unresolved attempt is held as
@@ -20,9 +19,8 @@ before an upgrade.
 The standalone browser attempt adapter validates the authenticated response
 against the exact expected identity and issues a single-use local signer permit
 only for a newly inserted attempt. A lost response and all later reads remain
-recovery-only. It is not connected to a wallet or UI; its caller must hold the
-journal lock, enforce the current consent and context, and independently verify
-any recovered signed packet.
+recovery-only. The draft client uses it under the journal lock; the caller must
+enforce current consent and context and independently verify recovered packets.
 
 Local verification of the frozen migration and server draft: 145 tests across
 12 focused Jito files; 10 local engine/schema tests covering D1, SQLite and a
@@ -88,15 +86,22 @@ revoked or replaced consent. Changing a signing password clears its approval.
 The server, journal and exact owned receipt checks remain authoritative; these
 UI guards do not prove that an unknown wallet outcome was unsigned.
 
-Still required before a release: integrate the encrypted local journal and
-owner-scoped server attempt with every browser signing, import, registration,
-cancel and submit path; preserve separately unchecked approval; test rejected
-wallet prompts, lost responses, concurrent tabs, reloads, storage failures,
-stale context and exact receipt recovery; design legacy settlement and a
-controlled old-client rollout; repeat migration and full-flow checks on the
-final committed source. A local or cross-device unknown must never grant a
-retry or release by itself. Migration 0163 is a draft number and must be
+Still required before a release: verify integrated journal and server behavior
+in a real browser with separate approvals, concurrent tabs, reloads, storage
+failures and exact receipt recovery; design legacy settlement and a controlled
+old-client rollout; and repeat migration and full-flow checks on the final
+committed source. Old open clients can already possess signed or unsigned
+bytes, and applying 0163 can quarantine historical records and make an old
+code rollback incompatible with the new guards. Back up and rehearse recovery
+before any future migration. A local or cross-device unknown must never grant
+a retry or release by itself. Migration 0163 is a draft number and must be
 rechecked against the target branch before merge.
+
+The existing sequential simulation check is diagnostic and does not authorize
+submission. The current submission path does not require a fresh full
+same-bank qualification of the exact signed vector. That is an outstanding
+release blocker; individual packet simulations do not establish the requested
+sequential-bundle evidence. Do not treat this draft as fully qualified.
 
 No deployment, hosted database migration, provider or credential change,
 funded transaction, real-wallet signing, or live bundle submission is
