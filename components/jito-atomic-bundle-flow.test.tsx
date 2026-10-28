@@ -152,6 +152,223 @@ it('requires separate unchecked submission approval, then a lost response recove
   expect(container.textContent).toContain('Submission outcome unknown');
   expect(container.textContent).not.toContain('Submit complete Jito bundle');
 });
+
+it('shows only bound provider-reported packet outcomes, then clears them on history refresh', async () => {
+  const { session, bundle, history } = await fixture();
+  bundle.state = 'submitted';
+  const scope = await jitoOwnerScope('alice');
+  const posts: string[] = [];
+  const chainObservation = {
+    format: 'jito-chain-observation-v1',
+    bundleId: bundle.manifest.id,
+    bundleSha256: bundle.manifest.sha256,
+    state: 'submitted',
+    observedAt: '2026-10-28T12:00:00.000Z',
+    packets: [
+      {
+        packet: 0,
+        signature: bundle.signatures[0],
+        status: 'finalized-failure',
+        slot: 300,
+      },
+      {
+        packet: 1,
+        signature: bundle.signatures[1],
+        status: 'not-found',
+        slot: null,
+      },
+    ],
+  };
+  fetcher.mockImplementation(async (_url, init) => {
+    if (!init?.method)
+      return Response.json(history, {
+        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+      });
+    posts.push(JSON.parse(init.body).action);
+    return Response.json(
+      { bundle, chainObservation },
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('Check chain outcomes'),
+  );
+  await click('Check chain outcomes');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('Finalized, failure reported'),
+  );
+  expect(container.textContent).toContain('Not found by this provider');
+  expect(container.textContent).toContain(
+    'not verified settlement receipts or proof',
+  );
+  expect(posts).toEqual(['recover']);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).not.toContain(
+      'Provider-reported packet outcomes',
+    ),
+  );
+  expect(posts).toEqual(['recover']);
+});
+
+it('does not display a provider report rebound to another packet or bundle', async () => {
+  const { session, bundle, history } = await fixture();
+  bundle.state = 'submitted';
+  const scope = await jitoOwnerScope('alice');
+  fetcher.mockImplementation(async (_url, init) => {
+    if (!init?.method)
+      return Response.json(history, {
+        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+      });
+    return Response.json(
+      {
+        bundle,
+        chainObservation: {
+          format: 'jito-chain-observation-v1',
+          bundleId: bundle.manifest.id,
+          bundleSha256: bundle.manifest.sha256,
+          state: 'submitted',
+          observedAt: '2026-10-28T12:00:00.000Z',
+          packets: [
+            {
+              packet: 0,
+              signature: 'different',
+              status: 'finalized-success',
+              slot: 300,
+            },
+            {
+              packet: 1,
+              signature: bundle.signatures[1],
+              status: 'not-found',
+              slot: null,
+            },
+          ],
+        },
+      },
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('Check chain outcomes'),
+  );
+  await click('Check chain outcomes');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain(
+      'Provider outcome details were unavailable',
+    ),
+  );
+  expect(container.textContent).not.toContain(
+    'Provider-reported packet outcomes',
+  );
+  expect(container.textContent).toContain('Accepted by Jito');
+});
+
+it('says outcome details are unavailable when an active signed recovery has no report', async () => {
+  const { session, bundle, history } = await fixture();
+  bundle.state = 'submitting';
+  const scope = await jitoOwnerScope('alice');
+  const actions: string[] = [];
+  fetcher.mockImplementation(async (_url, init) => {
+    if (!init?.method)
+      return Response.json(history, {
+        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+      });
+    actions.push(JSON.parse(init.body).action);
+    return Response.json(
+      { bundle },
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('Check chain outcomes'),
+  );
+  await click('Check chain outcomes');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain(
+      'Provider outcome details were unavailable',
+    ),
+  );
+  expect(container.textContent).toContain('Submission outcome unknown');
+  expect(container.textContent).not.toContain(
+    'Provider-reported packet outcomes',
+  );
+  expect(actions).toEqual(['recover']);
+});
+
+it('clears a previously shown provider report when the signed-in owner no longer matches', async () => {
+  const { session, bundle, history } = await fixture();
+  bundle.state = 'submitted';
+  const scope = await jitoOwnerScope('alice');
+  const otherScope = await jitoOwnerScope('bob');
+  let changed = false;
+  fetcher.mockImplementation(async (_url, init) => {
+    if (changed)
+      return Response.json(
+        { error: 'Signed-in account changed.' },
+        {
+          status: 409,
+          headers: { [JITO_OWNER_SCOPE_HEADER]: otherScope },
+        },
+      );
+    if (!init?.method)
+      return Response.json(history, {
+        headers: { [JITO_OWNER_SCOPE_HEADER]: scope },
+      });
+    return Response.json(
+      {
+        bundle,
+        chainObservation: {
+          format: 'jito-chain-observation-v1',
+          bundleId: bundle.manifest.id,
+          bundleSha256: bundle.manifest.sha256,
+          state: 'submitted',
+          observedAt: '2026-10-28T12:00:00.000Z',
+          packets: [
+            {
+              packet: 0,
+              signature: bundle.signatures[0],
+              status: 'finalized-failure',
+              slot: 300,
+            },
+            {
+              packet: 1,
+              signature: bundle.signatures[1],
+              status: 'not-found',
+              slot: null,
+            },
+          ],
+        },
+      },
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('Check chain outcomes'),
+  );
+  await click('Check chain outcomes');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain(
+      'Provider-reported packet outcomes',
+    ),
+  );
+  changed = true;
+  await click('Load bundle approvals');
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('Signed-in account changed'),
+  );
+  expect(container.textContent).not.toContain(
+    'Provider-reported packet outcomes',
+  );
+  expect(container.textContent).not.toContain(bundle.manifest.id);
+});
 it('aborts old history on session revision changes and ignores a late response', async () => {
   const { session, history } = await fixture();
   const scope = await jitoOwnerScope('alice');

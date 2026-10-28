@@ -8,6 +8,11 @@ import {
   type JitoFinalization,
 } from './jito-finalization';
 import { matchingJitoSwapReceipt } from './jito-swap-receipt';
+import {
+  createJitoChainObservation,
+  requireJitoChainObservation,
+  type JitoChainObservation,
+} from './jito-chain-observation';
 import { matchingJitoSettlementPolicy } from './jito-settlement-policy';
 import { currentTradeSession } from './imported-trade-session-server';
 import { currentImportedAcquisition } from './imported-acquisition-server';
@@ -473,14 +478,38 @@ export async function observeJitoBundle(
   signal: AbortSignal,
   recoverSwap: (id: string) => Promise<unknown>,
 ) {
+  return (
+    await observeJitoBundleInternal(db, owner, id, signal, recoverSwap, false)
+  ).record;
+}
+
+/** The report is optional, transient provider data; the record is unchanged. */
+export async function observeJitoBundleWithObservation(
+  db: D1Database,
+  owner: string,
+  id: string,
+  signal: AbortSignal,
+  recoverSwap: (id: string) => Promise<unknown>,
+) {
+  return observeJitoBundleInternal(db, owner, id, signal, recoverSwap, true);
+}
+
+async function observeJitoBundleInternal(
+  db: D1Database,
+  owner: string,
+  id: string,
+  signal: AbortSignal,
+  recoverSwap: (id: string) => Promise<unknown>,
+  includeObservation: boolean,
+) {
   const bundle = await readJitoBundle(db, owner, id);
   if (['cancelled', 'expired', 'finalized'].includes(bundle.row.state))
-    return bundle.record;
+    return { record: bundle.record, observation: null };
   const rpc = await rpcForBundle(signal);
   const signatures = bundle.packets
     .filter((p) => p.signature)
     .map((p) => p.signature!);
-  if (!signatures.length) return bundle.record;
+  if (!signatures.length) return { record: bundle.record, observation: null };
   const raw = (await rpc('getSignatureStatuses', [
     signatures,
     { searchTransactionHistory: true },
@@ -493,6 +522,18 @@ export async function observeJitoBundle(
   };
   if (!Array.isArray(raw?.value) || raw.value.length !== signatures.length)
     throw new Error('Signature recovery unavailable. Reservations retained.');
+  let observation: JitoChainObservation | null = null;
+  if (includeObservation) {
+    try {
+      observation = createJitoChainObservation(
+        bundle.record,
+        raw,
+        new Date().toISOString(),
+      );
+    } catch {
+      // Optional diagnostics must not affect recovery or expose provider data.
+    }
+  }
   const all = signatures.length === bundle.packets.length;
   const finalized =
     all &&
@@ -633,5 +674,24 @@ export async function observeJitoBundle(
     }
   }
   // Partial, failed, processed or missing evidence never establishes atomic success.
-  return (await readJitoBundle(db, owner, id)).record;
+  const latest = (await readJitoBundle(db, owner, id)).record;
+  if (
+    observation &&
+    latest.manifest.sha256 === bundle.manifest.sha256 &&
+    latest.manifest.id === bundle.manifest.id &&
+    latest.state === bundle.record.state &&
+    latest.updatedAt === bundle.record.updatedAt &&
+    JSON.stringify(latest.signatures) ===
+      JSON.stringify(bundle.record.signatures)
+  ) {
+    try {
+      return {
+        record: latest,
+        observation: requireJitoChainObservation(observation, latest),
+      };
+    } catch {
+      // Drift or malformed optional diagnostics never alter retained state.
+    }
+  }
+  return { record: latest, observation: null };
 }

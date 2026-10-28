@@ -35,6 +35,10 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 ACTIVE: browser-only encrypted Jito recovery journal foundation in new lib/jito-recovery-journal*.ts and focused tests. It is not yet integrated or a cross-device/server reservation; no wallet, signing, provider, database migration or deployment changes.
+
+- Codex + helper, 28 October 2026 COMPLETE, claim released: bounded Jito per-packet provider observations during explicit recovery. See docs/CODEX-JITO-PACKET-OBSERVATIONS-20261028.md. Existing reads, reservations, one-send and consent/signing checks preserved; no real wallet, funded action or deployment.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: one-file lookup of older Jito recovery records. See docs/CODEX-JITO-OLDER-RECOVERY-LOOKUP-20261028.md. Uses strict local parsing and exact authenticated records; registration requires existing consent, with no automatic signing, submission, provider changes or deployment.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: strict local Jito recovery-file locator. See docs/CODEX-JITO-RECOVERY-LOCATOR-20261028.md. It returns only bounded context identifiers and grants no signing, submission or provider authority; UI integration remains separate.

@@ -68,6 +68,7 @@ import {
   submitJitoBundle,
   registerJitoPacket,
   observeJitoBundle,
+  observeJitoBundleWithObservation,
   readJitoBundle,
 } from './jito-bundle-server';
 const databases: ReturnType<typeof jitoDatabase>[] = [];
@@ -82,7 +83,7 @@ afterEach(() => {
   mocks.send.mockReset();
   mocks.reads.mockReset();
 });
-async function fixture() {
+async function fixture({ swap = true, tip = true } = {}) {
   const f = await jitoBundleFixture(),
     d = jitoDatabase(f.manifest);
   databases.push(d);
@@ -96,22 +97,24 @@ async function fixture() {
   d.attach();
   mocks.simulation = f.swap.simulation;
   mocks.tip = f.tip.recipient;
-  await registerJitoPacket(
-    d.db,
-    'owner',
-    f.manifest.id,
-    f.manifest.sha256,
-    0,
-    f.swap.signed.transaction,
-  );
-  await registerJitoPacket(
-    d.db,
-    'owner',
-    f.manifest.id,
-    f.manifest.sha256,
-    1,
-    f.tip.signed.transaction,
-  );
+  if (swap)
+    await registerJitoPacket(
+      d.db,
+      'owner',
+      f.manifest.id,
+      f.manifest.sha256,
+      0,
+      f.swap.signed.transaction,
+    );
+  if (tip)
+    await registerJitoPacket(
+      d.db,
+      'owner',
+      f.manifest.id,
+      f.manifest.sha256,
+      1,
+      f.tip.signed.transaction,
+    );
   return { f, d };
 }
 it('retains reservations through the exact expiry margin and rechecks mainnet before releasing them', async () => {
@@ -397,5 +400,123 @@ it('retains partial/failed outcomes and releases only after all validity windows
     d.sqlite.prepare('SELECT count(*) AS n FROM solana_swap_reservations').get()
       ?.n,
   ).toBe(0);
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+});
+
+it('returns sanitized partial provider reports without extra reads, resending, or releasing reservations', async () => {
+  const { f, d } = await fixture();
+  mocks.send.mockRejectedValue(new Error('unknown'));
+  await submitJitoBundle(
+    d.db,
+    'owner',
+    f.manifest.id,
+    f.manifest.sha256,
+    AbortSignal.timeout(1000),
+  );
+  mocks.reads.mockClear();
+  mocks.statuses = {
+    value: [
+      {
+        slot: '300',
+        confirmationStatus: 'finalized',
+        err: { InstructionError: ['provider-private'] },
+      },
+      null,
+    ],
+  };
+  const result = await observeJitoBundleWithObservation(
+    d.db,
+    'owner',
+    f.manifest.id,
+    AbortSignal.timeout(1000),
+    async () => null,
+  );
+  expect(result.record.state).toBe('submitting');
+  expect(result.observation?.packets).toEqual([
+    {
+      packet: 0,
+      signature: f.swap.signed.signature,
+      status: 'finalized-failure',
+      slot: 300,
+    },
+    {
+      packet: 1,
+      signature: f.tip.signed.signature,
+      status: 'not-found',
+      slot: null,
+    },
+  ]);
+  expect(JSON.stringify(result.observation)).not.toContain('provider-private');
+  expect(mocks.reads.mock.calls.map((call) => call[0])).toEqual([
+    'getGenesisHash',
+    'getSignatureStatuses',
+  ]);
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+  expect(
+    d.sqlite.prepare('SELECT count(*) AS n FROM solana_swap_reservations').get()
+      ?.n,
+  ).toBe(1);
+});
+
+it('keeps original packet positions when only the later tip packet is registered', async () => {
+  const { f, d } = await fixture({ swap: false });
+  mocks.reads.mockClear();
+  mocks.statuses = {
+    value: [{ slot: '301', confirmationStatus: 'processed', err: null }],
+  };
+  const result = await observeJitoBundleWithObservation(
+    d.db,
+    'owner',
+    f.manifest.id,
+    AbortSignal.timeout(1000),
+    async () => null,
+  );
+  expect(result.record.state).toBe('reviewed');
+  expect(result.observation?.packets).toEqual([
+    { packet: 0, signature: null, status: 'not-registered', slot: null },
+    {
+      packet: 1,
+      signature: f.tip.signed.signature,
+      status: 'processed-success',
+      slot: 301,
+    },
+  ]);
+  expect(mocks.reads.mock.calls.map((call) => call[0])).toEqual([
+    'getGenesisHash',
+    'getSignatureStatuses',
+  ]);
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+
+it('omits the optional observation when retained bundle state changes while the provider read is pending', async () => {
+  const { f, d } = await fixture();
+  mocks.send.mockRejectedValue(new Error('unknown'));
+  await submitJitoBundle(
+    d.db,
+    'owner',
+    f.manifest.id,
+    f.manifest.sha256,
+    AbortSignal.timeout(1000),
+  );
+  mocks.statuses = {
+    value: [{ slot: '300', confirmationStatus: 'processed', err: null }, null],
+  };
+  mocks.reads.mockImplementation((method) => {
+    if (method === 'getSignatureStatuses')
+      d.sqlite
+        .prepare(
+          "UPDATE jito_bundles SET updated_at='2026-10-28T23:59:59.000Z' WHERE id=?",
+        )
+        .run(f.manifest.id);
+  });
+  const result = await observeJitoBundleWithObservation(
+    d.db,
+    'owner',
+    f.manifest.id,
+    AbortSignal.timeout(1000),
+    async () => null,
+  );
+  expect(result.record.state).toBe('submitting');
+  expect(result.observation).toBeNull();
   expect(mocks.send).toHaveBeenCalledTimes(1);
 });

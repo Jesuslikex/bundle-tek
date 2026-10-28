@@ -36,6 +36,11 @@ import {
 import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
 import { JitoMemoryRecovery } from './jito-memory-recovery';
 import { JitoTerminalRecoveryImport } from './jito-terminal-recovery-import';
+import { JitoChainObservationView } from './jito-chain-observation';
+import {
+  requireJitoChainObservation,
+  type JitoChainObservation,
+} from '@/lib/jito-chain-observation';
 import {
   JitoRecoveryLookup,
   type JitoLocatedRecovery,
@@ -163,7 +168,9 @@ function JitoAtomicBundleForContext({
     [error, setError] = useState(''),
     [now, setNow] = useState(() => Date.now()),
     [historyVerified, setHistoryVerified] = useState(false),
-    [lookupView, setLookupView] = useState<JitoLocatedRecovery | null>(null);
+    [lookupView, setLookupView] = useState<JitoLocatedRecovery | null>(null),
+    [chainObservation, setChainObservation] =
+      useState<JitoChainObservation | null>(null);
   const mounted = useRef(true),
     running = useRef(false),
     historyVerifiedNow = useRef(false),
@@ -231,6 +238,7 @@ function JitoAtomicBundleForContext({
         setEligible([]);
         setAcceptedSubmit(null);
         setLookupView(null);
+        setChainObservation(null);
         setError(reason);
       }
     };
@@ -263,6 +271,7 @@ function JitoAtomicBundleForContext({
       eligible?: WarmupSigningReview[];
       projectId?: string;
       sessionId?: string;
+      chainObservation?: unknown;
     };
     if (!response.ok)
       throw new Error(data.error || 'Bundle operation unavailable.');
@@ -319,6 +328,7 @@ function JitoAtomicBundleForContext({
     setBusy(true);
     setError('');
     setAcceptedSubmit(null);
+    setChainObservation(null);
     if (!body) {
       historyVerifiedNow.current = false;
       historyRecordsNow.current = [];
@@ -348,6 +358,31 @@ function JitoAtomicBundleForContext({
             'Signature registration did not match. Reload saved history.',
           );
         if (mounted.current && isContextCurrent()) {
+          const payload = body as
+            | { action?: unknown; id?: unknown }
+            | undefined;
+          if (payload?.action === 'recover') {
+            if (payload.id !== bundle.manifest.id)
+              throw Error('Bundle recovery context differs.');
+            if (data.chainObservation !== undefined) {
+              try {
+                setChainObservation(
+                  requireJitoChainObservation(data.chainObservation, bundle),
+                );
+              } catch {
+                setError(
+                  'Provider outcome details were unavailable. Check retained status before another action.',
+                );
+              }
+            } else if (
+              ['reviewed', 'submitting', 'submitted'].includes(bundle.state) &&
+              bundle.signatures.some(Boolean)
+            ) {
+              setError(
+                'Provider outcome details were unavailable. Check retained status before another action.',
+              );
+            }
+          }
           if (historyVerifiedNow.current)
             historyRecordsNow.current = [
               bundle,
@@ -446,6 +481,7 @@ function JitoAtomicBundleForContext({
     }
   }
   async function readExactBundle(id: string) {
+    if (mounted.current && isContextCurrent()) setChainObservation(null);
     const data = await request(undefined, id, 5000);
     if (
       data.projectId !== projectId ||
@@ -543,6 +579,7 @@ function JitoAtomicBundleForContext({
     signingOperation?: JitoOperationToken,
     assertAdditionalCurrent?: () => void,
   ) {
+    if (mounted.current && isContextCurrent()) setChainObservation(null);
     assertAdditionalCurrent?.();
     if (
       !ownerScope ||
@@ -864,6 +901,17 @@ function JitoAtomicBundleForContext({
             ).some(Boolean);
           const canSign = canRegister && !hasPendingPacket;
           const complete = bundle.signatures.every(Boolean);
+          let currentObservation: JitoChainObservation | null = null;
+          if (chainObservation) {
+            try {
+              currentObservation = requireJitoChainObservation(
+                chainObservation,
+                bundle,
+              );
+            } catch {
+              // A newer bundle/signature vector never inherits an older report.
+            }
+          }
           return (
             <article key={m.id} className="space-y-3 rounded-md border p-3">
               <h5>Bundle {m.id}</h5>
@@ -891,6 +939,12 @@ function JitoAtomicBundleForContext({
                   Accepted by Jito. Finalized chain outcomes have not yet been
                   established.
                 </p>
+              )}
+              {currentObservation && (
+                <JitoChainObservationView
+                  observation={currentObservation}
+                  swapCount={m.swaps.length}
+                />
               )}
               {bundle.state === 'finalized' && (
                 <p>

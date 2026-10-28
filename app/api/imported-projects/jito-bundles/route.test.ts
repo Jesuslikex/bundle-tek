@@ -22,7 +22,7 @@ vi.mock('@/lib/jito-bundle-server', () => ({
   registerJitoPacket: mocks.register,
   submitJitoBundle: mocks.submit,
   cancelJitoBundle: mocks.cancel,
-  observeJitoBundle: mocks.recover,
+  observeJitoBundleWithObservation: mocks.recover,
 }));
 vi.mock('@/lib/jito-sequential-check-server', () => ({
   checkJitoBundleSequential: mocks.sequentialCheck,
@@ -382,12 +382,28 @@ it('forwards finalized receipt evidence to bundle recovery instead of reducing i
       expect(await callback(id)).toEqual(receipt);
       expect(await callback(id)).toBeNull();
       expect(await callback(id)).toBeNull();
-      return { state: 'submitted' };
+      return { record: { state: 'submitted' }, observation: null };
     },
   );
   expect((await POST(request({ action: 'recover', id }))).status).toBe(200);
   const recoveryRequest = mocks.approvalRecover.mock.calls[0][0] as Request;
   expect(await recoveryRequest.json()).toEqual({ action: 'recover', id });
+});
+
+it('returns a provider observation only on the explicitly requested recovery response', async () => {
+  const observation = { format: 'jito-chain-observation-v1', packets: [] };
+  mocks.recover.mockResolvedValue({
+    record: { state: 'submitting' },
+    observation,
+  });
+  const response = await POST(request({ action: 'recover', id }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    bundle: { state: 'submitting' },
+    chainObservation: observation,
+  });
+  expect(mocks.recover).toHaveBeenCalledOnce();
+  expect(mocks.submit).not.toHaveBeenCalled();
 });
 
 it('exposes an explicit owner-scoped sequential read without signing or submission approval', async () => {

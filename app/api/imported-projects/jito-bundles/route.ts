@@ -8,7 +8,7 @@ import {
   registerJitoPacket,
   submitJitoBundle,
   cancelJitoBundle,
-  observeJitoBundle,
+  observeJitoBundleWithObservation,
 } from '@/lib/jito-bundle-server';
 import { POST as recoverImportedApproval } from '../signing/route';
 import { prepareJitoBundle } from '@/lib/jito-bundle-preparation';
@@ -254,8 +254,8 @@ export async function POST(request: Request) {
       case 'cancel':
         bundle = await cancelJitoBundle(db, user.userId, body.id);
         break;
-      default:
-        bundle = await observeJitoBundle(
+      default: {
+        const recovered = await observeJitoBundleWithObservation(
           db,
           user.userId,
           body.id,
@@ -278,6 +278,13 @@ export async function POST(request: Request) {
               : null;
           },
         );
+        return reply({
+          bundle: recovered.record,
+          ...(recovered.observation
+            ? { chainObservation: recovered.observation }
+            : {}),
+        });
+      }
     }
     return reply({ bundle });
   } catch (error) {
