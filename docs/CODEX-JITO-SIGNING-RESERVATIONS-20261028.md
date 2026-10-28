@@ -50,7 +50,9 @@ packet, including after expiry, only against an authenticated matching UNKNOWN
 attempt. It checks the original attempt before and after storage and does not
 grant a signer permit or submit authority. Its caller must enforce the same
 owner lock and authenticate the exact server snapshot. Thirty-eight journal
-tests pass; the recovery-file user interface is not yet connected.
+tests pass. A separate recovery-file panel has 13 synthetic tests, including
+lost-response recovery and unresolved-memory guidance. It is not yet connected
+to the parent and depends on the parent supplying authenticated exact snapshots.
 
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,
