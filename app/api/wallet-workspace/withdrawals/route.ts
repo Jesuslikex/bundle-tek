@@ -34,7 +34,7 @@ import {
   fundingHistoryScope,
 } from '@/lib/mainnet-funding-server';
 export const dynamic = 'force-dynamic';
-const json = (value: unknown, status = 200) =>
+const baseJson = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
 const select =
   'SELECT id,wallet_address AS wallet,wallet_revision AS walletRevision,state,signature,document,receipt,failure_receipt AS failureReceipt,created_at AS createdAt,updated_at AS updatedAt FROM native_withdrawals';
@@ -51,15 +51,15 @@ const parse = (row: Row): NativeWithdrawal => ({
 });
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
-  if (!user) return json({ error: 'Sign in to view withdrawals.' }, 401);
+  if (!user) return baseJson({ error: 'Sign in to view withdrawals.' }, 401);
   let ownerScope: string;
   try {
     ownerScope = await withdrawalOwnerScope(user.userId);
   } catch {
-    return json({ error: 'Withdrawal account scope unavailable.' }, 503);
+    return baseJson({ error: 'Withdrawal account scope unavailable.' }, 503);
   }
   const scopedJson = (value: unknown, status = 200) => {
-    const response = json(value, status);
+    const response = baseJson(value, status);
     response.headers.set(WITHDRAWAL_OWNER_SCOPE_HEADER, ownerScope);
     return response;
   };
@@ -169,7 +169,21 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   const user = await getChatGPTUser();
-  if (!user) return json({ error: 'Sign in to review withdrawals.' }, 401);
+  if (!user) return baseJson({ error: 'Sign in to review withdrawals.' }, 401);
+  let ownerScope: string;
+  try {
+    ownerScope = await withdrawalOwnerScope(user.userId);
+  } catch {
+    return baseJson({ error: 'Withdrawal account scope unavailable.' }, 503);
+  }
+  const json = (value: unknown, status = 200) => {
+    const response = baseJson(value, status);
+    response.headers.set(WITHDRAWAL_OWNER_SCOPE_HEADER, ownerScope);
+    return response;
+  };
+  const expectedScope = request.headers.get(WITHDRAWAL_OWNER_SCOPE_HEADER);
+  if (expectedScope !== null && expectedScope !== ownerScope)
+    return json({ error: 'Signed-in account changed.' }, 409);
   let body: Record<string, unknown>;
   try {
     body = await walletRequest(request, 8192);

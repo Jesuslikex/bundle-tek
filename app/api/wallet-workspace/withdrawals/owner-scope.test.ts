@@ -8,6 +8,7 @@ const mock = vi.hoisted(() => ({
   user: 'alice' as string | null,
   exact: null as unknown,
   reads: 0,
+  dbCalls: 0,
   lastSql: '',
   lastArgs: [] as unknown[],
 }));
@@ -16,36 +17,40 @@ vi.mock('@/app/chatgpt-auth', () => ({
     mock.user ? { userId: mock.user, email: 'fixture@example.test' } : null,
 }));
 vi.mock('@/db', () => ({
-  getD1: () => ({
-    prepare: (sql: string) => ({
-      bind: (...args: unknown[]) => ({
-        first: async () => {
-          mock.reads++;
-          mock.lastSql = sql;
-          mock.lastArgs = args;
-          if (sql.includes('AND id=?'))
-            return args.length === 3 &&
-              args[0] === 'alice' &&
-              args[1] ===
-                (mock.exact as { wallet_address: string }).wallet_address &&
-              args[2] === (mock.exact as { id: string }).id
-              ? mock.exact
-              : null;
-          return null;
-        },
-        all: async () => {
-          mock.reads++;
-          return { results: [] };
-        },
+  getD1: () => (
+    mock.dbCalls++,
+    {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          first: async () => {
+            mock.reads++;
+            mock.lastSql = sql;
+            mock.lastArgs = args;
+            if (sql.includes('AND id=?'))
+              return args.length === 3 &&
+                args[0] === 'alice' &&
+                args[1] ===
+                  (mock.exact as { wallet_address: string }).wallet_address &&
+                args[2] === (mock.exact as { id: string }).id
+                ? mock.exact
+                : null;
+            return null;
+          },
+          all: async () => {
+            mock.reads++;
+            return { results: [] };
+          },
+        }),
       }),
-    }),
-  }),
+    }
+  ),
 }));
-import { GET } from './route';
+import { GET, POST } from './route';
 beforeEach(() => {
   mock.user = 'alice';
   mock.exact = null;
   mock.reads = 0;
+  mock.dbCalls = 0;
   mock.lastSql = '';
   mock.lastArgs = [];
 });
@@ -145,4 +150,57 @@ it('keeps exact reads constrained to the requested funding scope', async () => {
     1,
     1,
   ]);
+});
+it.each([
+  'prepare',
+  'begin_signing',
+  'reject_signing',
+  'register',
+  'submit',
+  'recover',
+  'cancel',
+])(
+  'rejects stale owner scope for %s before parsing or database work, even with a shared wallet',
+  async (action) => {
+    const { f, scope } = await fixture();
+    mock.user = 'bob';
+    const request = new Request(
+      'http://localhost/api/wallet-workspace/withdrawals',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          [WITHDRAWAL_OWNER_SCOPE_HEADER]: scope,
+        },
+        body: JSON.stringify({
+          action,
+          wallet: f.wallet,
+          walletRevision: f.review.walletRevision,
+          id: f.review.id,
+        }),
+      },
+    );
+    const response = await POST(request);
+    expect(response.status).toBe(409);
+    expect(request.bodyUsed).toBe(false);
+    expect(response.headers.get(WITHDRAWAL_OWNER_SCOPE_HEADER)).toBe(
+      await withdrawalOwnerScope('bob'),
+    );
+    expect(mock.dbCalls).toBe(0);
+    expect(mock.reads).toBe(0);
+  },
+);
+it('keeps legacy unscoped POST callers compatible', async () => {
+  const response = await POST(
+    new Request('http://localhost/api/wallet-workspace/withdrawals', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'not-an-action' }),
+    }),
+  );
+  expect(response.status).toBe(400);
+  expect(response.headers.get(WITHDRAWAL_OWNER_SCOPE_HEADER)).toBe(
+    await withdrawalOwnerScope('alice'),
+  );
+  expect(mock.dbCalls).toBe(0);
 });

@@ -81,6 +81,14 @@ async function fixture() {
   let serverOwner = 'alice',
     delay = false,
     exact = cancelled;
+  let historyProblem:
+    | 'none'
+    | 'missing'
+    | 'wrong'
+    | 'signedout'
+    | 'unavailable' = 'none';
+  let historyDelay = false;
+  let resolveHistory!: () => void;
   let resolveExact!: () => void;
   const calls: { url: string; init?: RequestInit }[] = [];
   fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
@@ -103,17 +111,51 @@ async function fixture() {
         return Response.json({ error: 'scope' }, { status: 409, headers });
       return Response.json({ withdrawal: exact }, { headers });
     }
-    if (p.get('cursor'))
-      return Response.json({
-        withdrawals: [cancelled],
-        active,
-        nextCursor: null,
+    if (historyDelay)
+      await new Promise<void>((resolve) => {
+        resolveHistory = resolve;
       });
-    return Response.json({
-      withdrawals: [active],
-      active,
-      nextCursor: active.id,
-    });
+    const historyScope = await withdrawalOwnerScope(serverOwner);
+    const expected = new Headers(init?.headers).get(
+      WITHDRAWAL_OWNER_SCOPE_HEADER,
+    );
+    if (historyProblem === 'signedout')
+      return Response.json({ error: 'Sign in' }, { status: 401 });
+    if (historyProblem === 'unavailable')
+      return Response.json({ error: 'Unavailable' }, { status: 503 });
+    if (expected !== historyScope)
+      return Response.json(
+        { error: 'scope' },
+        {
+          status: 409,
+          headers: { [WITHDRAWAL_OWNER_SCOPE_HEADER]: historyScope },
+        },
+      );
+    const historyHeaders = new Headers();
+    if (historyProblem !== 'missing')
+      historyHeaders.set(
+        WITHDRAWAL_OWNER_SCOPE_HEADER,
+        historyProblem === 'wrong'
+          ? await withdrawalOwnerScope('bob')
+          : historyScope,
+      );
+    if (p.get('cursor'))
+      return Response.json(
+        {
+          withdrawals: [cancelled],
+          active,
+          nextCursor: null,
+        },
+        { headers: historyHeaders },
+      );
+    return Response.json(
+      {
+        withdrawals: [active],
+        active,
+        nextCursor: active.id,
+      },
+      { headers: historyHeaders },
+    );
   });
   const wallets = [
     { chain: 'Solana', address: old.wallet, label: 'Fixture', archived: false },
@@ -129,6 +171,9 @@ async function fixture() {
       ),
     );
   await render();
+  await vi.waitFor(() =>
+    expect(button('Reload withdrawal history').disabled).toBe(false),
+  );
   await click('Reload withdrawal history');
   await until('Retained withdrawal');
   await click('Load older withdrawals');
@@ -156,6 +201,13 @@ async function fixture() {
     wrongExact: () => {
       exact = { ...cancelled, id: next.review.id, document: next.review };
     },
+    historyProblem: (value: typeof historyProblem) => {
+      historyProblem = value;
+    },
+    delayHistory: () => {
+      historyDelay = true;
+    },
+    resolveHistory: () => resolveHistory(),
   };
 }
 it('checks exact ownership on request and displays a paginated cancelled packet without changing the active row', async () => {
@@ -174,7 +226,62 @@ it('checks exact ownership on request and displays a paginated cancelled packet 
   expect(container.textContent).toContain('Cancellation does not establish');
   expect(f.calls.at(-1)?.url).toContain(`withdrawalId=${f.cancelled.id}`);
   expect(f.calls.at(-1)?.init?.redirect).toBe('error');
+  const historyCalls = f.calls.filter((x) => !x.url.includes('withdrawalId='));
+  expect(historyCalls).toHaveLength(2);
+  for (const call of historyCalls) {
+    expect(
+      new Headers(call.init?.headers).get(WITHDRAWAL_OWNER_SCOPE_HEADER),
+    ).toBe(await withdrawalOwnerScope('alice'));
+    expect(call.init?.credentials).toBe('same-origin');
+    expect(call.init?.redirect).toBe('error');
+  }
   expect(f.calls.filter((x) => x.init?.method)).toHaveLength(0);
+});
+it.each(['mismatch', 'missing', 'wrong', 'signedout', 'unavailable'] as const)(
+  'hides prior account rows and refuses the %s history response',
+  async (problem) => {
+    const f = await fixture();
+    if (problem === 'mismatch') f.serverOwner('bob');
+    else f.historyProblem(problem);
+    await click('Reload withdrawal history');
+    await until('Signed-in account changed');
+    expect(container.textContent).toContain(
+      'account verification is unavailable',
+    );
+    expect(container.textContent).not.toContain('Retained withdrawal');
+    expect(container.textContent).not.toContain(
+      'Check for retained signed packet',
+    );
+    expect(container.querySelector('textarea')).toBeNull();
+    expect(f.calls.filter((x) => x.init?.method)).toHaveLength(0);
+  },
+);
+it.each(['switch', 'pending'] as const)(
+  'does not expose stale history after the client session becomes %s during its request',
+  async (change) => {
+    const f = await fixture();
+    f.delayHistory();
+    await click('Reload withdrawal history');
+    await vi.waitFor(() =>
+      expect(button('Reload withdrawal history').disabled).toBe(true),
+    );
+    if (change === 'switch') auth.owner = 'bob';
+    else auth.pending = true;
+    await f.render();
+    await act(async () => f.resolveHistory());
+    expect(container.textContent).not.toContain('Retained withdrawal');
+    expect(container.querySelector('textarea')).toBeNull();
+  },
+);
+it('withholds history requests while the session is pending', async () => {
+  const f = await fixture();
+  auth.pending = true;
+  await f.render();
+  const count = f.calls.length;
+  expect(button('Reload withdrawal history').disabled).toBe(true);
+  await click('Reload withdrawal history');
+  expect(f.calls).toHaveLength(count);
+  expect(container.textContent).toContain('wait for account verification');
 });
 it('fails closed if no packet is retained', async () => {
   const f = await fixture();
@@ -205,7 +312,15 @@ it('refuses a server-side account mismatch and a different exact row', async () 
   await click('Check for retained signed packet');
   await until('unavailable for this account');
   expect(container.querySelector('textarea')).toBeNull();
+  expect(container.textContent).not.toContain('Retained withdrawal');
+  expect(container.textContent).not.toContain(
+    'Check for retained signed packet',
+  );
   f.serverOwner('alice');
+  await click('Reload withdrawal history');
+  await until('Retained withdrawal');
+  await click('Load older withdrawals');
+  await until('Check for retained signed packet');
   f.wrongExact();
   await click('Check for retained signed packet');
   await until('Cancelled withdrawal context differs');

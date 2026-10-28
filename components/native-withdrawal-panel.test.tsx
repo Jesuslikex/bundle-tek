@@ -14,10 +14,17 @@ import {
   WITHDRAWAL_OWNER_SCOPE_HEADER,
 } from '@/lib/native-withdrawal-owner-scope';
 
-const state = vi.hoisted(() => ({ wallets: [] as unknown[] }));
+const state = vi.hoisted(() => ({
+  wallets: [] as unknown[],
+  owner: 'alice',
+  pending: false,
+}));
 vi.mock('better-auth/react', () => ({
   createAuthClient: () => ({
-    useSession: () => ({ data: { user: { id: 'alice' } }, isPending: false }),
+    useSession: () => ({
+      data: state.owner ? { user: { id: state.owner } } : null,
+      isPending: state.pending,
+    }),
   }),
 }));
 vi.mock('@wallet-standard/app', () => ({
@@ -34,6 +41,8 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetcher);
   fetcher.mockReset();
   state.wallets = [];
+  state.owner = 'alice';
+  state.pending = false;
   unmounted = false;
   sessionStorage.clear();
   container = document.createElement('div');
@@ -108,12 +117,18 @@ async function fixture(external = true) {
   state.wallets = [wallet];
   const posts: string[] = [];
   fetcher.mockImplementation(async (_url: string, init?: RequestInit) => {
+    const headers = {
+      [WITHDRAWAL_OWNER_SCOPE_HEADER]: await withdrawalOwnerScope('alice'),
+    };
     if (!init?.method)
-      return Response.json({
-        withdrawals: [row],
-        active: row,
-        nextCursor: null,
-      });
+      return Response.json(
+        {
+          withdrawals: [row],
+          active: row,
+          nextCursor: null,
+        },
+        { headers },
+      );
     const body = JSON.parse(init.body as string);
     posts.push(body.action);
     if (body.action === 'begin_signing') row.state = 'signing';
@@ -121,19 +136,24 @@ async function fixture(external = true) {
       row.state = 'signed';
       row.signature = f.signed.signature;
     } else throw Error(`Unexpected synthetic action ${body.action}`);
-    return Response.json({ withdrawal: row });
+    return Response.json({ withdrawal: row }, { headers });
   });
   const wallets = [
     { chain: 'Solana', address: f.wallet, label: 'Fixture', archived: false },
   ] as WorkspaceWallet[];
-  await act(async () =>
-    root.render(
-      <NativeWithdrawalPanel
-        wallets={wallets}
-        initialWallet={f.wallet}
-        initialOpen
-      />,
-    ),
+  const render = async () =>
+    act(async () =>
+      root.render(
+        <NativeWithdrawalPanel
+          wallets={wallets}
+          initialWallet={f.wallet}
+          initialOpen
+        />,
+      ),
+    );
+  await render();
+  await vi.waitFor(() =>
+    expect(button('Reload withdrawal history').disabled).toBe(false),
   );
   await click('Reload withdrawal history');
   await until('Retained withdrawal');
@@ -175,6 +195,7 @@ async function fixture(external = true) {
     wallet,
     sign,
     posts,
+    render,
     resolve: () =>
       resolveWallet([
         {
@@ -192,6 +213,91 @@ async function start(f: Awaited<ReturnType<typeof fixture>>) {
     expect(f.sign).toHaveBeenCalledOnce();
   });
 }
+it.each(['wrong', 'missing', 'signedout', 'unavailable'] as const)(
+  'does not trust a %s owner-scoped signing reservation response',
+  async (problem) => {
+    const f = await fixture();
+    fetcher.mockImplementationOnce(async (_url: string, init?: RequestInit) => {
+      expect(
+        new Headers(init?.headers).get(WITHDRAWAL_OWNER_SCOPE_HEADER),
+      ).toBe(await withdrawalOwnerScope('alice'));
+      expect(init?.redirect).toBe('error');
+      return Response.json(
+        { withdrawal: f.row },
+        {
+          status:
+            problem === 'signedout'
+              ? 401
+              : problem === 'unavailable'
+                ? 503
+                : 200,
+          headers:
+            problem === 'wrong'
+              ? {
+                  [WITHDRAWAL_OWNER_SCOPE_HEADER]:
+                    await withdrawalOwnerScope('bob'),
+                }
+              : {},
+        },
+      );
+    });
+    await click('Approve and sign withdrawal');
+    await until('Signed-in account changed');
+    expect(container.textContent).toContain(
+      'account verification is unavailable',
+    );
+    expect(f.sign).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain('Retained withdrawal');
+    expect(container.querySelector('textarea')).toBeNull();
+  },
+);
+it('preserves an ordinary conflict response from the same owner', async () => {
+  const f = await fixture();
+  fetcher.mockImplementationOnce(async () =>
+    Response.json(
+      { error: 'Withdrawal is already reserved.' },
+      {
+        status: 409,
+        headers: {
+          [WITHDRAWAL_OWNER_SCOPE_HEADER]: await withdrawalOwnerScope('alice'),
+        },
+      },
+    ),
+  );
+  await click('Approve and sign withdrawal');
+  await until('Withdrawal is already reserved.');
+  expect(f.sign).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('Retained withdrawal');
+});
+it.each(['switch', 'pending'] as const)(
+  'does not open a wallet prompt after a stale reservation response when the session becomes %s',
+  async (change) => {
+    const f = await fixture();
+    let release!: () => void;
+    fetcher.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return Response.json(
+        { withdrawal: { ...f.row, state: 'signing' } },
+        {
+          headers: {
+            [WITHDRAWAL_OWNER_SCOPE_HEADER]:
+              await withdrawalOwnerScope('alice'),
+          },
+        },
+      );
+    });
+    await click('Approve and sign withdrawal');
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    if (change === 'switch') state.owner = 'bob';
+    else state.pending = true;
+    await f.render();
+    await act(async () => release());
+    expect(f.sign).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain('Retained withdrawal');
+  },
+);
 it('retains then registers after the external signer check succeeds', async () => {
   const f = await fixture();
   await start(f);
@@ -242,6 +348,56 @@ it('keeps the returned signature in memory and refuses registration when storage
   await until('An exact returned signature is retained in this tab');
   expect(f.posts).toEqual(['begin_signing']);
   expect(container.textContent).toContain('closing it may lose the signature');
+});
+it('restores a reverified in-memory signature after an account mismatch when tab storage remains unavailable', async () => {
+  const f = await fixture();
+  await start(f);
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw Error('unavailable');
+  });
+  await act(async () => f.resolve());
+  await until('An exact returned signature is retained in this tab');
+  fetcher.mockImplementationOnce(async () =>
+    Response.json(
+      { error: 'scope' },
+      {
+        status: 409,
+        headers: {
+          [WITHDRAWAL_OWNER_SCOPE_HEADER]: await withdrawalOwnerScope('bob'),
+        },
+      },
+    ),
+  );
+  await click('Reload withdrawal history');
+  await until('Signed-in account changed');
+  expect(container.textContent).not.toContain('Retained withdrawal');
+  expect(container.querySelector('textarea')).toBeNull();
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+    throw Error('unavailable');
+  });
+  await click('Reload withdrawal history');
+  await until('An exact returned signature is retained in this tab');
+  expect(container.querySelector('textarea')?.value).toBe(
+    f.f.signed.transaction,
+  );
+  expect(f.posts).toEqual(['begin_signing']);
+});
+it('refuses a tampered retained signing record without registering or sending', async () => {
+  const f = await fixture();
+  f.row.state = 'signing';
+  sessionStorage.setItem(
+    `pulseforge.native-withdrawal-signature:${f.row.id}`,
+    JSON.stringify({
+      wallet: f.row.wallet,
+      sha256: f.row.document.sha256,
+      signature: '1'.repeat(64),
+    }),
+  );
+  await click('Reload withdrawal history');
+  await until('Retained packet storage is unavailable or invalid.');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+  expect(container.querySelector('textarea')).toBeNull();
 });
 it('retains a returned external signature in tab storage after the panel unmounts without registering', async () => {
   const f = await fixture();
@@ -331,11 +487,18 @@ it('recovers a verified in-memory cancelled packet when storage reads fail and p
           },
         },
       );
-    return Response.json({
-      withdrawals: [f.row, active],
-      active,
-      nextCursor: null,
-    });
+    return Response.json(
+      {
+        withdrawals: [f.row, active],
+        active,
+        nextCursor: null,
+      },
+      {
+        headers: {
+          [WITHDRAWAL_OWNER_SCOPE_HEADER]: await withdrawalOwnerScope('alice'),
+        },
+      },
+    );
   });
   await click('Reload withdrawal history');
   await until('Check for retained signed packet');

@@ -37,7 +37,7 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: synthetic Jito qualification/runtime policy-refusal composition test. See docs/CODEX-JITO-RUNTIME-POLICY-COMPOSITION-20261028.md. No provider requests, policy changes, signing or deployment.
 
-- Codex + helper, 28 October 2026 ACTIVE: fence native withdrawal history and panel actions to the current signed-in owner in components/native-withdrawal-panel.tsx, app/api/wallet-workspace/withdrawals/route.ts and focused tests. Preserve legacy API compatibility, pagination, signer and withdrawal approvals; no signing, provider, migration or deployment changes.
+- Codex + helper, 28 October 2026 COMPLETE, claim released: fence native withdrawal history and panel actions to the current signed-in owner. See docs/CODEX-WITHDRAWAL-OWNER-FENCE-20261028.md. Legacy API compatibility and withdrawal approvals remain; no signing, provider, migration or deployment changes.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: opt-in replay of a retained native Jito response with an in-memory transport. See docs/CODEX-JITO-OFFLINE-PREFEE-REPLAY-20261028.md. No credentials, live RPC, signing, broadcast or authority changes.
 

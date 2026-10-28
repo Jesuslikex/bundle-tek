@@ -263,13 +263,41 @@ function NativeWithdrawalPanelForOwner({
       setNotice('Wallet account changed. Recover any retained signature.');
     });
   }, [external]);
+  function clearAccountView() {
+    setRows([]);
+    setActive(null);
+    setCursor(null);
+    setHistoryLoaded(false);
+    setCancelledRecovery(null);
+    setAccepted(false);
+    setPassword('');
+    setNotice('');
+  }
   async function request(body: object, signal: AbortSignal) {
+    if (!ownerScope)
+      throw new Error('Sign in and wait for account verification.');
+    const requestEpoch = epoch.current;
     const response = await fetch('/api/wallet-workspace/withdrawals', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        [WITHDRAWAL_OWNER_SCOPE_HEADER]: ownerScope,
+      },
+      credentials: 'same-origin',
+      redirect: 'error',
       body: JSON.stringify(body),
       signal,
     });
+    if (
+      response.status === 401 ||
+      response.headers.get(WITHDRAWAL_OWNER_SCOPE_HEADER) !== ownerScope
+    ) {
+      if (mounted.current && requestEpoch === epoch.current && !signal.aborted)
+        clearAccountView();
+      throw new Error(
+        'Signed-in account changed or account verification is unavailable. Sign in and reload withdrawal history.',
+      );
+    }
     const value = (await response.json()) as {
       withdrawal?: NativeWithdrawal;
       error?: string;
@@ -301,7 +329,7 @@ function NativeWithdrawalPanelForOwner({
     setPassword('');
   }
   async function history(older = false) {
-    if (busy || !wallet) return;
+    if (busy || !wallet || !ownerScope) return;
     const controller = new AbortController();
     pending.current?.abort();
     pending.current = controller;
@@ -309,17 +337,31 @@ function NativeWithdrawalPanelForOwner({
     setCancelledRecovery(null);
     setBusy(true);
     setError('');
+    let accountChanged = false;
     try {
       const response = await fetch(
         `/api/wallet-workspace/withdrawals?wallet=${encodeURIComponent(wallet)}${funding ? '&' + new URLSearchParams({ planId: funding.plan.id, revision: String(funding.plan.revision), item: String(funding.item), ...(funding.leg ? { leg: String(funding.leg) } : {}) }) : ''}${older && cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`,
         {
           cache: 'no-store',
+          credentials: 'same-origin',
+          redirect: 'error',
+          headers: { [WITHDRAWAL_OWNER_SCOPE_HEADER]: ownerScope },
           signal: AbortSignal.any([
             controller.signal,
             AbortSignal.timeout(15000),
           ]),
         },
       );
+      if (
+        response.status === 401 ||
+        response.status === 409 ||
+        response.headers.get(WITHDRAWAL_OWNER_SCOPE_HEADER) !== ownerScope
+      ) {
+        accountChanged = true;
+        throw new Error(
+          'Signed-in account changed or account verification is unavailable. Sign in and reload withdrawal history.',
+        );
+      }
       const value = (await response.json()) as {
         withdrawals: NativeWithdrawal[];
         active: NativeWithdrawal | null;
@@ -363,13 +405,30 @@ function NativeWithdrawalPanelForOwner({
             funding.leg,
           );
       }
-      const cached =
-        latest?.state === 'signing'
-          ? await restoreNativeWithdrawalSignature(
-              latest.document,
-              sessionStorage,
-            )
-          : null;
+      let cached: { signature: string; transaction: string } | null = null;
+      if (latest?.state === 'signing') {
+        let storageFailed = false;
+        try {
+          cached = await restoreNativeWithdrawalSignature(
+            latest.document,
+            sessionStorage,
+          );
+        } catch {
+          storageFailed = true;
+        }
+        if (!cached && cachedSigned?.id === latest.id) {
+          const verified = await inspectNativeWithdrawal(
+            latest.document,
+            cachedSigned.transaction,
+            true,
+          );
+          if (verified.signature !== cachedSigned.signature)
+            throw new Error('Retained local withdrawal signature differs.');
+          cached = cachedSigned;
+        }
+        if (storageFailed && !cached)
+          throw new Error('Retained packet storage is unavailable or invalid.');
+      }
       if (current !== epoch.current || controller.signal.aborted) return;
       setRows((prior) =>
         older
@@ -389,12 +448,16 @@ function NativeWithdrawalPanelForOwner({
       setCursor(value.nextCursor);
       setAccepted(false);
     } catch (err) {
-      if (current === epoch.current && !controller.signal.aborted)
+      if (current === epoch.current && !controller.signal.aborted) {
+        if (accountChanged) {
+          clearAccountView();
+        }
         setError(
           err instanceof Error
             ? err.message
             : 'Withdrawal history unavailable.',
         );
+      }
     } finally {
       if (current === epoch.current && !controller.signal.aborted)
         setBusy(false);
@@ -449,9 +512,16 @@ function NativeWithdrawalPanelForOwner({
         },
       );
       if (
-        !response.ok ||
+        response.status === 401 ||
         response.headers.get(WITHDRAWAL_OWNER_SCOPE_HEADER) !== ownerScope
-      )
+      ) {
+        assertContext();
+        clearAccountView();
+        throw new Error(
+          'Cancelled withdrawal is unavailable for this account.',
+        );
+      }
+      if (!response.ok)
         throw new Error(
           'Cancelled withdrawal is unavailable for this account.',
         );
@@ -873,7 +943,7 @@ function NativeWithdrawalPanelForOwner({
           <div className="wallet-roster-actions">
             <Button
               variant="outline"
-              disabled={busy || !wallet}
+              disabled={busy || !wallet || !ownerScope}
               onClick={() => void history()}
             >
               {funding
@@ -881,6 +951,9 @@ function NativeWithdrawalPanelForOwner({
                 : 'Reload withdrawal history'}
             </Button>
           </div>
+          {!ownerScope && (
+            <p>Sign in and wait for account verification to load history.</p>
+          )}
           {!active && (
             <div className="native-withdrawal-form">
               <label htmlFor={field + 'asset'}>
@@ -1380,7 +1453,7 @@ function NativeWithdrawalPanelForOwner({
           {cursor && (
             <Button
               variant="outline"
-              disabled={busy}
+              disabled={busy || !ownerScope}
               onClick={() => void history(true)}
             >
               Load older withdrawals
