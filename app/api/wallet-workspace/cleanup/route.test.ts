@@ -172,6 +172,38 @@ const prepare = async (extra: object = {}) =>
     ...extra,
   });
 
+it('redacts synthetic database errors from history and action logs and responses', async () => {
+  const real = mocks.db;
+  const secret = 'https://rpc.synthetic.invalid/FAKE_TOKEN_SecretValue';
+  const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mocks.db = {prepare() { throw new Error(secret); }} as unknown as D1Database;
+  try {
+    const history = await GET(new Request('http://localhost/api/wallet-workspace/cleanup'));
+    expect(history.status).toBe(503);
+    expect(await history.json()).toEqual({error:'Cleanup history unavailable.'});
+    const action = await post({action:'recover', id:'11111111-1111-4111-8111-111111111111'});
+    expect(action.status).toBe(503);
+    expect(JSON.stringify(await action.json())).not.toContain(secret);
+    expect(JSON.stringify(logger.mock.calls)).not.toContain(secret);
+    expect(logger).toHaveBeenCalledWith('cleanup history unavailable');
+    expect(logger).toHaveBeenCalledWith('cleanup action failed', 'storage');
+  } finally { mocks.db = real; logger.mockRestore(); }
+});
+
+it('redacts a synthetic provider error even when its token matches the old safe-character pattern', async () => {
+  const secret = 'FAKE_TOKEN_SecretValue';
+  mocks.fetcher = async () => { throw new Error(secret); };
+  const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    const response = await prepare();
+    expect(response.status).toBe(200);
+    const result = await response.json() as {errors: {error: string}[]};
+    expect(result.errors[0].error).toBe('Cleanup checks unavailable for this wallet.');
+    expect(JSON.stringify(result)).not.toContain(secret);
+    expect(JSON.stringify(logger.mock.calls)).not.toContain(secret);
+  } finally { logger.mockRestore(); }
+});
+
 it('runs prepare, batch signing, registration, one submission and finalized recovery', async () => {
   const prepared = await prepare();
   expect(prepared.status).toBe(200);
@@ -401,6 +433,29 @@ it('sells leftover tokens as their own reviewed batch, then allows close and swe
   } finally {
     delete env.JUPITER_API_KEY;
   }
+});
+
+it('redacts a synthetic buy-preparation error while retaining the finalized sale', async () => {
+  env.JUPITER_API_KEY = 'synthetic-test-key';
+  const secret = 'https://rpc.synthetic.invalid/FAKE_BUY_TOKEN';
+  const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    const sold = await body(await prepare({stage:'sell'}));
+    const row = sold.cleanups[0];
+    await post({action:'begin_signing',batchId:sold.batchId});
+    const [signed] = await signWalletCleanupBatch(await f.session(f.owner),[row.document],()=>{});
+    await post({action:'register',id:row.id,transaction:signed.transaction});
+    await post({action:'submit',id:row.id,transaction:signed.transaction});
+    receiptFor = (tx) => f.sell.receipt(tx);
+    f.buy.deps.prepare = (async () => { throw new Error(secret); }) as never;
+    const recovered = await post({action:'recover',id:row.id});
+    expect(recovered.status).toBe(200);
+    const result = await body(recovered);
+    expect(result.cleanup.state).toBe('finalized');
+    expect(JSON.stringify(result)).not.toContain(secret);
+    expect(JSON.stringify(logger.mock.calls)).not.toContain(secret);
+    expect(logger).toHaveBeenCalledWith('cleanup buy preparation failed');
+  } finally { delete env.JUPITER_API_KEY; logger.mockRestore(); }
 });
 
 it('refuses the sell stage when Jupiter is not configured', async () => {

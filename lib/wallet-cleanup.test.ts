@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   getBase64Encoder,
   getCompiledTransactionMessageDecoder,
@@ -559,6 +559,23 @@ describe('cleanup sells', () => {
     f.sell.simulation.source = cleanupFixture().sell.simulation.source;
     f.sell.simulation.inputAmountMatches = null;
     expect((await sells(f)).sells).toEqual([]);
+  });
+  it('does not log or return a synthetic credential-bearing sell failure', async () => {
+    const f = cleanupFixture();
+    const secret = 'FAKE_API_KEY_SecretValue';
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const result = await prepareWalletCleanupSells(
+        { batchId, wallet: f.wallet, walletRevision: 1, destination: f.destination },
+        'synthetic-key', AbortSignal.timeout(10000), f.fetcher,
+        { ...f.sell.deps, prepare: async () => { throw new Error(secret); } },
+      );
+      expect(result.sells).toEqual([]);
+      expect(result.errors[0].error).toBe('Sell route unavailable.');
+      expect(JSON.stringify(result)).not.toContain(secret);
+      expect(JSON.stringify(logger.mock.calls)).not.toContain(secret);
+      expect(logger).toHaveBeenCalledWith('cleanup sell preparation failed');
+    } finally { logger.mockRestore(); }
   });
   it('decodes finalized sell receipts and refuses partial sales', async () => {
     const f = cleanupFixture();

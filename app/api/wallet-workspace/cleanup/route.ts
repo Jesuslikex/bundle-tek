@@ -47,6 +47,25 @@ const parse = (row: Row): WalletCleanup => ({
 const ACTIVE = "('awaiting_signature','signing','signed','submitted')";
 const currentWalletSql =
   "EXISTS(SELECT 1 FROM workspace_wallets w WHERE w.owner_id=wallet_cleanups.owner_id AND w.chain='Solana' AND w.address=wallet_cleanups.wallet_address AND w.revision=wallet_cleanups.wallet_revision AND w.archived=0)";
+// Only fixed application-authored messages may be returned from a provider
+// preparation failure. Provider error strings can contain credentials.
+const cleanupPreparationMessages = new Set([
+  'Cleanup network differs.',
+  'Cleanup token accounts unavailable or too many.',
+  'Cleanup wallet accounts unavailable.',
+  'Use ordinary system wallets without account data.',
+  'Wallet cannot pay the cleanup network fee.',
+  'Destination would stay below the rent minimum.',
+  'Cleanup network fee differs from one signature.',
+  'Cleanup simulation failed.',
+  'Cleanup simulation post-state unavailable.',
+  'Cleanup settlement differs from its review.',
+  'Cleanup mint accounts unavailable.',
+]);
+const cleanupPreparationFailure = (error: unknown) =>
+  error instanceof Error && cleanupPreparationMessages.has(error.message)
+    ? error.message
+    : 'Cleanup checks unavailable for this wallet.';
 
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
@@ -86,8 +105,8 @@ export async function GET(request: Request) {
         result.results.map((row) => validatedWalletCleanup(parse(row))),
       ),
     });
-  } catch (err) {
-    console.error('cleanup GET', err);
+  } catch {
+    console.error('cleanup history unavailable');
     return json({ error: 'Cleanup history unavailable.' }, 503);
   }
 }
@@ -114,7 +133,7 @@ export async function POST(request: Request) {
   } catch {
     return json({ error: 'Invalid cleanup request.' }, 400);
   }
-  let phase = 'storage';
+  let phase: 'storage' | 'provider' | 'send' = 'storage';
   try {
     const db = getD1(),
       now = () => new Date().toISOString(),
@@ -221,10 +240,7 @@ export async function POST(request: Request) {
         } catch (error) {
           errors.push({
             wallet: round.seller,
-            error:
-              error instanceof Error && /^[\w .,'-]{1,120}$/.test(error.message)
-                ? error.message
-                : 'Cleanup checks unavailable for this wallet.',
+            error: cleanupPreparationFailure(error),
           });
           continue;
         }
@@ -411,10 +427,7 @@ export async function POST(request: Request) {
           const error = outcome.reason;
           errors.push({
             wallet: wallet.address,
-            error:
-              error instanceof Error && /^[\w .,'-]{1,120}$/.test(error.message)
-                ? error.message
-                : 'Cleanup checks unavailable for this wallet.',
+            error: cleanupPreparationFailure(error),
           });
           continue;
         }
@@ -725,8 +738,8 @@ export async function POST(request: Request) {
                   buyerRow.revision,
                 )
                 .first<{ id: string }>();
-            } catch (error) {
-              console.error('cleanup buy failed', error);
+            } catch {
+              console.error('cleanup buy preparation failed');
               // The sell stands even when the buy-back cannot be prepared.
             }
           }
@@ -817,7 +830,7 @@ export async function POST(request: Request) {
     if (!latest) throw new Error();
     return json({ cleanup: latest });
   } catch (error) {
-    console.error('cleanup action failed', phase, error);
+    console.error('cleanup action failed', phase);
     if (
       error instanceof Error &&
       /reserved|Signature already registered/.test(error.message)

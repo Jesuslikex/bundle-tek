@@ -669,17 +669,7 @@ export async function prepareWalletCleanupSells(
         native + transfer + uint(sim.networkFeeLamports) + 2_100_000n <
           uint(order.minimumOutAmount)
       ) {
-        console.error('sell guard', {
-          ok: sim.succeeded,
-          route: sim.routeAssessment.status,
-          src: sim.routeAssessment.decoded?.sourceAccount,
-          holding: holding.address,
-          input: sim.inputAmountMatches,
-          native: sim.nativeChangeRaw,
-          transfer: String(transfer),
-          min: order.minimumOutAmount,
-          fee: sim.networkFeeLamports,
-        });
+        console.error('cleanup sell simulation refused');
         throw new Error('Sell simulation did not deliver the reviewed SOL.');
       }
       const refreshed = await refreshPacketBlockhash(packet, signal, fetcher);
@@ -726,11 +716,17 @@ export async function prepareWalletCleanupSells(
       await inspectWalletCleanup(review, review.transaction, false);
       sells.push(review);
     } catch (error) {
-      console.error('cleanup sell failed', error);
+      console.error('cleanup sell preparation failed');
       errors.push({
         mint: holding.mint,
         error:
-          error instanceof Error && /^[\w .,'()-]{1,160}$/.test(error.message)
+          error instanceof Error &&
+          [
+            'Token mint unavailable.',
+            'Token mint layout differs.',
+            'Sell order differs from the token balance.',
+            'Sell simulation did not deliver the reviewed SOL.',
+          ].includes(error.message)
             ? error.message
             : 'Sell route unavailable.',
       });
