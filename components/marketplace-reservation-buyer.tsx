@@ -11,6 +11,8 @@ import { readPanelJson } from './read-panel-json';
 import type { CartReview } from '@/lib/marketplace-cart';
 import { operatorDraftId } from '@/lib/marketplace-operator-draft-view';
 import { marketplaceSol } from '@/lib/marketplace-catalog';
+import { unlockVault, VAULT_STORAGE_KEY } from '@/lib/browser-wallet-vault';
+import { signMarketplacePayment } from '@/lib/marketplace-payment-sign';
 import {
   admitReservationReview,
   makeReservationRequest,
@@ -60,7 +62,14 @@ export function MarketplaceReservationBuyer({
     [clock, setClock] = useState(0),
     [retentionFailed, setRetentionFailed] = useState(false),
     [version, setVersion] = useState(0),
-    [history, setHistory] = useState<ReservationHistoryPage | null>(null);
+    [history, setHistory] = useState<ReservationHistoryPage | null>(null),
+    [payTerms, setPayTerms] = useState<{
+      sellerWallet: string;
+      lamports: string;
+      paidAt: string | null;
+    } | null>(null),
+    [payPassword, setPayPassword] = useState(''),
+    [paying, setPaying] = useState(false);
   const pending = useRef<AbortController | null>(null),
     expected = useRef<ReservationRequest | undefined>(undefined),
     recoveryButton = useRef<HTMLButtonElement | null>(null),
@@ -115,6 +124,70 @@ export function MarketplaceReservationBuyer({
     setHistory(null);
     if (expected.current?.id !== saved) expected.current = undefined;
     setOpen(true);
+  }
+  async function pay() {
+    const activeId = receipt?.record.id ?? id;
+    if (!payTerms || paying || !activeId) return;
+    setPaying(true);
+    setError('');
+    try {
+      const encrypted = localStorage.getItem(VAULT_STORAGE_KEY);
+      if (!encrypted) throw Error('Create or import your vault first.');
+      const session = await unlockVault(encrypted, payPassword);
+      const wallet = session.payload.wallets.find((w) => w.family === 'solana');
+      if (!wallet) throw Error('This vault holds no Solana wallet to pay from.');
+      const terms = await fetch(
+        '/api/marketplace/reservations?id=' + encodeURIComponent(activeId),
+        { cache: 'no-store' },
+      );
+      if (!terms.ok) throw Error('The payment terms could not be read.');
+      const body = (await terms.json()) as {
+        payment?: { transaction: string } | null;
+      };
+      if (!body.payment?.transaction)
+        throw Error('The seller payout address is not configured.');
+      const signed = signMarketplacePayment(
+        session,
+        wallet.address,
+        body.payment.transaction,
+      );
+      const paid = await fetch('/api/marketplace/reservations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pay',
+          id: activeId,
+          transaction: signed.transaction,
+        }),
+      });
+      if (!paid.ok) {
+        const failure = (await paid.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw Error(failure.error ?? 'The payment was not accepted.');
+      }
+      setPayPassword('');
+      setPayTerms({ ...payTerms, paidAt: new Date().toISOString() });
+      setMessage('Paid. Importing the wallets…');
+      const settled = await fetch('/api/marketplace/reservations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'settle', id: activeId }),
+      });
+      const done = (await settled.json().catch(() => ({}))) as {
+        settled?: { walletCount?: number };
+        error?: string;
+      };
+      if (!settled.ok || !done.settled)
+        throw Error(done.error ?? 'The paid wallets could not be imported.');
+      setMessage(
+        `Paid and imported ${done.settled.walletCount ?? 0} wallet(s) to My wallets. Key delivery is still manual.`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The payment failed.');
+    } finally {
+      setPaying(false);
+    }
   }
   function close() {
     pending.current?.abort();
@@ -256,26 +329,36 @@ export function MarketplaceReservationBuyer({
             : 'Hold expired. Refresh inventory and request a new cart review.',
       );
       if (action === 'reserve' && checked.state === 'held') {
-        // Proxima imports purchased wallets automatically; the manual import
-        // button stays as the fallback when this fails.
-        void fetch('/api/marketplace/reservations', {
+        // A hold is not a purchase. The terms ride on the hold response, so an
+        // unpaid hold offers the payment instead of attempting a settle.
+        const terms = (body as {
+          payment?: {
+            sellerWallet: string;
+            lamports: string;
+            paidAt: string | null;
+          } | null;
+        }).payment;
+        if (terms && !terms.paidAt) {
+          setPayTerms(terms);
+          setMessage(
+            'Wallet hold verified. Pay the reviewed total to make it a purchase.',
+          );
+          return;
+        }
+        const settled = await fetch('/api/marketplace/reservations', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ action: 'settle', id: activeId }),
-          cache: 'no-store',
-        })
-          .then(async (r) => {
-            if (!r.ok) return;
-            const settled = (await r.json()) as {
-              settled?: { walletCount?: number };
-            };
-            const count = settled.settled?.walletCount ?? 0;
-            if (!count || !live(c)) return;
-            setMessage(
-              `Wallet hold verified and ${count} wallet${count === 1 ? '' : 's'} imported to My wallets. No payment or key delivery was authorized.`,
-            );
-          })
-          .catch(() => {});
+        }).catch(() => null);
+        if (!settled?.ok || !live(c)) return;
+        const done = (await settled.json().catch(() => ({}))) as {
+          settled?: { walletCount?: number };
+        };
+        const count = done.settled?.walletCount ?? 0;
+        if (!count || !live(c)) return;
+        setMessage(
+          `Wallet hold verified and ${count} wallet${count === 1 ? '' : 's'} imported to My wallets. No payment or key delivery was authorized.`,
+        );
       }
     } catch {
       if (live(c)) {
@@ -571,6 +654,30 @@ export function MarketplaceReservationBuyer({
             </>
           )}
           {message && <output>{message}</output>}
+          {payTerms && !payTerms.paidAt && (
+            <div className={styles.payment}>
+              <p>
+                Pay {marketplaceSol(payTerms.lamports)} SOL to{' '}
+                <code>{payTerms.sellerWallet}</code> from the paying wallet in
+                your vault. The hold is not a purchase until this lands.
+              </p>
+              <label>
+                Vault passphrase
+                <input
+                  type="password"
+                  value={payPassword}
+                  onChange={(e) => setPayPassword(e.target.value)}
+                  disabled={paying}
+                />
+              </label>
+              <button
+                disabled={paying || !payPassword}
+                onClick={() => void pay()}
+              >
+                {paying ? 'Paying…' : 'Pay and import'}
+              </button>
+            </div>
+          )}
           {error && <p role="alert">{error}</p>}
           {signIn && <Link href="/sign-in">Sign in</Link>}
           <div className={styles.controls}>

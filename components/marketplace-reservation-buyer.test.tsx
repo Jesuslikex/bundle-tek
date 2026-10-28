@@ -100,7 +100,7 @@ function response() {
     },
   });
 }
-/** Hold traffic only; the automatic settle POST is a separate follow-up. */
+/** Everything except the settle POST. The terms read counts too. */
 function holds(fetcher: ReturnType<typeof server>) {
   return fetcher.mock.calls.filter(([, init]) => {
     const body = init?.body;
@@ -461,4 +461,51 @@ it('pages saved summaries manually without automatically recovering or writing a
     true,
   );
   expect(sessionStorage.getItem(key)).toBeNull();
+});
+
+it('offers the reviewed payment after a hold instead of pretending it is a purchase', async () => {
+  const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      const { action, ...payload } = JSON.parse(init.body as string);
+      if (action === 'reserve') saved = await makeReservation(payload);
+      // A hold is not a purchase: settle refuses until the buyer pays.
+      if (action === 'settle')
+        return Response.json({ error: 'Pay first.' }, { status: 409 });
+    }
+    const base = (await response().json()) as { reservation: unknown };
+    return Response.json({
+      ...base,
+      payment: {
+        sellerWallet: 'So11111111111111111111111111111111111111112',
+        lamports: '50000000',
+        paidAt: null,
+      },
+    });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await mount();
+  await click('Fixture hold review');
+  await check(RESERVATION_ACK);
+  await click('Hold these wallets');
+  // The settle POST and the follow-up terms read are two chains deep; poll for
+  // the block instead of guessing a tick count.
+  for (let i = 0; i < 40; i += 1) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+    if (document.body.textContent?.includes('Pay the reviewed total')) break;
+  }
+  console.log('BODY', document.body.textContent);
+  expect(document.body.textContent).toContain(
+    'Pay the reviewed total to make it a purchase',
+  );
+  expect(document.body.textContent).toContain('0.05 SOL');
+  expect(document.body.textContent).toContain(
+    'So11111111111111111111111111111111111111112',
+  );
+  const pay = [...document.querySelectorAll('button')].find(
+    (b) => b.textContent === 'Pay and import',
+  )!;
+  expect(pay).toBeDefined();
+  expect(pay.disabled).toBe(true);
 });

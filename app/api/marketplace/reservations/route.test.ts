@@ -61,6 +61,15 @@ async function reservationBody(response: Response) {
           state: z.enum(['held', 'released', 'expired']),
         })
         .strict(),
+      payment: z
+        .object({
+          sellerWallet: z.string(),
+          lamports: z.string(),
+          paidAt: z.iso.datetime().nullable(),
+        })
+        .strict()
+        .nullable()
+        .optional(),
     })
     .strict()
     .parse(await response.json());

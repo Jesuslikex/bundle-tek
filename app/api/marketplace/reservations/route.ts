@@ -390,13 +390,24 @@ export async function POST(request: Request) {
           true,
         );
     }
+    const reservation = await reserveMarketplaceCart(
+      db,
+      user.userId,
+      payload,
+      request.signal,
+    );
+    // Carry the payment terms on the hold itself so the buyer needs no second
+    // read to know what to pay.
+    const sellerWallet = marketplaceSellerWallet();
     return json({
-      reservation: await reserveMarketplaceCart(
-        db,
-        user.userId,
-        payload,
-        request.signal,
-      ),
+      reservation,
+      payment: sellerWallet
+        ? {
+            sellerWallet,
+            lamports: reservation.record.review.askingPriceLamports,
+            paidAt: null,
+          }
+        : null,
     });
   } catch (error) {
     return failure(error, request);

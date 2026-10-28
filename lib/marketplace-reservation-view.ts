@@ -14,6 +14,16 @@ const response = z
         state: z.enum(['held', 'released', 'expired']),
       })
       .strict(),
+    // Optional: only present when a seller payout address is configured.
+    payment: z
+      .object({
+        sellerWallet: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/),
+        lamports: z.string().regex(/^[1-9]\d{0,19}$/),
+        paidAt: z.iso.datetime().nullable(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict();
 export type BuyerReservation = z.infer<typeof response>['reservation'];
