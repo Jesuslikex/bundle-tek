@@ -14,6 +14,7 @@ import {
   retainJitoRecoverySignature,
   withJitoRecoveryJournalLock,
 } from '@/lib/jito-recovery-journal';
+import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
 import type { TradeSession } from '@/lib/imported-trade-session';
 import type { JitoAttempt } from '@/lib/jito-sign-attempt-client';
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
@@ -613,4 +614,74 @@ it('blocks the other packet and cancellation while a swap wallet prompt is unres
   expect(f.sign).toHaveBeenCalledTimes(1);
   expect(f.posts).toEqual(['begin-signing']);
   await act(async () => f.finishSign());
+});
+
+it('refreshes a changed recent bundle explicitly after the locator follow-up, without signing or submitting', async () => {
+  const f = await setup();
+  await f.load();
+  await f.waitSignReady();
+  const attemptId = crypto.randomUUID();
+  f.attempts.push({
+    bundleId: f.f.manifest.id,
+    manifestSha256: f.f.manifest.sha256,
+    packet: 0,
+    signer: f.f.review.wallet,
+    intentId: f.f.review.id,
+    attemptId,
+    state: 'unknown',
+    signature: null,
+    transaction: null,
+  });
+  const original = f.fetcher.getMockImplementation()!;
+  let exacts = 0;
+  f.fetcher.mockImplementation(async (url, init) => {
+    if (!init?.method && url.includes('bundleId=') && ++exacts === 5) {
+      f.attempts[0] = {
+        ...f.attempts[0],
+        state: 'registered',
+        signature: f.f.swap.signed.signature,
+        transaction: f.f.swap.signed.transaction,
+      };
+      f.bundle.signatures[0] = f.f.swap.signed.signature;
+    }
+    return original(url, init);
+  });
+  const recovery = await createJitoPacketRecovery(
+    f.f.manifest,
+    0,
+    f.f.swap.signed.transaction,
+  );
+  const bytes = new TextEncoder().encode(JSON.stringify(recovery));
+  const file = new File([bytes], 'packet.json', { type: 'application/json' });
+  Object.defineProperty(file, 'arrayBuffer', {
+    value: async () => bytes.buffer,
+  });
+  const input = container.querySelector(
+    'section[aria-label="Find an older Jito bundle"] input[type=file]',
+  ) as HTMLInputElement;
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  await act(async () =>
+    input.dispatchEvent(new Event('change', { bubbles: true })),
+  );
+  await until(() =>
+    expect(button('Open original bundle').disabled).toBe(false),
+  );
+  await click('Open original bundle');
+  await until(() =>
+    expect(container.textContent).toContain(
+      'Bundle details need verification',
+    ),
+  );
+  expect(container.textContent).not.toContain(
+    `Signed: ${f.f.swap.signed.signature}`,
+  );
+  await click('Verify bundle details');
+  await until(() =>
+    expect(container.textContent).toContain(f.f.swap.signed.signature),
+  );
+  expect(container.textContent).not.toContain(
+    'Bundle details need verification',
+  );
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
 });

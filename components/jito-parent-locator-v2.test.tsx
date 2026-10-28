@@ -316,6 +316,15 @@ it('opens a 21st bundle separately without evicting the 20 recent records or sig
   for (const item of f.history)
     expect(container.textContent).toContain(item.manifest.id);
   expect(container.textContent).toContain(f.older.manifest.id);
+  const link = [...container.querySelectorAll('a')].find((item) =>
+    item.textContent?.includes('Go to opened bundle'),
+  );
+  expect(link?.getAttribute('href')).toBe(
+    `#jito-bundle-${f.older.manifest.id}`,
+  );
+  const target = document.getElementById(`jito-bundle-${f.older.manifest.id}`);
+  expect(target?.tagName).toBe('ARTICLE');
+  expect(target?.getAttribute('tabindex')).toBe('-1');
   expect(f.actions).toEqual([]);
   expect(
     f.exactRequests.filter((id) => id === f.older.manifest.id).length,

@@ -177,6 +177,7 @@ function JitoAtomicBundleForContext({
     [error, setError] = useState(''),
     [now, setNow] = useState(() => Date.now()),
     [historyVerified, setHistoryVerified] = useState(false),
+    [openedBundleId, setOpenedBundleId] = useState<string | null>(null),
     [located, setLocated] = useState<{
       record: JitoBundleRecord;
       snapshot: JitoV2Snapshot | null;
@@ -276,6 +277,7 @@ function JitoAtomicBundleForContext({
         setEligible([]);
         setAcceptedSubmit(null);
         setLocated(null);
+        setOpenedBundleId(null);
         locatedNow.current = null;
         setChainObservation(null);
         setSnapshots({});
@@ -968,6 +970,7 @@ function JitoAtomicBundleForContext({
                 locatedNow.current = { record: snapshot.bundle, snapshot };
                 setLocated(locatedNow.current);
               }
+              setOpenedBundleId(locator.bundleId);
               setAcceptedSubmit(null);
               void readExactSnapshot(locator.bundleId, locator.sha256).catch(
                 () => {
@@ -989,6 +992,15 @@ function JitoAtomicBundleForContext({
           recovery file appears separately; select the file again in its packet
           panel to verify or register the evidence.
         </p>
+        {openedBundleId &&
+          displayBundles.some(
+            (item) => item.manifest.id === openedBundleId,
+          ) && (
+            <p>
+              Bundle found.{' '}
+              <a href={`#jito-bundle-${openedBundleId}`}>Go to opened bundle</a>
+            </p>
+          )}
         {historyVerified &&
           ownerScope &&
           coordinator
@@ -1165,12 +1177,19 @@ function JitoAtomicBundleForContext({
             }
           }
           return (
-            <article key={m.id} className="space-y-3 rounded-md border p-3">
+            <article
+              key={m.id}
+              id={`jito-bundle-${m.id}`}
+              tabIndex={-1}
+              className="space-y-3 rounded-md border p-3"
+            >
               <h5>Bundle {m.id}</h5>
               {isLocated && <p>Older bundle opened from a recovery file.</p>}
               {!verified && (
                 <p>
                   Bundle details need verification before actions are available.
+                  If they changed, select Verify bundle details to refresh this
+                  bundle before taking action.
                 </p>
               )}
               {!verified && (
