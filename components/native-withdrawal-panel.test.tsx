@@ -9,8 +9,17 @@ import { NativeWithdrawalPanel } from './native-withdrawal-panel';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import * as vaultModule from '@/lib/browser-wallet-vault';
 import * as cacheModule from '@/lib/native-withdrawal-signature-cache';
+import {
+  withdrawalOwnerScope,
+  WITHDRAWAL_OWNER_SCOPE_HEADER,
+} from '@/lib/native-withdrawal-owner-scope';
 
 const state = vi.hoisted(() => ({ wallets: [] as unknown[] }));
+vi.mock('better-auth/react', () => ({
+  createAuthClient: () => ({
+    useSession: () => ({ data: { user: { id: 'alice' } }, isPending: false }),
+  }),
+}));
 vi.mock('@wallet-standard/app', () => ({
   getWallets: () => ({ get: () => state.wallets, on: () => () => {} }),
 }));
@@ -288,6 +297,62 @@ it('keeps a vault signature in memory with a warning if tab storage and context 
   expect(container.textContent).toContain('Tab storage failed after signing');
   expect(container.querySelector('textarea')?.value).toBe(
     f.f.signed.transaction,
+  );
+  expect(f.posts).toEqual(['begin_signing']);
+});
+it('recovers a verified in-memory cancelled packet when storage reads fail and preserves the active withdrawal', async () => {
+  const f = await fixture();
+  await start(f);
+  f.wallet.accounts = [{ ...f.wallet.accounts[0] }];
+  await act(async () => f.resolve());
+  await until('An exact returned signature is retained in this tab');
+  f.row.state = 'cancelled';
+  const next = await nativeWithdrawalFixture();
+  const active = {
+    id: next.review.id,
+    wallet: next.wallet,
+    walletRevision: next.review.walletRevision,
+    document: next.review,
+    state: 'awaiting_signature',
+    signature: null,
+    receipt: null,
+    createdAt: next.review.preparedAt,
+    updatedAt: next.review.preparedAt,
+  };
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (init?.method) throw Error('Unexpected synthetic mutation');
+    if (url.includes('withdrawalId='))
+      return Response.json(
+        { withdrawal: f.row },
+        {
+          headers: {
+            [WITHDRAWAL_OWNER_SCOPE_HEADER]:
+              await withdrawalOwnerScope('alice'),
+          },
+        },
+      );
+    return Response.json({
+      withdrawals: [f.row, active],
+      active,
+      nextCursor: null,
+    });
+  });
+  await click('Reload withdrawal history');
+  await until('Check for retained signed packet');
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('Check for retained signed packet').disabled).toBe(false);
+  });
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+    throw Error('unavailable');
+  });
+  await click('Check for retained signed packet');
+  await until('Cancelled withdrawal signed packet');
+  expect(container.querySelector('textarea')?.value).toBe(
+    f.f.signed.transaction,
+  );
+  expect(container.textContent).toContain(
+    'Retained withdrawal · awaiting_signature',
   );
   expect(f.posts).toEqual(['begin_signing']);
 });

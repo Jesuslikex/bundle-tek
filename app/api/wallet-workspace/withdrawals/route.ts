@@ -9,6 +9,10 @@ import { walletRequest } from '@/lib/wallet-request';
 import { walletAddress } from '@/lib/wallet-workspace';
 import { UUID } from '@/lib/wallet-operation';
 import {
+  WITHDRAWAL_OWNER_SCOPE_HEADER,
+  withdrawalOwnerScope,
+} from '@/lib/native-withdrawal-owner-scope';
+import {
   withdrawalInput,
   inspectNativeWithdrawal,
   type NativeWithdrawal,
@@ -48,13 +52,39 @@ const parse = (row: Row): NativeWithdrawal => ({
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return json({ error: 'Sign in to view withdrawals.' }, 401);
+  let ownerScope: string;
+  try {
+    ownerScope = await withdrawalOwnerScope(user.userId);
+  } catch {
+    return json({ error: 'Withdrawal account scope unavailable.' }, 503);
+  }
+  const scopedJson = (value: unknown, status = 200) => {
+    const response = json(value, status);
+    response.headers.set(WITHDRAWAL_OWNER_SCOPE_HEADER, ownerScope);
+    return response;
+  };
+  const expectedScope = request.headers.get(WITHDRAWAL_OWNER_SCOPE_HEADER);
+  if (expectedScope !== null && expectedScope !== ownerScope)
+    return scopedJson({ error: 'Signed-in account changed.' }, 409);
   const params = new URL(request.url).searchParams,
-    cursor = params.get('cursor');
+    cursor = params.get('cursor'),
+    exactId = params.get('withdrawalId');
   let wallet: string;
   let funding: FundingSelection | undefined;
   try {
     wallet = walletAddress(params.get('wallet'), 'Solana');
     if (cursor !== null && !UUID.test(cursor)) throw new Error();
+    if (
+      exactId !== null &&
+      (!UUID.test(exactId) ||
+        cursor !== null ||
+        expectedScope === null ||
+        ['wallet', 'withdrawalId', 'planId', 'revision', 'item', 'leg'].some(
+          (key) => params.getAll(key).length > 1,
+        ) ||
+        (params.has('leg') && !params.has('planId')))
+    )
+      throw new Error();
     if (params.has('planId') || params.has('revision') || params.has('item'))
       funding = fundingSelection({
         planId: params.get('planId'),
@@ -63,23 +93,40 @@ export async function GET(request: Request) {
         ...(params.has('leg') ? { leg: Number(params.get('leg')) } : {}),
       });
   } catch {
-    return json({ error: 'Choose a valid withdrawal wallet and cursor.' }, 400);
+    return scopedJson(
+      { error: 'Choose a valid withdrawal wallet and cursor.' },
+      400,
+    );
   }
   try {
     const scope = fundingHistoryScope(funding);
-    const db = getD1(),
-      anchor = cursor
-        ? await db
-            .prepare(
-              select +
-                ' WHERE owner_id=? AND wallet_address=? AND id=?' +
-                scope.sql,
-            )
-            .bind(user.userId, wallet, cursor, ...scope.bindings)
-            .first<Row>()
-        : null;
+    const db = getD1();
+    if (exactId) {
+      const exact = await db
+        .prepare(
+          select +
+            ' WHERE owner_id=? AND wallet_address=? AND id=?' +
+            scope.sql,
+        )
+        .bind(user.userId, wallet, exactId, ...scope.bindings)
+        .first<Row>();
+      if (!exact) return scopedJson({ error: 'Withdrawal unavailable.' }, 404);
+      return scopedJson({
+        withdrawal: await validatedNativeWithdrawal(parse(exact)),
+      });
+    }
+    const anchor = cursor
+      ? await db
+          .prepare(
+            select +
+              ' WHERE owner_id=? AND wallet_address=? AND id=?' +
+              scope.sql,
+          )
+          .bind(user.userId, wallet, cursor, ...scope.bindings)
+          .first<Row>()
+      : null;
     if (cursor && !anchor)
-      return json({ error: 'Withdrawal cursor unavailable.' }, 400);
+      return scopedJson({ error: 'Withdrawal cursor unavailable.' }, 400);
     const result = await db
       .prepare(
         select +
@@ -111,13 +158,13 @@ export async function GET(request: Request) {
         .slice(0, 50)
         .map((row) => validatedNativeWithdrawal(parse(row))),
     );
-    return json({
+    return scopedJson({
       withdrawals: rows,
       active: active ? await validatedNativeWithdrawal(parse(active)) : null,
       nextCursor: result.results.length > 50 ? rows.at(-1)!.id : null,
     });
   } catch {
-    return json({ error: 'Withdrawal history unavailable.' }, 503);
+    return scopedJson({ error: 'Withdrawal history unavailable.' }, 503);
   }
 }
 export async function POST(request: Request) {

@@ -5,12 +5,21 @@ import {
   fundingLegs,
   requireSelectedFundingReview,
 } from '@/lib/mainnet-funding';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createAuthClient } from 'better-auth/react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { unlockVault, VAULT_STORAGE_KEY } from '@/lib/browser-wallet-vault';
 import {
   signNativeWithdrawal,
+  inspectNativeWithdrawal,
   validatedNativeWithdrawal,
   type NativeWithdrawal,
 } from '@/lib/native-withdrawal';
@@ -24,26 +33,23 @@ import {
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { WalletSigningRejected } from '@/lib/wallet-signing-rejection';
+import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 import {
   retainNativeWithdrawalSignature,
   restoreNativeWithdrawalSignature,
   clearNativeWithdrawalSignature,
 } from '@/lib/native-withdrawal-signature-cache';
+import {
+  WITHDRAWAL_OWNER_SCOPE_HEADER,
+  withdrawalOwnerScope,
+} from '@/lib/native-withdrawal-owner-scope';
 // Exact SOL text for a lamport amount, as the prepare request expects.
 const lamportsText = (raw: string) => {
   const padded = raw.padStart(10, '0');
   const fraction = padded.slice(-9).replace(/0+$/, '');
   return padded.slice(0, -9) + (fraction ? '.' + fraction : '');
 };
-export function NativeWithdrawalPanel({
-  wallets,
-  initialWallet = '',
-  initialToken,
-  initialOpen = false,
-  initialRecipient = '',
-  initialAmount = '',
-  funding,
-}: {
+type NativeWithdrawalPanelProps = {
   wallets: WorkspaceWallet[];
   initialWallet?: string;
   initialToken?: { mint: string; decimals: number };
@@ -52,7 +58,49 @@ export function NativeWithdrawalPanel({
   initialRecipient?: string;
   initialAmount?: string;
   funding?: { plan: SavedFunding; item: number; leg?: number };
-}) {
+};
+const auth = createAuthClient();
+export function NativeWithdrawalPanel(props: NativeWithdrawalPanelProps) {
+  const { data, isPending } = auth.useSession();
+  const owner =
+    !isPending && typeof data?.user?.id === 'string' ? data.user.id : null;
+  const [scope, setScope] = useState<{ owner: string; value: string } | null>(
+    null,
+  );
+  useEffect(() => {
+    let active = true;
+    if (owner)
+      void withdrawalOwnerScope(owner)
+        .then((value) => {
+          if (active) setScope({ owner, value });
+        })
+        .catch(() => {
+          if (active) setScope(null);
+        });
+    return () => {
+      active = false;
+    };
+  }, [owner, isPending]);
+  return (
+    <NativeWithdrawalPanelForOwner
+      key={JSON.stringify([owner, isPending])}
+      {...props}
+      ownerScope={
+        owner && !isPending && scope?.owner === owner ? scope.value : null
+      }
+    />
+  );
+}
+function NativeWithdrawalPanelForOwner({
+  wallets,
+  initialWallet = '',
+  initialToken,
+  initialOpen = false,
+  initialRecipient = '',
+  initialAmount = '',
+  funding,
+  ownerScope,
+}: NativeWithdrawalPanelProps & { ownerScope: string | null }) {
   const choices = wallets.filter((w) => w.chain === 'Solana');
   let fundingLeg: ReturnType<typeof fundingLegs>[number] | undefined;
   try {
@@ -74,6 +122,10 @@ export function NativeWithdrawalPanel({
     [cachedSigned, setCachedSigned] = useState<{
       id: string;
       signature: string;
+      transaction: string;
+    } | null>(null),
+    [cancelledRecovery, setCancelledRecovery] = useState<{
+      id: string;
       transaction: string;
     } | null>(null),
     [wallet, setWallet] = useState(
@@ -125,7 +177,7 @@ export function NativeWithdrawalPanel({
     epoch.current++;
     abortPending();
   }, [abortPending]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     mounted.current = true;
     return dispose;
   }, [dispose]);
@@ -142,6 +194,7 @@ export function NativeWithdrawalPanel({
     setError('');
     setNotice('');
     setCachedSigned(null);
+    setCancelledRecovery(null);
     setWallet(value);
   }
   useEffect(() => {
@@ -152,6 +205,7 @@ export function NativeWithdrawalPanel({
   useEffect(() => {
     const reset = () => {
       epoch.current++;
+      setCancelledRecovery(null);
       setAccepted(false);
       setPassword('');
       pending.current?.abort();
@@ -176,6 +230,7 @@ export function NativeWithdrawalPanel({
         refresh = () => {
           if (disposed) return;
           epoch.current++;
+          setCancelledRecovery(null);
           setAccepted(false);
           pending.current?.abort();
           if (!prompt.current) setBusy(false);
@@ -201,6 +256,7 @@ export function NativeWithdrawalPanel({
     if (!external) return;
     return onNativeWithdrawalWalletChange(external, () => {
       epoch.current++;
+      setCancelledRecovery(null);
       pending.current?.abort();
       if (!prompt.current) setBusy(false);
       setAccepted(false);
@@ -232,6 +288,7 @@ export function NativeWithdrawalPanel({
   }
   function update(row: NativeWithdrawal) {
     if (!mounted.current) return;
+    setCancelledRecovery(null);
     setRows((prior) => [row, ...prior.filter((old) => old.id !== row.id)]);
     setActive(
       ['awaiting_signature', 'signing', 'signed', 'submitted'].includes(
@@ -249,6 +306,7 @@ export function NativeWithdrawalPanel({
     pending.current?.abort();
     pending.current = controller;
     const current = epoch.current;
+    setCancelledRecovery(null);
     setBusy(true);
     setError('');
     try {
@@ -325,7 +383,9 @@ export function NativeWithdrawalPanel({
       );
       setActive(latest);
       setHistoryLoaded(true);
-      setCachedSigned(latest && cached ? { id: latest.id, ...cached } : null);
+      setCachedSigned((prior) =>
+        latest && cached ? { id: latest.id, ...cached } : prior,
+      );
       setCursor(value.nextCursor);
       setAccepted(false);
     } catch (err) {
@@ -337,6 +397,131 @@ export function NativeWithdrawalPanel({
         );
     } finally {
       if (current === epoch.current && !controller.signal.aborted)
+        setBusy(false);
+    }
+  }
+  async function recoverCancelled(row: NativeWithdrawal) {
+    if (
+      busy ||
+      prompt.current ||
+      !ownerScope ||
+      row.state !== 'cancelled' ||
+      row.wallet !== wallet
+    )
+      return;
+    const current = epoch.current;
+    const controller = new AbortController();
+    pending.current?.abort();
+    pending.current = controller;
+    setBusy(true);
+    setError('');
+    setCancelledRecovery(null);
+    const assertContext = () => {
+      if (
+        !mounted.current ||
+        current !== epoch.current ||
+        controller.signal.aborted
+      )
+        throw new Error('Withdrawal context changed. Reload history.');
+    };
+    try {
+      const original = await validatedNativeWithdrawal(row);
+      assertContext();
+      const params = new URLSearchParams({ wallet, withdrawalId: original.id });
+      if (funding) {
+        params.set('planId', funding.plan.id);
+        params.set('revision', String(funding.plan.revision));
+        params.set('item', String(funding.item));
+        if (funding.leg) params.set('leg', String(funding.leg));
+      }
+      const signal = AbortSignal.any([
+        controller.signal,
+        AbortSignal.timeout(15000),
+      ]);
+      const response = await fetch(
+        `/api/wallet-workspace/withdrawals?${params}`,
+        {
+          credentials: 'same-origin',
+          redirect: 'error',
+          cache: 'no-store',
+          signal,
+          headers: { [WITHDRAWAL_OWNER_SCOPE_HEADER]: ownerScope },
+        },
+      );
+      if (
+        !response.ok ||
+        response.headers.get(WITHDRAWAL_OWNER_SCOPE_HEADER) !== ownerScope
+      )
+        throw new Error(
+          'Cancelled withdrawal is unavailable for this account.',
+        );
+      const body = (await readBoundedPanelJson(response, signal)) as {
+        withdrawal?: unknown;
+      };
+      const exact = await validatedNativeWithdrawal(body?.withdrawal);
+      assertContext();
+      if (
+        exact.id !== original.id ||
+        exact.wallet !== wallet ||
+        exact.state !== 'cancelled' ||
+        exact.walletRevision !== original.walletRevision ||
+        JSON.stringify(exact.document) !== JSON.stringify(original.document)
+      )
+        throw new Error('Cancelled withdrawal context differs.');
+      if (funding)
+        await requireSelectedFundingReview(
+          exact.document,
+          funding.plan,
+          funding.item,
+          funding.leg,
+        );
+      assertContext();
+      let retained: { signature: string; transaction: string } | null = null;
+      let storageFailed = false;
+      try {
+        retained = await restoreNativeWithdrawalSignature(
+          exact.document,
+          sessionStorage,
+        );
+      } catch {
+        storageFailed = true;
+      }
+      assertContext();
+      if (!retained && cachedSigned?.id === exact.id) {
+        const verified = await inspectNativeWithdrawal(
+          exact.document,
+          cachedSigned.transaction,
+          true,
+        );
+        if (verified.signature !== cachedSigned.signature)
+          throw new Error('Retained local withdrawal signature differs.');
+        retained = cachedSigned;
+      }
+      if (!retained)
+        throw new Error(
+          storageFailed
+            ? 'Retained packet storage is unavailable or invalid.'
+            : 'No exact signed packet is retained for this cancelled withdrawal.',
+        );
+      assertContext();
+      setCancelledRecovery({ id: exact.id, transaction: retained.transaction });
+    } catch (failure) {
+      if (
+        mounted.current &&
+        current === epoch.current &&
+        !controller.signal.aborted
+      )
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : 'Cancelled withdrawal recovery unavailable.',
+        );
+    } finally {
+      if (
+        mounted.current &&
+        current === epoch.current &&
+        !controller.signal.aborted
+      )
         setBusy(false);
     }
   }
@@ -634,6 +819,7 @@ export function NativeWithdrawalPanel({
           disabled={busy}
           onClick={() => {
             epoch.current++;
+            setCancelledRecovery(null);
             setAccepted(false);
             setPassword('');
             setOpen(!open);
@@ -1098,6 +1284,41 @@ export function NativeWithdrawalPanel({
                   </p>
                 )}
                 <p>{new Date(row.createdAt).toLocaleString()}</p>
+                {row.state === 'cancelled' && (
+                  <>
+                    <p>
+                      Cancellation does not establish whether a wallet returned
+                      a signature.
+                    </p>
+                    <Button
+                      variant="outline"
+                      disabled={busy || !ownerScope}
+                      onClick={() => void recoverCancelled(row)}
+                    >
+                      Check for retained signed packet
+                    </Button>
+                    {cancelledRecovery?.id === row.id && (
+                      <>
+                        <p>
+                          This signed transaction is private. Anyone with it may
+                          submit it while it remains valid. This copy is for
+                          recovery only; the app does not register or send it.
+                        </p>
+                        <label htmlFor={`${field}-cancelled-${row.id}`}>
+                          Cancelled withdrawal signed packet
+                        </label>
+                        <textarea
+                          id={`${field}-cancelled-${row.id}`}
+                          readOnly
+                          spellCheck={false}
+                          rows={3}
+                          value={cancelledRecovery.transaction}
+                          className="w-full break-all rounded-md border p-2 font-mono text-xs"
+                        />
+                      </>
+                    )}
+                  </>
+                )}
                 {row.signature && (
                   <a
                     href={`https://explorer.solana.com/tx/${encodeURIComponent(row.signature)}`}
