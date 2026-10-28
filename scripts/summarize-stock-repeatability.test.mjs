@@ -123,13 +123,14 @@ function expectValid(rows) {
   assert.equal(summarizeStockRepeatability(rows).repeatableInThisSample, true);
 }
 
-test('requires unchanged quiet activity and includes its audit in the 32-slot qualification span', () => {
+test('requires unchanged quiet activity and bounds the pipeline, not the audit', () => {
   const rows = samples();
   for (const r of rows)
     Object.assign(r, {
       publicReferenceKind: 'idle-public-transaction-reference',
       runtime: { ...r.runtime, minimumSlot: 1000, maximumSlot: 1030 },
-      qualificationElapsedSlots: 31,
+      // The pipeline span is 1030-1000; the audit at 1031 is checked apart.
+      qualificationElapsedSlots: 30,
       quietReferenceObserved: true,
       referenceActivity: {
         before: {

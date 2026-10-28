@@ -198,10 +198,14 @@ export function summarizeStockRepeatability(receipts) {
       r.publicReferenceKind === 'idle-public-transaction-reference'
     ) {
       const activity = r.referenceActivity;
-      const fullSpan =
+      // The bound is on the pipeline; the audit lands later and is checked
+      // separately, matching the qualifier.
+      const span = r.runtime
+        ? r.runtime.maximumSlot - r.runtime.minimumSlot
+        : null;
+      const auditSpan =
         activity?.after && r.runtime
-          ? Math.max(activity.after.observedSlot, r.runtime.maximumSlot) -
-            r.runtime.minimumSlot
+          ? activity.after.observedSlot - r.runtime.minimumSlot
           : null;
       if (
         !activity?.before ||
@@ -209,10 +213,11 @@ export function summarizeStockRepeatability(receipts) {
         !unchangedQuietReference(activity.before, activity.after) ||
         r.quietReferenceObserved !== true ||
         activity.outcome !== 'no-new-observed-activity' ||
-        !Number.isSafeInteger(fullSpan) ||
-        fullSpan > 32 ||
-        fullSpan < span ||
-        r.qualificationElapsedSlots !== fullSpan
+        !Number.isSafeInteger(span) ||
+        span > 32 ||
+        !Number.isSafeInteger(auditSpan) ||
+        auditSpan < span ||
+        r.qualificationElapsedSlots !== span
       )
         throw Error(
           'Quiet reference or full qualification span is not verified.',

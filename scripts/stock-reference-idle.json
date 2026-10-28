@@ -3,10 +3,10 @@
   "readOnly": true,
   "references": {
     "SOL": "GRm8X46adZ3KZXUbTnkPc1SZwRtN3DUE8CKcqKjEz6x2",
-    "USDC": "7gAmms23jNJW17V8PnbRm4FwXW5UxGc4abFiDAcSFUx9"
+    "USDC": "21TNeLp92vZsTbuPYfkaQ9gQeJdZqoEBbxy8VEyaV1jj"
   },
   "referenceHashes": {
     "SOL": "7dabbb00bdaeff1ab5cb14b5104780c019b44e7faaed5a27ee4ed4ab0e11266f",
-    "USDC": "c8532ceed624302228a662745fd8d2f6d6a4eb30bc2b727cd822a22c99b799fc"
+    "USDC": "455fcf7a3a226e846784fe40df914671c79fccbc83bc9035139ba11e7352e842"
   }
 }
