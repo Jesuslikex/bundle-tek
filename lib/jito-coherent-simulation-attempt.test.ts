@@ -129,12 +129,11 @@ for (const mutation of [
         const fee = m[0] as {
           result: { context: { slot: bigint }; value: unknown };
         };
-        // +1 is tolerated (the fee batch can simulate a slot later); +2 is not.
+        // Even one slot beyond the simulation bank must be refused.
         if (mutation === 'later-fees')
           for (const row of m.slice(0, -1))
-            (row as typeof fee).result.context.slot = 103n;
-        // One slot of member spread is accepted; two is not.
-        if (mutation === 'mixed-fees') fee.result.context.slot = 103n;
+            (row as typeof fee).result.context.slot = 102n;
+        if (mutation === 'mixed-fees') fee.result.context.slot = 102n;
         if (mutation === 'null-fee') fee.result.value = null;
         if (mutation === 'string-fee') fee.result.value = '5000';
         if (mutation === 'zero-fee') fee.result.value = 0n;
@@ -167,6 +166,45 @@ for (const phase of ['discovery', 'batch'] as const)
     expect(result).toMatchObject({ reason: 'rate-limited' });
     expect(send).toHaveBeenCalledTimes(phase === 'discovery' ? 1 : 2);
   });
+it('refuses a mixed fee at the original floor plus 33 even when the simulation is at plus 32', async () => {
+  const f = await jitoRawResponseFixture({ wallets: 1 });
+  const fetcher = vi
+    .spyOn(globalThis, 'fetch')
+    .mockRejectedValue(Error('network forbidden'));
+  try {
+    const send = transport(f, (rows) => {
+      (
+        rows[1] as { result: { context: { slot: bigint } } }
+      ).result.context.slot = 102n;
+      return rows;
+    });
+    const result = await collectJitoCoherentSimulationAttempt(
+      input(f, send, { minimumSlot: 69, minimumReadSlot: 69 }),
+    );
+    expect(result).toMatchObject({
+      status: 'refused',
+      reason: 'fees-refused',
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+    expect(result.fees?.fees.map((fee) => fee.slot)).toEqual([101, 102]);
+    expect(result.simulation).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  } finally {
+    fetcher.mockRestore();
+  }
+});
+it('accepts the original floor plus 32 only when every fee and the simulation share that bank', async () => {
+  const f = await jitoRawResponseFixture({ wallets: 1 });
+  const result = await collectJitoCoherentSimulationAttempt(
+    input(f, transport(f), { minimumSlot: 69, minimumReadSlot: 69 }),
+  );
+  expect(result.status).toBe('captured');
+  if (result.status !== 'captured')
+    throw Error('Expected exact same-bank capture');
+  expect(result.fees.fees.map((fee) => fee.slot)).toEqual([101, 101]);
+  expect(result.simulation.frames.slot).toBe(101);
+});
 it('snapshots packets, identity, floor and signature mode before transport awaits', async () => {
   const f = await jitoRawResponseFixture({ lookup: true }),
     original = f.policy.packets.map((p) => p.transaction);

@@ -115,13 +115,13 @@ function harness(options = {}) {
         status: options.refuse || options.batchRefused ? 'refused' : 'captured',
         reason: 'fees-refused',
         fees: {
-          simulationBankSlot: 102,
+          simulationBankSlot: options.bank ?? 102,
           fees: [
-            { slot: 102, feeLamports: '5000' },
-            { slot: 102, feeLamports: '5000' },
+            { slot: options.feeSlots?.[0] ?? 102, feeLamports: '5000' },
+            { slot: options.feeSlots?.[1] ?? 102, feeLamports: '5000' },
           ],
         },
-        simulation: { frames: { slot: 102, frames: [{}, {}] } },
+        simulation: { frames: { slot: options.bank ?? 102, frames: [{}, {}] } },
         discovery: capture({ result: 'hint' }),
         batch: options.batchRefused
           ? { status: 'refused', rawResponse: parent }
@@ -179,6 +179,23 @@ function harness(options = {}) {
     });
   return { run, files, requests, pacing };
 }
+
+void test('campaign refuses mixed fee banks including a member beyond the original 32-slot span', async () => {
+  const h = harness({ bank: 132, feeSlots: [132, 133] });
+  const result = await h.run();
+  assert.equal(result.nativeCapturedCount, 0);
+  assert.equal(result.providerQualified, false);
+  assert.equal(result.attempts.length, 3);
+  for (const attempt of result.attempts)
+    assert.match(attempt.reason, /^bank-or-fee-refused/);
+});
+void test('campaign retains a complete original-floor plus 32 sample when every bank matches', async () => {
+  const h = harness({ bank: 132, feeSlots: [132, 132] });
+  const result = await h.run();
+  assert.equal(result.nativeCapturedCount, 3);
+  assert.equal(result.providerQualified, true);
+  assert.equal(result.executionAllowed, false);
+});
 
 void test('three fixed native attempts retain wire parents, member ranges and final genesis without authority', async () => {
   const h = harness();

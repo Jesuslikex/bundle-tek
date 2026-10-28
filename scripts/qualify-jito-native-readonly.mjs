@@ -433,37 +433,40 @@ export async function runNativeJitoCampaign({
           'plan-refused',
         ].includes(result.reason)
           ? result.reason
-      : 'runtime-refused';
-    if (typeof result.detail === 'string') attempt.detail = result.detail;
-    if (process.env.JITO_DEBUG) console.log('KEYS', Object.keys(result).join(','));
+          : 'runtime-refused';
+        if (typeof result.detail === 'string') attempt.detail = result.detail;
+        if (process.env.JITO_DEBUG)
+          console.log('KEYS', Object.keys(result).join(','));
       } else {
         const bank = result.fees.simulationBankSlot;
         inWindow(bank);
         if (
-          // Frames must sit at the bank the simulation used; the fee replies may
-          // straddle one slot either side of it, and fees do not change per slot.
           result.simulation.frames.slot !== bank ||
           result.simulation.frames.frames.length !== 2 ||
           result.fees.fees.length !== 2 ||
           result.fees.fees.some(
             (f) =>
-              Math.abs(f.slot - bank) > 1 ||
+              f.slot !== bank ||
+              f.slot < attempt.originalFloor ||
+              f.slot - attempt.originalFloor > 32 ||
               String(f.feeLamports) !== '5000',
           )
         )
           throw failure(
-        'bank-or-fee-refused' +
-          ' bank=' +
-          bank +
-          ' account=' +
-          attempt.accountSlot +
-          ' frames=' +
-          result.simulation.frames.frames.length +
-          '@' +
-          result.simulation.frames.slot +
-          ' fees=' +
-          result.fees.fees.map((f) => f.slot + ':' + f.feeLamports).join(','),
-      );
+            'bank-or-fee-refused' +
+              ' bank=' +
+              bank +
+              ' account=' +
+              attempt.accountSlot +
+              ' frames=' +
+              result.simulation.frames.frames.length +
+              '@' +
+              result.simulation.frames.slot +
+              ' fees=' +
+              result.fees.fees
+                .map((f) => f.slot + ':' + f.feeLamports)
+                .join(','),
+          );
         attempt.bank = bank;
         phase = 'final-genesis';
         if ((await rpc('getGenesisHash', [])) !== GENESIS)
@@ -623,9 +626,19 @@ export async function compileNativeAdapter({
       },
     ],
     outfile: artifact,
+    write: false,
     metafile: true,
     logLevel: 'silent',
   });
+  if (
+    built.outputFiles.length !== 1 ||
+    resolve(built.outputFiles[0].path) !== artifact
+  )
+    throw failure('source-identity-refused');
+  // Keep the compiler output in memory, then persist exactly those bytes from
+  // this process. Some Windows setups deny filesystem writes by the esbuild
+  // subprocess even when the caller can write in the same directory.
+  writeFileSync(artifact, built.outputFiles[0].contents, { flag: 'wx' });
   const identity = {
     artifactSha256: hash(readFileSync(artifact)),
     inputs: nativeSourceIdentity(built.metafile.inputs, rootDir, frozenSources),
@@ -697,7 +710,9 @@ export async function main(args = process.argv.slice(2)) {
         interval !== '' &&
         (!/^\d{1,4}$/.test(interval) || Number(interval) > 2000)
       )
-        throw failure('configuration-refused: invalid SOLANA_RPC_MIN_INTERVAL_MS');
+        throw failure(
+          'configuration-refused: invalid SOLANA_RPC_MIN_INTERVAL_MS',
+        );
       process.env.SOLANA_RPC_MIN_INTERVAL_MS = interval;
     }
     const { adapter } = await compileNativeAdapter({ folder, persist });

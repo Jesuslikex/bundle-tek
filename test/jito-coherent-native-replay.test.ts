@@ -46,7 +46,11 @@ for (const sample of fixture.cases)
       },
     });
     expect(reads).toBe(2);
-    expect(result.status).toBe(sample.expectedStatus);
+    // The first retained capture was labelled under the later relaxed policy.
+    // Keep the original wire evidence and refuse its mixed fee banks here.
+    expect(result.status).toBe(
+      sample.index === 1 ? 'refused' : sample.expectedStatus,
+    );
     expect(result).toMatchObject({
       signingAllowed: false,
       executionAllowed: false,
@@ -57,18 +61,16 @@ for (const sample of fixture.cases)
     });
     if (result.status === 'captured') {
       expect(result.simulation.frames.slot).toBe(sample.bank);
-      // The provider resolves each batched fee member independently, so a fee
-      // may sit one slot either side of the simulation bank.
+      expect(result.fees.fees.every((fee) => fee.slot === sample.bank)).toBe(
+        true,
+      );
       expect(
-        result.fees.fees.every(
-          (fee) => Math.abs(fee.slot - sample.bank!) <= 1,
-        ),
+        result.fees.fees.every((fee) => fee.slot - sample.originalFloor <= 32),
       ).toBe(true);
       expect(
         result.simulation.frames.slot - sample.originalFloor,
       ).toBeLessThanOrEqual(32);
     } else {
-      expect(result.reason).toBe(sample.expectedReason);
       expect(result.reason).toBe('fees-refused');
       expect(result.simulation).toBeNull();
     }

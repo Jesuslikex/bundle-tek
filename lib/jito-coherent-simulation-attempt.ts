@@ -347,20 +347,16 @@ export async function collectJitoCoherentSimulationAttempt(input: {
         ...refuse('fees-refused'),
         detail: fees.reason ?? 'no reason',
       };
-    // The fee batch can simulate one slot later than the account read. Fees do
-    // not change per slot, so +1 is accepted and the window uses the simulated
-    // bank below.
     if (
-      fees.simulationBankSlot !== bank &&
-      fees.simulationBankSlot !== bank + 1
+      fees.simulationBankSlot !== bank ||
+      fees.fees.some(
+        (fee) => fee.slot < minimumSlot || fee.slot - minimumSlot > 32,
+      )
     )
       return {
         ...refuse('fees-refused'),
         detail:
-          'bank ' +
-          String(fees.simulationBankSlot) +
-          ' != ' +
-          String(bank),
+          'bank ' + String(fees.simulationBankSlot) + ' != ' + String(bank),
       };
     simulation = await readJitoSimulationResponse({
       profile: 'jito-rust-raw-frames-v1',

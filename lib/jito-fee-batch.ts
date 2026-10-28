@@ -239,14 +239,9 @@ export async function readJitoFeeBatchResponse(
         slot,
       });
     }
-    // The provider resolves each batched member independently, so the replies
-    // can straddle one slot. Fees do not change per slot; the oldest bank is the
-    // one the simulation must use.
-    const lowest = Math.min(...fees.map((f) => f.slot));
-    if (fees.some((f) => f.slot - lowest > 1))
-      return refused(
-        'fee banks differ: ' + fees.map((f) => f.slot).join(','),
-      );
+    // Every fee must be observed at the same bank as the bound simulation.
+    if (fees.some((f) => f.slot !== fees[0].slot))
+      return refused('fee banks differ: ' + fees.map((f) => f.slot).join(','));
     if (aborted()) return refused('fee read interrupted');
     const packets = state.packets.map((p, i) => ({
       ...clonePacket(p),
@@ -254,7 +249,7 @@ export async function readJitoFeeBatchResponse(
     }));
     return {
       status: 'observed' as const,
-      simulationBankSlot: lowest,
+      simulationBankSlot: fees[0].slot,
       feeBankCoherent: true as const,
       fees,
       packets,
