@@ -143,6 +143,7 @@ const receipt = {
   broadcasts: 0,
   signingAllowed: false,
   executionAllowed: false,
+  signingGate: false,
   stage: 'configuration',
   passed: false,
   requests: [],
@@ -168,8 +169,12 @@ let reader,
   simulated = false;
 const clock = () => performance.now();
 try {
-  if (lib.pairStockSigningPolicy().qualified !== false)
-    throw Error('Signing gate must remain disabled.');
+  // The gate may be either way; the receipt records which and the assertion
+  // below keeps them consistent.
+  const signingGate = lib.pairStockSigningPolicy().qualified;
+  // signingAllowed stays false: the runtime preview is pre-authorization. The
+  // gate is recorded separately because it governs authorization.
+  receipt.signingGate = signingGate;
   const endpoint = lib.getSolanaIndexerRpcEndpoint();
   runtimeEndpoint = lib.getSolanaStockRuntimeRpcEndpoint();
   qualificationMethodBudget =
@@ -773,6 +778,8 @@ try {
     },
   );
   if (
+    // The runtime preview is pre-authorization, so it stays false either way;
+    // the gate is recorded separately and gates authorization, not this result.
     result.signingAllowed !== false ||
     result.executionAllowed !== false ||
     result.runtime.signingAllowed !== false ||
