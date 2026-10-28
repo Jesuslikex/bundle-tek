@@ -448,7 +448,19 @@ export async function runNativeJitoCampaign({
             (f) => f.slot !== bank || String(f.feeLamports) !== '5000',
           )
         )
-          throw failure('bank-or-fee-refused');
+          throw failure(
+        'bank-or-fee-refused' +
+          ' bank=' +
+          bank +
+          ' account=' +
+          attempt.accountSlot +
+          ' frames=' +
+          result.simulation.frames.frames.length +
+          '@' +
+          result.simulation.frames.slot +
+          ' fees=' +
+          result.fees.fees.map((f) => f.slot + ':' + f.feeLamports).join(','),
+      );
         attempt.bank = bank;
         phase = 'final-genesis';
         if ((await rpc('getGenesisHash', [])) !== GENESIS)

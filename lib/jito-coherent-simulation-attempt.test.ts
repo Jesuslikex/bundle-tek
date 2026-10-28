@@ -129,9 +129,10 @@ for (const mutation of [
         const fee = m[0] as {
           result: { context: { slot: bigint }; value: unknown };
         };
+        // +1 is tolerated (the fee batch can simulate a slot later); +2 is not.
         if (mutation === 'later-fees')
           for (const row of m.slice(0, -1))
-            (row as typeof fee).result.context.slot = 102n;
+            (row as typeof fee).result.context.slot = 103n;
         if (mutation === 'mixed-fees') fee.result.context.slot = 102n;
         if (mutation === 'null-fee') fee.result.value = null;
         if (mutation === 'string-fee') fee.result.value = '5000';

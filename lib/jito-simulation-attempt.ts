@@ -185,7 +185,11 @@ export async function collectJitoSimulationAttempt(input: {
       deadline,
     );
     deadline.throwIfAborted();
-    if (fees.status !== 'observed') return refuse('fees-refused');
+    if (fees.status !== 'observed')
+      return {
+        ...refuse('fees-refused'),
+        detail: fees.reason ?? 'no reason',
+      };
     phase = 'simulation';
     const request = await buildJitoBundleSimulationRequest(
       fees.packets,
