@@ -73,6 +73,8 @@ vi.mock('@/lib/jito-recovery-journal-store', () => ({
     )
       throw Error('acknowledgement unavailable');
     storage.rows.delete(expected.key);
+    if (storage.fault === 'ack-after')
+      throw Error('ambiguous committed acknowledgement');
   },
 }));
 const owner = 'a'.repeat(64),
@@ -1571,6 +1573,10 @@ it.each([
   'lost response',
   'journal acknowledgement failure',
   'history without exact receipt',
+  'journal deletion committed but response lost',
+  'journal deletion then wrong owner',
+  'journal deletion then mismatched receipt',
+  'journal deletion then context change',
 ] as const)(
   'keeps the real parent and child recoverable with a %s',
   async (mode) => {
@@ -1621,13 +1627,27 @@ it.each([
     const signer = vi.spyOn(signing, 'signApprovedWarmupPacket');
     const calls: string[] = [];
     let failExact = false;
+    let replyScope = scope;
+    let holdExact = false,
+      startedExact!: () => void,
+      releaseExact!: () => void;
+    const beganExact = new Promise<void>((resolve) => {
+      startedExact = resolve;
+    });
+    const blockedExact = new Promise<void>((resolve) => {
+      releaseExact = resolve;
+    });
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init?: RequestInit) => {
-        const headers = { [JITO_OWNER_SCOPE_HEADER]: scope };
+        const headers = { [JITO_OWNER_SCOPE_HEADER]: replyScope };
         if (!init?.method) {
           if (url.includes('bundleId=')) {
             if (failExact) throw Error('exact receipt unavailable');
+            if (holdExact) {
+              startedExact();
+              await blockedExact;
+            }
             return Response.json(
               {
                 projectId: f.manifest.projectId,
@@ -1738,7 +1758,144 @@ it.each([
     });
     if (mode === 'journal acknowledgement failure') storage.fault = 'ack';
     if (mode === 'history without exact receipt') storage.fault = 'retain';
+    if (mode.startsWith('journal deletion')) storage.fault = 'ack-after';
     await clickText('Sign swap 1 only');
+    if (mode.startsWith('journal deletion')) {
+      await waitFor(() =>
+        expect(container.textContent).toContain(
+          'needs recovery before another action',
+        ),
+      );
+      expect(bundle.signatures[0]).toBe(f.swap.signed.signature);
+      expect(storage.rows.size).toBe(0);
+      expect(container.textContent).toContain(
+        'Download original packet recovery file',
+      );
+      await act(async () =>
+        root.render(
+          <JitoAtomicBundle
+            projectId={f.manifest.projectId}
+            session={session}
+            locked
+          />,
+        ),
+      );
+      await act(async () =>
+        root.render(
+          <JitoAtomicBundle
+            projectId={f.manifest.projectId}
+            session={session}
+            locked={false}
+          />,
+        ),
+      );
+      await waitFor(() =>
+        expect(
+          [...container.querySelectorAll('button')].find((node) =>
+            node.textContent?.includes('Load bundle approvals and history'),
+          )?.disabled,
+        ).toBe(false),
+      );
+      await clickText('Load bundle approvals and history');
+      await waitFor(() =>
+        expect(container.textContent).toContain(
+          'Download original packet recovery file',
+        ),
+      );
+      const label = [...container.querySelectorAll('label')].find((node) =>
+        node.textContent?.includes(
+          'I approve acknowledging only this exact already registered packet',
+        ),
+      )!;
+      const checkbox = label.querySelector('input')!;
+      expect(checkbox.checked).toBe(false);
+      expect(calls).toEqual(['begin-signing', 'register']);
+      storage.fault = '';
+      if (mode === 'journal deletion then wrong owner')
+        replyScope = 'b'.repeat(64);
+      if (mode === 'journal deletion then mismatched receipt')
+        attempts[0] = { ...attempts[0], transaction: 'different' };
+      if (mode === 'journal deletion then context change') holdExact = true;
+      await act(async () => checkbox.click());
+      await clickText('Verify and acknowledge registered packet');
+      if (mode === 'journal deletion then context change') {
+        await act(async () => {
+          await beganExact;
+        });
+        await act(async () =>
+          root.render(
+            <JitoAtomicBundle
+              projectId={f.manifest.projectId}
+              session={session}
+              locked
+            />,
+          ),
+        );
+        holdExact = false;
+        await act(async () => {
+          releaseExact();
+        });
+        await act(async () =>
+          root.render(
+            <JitoAtomicBundle
+              projectId={f.manifest.projectId}
+              session={session}
+              locked={false}
+            />,
+          ),
+        );
+        await waitFor(() =>
+          expect(
+            [...container.querySelectorAll('button')].find((node) =>
+              node.textContent?.includes('Load bundle approvals and history'),
+            )?.disabled,
+          ).toBe(false),
+        );
+        await clickText('Load bundle approvals and history');
+        await waitFor(() =>
+          expect(container.textContent).toContain(
+            'Download original packet recovery file',
+          ),
+        );
+      } else if (mode === 'journal deletion then wrong owner') {
+        await waitFor(() =>
+          expect(container.textContent).toContain('Signed-in account changed'),
+        );
+        replyScope = scope;
+        await waitFor(() =>
+          expect(
+            [...container.querySelectorAll('button')].find((node) =>
+              node.textContent?.includes('Load bundle approvals and history'),
+            )?.disabled,
+          ).toBe(false),
+        );
+        await clickText('Load bundle approvals and history');
+        await waitFor(() =>
+          expect(container.textContent).toContain(
+            'Download original packet recovery file',
+          ),
+        );
+      } else if (mode === 'journal deletion then mismatched receipt') {
+        await waitFor(() =>
+          expect(container.textContent).toContain(
+            'Exact registered receipt or local recovery could not be verified',
+          ),
+        );
+        expect(container.textContent).toContain(
+          'Download original packet recovery file',
+        );
+      } else {
+        await waitFor(() =>
+          expect(container.textContent).not.toContain(
+            'Download original packet recovery file',
+          ),
+        );
+      }
+      expect(storage.rows.size).toBe(0);
+      expect(calls).toEqual(['begin-signing', 'register']);
+      expect(signer).toHaveBeenCalledTimes(1);
+      return;
+    }
     if (mode === 'history without exact receipt') {
       await waitFor(() =>
         expect(container.textContent).toContain(
@@ -1779,6 +1936,26 @@ it.each([
           );
         },
         { timeout: 15000 },
+      );
+      const label = [...container.querySelectorAll('label')].find((node) =>
+        node.textContent?.includes(
+          'I approve acknowledging only this exact already registered packet',
+        ),
+      )!;
+      const checkbox = label.querySelector('input')!;
+      expect(checkbox.checked).toBe(false);
+      await act(async () => checkbox.click());
+      await clickText('Verify and acknowledge registered packet');
+      await waitFor(() =>
+        expect(container.textContent).toContain(
+          'Exact registered receipt or local recovery could not be verified',
+        ),
+      );
+      expect(container.textContent).toContain(
+        'Download original packet recovery file',
+      );
+      expect(([...storage.rows.values()][0] as { state: string }).state).toBe(
+        'retained',
       );
       expect(calls).toEqual(['begin-signing', 'register']);
       expect(signer).toHaveBeenCalledTimes(1);

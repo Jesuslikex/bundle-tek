@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { JitoBundleManifest } from '@/lib/jito-bundle';
 import type {
   JitoMemoryInspection,
@@ -19,6 +19,7 @@ export function JitoMemoryRecovery({
   serverSignature,
   isContextCurrent,
   register,
+  reconcileRegistered,
 }: {
   ownerScope: string;
   manifest: JitoBundleManifest;
@@ -29,11 +30,53 @@ export function JitoMemoryRecovery({
   serverSignature: string | null;
   isContextCurrent: () => boolean;
   register: (transaction: string) => Promise<void>;
+  reconcileRegistered?: (
+    transaction: string,
+    signature: string,
+  ) => Promise<void>;
 }) {
   const [inspection, setInspection] = useState<JitoMemoryInspection | null>(
     null,
   );
   const [accepted, setAccepted] = useState(false);
+  const [reconcileApproved, setReconcileApproved] = useState(false);
+  const [approvalGeneration, setApprovalGeneration] = useState(0);
+  const approvalNow = useRef(false),
+    approvalGenerationNow = useRef(0);
+  const reconcileContext = useRef({
+    ownerScope,
+    manifest,
+    packet,
+    coordinator,
+    serverSignature,
+    reconcileRegistered,
+    isContextCurrent,
+  });
+  useLayoutEffect(() => {
+    reconcileContext.current = {
+      ownerScope,
+      manifest,
+      packet,
+      coordinator,
+      serverSignature,
+      reconcileRegistered,
+      isContextCurrent,
+    };
+  }, [
+    ownerScope,
+    manifest,
+    packet,
+    coordinator,
+    serverSignature,
+    reconcileRegistered,
+    isContextCurrent,
+  ]);
+  const consumeReconcileApproval = () => {
+    approvalNow.current = false;
+    approvalGenerationNow.current++;
+    setApprovalGeneration(approvalGenerationNow.current);
+    setReconcileApproved(false);
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const mounted = useRef(false),
@@ -149,6 +192,52 @@ export function JitoMemoryRecovery({
       if (mounted.current) setBusy(false);
     }
   }
+  async function reconcileMemory() {
+    const current = reconcileContext.current;
+    if (
+      !mounted.current ||
+      running.current ||
+      !reconcileRegistered ||
+      !isContextCurrent() ||
+      !current.isContextCurrent() ||
+      current.reconcileRegistered !== reconcileRegistered ||
+      current.ownerScope !== ownerScope ||
+      current.manifest !== manifest ||
+      current.packet !== packet ||
+      current.coordinator !== coordinator ||
+      current.serverSignature !== serverSignature ||
+      !approvalNow.current ||
+      approvalGeneration !== approvalGenerationNow.current ||
+      !inspection ||
+      inspection.status !== 'retained' ||
+      serverSignature !== inspection.signature
+    )
+      return;
+    consumeReconcileApproval();
+    running.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const value = await exactRetained();
+      if (
+        !mounted.current ||
+        !isContextCurrent() ||
+        value.signature !== serverSignature ||
+        value.signature !== inspection.signature ||
+        value.transaction !== inspection.transaction
+      )
+        throw Error('Retained packet changed.');
+      await reconcileRegistered(value.transaction, value.signature);
+    } catch {
+      if (mounted.current && isContextCurrent())
+        setError(
+          'Exact registered receipt or local recovery could not be verified. Keep this original packet and retry recovery.',
+        );
+    } finally {
+      running.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  }
   if (!inspection || inspection.status === 'absent')
     return error ? <p role="alert">{error}</p> : null;
   return (
@@ -175,6 +264,52 @@ export function JitoMemoryRecovery({
           >
             Download original packet recovery file
           </Button>
+          {reconcileRegistered && serverSignature === inspection.signature && (
+            <>
+              <p>
+                The saved history shows the same signature. The exact server
+                receipt and local recovery must be checked again before clearing
+                this in-memory copy.
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={reconcileApproved}
+                  disabled={busy}
+                  onChange={(event) => {
+                    const current = reconcileContext.current;
+                    if (
+                      !mounted.current ||
+                      running.current ||
+                      !isContextCurrent() ||
+                      !current.isContextCurrent() ||
+                      current.reconcileRegistered !== reconcileRegistered ||
+                      current.ownerScope !== ownerScope ||
+                      current.manifest !== manifest ||
+                      current.packet !== packet ||
+                      current.coordinator !== coordinator ||
+                      current.serverSignature !== serverSignature ||
+                      approvalGeneration !== approvalGenerationNow.current
+                    )
+                      return;
+                    approvalNow.current = event.target.checked;
+                    approvalGenerationNow.current++;
+                    setApprovalGeneration(approvalGenerationNow.current);
+                    setReconcileApproved(event.target.checked);
+                  }}
+                />{' '}
+                I approve acknowledging only this exact already registered
+                packet after verification. This does not sign or submit.
+              </label>
+              <Button
+                variant="outline"
+                disabled={busy || !reconcileApproved}
+                onClick={() => void reconcileMemory()}
+              >
+                Verify and acknowledge registered packet
+              </Button>
+            </>
+          )}
           {registrationAllowed && !serverSignature && (
             <>
               <label>

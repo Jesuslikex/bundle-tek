@@ -36,6 +36,7 @@ import {
 import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
 import {
   listJitoRecoveryJournalPending,
+  inspectJitoRecoveryJournal,
   withJitoRecoveryJournalLock,
 } from '@/lib/jito-recovery-journal';
 import {
@@ -869,6 +870,104 @@ function JitoAtomicBundleForContext({
     // The caller holds the owner journal lock and must acknowledge its
     // durable entry before releasing any retained in-memory packet.
   }
+  /** Explicit acknowledgement of an already registered in-memory packet.
+   * The absent journal is never treated as proof that signing did not happen. */
+  async function reconcileRetainedMemory(
+    manifest: JitoBundleManifest,
+    packet: number,
+    transaction: string,
+    signature: string,
+  ) {
+    if (
+      !ownerScope ||
+      !ownerId ||
+      !historyVerifiedNow.current ||
+      !isContextCurrent()
+    )
+      throw Error('Recovery context changed.');
+    const approved = structuredClone(manifest);
+    const terms = JSON.stringify(approved);
+    const operation = coordinator.startOperation(
+      ownerScope,
+      approved.id,
+      packet,
+    );
+    const assertCurrent = () => {
+      if (
+        !mounted.current ||
+        !isContextCurrent() ||
+        !historyVerifiedNow.current ||
+        JSON.stringify(manifest) !== terms
+      )
+        throw Error('Recovery context changed.');
+    };
+    try {
+      await withJitoRecoveryJournalLock(
+        ownerScope,
+        assertCurrent,
+        async (lock) => {
+          const exact = async () => {
+            const fresh = await readExactSnapshot(approved.id, approved.sha256);
+            assertCurrent();
+            const matches = fresh.attempts.filter((a) => a.packet === packet);
+            if (
+              fresh.legacyReadOnly ||
+              matches.length !== 1 ||
+              matches[0].state !== 'registered' ||
+              matches[0].signature !== signature ||
+              matches[0].transaction !== transaction ||
+              fresh.bundle.signatures[packet] !== signature
+            )
+              throw Error('Exact registered receipt unavailable.');
+            const verified = await createJitoPacketRecovery(
+              approved,
+              packet,
+              transaction,
+            );
+            assertCurrent();
+            if (verified.signature !== signature)
+              throw Error('Retained packet differs.');
+            return fresh;
+          };
+          await exact();
+          const local = await inspectJitoRecoveryJournal(
+            lock,
+            approved,
+            packet,
+            '',
+            async () => ({
+              ownerScope,
+              record: (await exact()).bundle,
+            }),
+          );
+          if (local.status !== 'not-found')
+            throw Error('Durable recovery needs attention.');
+          const memory = await coordinator.inspect(
+            ownerScope,
+            approved,
+            packet,
+          );
+          assertCurrent();
+          if (
+            memory.status !== 'retained' ||
+            memory.signature !== signature ||
+            memory.transaction !== transaction
+          )
+            throw Error('Retained packet differs.');
+          await exact();
+          await coordinator.acknowledge(
+            ownerScope,
+            approved,
+            packet,
+            signature,
+            assertCurrent,
+          );
+        },
+      );
+    } finally {
+      coordinator.finishOperation(operation);
+    }
+  }
   const displayBundles =
     located &&
     !bundles.some((b) => b.manifest.id === located.record.manifest.id)
@@ -1388,6 +1487,14 @@ function JitoAtomicBundleForContext({
                       isContextCurrent={isContextCurrent}
                       register={(transaction) =>
                         registerPacket(m, packet, transaction)
+                      }
+                      reconcileRegistered={(transaction, signature) =>
+                        reconcileRetainedMemory(
+                          m,
+                          packet,
+                          transaction,
+                          signature,
+                        )
                       }
                     />
                   ) : null,

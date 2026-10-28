@@ -89,6 +89,11 @@ Matching history alone no longer clears a retained in-memory signed packet.
 The active owner-locked paths acknowledge memory only after exact server
 receipt verification and durable journal acknowledgement; failures retain the
 packet for recovery. Five focused synthetic suites passed 144 tests.
+If a journal acknowledgement committed but the screen changed before the
+memory copy was acknowledged, an explicit, initially unchecked action can now
+reconcile it against repeated owner-scoped exact registered receipts and the
+same packet. A missing journal alone never grants a signing or submission
+action. The expanded five-suite recovery run passes 150 synthetic cases.
 
 Still required before a release: verify integrated journal and server behavior
 in a real browser with separate approvals, concurrent tabs, reloads, storage

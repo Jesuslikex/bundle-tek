@@ -119,3 +119,111 @@ it('keeps legacy saved-signature confirmation read-only and retains original mem
   expect(setView).not.toHaveBeenCalled();
   expect(register).not.toHaveBeenCalled();
 });
+
+it('requires a fresh unchecked acknowledgement and refuses stale approval or owner context', async () => {
+  const { f, coordinator, recovery } = await retainedFixture();
+  const reconcile = vi.fn(async () => {}),
+    register = vi.fn();
+  let active = true;
+  const render = async () =>
+    act(async () =>
+      root.render(
+        <JitoMemoryRecovery
+          ownerScope={owner}
+          manifest={f.manifest}
+          packet={0}
+          coordinator={coordinator}
+          revision={0}
+          registrationAllowed={false}
+          serverSignature={recovery.signature}
+          isContextCurrent={() => active}
+          register={register}
+          reconcileRegistered={reconcile}
+        />,
+      ),
+    );
+  await render();
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain(
+      'Verify and acknowledge registered packet',
+    );
+  });
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes(
+      'I approve acknowledging only this exact already registered packet',
+    ),
+  )!;
+  const checkbox = label.querySelector('input')!;
+  expect(checkbox.checked).toBe(false);
+  expect(container.querySelector('input[type=password]')).toBeNull();
+  await act(async () => checkbox.click());
+  const button = [...container.querySelectorAll('button')].find((node) =>
+    node.textContent?.includes('Verify and acknowledge registered packet'),
+  )!;
+  const key = Object.getOwnPropertyNames(button).find((name) =>
+    name.startsWith('__reactProps$'),
+  )!;
+  const stale = (button as unknown as Record<string, { onClick: () => void }>)[
+    key
+  ].onClick;
+  await act(async () => checkbox.click());
+  await act(async () => checkbox.click());
+  await act(async () => stale());
+  expect(reconcile).not.toHaveBeenCalled();
+  active = false;
+  await act(async () => button.click());
+  expect(reconcile).not.toHaveBeenCalled();
+  expect((await coordinator.inspect(owner, f.manifest, 0)).status).toBe(
+    'retained',
+  );
+});
+
+it('keeps the exact in-memory packet when the explicit reconciliation callback fails', async () => {
+  const { f, coordinator, recovery } = await retainedFixture();
+  const reconcile = vi.fn(async () => {
+    throw Error('no confirmed receipt');
+  });
+  await act(async () =>
+    root.render(
+      <JitoMemoryRecovery
+        ownerScope={owner}
+        manifest={f.manifest}
+        packet={0}
+        coordinator={coordinator}
+        revision={0}
+        registrationAllowed={false}
+        serverSignature={recovery.signature}
+        isContextCurrent={() => true}
+        register={vi.fn()}
+        reconcileRegistered={reconcile}
+      />,
+    ),
+  );
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain(
+      'Verify and acknowledge registered packet',
+    );
+  });
+  const label = [...container.querySelectorAll('label')].find((node) =>
+    node.textContent?.includes(
+      'I approve acknowledging only this exact already registered packet',
+    ),
+  )!;
+  await act(async () => label.querySelector('input')!.click());
+  const button = [...container.querySelectorAll('button')].find((node) =>
+    node.textContent?.includes('Verify and acknowledge registered packet'),
+  )!;
+  await act(async () => button.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain(
+      'Exact registered receipt or local recovery could not be verified',
+    );
+  });
+  expect(reconcile).toHaveBeenCalledOnce();
+  expect((await coordinator.inspect(owner, f.manifest, 0)).status).toBe(
+    'retained',
+  );
+});
