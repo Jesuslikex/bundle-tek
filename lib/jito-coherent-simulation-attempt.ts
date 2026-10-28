@@ -230,9 +230,12 @@ export async function collectJitoCoherentSimulationAttempt(input: {
     });
     const first = await send(discoveryBody, 1);
     if (!first)
-      return refuse(
-        reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
-      );
+      return {
+        ...refuse(
+          reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
+        ),
+        detail: 'status ' + String(reads.at(-1)?.status ?? 'none'),
+      };
     discovery = await readJitoSimulationPayload(
       responseField(first, 'body'),
       deadline,
@@ -304,9 +307,12 @@ export async function collectJitoCoherentSimulationAttempt(input: {
     phase = 'batch';
     const response = await send(batchBody, prepared.packetBindings.length + 1);
     if (!response)
-      return refuse(
-        reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
-      );
+      return {
+        ...refuse(
+          reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
+        ),
+        detail: 'status ' + String(reads.at(-1)?.status ?? 'none'),
+      };
     const ids = Array.from(
       { length: prepared.packetBindings.length },
       (_, i) => `${feeIdPrefix}:${i}`,
@@ -380,14 +386,21 @@ export async function collectJitoCoherentSimulationAttempt(input: {
       feeProjection,
       ...authority,
     };
-  } catch {
-    return refuse(
-      deadline.aborted
-        ? 'interrupted'
-        : planReady
-          ? 'transport-unavailable'
-          : 'plan-refused',
-    );
+  } catch (error) {
+    // The reason alone says nothing about which step threw; keep the message.
+    // These are our own refusal strings, not provider bodies.
+    const detail =
+      error instanceof Error ? error.message.slice(0, 300) : 'unknown';
+    return {
+      ...refuse(
+        deadline.aborted
+          ? 'interrupted'
+          : planReady
+            ? 'transport-unavailable'
+            : 'plan-refused',
+      ),
+      detail,
+    };
   } finally {
     owner.abort();
     // Readers normally drain/cancel their own acquired bodies. Also close a

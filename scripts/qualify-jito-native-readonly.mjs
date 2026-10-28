@@ -429,7 +429,8 @@ export async function runNativeJitoCampaign({
           'plan-refused',
         ].includes(result.reason)
           ? result.reason
-          : 'runtime-refused';
+      : 'runtime-refused';
+    if (typeof result.detail === 'string') attempt.detail = result.detail;
       } else {
         const bank = result.fees.simulationBankSlot;
         inWindow(bank);

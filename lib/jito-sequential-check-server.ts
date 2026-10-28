@@ -218,6 +218,7 @@ export async function checkJitoBundleSequential(
   const controller = new AbortController(),
     control = AbortSignal.any([deadline, controller.signal]);
   let reason: JitoSequentialCheckResult['reason'] = 'transport-unavailable',
+    detail = '',
     units = 0,
     httpReads = 0,
     rateLimited = false;
@@ -293,7 +294,8 @@ export async function checkJitoBundleSequential(
       }
       if (!response.ok) {
         reason = 'http-refused';
-        throw Error('http');
+        // Carry the status: 'http' alone says nothing about what the provider did.
+        throw Error('http ' + response.status);
       }
       const raw = record(
         (await readJitoSimulationPayload(response.body, control, 524288)).value,
@@ -491,7 +493,9 @@ export async function checkJitoBundleSequential(
     )
       throw Error('network');
     control.throwIfAborted();
-  } catch {
+  } catch (error) {
+    // Keep the message: the reason alone hides which step and which status.
+    detail = error instanceof Error ? error.message.slice(0, 200) : 'unknown';
     if (rateLimited) reason = 'rate-limited';
     else if (control.aborted) reason = 'interrupted';
     else if (reason === 'frame-integrity-only') reason = 'simulation-refused';
