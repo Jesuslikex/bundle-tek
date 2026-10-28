@@ -140,6 +140,12 @@ function JitoSequentialCheckForContext({
         provider, or replace chain recovery. It never signs, sends or retries a
         bundle.
       </p>
+      <p>
+        This check is optional. Sign and Submit do not depend on this check;
+        each still requires its own checks and approval. This check does not
+        establish provider readiness or complete bundle economic and runtime
+        qualification.
+      </p>
       <Button
         variant="outline"
         disabled={disabled || busy}

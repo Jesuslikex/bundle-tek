@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 COMPLETE, claim released: clarified that the Jito sequential check is optional and does not gate the separate Sign and Submit checks. See docs/CODEX-JITO-CHECK-DISCLOSURE-20261028.md. Existing consent/server checks unchanged; no deployment, provider changes or funded actions.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: non-authoritative timing diagnostics for native Jito. See docs/CODEX-JITO-NATIVE-TIMING-20261028.md. One Helius native sample captured 1/3, with the other two refused; no full qualification, request, pacing, provider setting, authority, deploy or funded action changes.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: minimum-output refusal guidance in pair order review, with fixed text only for tagged minimum failures during preparation. See docs/CODEX-PAIR-MINIMUM-REFUSAL-20261028.md. Manual fresh review and unchecked consent are preserved; no guard, signing, deployment, provider, migration or funded-action changes.

@@ -72,6 +72,15 @@ it('performs no automatic read and explains unsigned-only availability', async (
   await render(manifest);
   expect(fetcher).not.toHaveBeenCalled();
   expect(button().disabled).toBe(false);
+  expect(container.textContent).toContain(
+    'This check is optional. Sign and Submit do not depend on this check;',
+  );
+  expect(container.textContent).toContain(
+    'each still requires its own checks and approval.',
+  );
+  expect(container.textContent).toContain(
+    'does not establish provider readiness or complete bundle economic and runtime qualification.',
+  );
   await render(manifest, true);
   expect(button().disabled).toBe(true);
   expect(container.textContent).toContain(
@@ -102,6 +111,12 @@ it('sends only the explicit saved identity and renders an exact-bank refusal wit
   });
   expect(container.textContent).toContain(
     'exact simulation bank is unavailable',
+  );
+  expect(container.textContent).toContain(
+    'This check is optional. Sign and Submit do not depend on this check;',
+  );
+  expect(container.textContent).toContain(
+    'does not establish provider readiness or complete bundle economic and runtime qualification.',
   );
   expect(container.textContent).toContain('never signs, sends or retries');
   expect(storage).not.toHaveBeenCalled();
