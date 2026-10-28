@@ -74,6 +74,12 @@ requested, the wallet response, local retention and registration, and its
 evidence-only recovery steps. Thirty-eight focused child tests pass, including
 delayed-stage checks; these are synthetic and do not prove a real wallet flow.
 
+A separate terminal-bundle panel verifies an owned signed file and offers
+explicit private export only, without registration, signing or submission.
+Its 17 synthetic tests cover the owner lock, stale context and terminal state;
+it has not yet been connected to the parent or checked as a real browser
+download. Missing historical receipts are not treated as proof of finality.
+
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,
 cancel and submit path; preserve separately unchecked approval; test rejected
