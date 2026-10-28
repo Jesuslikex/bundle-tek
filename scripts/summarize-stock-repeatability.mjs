@@ -92,6 +92,7 @@ export function summarizeStockRepeatability(receipts) {
     if (r.rpcPacingScope === 'setup-and-runtime') {
       const methods = new Set([
         'getGenesisHash',
+        'getLatestBlockhash',
         'getSlot',
         'getMultipleAccounts',
         'getBlockHeight',

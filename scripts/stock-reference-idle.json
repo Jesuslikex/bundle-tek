@@ -2,9 +2,11 @@
   "format": "stock-public-reference-fixture-v1",
   "readOnly": true,
   "references": {
-    "SOL": "GRm8X46adZ3KZXUbTnkPc1SZwRtN3DUE8CKcqKjEz6x2"
+    "SOL": "GRm8X46adZ3KZXUbTnkPc1SZwRtN3DUE8CKcqKjEz6x2",
+    "USDC": "7gAmms23jNJW17V8PnbRm4FwXW5UxGc4abFiDAcSFUx9"
   },
   "referenceHashes": {
-    "SOL": "7dabbb00bdaeff1ab5cb14b5104780c019b44e7faaed5a27ee4ed4ab0e11266f"
+    "SOL": "7dabbb00bdaeff1ab5cb14b5104780c019b44e7faaed5a27ee4ed4ab0e11266f",
+    "USDC": "c8532ceed624302228a662745fd8d2f6d6a4eb30bc2b727cd822a22c99b799fc"
   }
 }
