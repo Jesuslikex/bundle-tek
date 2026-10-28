@@ -48,6 +48,8 @@ const slot = (value) => {
 };
 
 export function validateEndpoint(value) {
+  if (!value)
+    throw failure('configuration-refused: SOLANA_HOLDER_RPC_URL is not set');
   try {
     const url = new URL(value);
     if (
@@ -58,10 +60,12 @@ export function validateEndpoint(value) {
       url.password ||
       url.hash
     )
-      throw failure('configuration-refused');
+      throw failure(
+        'configuration-refused: endpoint must be https Alchemy mainnet',
+      );
     return url.href;
   } catch {
-    throw failure('configuration-refused');
+    throw failure('configuration-refused: endpoint is not a valid URL');
   }
 }
 
@@ -109,8 +113,10 @@ export async function runNativeJitoCampaign({
   attemptTimeoutMs = 45000,
 }) {
   const pinnedEndpoint = validateEndpoint(endpoint);
-  if (typeof pace !== 'function') throw failure('configuration-refused');
-  if (attemptTimeoutMs !== 45000) throw failure('configuration-refused');
+  if (typeof pace !== 'function')
+    throw failure('configuration-refused: adapter has no pacing function');
+  if (attemptTimeoutMs !== 45000)
+    throw failure('configuration-refused: attempt timeout must be 45000 ms');
   const report = {
     profile: 'unsigned-native-zero-transfer-only',
     plannedAttempts: 3,
@@ -656,7 +662,7 @@ export async function main(args = process.argv.slice(2)) {
         interval !== '' &&
         (!/^\d{1,4}$/.test(interval) || Number(interval) > 2000)
       )
-        throw failure('configuration-refused');
+        throw failure('configuration-refused: invalid SOLANA_RPC_MIN_INTERVAL_MS');
       process.env.SOLANA_RPC_MIN_INTERVAL_MS = interval;
     }
     const { adapter } = await compileNativeAdapter({ folder, persist });
@@ -675,12 +681,16 @@ export async function main(args = process.argv.slice(2)) {
       }),
     );
     return result;
-  } catch {
+  } catch (error) {
+    // The reason alone says nothing; keep the app-authored message. These are
+    // our own refusal strings, not provider bodies, so no credential leaks.
+    const detail =
+      error instanceof Error ? error.message.slice(0, 400) : 'unknown';
     persist(
       'startup-failure.json',
-      encoded({ reason: 'setup-or-campaign-failed', ...authority }),
+      encoded({ reason: 'setup-or-campaign-failed', detail, ...authority }),
     );
-    throw failure('setup-or-campaign-failed');
+    throw failure('setup-or-campaign-failed: ' + detail);
   }
 }
 
