@@ -861,20 +861,13 @@ function JitoAtomicBundleForContext({
       throw new Error(
         'Signed-in account or bundle changed. Reload saved history.',
       );
-    if (retained.status === 'retained') {
-      if (retained.signature !== checked.signature)
-        throw new Error('Retained signature differs.');
-      await coordinator.acknowledge(
-        ownerScope,
-        manifest,
-        packet,
-        checked.signature,
-        () => {
-          if (!isContextCurrent())
-            throw new Error('Signed-in account or bundle changed.');
-        },
-      );
-    }
+    if (
+      retained.status === 'retained' &&
+      retained.signature !== checked.signature
+    )
+      throw new Error('Retained signature differs.');
+    // The caller holds the owner journal lock and must acknowledge its
+    // durable entry before releasing any retained in-memory packet.
   }
   const displayBundles =
     located &&

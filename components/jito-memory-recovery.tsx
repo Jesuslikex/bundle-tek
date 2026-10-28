@@ -50,23 +50,9 @@ export function JitoMemoryRecovery({
       .inspect(ownerScope, manifest, packet)
       .then(async (value) => {
         if (!active || !isContextCurrent()) return;
-        if (
-          value.status === 'retained' &&
-          serverSignature === value.signature
-        ) {
-          await coordinator.acknowledge(
-            ownerScope,
-            manifest,
-            packet,
-            value.signature,
-            () => {
-              if (!active || !isContextCurrent())
-                throw Error('Bundle context changed.');
-            },
-          );
-          if (active && isContextCurrent()) setInspection({ status: 'absent' });
-          return;
-        }
+        // A history signature alone is not an exact registered receipt or proof
+        // that durable journal acknowledgement succeeded. Keep the in-memory
+        // packet until its owner-locked recovery operation confirms both.
         if (active && isContextCurrent()) setInspection(value);
       })
       .catch(() => {

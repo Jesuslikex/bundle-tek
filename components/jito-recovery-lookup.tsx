@@ -295,20 +295,11 @@ export function JitoRecoveryLookup({
         fresh.signatures[view.packet] !== view.recovery.signature
       )
         throw Error('Saved bundle does not contain this exact signature.');
-      await coordinator.acknowledge(
-        ownerScope!,
-        view.record.manifest,
-        view.packet,
-        view.recovery.signature,
-        assertCurrent,
+      // This legacy bundle-only read does not prove an exact v2 attempt or
+      // durable journal acknowledgement. Keep the original memory evidence.
+      setNotice(
+        'The saved signature matches. This older view cannot clear recovery; use the current bundle recovery controls.',
       );
-      assertCurrent();
-      setView({
-        kind: 'readonly',
-        record: fresh,
-        packet: view.packet,
-        recovery: view.recovery,
-      });
     } catch (failure) {
       if (mounted.current && isContextCurrent())
         setError(
@@ -386,8 +377,9 @@ export function JitoRecoveryLookup({
             {matchingObserved && (
               <>
                 <p>
-                  Saved history already contains this exact signature. Confirm
-                  it against the saved bundle before clearing local recovery.
+                  Saved history contains this signature. You can inspect the
+                  saved record here; this older view cannot clear local
+                  recovery.
                 </p>
                 <Button
                   variant="outline"

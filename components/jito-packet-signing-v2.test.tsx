@@ -1566,7 +1566,12 @@ it('keeps UNKNOWN when the final server pre-sign check fails', async () => {
   );
 });
 
-it.each(['normal response', 'lost response'] as const)(
+it.each([
+  'normal response',
+  'lost response',
+  'journal acknowledgement failure',
+  'history without exact receipt',
+] as const)(
   'keeps the real parent and child recoverable with a %s',
   async (mode) => {
     const f = await jitoBundleFixture();
@@ -1615,12 +1620,14 @@ it.each(['normal response', 'lost response'] as const)(
     vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('synthetic-vault');
     const signer = vi.spyOn(signing, 'signApprovedWarmupPacket');
     const calls: string[] = [];
+    let failExact = false;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init?: RequestInit) => {
         const headers = { [JITO_OWNER_SCOPE_HEADER]: scope };
         if (!init?.method) {
-          if (url.includes('bundleId='))
+          if (url.includes('bundleId=')) {
+            if (failExact) throw Error('exact receipt unavailable');
             return Response.json(
               {
                 projectId: f.manifest.projectId,
@@ -1631,6 +1638,7 @@ it.each(['normal response', 'lost response'] as const)(
               },
               { headers },
             );
+          }
           return Response.json(
             {
               projectId: f.manifest.projectId,
@@ -1728,7 +1736,54 @@ it.each(['normal response', 'lost response'] as const)(
       );
       expect(button?.disabled).toBe(false);
     });
+    if (mode === 'journal acknowledgement failure') storage.fault = 'ack';
+    if (mode === 'history without exact receipt') storage.fault = 'retain';
     await clickText('Sign swap 1 only');
+    if (mode === 'history without exact receipt') {
+      await waitFor(() =>
+        expect(container.textContent).toContain(
+          'needs recovery before another action',
+        ),
+      );
+      expect(([...storage.rows.values()][0] as { state: string }).state).toBe(
+        'unknown',
+      );
+      bundle.signatures[0] = f.swap.signed.signature;
+      failExact = true;
+      await clickText('Load bundle approvals and history');
+      await waitFor(() =>
+        expect(container.textContent).toContain(
+          'Download original packet recovery file',
+        ),
+      );
+      expect(container.textContent).toContain(
+        'Some bundle details could not be verified',
+      );
+      expect(calls).toEqual(['begin-signing']);
+      expect(signer).toHaveBeenCalledTimes(1);
+      return;
+    }
+    if (mode === 'journal acknowledgement failure') {
+      await vi.waitFor(
+        async () => {
+          await act(async () => {});
+          expect(bundle.signatures[0]).toBe(f.swap.signed.signature);
+          expect(
+            ([...storage.rows.values()][0] as { state: string }).state,
+          ).toBe('retained');
+          expect(container.textContent).toContain(
+            'needs recovery before another action',
+          );
+          expect(container.textContent).toContain(
+            'Download original packet recovery file',
+          );
+        },
+        { timeout: 15000 },
+      );
+      expect(calls).toEqual(['begin-signing', 'register']);
+      expect(signer).toHaveBeenCalledTimes(1);
+      return;
+    }
     if (mode === 'normal response') {
       await vi.waitFor(
         async () => {

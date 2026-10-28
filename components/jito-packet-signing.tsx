@@ -457,6 +457,14 @@ export function JitoPacketSigning({
               passphrase,
               readFresh,
             );
+            assertCurrent();
+            await coordinator.acknowledge(
+              ownerScope,
+              approved,
+              packet,
+              signed.signature,
+              assertCurrent,
+            );
             if (mounted.current) {
               setPending(null);
               setAccepted(false);

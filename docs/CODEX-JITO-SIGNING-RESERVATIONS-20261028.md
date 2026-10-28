@@ -85,6 +85,10 @@ Signing, recovery and submission controls also reject stale callbacks and
 revoked or replaced consent. Changing a signing password clears its approval.
 The server, journal and exact owned receipt checks remain authoritative; these
 UI guards do not prove that an unknown wallet outcome was unsigned.
+Matching history alone no longer clears a retained in-memory signed packet.
+The active owner-locked paths acknowledge memory only after exact server
+receipt verification and durable journal acknowledgement; failures retain the
+packet for recovery. Five focused synthetic suites passed 144 tests.
 
 Still required before a release: verify integrated journal and server behavior
 in a real browser with separate approvals, concurrent tabs, reloads, storage
