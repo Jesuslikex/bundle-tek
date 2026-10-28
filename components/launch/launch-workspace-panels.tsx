@@ -57,6 +57,18 @@ export function LaunchWorkspacePanels({
           outside buyers and offers a Nuke or early finish.
         </p>
       </section>
+      <section aria-labelledby="ws-cleanup-title">
+        <h2 id="ws-cleanup-title">Cleanup</h2>
+        <p className="launch-ws-empty">
+          Sell tokens from input wallets and distribute to output wallets via
+          sell→buy rounds on the market. Rounds run on a fixed or random delay.
+        </p>
+        <div className="launch-ws-panel-actions">
+          <Button variant="outline" onClick={onOpenWallets}>
+            Configure
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

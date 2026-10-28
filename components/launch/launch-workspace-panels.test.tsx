@@ -8,7 +8,7 @@ import { LaunchWorkspacePanels } from './launch-workspace-panels';
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-test('renders the three panels and links to existing flows', () => {
+test('renders the four panels and links to existing flows', () => {
   const onFund = vi.fn();
   const onOpenWallets = vi.fn();
   const host = document.createElement('div');
@@ -27,11 +27,15 @@ test('renders the three panels and links to existing flows', () => {
   expect(text).toContain('Funding Wallet');
   expect(text).toContain('Auto Sell');
   expect(text).toContain('Sniper Guard');
+  expect(text).toContain('Cleanup');
+  expect(text).toContain('buy rounds');
   const buttons = [...host.querySelectorAll('button')];
   act(() => buttons.find((b) => b.textContent === 'Fund wallets')?.click());
   act(() => buttons.find((b) => b.textContent === 'My wallets')?.click());
+  act(() => buttons.find((b) => b.textContent === 'Configure')?.click());
   expect(onFund).toHaveBeenCalledOnce();
-  expect(onOpenWallets).toHaveBeenCalledOnce();
+  // Both the wallet link and the Cleanup card route to the wallet workspace.
+  expect(onOpenWallets).toHaveBeenCalledTimes(2);
   act(() => root.unmount());
   host.remove();
 });
