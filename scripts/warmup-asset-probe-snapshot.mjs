@@ -30,6 +30,7 @@ export async function snapshotWarmupAssetProbe(root, folder) {
     packages: 'external',
     metafile: true,
     outfile: bundle,
+    write: false,
     logLevel: 'silent',
     plugins: [
       {
@@ -63,6 +64,12 @@ export async function snapshotWarmupAssetProbe(root, folder) {
   );
   if (realInputs.some((name) => !sourceFiles[name.replaceAll('\\', '/')]))
     throw Error('An input was not captured by the probe source reader.');
+  if (
+    built.outputFiles.length !== 1 ||
+    resolve(built.outputFiles[0].path) !== resolve(bundle)
+  )
+    throw Error('Probe compiler output differs.');
+  writeFileSync(bundle, built.outputFiles[0].contents, { flag: 'wx' });
   const journalBytes = readFileSync(join(root, 'drizzle/meta/_journal.json'));
   const journal = JSON.parse(journalBytes.toString('utf8'));
   const schema = [

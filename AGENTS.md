@@ -35,6 +35,12 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 COMPLETE, claim released: offline esbuild output-write repair for exchange and warmup probes. See docs/CODEX-OFFLINE-COMPILER-WRITES-20261028.md. Focused tests and a stable-source 88/88 script snapshot passed. No provider or wallet actions.
+
+- Codex + helper, 28 October 2026 ACTIVE, isolated quote-refusal worktree: optional exact pre-sign boundary hooks and focused tests in lib/warmup-external-signer.ts, lib/native-withdrawal-external-signer.ts, lib/warmup-signing.ts and lib/native-withdrawal.ts, only to fence Jito recovery and classify provably unstarted reservations. Preserve default behavior, all checks/consents and post-sign guards; no real signing, send, provider change or deploy.
+
+- Codex + helper, 28 October 2026 ACTIVE, isolated quote-refusal worktree: synthetic Jito wallet-prompt/remount recovery in components/jito-packet-signing.tsx, components/jito-atomic-bundle.tsx, components/jito-memory-recovery.tsx, components/jito-sequential-check.tsx and their focused tests; new lib/jito owner-scope and memory-only signature coordinator helpers and tests; app/api/imported-projects/jito-bundles/route.ts and focused tests for additive owner-scope fencing. Preserve exact original packet/context and authenticated owner, require existing approvals, manual recovery only, no automatic send/sign, no real wallet/signing, persistent provider settings or deployment. Other agents please avoid these paths until released.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: clarified that the Jito sequential check is optional and does not gate the separate Sign and Submit checks. See docs/CODEX-JITO-CHECK-DISCLOSURE-20261028.md. Existing consent/server checks unchanged; no deployment, provider changes or funded actions.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: non-authoritative timing diagnostics for native Jito. See docs/CODEX-JITO-NATIVE-TIMING-20261028.md. One Helius native sample captured 1/3, with the other two refused; no full qualification, request, pacing, provider setting, authority, deploy or funded action changes.

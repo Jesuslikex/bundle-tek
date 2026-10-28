@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, appendFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  appendFileSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -57,4 +62,16 @@ test('freezes exact compiler inputs and all original migrations, then loads the 
     sourceUnchanged: true,
     snapshotUnchanged: false,
   });
+});
+test('refuses an existing reader artifact without overwriting its bytes', async () => {
+  const root = resolve(process.cwd());
+  const folder = join(root, 'work', 'warmup-probe-existing-' + randomUUID());
+  mkdirSync(folder, { recursive: true });
+  const bundle = join(folder, 'reader.mjs');
+  const original = Buffer.from('existing artifact must remain unchanged');
+  writeFileSync(bundle, original, { flag: 'wx' });
+  await assert.rejects(snapshotWarmupAssetProbe(root, folder), {
+    code: 'EEXIST',
+  });
+  assert.deepEqual(readFileSync(bundle), original);
 });

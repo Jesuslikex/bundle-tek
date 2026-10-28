@@ -103,7 +103,7 @@ export async function qualifyExchangeProvider({
       receipt.sourceFiles[name] = hash(await readFile(join(root, name)));
     const bundle = join(folder, 'reader.mjs'),
       { build } = await import('esbuild');
-    await build({
+    const built = await build({
       stdin: {
         contents: `export {previewOwnedExchangeFunding,readOwnedExchangeFundingQuote,ExchangeFundingError} from './lib/exchange-funding-quote';export {prepareOwnedExchangeOrderReview} from './lib/exchange-order-service';export {readOwnedExchangeOrderHistory} from './lib/exchange-order-history-service';export {exchangeUiRequest} from './lib/exchange-ui-request';export {exchangeSolLamports,exchangeSolDisplay} from './lib/exchange-funding-review';export {validateFunding} from './lib/funding-plan';export {exchangeOrderReviewApiFixture} from './test/exchange-order-review-api-fixture';`,
         resolveDir: root,
@@ -114,8 +114,15 @@ export async function qualifyExchangeProvider({
       format: 'esm',
       packages: 'external',
       outfile: bundle,
+      write: false,
       logLevel: 'silent',
     });
+    if (
+      built.outputFiles.length !== 1 ||
+      resolve(built.outputFiles[0].path) !== resolve(bundle)
+    )
+      throw refusal('build-unavailable');
+    await writeFile(bundle, built.outputFiles[0].contents, { flag: 'wx' });
     receipt.executedBundleSha256 = hash(await readFile(bundle));
     lib = await import(pathToFileURL(bundle).href);
     receipt.stage = 'validation';
