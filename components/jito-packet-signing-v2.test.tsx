@@ -894,6 +894,136 @@ async function approveRecovery() {
   });
 }
 
+it('distinguishes preparation, wallet request and registration without claiming a signature early', async () => {
+  const f = await setup(true);
+  let unlock!: (session: vault.VaultSession) => void, unlocking!: () => void;
+  let wallet!: (
+      result: { signedTransaction: Uint8Array<ArrayBuffer> }[],
+    ) => void,
+    walletStarted!: () => void;
+  let finishRegister!: () => void, registering!: () => void;
+  const unlockPending = new Promise<vault.VaultSession>((resolve) => {
+    unlock = resolve;
+  });
+  const unlockStart = new Promise<void>((resolve) => {
+    unlocking = resolve;
+  });
+  const walletPending = new Promise<
+    { signedTransaction: Uint8Array<ArrayBuffer> }[]
+  >((resolve) => {
+    wallet = resolve;
+  });
+  const walletStart = new Promise<void>((resolve) => {
+    walletStarted = resolve;
+  });
+  const registerPending = new Promise<void>((resolve) => {
+    finishRegister = resolve;
+  });
+  const registerStart = new Promise<void>((resolve) => {
+    registering = resolve;
+  });
+  const originalRegister = f.register.getMockImplementation()!;
+  vi.mocked(vault.unlockVault).mockImplementation(async () => {
+    unlocking();
+    return unlockPending;
+  });
+  f.externalSign.mockImplementation(async () => {
+    walletStarted();
+    return walletPending;
+  });
+  f.register.mockImplementation(async (transaction, id) => {
+    registering();
+    await registerPending;
+    await originalRegister(transaction, id);
+  });
+  await chooseExternal();
+  await f.approve();
+  await f.sign();
+  await act(async () => {
+    await unlockStart;
+  });
+  expect(container.textContent).toContain('Preparing the signing request');
+  expect(container.textContent).toContain(
+    'No signature has been requested yet',
+  );
+  expect(container.textContent).not.toContain(
+    'Waiting for the wallet to respond',
+  );
+  expect(f.externalSign).not.toHaveBeenCalled();
+  await act(async () => {
+    unlock(f.session);
+    await walletStart;
+  });
+  expect(container.textContent).toContain(
+    'Waiting for the wallet to respond to the signing request',
+  );
+  expect(container.textContent).not.toContain(
+    'Saving the returned signed packet',
+  );
+  expect(f.register).not.toHaveBeenCalled();
+  await act(async () => {
+    wallet([{ signedTransaction: f.externalBytes }]);
+    await registerStart;
+  });
+  expect(container.textContent).toContain(
+    'Registering the signed packet for recovery',
+  );
+  await act(async () => {
+    finishRegister();
+  });
+  await waitFor(() => expect(storage.rows.size).toBe(0));
+  expect(container.textContent).not.toContain(
+    'Registering the signed packet for recovery',
+  );
+  expect(f.externalSign).toHaveBeenCalledTimes(1);
+});
+
+it('shows recovery inspection as read-only while the exact authenticated read is pending', async () => {
+  const f = await setup();
+  f.register.mockRejectedValueOnce(Error('lost registration response'));
+  await f.approve();
+  await f.sign();
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'needs recovery before another action',
+    ),
+  );
+  const response = await f.readSnapshot();
+  let release!: (value: JitoPacketV2Snapshot) => void, started!: () => void;
+  const pending = new Promise<JitoPacketV2Snapshot>((resolve) => {
+    release = resolve;
+  });
+  const began = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  f.readSnapshot.mockImplementationOnce(async () => {
+    started();
+    return pending;
+  });
+  await enterRecoveryPassword();
+  await clickText('Inspect retained swap 1 packet');
+  await act(async () => {
+    await began;
+  });
+  expect(container.textContent).toContain(
+    'Checking the retained recovery packet. This does not sign or submit.',
+  );
+  expect(f.registerEvidence).not.toHaveBeenCalled();
+  await act(async () => {
+    release(response);
+  });
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'Exact retained packet verified locally',
+    ),
+  );
+  expect(container.textContent).not.toContain(
+    'Checking the retained recovery packet. This does not sign or submit.',
+  );
+  expect(f.signer).toHaveBeenCalledTimes(1);
+  expect(f.registerEvidence).not.toHaveBeenCalled();
+});
+
 it('recovers retained evidence after reload only with a separate unchecked approval', async () => {
   const f = await setup();
   f.register.mockRejectedValueOnce(Error('response lost before registration'));

@@ -67,6 +67,11 @@ still fails against the v2 contract and has not been skipped, deleted or
 replaced. See `CODEX-JITO-V2-remount-inventory-20261028.md` for remaining
 coverage. This branch must not be merged or deployed as a completed flow.
 
+The signing panel now distinguishes preparation before a signature is
+requested, the wallet response, local retention and registration, and its
+evidence-only recovery steps. Thirty-eight focused child tests pass, including
+delayed-stage checks; these are synthetic and do not prove a real wallet flow.
+
 Still required before a release: integrate the encrypted local journal and
 owner-scoped server attempt with every browser signing, import, registration,
 cancel and submit path; preserve separately unchecked approval; test rejected

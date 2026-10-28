@@ -97,6 +97,17 @@ export function JitoPacketSigning({
     [choice, setChoice] = useState('vault'),
     [wallets, setWallets] = useState<WarmupExternalWallet[]>([]),
     [busy, setBusy] = useState(false),
+    [progress, setProgress] = useState<
+      | 'preparing'
+      | 'wallet-request'
+      | 'vault-signing'
+      | 'retaining'
+      | 'registering'
+      | 'recovery-inspecting'
+      | 'recovery-confirming'
+      | 'recovery-exporting'
+      | null
+    >(null),
     [error, setError] = useState(''),
     [pending, setPending] = useState<string | null>(null),
     [recoveryPassword, setRecoveryPassword] = useState(''),
@@ -171,6 +182,7 @@ export function JitoPacketSigning({
     }
     running.current = true;
     setBusy(true);
+    setProgress('preparing');
     setError('');
     const passphrase = password;
     const external =
@@ -315,12 +327,15 @@ export function JitoPacketSigning({
               onSignerStart: () => {
                 assertCurrent();
                 coordinator.markStarted(memory!);
+                if (mounted.current)
+                  setProgress(external ? 'wallet-request' : 'vault-signing');
               },
               retainSigned: async (signed: { transaction: string }) => {
                 // Both independent attempts run even when the UI unmounted. A
                 // failed durable write prevents registration and keeps UNKNOWN.
                 if (vault)
                   for (const item of vault.payload.wallets) item.seed = '';
+                if (mounted.current) setProgress('retaining');
                 const retained = await Promise.allSettled([
                   coordinator.capture(memory!, approved, signed.transaction),
                   retainJitoRecoverySignature(
@@ -364,7 +379,10 @@ export function JitoPacketSigning({
                     hooks,
                   );
             assertCurrent();
-            if (mounted.current) setPending(signed.transaction);
+            if (mounted.current) {
+              setPending(signed.transaction);
+              setProgress('registering');
+            }
             await register(signed.transaction, attemptId, operation);
             assertCurrent();
             await acknowledgeJitoRecoveryRegistered(
@@ -401,7 +419,10 @@ export function JitoPacketSigning({
       if (vault) for (const item of vault.payload.wallets) item.seed = '';
       coordinator.finishOperation(operation);
       running.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) {
+        setBusy(false);
+        setProgress(null);
+      }
     }
   }
 
@@ -435,6 +456,9 @@ export function JitoPacketSigning({
     setRecoveryMessage('');
     running.current = true;
     setBusy(true);
+    setProgress(
+      registerApproved ? 'recovery-confirming' : 'recovery-inspecting',
+    );
     const assertCurrent = () => {
       if (
         !mounted.current ||
@@ -583,7 +607,10 @@ export function JitoPacketSigning({
     } finally {
       coordinator.finishOperation(operation);
       running.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) {
+        setBusy(false);
+        setProgress(null);
+      }
     }
   }
 
@@ -591,6 +618,7 @@ export function JitoPacketSigning({
     if (!pending || running.current) return;
     running.current = true;
     setBusy(true);
+    setProgress('recovery-exporting');
     setError('');
     try {
       const record = await createJitoPacketRecovery(manifest, packet, pending);
@@ -609,12 +637,39 @@ export function JitoPacketSigning({
       if (mounted.current) setError('Recovery export unavailable.');
     } finally {
       running.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) {
+        setBusy(false);
+        setProgress(null);
+      }
     }
   }
 
   return (
     <div className="space-y-2 rounded-md border p-3">
+      {progress && (
+        <output aria-live="polite">
+          {
+            {
+              preparing:
+                'Preparing the signing request and checking the wallet. No signature has been requested yet.',
+              'wallet-request':
+                'Waiting for the wallet to respond to the signing request. This does not submit a transaction.',
+              'vault-signing':
+                'Signing this packet in the browser. This does not submit a transaction.',
+              retaining:
+                'Saving the returned signed packet for recovery. It has not been submitted.',
+              registering:
+                'Registering the signed packet for recovery. This does not submit a transaction.',
+              'recovery-inspecting':
+                'Checking the retained recovery packet. This does not sign or submit.',
+              'recovery-confirming':
+                'Confirming the retained recovery packet. This does not sign or submit.',
+              'recovery-exporting':
+                'Preparing the recovery file. This does not sign or submit.',
+            }[progress]
+          }
+        </output>
+      )}
       <p>
         Signer for {label}: <code>{wallet}</code>. This action signs one packet.
         It does not submit it.
@@ -622,7 +677,7 @@ export function JitoPacketSigning({
       <p>
         A browser vault and its password are required to protect recovery,
         including when signing with an external wallet. To import a signed
-        packet file, use the bundle's file recovery section.
+        packet file, use the bundle&apos;s file recovery section.
       </p>
       <p>
         External wallets must expose the selected mainnet account and its exact
