@@ -2482,11 +2482,12 @@ body {
 .wallet-network-icon {
   display: grid;
   place-items: center;
-  width: 18px;
+  min-width: 22px;
   height: 18px;
-  border-radius: 50%;
+  padding: 0 5px;
+  border-radius: 999px;
   background: var(--muted);
-  font-size: 7px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -2513,13 +2514,17 @@ body {
 .wallet-folders-head-actions button {
   display: grid;
   place-items: center;
-  padding: 2px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
   color: var(--muted-foreground);
-  transition: color 0.15s;
+  transition: color 0.15s, background 0.15s;
 }
 .wallet-folders-head-actions button:hover,
 .wallet-folders-head-actions button.is-active {
   color: var(--foreground);
+  background: var(--muted);
 }
 .wallet-folders-sort {
   display: flex;
@@ -5864,7 +5869,7 @@ body {
 .app-shell table th {
   font-size: 11px;
   letter-spacing: 0.44px;
-  color: #787a8d;
+  color: var(--muted-foreground);
   font-weight: 500;
 }
 .app-shell table td {

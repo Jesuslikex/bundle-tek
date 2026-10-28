@@ -785,7 +785,7 @@
 .status.cancelled,
 .status.planned {
   background: #2a2a2a;
-  color: #888;
+  color: #adadad;
 }
 
 .status.completed {

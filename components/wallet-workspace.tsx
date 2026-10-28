@@ -1459,7 +1459,7 @@ export function WalletWorkspace({
               <p>
                 {combined
                   ? `${combined.count} ${combined.count === 1 ? 'address' : 'addresses'} · ${chain === 'Solana' ? 'slot' : 'block'} ${combined.blockNumber} · ${combined.commitment} · observed ${new Date(combined.observedAt).toLocaleString()}`
-                  : 'Refresh this page or selection for balances from one snapshot.'}
+                  : 'Refresh balances or change the selection to load a snapshot.'}
               </p>
               <small>
                 Native currency only. Observations can become stale. No USD
@@ -1479,7 +1479,7 @@ export function WalletWorkspace({
 
               onClick={() => void refreshBalances()}
             >
-              Refresh {picks.length ? 'selected' : 'page'} balances
+              Refresh {picks.length ? 'selected ' : ''}balances
             </Button>
             {balanceTargets.length > 100 && (
               <small>Select up to 100 wallets per refresh.</small>

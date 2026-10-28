@@ -516,7 +516,7 @@ it('pages a large roster while preserving explicit selections and the 100-wallet
   expect(host.textContent).toContain('110 matching wallets');
   expect(
     [...host.querySelectorAll('button')].find(
-      (b) => b.textContent === 'Refresh page balances',
+      (b) => b.textContent === 'Refresh balances',
     )?.disabled,
   ).toBe(false);
   await selectPage();

@@ -1074,7 +1074,7 @@ export function WalletCleanupPanel({
             }}
           >
             <div className={styles.head}>
-              <h1>Cleanup</h1>
+              <h2>Cleanup</h2>
               <div className={styles.headActions}>
                 <button
                   type="button"
@@ -1437,11 +1437,11 @@ export function WalletCleanupPanel({
                   }
                 >
                   <div className={styles.pickerHead}>
-                    <h1>
+                    <h2>
                       {picker === 'input'
                         ? 'Select Input Wallets (Sellers)'
                         : 'Select Output Wallets (Buyers)'}
-                    </h1>
+                    </h2>
                     <div className={styles.headActions}>
                       <button
                         type="button"
