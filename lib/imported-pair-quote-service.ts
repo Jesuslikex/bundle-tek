@@ -121,6 +121,8 @@ export type ImportedPairQuoteDependencies = {
     signal: AbortSignal,
   ) => Promise<Quote>;
   now?: () => number;
+  /** Internal, provisional observation only. Quote validation must still finish. */
+  onQuoteObserved?: (input: Parameters<typeof quoteSolanaPair>[0]) => void;
 };
 export function configuredPairQuoteDependencies(
   signal: AbortSignal,
@@ -355,6 +357,12 @@ export async function quoteOwnedImportedPair(
       throw error;
     }
     signal.throwIfAborted();
+    provider.onQuoteObserved?.({
+      baseMint: saved.address,
+      quoteMint: quoteAsset.address,
+      side: input.side,
+      amountRaw,
+    });
     const [after, finalGenesis] = await Promise.all([
       readMints(before.slot),
       checked('getGenesisHash', []),

@@ -48,6 +48,25 @@ export type PairOrderFirstRequest = ImportedPairOrderRequest & {
   absoluteMinimumRaw: string | null;
   marketPair?: string | null;
 };
+async function waitForProvisionalOrder<T>(
+  pending: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  signal.throwIfAborted();
+  let abort = () => {};
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<never>((_, reject) => {
+        abort = () => reject(signal.reason);
+        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) abort();
+      }),
+    ]);
+  } finally {
+    signal.removeEventListener('abort', abort);
+  }
+}
 type PairOrderFirstDependencies = ImportedPairOrderDependencies & {
   observeQuoteMarket?: typeof observeTokenMarket;
 };
@@ -193,8 +212,27 @@ async function preparePairOrderFirst(
         "SELECT p.document,p.revision,p.archived,w.revision AS wallet_revision,w.archived AS wallet_archived,w.role,w.updated_at AS wallet_updated_at FROM imported_token_projects p JOIN workspace_wallets w ON w.owner_id=p.owner_id AND w.chain='Solana' AND w.address=? WHERE p.owner_id=? AND p.id=?",
       )
       .bind(request.wallet, owner, request.id)
-      .first();
+      .first<{
+        document: string;
+        revision: number;
+        archived: number;
+        wallet_revision: number;
+        wallet_archived: number;
+        role: string;
+        wallet_updated_at: string;
+      }>();
   const originalOwned = await ownedSnapshot();
+  if (
+    !originalOwned ||
+    originalOwned.archived ||
+    originalOwned.wallet_archived ||
+    originalOwned.revision !== request.revision ||
+    originalOwned.wallet_revision !== request.walletRevision ||
+    !['Recipient', 'Deployer', 'Funder'].includes(originalOwned.role)
+  )
+    throw new ImportedPairQuoteError(
+      'Saved project or wallet changed or is archived.',
+    );
   const now = provider.now ?? Date.now;
   // Server-created Jupiter baseline, never an arbitrary client-supplied number.
   const {
@@ -204,13 +242,56 @@ async function preparePairOrderFirst(
     feeAndRentLimitRaw: _limit,
     ...quoteRequest
   } = request;
-  const initial = await quoteOwnedImportedPair(
-    db,
-    owner,
-    quoteRequest,
-    signal,
-    provider,
-  );
+  // Start the unsigned provider order after the quote returns, in parallel with
+  // the quote's mandatory post-read checks. It remains private until all of
+  // those checks and the strict initial-minimum comparison have succeeded.
+  const speculative = new AbortController();
+  const orderSignal = AbortSignal.any([signal, speculative.signal]);
+  let pendingOrder:
+    | Promise<
+        | { order: Awaited<ReturnType<typeof prepareSolanaPair>> }
+        | { error: unknown }
+      >
+    | undefined;
+  let initial: Awaited<ReturnType<typeof quoteOwnedImportedPair>>;
+  try {
+    initial = await quoteOwnedImportedPair(db, owner, quoteRequest, signal, {
+      ...provider,
+      onQuoteObserved: (observed) => {
+        if (pendingOrder)
+          throw new ImportedPairQuoteError(
+            'Duplicate provisional quote observation.',
+          );
+        pendingOrder = (async () => {
+          orderSignal.throwIfAborted();
+          if (
+            JSON.stringify(await ownedSnapshot()) !==
+            JSON.stringify(originalOwned)
+          )
+            throw new ImportedPairQuoteError('Owned review context changed.');
+          orderSignal.throwIfAborted();
+          try {
+            return await provider.prepare(
+              { ...observed, wallet: request.wallet },
+              orderSignal,
+            );
+          } catch {
+            orderSignal.throwIfAborted();
+            throw new ImportedPairQuoteError(
+              'Wallet-bound unsigned order provider is unavailable or returned an unsupported packet. No approval or signature was created.',
+              502,
+            );
+          }
+        })().then(
+          (order) => ({ order }),
+          (error) => ({ error }),
+        );
+      },
+    });
+  } catch (error) {
+    speculative.abort();
+    throw error;
+  }
   signal.throwIfAborted();
   // Run the independent quote observation alongside packet preparation/code IO,
   // not after the final on-chain recheck. Scaled units are deliberately unsupported.
@@ -224,16 +305,18 @@ async function preparePairOrderFirst(
           provider.observeQuoteMarket,
         )
       : Promise.resolve(null);
-  const order = await provider.prepare(
-    {
-      baseMint: initial.pair.base.address,
-      quoteMint: initial.pair.quote.address,
-      side: request.side,
-      amountRaw: initial.inputRaw,
-      wallet: request.wallet,
-    },
-    signal,
-  );
+  if (!pendingOrder)
+    throw new ImportedPairQuoteError(
+      'Unsigned order observation is unavailable.',
+    );
+  let outcome: Awaited<typeof pendingOrder>;
+  try {
+    outcome = await waitForProvisionalOrder(pendingOrder, orderSignal);
+  } finally {
+    speculative.abort();
+  }
+  if ('error' in outcome) throw outcome.error;
+  const order = outcome.order;
   signal.throwIfAborted();
   // Existing owned lifecycle now fetches its fresh quote AFTER packet preparation.
   // Protect the initial preview strictly before requesting the fresh reference.

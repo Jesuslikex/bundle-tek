@@ -106,7 +106,7 @@ const folder = resolve(
 );
 mkdirSync(folder, { recursive: true });
 const bundle = join(folder, 'reader.mjs');
-await build({
+const compiled = await build({
   stdin: {
     contents: `export {qualifyOwnedPairOrderFirstRuntime} from './lib/pair-order-first-service'; export {createPairReadRpc} from './lib/pair-read-rpc'; export {prepareSolanaPair,quoteSolanaPair} from './lib/warmup-swap-quote'; export {balanceRpc,SOLANA_MAINNET_GENESIS} from './lib/wallet-balances'; export {getSolanaIndexerRpcEndpoint,getSolanaStockRuntimeRpcEndpoint} from './lib/solana-rpc'; export {pairAssociatedAddress} from './lib/pair-wallet-evidence'; export {readPairMintEvidence} from './lib/pair-mint-evidence'; export {createStockPairEvidenceRpc,stockPairAccountLimit} from './lib/pair-stock-clock'; export {importedTokenDocument} from './lib/imported-token-project'; export {pairStockSigningPolicy} from './lib/pair-stock-signing-policy'; export {paceWalletRpc,stockQualificationMethodBudget} from './lib/wallet-rpc-pacing';`,
     resolveDir: process.cwd(),
@@ -117,8 +117,17 @@ await build({
   format: 'esm',
   packages: 'external',
   outfile: bundle,
+  write: false,
   logLevel: 'silent',
 });
+if (
+  compiled.outputFiles.length !== 1 ||
+  resolve(compiled.outputFiles[0].path) !== bundle
+)
+  throw Error('Unsigned qualification reader output is unavailable.');
+// Some Windows environments deny writes by the esbuild subprocess even when
+// the caller can write in the same folder. Persist only the compiled bytes.
+writeFileSync(bundle, compiled.outputFiles[0].contents, { flag: 'wx' });
 const lib = await import(pathToFileURL(bundle).href);
 const stop = new AbortController(),
   signal = AbortSignal.any([stop.signal, AbortSignal.timeout(90000)]);

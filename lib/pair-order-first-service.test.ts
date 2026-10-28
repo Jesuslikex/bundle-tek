@@ -99,6 +99,255 @@ async function setup() {
     );
   return { v, request, run };
 }
+it('starts one unsigned order while post-quote mint verification is pending and publishes only after it passes', async () => {
+  const { v, run } = await setup();
+  const quote = v.quote.getMockImplementation()!,
+    rpc = v.rpc.getMockImplementation()!;
+  let quoteFinished = false,
+    release!: () => void,
+    blocked!: () => void,
+    prepared!: () => void;
+  const gate = new Promise<void>((r) => {
+      release = r;
+    }),
+    waiting = new Promise<void>((r) => {
+      blocked = r;
+    }),
+    orderStarted = new Promise<void>((r) => {
+      prepared = r;
+    });
+  v.quote.mockImplementation(async (...args) => {
+    const result = await quote(...args);
+    quoteFinished = true;
+    return result;
+  });
+  let blockedOnce = false;
+  v.rpc.mockImplementation(async (method, params) => {
+    if (
+      quoteFinished &&
+      !blockedOnce &&
+      method === 'getMultipleAccounts' &&
+      !(params[0] as string[]).includes(v.wallet)
+    ) {
+      blockedOnce = true;
+      blocked();
+      await gate;
+    }
+    return rpc(method, params);
+  });
+  const prepare = v.prepare.getMockImplementation()!;
+  v.prepare.mockImplementation(async (...args) => {
+    prepared();
+    return prepare(...args);
+  });
+  const work = run();
+  try {
+    await waiting;
+    await orderStarted;
+    expect(v.prepare).toHaveBeenCalledTimes(1);
+    expect(
+      v.sqlite
+        .prepare('SELECT count(*) AS n FROM pair_order_first_reviews')
+        .get(),
+    ).toMatchObject({ n: 0 });
+    release();
+    await expect(work).resolves.toMatchObject({
+      review: { signingAllowed: false },
+    });
+  } finally {
+    release();
+  }
+});
+it('aborts the provisional order and saves no review if the project changes before quote verification completes', async () => {
+  const { v, run } = await setup();
+  const quote = v.quote.getMockImplementation()!,
+    rpc = v.rpc.getMockImplementation()!;
+  let quoteFinished = false,
+    release!: () => void,
+    blocked!: () => void,
+    prepared!: () => void,
+    captured: AbortSignal | undefined;
+  const gate = new Promise<void>((r) => {
+      release = r;
+    }),
+    waiting = new Promise<void>((r) => {
+      blocked = r;
+    }),
+    started = new Promise<void>((r) => {
+      prepared = r;
+    });
+  v.quote.mockImplementation(async (...args) => {
+    const result = await quote(...args);
+    quoteFinished = true;
+    return result;
+  });
+  let blockedOnce = false;
+  v.rpc.mockImplementation(async (method, params) => {
+    if (
+      quoteFinished &&
+      !blockedOnce &&
+      method === 'getMultipleAccounts' &&
+      !(params[0] as string[]).includes(v.wallet)
+    ) {
+      blockedOnce = true;
+      blocked();
+      await gate;
+    }
+    return rpc(method, params);
+  });
+  v.prepare.mockImplementation(async (_input, signal) => {
+    captured = signal;
+    prepared();
+    return new Promise(() => {});
+  });
+  const work = run();
+  try {
+    await waiting;
+    await started;
+    v.sqlite
+      .prepare(
+        'UPDATE imported_token_projects SET revision=revision+1 WHERE id=?',
+      )
+      .run(v.request.id);
+    release();
+    await expect(work).rejects.toThrow(/changed/);
+    expect(captured?.aborted).toBe(true);
+    expect(
+      v.sqlite
+        .prepare('SELECT count(*) AS n FROM pair_order_first_reviews')
+        .get(),
+    ).toMatchObject({ n: 0 });
+  } finally {
+    release();
+  }
+});
+it('aborts the provisional order when the final mint policy recheck changes', async () => {
+  const { v, run } = await setup();
+  const quote = v.quote.getMockImplementation()!,
+    rpc = v.rpc.getMockImplementation()!;
+  let quoteFinished = false,
+    release!: () => void,
+    blocked!: () => void,
+    prepared!: () => void,
+    captured: AbortSignal | undefined;
+  const gate = new Promise<void>((r) => {
+      release = r;
+    }),
+    waiting = new Promise<void>((r) => {
+      blocked = r;
+    }),
+    started = new Promise<void>((r) => {
+      prepared = r;
+    });
+  v.quote.mockImplementation(async (...args) => {
+    const result = await quote(...args);
+    quoteFinished = true;
+    return result;
+  });
+  let blockedOnce = false;
+  v.rpc.mockImplementation(async (method, params) => {
+    if (
+      quoteFinished &&
+      !blockedOnce &&
+      method === 'getMultipleAccounts' &&
+      !(params[0] as string[]).includes(v.wallet)
+    ) {
+      blockedOnce = true;
+      blocked();
+      await gate;
+    }
+    return rpc(method, params);
+  });
+  v.prepare.mockImplementation(async (_input, signal) => {
+    captured = signal;
+    prepared();
+    return new Promise(() => {});
+  });
+  const work = run();
+  try {
+    await waiting;
+    await started;
+    v.mints[0] = pairQuoteMint(7, v.mints[0].owner);
+    release();
+    await expect(work).rejects.toThrow(/policy|precision|changed/);
+    expect(captured?.aborted).toBe(true);
+    expect(
+      v.sqlite
+        .prepare('SELECT count(*) AS n FROM pair_order_first_reviews')
+        .get(),
+    ).toMatchObject({ n: 0 });
+  } finally {
+    release();
+  }
+});
+it('does not contact the unsigned order provider for an archived or unowned wallet', async () => {
+  const { v, run } = await setup();
+  v.sqlite
+    .prepare('UPDATE workspace_wallets SET archived=1 WHERE address=?')
+    .run(v.wallet);
+  await expect(run()).rejects.toThrow(/wallet changed or is archived/);
+  expect(v.prepare).not.toHaveBeenCalled();
+  expect(v.quote).not.toHaveBeenCalled();
+});
+it('does not dispatch a provisional order if ownership changes while the initial quote is in flight', async () => {
+  const { v, run } = await setup();
+  const quote = v.quote.getMockImplementation()!;
+  v.quote.mockImplementation(async (...args) => {
+    const result = await quote(...args);
+    v.sqlite
+      .prepare("UPDATE workspace_wallets SET role='Holder' WHERE address=?")
+      .run(v.wallet);
+    return result;
+  });
+  await expect(run()).rejects.toThrow(/context changed/);
+  expect(v.prepare).not.toHaveBeenCalled();
+  expect(
+    v.sqlite
+      .prepare('SELECT count(*) AS n FROM pair_order_first_reviews')
+      .get(),
+  ).toMatchObject({ n: 0 });
+});
+it('sanitizes provisional order provider failures without leaking provider details', async () => {
+  const { v, run } = await setup();
+  v.prepare.mockRejectedValue(new Error('private-provider-secret-and-url'));
+  await expect(run()).rejects.toMatchObject({
+    status: 502,
+    message:
+      'Wallet-bound unsigned order provider is unavailable or returned an unsupported packet. No approval or signature was created.',
+  });
+  expect(
+    v.sqlite
+      .prepare('SELECT count(*) AS n FROM pair_order_first_reviews')
+      .get(),
+  ).toMatchObject({ n: 0 });
+});
+it('stops waiting on an uncooperative provisional order after cancellation', async () => {
+  const { v, request } = await setup();
+  let started!: () => void;
+  const ready = new Promise<void>((r) => {
+    started = r;
+  });
+  v.prepare.mockImplementation(async () => {
+    started();
+    return new Promise(() => {});
+  });
+  const controller = new AbortController();
+  const work = prepareOwnedPairOrderFirstReview(
+    v.db,
+    'alice',
+    request,
+    controller.signal,
+    v.orderDependencies,
+  );
+  await ready;
+  controller.abort();
+  await expect(work).rejects.toBeDefined();
+  expect(
+    v.sqlite
+      .prepare('SELECT count(*) AS n FROM pair_order_first_reviews')
+      .get(),
+  ).toMatchObject({ n: 0 });
+});
 it('enforces exact owned consent and one authorization per review in the local database', async () => {
   const { v, run } = await setup();
   for (const file of [
