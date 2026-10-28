@@ -35,6 +35,7 @@ import {
 } from '@/lib/jito-memory-signature-recovery';
 import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
 import { JitoMemoryRecovery } from './jito-memory-recovery';
+import { JitoTerminalRecoveryImport } from './jito-terminal-recovery-import';
 
 async function checkedRecord(
   value: JitoBundleRecord,
@@ -436,6 +437,23 @@ function JitoAtomicBundleForContext({
     )
       throw new Error('Bundle changed. Reload saved history before importing.');
   }
+  async function terminalPacketSignature(
+    manifest: JitoBundleManifest,
+    packet: number,
+    state: 'cancelled' | 'expired',
+  ) {
+    const record = await readExactBundle(manifest.id);
+    if (
+      !isContextCurrent() ||
+      record.state !== state ||
+      record.manifest.sha256 !== manifest.sha256 ||
+      !Number.isInteger(packet) ||
+      packet < 0 ||
+      packet >= record.signatures.length
+    )
+      throw new Error('Bundle changed. Reload saved history before recovery.');
+    return record.signatures[packet];
+  }
   async function loadOriginal(id: string) {
     if (running.current || !historyVerified) return;
     running.current = true;
@@ -568,6 +586,10 @@ function JitoAtomicBundleForContext({
         >
           Load bundle approvals and history
         </Button>
+        <p>
+          History lists up to 20 recent bundles. Older bundles appear only when
+          this panel has a pending in-memory recovery.
+        </p>
         {historyVerified &&
           ownerScope &&
           coordinator
@@ -821,6 +843,36 @@ function JitoAtomicBundleForContext({
                       }
                     />
                   ) : null,
+                )}
+              {historyVerified &&
+                ownerScope &&
+                (bundle.state === 'cancelled' ||
+                  bundle.state === 'expired') && (
+                  <details>
+                    <summary>Inspect saved signed packet recovery</summary>
+                    {Array.from({ length: m.swaps.length + 1 }, (_, packet) => (
+                      <JitoTerminalRecoveryImport
+                        key={`${m.id}:terminal:${packet}`}
+                        manifest={m}
+                        packet={packet}
+                        ownerScope={ownerScope}
+                        coordinator={coordinator}
+                        disabled={
+                          busy ||
+                          coordinator.operationActive() ||
+                          coordinator.has(ownerScope, m.id, packet)
+                        }
+                        isContextCurrent={isContextCurrent}
+                        readTerminalSignature={() =>
+                          terminalPacketSignature(
+                            m,
+                            packet,
+                            bundle.state as 'cancelled' | 'expired',
+                          )
+                        }
+                      />
+                    ))}
+                  </details>
                 )}
               {bundle.state === 'reviewed' &&
                 m.swaps

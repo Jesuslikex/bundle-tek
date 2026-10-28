@@ -35,6 +35,10 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex + helper, 28 October 2026 ACTIVE: strict local Jito recovery-file locator in new lib/jito-recovery-locator.ts and focused tests. Return only bounded context identifiers, never send or retain signed bytes, and grant no signing, submission or provider authority.
+
+- Codex + helper, 28 October 2026 COMPLETE, claim released: Jito terminal-state recovery-file inspection and private export only. See docs/CODEX-JITO-TERMINAL-FILE-RECOVERY-20261028.md. Requires exact owner-scoped record and signature verification; no registration, signing, submission, provider changes or deployment.
+
 - Codex, 28 October 2026 COMPLETE: isolated build and script verification at 0076843. See docs/CODEX-BUILD-SCRIPTS-0076843-20261028.md. No deployment or provider settings were changed.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: retain exact imported signed Jito recovery packets in the existing memory coordinator and fence bundle-wide actions. See docs/CODEX-JITO-IMPORTED-PACKET-RECOVERY-20261028.md. Manual consent and all signing/submit gates preserved; no real wallet action, provider settings or deployment.

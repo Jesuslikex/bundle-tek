@@ -1,0 +1,7 @@
+# Terminal Jito recovery-file inspection
+
+Cancelled and expired bundles in visible history now offer a collapsed recovery section. A user can explicitly choose a recovery file, verify its exact signed packet locally against the original manifest, and check a fresh authenticated owner-scoped terminal record and any saved signature. A second fresh record and signature check precedes private download. The view does not register, sign, submit or send anything, and warns that a signed packet may still be usable while valid.
+
+The existing owner operation lock prevents simultaneous local mutations. A pending recovery for the same packet blocks inspection; another packet's pending record is left unchanged. Account and context changes fence asynchronous work. History still shows 20 recent bundles, plus older pending in-memory recoveries; locating older terminal bundles after a reload is separate work.
+
+Independent Node 24 verification passed 96 tests across six related files, including locator tests from a prior snapshot; the author separately ran 52 terminal and parent tests after the collapsed disclosure change. Scoped typed lint and formatting passed. An independent source review found no blocker. This is synthetic verification, not real-wallet, provider or funded proof. Session changes after the final check, other devices and loss of local state remain non-atomic limits. No provider settings or deployment changed.

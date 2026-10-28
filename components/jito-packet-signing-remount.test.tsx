@@ -388,6 +388,80 @@ async function importPacket(
     input.dispatchEvent(new Event('change', { bubbles: true })),
   );
 }
+async function openTerminalRecovery() {
+  await until('Inspect saved signed packet recovery');
+  const summary = [...container.querySelectorAll('summary')].find((node) =>
+    node.textContent?.includes('Inspect saved signed packet recovery'),
+  )!;
+  const disclosure = summary.parentElement as HTMLDetailsElement;
+  expect(disclosure.open).toBe(false);
+  await act(async () => summary.click());
+  expect(disclosure.open).toBe(true);
+}
+it.each(['cancelled', 'expired'] as const)(
+  'inspects a %s bundle recovery file through the owner-scoped exact record without signing or submission',
+  async (state) => {
+    const f = await fixture();
+    f.bundle.state = state;
+    await f.render();
+    await click('Load bundle approvals');
+    await openTerminalRecovery();
+    await importPacket(f);
+    await until('Exact signed packet verified');
+    expect(container.textContent).toContain(
+      'does not register, sign or submit',
+    );
+    expect(container.textContent).not.toContain(
+      'Register retained packet only',
+    );
+    expect(container.textContent).not.toContain('Sign swap 1 only');
+    expect(container.textContent).not.toContain('Submit complete Jito bundle');
+    expect(f.posts).toEqual([]);
+    expect(f.sign).not.toHaveBeenCalled();
+  },
+);
+it('refuses terminal import when the authenticated account changes before the exact read', async () => {
+  const f = await fixture();
+  f.bundle.state = 'cancelled';
+  await f.render();
+  await click('Load bundle approvals');
+  await openTerminalRecovery();
+  f.serverOwner('bob');
+  await importPacket(f);
+  await until('Signed-in account changed. Reload bundle history.');
+  expect(container.textContent).not.toContain('Exact signed packet verified');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('refuses terminal import if the fresh saved record is no longer terminal', async () => {
+  const f = await fixture();
+  f.bundle.state = 'cancelled';
+  await f.render();
+  await click('Load bundle approvals');
+  await openTerminalRecovery();
+  f.delayExact();
+  await importPacket(f);
+  await act(async () => f.exactFetchStarted);
+  f.bundle.state = 'reviewed';
+  await act(async () => f.resolveExact());
+  await until('Bundle changed. Reload saved history before recovery.');
+  expect(container.textContent).not.toContain('Exact signed packet verified');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
+it('refuses terminal import if the saved packet signature conflicts', async () => {
+  const f = await fixture();
+  f.bundle.state = 'expired';
+  f.bundle.signatures[0] = f.f.tip.signed.signature;
+  await f.render();
+  await click('Load bundle approvals');
+  await openTerminalRecovery();
+  await importPacket(f);
+  await until('Saved bundle signature differs from this recovery file.');
+  expect(container.textContent).not.toContain('Exact signed packet verified');
+  expect(f.posts).toEqual([]);
+  expect(f.sign).not.toHaveBeenCalled();
+});
 it.each([0, 1])(
   'retains imported packet %s in the coordinator and blocks unsigned cancellation until explicit registration',
   async (packet) => {
