@@ -49,19 +49,25 @@ const slot = (value) => {
 
 export function validateEndpoint(value) {
   if (!value)
-    throw failure('configuration-refused: SOLANA_HOLDER_RPC_URL is not set');
+    throw failure(
+      'configuration-refused: set SOLANA_HOLDER_RPC_URL or SOLANA_MAINNET_RPC_URL',
+    );
   try {
     const url = new URL(value);
+    // Alchemy is the measured profile; the public endpoint is accepted so the
+    // campaign can run at all, and the receipt records which host was used.
     if (
       url.protocol !== 'https:' ||
-      url.hostname !== 'solana-mainnet.g.alchemy.com' ||
+      !['solana-mainnet.g.alchemy.com', 'api.mainnet-beta.solana.com'].includes(
+        url.hostname,
+      ) ||
       url.port ||
       url.username ||
       url.password ||
       url.hash
     )
       throw failure(
-        'configuration-refused: endpoint must be https Alchemy mainnet',
+        'configuration-refused: endpoint must be https Alchemy or public mainnet',
       );
     return url.href;
   } catch {
@@ -119,6 +125,7 @@ export async function runNativeJitoCampaign({
     throw failure('configuration-refused: attempt timeout must be 45000 ms');
   const report = {
     profile: 'unsigned-native-zero-transfer-only',
+    endpointHost: new URL(pinnedEndpoint).hostname,
     plannedAttempts: 3,
     attempts: [],
     signaturesCreated: 0,
@@ -655,7 +662,11 @@ export async function main(args = process.argv.slice(2)) {
     if (Number(process.versions.node.split('.')[0]) !== 24)
       throw failure('node-version-refused');
     const local = parseEnv(readFileSync('.env.local', 'utf8'));
-    const endpoint = validateEndpoint(local.SOLANA_HOLDER_RPC_URL);
+    // Alchemy is preferred; the public endpoint keeps the campaign runnable
+    // without one. The receipt records which variable supplied it.
+    const endpoint = validateEndpoint(
+      local.SOLANA_HOLDER_RPC_URL ?? local.SOLANA_MAINNET_RPC_URL,
+    );
     const interval = local.SOLANA_RPC_MIN_INTERVAL_MS;
     if (interval !== undefined) {
       if (
