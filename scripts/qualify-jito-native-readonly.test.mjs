@@ -324,6 +324,15 @@ for (const [name, at] of [
     assert.equal(h.requests.length, at);
     assert.equal(result.nativeCapturedCount, 0);
     assert.equal(result.providerQualified, false);
+    const timings = result.attempts[0].diagnosticTimings;
+    assert.equal(timings.length, at);
+    assert.equal(timings.at(-1).sendOutcome, 'headers-received');
+    assert.ok(timings.at(-1).bodyParsedAtMs >= timings.at(-1).headersAtMs);
+    assert.ok(timings.at(-1).retainedAtMs >= timings.at(-1).bodyParsedAtMs);
+    assert.doesNotMatch(
+      JSON.stringify(timings),
+      /private provider message|PRIVATE-TEST-ONLY/,
+    );
     assert.doesNotMatch(
       JSON.stringify(result),
       /private provider message|PRIVATE-TEST-ONLY/,
@@ -369,6 +378,51 @@ void test('three fixed native attempts retain wire parents, member ranges and fi
     JSON.parse(h.files.get('campaign.json')).completedPlannedAttempts,
     true,
   );
+});
+void test('records non-authoritative monotonic request timings with honest retention labels', async () => {
+  const h = harness();
+  const result = await h.run();
+  for (const attempt of result.attempts) {
+    assert.equal(attempt.diagnosticTimings.length, 6);
+    assert.deepEqual(
+      attempt.diagnosticTimings.map((item) => item.methods.length),
+      [1, 1, 1, 1, 3, 1],
+    );
+    for (const timing of attempt.diagnosticTimings) {
+      assert.ok(timing.queuedAtMs <= timing.paceStartMs);
+      assert.ok(timing.paceStartMs <= timing.paceEndMs);
+      assert.ok(timing.paceEndMs <= timing.fetchStartMs);
+      assert.ok(timing.fetchStartMs <= timing.headersAtMs);
+      assert.ok(timing.headersAtMs <= timing.sendFinishedAtMs);
+      assert.equal(timing.sendOutcome, 'headers-received');
+      assert.ok(timing.retainedAtMs >= timing.headersAtMs);
+      if (timing.label.startsWith('runtime:'))
+        assert.equal(timing.bodyParsedAtMs, null);
+      else {
+        assert.ok(timing.bodyParsedAtMs >= timing.sendFinishedAtMs);
+        assert.ok(timing.retainedAtMs >= timing.bodyParsedAtMs);
+      }
+      assert.doesNotMatch(
+        JSON.stringify(timing),
+        /PRIVATE-TEST|https:|transaction/,
+      );
+    }
+  }
+  assert.equal(h.requests.length, 18);
+  assert.equal(h.pacing.length, 24);
+});
+void test('records a terminal HTTP rate limit without logging its provider body', async () => {
+  const h = harness({ rateAt: 2 });
+  const result = await h.run();
+  assert.equal(result.attempts.length, 1);
+  assert.equal(result.attempts[0].reason, 'rate-limited');
+  assert.equal(h.requests.length, 2);
+  const timings = result.attempts[0].diagnosticTimings;
+  assert.equal(timings.length, 2);
+  assert.equal(timings[1].sendOutcome, 'rate-limited');
+  assert.equal(timings[1].bodyParsedAtMs, null);
+  assert.equal(timings[1].retainedAtMs, null);
+  assert.doesNotMatch(JSON.stringify(timings), /PRIVATE-TEST|https:|secret/);
 });
 void test('semantic refusals keep every fixed attempt, without looping for a pass', async () => {
   const h = harness({ refuse: true });
@@ -431,7 +485,15 @@ void test('cancellation owns a late fetch response and cancels its body', async 
   const run = h.run({ signal: abort.signal });
   await new Promise(setImmediate);
   abort.abort();
-  await run;
+  const result = await run;
+  const beforeLateResponse = JSON.stringify(
+    result.attempts[0].diagnosticTimings,
+  );
+  assert.equal(
+    result.attempts[0].diagnosticTimings[0].sendOutcome,
+    'interrupted',
+  );
+  assert.equal(result.attempts[0].diagnosticTimings[0].headersAtMs, null);
   release(
     new Response(
       new ReadableStream({
@@ -443,6 +505,10 @@ void test('cancellation owns a late fetch response and cancels its body', async 
   );
   await new Promise(setImmediate);
   assert.equal(cancelled, true);
+  assert.equal(
+    JSON.stringify(result.attempts[0].diagnosticTimings),
+    beforeLateResponse,
+  );
 });
 void test('extra requests exhaust the fixed HTTP budget rather than extending the campaign', async () => {
   const h = harness({
@@ -736,6 +802,11 @@ void test('cancelled pacing never issues the pending or subsequent fetch', async
   assert.equal(h.requests.length, 0);
   assert.equal(result.attempts.length, 1);
   assert.equal(result.attempts[0].reason, 'interrupted');
+  const timing = result.attempts[0].diagnosticTimings[0];
+  assert.equal(timing.sendOutcome, 'interrupted');
+  assert.equal(timing.paceEndMs, null);
+  assert.equal(timing.fetchStartMs, null);
+  assert.equal(timing.headersAtMs, null);
 });
 
 void test('an absent pacing implementation fails before network use', async () => {

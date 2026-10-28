@@ -171,11 +171,21 @@ export async function runNativeJitoCampaign({
       ...(signal ? [signal] : []),
     ]);
     const responses = new Set();
+    // Diagnostic wall-clock observations only. They are never used for bank,
+    // budget, retry, signature, or execution admission.
+    const timingOrigin = performance.now(),
+      timingForRead = new WeakMap();
+    let timingClosed = false;
+    const elapsed = () => Math.max(0, performance.now() - timingOrigin);
+    const mark = (timing, field) => {
+      if (!timingClosed) timing[field] = elapsed();
+    };
     const attempt = {
       index: index + 1,
       status: 'refused',
       reason: 'setup-failed',
       reads: [],
+      diagnosticTimings: [],
       nativeCaptured: false,
       ...authority,
     };
@@ -210,7 +220,7 @@ export async function runNativeJitoCampaign({
         if (listener) deadline.removeEventListener('abort', listener);
       }
     }
-    async function send(body) {
+    async function send(body, label) {
       deadline.throwIfAborted();
       const rows = JSON.parse(body);
       const requests = Array.isArray(rows) ? rows : [rows];
@@ -235,49 +245,80 @@ export async function runNativeJitoCampaign({
         budgetFailed = true;
         throw failure('budget-exhausted');
       }
-      for (const _request of requests) {
-        await bounded(
-          Promise.resolve().then(() => pace(pinnedEndpoint, deadline)),
-        );
-        deadline.throwIfAborted();
-      }
-      logical += requests.length;
-      const read = {
-        index: attempt.reads.length,
-        methods: requests.map((r) => r.method),
-        logicalMethods: requests.length,
-        requestSha256: hash(body),
+      const timing = {
+        label,
+        methods: requests.map((request) => request.method),
+        queuedAtMs: elapsed(),
+        paceStartMs: null,
+        paceEndMs: null,
+        fetchStartMs: null,
+        headersAtMs: null,
+        bodyParsedAtMs: null,
+        retainedAtMs: null,
+        sendFinishedAtMs: null,
+        sendOutcome: null,
       };
-      attempt.reads.push(read);
-      keep(`${read.index}.request.json`, body);
-      const pending = Promise.resolve()
-        .then(() =>
-          fetcher(pinnedEndpoint, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body,
-            signal: deadline,
-            redirect: 'error',
-            cache: 'no-store',
-          }),
-        )
-        .then((response) => {
-          responses.add(response);
-          if (deadline.aborted) cancel(response);
-          return response;
-        });
-      const response = await bounded(pending);
-      read.httpStatus = response.status;
-      if (response.status === 429) rateLimited = true;
-      if (!response.ok) {
-        cancel(response);
-        throw failure(
-          (rateLimited ? 'rate-limited' : 'http-refused') +
-            ' status ' +
-            response.status,
-        );
+      attempt.diagnosticTimings.push(timing);
+      try {
+        mark(timing, 'paceStartMs');
+        for (const _request of requests) {
+          await bounded(
+            Promise.resolve().then(() => pace(pinnedEndpoint, deadline)),
+          );
+          deadline.throwIfAborted();
+        }
+        mark(timing, 'paceEndMs');
+        logical += requests.length;
+        const read = {
+          index: attempt.reads.length,
+          methods: requests.map((r) => r.method),
+          logicalMethods: requests.length,
+          requestSha256: hash(body),
+        };
+        attempt.reads.push(read);
+        timingForRead.set(read, timing);
+        keep(`${read.index}.request.json`, body);
+        mark(timing, 'fetchStartMs');
+        const pending = Promise.resolve()
+          .then(() =>
+            fetcher(pinnedEndpoint, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body,
+              signal: deadline,
+              redirect: 'error',
+              cache: 'no-store',
+            }),
+          )
+          .then((response) => {
+            responses.add(response);
+            if (deadline.aborted) cancel(response);
+            return response;
+          });
+        const response = await bounded(pending);
+        mark(timing, 'headersAtMs');
+        read.httpStatus = response.status;
+        if (response.status === 429) rateLimited = true;
+        if (!response.ok) {
+          cancel(response);
+          timing.sendOutcome = rateLimited ? 'rate-limited' : 'http-refused';
+          throw failure(
+            (rateLimited ? 'rate-limited' : 'http-refused') +
+              ' status ' +
+              response.status,
+          );
+        }
+        timing.sendOutcome = 'headers-received';
+        return { response, read };
+      } catch (error) {
+        if (!timingClosed && !timing.sendOutcome)
+          timing.sendOutcome = deadline.aborted
+            ? 'interrupted'
+            : 'send-refused';
+        throw error;
+      } finally {
+        mark(timing, 'sendFinishedAtMs');
       }
-      return { response, read };
     }
     function retain(read, capture) {
       if (
@@ -288,6 +329,8 @@ export async function runNativeJitoCampaign({
       )
         throw failure('capture-integrity-refused');
       keep(`${read.index}.response.bin`, capture.rawBody);
+      const timing = timingForRead.get(read);
+      if (timing) mark(timing, 'retainedAtMs');
       Object.assign(read, {
         responseSha256: capture.rawSha256,
         responseBytes: capture.byteLength,
@@ -297,10 +340,13 @@ export async function runNativeJitoCampaign({
       const id = `native:${index}:${attempt.reads.length}`;
       const { response, read } = await send(
         JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        `${phase}:${method}`,
       );
       const capture = await bounded(
         adapter.readJitoSimulationPayload(response.body, deadline, 4194304),
       );
+      const timing = timingForRead.get(read);
+      if (timing) mark(timing, 'bodyParsedAtMs');
       retain(read, capture);
       const value = capture.value;
       const replies = Array.isArray(value) ? value : [value];
@@ -424,7 +470,7 @@ export async function runNativeJitoCampaign({
               params[1].replaceRecentBlockhash !== false
             )
               throw failure('request-refused');
-            const read = await send(request.body);
+            const read = await send(request.body, `runtime:${request.phase}`);
             runtimeReads.push({ phase: request.phase, read: read.read });
             return read.response;
           },
@@ -547,6 +593,7 @@ export async function runNativeJitoCampaign({
             ? 'interrupted'
             : (safeFailures.get(error) ?? 'setup-or-transport-failed');
     } finally {
+      timingClosed = true;
       owner.abort();
       for (const response of responses) cancel(response);
     }
