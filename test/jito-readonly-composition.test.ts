@@ -277,6 +277,76 @@ function deferred<T = void>() {
   });
   return { promise, resolve };
 }
+it('isolates concurrent refusal stages, cancellation and later setup diagnostics', async () => {
+  const a = await fixture();
+  const b = await fixture();
+  const aStarted = deferred();
+  const bStarted = deferred();
+  const releaseB = deferred();
+  const cancelA = new AbortController();
+  let bSignal: AbortSignal | null = null;
+
+  const fetchA: typeof fetch = async (_url, init) => {
+    if (fixtureBody(init).method !== 'getGenesisHash')
+      throw Error('Unexpected first invocation request');
+    aStarted.resolve();
+    return new Promise<Response>((_resolve, reject) => {
+      init!.signal!.addEventListener(
+        'abort',
+        () => reject(Error('Cancelled')),
+        {
+          once: true,
+        },
+      );
+      if (init!.signal!.aborted) reject(Error('Already cancelled'));
+    });
+  };
+  const fetchB: typeof fetch = async (url, init) => {
+    if (fixtureBody(init).id === 'jito-assets:after') {
+      bSignal = init!.signal!;
+      bStarted.resolve();
+      await releaseB.promise;
+    }
+    return b.fetcher(url, init);
+  };
+  const pendingA = collectJitoReadOnlyQualification(
+    a.e.manifest,
+    [a.capsule],
+    cancelA.signal,
+    { fetcher: fetchA, pace: async () => {} },
+  );
+  await aStarted.promise;
+  const pendingB = collectJitoReadOnlyQualification(
+    b.e.manifest,
+    [b.capsule],
+    new AbortController().signal,
+    { fetcher: fetchB, pace: async () => {} },
+  );
+  await bStarted.promise;
+  cancelA.abort();
+  const refused = await pendingA;
+  expect(refused).toMatchObject({ status: 'refused', stage: 'network' });
+  expect(refused.evidence.timing.events).toContainEqual(
+    expect.objectContaining({ phase: 'network', event: 'refused' }),
+  );
+  expect(bSignal!.aborted).toBe(false);
+  releaseB.resolve();
+  const completed = await pendingB;
+  expect(completed).toMatchObject({
+    status: 'checks-passed',
+    stage: 'replay',
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  await expect(
+    collectJitoReadOnlyQualification(
+      a.e.manifest,
+      [],
+      new AbortController().signal,
+      { fetcher: fetchA, pace: async () => {} },
+    ),
+  ).rejects.toThrow('Jito read-only qualification refused at setup');
+});
 it('starts both independent preflight reads but waits for both before simulation', async () => {
   const x = await fixture();
   const assetStarted = deferred(),

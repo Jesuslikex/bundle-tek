@@ -40,21 +40,6 @@ const authority = {
   automaticExecutionAllowed: false as const,
   receiptVerified: false as const,
 };
-// The reason alone hides which step and which status; carry the detail when the
-// refusal has one.
-const refusedDetail = (refused: { reason: string; detail?: string }) =>
-  Error(
-    refused.reason +
-      ' at ' +
-      stage +
-      (refused.detail ? ': ' + refused.detail : ''),
-  );
-// Which stage refused. Module scope so fail() can name it; the campaign is
-// sequential, so one shared value is enough.
-let stage = 'setup';
-const fail = (): never => {
-  throw Error('Jito read-only qualification refused at ' + stage);
-};
 /** Private server-only diagnostic. Full newly captured baseline evidence is
  * mandatory; saved scalar summaries and arbitrary caller-created proof objects
  * cannot substitute. No owned-source/DB, signing, execution or node-attestation
@@ -67,6 +52,18 @@ export async function collectJitoReadOnlyQualification(
   signal: AbortSignal,
   dependencies: { fetcher?: typeof fetch; pace?: typeof paceWalletRpc } = {},
 ) {
+  // Each invocation owns its diagnostics, including when campaigns overlap.
+  let stage = 'setup';
+  const fail = (): never => {
+    throw Error('Jito read-only qualification refused at ' + stage);
+  };
+  const refusedDetail = (refused: { reason: string; detail?: string }) =>
+    Error(
+      refused.reason +
+        ' at ' +
+        stage +
+        (refused.detail ? ': ' + refused.detail : ''),
+    );
   const timingOriginMs = performance.now();
   const timingEvents: {
     phase: string;
