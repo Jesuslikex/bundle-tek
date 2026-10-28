@@ -431,6 +431,7 @@ export async function runNativeJitoCampaign({
           ? result.reason
       : 'runtime-refused';
     if (typeof result.detail === 'string') attempt.detail = result.detail;
+    if (process.env.JITO_DEBUG) console.log('KEYS', Object.keys(result).join(','));
       } else {
         const bank = result.fees.simulationBankSlot;
         inWindow(bank);

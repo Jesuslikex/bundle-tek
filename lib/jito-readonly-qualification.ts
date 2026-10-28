@@ -40,6 +40,10 @@ const authority = {
   automaticExecutionAllowed: false as const,
   receiptVerified: false as const,
 };
+// The reason alone hides which step and which status; carry the detail when the
+// refusal has one.
+const refusedDetail = (refused: { reason: string; detail?: string }) =>
+  Error(refused.detail ? refused.reason + ': ' + refused.detail : refused.reason);
 const fail = (): never => {
   throw Error('Jito read-only qualification refused.');
 };
@@ -347,7 +351,7 @@ export async function collectJitoReadOnlyQualification(
     if (refused?.status === 'rejected') {
       const failure = failures[0];
       stage = failure?.stage ?? 'preflight';
-      throw failure?.error ?? refused.reason;
+      throw failure?.error ?? refusedDetail(refused.reason);
     }
     control.throwIfAborted();
     if (!beforeAssets || !beforeCode) return fail();
@@ -430,7 +434,7 @@ export async function collectJitoReadOnlyQualification(
     if (postflightRefused?.status === 'rejected') {
       const failure = failures[0];
       stage = failure?.stage ?? 'postflight';
-      throw failure?.error ?? postflightRefused.reason;
+      throw failure?.error ?? refusedDetail(postflightRefused.reason);
     }
     control.throwIfAborted();
     if (!afterAssets || !afterCode) return fail();
