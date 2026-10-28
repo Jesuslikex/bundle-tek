@@ -1,4 +1,5 @@
 import bs58 from 'bs58';
+import { buildOwnedJitoSignedVector } from './jito-owned-signed-vector';
 import {
   getTransactionDecoder,
   getCompiledTransactionMessageDecoder,
@@ -181,7 +182,7 @@ function loadedFromObservation(o: JitoEconomicObservation) {
 /** Replay raw sequential account effects against the exact supplied review policy.
  * Server-internal, unsigned and unmounted. Caller evidence is not authenticated here.
  * A passing local replay grants no provider, currentness, ownership, signing or execution authority. */
-export async function verifyJitoBundleEconomicObservation(input: {
+type EconomicInput = {
   manifest: JitoBundleManifest;
   observations: JitoEconomicObservation[];
   result: unknown;
@@ -193,7 +194,60 @@ export async function verifyJitoBundleEconomicObservation(input: {
     before: unknown;
     after: unknown;
   };
+};
+
+export async function verifyJitoBundleEconomicObservation(
+  input: EconomicInput,
+) {
+  return replayJitoBundleEconomics(input);
+}
+
+/** Pure signed-vector replay. The caller must separately authenticate the owned
+ * snapshot and prove the actual raw request/response and baseline/asset/runtime
+ * provenance. Passing caller-created JSON here does not establish those facts
+ * and never grants signing, provider or submission authority. */
+export async function verifySignedJitoBundleEconomicObservation(input: {
+  economic: EconomicInput;
+  ownerId: string;
+  responseOwnerScope: string | null;
+  projectId: string;
+  sessionId: string;
+  bundleId: string;
+  manifestSha256: string;
+  rawSnapshot: unknown;
 }) {
+  const captured = snapshot(input) as typeof input;
+  const vector = await buildOwnedJitoSignedVector({
+    rawSnapshot: captured.rawSnapshot,
+    ownerId: captured.ownerId,
+    responseOwnerScope: captured.responseOwnerScope,
+    projectId: captured.projectId,
+    sessionId: captured.sessionId,
+    bundleId: captured.bundleId,
+    manifestSha256: captured.manifestSha256,
+  });
+  if (
+    captured.economic.manifest.sha256 !== vector.manifestSha256 ||
+    captured.economic.manifest.id !== vector.bundleId ||
+    captured.economic.manifest.projectId !== vector.projectId ||
+    captured.economic.manifest.sessionId !== vector.sessionId
+  )
+    return fail('signed vector context differs');
+  const result = await replayJitoBundleEconomics(
+    captured.economic,
+    vector.packets.map((packet) => packet.transaction),
+  );
+  return {
+    ...result,
+    signedVectorFingerprint: vector.fingerprint,
+    sourceAuthenticated: false as const,
+  };
+}
+
+async function replayJitoBundleEconomics(
+  input: EconomicInput,
+  signedTransactions?: string[],
+) {
   // Capture the whole caller-owned observation before any asynchronous digest/decoder.
   // The future transport must independently bound bytes before parsing JSON.
   const captured = snapshot(input) as typeof input;
@@ -280,18 +334,25 @@ export async function verifyJitoBundleEconomicObservation(input: {
     if (simulation.simulationSlot > simulationBankSlot)
       return fail('bundle precedes prior swap observation');
   }
+  if (
+    signedTransactions &&
+    signedTransactions.length !== manifest.swaps.length + 1
+  )
+    return fail('signed vector cardinality differs');
   const checked = await verifyJitoBundleSimulationFrames({
     minimumSlot,
     simulationBankSlot,
     packets: [
       ...observations.map((o, i) => ({
-        transaction: manifest.swaps[i].transaction,
+        transaction: signedTransactions?.[i] ?? manifest.swaps[i].transaction,
         loadedAddresses: parsed[i].loadedAddresses,
         maximumFeeLamports: manifest.swaps[i].maximumFeeLamports,
         expectedFeeLamports: o.simulation.networkFeeLamports,
       })),
       {
-        transaction: manifest.tip.transaction,
+        transaction:
+          signedTransactions?.[manifest.swaps.length] ??
+          manifest.tip.transaction,
         loadedAddresses: null,
         maximumFeeLamports: manifest.tip.feeLamports,
         expectedFeeLamports: manifest.tip.feeLamports,

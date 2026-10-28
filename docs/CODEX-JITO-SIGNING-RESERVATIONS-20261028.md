@@ -107,6 +107,11 @@ swap and tip signature and binds the ordered exact bytes to the owner and
 bundle. It grants no source, provider, runtime, signing or execution authority;
 future use must authenticate its input and recheck mutable bytes at the final
 boundary. Its focused tests and the snapshot tests pass 17 synthetic cases.
+An additive signed economic replay passes those exact signed packet bytes into
+the existing frame and economic checks while leaving the unsigned API intact.
+It does not authenticate a provider request, response, baseline or runtime
+capture, and grants no provider or execution authority. Five focused suites
+passed 201 synthetic tests.
 
 No deployment, hosted database migration, provider or credential change,
 funded transaction, real-wallet signing, or live bundle submission is
