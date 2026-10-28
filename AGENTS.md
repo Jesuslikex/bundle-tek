@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex, 28 October 2026 COMPLETE: isolated build and script verification at 0076843. See docs/CODEX-BUILD-SCRIPTS-0076843-20261028.md. No deployment or provider settings were changed.
+
 - Codex + helper, 28 October 2026 COMPLETE, claim released: retain exact imported signed Jito recovery packets in the existing memory coordinator and fence bundle-wide actions. See docs/CODEX-JITO-IMPORTED-PACKET-RECOVERY-20261028.md. Manual consent and all signing/submit gates preserved; no real wallet action, provider settings or deployment.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: explicit diagnostic-only Jito prefee qualification composition. See docs/CODEX-JITO-PREFEE-COMPOSITION-20261028.md. Legacy default and all policy, custody, economic, slot, pacing and authority safeguards stay unchanged; no production caller, provider request, signing or deployment.
