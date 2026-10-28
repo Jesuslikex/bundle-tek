@@ -237,6 +237,12 @@ function AutoSellContext({
   // A saved run for this exact project, loaded ahead of Run so the start path
   // stays synchronous. Null means "start clean".
   const restoreRef = useRef<AutoSellRunRestore | null>(null);
+  const journalRef = useRef<{
+    runId: string;
+    sequence: number;
+    headSha256: string;
+    chain: Promise<void>;
+  } | null>(null);
   const savedRun = useRef<{
     ownerScope: string;
     reminder: { runId: string; profileSha256: string };
@@ -748,6 +754,57 @@ function AutoSellContext({
           session: () => vault.current,
           maxSlippageBps,
         }),
+        // Journalling is best-effort: a failed reserve never fails a sell that
+        // already landed, and the cursor only advances on a confirmed reply.
+        onSold: (entry) => {
+          const journal = journalRef.current;
+          if (!journal) return;
+          const revision = selected.find(
+            (w) => w.address === entry.wallet,
+          )?.revision;
+          if (!revision) return;
+          journal.chain = journal.chain
+            .then(async () => {
+              const response = await fetch(
+                '/api/imported-projects/auto-sell-runs',
+                {
+                  method: 'POST',
+                  headers: { 'content-type': 'application/json' },
+                  body: JSON.stringify({
+                    action: 'reserve',
+                    attempt: {
+                      id: crypto.randomUUID(),
+                      runId: journal.runId,
+                      expectedSequence: journal.sequence,
+                      expectedHeadSha256: journal.headSha256,
+                      strategyId: entry.strategyId,
+                      wallet: entry.wallet,
+                      walletRevision: revision,
+                      inputRaw: entry.soldRaw.toString(),
+                      occurrence: {
+                        kind: 'counter',
+                        sourceIds: [entry.signature],
+                        bufferedRaw: entry.soldRaw.toString(),
+                      },
+                      consent: 'reserve-auto-sell-attempt-v1',
+                    },
+                  }),
+                },
+              );
+              if (!response.ok) return;
+              const body = (await response.json()) as {
+                attempt?: { sequence?: number; sha256?: string };
+              };
+              if (
+                typeof body.attempt?.sequence === 'number' &&
+                typeof body.attempt.sha256 === 'string'
+              ) {
+                journal.sequence = body.attempt.sequence;
+                journal.headSha256 = body.attempt.sha256;
+              }
+            })
+            .catch(() => {});
+        },
         onUpdate: (next) => {
           if (!next.running && !next.selling) releaseThisRun();
           // A previous run finishing its last sell must not touch this one.
@@ -817,6 +874,13 @@ function AutoSellContext({
           restoreRef.current = null;
         }
         if (!current()) return;
+        if (restoreRef.current)
+          journalRef.current = {
+            runId: saved.reminder.runId,
+            sequence: restoreRef.current.head.sequence,
+            headSha256: restoreRef.current.head.headSha256,
+            chain: Promise.resolve(),
+          };
       }
       instance.start(restoreRef.current ?? undefined);
     } catch (e) {

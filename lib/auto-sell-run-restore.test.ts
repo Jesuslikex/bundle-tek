@@ -20,7 +20,10 @@ function progress(patch: Partial<AutoSellRunProgress> = {}): AutoSellRunProgress
       endsAt: null,
     },
     lifecycle: 'open',
-    evidence: { stop: null },
+    evidence: {
+      stop: null,
+      head: { sequence: 3, headSha256: 'a'.repeat(64) },
+    },
     strategies: [
       {
         id: 'a',

@@ -14,6 +14,8 @@ export const AUTO_SELL_RESTORE_UNAVAILABLE = [
 ] as const;
 
 export type AutoSellRunRestore = {
+  /** Journal head at restore time, so a caller can chain new attempts. */
+  head: { sequence: number; headSha256: string };
   activeAt: number;
   paused: boolean;
   stoppedReason: string | null;
@@ -88,6 +90,10 @@ export function autoSellRunRestore(
     });
   }
   return {
+    head: {
+      sequence: progress.evidence.head.sequence,
+      headSha256: progress.evidence.head.headSha256,
+    },
     activeAt,
     paused,
     stoppedReason,
