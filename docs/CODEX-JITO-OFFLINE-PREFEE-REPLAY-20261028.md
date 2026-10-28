@@ -1,0 +1,7 @@
+# Retained native Jito prefee replay
+
+An opt-in Windows test replays one previously captured native zero-transfer attempt using its fixed-size, SHA-256-pinned local evidence and an in-memory transport. It compares the reconstructed request bytes and captured result, verifies that all authority flags remain false, and emits only bounded scalar timings. Normal runs skip the replay when its local evidence-directory setting is absent. The test uses no provider credentials or live RPC.
+
+One independent Node 24 replay passed and measured about 7.6 ms for in-memory batch body reading and parsing, 1.5 ms for the derived discovery member, 1.1 ms for fee projection and validation, and 2.4 ms for exact-request construction. These are a single small historical native fixture on this machine; they omit real streaming and network delays and do not represent current provider behavior, swaps or qualification. A later final replay passed both tests; typed lint and formatting passed.
+
+The selected evidence directory is constrained to the local worktree's ignored QA directory with path and exact-file checks. Global fetch is stubbed and the collector uses the supplied in-memory transport; this is not an operating-system network sandbox. Mapped drives and filesystem races are not fully excluded, and replay does not prove the old capture was a trustworthy live observation. No signature, submission, funded trade, provider setting or deployment was used.
