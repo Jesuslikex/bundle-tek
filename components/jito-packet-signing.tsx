@@ -614,6 +614,148 @@ export function JitoPacketSigning({
     }
   }
 
+  /** Explicit, local export of the exact retained packet. Expiry does not
+   * invalidate evidence, and this path never signs, registers or submits. */
+  async function exportRetained() {
+    if (
+      running.current ||
+      recoveryDisabled ||
+      !ownerScope ||
+      !recoveryPassword ||
+      !recoveryView
+    )
+      return;
+    let operation: JitoOperationToken;
+    let approved: JitoBundleManifest;
+    let approvedTerms: string;
+    try {
+      approved = structuredClone(manifest);
+      approvedTerms = JSON.stringify(approved);
+      operation = coordinator.startOperation(ownerScope, approved.id, packet);
+    } catch {
+      setError('Recovery is unavailable. Reload saved bundle history.');
+      return;
+    }
+    const expected = recoveryView,
+      passphrase = recoveryPassword;
+    setRecoveryPassword('');
+    setRecoveryApproved(false);
+    setError('');
+    running.current = true;
+    setBusy(true);
+    setProgress('recovery-exporting');
+    const assertCurrent = () => {
+      if (
+        !mounted.current ||
+        !isContextCurrent() ||
+        JSON.stringify(manifest) !== approvedTerms
+      )
+        throw Error('Recovery context changed.');
+    };
+    try {
+      await requireJitoManifest(approved, false);
+      assertCurrent();
+      await withJitoRecoveryJournalLock(
+        ownerScope,
+        assertCurrent,
+        async (lock) => {
+          const snapshot = async () => {
+            const current = structuredClone(await readSnapshot());
+            assertCurrent();
+            if (
+              !current ||
+              current.ownerScope !== ownerScope ||
+              current.projectId !== approved.projectId ||
+              current.sessionId !== approved.sessionId ||
+              current.legacyReadOnly ||
+              current.bundle.manifest.id !== approved.id ||
+              current.bundle.manifest.sha256 !== approved.sha256 ||
+              !Array.isArray(current.attempts)
+            )
+              throw Error('Recovery snapshot differs.');
+            return current;
+          };
+          const readFresh = async () => ({
+            ownerScope,
+            record: (await snapshot()).bundle,
+          });
+          const retained = await inspectJitoRecoveryJournal(
+            lock,
+            approved,
+            packet,
+            passphrase,
+            readFresh,
+          );
+          if (
+            retained.status !== 'retained' ||
+            retained.signature !== expected.signature
+          )
+            throw Error('Retained packet differs.');
+          const record = await createJitoPacketRecovery(
+            approved,
+            packet,
+            retained.transaction,
+          );
+          assertCurrent();
+          if (record.signature !== expected.signature)
+            throw Error('Retained packet differs.');
+          const fresh = await snapshot();
+          const matches = fresh.attempts.filter(
+            (attempt) => attempt.packet === packet,
+          );
+          if (matches.length !== 1)
+            throw Error('Exact signing attempt unavailable.');
+          const attempt = matches[0];
+          if (
+            attempt.attemptId !== expected.attemptId ||
+            attempt.bundleId !== approved.id ||
+            attempt.manifestSha256 !== approved.sha256 ||
+            attempt.signer !==
+              (approved.swaps[packet]?.wallet ?? approved.tip.wallet) ||
+            attempt.intentId !== (approved.swaps[packet]?.id ?? null) ||
+            (attempt.state === 'unknown' &&
+              (attempt.signature !== null ||
+                attempt.transaction !== null ||
+                fresh.bundle.signatures[packet] !== null)) ||
+            (attempt.state === 'registered' &&
+              (attempt.signature !== retained.signature ||
+                attempt.transaction !== retained.transaction ||
+                fresh.bundle.signatures[packet] !== retained.signature)) ||
+            !['unknown', 'registered'].includes(attempt.state)
+          )
+            throw Error('Exact signing attempt differs.');
+          assertCurrent();
+          const url = URL.createObjectURL(
+            new Blob([JSON.stringify(record, null, 2)], {
+              type: 'application/json',
+            }),
+          );
+          try {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `bundle-${approved.id}-packet-${packet + 1}-recovery.json`;
+            assertCurrent();
+            link.click();
+          } finally {
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }
+        },
+      );
+    } catch {
+      if (mounted.current)
+        setError(
+          'Retained packet could not be verified for export. Keep the attempt blocked and reload saved history.',
+        );
+    } finally {
+      coordinator.finishOperation(operation);
+      running.current = false;
+      if (mounted.current) {
+        setBusy(false);
+        setProgress(null);
+      }
+    }
+  }
+
   async function exportRecovery() {
     if (!pending || running.current) return;
     running.current = true;
@@ -796,9 +938,20 @@ export function JitoPacketSigning({
               Verified retained signature: <code>{recoveryView.signature}</code>
             </p>
             <p>
-              Re-enter the same vault password to register this exact signed
-              packet or acknowledge its existing receipt.
+              Re-enter the same vault password to download this exact signed
+              packet, register it, or acknowledge its existing receipt.
             </p>
+            <p>
+              A downloaded signed packet is sensitive: anyone with it may be
+              able to submit it while it remains valid. Keep the file private.
+            </p>
+            <Button
+              variant="outline"
+              disabled={busy || recoveryDisabled || !recoveryPassword}
+              onClick={() => void exportRetained()}
+            >
+              Download retained {label} packet privately
+            </Button>
             <label className="flex items-start gap-2">
               <input
                 type="checkbox"

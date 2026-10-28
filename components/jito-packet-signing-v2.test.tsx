@@ -1080,6 +1080,100 @@ it('recovers retained evidence after reload only with a separate unchecked appro
   expect(f.begin).toHaveBeenCalledTimes(1);
 });
 
+it('downloads an exact retained packet after remount and expiry only on explicit request', async () => {
+  const f = await setup();
+  f.register.mockRejectedValueOnce(Error('lost registration response'));
+  await f.approve();
+  await f.sign();
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'needs recovery before another action',
+    ),
+  );
+  await remountPacket(f, 0, true);
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(f.f.manifest.expiresAt) + 1);
+  await enterRecoveryPassword();
+  await clickText('Inspect retained swap 1 packet');
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'Exact retained packet verified locally',
+    ),
+  );
+  expect(container.textContent).toContain(
+    'anyone with it may be able to submit it',
+  );
+  const create = vi.fn((_blob: Blob) => 'blob:synthetic'),
+    revoke = vi.fn();
+  vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: revoke });
+  const clickAnchor = vi
+    .spyOn(HTMLAnchorElement.prototype, 'click')
+    .mockImplementation(() => {});
+  expect(create).not.toHaveBeenCalled();
+  await enterRecoveryPassword();
+  await clickText('Download retained swap 1 packet privately');
+  await waitFor(() => expect(clickAnchor).toHaveBeenCalledTimes(1));
+  expect(create).toHaveBeenCalledTimes(1);
+  const blob = create.mock.calls[0][0] as Blob;
+  const text = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(Error('Expected text'));
+    };
+    reader.onerror = () => reject(Error('read failed'));
+    reader.readAsText(blob);
+  });
+  expect(JSON.parse(text)).toEqual(
+    await createJitoPacketRecovery(
+      f.f.manifest,
+      0,
+      f.f.swap.signed.transaction,
+    ),
+  );
+  expect(storage.rows.size).toBe(1);
+  expect(f.registerEvidence).not.toHaveBeenCalled();
+  expect(f.signer).toHaveBeenCalledTimes(1);
+  expect(f.begin).toHaveBeenCalledTimes(1);
+});
+
+it('does not export or clear a retained packet if the authenticated owner changes', async () => {
+  const f = await setup();
+  f.register.mockRejectedValueOnce(Error('lost registration response'));
+  await f.approve();
+  await f.sign();
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'needs recovery before another action',
+    ),
+  );
+  await remountPacket(f, 0, true);
+  await enterRecoveryPassword();
+  await clickText('Inspect retained swap 1 packet');
+  await waitFor(() =>
+    expect(container.textContent).toContain(
+      'Exact retained packet verified locally',
+    ),
+  );
+  const create = vi.fn(() => 'blob:synthetic');
+  vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: vi.fn() });
+  f.readSnapshot.mockImplementation(async () => ({
+    ownerScope: 'b'.repeat(64),
+    projectId: f.f.manifest.projectId,
+    sessionId: f.f.manifest.sessionId,
+    bundle: structuredClone(f.bundle),
+    attempts: structuredClone(f.attempts),
+    legacyReadOnly: false,
+  }));
+  await enterRecoveryPassword();
+  await clickText('Download retained swap 1 packet privately');
+  await waitFor(() =>
+    expect(container.textContent).toContain('could not be verified for export'),
+  );
+  expect(create).not.toHaveBeenCalled();
+  expect(storage.rows.size).toBe(1);
+  expect(f.registerEvidence).not.toHaveBeenCalled();
+});
+
 it('acknowledges an existing exact server receipt after a lost response without registering again', async () => {
   const f = await setup();
   f.register.mockImplementationOnce(async (transaction, id) => {
