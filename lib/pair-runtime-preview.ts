@@ -232,7 +232,10 @@ async function inspectPairRuntime(
     throw Error('Pair runtime writable scope differs.');
   const top = reviewSwapInstructions(message, lookups ?? undefined);
   const route = assessJupiterRoute(top, candidate.order);
-  if (route.status !== 'Matched fields' || !route.decoded)
+  // DFlow leaves the route undecoded, so a Jupiter-shaped match cannot be
+  // required; the traced simulation below still gates execution.
+  const dflow = candidate.order.router === 'dflow';
+  if ((route.status !== 'Matched fields' || !route.decoded) && !dflow)
     throw Error(
       'Pair runtime route fields differ: ' +
         route.status +
@@ -339,13 +342,15 @@ async function inspectPairRuntime(
       throw Error('Pair runtime executable coverage differs.');
     return { programs, compute: accounts[keys.indexOf(COMPUTE)], accounts };
   }
+  // Without a decoded route the two wallet token accounts are not known here;
+  // the binding step below derives them from the wallet and the order mints.
   const selected = [
     candidate.preflight.wallet,
-    route.decoded.sourceAccount,
-    route.decoded.destinationAccount,
-  ];
+    route.decoded?.sourceAccount,
+    route.decoded?.destinationAccount,
+  ].filter((key): key is string => Boolean(key));
   if (
-    new Set(selected).size !== 3 ||
+    new Set(selected).size !== selected.length ||
     selected.some((key) => !writable.includes(key))
   )
     throw Error('Pair runtime selected privileges differ.');
