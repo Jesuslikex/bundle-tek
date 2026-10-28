@@ -458,15 +458,22 @@ export function NativeWithdrawalPanel({
     setBusy(true);
     setError('');
     let signingBegun = false,
-      signatureCreated = false;
+      signerStarted = false;
     const assertCurrent = () => {
-      if (!mounted.current || current !== epoch.current)
+      if (
+        !mounted.current ||
+        current !== epoch.current ||
+        Date.parse(row.document.expiresAt) <= Date.now()
+      )
         throw new Error('Withdrawal review changed. Reload retained recovery.');
     };
-    const register = async (signed: {
-      signature: string;
-      transaction: string;
-    }) => {
+    const retain = async (
+      signed: {
+        signature: string;
+        transaction: string;
+      },
+      requireTabStorage: boolean,
+    ) => {
       if (mounted.current) setCachedSigned({ id: row.id, ...signed });
       try {
         await retainNativeWithdrawalSignature(
@@ -475,8 +482,21 @@ export function NativeWithdrawalPanel({
           sessionStorage,
         );
       } catch {
-        /* Still attempt durable registration if tab storage is unavailable. */
+        if (requireTabStorage)
+          throw new Error(
+            'Tab storage failed after signing. Keep this panel open and use the retained signature for recovery; closing it may lose the signature.',
+          );
+        if (mounted.current)
+          setNotice(
+            'Tab storage failed after signing. Keep this panel open until registration is confirmed; closing it may lose the retained signature.',
+          );
       }
+    };
+    const register = async (signed: {
+      signature: string;
+      transaction: string;
+    }) => {
+      assertCurrent();
       const retained = await request(
         { action: 'register', id: row.id, transaction: signed.transaction },
         AbortSignal.timeout(15000),
@@ -493,6 +513,26 @@ export function NativeWithdrawalPanel({
       if (mounted.current) setCachedSigned(null);
     };
     try {
+      if (signer === 'external') {
+        // Probe before reserving a signing attempt. Storage can still fail
+        // later, so the panel also keeps the returned packet in memory.
+        const probe = `pulseforge.withdrawal-storage-probe:${crypto.randomUUID()}`;
+        const sample = 'x'.repeat(512);
+        try {
+          sessionStorage.setItem(probe, sample);
+          if (sessionStorage.getItem(probe) !== sample) throw new Error();
+          sessionStorage.removeItem(probe);
+        } catch {
+          try {
+            sessionStorage.removeItem(probe);
+          } catch {
+            // No signature or reservation exists yet.
+          }
+          throw new Error(
+            'Tab storage is unavailable. Enable it before signing so the returned signature can be recovered.',
+          );
+        }
+      }
       const begun = await request(
         { action: 'begin_signing', id: row.id },
         AbortSignal.timeout(15000),
@@ -506,12 +546,14 @@ export function NativeWithdrawalPanel({
       assertCurrent();
       if (signer === 'external') {
         if (!external) throw new Error('Select and connect the exact wallet.');
-        await signExternalNativeWithdrawal(
+        const signed = await signExternalNativeWithdrawal(
           external,
           row.document,
           assertCurrent,
-          register,
+          (value) => retain(value, true),
         );
+        assertCurrent();
+        await register(signed);
       } else {
         const session = await unlockVault(
           localStorage.getItem(VAULT_STORAGE_KEY) || '',
@@ -524,8 +566,13 @@ export function NativeWithdrawalPanel({
             session,
             row.document,
             assertCurrent,
+            {
+              onSignerStart: () => {
+                signerStarted = true;
+              },
+              retainSigned: (value) => retain(value, false),
+            },
           );
-          signatureCreated = true;
           await register(signed);
         } finally {
           session.payload.wallets.forEach((w) => {
@@ -542,7 +589,7 @@ export function NativeWithdrawalPanel({
       if (
         signingBegun &&
         (err instanceof WalletSigningRejected ||
-          (signer === 'vault' && !signatureCreated))
+          (signer === 'vault' && !signerStarted))
       ) {
         try {
           const cancelled = await request(
@@ -813,6 +860,12 @@ export function NativeWithdrawalPanel({
               </details>
               {active.state === 'awaiting_signature' && (
                 <>
+                  <p>
+                    A returned signature is kept in this tab for recovery until
+                    registration. Keep the tab open during signing; browser
+                    storage can become unavailable or be cleared. Closing the
+                    tab can lose an unregistered signature.
+                  </p>
                   <label htmlFor={field + 'signer'}>Sign with</label>
                   <select
                     id={field + 'signer'}
@@ -934,9 +987,26 @@ export function NativeWithdrawalPanel({
                         Register it for recovery without signing or sending
                         again.
                       </p>
+                      <p>
+                        The packet below is a signed transaction. Anyone with it
+                        may submit it while it remains valid. Keep it private.
+                        {expired &&
+                          ' This review has expired and cannot be registered.'}
+                      </p>
+                      <label htmlFor={field + 'retained-packet'}>
+                        Signed withdrawal packet for private recovery
+                      </label>
+                      <textarea
+                        id={field + 'retained-packet'}
+                        readOnly
+                        spellCheck={false}
+                        rows={3}
+                        value={cachedSigned.transaction}
+                        className="w-full break-all rounded-md border p-2 font-mono text-xs"
+                      />
                       <Button
                         variant="outline"
-                        disabled={busy}
+                        disabled={busy || expired}
                         onClick={() => void act('register_cached')}
                       >
                         Register retained withdrawal signature
