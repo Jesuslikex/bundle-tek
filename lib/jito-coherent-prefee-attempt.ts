@@ -419,6 +419,8 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
     }
     return {
       status: 'captured' as const,
+      // Matching slots in distinct batch members do not prove a common fork.
+      ...(singleBatch ? { bankIdentityVerified: false as const } : {}),
       minimumSlot,
       reads,
       batch,

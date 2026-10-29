@@ -383,6 +383,7 @@ it('binds one actual batch with independent fees and confirmed request bytes', a
  const request = JSON.parse(send.mock.calls[0][0].body).at(-1);
  expect(JSON.parse(result.simulation.request.body)).toEqual(request);
  expect(result.simulation.request).toHaveProperty('requestBankSelection','confirmed');
+ expect(result).toHaveProperty('bankIdentityVerified',false);
  expect(result).toMatchObject({providerQualified:false,executionAllowed:false,signingAllowed:false});
 });
 it('single batch refuses independent fee bank drift without retry', async()=>{
