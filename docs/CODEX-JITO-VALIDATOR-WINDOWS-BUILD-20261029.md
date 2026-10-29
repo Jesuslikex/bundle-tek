@@ -1,0 +1,27 @@
+# Local Jito validator build investigation
+
+The separate `jito-validator-research` checkout is at upstream revision
+256fbf9b601a98551636a2a394158067014f47b3. It is not the Bundle checkout and
+is not a deployed validator. The original `cargo test -p solana-rpc
+test_rpc_simulate_bundle_happy_path --lib --locked` failed because the Cargo
+Git checkout of crossbeam-epoch contained a Windows plain-text symlink instead
+of its target source.
+
+An isolated sibling `jito-crossbeam-research` copy uses the same dependency
+revision with the three symlink target contents copied into their link paths.
+Only the research validator Cargo.toml and its Cargo.lock were changed to use
+that local path. This is an altered build environment, not an unchanged locked
+build; no shared Cargo cache or Bundle source was edited. The next build passed
+the crossbeam error and failed at vendored OpenSSL because Perl was unavailable.
+
+Official Strawberry Perl 5.42.2.1 portable was downloaded into the research
+workspace; SHA256 32d83be90cf04b807cfb9477482bc36302cdee6f5b04cf57e81adecbd8f07898
+matched the publisher's releases.json. It was extracted locally and added to
+the build process PATH only. The subsequent build got further, then clang-sys
+reported that it could not find clang.dll or libclang.dll. At this checkpoint,
+other compiler jobs were winding down; the upstream test has not passed.
+
+The custom same-bank endpoint has not been implemented or tested. The separate
+Jupiter source-to-binary verification and full-swap qualification are also open.
+No application policy, provider, hosted database, signing, deployment or funded
+action was changed. Do not treat this research toolchain as release evidence.
