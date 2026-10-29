@@ -48,3 +48,17 @@ library was extracted; other build jobs remained active at this checkpoint.
 The baseline must finish and be retried with both files before claiming that
 the libclang build issue is fixed. A previous build also showed an OpenSSL
 compiler error; whether the shorter target fixes that remains unverified.
+
+Next baseline run with both LLVM files passed the previous libclang discovery
+point but failed because protoc and sh were missing. Official protoc 36.2 was
+downloaded to an isolated directory and its release SHA-256
+f0c128dc0d8492eceece83bb459a4c0e316764b929ffbf1aa416357fd644edd3 was
+verified. The next run used that protoc and the existing bundled Git shell,
+with paths set only in the build process. It progressed past those errors but
+jemalloc's configure failed: the shell parsed the Visual Studio compiler path
+at its spaces (`C:\\Program` not found). Jemalloc itself warns its Windows
+MSVC target is untested. Other compiler jobs were still running at checkpoint;
+the baseline test has not passed. A compiler-name-only process override has
+not yet been tested and might expose further platform incompatibilities.
+The research checkout retains the local crossbeam Cargo.toml/lock modifications;
+no application or qualification checks were changed.
