@@ -25,3 +25,13 @@ The custom same-bank endpoint has not been implemented or tested. The separate
 Jupiter source-to-binary verification and full-swap qualification are also open.
 No application policy, provider, hosted database, signing, deployment or funded
 action was changed. Do not treat this research toolchain as release evidence.
+
+Follow-up: official LLVM 21.1.8 Windows installer was downloaded to the
+research workspace and its SHA-256 matched GitHub's release asset digest
+7a5386c26497db1691f320121e5b113364dd0274b98e55f15f4dbc00c0450113.
+Windows tar could not extract the executable. An attempted command to download
+and administratively extract the official 7-Zip MSI for unpacking was rejected
+by automatic approval review with "blocked by policy"; it did not execute and
+was not retried or bypassed. LLVM has not been installed or extracted and the
+libclang dependency remains unresolved. The earlier Cargo process had reported
+the missing libclang error while waiting for other jobs; no test pass is claimed.
