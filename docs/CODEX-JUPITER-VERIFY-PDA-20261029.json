@@ -1,0 +1,10 @@
+{
+  "format": "verification-pda-observation-v1",
+  "observedAt": "2026-10-29T04:47:25.719Z",
+  "provider": "solana-public-mainnet",
+  "target": { "status": "observed", "contextSlot": 462751491, "count": 0 },
+  "control": { "status": "observed", "contextSlot": 462751492, "count": 14 },
+  "sourceVerified": false,
+  "signingAllowed": false,
+  "executionAllowed": false
+}
