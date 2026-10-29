@@ -35,3 +35,16 @@ by automatic approval review with "blocked by policy"; it did not execute and
 was not retried or bypassed. LLVM has not been installed or extracted and the
 libclang dependency remains unresolved. The earlier Cargo process had reported
 the missing libclang error while waiting for other jobs; no test pass is claimed.
+
+Subsequently the official LLVM 21.1.8 Windows tar.xz release was downloaded
+directly, avoiding the rejected MSI extraction. Its SHA-256 matched the release
+asset digest 749d22f565fcd5718dbed06512572d0e5353b502c03fe1f7f17ee8b8aca21a47.
+Windows tar extracted libclang.dll and its matching libclang.lib into the
+isolated jito-llvm-research directory; no installer or system PATH change was
+used. A DLL load probe found clang_getClangVersion but exited abnormally after
+printing success, so it is not a clean test. A validator baseline retry using
+a shorter isolated target directory found the DLL but failed before the import
+library was extracted; other build jobs remained active at this checkpoint.
+The baseline must finish and be retried with both files before claiming that
+the libclang build issue is fixed. A previous build also showed an OpenSSL
+compiler error; whether the shorter target fixes that remains unverified.
