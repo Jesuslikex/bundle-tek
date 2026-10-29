@@ -373,3 +373,29 @@ it('keeps signature mode while granting no signature authority', async () => {
   expect(exactRequest.params[1].skipSigVerify).toBe(false);
   expect(result.signatureVerified).toBe(false);
 });
+
+it('binds one actual batch with independent fees and confirmed request bytes', async () => {
+ const f = await jitoRawResponseFixture(), send = vi.fn(async (r: Parameters<Input['transport']>[0]) => new Response(f.wire(batchRows(f,r).map(row => row.id.endsWith(':discovery') ? {...f.envelope,id:row.id} : row))));
+ const result = await collectJitoCoherentPrefeeAttempt(input(f, send, {singleBatch:true}));
+ expect(result.status, 'single batch admission').toBe('captured');
+ expect(send).toHaveBeenCalledTimes(1);
+ if(result.status !== 'captured') throw Error('not captured');
+ const request = JSON.parse(send.mock.calls[0][0].body).at(-1);
+ expect(JSON.parse(result.simulation.request.body)).toEqual(request);
+ expect(result.simulation.request).toHaveProperty('requestBankSelection','confirmed');
+ expect(result).toMatchObject({providerQualified:false,executionAllowed:false,signingAllowed:false});
+});
+it('single batch refuses independent fee bank drift without retry', async()=>{
+ const f=await jitoRawResponseFixture(); const send=transport(f, rows=>{
+ (rows[0] as {result:{context:{slot:bigint}}}).result.context.slot=102n;return rows;
+ });
+ const r=await collectJitoCoherentPrefeeAttempt(input(f,send,{singleBatch:true}));
+ expect(r).toMatchObject({status:'refused',reason:'fees-refused'});expect(send).toHaveBeenCalledTimes(1);
+});
+it('single batch refuses a fee differing from the independent observation', async()=>{
+ const f=await jitoRawResponseFixture();const send=transport(f, rows=>{
+ (rows[0] as {result:{value:bigint}}).result.value=5001n;return rows;
+ });
+ const r=await collectJitoCoherentPrefeeAttempt(input(f,send,{singleBatch:true}));
+ expect(r.status).toBe('refused');expect(send).toHaveBeenCalledTimes(1);
+});

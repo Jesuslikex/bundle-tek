@@ -82,6 +82,7 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
   transport: (request: Read) => Promise<Response>;
   /** Optional diagnostics only; never used to admit evidence or authorize execution. */
   diagnosticTiming?: boolean;
+  singleBatch?: true;
 }) {
   const read = <K extends keyof typeof input>(key: K): (typeof input)[K] => {
     const descriptor = Object.getOwnPropertyDescriptor(input, key);
@@ -109,6 +110,10 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
     interrupted(signal)
   )
     throw Error('Jito simulation attempt policy or signal differs.');
+  const singleOption = Object.getOwnPropertyDescriptor(input, 'singleBatch');
+  if (singleOption && (!Object.hasOwn(singleOption, 'value') || singleOption.value !== true))
+    throw Error('Invalid single batch option.');
+  const singleBatch = !!singleOption;
   const owner = new AbortController();
   // A data-property boolean is the only opt-in. Never invoke a diagnostic
   // callback or a timing option getter from the collector.
@@ -379,20 +384,22 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
       params: exactRequest.params,
     });
     markDuration('exactBuildMs', exactBuildStart);
+    if (singleBatch) sentSimulationBody = discoveryBody;
     phase = 'exact';
-    const response = await send(sentSimulationBody, 1);
+    const response = singleBatch ? new Response(discoveryBytes) : await send(sentSimulationBody, 1);
     if (!response)
       return refuse(
         reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
       );
     simulation = await readJitoSimulationResponse({
+      ...(singleBatch ? { requestBankSelection: 'confirmed' as const } : {}),
       profile: 'jito-rust-raw-frames-v1',
       packets: fees.packets,
       minimumSlot,
       simulationBankSlot: bank,
       bankEncoding: 'slot-object',
       verifySignatures,
-      rpcId: simulationRpcId,
+      rpcId: singleBatch ? discoveryId : simulationRpcId,
       body: responseField(response, 'body'),
       signal: deadline,
     });

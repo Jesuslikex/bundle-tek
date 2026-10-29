@@ -274,6 +274,7 @@ async function sha(bytes: Uint8Array) {
  * Invalid policy/pre-read cancellation throws and leaves the body with its caller;
  * after capture starts, failures return a refusal and the reader owns its cleanup. */
 export async function readJitoSimulationResponse(input: {
+  requestBankSelection?: 'confirmed';
   profile: 'jito-rust-raw-frames-v1';
   packets: JitoBundleSimulationPacket[];
   minimumSlot: number;
@@ -327,13 +328,20 @@ export async function readJitoSimulationResponse(input: {
       verifySignatures: read('verifySignatures'),
     },
   );
+  const selection = Object.getOwnPropertyDescriptor(input, 'requestBankSelection');
+  if (selection && (!Object.hasOwn(selection, 'value') || selection.value !== 'confirmed'))
+    return refuse('request bank selection differs');
+  // Bind the actual commitment-selected wire request, never an unsent slot request.
+  const params = selection ? structuredClone(request.params) : request.params;
+  if (selection) (params[1] as unknown as Record<string, unknown>).simulationBank = { commitment: { commitment: 'confirmed' } };
   const requestBody = JSON.stringify({
     jsonrpc: '2.0',
     id: rpcId,
     method: request.method,
-    params: request.params,
+    params,
   });
   const requestEvidence = {
+    ...(selection ? { requestBankSelection: 'confirmed' as const } : {}),
     profile,
     bankEncoding: request.bankEncoding,
     rpcId,
