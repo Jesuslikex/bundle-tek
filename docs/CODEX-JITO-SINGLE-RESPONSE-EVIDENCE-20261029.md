@@ -42,3 +42,26 @@ Recomputed from ignored jito-program-review-20261025 files:
 
 No full-swap qualification, signing authority, deployment or funded test is
 claimed. Existing refusal behavior and the draft submission block remain.
+
+## Implementation review and fresh verification follow-up
+
+The existing raw response parser already requires fee and account evidence;
+`jito-bundle-simulation-frames.ts` compares that fee against expectedFeeLamports.
+`jito-fee-batch.ts` supplies the independently observed expected fee. Replacing
+that expectation with the simulation's own fee would make the comparison
+circular, so this is not an admissible implementation.
+
+The prefee discovery batch already includes separate fee observations and full
+simulation accounts. A prospective one-batch collector could preserve that
+comparison, but must explicitly bind its actual commitment-selected request
+and validate the returned bank. It cannot reuse the exact-slot reader by
+claiming that an unsent slot-pinned request was sent. The current collector
+still performs the exact-slot request; no collector or admission rule was changed.
+
+A fresh read-only public request to
+https://verify.osec.io/status/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+returned HTTP 200 with is_verified false and empty executable_hash, repo_url
+and commit on 29 October. This is a service observation, not proof that no
+verification exists anywhere or that the program is unsafe. Jupiter's official
+audit index still links the October 2025 v6 audit; an audit listing alone does
+not bind the retained binary to the audited source. No policy hash is changed.
