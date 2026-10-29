@@ -1,0 +1,13 @@
+{
+  "format": "jupiter-upgrade-signature-observation-v1",
+  "observedAt": "2026-10-29T04:55:07.514Z",
+  "providerReportedSlot": 459479624,
+  "wireSha256": "435f902840e7696fa647078da9426bed7772c3c0a2e0f44f418e5f843f7e8b24",
+  "signerCount": 1,
+  "messageSha256": "bb7c964b3efa6dc5bccf5fcf298fbfeb154a47865a50921b43b6e411a1532fa6",
+  "signaturesVerified": true,
+  "chainInclusionVerified": false,
+  "sourceVerified": false,
+  "signingAllowed": false,
+  "executionAllowed": false
+}
