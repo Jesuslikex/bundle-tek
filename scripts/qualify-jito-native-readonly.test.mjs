@@ -12,6 +12,7 @@ import {
   main,
   compileNativeAdapter,
   nativeSourceIdentity,
+  retainSingleBatchSimulation,
 } from './qualify-jito-native-readonly.mjs';
 
 const endpoint = 'https://solana-mainnet.g.alchemy.com/v2/PRIVATE-TEST-ONLY';
@@ -836,4 +837,14 @@ void test('an absent pacing implementation fails before network use', async () =
   const h = harness();
   await assert.rejects(h.run({ pace: undefined }), /configuration-refused/);
   assert.equal(h.requests.length, 0);
+});
+
+void test('single batch recorder proves member provenance and rejects tampering', () => {
+ const member=Buffer.from('{"id":"sim","result":{}}');
+ const parent=Buffer.concat([Buffer.from('['),member,Buffer.from(']')]);
+ const result={batch:{status:'captured',rawResponse:{rawBody:parent,rawSha256:digest(parent)},members:[{id:'sim',start:1,end:1+member.length,rawBody:member,sha256:digest(member)}]},simulation:{request:{requestBankSelection:'confirmed',rpcId:'sim'},rawResponse:{rawBody:member,rawSha256:digest(member),byteLength:member.length}}};
+ const files=new Map();retainSingleBatchSimulation(result,(name,bytes)=>files.set(name,bytes));
+ assert.deepEqual(files.get('simulation-member-not-wire.bin'),member);
+ assert.equal(JSON.parse(files.get('simulation-member-provenance.json')).parentSha256,digest(parent));
+ for(const broken of [ {...result,simulation:{...result.simulation,request:{...result.simulation.request,rpcId:'other'}}}, {...result,batch:{...result.batch,members:[{...result.batch.members[0],start:2}]}}, {...result,simulation:{...result.simulation,rawResponse:{...result.simulation.rawResponse,rawBody:Buffer.from('bad')}}} ]) assert.throws(()=>retainSingleBatchSimulation(broken,()=>{}),/member-integrity-refused/);
 });

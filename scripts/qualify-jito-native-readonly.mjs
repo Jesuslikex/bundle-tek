@@ -25,6 +25,34 @@ const authority = Object.freeze({
   runtimePrivilegesVerified: false,
 });
 const hash = (value) => createHash('sha256').update(value).digest('hex');
+// A batch member is derived evidence, never a separate wire response.
+export function retainSingleBatchSimulation(result, keep) {
+  const batch = result.batch;
+  const simulation = result.simulation;
+  if (batch?.status !== 'captured' || !batch.rawResponse ||
+      simulation?.request?.requestBankSelection !== 'confirmed' ||
+      !simulation.rawResponse || !Array.isArray(batch.members))
+    throw failure('member-integrity-refused');
+  const parent = batch.rawResponse.rawBody;
+  const raw = simulation.rawResponse.rawBody;
+  const matches = batch.members.filter((m) => m.id === simulation.request.rpcId);
+  if (!(parent instanceof Uint8Array) || !(raw instanceof Uint8Array) ||
+      matches.length !== 1 || hash(parent) !== batch.rawResponse.rawSha256 ||
+      hash(raw) !== simulation.rawResponse.rawSha256 ||
+      raw.byteLength !== simulation.rawResponse.byteLength)
+    throw failure('member-integrity-refused');
+  const m = matches[0];
+  if (!Number.isSafeInteger(m.start) || !Number.isSafeInteger(m.end) ||
+      m.start < 0 || m.end <= m.start || m.end > parent.length ||
+      !(m.rawBody instanceof Uint8Array) || hash(m.rawBody) !== m.sha256 ||
+      hash(parent.slice(m.start, m.end)) !== m.sha256 || hash(raw) !== m.sha256)
+    throw failure('member-integrity-refused');
+  keep('simulation-member-not-wire.bin', raw);
+  keep('simulation-member-provenance.json', encoded({
+    kind: 'derived-batch-member-not-wire-response', parentSha256: batch.rawResponse.rawSha256,
+    id: m.id, start: m.start, end: m.end, sha256: m.sha256,
+  }));
+}
 const encoded = (value) =>
   JSON.stringify(value, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
 const safeFailures = new WeakMap();
@@ -555,11 +583,15 @@ export async function runNativeJitoCampaign({
           }),
         );
       }
-      if (profile === 'prefee' && result.simulation?.rawResponse)
-        retain(
-          runtimeReads.find((r) => r.phase === 'exact').read,
-          result.simulation.rawResponse,
-        );
+      if (profile === 'prefee' && result.simulation?.rawResponse) {
+        if (result.simulation.request?.requestBankSelection === 'confirmed')
+          retainSingleBatchSimulation(result, keep);
+        else
+          retain(
+            runtimeReads.find((r) => r.phase === 'exact').read,
+            result.simulation.rawResponse,
+          );
+      }
       if (result.feeProjection?.rawBody)
         keep('derived-fees-not-wire.bin', result.feeProjection.rawBody);
       if (result.sentSimulationBody)
