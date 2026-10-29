@@ -62,3 +62,12 @@ the baseline test has not passed. A compiler-name-only process override has
 not yet been tested and might expose further platform incompatibilities.
 The research checkout retains the local crossbeam Cargo.toml/lock modifications;
 no application or qualification checks were changed.
+
+Follow-up: setting CC=cl and CXX=cl only for the build process avoided the
+compiler-path splitting failure. Jemalloc configure subsequently refused its
+generated target x86_64-pc-win32: config.sub reports OS `win32` not recognized.
+The dependency also explicitly warns that x86_64-pc-windows-msvc is untested.
+The build has failed, with other compiler jobs still winding down at this
+checkpoint. No upstream test pass or validator endpoint is claimed. Do not
+rename the target or remove jemalloc merely to claim a production-equivalent
+validator build; establish and test the actual runtime compatibility first.
