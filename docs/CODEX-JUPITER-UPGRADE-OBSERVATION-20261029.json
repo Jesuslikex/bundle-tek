@@ -1,0 +1,24 @@
+{
+  "format": "jupiter-historical-buffer-observation-v1",
+  "observedAt": "2026-10-29T04:52:19.456Z",
+  "upgrade": {
+    "upgradeSlot": 459479624,
+    "upgradeSignature": "3qcuiJd614zpxRq4935DZwdgcrpR32k8N7Xh5H32EB4w2QXonLQWc4XBrL6oMEfoegnCYKXGddQD95YC86rarEh8",
+    "buffer": "CbboLZHpRP8LTWmn3Wj2DGCya1rVvZX6ARMJs5k76n6n",
+    "authority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ"
+  },
+  "archiveContextSlot": 459479623,
+  "currentContextSlot": 462752869,
+  "comparison": {
+    "bufferCodeBytes": 2036392,
+    "bufferCodeSha256": "c0c0ce1c15b0eab3c8b81eacb25cb4895d8ba861a1b0125940609ac6ac064ae2",
+    "deployedCodeBytes": 2892224,
+    "deployedCodeSha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+    "paddedSha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+    "match": true
+  },
+  "sourceVerified": false,
+  "providerQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false
+}
