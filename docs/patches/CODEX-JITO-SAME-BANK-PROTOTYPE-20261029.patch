@@ -1,8 +1,8 @@
 diff --git a/rpc-client-api/src/bundles.rs b/rpc-client-api/src/bundles.rs
-index 898b10c..a603d5f 100644
+index 898b10c..b4edd65 100644
 --- a/rpc-client-api/src/bundles.rs
 +++ b/rpc-client-api/src/bundles.rs
-@@ -60,6 +60,15 @@ pub struct RpcSimulateBundleResult {
+@@ -60,6 +60,16 @@ pub struct RpcSimulateBundleResult {
      pub transaction_results: Vec<RpcSimulateBundleTransactionResult>,
  }
  
@@ -12,12 +12,33 @@ index 898b10c..a603d5f 100644
 +pub struct RpcSameBankBundleResult {
 +    pub bank_hash: String,
 +    pub independent_fees: Vec<u64>,
++    pub packet_hashes: Vec<String>,
 +    pub simulation: RpcSimulateBundleResult,
 +}
 +
  #[derive(Serialize, Deserialize, Clone, Debug)]
  #[serde(rename_all = "camelCase")]
  pub struct RpcSimulateBundleTransactionResult {
+diff --git a/rpc/Cargo.toml b/rpc/Cargo.toml
+index ea33ba2..739e35d 100644
+--- a/rpc/Cargo.toml
++++ b/rpc/Cargo.toml
+@@ -82,6 +82,7 @@ solana-rpc-client-api = { workspace = true }
+ solana-runtime = { workspace = true }
+ solana-runtime-transaction = { workspace = true }
+ solana-send-transaction-service = { workspace = true }
++solana-sha256-hasher = { workspace = true }
+ solana-signature = { workspace = true }
+ solana-signer = { workspace = true }
+ solana-slot-history = { workspace = true }
+@@ -135,7 +136,6 @@ solana-runtime = { path = "../runtime", features = ["agave-unstable-api", "dev-c
+ solana-runtime-transaction = { path = "../runtime-transaction", features = ["agave-unstable-api", "dev-context-only-utils"] }
+ solana-sdk-ids = { workspace = true }
+ solana-send-transaction-service = { path = "../send-transaction-service", features = ["agave-unstable-api", "dev-context-only-utils"] }
+-solana-sha256-hasher = { workspace = true }
+ solana-slot-hashes = { workspace = true }
+ solana-stake-interface = { workspace = true }
+ solana-svm-log-collector = { path = "../svm-log-collector", features = ["agave-unstable-api"] }
 diff --git a/rpc/src/rpc.rs b/rpc/src/rpc.rs
 index ef74f40..d750579 100644
 --- a/rpc/src/rpc.rs
@@ -53,7 +74,7 @@ index ef74f40..d750579 100644
              debug!("minimum_ledger_slot rpc request received");
              meta.minimum_ledger_slot()
 diff --git a/rpc/src/rpc/bundles.rs b/rpc/src/rpc/bundles.rs
-index 67de240..c4a784d 100644
+index 67de240..0b52533 100644
 --- a/rpc/src/rpc/bundles.rs
 +++ b/rpc/src/rpc/bundles.rs
 @@ -4,6 +4,7 @@ use {
@@ -77,9 +98,9 @@ index 67de240..c4a784d 100644
 +    config: Option<RpcSimulateBundleConfig>,
 +) -> Result<RpcResponse<RpcSameBankBundleResult>> {
 +    let (response, evidence) = simulate_bundle_inner(meta, rpc_bundle_request, config, true)?;
-+    let (bank_hash, independent_fees) = evidence.ok_or_else(|| Error::invalid_params("missing bank evidence"))?;
++    let (bank_hash, independent_fees, packet_hashes) = evidence.ok_or_else(|| Error::invalid_params("missing bank evidence"))?;
 +    Ok(RpcResponse { context: response.context, value: RpcSameBankBundleResult {
-+        bank_hash, independent_fees, simulation: response.value,
++        bank_hash, independent_fees, packet_hashes, simulation: response.value,
 +    }})
 +}
 +
@@ -88,7 +109,7 @@ index 67de240..c4a784d 100644
 +    rpc_bundle_request: RpcBundleRequest,
 +    config: Option<RpcSimulateBundleConfig>,
 +    same_bank: bool,
-+) -> Result<(RpcResponse<RpcSimulateBundleResult>, Option<(String, Vec<u64>)>)> {
++) -> Result<(RpcResponse<RpcSimulateBundleResult>, Option<(String, Vec<u64>, Vec<String>)>)> {
      const MAX_BUNDLES_SIMULATED: usize = 20;
      let transaction_count = rpc_bundle_request.encoded_transactions.len();
  
@@ -99,7 +120,26 @@ index 67de240..c4a784d 100644
      if transaction_count > MAX_BUNDLES_SIMULATED {
          return Err(Error::invalid_params(
              "bundle size too large, max 20 transactions",
-@@ -168,6 +194,17 @@ pub(super) fn simulate_bundle(
+@@ -84,12 +110,15 @@ pub(super) fn simulate_bundle(
+ 
+     let mut packet_hashes = HashSet::with_capacity(transaction_count);
+     let mut unsanitized_txs = Vec::with_capacity(transaction_count);
++    let mut wire_hashes = Vec::with_capacity(transaction_count);
+     for encoded_tx in rpc_bundle_request.encoded_transactions {
+-        let tx = decode_and_deserialize::<VersionedTransaction>(
++        let (wire, tx) = decode_and_deserialize::<VersionedTransaction>(
+             encoded_tx,
+             TransactionBinaryEncoding::Base64,
+-        )?
+-        .1;
++        )?;
++        if same_bank {
++            wire_hashes.push(solana_sha256_hasher::hash(&wire).to_string());
++        }
+         if !packet_hashes.insert(tx.message.hash()) {
+             return Err(Error::invalid_params("duplicate transactions"));
+         }
+@@ -168,6 +197,17 @@ pub(super) fn simulate_bundle(
          }
      }
  
@@ -111,18 +151,18 @@ index 67de240..c4a784d 100644
 +        let fees = transactions.iter().map(|tx| bank.get_fee_for_message(tx.message())
 +            .ok_or_else(|| Error::invalid_params("fee unavailable")))
 +            .collect::<Result<Vec<_>>>()?;
-+        Some((bank.hash().to_string(), fees))
++        Some((bank.hash().to_string(), fees, wire_hashes))
 +    } else { None };
 +
      let pre_execution_accounts = account_configs_to_accounts(&pre_execution_accounts_configs)?;
      let post_execution_accounts = account_configs_to_accounts(&post_execution_accounts_configs)?;
  
-@@ -260,7 +297,13 @@ pub(super) fn simulate_bundle(
+@@ -260,7 +300,13 @@ pub(super) fn simulate_bundle(
              })
              .collect::<Result<Vec<_>>>()?,
      };
 -    Ok(new_response(&bank, result))
-+    if let Some((_, fees)) = &evidence {
++    if let Some((_, fees, _)) = &evidence {
 +        if result.transaction_results.len() != fees.len() || result.transaction_results.iter()
 +            .zip(fees).any(|(tx, fee)| tx.err.is_some() || tx.fee != Some(*fee)) {
 +            return Err(Error::invalid_params("simulation and independent fee differ"));
@@ -132,7 +172,7 @@ index 67de240..c4a784d 100644
  }
  
  #[cfg(test)]
-@@ -332,6 +375,59 @@ mod tests {
+@@ -332,6 +378,66 @@ mod tests {
          }
      }
  
@@ -160,6 +200,13 @@ index 67de240..c4a784d 100644
 +        assert_eq!(result["result"]["context"]["slot"], bank.slot());
 +        assert_eq!(result["result"]["value"]["bankHash"], bank.hash().to_string());
 +        assert_eq!(result["result"]["value"]["independentFees"], json!([TEST_SIGNATURE_FEE, TEST_SIGNATURE_FEE]));
++        let hashes: Vec<String> = transactions.iter().map(|encoded| {
++            let (wire, _) = decode_and_deserialize::<VersionedTransaction>(
++                encoded.clone(), TransactionBinaryEncoding::Base64,
++            ).unwrap();
++            solana_sha256_hasher::hash(&wire).to_string()
++        }).collect();
++        assert_eq!(result["result"]["value"]["packetHashes"], json!(hashes));
 +        assert_eq!(result["result"]["value"]["simulation"]["summary"], "succeeded");
 +        assert!(call(true)["error"].is_object());
 +    }

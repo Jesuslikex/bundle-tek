@@ -24,3 +24,8 @@ The source checkout is /root/jito-same-bank-prototype in Ubuntu WSL2. The
 unmodified baseline uses a separate worktree. Jupiter source-to-binary
 verification, 32-slot full-swap runtime coverage and production integration
 remain unresolved. No funded action or deployment was performed.
+
+Follow-up: the 29 October packet-hash and isolated adapter work is documented in
+`CODEX-JITO-SAME-BANK-ADAPTER-20261029.md`. The patched RPC library and full
+validator binary were rebuilt and tested locally. The prototype remains
+untrusted and unmounted; the full qualification is still blocked.
