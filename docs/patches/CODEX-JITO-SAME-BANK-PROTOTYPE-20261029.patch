@@ -1,0 +1,162 @@
+diff --git a/rpc-client-api/src/bundles.rs b/rpc-client-api/src/bundles.rs
+index 898b10c..a603d5f 100644
+--- a/rpc-client-api/src/bundles.rs
++++ b/rpc-client-api/src/bundles.rs
+@@ -60,6 +60,15 @@ pub struct RpcSimulateBundleResult {
+     pub transaction_results: Vec<RpcSimulateBundleTransactionResult>,
+ }
+ 
++/// Local research endpoint evidence, not a cryptographic attestation.
++#[derive(Serialize, Deserialize, Clone, Debug)]
++#[serde(rename_all = "camelCase")]
++pub struct RpcSameBankBundleResult {
++    pub bank_hash: String,
++    pub independent_fees: Vec<u64>,
++    pub simulation: RpcSimulateBundleResult,
++}
++
+ #[derive(Serialize, Deserialize, Clone, Debug)]
+ #[serde(rename_all = "camelCase")]
+ pub struct RpcSimulateBundleTransactionResult {
+diff --git a/rpc/src/rpc.rs b/rpc/src/rpc.rs
+index ef74f40..d750579 100644
+--- a/rpc/src/rpc.rs
++++ b/rpc/src/rpc.rs
+@@ -3756,6 +3756,14 @@ pub mod rpc_full {
+             config: Option<RpcSimulateBundleConfig>,
+         ) -> Result<RpcResponse<RpcSimulateBundleResult>>;
+ 
++        #[rpc(meta, name = "simulateBundleWithSameBankFees")]
++        fn simulate_bundle_same_bank(
++            &self,
++            meta: Self::Metadata,
++            rpc_bundle_request: RpcBundleRequest,
++            config: Option<RpcSimulateBundleConfig>,
++        ) -> Result<RpcResponse<solana_rpc_client_api::bundles::RpcSameBankBundleResult>>;
++
+         #[rpc(meta, name = "minimumLedgerSlot")]
+         fn minimum_ledger_slot(&self, meta: Self::Metadata) -> Result<Slot>;
+ 
+@@ -4350,6 +4358,14 @@ pub mod rpc_full {
+         ) -> Result<RpcResponse<RpcSimulateBundleResult>> {
+             bundles::simulate_bundle(meta, rpc_bundle_request, config)
+         }
++        fn simulate_bundle_same_bank(
++            &self,
++            meta: Self::Metadata,
++            rpc_bundle_request: RpcBundleRequest,
++            config: Option<RpcSimulateBundleConfig>,
++        ) -> Result<RpcResponse<solana_rpc_client_api::bundles::RpcSameBankBundleResult>> {
++            bundles::simulate_bundle_same_bank(meta, rpc_bundle_request, config)
++        }
+         fn minimum_ledger_slot(&self, meta: Self::Metadata) -> Result<Slot> {
+             debug!("minimum_ledger_slot rpc request received");
+             meta.minimum_ledger_slot()
+diff --git a/rpc/src/rpc/bundles.rs b/rpc/src/rpc/bundles.rs
+index 67de240..317722a 100644
+--- a/rpc/src/rpc/bundles.rs
++++ b/rpc/src/rpc/bundles.rs
+@@ -4,6 +4,7 @@ use {
+     solana_rpc_client_api::bundles::{
+         RpcBundleExecutionError, RpcBundleRequest, RpcBundleSimulationSummary,
+         RpcSimulateBundleConfig, RpcSimulateBundleResult, RpcSimulateBundleTransactionResult,
++        RpcSameBankBundleResult,
+         SimulationSlotConfig,
+     },
+     solana_transaction_status::UiLoadedAddresses,
+@@ -21,6 +22,27 @@ pub(super) fn simulate_bundle(
+     rpc_bundle_request: RpcBundleRequest,
+     config: Option<RpcSimulateBundleConfig>,
+ ) -> Result<RpcResponse<RpcSimulateBundleResult>> {
++    simulate_bundle_inner(meta, rpc_bundle_request, config, false).map(|(response, _)| response)
++}
++
++pub(super) fn simulate_bundle_same_bank(
++    meta: JsonRpcRequestProcessor,
++    rpc_bundle_request: RpcBundleRequest,
++    config: Option<RpcSimulateBundleConfig>,
++) -> Result<RpcResponse<RpcSameBankBundleResult>> {
++    let (response, evidence) = simulate_bundle_inner(meta, rpc_bundle_request, config, true)?;
++    let (bank_hash, independent_fees) = evidence.ok_or_else(|| Error::invalid_params("missing bank evidence"))?;
++    Ok(RpcResponse { context: response.context, value: RpcSameBankBundleResult {
++        bank_hash, independent_fees, simulation: response.value,
++    }})
++}
++
++fn simulate_bundle_inner(
++    meta: JsonRpcRequestProcessor,
++    rpc_bundle_request: RpcBundleRequest,
++    config: Option<RpcSimulateBundleConfig>,
++    same_bank: bool,
++) -> Result<(RpcResponse<RpcSimulateBundleResult>, Option<(String, Vec<u64>)>)> {
+     const MAX_BUNDLES_SIMULATED: usize = 20;
+     let transaction_count = rpc_bundle_request.encoded_transactions.len();
+ 
+@@ -168,6 +190,17 @@ pub(super) fn simulate_bundle(
+         }
+     }
+ 
++    // Diagnostic only: calculate independent fees using exactly this frozen bank.
++    let evidence = if same_bank {
++        if !bank.is_frozen() || replace_recent_blockhash || transactions.is_empty() {
++            return Err(Error::invalid_params("same-bank evidence requires a frozen bank and unchanged packets"));
++        }
++        let fees = transactions.iter().map(|tx| bank.get_fee_for_message(tx.message())
++            .ok_or_else(|| Error::invalid_params("fee unavailable")))
++            .collect::<Result<Vec<_>>>()?;
++        Some((bank.hash().to_string(), fees))
++    } else { None };
++
+     let pre_execution_accounts = account_configs_to_accounts(&pre_execution_accounts_configs)?;
+     let post_execution_accounts = account_configs_to_accounts(&post_execution_accounts_configs)?;
+ 
+@@ -260,7 +293,13 @@ pub(super) fn simulate_bundle(
+             })
+             .collect::<Result<Vec<_>>>()?,
+     };
+-    Ok(new_response(&bank, result))
++    if let Some((_, fees)) = &evidence {
++        if result.transaction_results.len() != fees.len() || result.transaction_results.iter()
++            .zip(fees).any(|(tx, fee)| tx.err.is_some() || tx.fee != Some(*fee)) {
++            return Err(Error::invalid_params("simulation and independent fee differ"));
++        }
++    }
++    Ok((new_response(&bank, result), evidence))
+ }
+ 
+ #[cfg(test)]
+@@ -332,6 +371,34 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn test_same_bank_endpoint_binds_fee_to_frozen_simulation_bank() {
++        let rpc = RpcHandler::start();
++        let bank = rpc.working_bank();
++        let transactions = encoded_transfers(&rpc, 2);
++        bank.freeze();
++        let request = |replace_recent_blockhash| json!({
++            "jsonrpc": "2.0", "id": 7, "method": "simulateBundleWithSameBankFees",
++            "params": [{"encodedTransactions": transactions}, {
++                "simulationBank": {"slot": bank.slot()},
++                "skipSigVerify": true,
++                "replaceRecentBlockhash": replace_recent_blockhash,
++                "preExecutionAccountsConfigs": [null, null],
++                "postExecutionAccountsConfigs": [null, null]
++            }]
++        });
++        let call = |replace| {
++            let response = rpc.io.handle_request_sync(&request(replace).to_string(), rpc.meta.clone()).unwrap();
++            serde_json::from_str::<serde_json::Value>(&response).unwrap()
++        };
++        let result = call(false);
++        assert_eq!(result["result"]["context"]["slot"], bank.slot());
++        assert_eq!(result["result"]["value"]["bankHash"], bank.hash().to_string());
++        assert_eq!(result["result"]["value"]["independentFees"], json!([TEST_SIGNATURE_FEE, TEST_SIGNATURE_FEE]));
++        assert_eq!(result["result"]["value"]["simulation"]["summary"], "succeeded");
++        assert!(call(true)["error"].is_object());
++    }
++
+     #[test]
+     fn test_rpc_simulate_bundle_rejects_duplicate_addresses() {
+         let rpc = RpcHandler::start();
