@@ -53,7 +53,7 @@ index ef74f40..d750579 100644
              debug!("minimum_ledger_slot rpc request received");
              meta.minimum_ledger_slot()
 diff --git a/rpc/src/rpc/bundles.rs b/rpc/src/rpc/bundles.rs
-index 67de240..317722a 100644
+index 67de240..c4a784d 100644
 --- a/rpc/src/rpc/bundles.rs
 +++ b/rpc/src/rpc/bundles.rs
 @@ -4,6 +4,7 @@ use {
@@ -64,7 +64,7 @@ index 67de240..317722a 100644
          SimulationSlotConfig,
      },
      solana_transaction_status::UiLoadedAddresses,
-@@ -21,6 +22,27 @@ pub(super) fn simulate_bundle(
+@@ -21,9 +22,34 @@ pub(super) fn simulate_bundle(
      rpc_bundle_request: RpcBundleRequest,
      config: Option<RpcSimulateBundleConfig>,
  ) -> Result<RpcResponse<RpcSimulateBundleResult>> {
@@ -92,7 +92,14 @@ index 67de240..317722a 100644
      const MAX_BUNDLES_SIMULATED: usize = 20;
      let transaction_count = rpc_bundle_request.encoded_transactions.len();
  
-@@ -168,6 +190,17 @@ pub(super) fn simulate_bundle(
++    if same_bank && !(1..=5).contains(&transaction_count) {
++        return Err(Error::invalid_params("same-bank evidence requires 1 to 5 transactions"));
++    }
++
+     if transaction_count > MAX_BUNDLES_SIMULATED {
+         return Err(Error::invalid_params(
+             "bundle size too large, max 20 transactions",
+@@ -168,6 +194,17 @@ pub(super) fn simulate_bundle(
          }
      }
  
@@ -110,7 +117,7 @@ index 67de240..317722a 100644
      let pre_execution_accounts = account_configs_to_accounts(&pre_execution_accounts_configs)?;
      let post_execution_accounts = account_configs_to_accounts(&post_execution_accounts_configs)?;
  
-@@ -260,7 +293,13 @@ pub(super) fn simulate_bundle(
+@@ -260,7 +297,13 @@ pub(super) fn simulate_bundle(
              })
              .collect::<Result<Vec<_>>>()?,
      };
@@ -125,7 +132,7 @@ index 67de240..317722a 100644
  }
  
  #[cfg(test)]
-@@ -332,6 +371,34 @@ mod tests {
+@@ -332,6 +375,59 @@ mod tests {
          }
      }
  
@@ -155,6 +162,31 @@ index 67de240..317722a 100644
 +        assert_eq!(result["result"]["value"]["independentFees"], json!([TEST_SIGNATURE_FEE, TEST_SIGNATURE_FEE]));
 +        assert_eq!(result["result"]["value"]["simulation"]["summary"], "succeeded");
 +        assert!(call(true)["error"].is_object());
++    }
++
++    #[test]
++    fn test_same_bank_endpoint_rejects_unfrozen_or_invalid_bundle_sizes() {
++        let rpc = RpcHandler::start();
++        let bank = rpc.working_bank();
++        assert!(!bank.is_frozen());
++        let transactions = encoded_transfers(&rpc, 6);
++        let call = |count: usize| {
++            let request = json!({
++                "jsonrpc": "2.0", "id": 8, "method": "simulateBundleWithSameBankFees",
++                "params": [{"encodedTransactions": &transactions[..count]}, {
++                    "simulationBank": {"slot": bank.slot()},
++                    "skipSigVerify": true,
++                    "preExecutionAccountsConfigs": vec![Option::<u8>::None; count],
++                    "postExecutionAccountsConfigs": vec![Option::<u8>::None; count]
++                }]
++            });
++            let response = rpc.io.handle_request_sync(&request.to_string(), rpc.meta.clone()).unwrap();
++            serde_json::from_str::<serde_json::Value>(&response).unwrap()
++        };
++        assert!(call(1)["error"].is_object());
++        bank.freeze();
++        assert!(call(0)["error"].is_object());
++        assert!(call(6)["error"].is_object());
 +    }
 +
      #[test]
