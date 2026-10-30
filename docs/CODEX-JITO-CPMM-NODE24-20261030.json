@@ -1,0 +1,576 @@
+{
+  "format": "jito-cpmm-production-runtime-diagnostic-v1",
+  "captureSha256": "c854d0a0ebeed527a0a02c1ec3bef548f24acbc3cd93dfb527c4fe73c4ad53b6",
+  "runtime": {
+    "nodeVersion": "v24.22.1",
+    "requiredNodeMajor": 24
+  },
+  "observedAt": "2026-10-30T19:46:45.018Z",
+  "status": "refused",
+  "stage": "final-window",
+  "floor": 463408037,
+  "simulationSlot": 463408049,
+  "lastSlot": 463408071,
+  "spanSlots": 34,
+  "codeReads": 18,
+  "ordinaryReads": 11,
+  "lifetime": {
+    "format": "jito-cpmm-lifetime-observation-v1",
+    "transactionSha256": "b3abccca1ff4796001fabc73e07d3bb65645195be429ab49ad742f95ee1ed68a",
+    "blockhash": "D4oaYkgEoSbyH4M2nktTPyPAPZwBEA5LK7mfsU1Eyhqb",
+    "lastValidBlockHeight": "441430495",
+    "blockHeight": "441430366",
+    "minimumSlot": 463408037,
+    "validitySlot": 463408068,
+    "remainingBlocks": "129",
+    "providerQualified": false,
+    "bankVerified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "lifetimeRecheckedAfterFinalCode": true,
+  "writableReplay": {
+    "format": "jito-cpmm-sparse-state-replay-v1",
+    "transactionSha256": "b3abccca1ff4796001fabc73e07d3bb65645195be429ab49ad742f95ee1ed68a",
+    "slot": 463408049,
+    "poolTransitionChecked": true,
+    "oracleTransitionChecked": true,
+    "tokenTransitionChecked": true,
+    "outputRaw": "94182",
+    "rentCoverageChecked": true,
+    "sourceAuthenticated": false,
+    "packetVerified": false,
+    "economicOutputVerified": false,
+    "accountProvenanceVerified": false,
+    "bankVerified": false,
+    "providerQualified": false,
+    "programApproved": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "readonlyPostCoverage": false,
+    "fullSwapQualified": false
+  },
+  "marketComparison": {
+    "available": true,
+    "transactionSha256": "b3abccca1ff4796001fabc73e07d3bb65645195be429ab49ad742f95ee1ed68a",
+    "inputMarketPair": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+    "outputMarketPair": "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ",
+    "inputPriceUsd": "94.51",
+    "outputPriceUsd": "0.9982",
+    "inputObservedAt": "2026-10-30T19:46:38.165Z",
+    "outputObservedAt": "2026-10-30T19:46:38.188Z",
+    "minimumValueDifferenceBps": "-52",
+    "worse": true,
+    "acknowledgementRequired": false,
+    "expiresAt": "2026-10-30T19:51:38.165Z",
+    "priceVerified": false,
+    "providerQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "postCodeCustody": {
+    "slot": 463408068,
+    "comparisons": [
+      {
+        "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "beforeLamports": "8466160",
+        "afterLamports": "8466160",
+        "same": true
+      },
+      {
+        "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+        "beforeLamports": "1018505495",
+        "afterLamports": "1018505495",
+        "same": true
+      },
+      {
+        "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "beforeLamports": null,
+        "afterLamports": null,
+        "same": true
+      }
+    ]
+  },
+  "timing": {
+    "clock": "process-monotonic",
+    "originMs": 1705.2329,
+    "qualificationFinishedAtMs": 7561.5775,
+    "stages": [
+      {
+        "stage": "genesis",
+        "enteredAtMs": 0,
+        "finishedAtMs": 380.28949999999986
+      },
+      {
+        "stage": "blockhash",
+        "enteredAtMs": 380.28949999999986,
+        "finishedAtMs": 458.29140000000007
+      },
+      {
+        "stage": "first-four-program-code-scan",
+        "enteredAtMs": 458.29140000000007,
+        "finishedAtMs": 461.34040000000005
+      },
+      {
+        "stage": "first-code-and-issued-lifetime",
+        "enteredAtMs": 461.34040000000005,
+        "finishedAtMs": 2914.3755
+      },
+      {
+        "stage": "archive-base-prestate",
+        "enteredAtMs": 2914.3755,
+        "finishedAtMs": 3662.4386999999997
+      },
+      {
+        "stage": "strict-source-quote-candidate",
+        "enteredAtMs": 3662.4386999999997,
+        "finishedAtMs": 3690.8718
+      },
+      {
+        "stage": "full-setup-swap-tip-simulation",
+        "enteredAtMs": 3690.8718,
+        "finishedAtMs": 4346.1529
+      },
+      {
+        "stage": "observed-mutable-effects",
+        "enteredAtMs": 4346.1529,
+        "finishedAtMs": 4358.8106
+      },
+      {
+        "stage": "actual-pool-oracle-and-rent-replay",
+        "enteredAtMs": 4358.8106,
+        "finishedAtMs": 4386.9391
+      },
+      {
+        "stage": "native-fee-rent-and-tip-conservation",
+        "enteredAtMs": 4386.9391,
+        "finishedAtMs": 4394.268
+      },
+      {
+        "stage": "independent-market-comparison",
+        "enteredAtMs": 4394.268,
+        "finishedAtMs": 4403.2171
+      },
+      {
+        "stage": "final-four-program-code-scan",
+        "enteredAtMs": 4403.2171,
+        "finishedAtMs": 6565.777300000001
+      },
+      {
+        "stage": "post-code-custody-mint-and-lifetime",
+        "enteredAtMs": 6565.777300000001,
+        "finishedAtMs": 7370.4389
+      },
+      {
+        "stage": "final-window",
+        "enteredAtMs": 7370.4389,
+        "finishedAtMs": 7561.5768
+      }
+    ],
+    "ordinaryRpc": [
+      {
+        "id": 1,
+        "method": "getGenesisHash",
+        "stage": "genesis",
+        "queuedAtMs": 0.6192000000000917,
+        "pacedAtMs": 0.8230000000000928,
+        "sentAtMs": 0.8390999999999167,
+        "headersAtMs": 373.66550000000007,
+        "capturedAtMs": 380.2255,
+        "finishedAtMs": 380.2633999999998,
+        "contextSlot": null,
+        "httpStatus": 200
+      },
+      {
+        "id": 2,
+        "method": "getLatestBlockhash",
+        "stage": "blockhash",
+        "queuedAtMs": 380.3499999999999,
+        "pacedAtMs": 380.3906999999999,
+        "sentAtMs": 380.4077000000002,
+        "headersAtMs": 450.7736,
+        "capturedAtMs": 451.33910000000014,
+        "finishedAtMs": 451.3580999999999,
+        "contextSlot": "463408037",
+        "httpStatus": 200
+      },
+      {
+        "id": 3,
+        "method": "getGenesisHash",
+        "stage": "first-code-and-issued-lifetime",
+        "queuedAtMs": 462.90880000000016,
+        "pacedAtMs": 586.6705999999999,
+        "sentAtMs": 586.6904,
+        "headersAtMs": 655.3362000000002,
+        "capturedAtMs": 655.7692999999999,
+        "finishedAtMs": 655.7874000000002,
+        "contextSlot": null,
+        "httpStatus": 200
+      },
+      {
+        "id": 4,
+        "method": "getLatestBlockhash",
+        "stage": "first-code-and-issued-lifetime",
+        "queuedAtMs": 2712.3648000000003,
+        "pacedAtMs": 2844.9229000000005,
+        "sentAtMs": 2844.9515,
+        "headersAtMs": 2913.5861999999997,
+        "capturedAtMs": 2914.0028,
+        "finishedAtMs": 2914.0296,
+        "contextSlot": "463408049",
+        "httpStatus": 200
+      },
+      {
+        "id": 5,
+        "method": "simulateTransactionsAtSlot",
+        "stage": "archive-base-prestate",
+        "queuedAtMs": 2914.5813,
+        "pacedAtMs": 3047.7775,
+        "sentAtMs": 3047.8196,
+        "headersAtMs": 3479.6602000000003,
+        "capturedAtMs": 3661.2788,
+        "finishedAtMs": 3661.3953,
+        "contextSlot": "463408049",
+        "httpStatus": 200
+      },
+      {
+        "id": 6,
+        "method": "simulateTransactionsAtSlot",
+        "stage": "full-setup-swap-tip-simulation",
+        "queuedAtMs": 3690.9887,
+        "pacedAtMs": 3691.0095,
+        "sentAtMs": 3691.0319,
+        "headersAtMs": 4167.4831,
+        "capturedAtMs": 4345.7064,
+        "finishedAtMs": 4345.8837,
+        "contextSlot": "463408049",
+        "httpStatus": 200
+      },
+      {
+        "id": 7,
+        "method": "getMultipleAccounts",
+        "stage": "post-code-custody-mint-and-lifetime",
+        "queuedAtMs": 6565.8293,
+        "pacedAtMs": 6694.217299999999,
+        "sentAtMs": 6694.2584,
+        "headersAtMs": 6772.6287999999995,
+        "capturedAtMs": 6773.151699999999,
+        "finishedAtMs": 6773.175399999999,
+        "contextSlot": "463408068",
+        "httpStatus": 200
+      },
+      {
+        "id": 8,
+        "method": "isBlockhashValid",
+        "stage": "post-code-custody-mint-and-lifetime",
+        "queuedAtMs": 6571.555300000001,
+        "pacedAtMs": 6894.710400000001,
+        "sentAtMs": 6894.783899999999,
+        "headersAtMs": 6969.145299999999,
+        "capturedAtMs": 6969.4430999999995,
+        "finishedAtMs": 6969.479700000001,
+        "contextSlot": "463408068",
+        "httpStatus": 200
+      },
+      {
+        "id": 9,
+        "method": "getBlockHeight",
+        "stage": "post-code-custody-mint-and-lifetime",
+        "queuedAtMs": 6969.629,
+        "pacedAtMs": 7095.845200000001,
+        "sentAtMs": 7095.8838000000005,
+        "headersAtMs": 7171.833,
+        "capturedAtMs": 7172.1485,
+        "finishedAtMs": 7172.1904,
+        "contextSlot": null,
+        "httpStatus": 200
+      },
+      {
+        "id": 10,
+        "method": "getGenesisHash",
+        "stage": "post-code-custody-mint-and-lifetime",
+        "queuedAtMs": 7172.268300000001,
+        "pacedAtMs": 7292.333299999999,
+        "sentAtMs": 7292.360600000001,
+        "headersAtMs": 7369.383699999999,
+        "capturedAtMs": 7369.686500000001,
+        "finishedAtMs": 7369.7089000000005,
+        "contextSlot": null,
+        "httpStatus": 200
+      },
+      {
+        "id": 11,
+        "method": "getSlot",
+        "stage": "final-window",
+        "queuedAtMs": 7370.4616,
+        "pacedAtMs": 7494.462399999999,
+        "sentAtMs": 7494.477900000001,
+        "headersAtMs": 7561.164599999999,
+        "capturedAtMs": 7561.4538999999995,
+        "finishedAtMs": 7561.4728000000005,
+        "contextSlot": "463408071",
+        "httpStatus": 200
+      }
+    ],
+    "codeOriginMs": 2163.7394,
+    "codeRpc": [
+      {
+        "requestSha256": "9db5fe493f10b5f407f090e38c638473886f3dd35fd90e9db4f3d8de11643471",
+        "rawSha256": "51af67772ba0bc8fcd042a8cc76d09c8b37e92855cb8d19003ecad3995403b82",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 4.267100000000028,
+          "pacedAtMs": 327.8162000000002,
+          "sentAtMs": 328.1415000000002,
+          "headersAtMs": 406.09529999999995,
+          "capturedAtMs": 407.9931999999999,
+          "finishedAtMs": 408.6120000000001
+        }
+      },
+      {
+        "requestSha256": "5d562c7956f0f7b9a76043534c7309c0a1424d5d004e4f738be71b66064c62f3",
+        "rawSha256": "bd7f1b89dd62b3b0b7404c2c33ab285ab0cfc9eb7d2423f211fdaced94f07c0b",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 411.78380000000016,
+          "pacedAtMs": 527.9250000000002,
+          "sentAtMs": 528.1615000000002,
+          "headersAtMs": 595.3885,
+          "capturedAtMs": 595.8472999999999,
+          "finishedAtMs": 595.9461999999999
+        }
+      },
+      {
+        "requestSha256": "e379278418235bb53f09fe76d1b1480aa990296917c2e3e552e48b7d4f738e79",
+        "rawSha256": "d24c5d861ee617c1155d78f66a5fe664ddc0f4f0205cda018560b474580bc45b",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 411.9241000000002,
+          "pacedAtMs": 730.3515000000002,
+          "sentAtMs": 730.5590000000002,
+          "headersAtMs": 801.7058000000002,
+          "capturedAtMs": 802.1460999999999,
+          "finishedAtMs": 802.2278000000001
+        }
+      },
+      {
+        "requestSha256": "e674b8f20f6c9994999b371fd560c3cc59de2323d8e0c1229189a979ed11f7c8",
+        "rawSha256": "b1dafda01cddb66c3f96525e234d4ba485ac60c3b144f8f9eccd9ecf90263e2b",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 803.3105,
+          "pacedAtMs": 931.1424000000002,
+          "sentAtMs": 931.2815,
+          "headersAtMs": 1003.6898999999999,
+          "capturedAtMs": 1004.2496000000001,
+          "finishedAtMs": 1004.3528000000001
+        }
+      },
+      {
+        "requestSha256": "769254d8d45407943afe36d97b288f05170cdbdf1ca68160a5c2bad3a86439d0",
+        "rawSha256": "39a734e3166652bc21801e60b92774e29116713d544da1d6db8653bc58fd4659",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 1005.3983000000003,
+          "pacedAtMs": 1130.705,
+          "sentAtMs": 1130.9601000000002,
+          "headersAtMs": 1277.3294,
+          "capturedAtMs": 1513.4867,
+          "finishedAtMs": 1514.0632
+        }
+      },
+      {
+        "requestSha256": "e3841d4ec2692617f7ae745b0e6b4fb957d8824ad2116372d4f8aaf5f4600c13",
+        "rawSha256": "95c9d9e403a2e52ff87cc49e8648b5168109e85a9f89cc7db1a6b625de6162bb",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 1580.9719,
+          "pacedAtMs": 1581.0318000000002,
+          "sentAtMs": 1581.2617,
+          "headersAtMs": 1659.2368000000001,
+          "capturedAtMs": 1686.0113000000001,
+          "finishedAtMs": 1686.3941
+        }
+      },
+      {
+        "requestSha256": "f20ab71c079b71f09661b807562be569f94a9271f8b76b46d7423a1c25402488",
+        "rawSha256": "ec004bd6dce21d7d01fe918e6422c4f28ce4f68f6a30f45b332abd4f65a40dd3",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 1740.4179,
+          "pacedAtMs": 1781.7029000000002,
+          "sentAtMs": 1781.8395,
+          "headersAtMs": 1855.9547000000002,
+          "capturedAtMs": 1856.5906,
+          "finishedAtMs": 1856.7134
+        }
+      },
+      {
+        "requestSha256": "bc7ca3e5b947e2bcac88a4ffea74b7706481271c967e35e0984db23f8e9c6d70",
+        "rawSha256": "8dacd4d98c0cda358628fe85ddc4f29af691f1e59cdcebe05a786ca7072d5fd2",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 1740.6275,
+          "pacedAtMs": 1983.2616000000003,
+          "sentAtMs": 1983.4766999999997,
+          "headersAtMs": 2053.7612999999997,
+          "capturedAtMs": 2054.2155,
+          "finishedAtMs": 2054.2990000000004
+        }
+      },
+      {
+        "requestSha256": "162e332209a3732f20057a1f7e1944a86c4991833f2c27325d7f2f21d93cc07b",
+        "rawSha256": "85bbc4c02fd680d5c1b925196fd430913e52656e41a3ac145f00ea67f5e446bd",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 1740.6865000000003,
+          "pacedAtMs": 2184.189,
+          "sentAtMs": 2184.3525000000004,
+          "headersAtMs": 2251.1056000000003,
+          "capturedAtMs": 2251.4994,
+          "finishedAtMs": 2251.6173999999996
+        }
+      },
+      {
+        "requestSha256": "e3785446c19d67dd89e6b1149dab9f165e16850165e58cf8309ffec1047cd203",
+        "rawSha256": "2c8ce06d5a65d9be7978355aca4f19b05b9efde4a9441d8d0e9fd30279e69c49",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 3945.1627000000003,
+          "pacedAtMs": 3945.1913,
+          "sentAtMs": 3945.2565,
+          "headersAtMs": 4243.848599999999,
+          "capturedAtMs": 4244.7618,
+          "finishedAtMs": 4244.838400000001
+        }
+      },
+      {
+        "requestSha256": "88379026ba37a866ed9bf07459779f4dd94d8f2d052f2367d6c22cfe0422962f",
+        "rawSha256": "8404e09536af634ad74be639f4d907ae5575a4f943ad5f04f8ee64f93765ad48",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 4246.1774000000005,
+          "pacedAtMs": 4246.2958,
+          "sentAtMs": 4246.3706,
+          "headersAtMs": 4314.226200000001,
+          "capturedAtMs": 4314.5123,
+          "finishedAtMs": 4314.5524000000005
+        }
+      },
+      {
+        "requestSha256": "8af39891ad1e506866bf0f9ac8825c05a36bd3d2dc309109d4bee74b9981ca24",
+        "rawSha256": "267796e297c5fed0a366fa03f69a6ff66811d18f1288cdbae6ddce31a516e89c",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 4246.2588,
+          "pacedAtMs": 4456.6075,
+          "sentAtMs": 4456.841399999999,
+          "headersAtMs": 4527.6047,
+          "capturedAtMs": 4527.9995,
+          "finishedAtMs": 4528.042100000001
+        }
+      },
+      {
+        "requestSha256": "d5d0e62fb224ca7544d68c9ed57f9b063f298894b70ba9ee4d20ba851fe1a0b2",
+        "rawSha256": "bb17d76c4859f474b177c38e5a20a52f8be866272154d2575dda64c25ec5de36",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 4528.626700000001,
+          "pacedAtMs": 4657.0190999999995,
+          "sentAtMs": 4657.2032,
+          "headersAtMs": 4735.519,
+          "capturedAtMs": 4735.9076000000005,
+          "finishedAtMs": 4735.9583
+        }
+      },
+      {
+        "requestSha256": "689208bbc06c26b89237f740ff784255c4c0e04d9099a488f4a47fb0db249785",
+        "rawSha256": "ece03a6b7b783ee565ea6cb016040d648f76076a32b8a9d288324defd487e15c",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 4736.5031,
+          "pacedAtMs": 4857.6392,
+          "sentAtMs": 4857.7924,
+          "headersAtMs": 4935.4388,
+          "capturedAtMs": 5266.785400000001,
+          "finishedAtMs": 5267.3940999999995
+        }
+      },
+      {
+        "requestSha256": "a8f099edbc3c4a960a68932f64344508ef3c0c8d256bdfaf2c4dfd04a74ac538",
+        "rawSha256": "79b59de6538b0e8a920e55528cfc0bce58fc657ac3422dbd637ac6c33d0de9f7",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 5336.853999999999,
+          "pacedAtMs": 5336.8838,
+          "sentAtMs": 5337.127700000001,
+          "headersAtMs": 5415.194600000001,
+          "capturedAtMs": 5575.688099999999,
+          "finishedAtMs": 5576.2109
+        }
+      },
+      {
+        "requestSha256": "065ceb2cd7fa036da64127edf2eccee64bb17def229111f270667fa31477b7b0",
+        "rawSha256": "ee93ff8e4fa20a3c41a7b2900a4e2666a8b3894d171590d3364664eef3a4f10a",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 5630.401100000001,
+          "pacedAtMs": 5630.6453,
+          "sentAtMs": 5630.8866,
+          "headersAtMs": 5703.1903,
+          "capturedAtMs": 5703.662700000001,
+          "finishedAtMs": 5703.716399999999
+        }
+      },
+      {
+        "requestSha256": "c3af695e4a591df5061591592f48dee71b17339c3dd81aa6233663d41aaa116a",
+        "rawSha256": "7ffa88591177e495ebd06f2b661ab6bdb6edb85754950b46b49f2c0749d2005c",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 5630.5141,
+          "pacedAtMs": 5832.909900000001,
+          "sentAtMs": 5833.0789,
+          "headersAtMs": 5902.710300000001,
+          "capturedAtMs": 5903.101000000001,
+          "finishedAtMs": 5903.1451
+        }
+      },
+      {
+        "requestSha256": "7cdaa401fd275ce4711c79df25c9cfbb949af388493fc72c1b002a3cfd568016",
+        "rawSha256": "4efce592fa7fbaf2a2b62f2551fdf1847f0345ebc5bc06cf73e4048a61a8b9a2",
+        "httpStatus": 200,
+        "captureStatus": "captured",
+        "timing": {
+          "queuedAtMs": 5630.5627,
+          "pacedAtMs": 6034.191999999999,
+          "sentAtMs": 6034.335799999999,
+          "headersAtMs": 6104.927299999999,
+          "capturedAtMs": 6105.361499999999,
+          "finishedAtMs": 6105.4203
+        }
+      }
+    ],
+    "diagnosticOnly": true
+  },
+  "fullSwapQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "transactionsBroadcast": 0
+}

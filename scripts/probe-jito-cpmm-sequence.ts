@@ -71,6 +71,7 @@ const ORACLE = 'BeMRiScNtZrU1Ce4D6Kv5FYKLyhGTRbmMq2KPVxupuDv';
 const fail = (): never => {
   throw Error('CPMM sequence diagnostic refused.');
 };
+const REQUIRED_NODE_MAJOR = 24;
 function integer(v: unknown) {
   if (typeof v !== 'bigint' || v < 0n || v > BigInt(Number.MAX_SAFE_INTEGER))
     return fail();
@@ -176,6 +177,25 @@ async function main() {
   const withCode =
     (process.argv.length === 4 || withMarket) &&
     process.argv[3] === '--with-code-bracket';
+  if (Number(process.versions.node.split('.')[0]) !== REQUIRED_NODE_MAJOR) {
+    console.log(
+      JSON.stringify({
+        format: 'jito-cpmm-sequence-startup-refusal-v1',
+        status: 'refused',
+        reason: 'unsupported-node-major',
+        runtime: {
+          nodeVersion: process.version,
+          requiredNodeMajor: REQUIRED_NODE_MAJOR,
+        },
+        providerReads: 0,
+        signingAllowed: false,
+        executionAllowed: false,
+        transactionsBroadcast: 0,
+      }),
+    );
+    process.exitCode = 1;
+    return;
+  }
   if (
     (!withCode && process.argv.length !== 3) ||
     process.argv[2] !== '--live-readonly'
@@ -1063,6 +1083,10 @@ async function main() {
   const codeCaptures = codeTransport?.captures() ?? [];
   const receipt = {
     format: 'jito-cpmm-sequence-diagnostic-v1',
+    runtime: {
+      nodeVersion: process.version,
+      requiredNodeMajor: REQUIRED_NODE_MAJOR,
+    },
     observedAt: new Date().toISOString(),
     status,
     stage,
