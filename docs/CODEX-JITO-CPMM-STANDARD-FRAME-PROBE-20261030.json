@@ -1,0 +1,122 @@
+{
+  "format": "jito-cpmm-standard-frame-probe-v1",
+  "observedAt": "2026-10-30T20:02:00.209Z",
+  "runtime": {
+    "nodeVersion": "v24.22.1",
+    "requiredNodeMajor": 24
+  },
+  "captureSha256": "b9e2a7b3c6eacf8a62c89e21720f837760555af31ca91f834272bba253f48557",
+  "archive": {
+    "status": "unsigned-setup-swap-tip-mutable-effects-observed",
+    "floor": 463412293,
+    "simulationSlot": 463412304,
+    "lastSlot": 463412324,
+    "spanSlots": 31,
+    "lifetimeRechecked": true,
+    "writableReplay": {
+      "format": "jito-cpmm-sparse-state-replay-v1",
+      "transactionSha256": "acd05cc5f905f5cb4dfcc07fe66ce09f565f9317b971986e5f3b157fac3175d7",
+      "slot": 463412304,
+      "poolTransitionChecked": true,
+      "oracleTransitionChecked": true,
+      "tokenTransitionChecked": true,
+      "outputRaw": "94551",
+      "rentCoverageChecked": true,
+      "sourceAuthenticated": false,
+      "packetVerified": false,
+      "economicOutputVerified": false,
+      "accountProvenanceVerified": false,
+      "bankVerified": false,
+      "providerQualified": false,
+      "programApproved": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "readonlyPostCoverage": false,
+      "fullSwapQualified": false
+    },
+    "marketComparison": {
+      "available": true,
+      "transactionSha256": "acd05cc5f905f5cb4dfcc07fe66ce09f565f9317b971986e5f3b157fac3175d7",
+      "inputMarketPair": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+      "outputMarketPair": "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ",
+      "inputPriceUsd": "94.69",
+      "outputPriceUsd": "0.9968",
+      "inputObservedAt": "2026-10-30T20:01:53.310Z",
+      "outputObservedAt": "2026-10-30T20:01:53.331Z",
+      "minimumValueDifferenceBps": "-46",
+      "worse": true,
+      "acknowledgementRequired": false,
+      "expiresAt": "2026-10-30T20:06:53.310Z",
+      "priceVerified": false,
+      "providerQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false
+    },
+    "codeReads": 18,
+    "rateLimited": false
+  },
+  "standardProbe": {
+    "status": "refused",
+    "observations": {
+      "diagnosticOnly": true,
+      "bankVerified": false,
+      "feeBankVerified": false,
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "requestedBankSlot": 463412304,
+      "refusal": "bank-unavailable"
+    },
+    "transport": {
+      "stage": "bundle",
+      "httpReads": 1,
+      "methodUnits": 1,
+      "responseBytes": 123,
+      "terminal": true,
+      "rateLimited": false,
+      "maximumObservedSlot": null,
+      "timing": {
+        "clock": "process-monotonic",
+        "originMs": 4514.981,
+        "diagnosticOnly": true
+      },
+      "providerQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false
+    },
+    "diagnosticOnly": true,
+    "bankVerified": false,
+    "feeBankVerified": false,
+    "fullSwapQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "exactRequest": {
+    "method": "simulateBundle",
+    "transactionCount": 3,
+    "requestedBankSlot": 463412304,
+    "skipSigVerify": true,
+    "replaceRecentBlockhash": false,
+    "preAccountCounts": [
+      18,
+      18,
+      18
+    ],
+    "postAccountCounts": [
+      18,
+      18,
+      18
+    ],
+    "requestSha256": "0682dc940f5f1fb3c88659d796c89c9ca4d9575eb416b3e3f9e9139ee6cc564b",
+    "rawSha256": "9a9940cf6057249e7e71d85f7b168b46e7c6a2219384011ce3d3167281bfdc5b",
+    "code": -32602,
+    "classifiedReason": "bank-unavailable"
+  },
+  "bankVerified": false,
+  "readonlyPostStateVerified": false,
+  "feeBankVerified": false,
+  "fullSwapQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "transactionsBroadcast": 0
+}

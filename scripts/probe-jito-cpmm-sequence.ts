@@ -55,6 +55,7 @@ import type { PumpLaunchRpc } from '../lib/pump-launch-simulation';
 import { inspectJitoCpmmSparseSwapState } from '../lib/jito-cpmm-state-replay';
 import { observeTokenMarket, type TokenMarket } from '../lib/token-market';
 import { readJitoCpmmPriceComparison } from '../lib/jito-cpmm-price-evidence';
+import { probeJitoCpmmLiveFrames } from '../lib/jito-cpmm-live-frame-probe';
 const PAYER = '2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo',
   TIP = '96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5';
 const SYSTEM = '11111111111111111111111111111111',
@@ -172,8 +173,11 @@ async function main() {
     contextSlot: string | null;
     httpStatus: number | null;
   }[] = [];
+  const withFrameProbe =
+    process.argv.length === 7 && process.argv[6] === '--with-jito-frame-probe';
   const withCompression =
-    process.argv.length === 6 && process.argv[5] === '--with-code-compression';
+    (process.argv.length === 6 || withFrameProbe) &&
+    process.argv[5] === '--with-code-compression';
   const withMarket =
     (process.argv.length === 5 || withCompression) &&
     process.argv[4] === '--with-market-comparison';
@@ -245,6 +249,7 @@ async function main() {
   let lifetimeFloor = 0;
   let firstCodeReady: Promise<JitoRuntimeCapture> | null = null;
   let markets: Promise<PromiseSettledResult<TokenMarket>[]> | null = null;
+  let frameProbe: ReturnType<typeof probeJitoCpmmLiveFrames> | null = null;
   async function rpc(method: string, params: unknown[], readSignal = signal) {
     const requestSignal = AbortSignal.any([signal, readSignal]);
     const callId = ++calls;
@@ -692,6 +697,16 @@ async function main() {
     const bound = await inspectJitoCpmmUnsignedPacket(packet);
     observations.swapPacket = bound;
     const transactions = [setup.transaction, swap.transaction, native(1000n)];
+    if (withFrameProbe)
+      frameProbe = probeJitoCpmmLiveFrames(
+        {
+          transactions: transactions.slice(),
+          addresses: keys.slice(),
+          minimumSlot: floor,
+          simulationSlot,
+        },
+        signal,
+      );
     enterStage('full-setup-swap-tip-simulation');
     const result = (await rpc('simulateTransactionsAtSlot', [
       {
@@ -719,6 +734,11 @@ async function main() {
     )
       return fail();
     const rows = result.value.simulationResults;
+    if (frameProbe) {
+      const value = await frameProbe;
+      observations.jitoFrameProbe = value.summary;
+      if (value.summary.transport?.rateLimited) return fail();
+    }
     observations.results = rows.map((row) => ({
       slot: integer(row.slot),
       status: typeof row.status === 'string' ? row.status : 'invalid',
@@ -1085,6 +1105,8 @@ async function main() {
   codeTransport?.close();
   if (markets) await markets;
   const codeCaptures = codeTransport?.captures() ?? [];
+  const frameProbeResult = frameProbe ? await frameProbe : null;
+  if (frameProbeResult) observations.jitoFrameProbe = frameProbeResult.summary;
   const receipt = {
     format: 'jito-cpmm-sequence-diagnostic-v1',
     runtime: {
@@ -1127,6 +1149,7 @@ async function main() {
       observations.lifetimeRecheckStatus === 'fulfilled',
     marketComparisonRequested: withMarket,
     codeCompressionRequested: withCompression,
+    jitoFrameProbeRequested: withFrameProbe,
     overridesUsed: false,
     replaceRecentBlockhash: false,
     referenceQuietnessVerified: false,
@@ -1150,6 +1173,7 @@ async function main() {
       {
         receipt,
         captures,
+        frameProbe: frameProbeResult,
         codeCaptures: codeCaptures.map(({ rawBody, ...capture }) => ({
           ...capture,
           rawBodyBase64: Buffer.from(rawBody).toString('base64'),

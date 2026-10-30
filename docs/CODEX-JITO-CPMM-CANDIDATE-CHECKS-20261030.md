@@ -2,6 +2,8 @@
 
 ## Current checkpoint
 
+Latest evidence: `CODEX-JITO-CPMM-STANDARD-FRAME-PROBE-20261030.md` records one new exact-slot standard Jito request alongside the full unsigned archive CPMM vector. Archive checks passed in 31 slots; standard `simulateBundle` could not retrieve that same requested slot. No commitment/tip fallback or retry was used. The provider-dependent full-post-state/bank/fee hold remains. Final focused verification now passes 758 tests in 27 files on Node 24.
+
 The current CPMM binary has been matched to a controlled build of source `f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5`; see `CODEX-RAYDIUM-BUILD-MATCH-20261030.json`. Packet-bound token/pool/oracle/rent replay, sequential fee/tip settlement, owned serial code brackets, captured lifetime and final full custody/mint rechecks are implemented as isolated research. The shared signing allowlist and all signing gates remain unchanged. These helpers are not connected to an app API or UI and do not qualify a live swap.
 
 Initial live Alchemy code scans matched the reference in a 17-slot lower-bound probe without simulation. Fourteen pool candidates and several public references were investigated; a later reference supplied an eligible WSOL source, with missing USDC destination covered by simulated ATA setup below. No ownership or quietness is established for that public address, and no nonempty live swap has been fully qualified. Trusted actual request capture, same-bank/fee provenance and the contextless height-read bound remain open. Older sections below are historical checkpoints. This remains draft work on `codex/jito-v2-reservations-20261028`, with no deployment or funded action.
