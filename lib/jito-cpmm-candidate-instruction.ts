@@ -124,7 +124,7 @@ export async function inspectJitoCpmmCandidateInstruction(input: Candidate) {
     bytes.readBigUInt64LE(16) !== minimumOutputRaw
   )
     return fail();
-  const [authority] = await getProgramDerivedAddress({
+  const [authority, authorityBump] = await getProgramDerivedAddress({
     programAddress: address(CPMM),
     seeds: [new TextEncoder().encode('vault_and_lp_mint_auth_seed')],
   });
@@ -146,6 +146,9 @@ export async function inspectJitoCpmmCandidateInstruction(input: Candidate) {
     inputRaw: inputRaw.toString(),
     minimumOutputRaw: minimumOutputRaw.toString(),
     pool: accounts[3].address,
+    config: accounts[2].address,
+    observation: accounts[12].address,
+    authorityBump,
     authority: accounts[1].address,
     source: accounts[4].address,
     destination: accounts[5].address,
