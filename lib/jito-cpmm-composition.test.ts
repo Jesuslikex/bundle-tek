@@ -1189,6 +1189,13 @@ it('composes immutable owned code and lifetime captures with real packet/frame r
     f.keys.forEach((k, i) => {
       if (!initial.has(k)) initial.set(k, f.preAccounts[i]);
     });
+  for (const a of request.bankAccounts.before)
+    initial.set(a.address, {
+      owner: a.owner,
+      lamports: a.lamports,
+      executable: a.executable,
+      data: Buffer.from(a.dataBase64, 'base64'),
+    });
   // The scanner alone is mocked: this test checks owned capture composition,
   // not full binary hashing. The real two-scan probe covers that separately.
   const scanner = vi
@@ -1235,6 +1242,16 @@ it('composes immutable owned code and lifetime captures with real packet/frame r
   let at = 100,
     valid = true;
   let onHeight: () => void = () => {};
+  type FreshAccount = {
+    owner: string;
+    lamports: string;
+    executable: boolean;
+    data: string[];
+  } | null;
+  let mutateFresh: (
+    keys: string[],
+    response: { context: { slot: string }; value: FreshAccount[] },
+  ) => void = () => {};
   const calls: { method: string; params: unknown[] }[] = [];
   const rpc: PumpLaunchRpc = async (method, params) => {
     calls.push({ method, params });
@@ -1255,20 +1272,24 @@ it('composes immutable owned code and lifetime captures with real packet/frame r
     }
     if (method !== 'getMultipleAccounts') throw Error('unexpected method');
     const slice = (
-      params[1] as { dataSlice: { offset: number; length: number } }
+      params[1] as { dataSlice?: { offset: number; length: number } }
     ).dataSlice;
-    return {
+    const selected = params[0] as string[];
+    const response = {
       context: { slot: String(at) },
-      value: (params[0] as string[]).map((k) => {
+      value: selected.map((k) => {
         const a = initial.get(k);
+        const bytes = a ? Buffer.from(a.data) : null;
+        if (bytes && k === CLOCK && !slice) bytes.writeBigUInt64LE(BigInt(at));
         return a
           ? {
               owner: a.owner,
               lamports: a.lamports,
               executable: a.executable,
               data: [
-                Buffer.from(
-                  a.data.slice(slice.offset, slice.offset + slice.length),
+                (slice
+                  ? bytes!.subarray(slice.offset, slice.offset + slice.length)
+                  : bytes!
                 ).toString('base64'),
                 'base64',
               ],
@@ -1276,6 +1297,8 @@ it('composes immutable owned code and lifetime captures with real packet/frame r
           : null;
       }),
     };
+    if (!slice) mutateFresh(selected, response);
+    return response;
   };
   try {
     const signal = new AbortController().signal,
@@ -1314,6 +1337,14 @@ it('composes immutable owned code and lifetime captures with real packet/frame r
       bankVerified: false,
       signingAllowed: false,
     });
+    expect(proof.custody).toMatchObject({
+      slot: 103,
+      minimumReadSlot: 103,
+      walletAccountsChecked: 1,
+      tokenAccountsChecked: 2,
+      mintPoliciesChecked: 2,
+      rentPolicyUnchanged: true,
+    });
     expect(proof.lifetime).toMatchObject({
       remainingBlocks: '10',
       validitySlot: 104,
@@ -1348,6 +1379,13 @@ it('composes immutable owned code and lifetime captures with real packet/frame r
       );
       expect(race).toHaveBeenCalledOnce();
       expect(
+        calls.find(
+          (c) =>
+            c.method === 'getMultipleAccounts' &&
+            !(c.params[1] as { dataSlice?: unknown }).dataSlice,
+        )?.params[1],
+      ).toMatchObject({ minContextSlot: 103 });
+      expect(
         calls.find((c) => c.method === 'isBlockhashValid')?.params,
       ).toEqual([
         '11111111111111111111111111111111',
@@ -1358,6 +1396,104 @@ it('composes immutable owned code and lifetime captures with real packet/frame r
       onHeight = () => {};
       after.maximumSlot = 103;
     }
+    const firstBound = await inspectJitoCpmmUnsignedPacket(request.swaps[0]);
+    const mutateBytes =
+      (key: string, change: (b: ReturnType<typeof Buffer.from>) => void) =>
+      (
+        keys: string[],
+        r: { context: { slot: string }; value: FreshAccount[] },
+      ) => {
+        const a = r.value[keys.indexOf(key)]!,
+          b = Buffer.from(a.data[0], 'base64');
+        change(b);
+        a.data[0] = b.toString('base64');
+      };
+    const refusals: (typeof mutateFresh)[] = [
+      (keys, r) => {
+        const a = r.value[keys.indexOf(firstBound.payer)]!;
+        a.lamports = (BigInt(a.lamports) + 1n).toString();
+      },
+      mutateBytes(firstBound.source, (b) => {
+        b[129] = 1;
+      }),
+      mutateBytes(USDC, (b) => {
+        b[44] = 7;
+      }),
+      mutateBytes(RENT, (b) => {
+        b.writeBigUInt64LE(3481n);
+      }),
+      mutateBytes(CLOCK, (b) => {
+        b.writeBigUInt64LE(104n);
+      }),
+      (_keys, r) => {
+        r.context.slot = '102';
+      },
+      (_keys, r) => {
+        r.context.slot = '133';
+      },
+      (_keys, r) => {
+        r.value.pop();
+      },
+      (keys, r) => {
+        r.value[keys.indexOf(firstBound.destination)] = null;
+      },
+      (keys, r) => {
+        r.value[keys.indexOf(USDC)]!.lamports = '0';
+      },
+      (keys, r) => {
+        const index = keys.indexOf(firstBound.payer);
+        keys.splice(index, 1);
+        r.value.splice(index, 1);
+      },
+    ];
+    for (const mutate of refusals) {
+      mutateFresh = mutate;
+      await expect(
+        verifyJitoCpmmOwnedResearchBracket(
+          request,
+          lifetime,
+          before,
+          after,
+          rpc,
+          signal,
+        ),
+      ).rejects.toThrow();
+    }
+    mutateFresh = refusals[0];
+    await expect(
+      verifyJitoCpmmOwnedResearchBracket(
+        request,
+        lifetime,
+        before,
+        after,
+        rpc,
+        signal,
+      ),
+    ).rejects.toMatchObject({
+      pairDiagnostic: {
+        check: 'cpmm-final-custody',
+        address: firstBound.payer,
+        role: 'wallet',
+        comparisons: expect.arrayContaining([
+          { field: 'lamports', before: '10000000', after: '10000001' },
+        ]),
+      },
+    });
+    mutateFresh = mutateBytes(USDC, (b) => {
+      b.writeBigUInt64LE(b.readBigUInt64LE(36) + 1n, 36);
+    });
+    // Normal mint/burn supply changes preserve the pre-existing mint-policy rule.
+    await expect(
+      verifyJitoCpmmOwnedResearchBracket(
+        request,
+        lifetime,
+        before,
+        after,
+        rpc,
+        signal,
+      ),
+    ).resolves.toMatchObject({ custody: { mintPoliciesChecked: 2 } });
+    mutateFresh = () => {};
     const wrongReader: PumpLaunchRpc = (...args) => rpc(...args);
     await expect(
       verifyJitoCpmmOwnedResearchBracket(
