@@ -1,0 +1,42 @@
+{
+  "summary": {
+    "provider": "Helius",
+    "node": "24.22.1",
+    "status": "refused",
+    "stage": "exact-bank-bundle",
+    "calls": 3,
+    "rateLimited": false,
+    "diagnosticOnly": true,
+    "bankVerified": false,
+    "feeBankVerified": false,
+    "fullSwapQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "lastHttpStatus": 200,
+    "floor": 463422166,
+    "rpcErrorCode": "-32602",
+    "refusal": "bank-unavailable"
+  },
+  "captures": [
+    {
+      "method": "getGenesisHash",
+      "httpStatus": 200,
+      "requestSha256": "b6df863d2691e7d417024a68756f6c64f608af714e8b9cbdccf2554909445a73",
+      "responseSha256": "40bd87eb2de76dce8f4b8b68d2433835df368b5899302d89b47df9bc8ce7e7de"
+    },
+    {
+      "method": "getLatestBlockhash",
+      "httpStatus": 200,
+      "requestSha256": "aae52519fce366b1ef451e92cec5e64be0feaece529ead90e50ef43c3f620307",
+      "responseSha256": "f3da130ffe712a9857136487580d86b028037be34b6643493aba49644b05e48a"
+    },
+    {
+      "method": "simulateBundle",
+      "httpStatus": 200,
+      "requestSha256": "a6179ca4b1e9c9f60f46e10fe3a1db102d0295d2bb8d710f61959e786ee742ce",
+      "responseSha256": "6acdf33c6f7f9bae3603bba9d66dc28e7fa4278c100b59ffcb3078e1eacf4fad"
+    }
+  ],
+  "captureHashesVerified": true,
+  "unsignedPacketsVerified": true
+}
