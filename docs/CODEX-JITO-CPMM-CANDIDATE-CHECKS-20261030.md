@@ -43,3 +43,11 @@ Current completion map:
 | Full swap with both runtime scans inside 32 slots                            | Not qualified                                              |
 
 No production/live-site audit, complete product parity, deployment or funded verification is claimed by this source audit. Preserve the three unrelated untracked recovery-password files.
+
+## Exact unsigned packet binding
+
+Added `lib/jito-cpmm-unsigned-packet.ts`: canonical transaction and message decode/re-encode, 1232-byte cap, exactly one unsigned payer, exact fee payer, unique static keys, no unresolved lookup tables, no unused keys, and a single read-only-program CPMM instruction. Account signer/writable roles and data are derived from message bytes, then passed to the existing candidate inspector. Original transaction/message hashes accompany the diagnostic. Signatures, extra instructions, lookup-based routes, setup/wrapping instructions and malformed envelopes are refused. This is a narrow existing-ATA profile, not full real-world route support.
+
+Validation: two candidate test files pass 59 tests including an independently constructed raw-wire packet and signed/header/trailing-byte/amount mutations. Typecheck and scoped lint pass.
+
+`instructionBoundToPacket` is true only after byte binding. `packetVerified`, `accountStateVerified`, `priceVerified`, `economicOutputVerified`, program/source/provider approval and signing/execution remain false. Blockhash lifetime, pool/config/oracle and raw mint/rent/independent price evidence are still missing, as are actual same-bank provenance and the full runtime qualification. No call site enables this module for signing. No new live provider or funded run was made in this step.

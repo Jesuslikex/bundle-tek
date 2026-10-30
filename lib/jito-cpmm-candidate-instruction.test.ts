@@ -244,3 +244,74 @@ describe('Raydium CPMM candidate instruction inspection', () => {
     expect(result.signingAllowed).toBe(false);
   });
 });
+
+// Raw-wire fixture intentionally avoids using the production encoder.
+it('binds candidate checks to canonical unsigned packet bytes and rejects packet mutations', async () => {
+  const { inspectJitoCpmmUnsignedPacket } =
+    await import('./jito-cpmm-unsigned-packet');
+  const c = await candidate();
+  const writable = c.accounts.filter((a) => a.writable).map((a) => a.address);
+  const readonly = [
+    ...new Set(c.accounts.filter((a) => !a.writable).map((a) => a.address)),
+    PROGRAM,
+  ];
+  const keys = [...writable, ...readonly];
+  const packet = Buffer.from([
+    1,
+    ...new Uint8Array(64),
+    128,
+    1,
+    0,
+    readonly.length,
+    keys.length,
+    ...keys.flatMap((k) => Array.from(bs58.decode(k))),
+    ...new Uint8Array(32),
+    1,
+    keys.indexOf(PROGRAM),
+    13,
+    ...c.accounts.map((a) => keys.indexOf(a.address)),
+    24,
+    ...Buffer.from(c.dataHex, 'hex'),
+    0,
+  ]);
+  const result = await inspectJitoCpmmUnsignedPacket({
+    transaction: packet.toString('base64'),
+    expected: c.expected,
+  });
+  expect(result.instructionBoundToPacket).toBe(true);
+  expect(result.signingAllowed).toBe(false);
+  expect(result.packetVerified).toBe(false);
+  expect(result.transactionSha256).toMatch(/^[a-f0-9]{64}$/);
+  for (const mutate of [
+    (b: Uint8Array) => {
+      b[1] = 1;
+    },
+    (b: Uint8Array) => {
+      b[66] = 2;
+    },
+    (b: Uint8Array) => {
+      b[67] = 1;
+    },
+  ]) {
+    const bad = Uint8Array.from(packet);
+    mutate(bad);
+    await expect(
+      inspectJitoCpmmUnsignedPacket({
+        transaction: Buffer.from(bad).toString('base64'),
+        expected: c.expected,
+      }),
+    ).rejects.toThrow();
+  }
+  await expect(
+    inspectJitoCpmmUnsignedPacket({
+      transaction: Buffer.concat([packet, Buffer.from([0])]).toString('base64'),
+      expected: c.expected,
+    }),
+  ).rejects.toThrow();
+  await expect(
+    inspectJitoCpmmUnsignedPacket({
+      transaction: packet.toString('base64'),
+      expected: { ...c.expected, inputRaw: '124' },
+    }),
+  ).rejects.toThrow();
+});
