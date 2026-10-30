@@ -18,7 +18,8 @@ export const CPMM_MATCHED_SOURCE_IDENTITY = Object.freeze({
   identityKind: 'elf-code',
 });
 const SYSTEM = '11111111111111111111111111111111',
-  TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+  TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+  ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
 const fail = (): never => {
   throw Error('CPMM matched-source research identity refused.');
 };
@@ -28,20 +29,39 @@ export function requireJitoCpmmResearchIdentities(
   first: readonly PairObservedProgram[],
   last: readonly PairObservedProgram[],
 ) {
+  return requireResearchIdentities(first, last, false);
+}
+/** Separate four-program research profile. The original three-program profile
+ * and shared signing policy remain unchanged; ATA must match its existing pin. */
+export function requireJitoCpmmSetupResearchIdentities(
+  first: readonly PairObservedProgram[],
+  last: readonly PairObservedProgram[],
+) {
+  return {
+    ...requireResearchIdentities(first, last, true),
+    ataSetupProgramChecked: true as const,
+  };
+}
+function requireResearchIdentities(
+  first: readonly PairObservedProgram[],
+  last: readonly PairObservedProgram[],
+  withSetup: boolean,
+) {
+  const allowed = [
+    SYSTEM,
+    TOKEN,
+    CPMM_MATCHED_SOURCE_IDENTITY.address,
+    ...(withSetup ? [ATA] : []),
+  ];
   const a = snapshotJitoEvidence(first, 16384),
     b = snapshotJitoEvidence(last, 16384);
   if (
     !Array.isArray(a) ||
-    a.length !== 3 ||
+    a.length !== allowed.length ||
     JSON.stringify(a) !== JSON.stringify(b) ||
-    new Set(a.map((p) => p?.address)).size !== 3 ||
+    new Set(a.map((p) => p?.address)).size !== allowed.length ||
     a.some(
-      (p) =>
-        !p ||
-        ![SYSTEM, TOKEN, CPMM_MATCHED_SOURCE_IDENTITY.address].includes(
-          p.address,
-        ) ||
-        Object.keys(p).length !== 8,
+      (p) => !p || !allowed.includes(p.address) || Object.keys(p).length !== 8,
     )
   )
     return fail();
@@ -54,7 +74,15 @@ export function requireJitoCpmmResearchIdentities(
   requirePairTrustedPrograms(standard, standard);
   if (
     standard.find((p) => p.address === SYSTEM)?.codeBytes !== 21 ||
-    standard.find((p) => p.address === TOKEN)?.codeBytes !== 108600
+    standard.find((p) => p.address === TOKEN)?.codeBytes !== 108600 ||
+    (withSetup &&
+      standard.some(
+        (p) =>
+          p.address === ATA &&
+          (p.codeBytes !== 105032 ||
+            p.programData !== null ||
+            p.deploymentSlot !== null),
+      ))
   )
     return fail();
   return {

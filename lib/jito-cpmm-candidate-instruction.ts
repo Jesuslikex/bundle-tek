@@ -2,8 +2,9 @@ import { address, getProgramDerivedAddress } from '@solana/kit';
 import bs58 from 'bs58';
 import { snapshotJitoEvidence } from './jito-evidence-json';
 
-// Candidate inspection only. The referenced Raydium source has not yet been
-// matched to the deployed binary. Nothing here grants route or signing authority.
+// Candidate inspection only. The controlled source/build match is recorded in
+// CODEX-RAYDIUM-BUILD-MATCH-20261030.json; this inspector does not authenticate
+// live program bytes and grants no route or signing authority.
 const CPMM = 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C';
 const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';

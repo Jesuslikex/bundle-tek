@@ -6,6 +6,8 @@ import {
   verifyJitoRuntimeBracket,
   JITO_RESERVED_WRITE_KEYS,
   jitoRuntimePolicyRefusal,
+  verifyJitoCpmmSetupResearchRuntimeBracket,
+  verifyJitoCpmmResearchRuntimeBracket,
 } from './jito-runtime-evidence';
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
 import type { JitoBundleSimulationPacket } from './jito-bundle-simulation-frames';
@@ -245,5 +247,34 @@ it('refuses missing executable frame state independently of requested privileges
   modified.frames[0].postAccounts[index] = null;
   await expect(
     verifyJitoRuntimeBracket(a, b, modified, signal()),
+  ).rejects.toThrow();
+});
+
+it('does not convert reviewed captures or public clones into either research profile', async () => {
+  const f = await fixture();
+  const a = await collectJitoRuntimeEvidence(
+    f.keys,
+    f.floor,
+    f.floor,
+    signal(),
+    f.rpc,
+  );
+  const b = await collectJitoRuntimeEvidence(
+    f.keys,
+    f.floor,
+    f.frames.slot,
+    signal(),
+    f.rpc,
+  );
+  await expect(
+    verifyJitoCpmmSetupResearchRuntimeBracket(a, b, f.frames, signal()),
+  ).rejects.toThrow();
+  await expect(
+    verifyJitoCpmmResearchRuntimeBracket(a, b, f.frames, signal()),
+  ).rejects.toThrow();
+  const clone = structuredClone(a);
+  clone.diagnosticProfile = 'cpmm-ata-matched-source-research';
+  await expect(
+    verifyJitoCpmmSetupResearchRuntimeBracket(clone, b, f.frames, signal()),
   ).rejects.toThrow();
 });

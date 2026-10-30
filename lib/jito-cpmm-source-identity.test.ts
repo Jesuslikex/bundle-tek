@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   CPMM_MATCHED_SOURCE_IDENTITY,
   requireJitoCpmmResearchIdentities,
+  requireJitoCpmmSetupResearchIdentities,
 } from './jito-cpmm-source-identity';
 import {
   PAIR_TRUSTED_PROGRAMS,
@@ -67,4 +68,57 @@ it('requires three distinct complete matching scans and retains standard program
   expect(() =>
     requireJitoCpmmResearchIdentities(duplicate, duplicate),
   ).toThrow();
+});
+
+function setupIdentities(): PairObservedProgram[] {
+  const address = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
+  const p = PAIR_TRUSTED_PROGRAMS.find((p) => p.address === address)!;
+  return [
+    ...researchIdentities(),
+    {
+      address,
+      loader: p.loader,
+      identityKind: p.identityKind,
+      upgradeAuthority: p.upgradeAuthority,
+      codeSha256: p.codeSha256[0],
+      codeBytes: 105032,
+      programData: null,
+      deploymentSlot: null,
+    },
+  ];
+}
+it('isolates the four-program setup profile and retains every shared pin', () => {
+  const a = setupIdentities();
+  expect(
+    requireJitoCpmmSetupResearchIdentities(a, structuredClone(a)),
+  ).toMatchObject({
+    ataSetupProgramChecked: true,
+    matchedSourceIdentityChecked: true,
+    reviewedCodePolicyMatched: false,
+    programApproved: false,
+    signingAllowed: false,
+  });
+  expect(() => requireJitoCpmmResearchIdentities(a, a)).toThrow();
+  expect(() =>
+    requireJitoCpmmSetupResearchIdentities(
+      researchIdentities(),
+      researchIdentities(),
+    ),
+  ).toThrow();
+  expect(() => requirePairTrustedPrograms(a, a)).toThrow();
+});
+it.each([
+  'address',
+  'loader',
+  'identityKind',
+  'upgradeAuthority',
+  'codeSha256',
+  'codeBytes',
+  'programData',
+  'deploymentSlot',
+])('refuses changed ATA %s even when both scans agree', (field) => {
+  const a = setupIdentities();
+  (a.at(-1)! as unknown as Record<string, unknown>)[field] =
+    field === 'codeBytes' ? 105033 : 'changed';
+  expect(() => requireJitoCpmmSetupResearchIdentities(a, a)).toThrow();
 });

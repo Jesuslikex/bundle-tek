@@ -1,0 +1,80 @@
+{
+  "format": "jito-cpmm-source-runtime-probe-v1",
+  "sourceProfile": "cpmm-with-ata-research",
+  "observedAt": "2026-10-30T19:13:20.459Z",
+  "status": "two-source-reference-scans-matched",
+  "minimumSlot": 463398688,
+  "firstMaximumSlot": 463398698,
+  "secondMaximumSlot": 463398708,
+  "firstReads": 10,
+  "secondReads": 10,
+  "programs": [
+    {
+      "address": "11111111111111111111111111111111",
+      "loader": "NativeLoader1111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+      "codeBytes": 21,
+      "identityKind": "native-system"
+    },
+    {
+      "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "loader": "BPFLoader2111111111111111111111111111111111",
+      "programData": null,
+      "deploymentSlot": null,
+      "upgradeAuthority": null,
+      "codeSha256": "6804554e69fd3a58caa191dc4a58f4c67223d30ca28ab8987f39fc18d2f7374d",
+      "codeBytes": 105032,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
+      "deploymentSlot": "452376460",
+      "upgradeAuthority": "FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK",
+      "codeSha256": "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+      "codeBytes": 793824,
+      "identityKind": "elf-code"
+    },
+    {
+      "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+      "deploymentSlot": "419472000",
+      "upgradeAuthority": null,
+      "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+      "codeBytes": 108600,
+      "identityKind": "elf-code"
+    }
+  ],
+  "identitiesMatch": true,
+  "simulationPerformed": false,
+  "transport": {
+    "stage": "runtime",
+    "httpReads": 20,
+    "methodUnits": 20,
+    "responseBytes": 2697002,
+    "terminal": true,
+    "rateLimited": false,
+    "maximumObservedSlot": 463398708,
+    "timing": {
+      "clock": "process-monotonic",
+      "originMs": 1696.1323,
+      "diagnosticOnly": true
+    },
+    "providerQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "fullSwapQualified": false,
+  "providerQualified": false,
+  "sourceAuthenticated": false,
+  "reviewedCodePolicyMatched": false,
+  "programApproved": false,
+  "bankVerified": false,
+  "signingAllowed": false,
+  "executionAllowed": false
+}

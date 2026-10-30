@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import {
   collectJitoCpmmResearchRuntimeEvidence,
+  collectJitoCpmmSetupResearchRuntimeEvidence,
   type JitoRuntimeCapture,
 } from '../lib/jito-runtime-evidence';
 import { CPMM_MATCHED_SOURCE_IDENTITY } from '../lib/jito-cpmm-source-identity';
@@ -19,7 +20,12 @@ const flags = {
   executionAllowed: false,
 };
 async function main() {
-  if (process.argv.length !== 3 || process.argv[2] !== '--live-readonly')
+  const withSetup =
+    process.argv.length === 4 && process.argv[3] === '--with-ata';
+  if (
+    (!withSetup && process.argv.length !== 3) ||
+    process.argv[2] !== '--live-readonly'
+  )
     throw Error();
   const signal = AbortSignal.timeout(60000),
     endpoint = getSolanaHolderRpcEndpoint();
@@ -70,8 +76,12 @@ async function main() {
       '11111111111111111111111111111111',
       'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
       CPMM_MATCHED_SOURCE_IDENTITY.address,
+      ...(withSetup ? ['ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'] : []),
     ];
-    first = await collectJitoCpmmResearchRuntimeEvidence(
+    const collect = withSetup
+      ? collectJitoCpmmSetupResearchRuntimeEvidence
+      : collectJitoCpmmResearchRuntimeEvidence;
+    first = await collect(
       keys,
       minimumSlot,
       minimumSlot,
@@ -79,7 +89,7 @@ async function main() {
       transport.rpc,
     );
     // No simulation between these scans: this is a lower-bound diagnostic only.
-    second = await collectJitoCpmmResearchRuntimeEvidence(
+    second = await collect(
       keys,
       minimumSlot,
       first.maximumSlot,
@@ -96,6 +106,7 @@ async function main() {
   }
   const receipt = {
     format: 'jito-cpmm-source-runtime-probe-v1',
+    sourceProfile: withSetup ? 'cpmm-with-ata-research' : 'cpmm-research',
     observedAt: new Date().toISOString(),
     status,
     minimumSlot,

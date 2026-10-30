@@ -13,7 +13,22 @@ import {
 } from './jito-evidence-json';
 import type { PumpLaunchRpc, PumpRpcAccount } from './pump-launch-simulation';
 import type { JitoBundleSimulationFrames } from './jito-bundle-simulation-frames';
-import { requireJitoCpmmResearchIdentities } from './jito-cpmm-source-identity';
+import {
+  requireJitoCpmmResearchIdentities,
+  requireJitoCpmmSetupResearchIdentities,
+} from './jito-cpmm-source-identity';
+type RuntimeProfile = 'reviewed' | 'cpmm-research' | 'cpmm-ata-research';
+function requireRuntimePrograms(
+  profile: RuntimeProfile,
+  first: Identity[],
+  last: Identity[],
+) {
+  if (profile === 'cpmm-research')
+    requireJitoCpmmResearchIdentities(first, last);
+  else if (profile === 'cpmm-ata-research')
+    requireJitoCpmmSetupResearchIdentities(first, last);
+  else requirePairTrustedPrograms(first, last);
+}
 const SYSTEM = '11111111111111111111111111111111',
   COMPUTE = 'ComputeBudget111111111111111111111111111111',
   NATIVE = 'NativeLoader1111111111111111111111111111111';
@@ -93,14 +108,16 @@ export type JitoRuntimeCapture = {
   reads: number;
   signingAllowed: false;
   executionAllowed: false;
-  diagnosticProfile?: 'cpmm-matched-source-research';
+  diagnosticProfile?:
+    | 'cpmm-matched-source-research'
+    | 'cpmm-ata-matched-source-research';
 };
 const issued = new WeakMap<
   object,
   {
     value: JitoRuntimeCapture;
     inventory: PumpRpcAccount[];
-    profile: 'reviewed' | 'cpmm-research';
+    profile: RuntimeProfile;
     rpc: PumpLaunchRpc;
   }
 >();
@@ -197,13 +214,31 @@ export async function collectJitoCpmmResearchRuntimeEvidence(
     'cpmm-research',
   );
 }
+/** Explicit setup profile; cannot be consumed by either original verifier. */
+export async function collectJitoCpmmSetupResearchRuntimeEvidence(
+  keysInput: string[],
+  minimumSlot: number,
+  minimumReadSlot: number,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc,
+): Promise<JitoRuntimeCapture> {
+  return collectRuntime(
+    keysInput,
+    minimumSlot,
+    minimumReadSlot,
+    signal,
+    rpc,
+    'cpmm-ata-research',
+  );
+}
+
 async function collectRuntime(
   keysInput: string[],
   minimumSlot: number,
   minimumReadSlot: number,
   signal: AbortSignal,
   rpc: PumpLaunchRpc,
-  profile: 'reviewed' | 'cpmm-research',
+  profile: RuntimeProfile,
 ): Promise<JitoRuntimeCapture> {
   signal = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
   const keys = snapshotJitoEvidence(keysInput);
@@ -316,11 +351,9 @@ async function collectRuntime(
   // The first scan alone can refuse an unreviewed program immediately; it can
   // never create policy by copying today's observed hash into an allowlist.
   try {
-    if (profile === 'cpmm-research')
-      requireJitoCpmmResearchIdentities(identities, identities);
-    else requirePairTrustedPrograms(identities, identities);
+    requireRuntimePrograms(profile, identities, identities);
   } catch {
-    if (profile === 'cpmm-research')
+    if (profile !== 'reviewed')
       throw Error('Jito CPMM research source identity refused.');
     const differences = identities.flatMap((observed) => {
       const expected = PAIR_TRUSTED_PROGRAMS.find(
@@ -357,8 +390,13 @@ async function collectRuntime(
     reads,
     signingAllowed: false as const,
     executionAllowed: false as const,
-    ...(profile === 'cpmm-research'
-      ? { diagnosticProfile: 'cpmm-matched-source-research' as const }
+    ...(profile !== 'reviewed'
+      ? {
+          diagnosticProfile:
+            profile === 'cpmm-research'
+              ? ('cpmm-matched-source-research' as const)
+              : ('cpmm-ata-matched-source-research' as const),
+        }
       : {}),
   };
   const value = { ...base, sha256: await checksum(base) };
@@ -405,12 +443,36 @@ export async function verifyJitoCpmmResearchRuntimeBracket(
     sourceAuthenticated: false as const,
   };
 }
+export async function verifyJitoCpmmSetupResearchRuntimeBracket(
+  first: JitoRuntimeCapture,
+  last: JitoRuntimeCapture,
+  frames: JitoBundleSimulationFrames,
+  signal: AbortSignal,
+) {
+  const value = await verifyRuntime(
+    first,
+    last,
+    frames,
+    signal,
+    'cpmm-ata-research',
+  );
+  return {
+    ...value,
+    format: 'jito-cpmm-setup-research-runtime-bracket-v1' as const,
+    matchedSourceIdentityChecked: true as const,
+    ataSetupProgramChecked: true as const,
+    reviewedCodePolicyMatched: false as const,
+    programApproved: false as const,
+    sourceAuthenticated: false as const,
+  };
+}
+
 async function verifyRuntime(
   first: JitoRuntimeCapture,
   last: JitoRuntimeCapture,
   frames: JitoBundleSimulationFrames,
   signal: AbortSignal,
-  profile: 'reviewed' | 'cpmm-research',
+  profile: RuntimeProfile,
 ) {
   const copiedFrames = structuredClone(frames);
   const a = issued.get(first),
@@ -426,9 +488,7 @@ async function verifyRuntime(
     b.value.maximumSlot - a.value.minimumSlot > 32
   )
     return fail();
-  if (profile === 'cpmm-research')
-    requireJitoCpmmResearchIdentities(a.value.programs, b.value.programs);
-  else requirePairTrustedPrograms(a.value.programs, b.value.programs);
+  requireRuntimePrograms(profile, a.value.programs, b.value.programs);
   const keys = [...new Set(copiedFrames.frames.flatMap((f) => f.keys))];
   if (JSON.stringify(keys) !== JSON.stringify(a.value.keys)) return fail();
   const identities = new Map(a.value.programs.map((p) => [p.address, p]));
