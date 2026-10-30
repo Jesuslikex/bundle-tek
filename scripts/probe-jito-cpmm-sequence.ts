@@ -151,6 +151,26 @@ function noLookups(value: unknown, legacy: boolean) {
   );
 }
 async function main() {
+  const timingOriginMs = performance.now();
+  const elapsed = () => Math.max(0, performance.now() - timingOriginMs);
+  const stageTimings: {
+    stage: string;
+    enteredAtMs: number;
+    finishedAtMs: number | null;
+  }[] = [{ stage: 'genesis', enteredAtMs: 0, finishedAtMs: null }];
+  const rpcTimings: {
+    id: number;
+    method: string;
+    stage: string;
+    queuedAtMs: number;
+    pacedAtMs: number | null;
+    sentAtMs: number | null;
+    headersAtMs: number | null;
+    capturedAtMs: number | null;
+    finishedAtMs: number | null;
+    contextSlot: string | null;
+    httpStatus: number | null;
+  }[] = [];
   const withMarket =
     process.argv.length === 5 && process.argv[4] === '--with-market-comparison';
   const withCode =
@@ -186,6 +206,12 @@ async function main() {
     floor: number | null = null,
     simulationSlot: number | null = null,
     lastSlot: number | null = null;
+  function enterStage(name: string) {
+    const now = elapsed();
+    stageTimings.at(-1)!.finishedAtMs = now;
+    stage = name;
+    stageTimings.push({ stage: name, enteredAtMs: now, finishedAtMs: null });
+  }
   let codeTransport: ReturnType<
     typeof createJitoQualificationTransport
   > | null = null;
@@ -211,79 +237,108 @@ async function main() {
       callId > (withCode ? 11 : 5)
     )
       return fail();
-    await paceWalletRpc(endpoint, requestSignal);
-    const id = 'cpmm-sequence:' + callId,
-      request = JSON.stringify({ jsonrpc: '2.0', id, method, params });
-    const r = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: request,
-      signal: requestSignal,
-      redirect: 'error',
-      cache: 'no-store',
-    });
-    lastHttpStatus = r.status;
-    responseDecodeCompleted = false;
-    if (!r.ok) {
-      rateLimited = r.status === 429;
-      void r.body?.cancel();
-      return fail();
-    }
-    // Preserve optional display decimals as opaque lexemes, never JS numbers.
-    // Every slot, fee and account lamport below still requires exact bigint.
-    let body;
+    const timing = {
+      id: callId,
+      method,
+      stage,
+      queuedAtMs: elapsed(),
+      pacedAtMs: null as number | null,
+      sentAtMs: null as number | null,
+      headersAtMs: null as number | null,
+      capturedAtMs: null as number | null,
+      finishedAtMs: null as number | null,
+      contextSlot: null as string | null,
+      httpStatus: null as number | null,
+    };
+    rpcTimings.push(timing);
     try {
-      body = await readJitoSimulationPayload(r.body, requestSignal, 1048576, {
-        allowDecimalTokens: true,
+      await paceWalletRpc(endpoint, requestSignal);
+      timing.pacedAtMs = elapsed();
+      const id = 'cpmm-sequence:' + callId,
+        request = JSON.stringify({ jsonrpc: '2.0', id, method, params });
+      timing.sentAtMs = elapsed();
+      const r = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: request,
+        signal: requestSignal,
+        redirect: 'error',
+        cache: 'no-store',
       });
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        /^Jito simulation JSON: [a-z -]+\.$/.test(error.message)
-      )
-        responseDecodeReason = error.message;
-      return fail();
-    }
-    responseDecodeCompleted = true;
-    totalBytes += body.byteLength;
-    if (totalBytes > 2097152) return fail();
-    captures.push({
-      method,
-      request,
-      response: Buffer.from(body.rawBody).toString('utf8'),
-    });
-    const p = body.value as Record<string, unknown>;
-    if (p.jsonrpc !== '2.0' || p.id !== id || Object.keys(p).length !== 3)
-      return fail();
-    if (Object.hasOwn(p, 'error')) {
-      const code = (p.error as { code?: unknown })?.code;
-      rpcErrorCode = typeof code === 'bigint' ? code.toString() : null;
-      rateLimited = code === 429n;
-      return fail();
-    }
-    if (!Object.hasOwn(p, 'result')) return fail();
-    const result = p.result as {
-      context?: { slot?: unknown };
-      value?: unknown;
-    } | null;
-    const trace = (observations.rpcEvidence ??= []) as unknown[];
-    trace.push({
-      method,
-      slot:
+      timing.headersAtMs = elapsed();
+      timing.httpStatus = r.status;
+      lastHttpStatus = r.status;
+      responseDecodeCompleted = false;
+      if (!r.ok) {
+        rateLimited = r.status === 429;
+        void r.body?.cancel();
+        return fail();
+      }
+      // Preserve optional display decimals as opaque lexemes, never JS numbers.
+      // Every slot, fee and account lamport below still requires exact bigint.
+      let body;
+      try {
+        body = await readJitoSimulationPayload(r.body, requestSignal, 1048576, {
+          allowDecimalTokens: true,
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          /^Jito simulation JSON: [a-z -]+\.$/.test(error.message)
+        )
+          responseDecodeReason = error.message;
+        return fail();
+      }
+      responseDecodeCompleted = true;
+      timing.capturedAtMs = elapsed();
+      totalBytes += body.byteLength;
+      if (totalBytes > 2097152) return fail();
+      captures.push({
+        method,
+        request,
+        response: Buffer.from(body.rawBody).toString('utf8'),
+      });
+      const p = body.value as Record<string, unknown>;
+      if (p.jsonrpc !== '2.0' || p.id !== id || Object.keys(p).length !== 3)
+        return fail();
+      if (Object.hasOwn(p, 'error')) {
+        const code = (p.error as { code?: unknown })?.code;
+        rpcErrorCode = typeof code === 'bigint' ? code.toString() : null;
+        rateLimited = code === 429n;
+        return fail();
+      }
+      if (!Object.hasOwn(p, 'result')) return fail();
+      const result = p.result as {
+        context?: { slot?: unknown };
+        value?: unknown;
+      } | null;
+      const trace = (observations.rpcEvidence ??= []) as unknown[];
+      timing.contextSlot =
         typeof result?.context?.slot === 'bigint'
           ? result.context.slot.toString()
-          : null,
-      ...(method === 'isBlockhashValid'
-        ? { valid: result?.value === true }
-        : {}),
-      ...(method === 'getBlockHeight'
-        ? {
-            blockHeight:
-              typeof p.result === 'bigint' ? p.result.toString() : 'invalid',
-          }
-        : {}),
-    });
-    return p.result;
+          : method === 'getSlot' && typeof p.result === 'bigint'
+            ? p.result.toString()
+            : null;
+      trace.push({
+        method,
+        slot:
+          typeof result?.context?.slot === 'bigint'
+            ? result.context.slot.toString()
+            : null,
+        ...(method === 'isBlockhashValid'
+          ? { valid: result?.value === true }
+          : {}),
+        ...(method === 'getBlockHeight'
+          ? {
+              blockHeight:
+                typeof p.result === 'bigint' ? p.result.toString() : 'invalid',
+            }
+          : {}),
+      });
+      return p.result;
+    } finally {
+      timing.finishedAtMs = elapsed();
+    }
   }
   function lifetimeValue(v: unknown): unknown {
     if (typeof v === 'bigint') return v.toString();
@@ -330,7 +385,7 @@ async function main() {
   try {
     if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
       return fail();
-    stage = 'blockhash';
+    enterStage('blockhash');
     let latest = (await rpc('getLatestBlockhash', [
       { commitment: 'confirmed' },
     ])) as {
@@ -383,7 +438,7 @@ async function main() {
     ];
     if (new Set(keys).size !== keys.length) return fail();
     if (withCode) {
-      stage = 'first-four-program-code-scan';
+      enterStage('first-four-program-code-scan');
       codeTransport = createJitoQualificationTransport(
         'runtime',
         floor,
@@ -396,7 +451,7 @@ async function main() {
         signal,
         codeTransport.rpc,
       );
-      stage = 'first-code-and-issued-lifetime';
+      enterStage('first-code-and-issued-lifetime');
       const initial = await Promise.allSettled([
         firstCodeReady,
         captureJitoCpmmLifetime(floor, lifetimeRpc, signal),
@@ -433,7 +488,7 @@ async function main() {
         ),
       ]).toString('base64');
     const config = { accounts: keys, encoding: 'base64' };
-    stage = 'archive-base-prestate';
+    enterStage('archive-base-prestate');
     observations.prestateProbe = {
       purpose: 'read-only-base-state',
       amountRaw: '1000',
@@ -493,7 +548,7 @@ async function main() {
       b[390] > 1
     )
       return fail();
-    stage = 'strict-source-quote-candidate';
+    enterStage('strict-source-quote-candidate');
     const quoteInput = {
       inputRaw: '1000000',
       minimumOutputRaw: '1',
@@ -613,7 +668,7 @@ async function main() {
     const bound = await inspectJitoCpmmUnsignedPacket(packet);
     observations.swapPacket = bound;
     const transactions = [setup.transaction, swap.transaction, native(1000n)];
-    stage = 'full-setup-swap-tip-simulation';
+    enterStage('full-setup-swap-tip-simulation');
     const result = (await rpc('simulateTransactionsAtSlot', [
       {
         simulations: transactions.map((encodedTransaction) => ({
@@ -672,7 +727,7 @@ async function main() {
       )
     )
       return fail();
-    stage = 'observed-mutable-effects';
+    enterStage('observed-mutable-effects');
     const base = image(result.value.preExecutionAccounts, keys);
     const prestateDifferences = keys
       .filter(
@@ -759,7 +814,7 @@ async function main() {
         after: tokenKeys.map((key) => raw(key, posts[1].get(key))),
       },
     );
-    stage = 'actual-pool-oracle-and-rent-replay';
+    enterStage('actual-pool-oracle-and-rent-replay');
     const replayKeys = [
       POOL,
       source as string,
@@ -787,7 +842,7 @@ async function main() {
       },
       signal,
     );
-    stage = 'native-fee-rent-and-tip-conservation';
+    enterStage('native-fee-rent-and-tip-conservation');
     for (const [i, post] of posts.entries()) {
       const fee = rows[i].feeLamports as bigint;
       if (fee < 1n || fee > 10000n) return fail();
@@ -822,7 +877,7 @@ async function main() {
     observations.poolAndOracleReplayComplete = false;
     observations.allThreeStatusesSuccessful = true;
     if (withMarket) {
-      stage = 'independent-market-comparison';
+      enterStage('independent-market-comparison');
       if (!markets) return fail();
       const prices = await markets;
       observations.marketReadStatuses = prices.map((value) => value.status);
@@ -885,7 +940,7 @@ async function main() {
     }
     if (withCode) {
       if (!firstCode || !codeTransport) return fail();
-      stage = 'final-four-program-code-scan';
+      enterStage('final-four-program-code-scan');
       lastCode = await collectJitoCpmmSetupResearchRuntimeEvidence(
         keys.slice(),
         floor,
@@ -905,7 +960,7 @@ async function main() {
       )
         return fail();
       observations.fourProgramArtifactBracketObserved = true;
-      stage = 'post-code-custody-mint-and-lifetime';
+      enterStage('post-code-custody-mint-and-lifetime');
       if (!lifetime) return fail();
       lifetimeFloor = lastCode.maximumSlot;
       const custodyKeys = [
@@ -980,7 +1035,7 @@ async function main() {
         settled[1].value.validitySlot,
       );
     }
-    stage = 'final-window';
+    enterStage('final-window');
     lastSlot = integer(
       await rpc('getSlot', [
         {
@@ -1001,8 +1056,11 @@ async function main() {
   } catch {
     process.exitCode = 1;
   }
+  stageTimings.at(-1)!.finishedAtMs = elapsed();
+  const qualificationFinishedAtMs = elapsed();
   codeTransport?.close();
   if (markets) await markets;
+  const codeCaptures = codeTransport?.captures() ?? [];
   const receipt = {
     format: 'jito-cpmm-sequence-diagnostic-v1',
     observedAt: new Date().toISOString(),
@@ -1019,6 +1077,23 @@ async function main() {
     responseDecodeReason,
     rpcErrorCode,
     observations,
+    // Monotonic diagnostics only. No timing value participates in admission.
+    timing: {
+      clock: 'process-monotonic',
+      originMs: timingOriginMs,
+      qualificationFinishedAtMs,
+      stages: stageTimings,
+      ordinaryRpc: rpcTimings,
+      codeOriginMs: codeTransport?.summary().timing.originMs ?? null,
+      codeRpc: codeCaptures.map((c) => ({
+        requestSha256: c.requestSha256,
+        rawSha256: c.rawSha256,
+        httpStatus: c.httpStatus,
+        captureStatus: c.captureStatus,
+        timing: c.timing,
+      })),
+      diagnosticOnly: true,
+    },
     codeTransport: codeTransport?.summary() ?? null,
     lifetimeRecheckedAfterFinalCode:
       observations.lifetimeRecheckStatus === 'fulfilled',
@@ -1040,7 +1115,21 @@ async function main() {
   };
   await mkdir('work', { recursive: true });
   const path = `work/jito-cpmm-sequence-${Date.now()}.json`;
-  await writeFile(path, JSON.stringify({ receipt, captures }, null, 2) + '\n');
+  await writeFile(
+    path,
+    JSON.stringify(
+      {
+        receipt,
+        captures,
+        codeCaptures: codeCaptures.map(({ rawBody, ...capture }) => ({
+          ...capture,
+          rawBodyBase64: Buffer.from(rawBody).toString('base64'),
+        })),
+      },
+      null,
+      2,
+    ) + '\n',
+  );
   console.log(JSON.stringify({ ...receipt, savedCapture: path }));
 }
 main().catch(() => {

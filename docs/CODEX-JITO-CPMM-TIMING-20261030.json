@@ -1,0 +1,549 @@
+{
+  "format": "jito-cpmm-monotonic-timing-v1",
+  "sourceCaptureSha256": "a90df4afa28d0c1c2d1efcba8b3966ff358905082b19b618c1556fc33dd19692",
+  "observedAt": "2026-10-30T19:40:08.612Z",
+  "status": "refused",
+  "stage": "final-window",
+  "floor": 463406186,
+  "simulationSlot": 463406199,
+  "lastSlot": 463406220,
+  "spanSlots": 34,
+  "clock": "process-monotonic",
+  "diagnosticOnly": true,
+  "qualificationFinishedAtMs": 7708.865099999999,
+  "stages": [
+    {
+      "stage": "genesis",
+      "enteredAtMs": 0,
+      "finishedAtMs": 315.5309
+    },
+    {
+      "stage": "blockhash",
+      "enteredAtMs": 315.5309,
+      "finishedAtMs": 412.9522999999999
+    },
+    {
+      "stage": "first-four-program-code-scan",
+      "enteredAtMs": 412.9522999999999,
+      "finishedAtMs": 415.5420999999999
+    },
+    {
+      "stage": "first-code-and-issued-lifetime",
+      "enteredAtMs": 415.5420999999999,
+      "finishedAtMs": 2899.8212000000003
+    },
+    {
+      "stage": "archive-base-prestate",
+      "enteredAtMs": 2899.8212000000003,
+      "finishedAtMs": 3704.6737000000003
+    },
+    {
+      "stage": "strict-source-quote-candidate",
+      "enteredAtMs": 3704.6737000000003,
+      "finishedAtMs": 3729.8509000000004
+    },
+    {
+      "stage": "full-setup-swap-tip-simulation",
+      "enteredAtMs": 3729.8509000000004,
+      "finishedAtMs": 4342.4481
+    },
+    {
+      "stage": "observed-mutable-effects",
+      "enteredAtMs": 4342.4481,
+      "finishedAtMs": 4354.4689
+    },
+    {
+      "stage": "actual-pool-oracle-and-rent-replay",
+      "enteredAtMs": 4354.4689,
+      "finishedAtMs": 4395.0222
+    },
+    {
+      "stage": "native-fee-rent-and-tip-conservation",
+      "enteredAtMs": 4395.0222,
+      "finishedAtMs": 4403.3745
+    },
+    {
+      "stage": "independent-market-comparison",
+      "enteredAtMs": 4403.3745,
+      "finishedAtMs": 4414.869
+    },
+    {
+      "stage": "final-four-program-code-scan",
+      "enteredAtMs": 4414.869,
+      "finishedAtMs": 6697.2698
+    },
+    {
+      "stage": "post-code-custody-mint-and-lifetime",
+      "enteredAtMs": 6697.2698,
+      "finishedAtMs": 7514.0635999999995
+    },
+    {
+      "stage": "final-window",
+      "enteredAtMs": 7514.0635999999995,
+      "finishedAtMs": 7708.864100000001
+    }
+  ],
+  "ordinaryRpc": [
+    {
+      "id": 1,
+      "method": "getGenesisHash",
+      "stage": "genesis",
+      "queuedAtMs": 0.5363999999999578,
+      "pacedAtMs": 0.753099999999904,
+      "sentAtMs": 0.7690999999999804,
+      "headersAtMs": 308.33839999999987,
+      "capturedAtMs": 315.45849999999996,
+      "finishedAtMs": 315.50350000000003,
+      "contextSlot": null,
+      "httpStatus": 200
+    },
+    {
+      "id": 2,
+      "method": "getLatestBlockhash",
+      "stage": "blockhash",
+      "queuedAtMs": 315.587,
+      "pacedAtMs": 315.6241,
+      "sentAtMs": 315.645,
+      "headersAtMs": 403.77070000000003,
+      "capturedAtMs": 404.6787999999999,
+      "finishedAtMs": 404.70550000000003,
+      "contextSlot": "463406186",
+      "httpStatus": 200
+    },
+    {
+      "id": 3,
+      "method": "getGenesisHash",
+      "stage": "first-code-and-issued-lifetime",
+      "queuedAtMs": 417.41449999999986,
+      "pacedAtMs": 525.9425000000001,
+      "sentAtMs": 525.9634000000001,
+      "headersAtMs": 591.5344,
+      "capturedAtMs": 592.2305999999999,
+      "finishedAtMs": 592.2637,
+      "contextSlot": null,
+      "httpStatus": 200
+    },
+    {
+      "id": 4,
+      "method": "getLatestBlockhash",
+      "stage": "first-code-and-issued-lifetime",
+      "queuedAtMs": 2698.8707999999997,
+      "pacedAtMs": 2834.9619999999995,
+      "sentAtMs": 2835.0055999999995,
+      "headersAtMs": 2899.1245,
+      "capturedAtMs": 2899.5125,
+      "finishedAtMs": 2899.5362999999998,
+      "contextSlot": "463406199",
+      "httpStatus": 200
+    },
+    {
+      "id": 5,
+      "method": "simulateTransactionsAtSlot",
+      "stage": "archive-base-prestate",
+      "queuedAtMs": 2900.0085,
+      "pacedAtMs": 3035.0486,
+      "sentAtMs": 3035.0923000000003,
+      "headersAtMs": 3477.5492999999997,
+      "capturedAtMs": 3703.0195000000003,
+      "finishedAtMs": 3703.1947,
+      "contextSlot": "463406199",
+      "httpStatus": 200
+    },
+    {
+      "id": 6,
+      "method": "simulateTransactionsAtSlot",
+      "stage": "full-setup-swap-tip-simulation",
+      "queuedAtMs": 3729.9184999999998,
+      "pacedAtMs": 3729.9417000000003,
+      "sentAtMs": 3729.9619999999995,
+      "headersAtMs": 4162.1728,
+      "capturedAtMs": 4342.1078,
+      "finishedAtMs": 4342.1911,
+      "contextSlot": "463406199",
+      "httpStatus": 200
+    },
+    {
+      "id": 7,
+      "method": "getMultipleAccounts",
+      "stage": "post-code-custody-mint-and-lifetime",
+      "queuedAtMs": 6697.3114000000005,
+      "pacedAtMs": 6849.657300000001,
+      "sentAtMs": 6849.6945,
+      "headersAtMs": 6911.6116,
+      "capturedAtMs": 6912.3822,
+      "finishedAtMs": 6912.4108,
+      "contextSlot": "463406216",
+      "httpStatus": 200
+    },
+    {
+      "id": 8,
+      "method": "isBlockhashValid",
+      "stage": "post-code-custody-mint-and-lifetime",
+      "queuedAtMs": 6702.2827,
+      "pacedAtMs": 7048.156300000001,
+      "sentAtMs": 7048.1891,
+      "headersAtMs": 7107.171700000001,
+      "capturedAtMs": 7107.544400000001,
+      "finishedAtMs": 7107.576800000001,
+      "contextSlot": "463406217",
+      "httpStatus": 200
+    },
+    {
+      "id": 9,
+      "method": "getBlockHeight",
+      "stage": "post-code-custody-mint-and-lifetime",
+      "queuedAtMs": 7107.7467,
+      "pacedAtMs": 7250.0573,
+      "sentAtMs": 7250.1,
+      "headersAtMs": 7311.6409,
+      "capturedAtMs": 7312.079100000001,
+      "finishedAtMs": 7312.1149000000005,
+      "contextSlot": null,
+      "httpStatus": 200
+    },
+    {
+      "id": 10,
+      "method": "getGenesisHash",
+      "stage": "post-code-custody-mint-and-lifetime",
+      "queuedAtMs": 7312.1810000000005,
+      "pacedAtMs": 7449.617899999999,
+      "sentAtMs": 7449.646000000001,
+      "headersAtMs": 7512.9354,
+      "capturedAtMs": 7513.315699999999,
+      "finishedAtMs": 7513.334000000001,
+      "contextSlot": null,
+      "httpStatus": 200
+    },
+    {
+      "id": 11,
+      "method": "getSlot",
+      "stage": "final-window",
+      "queuedAtMs": 7514.080599999999,
+      "pacedAtMs": 7647.102499999999,
+      "sentAtMs": 7647.1212,
+      "headersAtMs": 7708.266600000001,
+      "capturedAtMs": 7708.7171,
+      "finishedAtMs": 7708.739,
+      "contextSlot": "463406220",
+      "httpStatus": 200
+    }
+  ],
+  "codeOriginMs": 1936.3375,
+  "scriptOriginMs": 1523.1574,
+  "codeRpc": [
+    {
+      "method": "getMultipleAccounts",
+      "keys": 18,
+      "slice": {
+        "offset": 0,
+        "length": 128
+      },
+      "requestSha256": "1c2847f1a7b19579c48b51db9666c5ec1e45e581f8cedbd84b6112d2a2d7b701",
+      "rawSha256": "376a5b0323a910ecb22400b52f4f421b74d8b8d676b5f98f20ae21010020cce9",
+      "queuedAtMs": 4.038299999999936,
+      "pacedAtMs": 310.94759999999997,
+      "sentAtMs": 311.2516999999998,
+      "headersAtMs": 398.9584,
+      "capturedAtMs": 400.5036,
+      "finishedAtMs": 400.93100000000004
+    },
+    {
+      "method": "getGenesisHash",
+      "keys": 0,
+      "slice": null,
+      "requestSha256": "5d562c7956f0f7b9a76043534c7309c0a1424d5d004e4f738be71b66064c62f3",
+      "rawSha256": "bd7f1b89dd62b3b0b7404c2c33ab285ab0cfc9eb7d2423f211fdaced94f07c0b",
+      "queuedAtMs": 404.3217999999997,
+      "pacedAtMs": 513.9937,
+      "sentAtMs": 514.2440999999999,
+      "headersAtMs": 582.9263000000001,
+      "capturedAtMs": 583.4094,
+      "finishedAtMs": 583.4814000000001
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 4,
+      "slice": {
+        "offset": 0,
+        "length": 45
+      },
+      "requestSha256": "c2aee2149162999b739444ac2c9d2bb75ac8d8d2d7001066796091e0499230fb",
+      "rawSha256": "9bcd969a004dd2bd41084201a1db19aba903432ed8062c16c2db6ce0fc8e4cc0",
+      "queuedAtMs": 404.46399999999994,
+      "pacedAtMs": 714.9258,
+      "sentAtMs": 715.3238000000001,
+      "headersAtMs": 798.7048,
+      "capturedAtMs": 799.2757999999999,
+      "finishedAtMs": 799.3543999999997
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 2,
+      "slice": {
+        "offset": 0,
+        "length": 45
+      },
+      "requestSha256": "2fd600953a2d8d5cab2018518e09e57579c5d69c8fcda67d47c35f6ffa4b6969",
+      "rawSha256": "b2128591d58cc42f74d659a3784781b5f2f607ceaa4ab72905495804dd642397",
+      "queuedAtMs": 800.4317999999998,
+      "pacedAtMs": 914.9121,
+      "sentAtMs": 915.1212,
+      "headersAtMs": 987.3503000000001,
+      "capturedAtMs": 987.9231999999997,
+      "finishedAtMs": 988.0068000000001
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 1,
+      "slice": {
+        "offset": 0,
+        "length": 737280
+      },
+      "requestSha256": "27151583f1996641581abf0aad0ec0e3a3f014d0b9f81902ad65057f57a09c02",
+      "rawSha256": "bfd09d7ab046b616171bf7976f10032219c8ed7622a60ed09db211be464a808c",
+      "queuedAtMs": 988.9717,
+      "pacedAtMs": 1116.1351,
+      "sentAtMs": 1116.3321999999998,
+      "headersAtMs": 1240.5256,
+      "capturedAtMs": 1246.908,
+      "finishedAtMs": 1247.1275
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 2,
+      "slice": {
+        "offset": 45,
+        "length": 524288
+      },
+      "requestSha256": "3a0215189f80a72208d2c7188109ea7951285fd242e299065182b8756728b307",
+      "rawSha256": "07bdaed012ffb378a3df44a15f04f3aebb5e2c4929b5cf2a27fb3589b90f5a3b",
+      "queuedAtMs": 1268.9326,
+      "pacedAtMs": 1315.7894999999999,
+      "sentAtMs": 1315.9339999999997,
+      "headersAtMs": 1386.5086999999999,
+      "capturedAtMs": 1544.5845999999997,
+      "finishedAtMs": 1545.3424999999997
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 1,
+      "slice": {
+        "offset": 524333,
+        "length": 737280
+      },
+      "requestSha256": "8743f2f06e5a6caf32e40b172c1a0997fa1d448d9960ef2b72e2aeaada45b601",
+      "rawSha256": "b7b2690a5ba8c34f6294cc7d8ba7e165301656369f66227a18e8cf22c5e85cc7",
+      "queuedAtMs": 1620.0158999999999,
+      "pacedAtMs": 1620.0672,
+      "sentAtMs": 1620.7089999999998,
+      "headersAtMs": 1690.7676999999999,
+      "capturedAtMs": 1709.0762,
+      "finishedAtMs": 1709.4631
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 4,
+      "slice": {
+        "offset": 0,
+        "length": 45
+      },
+      "requestSha256": "e42d8239a60b5c2affaae8f0b3941daddb0182b65993224618443841822ddb4e",
+      "rawSha256": "ff2fdf6f2fdfa9f8ea2209fee301f3991244d01364b2546b1cdec72c56b1f866",
+      "queuedAtMs": 1739.3836000000001,
+      "pacedAtMs": 1822.0005999999998,
+      "sentAtMs": 1822.1562,
+      "headersAtMs": 1906.2478999999998,
+      "capturedAtMs": 1906.8752,
+      "finishedAtMs": 1906.9542999999999
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 2,
+      "slice": {
+        "offset": 0,
+        "length": 45
+      },
+      "requestSha256": "93ac4bb7f697a0b64f0d15f80bb18f62491c06daaaefc72d8b930d98833e396d",
+      "rawSha256": "0900aa2db11df55cfdad287daac899c84ef1967fb92f13298bf4ee2e19f0b40b",
+      "queuedAtMs": 1739.4841999999999,
+      "pacedAtMs": 2022.6963999999998,
+      "sentAtMs": 2022.8588999999997,
+      "headersAtMs": 2082.8172,
+      "capturedAtMs": 2083.2952,
+      "finishedAtMs": 2083.3754
+    },
+    {
+      "method": "getGenesisHash",
+      "keys": 0,
+      "slice": null,
+      "requestSha256": "2269d692831ac38ecb6ec23f6a16c9d51c26a3d3082816e0cb47dba37f2dea38",
+      "rawSha256": "9a6d73a91ece0aa2567b61cc68ee7b371da4d5335e89e672870e0adb0c63d68d",
+      "queuedAtMs": 1739.5216,
+      "pacedAtMs": 2223.5144999999998,
+      "sentAtMs": 2223.7088,
+      "headersAtMs": 2282.6433,
+      "capturedAtMs": 2283.1294000000003,
+      "finishedAtMs": 2283.2107
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 18,
+      "slice": {
+        "offset": 0,
+        "length": 128
+      },
+      "requestSha256": "ab7652879d3721bbd6e4e3c62e96db2d5fb3a9f6cffc45d67fae655280c10596",
+      "rawSha256": "f8a6073a2f95639d82cb55c6dcd401ebbb02c12c7101768e725d597f7da66c58",
+      "queuedAtMs": 4002.4266999999995,
+      "pacedAtMs": 4002.4774999999995,
+      "sentAtMs": 4002.5741000000003,
+      "headersAtMs": 4067.2844,
+      "capturedAtMs": 4069.2443,
+      "finishedAtMs": 4069.3349999999996
+    },
+    {
+      "method": "getGenesisHash",
+      "keys": 0,
+      "slice": null,
+      "requestSha256": "98a3a92e7efbcda5330fa3e70130ca99e1176d6ede4196b4a0af75c1dd462a9e",
+      "rawSha256": "1678ec7aa36eb4a156a129dbecb5d3c99dde26979f1b3e390c2db6cf3f9a83fd",
+      "queuedAtMs": 4071.0103999999997,
+      "pacedAtMs": 4212.7912,
+      "sentAtMs": 4212.9989000000005,
+      "headersAtMs": 4274.8699,
+      "capturedAtMs": 4275.254800000001,
+      "finishedAtMs": 4275.2961
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 4,
+      "slice": {
+        "offset": 0,
+        "length": 45
+      },
+      "requestSha256": "8291839895f6db96743923a8057855717aeb01641abbfc14d6f01410ba51fba2",
+      "rawSha256": "041ae504a3ff9c248772cf121ec7ac2d148d75d1bb27a7984c468daf67ab9898",
+      "queuedAtMs": 4071.0894999999996,
+      "pacedAtMs": 4414.184499999999,
+      "sentAtMs": 4414.315500000001,
+      "headersAtMs": 4474.962100000001,
+      "capturedAtMs": 4476.427900000001,
+      "finishedAtMs": 4476.564899999999
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 2,
+      "slice": {
+        "offset": 0,
+        "length": 45
+      },
+      "requestSha256": "675a4f4c6072ab6f8b6e80b3e2f3e0ec2a007a195a3f0e42bdea3a4c60dfc892",
+      "rawSha256": "118ab9347f30feace64dee0f262dc4724cc955de0e839809b24326bbc9a964f6",
+      "queuedAtMs": 4477.6401000000005,
+      "pacedAtMs": 4615.5794000000005,
+      "sentAtMs": 4615.7214,
+      "headersAtMs": 4675.018399999999,
+      "capturedAtMs": 4675.623,
+      "finishedAtMs": 4675.6644
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 1,
+      "slice": {
+        "offset": 0,
+        "length": 737280
+      },
+      "requestSha256": "560eff5e5418d5f09522e29aa9bb4e8479eefd3ad4dc49f21d7b32f0668897fa",
+      "rawSha256": "317d277fc78a183c41a27232704afd1bb5a8faf8979808689423bf2a54abdc65",
+      "queuedAtMs": 4676.2904,
+      "pacedAtMs": 4816.5098,
+      "sentAtMs": 4816.6983,
+      "headersAtMs": 4881.152599999999,
+      "capturedAtMs": 4950.7631,
+      "finishedAtMs": 4951.0533
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 2,
+      "slice": {
+        "offset": 45,
+        "length": 524288
+      },
+      "requestSha256": "1538d5b83a4dc1b332052a6497a42564333f528f744b40cd7ade2ffa032d982a",
+      "rawSha256": "203a25a4f6c6b74a88e79576a68c119946adb8e39f0638ba58b07aba2af2d810",
+      "queuedAtMs": 4966.1124,
+      "pacedAtMs": 5014.5875,
+      "sentAtMs": 5014.8261,
+      "headersAtMs": 5095.4437,
+      "capturedAtMs": 5539.7093,
+      "finishedAtMs": 5540.1383000000005
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 1,
+      "slice": {
+        "offset": 524333,
+        "length": 737280
+      },
+      "requestSha256": "cbad935e0c971baa0d019487575d804279d193667c9a4f0d37ae883baca9746f",
+      "rawSha256": "76bab59d631b5adb803eef16a144073c464908c9ff6cf1f36d811da59b4e8dc3",
+      "queuedAtMs": 5604.036399999999,
+      "pacedAtMs": 5604.078100000001,
+      "sentAtMs": 5604.2366999999995,
+      "headersAtMs": 5667.200199999999,
+      "capturedAtMs": 5787.551799999999,
+      "finishedAtMs": 5787.7762
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 4,
+      "slice": {
+        "offset": 0,
+        "length": 45
+      },
+      "requestSha256": "599f21e2162bf218f6914e9c759d3545475f7993eb9c363f6e3307fc6a7fe191",
+      "rawSha256": "b7e06751cce8a09508f14c840aa7e089c752632202fde9f317922797a1a224e0",
+      "queuedAtMs": 5822.2994,
+      "pacedAtMs": 5822.662200000001,
+      "sentAtMs": 5823.063899999999,
+      "headersAtMs": 5882.731,
+      "capturedAtMs": 5883.441699999999,
+      "finishedAtMs": 5883.484399999999
+    },
+    {
+      "method": "getMultipleAccounts",
+      "keys": 2,
+      "slice": {
+        "offset": 0,
+        "length": 45
+      },
+      "requestSha256": "2a541c580f77749946e6404526a4c501d3af858eb08e64dd858d46e938d43420",
+      "rawSha256": "d0f3f69147de09fd4ae35e5c31ce1cff497d65136691e0d6c7aacaaa38dd32e5",
+      "queuedAtMs": 5822.4794,
+      "pacedAtMs": 6023.768899999999,
+      "sentAtMs": 6024.038199999999,
+      "headersAtMs": 6086.6147,
+      "capturedAtMs": 6087.1662,
+      "finishedAtMs": 6087.2155
+    },
+    {
+      "method": "getGenesisHash",
+      "keys": 0,
+      "slice": null,
+      "requestSha256": "3aec3da293010ae636c275b9ab1044495c7c89d69e8c7129e6c748b47ee7992a",
+      "rawSha256": "a4d77d6c858178bc9002579727d17820634095492d6833afbf4f725f4bb6485d",
+      "queuedAtMs": 5822.5622,
+      "pacedAtMs": 6222.818799999999,
+      "sentAtMs": 6222.9496,
+      "headersAtMs": 6281.6775,
+      "capturedAtMs": 6282.1271,
+      "finishedAtMs": 6282.178600000001
+    }
+  ],
+  "capturedCodeChecksumsVerified": 20,
+  "sourceOrBankAuthenticated": false,
+  "fullSwapQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false,
+  "transactionsBroadcast": 0
+}
