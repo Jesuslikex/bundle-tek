@@ -18,9 +18,9 @@ const RENT = 'SysvarRent111111111111111111111111111111111';
 const CLOCK = 'SysvarC1ock11111111111111111111111111111111';
 const SYSVAR = 'Sysvar1111111111111111111111111111111111111';
 const pub = (i: number) => bs58.encode(new Uint8Array(32).fill(i));
-async function fixture(reverse = false) {
+async function fixture(reverse = false, payerByte = 1) {
   const now = Date.now(),
-    payer = pub(1),
+    payer = pub(payerByte),
     pool = pub(5);
   const inputMint = reverse ? USDC : WSOL,
     outputMint = reverse ? WSOL : USDC;
@@ -723,3 +723,422 @@ it.each([
     await expect(replayJitoCpmmSwapState(rentLoss, signal)).rejects.toThrow();
   },
 );
+
+async function bundleFixture(
+  reverse = false,
+  count = 1,
+  distinctWallets = false,
+) {
+  const kit = await import('@solana/kit');
+  const { PUMP_GROUP_JITO_TIP_ACCOUNTS } =
+    await import('./pump-group-broadcast');
+  const f = await fixture(reverse),
+    bound = await inspectJitoCpmmUnsignedPacket(f.packet);
+  const system = '11111111111111111111111111111111',
+    recipient = PUMP_GROUP_JITO_TIP_ACCOUNTS[0];
+  const ordinary = (lamports: string) => ({
+    owner: system,
+    executable: false,
+    lamports,
+    data: ['', 'base64'],
+  });
+  const executable = () => ({
+    owner: 'BPFLoader2111111111111111111111111111111111',
+    executable: true,
+    lamports: '1',
+    data: ['', 'base64'],
+  });
+  const swaps = [],
+    packets = [],
+    transactionResults = [];
+  let payerLamports = 10000000n;
+  const balances = new Map<string, bigint>();
+  for (let i = 0; i < count; i++) {
+    const template = distinctWallets && i ? await fixture(reverse, i + 1) : f;
+    const bound = await inspectJitoCpmmUnsignedPacket(template.packet);
+    if (distinctWallets && i)
+      for (const key of [bound.source, bound.destination])
+        f.accounts.set(key, structuredClone(template.accounts.get(key)!));
+    payerLamports = balances.get(bound.payer) ?? 10000000n;
+    const originalTx = kit
+      .getTransactionDecoder()
+      .decode(Buffer.from(template.packet.transaction, 'base64'));
+    const originalMessage = kit
+      .getCompiledTransactionMessageDecoder()
+      .decode(originalTx.messageBytes);
+    if (originalMessage.version !== 0) throw Error('Fixture needs v0');
+    const inputRaw = (BigInt(bound.inputRaw) + BigInt(i)).toString();
+    const data = Buffer.from(originalMessage.instructions[0].data!);
+    data.writeBigUInt64LE(BigInt(inputRaw), 8);
+    const messageBytes = kit.getCompiledTransactionMessageEncoder().encode({
+      ...originalMessage,
+      instructions: [{ ...originalMessage.instructions[0], data }],
+    });
+    const transaction = Buffer.from(
+      kit.getTransactionEncoder().encode({
+        ...originalTx,
+        messageBytes: messageBytes as typeof originalTx.messageBytes,
+      }),
+    ).toString('base64');
+    const swap = {
+      transaction,
+      expected: { ...template.packet.expected, inputRaw },
+    };
+    const quote = (
+      await readJitoCpmmCurrentPoolEvidence(
+        swap,
+        100,
+        f.rpc,
+        new AbortController().signal,
+      )
+    ).curve;
+    const keys = originalMessage.staticAccounts.map(String);
+    const read = (key: string) =>
+      key === bound.payer
+        ? ordinary(payerLamports.toString())
+        : key === CPMM || key === TOKEN
+          ? executable()
+          : structuredClone(f.accounts.get(key) ?? null);
+    const preExecutionAccounts = keys.map(read);
+    for (const [key, delta] of [
+      [bound.source, -BigInt(inputRaw)],
+      [bound.destination, BigInt(quote.expectedOutputRaw)],
+      [bound.inputVault, BigInt(inputRaw)],
+      [bound.outputVault, -BigInt(quote.expectedOutputRaw)],
+    ] as const) {
+      const a = f.accounts.get(key)!,
+        b = Buffer.from(a.data[0], 'base64');
+      b.writeBigUInt64LE(b.readBigUInt64LE(64) + delta, 64);
+      if (b.readUInt32LE(109) === 1)
+        a.lamports = (BigInt(a.lamports) + delta).toString();
+      a.data[0] = b.toString('base64');
+    }
+    const o = f.accounts.get(f.oracle)!,
+      ob = Buffer.from(o.data[0], 'base64');
+    if (!ob[8]) {
+      ob[8] = 1;
+      const timestamp = BigInt(Math.floor(f.now / 1000));
+      ob.writeBigUInt64LE(timestamp, 43);
+      ob.writeBigUInt64LE(timestamp, 4043);
+      o.data[0] = ob.toString('base64');
+    }
+    payerLamports -= 5000n;
+    balances.set(bound.payer, payerLamports);
+    transactionResults.push({
+      err: null,
+      preExecutionAccounts,
+      postExecutionAccounts: keys.map(read),
+      fee: '5000',
+      unitsConsumed: 1000,
+      loadedAccountsDataSize: '10000',
+    });
+    swaps.push(swap);
+    packets.push({
+      transaction,
+      loadedAddresses: null,
+      maximumFeeLamports: '10000',
+      expectedFeeLamports: '5000',
+    });
+  }
+  payerLamports = balances.get(bound.payer)!;
+  const transfer = Buffer.alloc(12);
+  transfer.writeUInt32LE(2);
+  transfer.writeBigUInt64LE(1000n, 4);
+  const wire = Buffer.from([
+    1,
+    ...new Uint8Array(64),
+    128,
+    1,
+    0,
+    1,
+    3,
+    ...[bound.payer, recipient, system].flatMap((k) =>
+      Array.from(bs58.decode(k)),
+    ),
+    ...bs58.decode(bound.blockhash),
+    1,
+    2,
+    2,
+    0,
+    1,
+    12,
+    ...transfer,
+    0,
+  ]);
+  const transaction = wire.toString('base64');
+  packets.push({
+    transaction,
+    loadedAddresses: null,
+    maximumFeeLamports: '10000',
+    expectedFeeLamports: '5000',
+  });
+  transactionResults.push({
+    err: null,
+    preExecutionAccounts: [
+      ordinary(payerLamports.toString()),
+      ordinary('1000000'),
+      executable(),
+    ],
+    postExecutionAccounts: [
+      ordinary((payerLamports - 6000n).toString()),
+      ordinary('1001000'),
+      executable(),
+    ],
+    fee: '5000',
+    unitsConsumed: 100,
+    loadedAccountsDataSize: '0',
+  });
+  const extra = [CLOCK, RENT].map((address) => {
+    const a = f.accounts.get(address)!;
+    return {
+      address,
+      owner: a.owner,
+      executable: a.executable,
+      lamports: a.lamports,
+      dataBase64: a.data[0],
+    };
+  });
+  return {
+    swaps,
+    tip: { transaction, recipient, amountRaw: '1000' },
+    walletReserves: [...balances.keys()].map((wallet) => ({
+      wallet,
+      reserveLamports: '1000000',
+    })),
+    packets,
+    minimumSlot: 100,
+    simulationBankSlot: 102,
+    result: {
+      context: { slot: 102 },
+      value: { summary: 'succeeded', transactionResults },
+    },
+    bankAccounts: { slot: 102, before: extra, after: structuredClone(extra) },
+  };
+}
+
+it.each([
+  { reverse: false, count: 1 },
+  { reverse: true, count: 1 },
+  { reverse: false, count: 4 },
+  { reverse: true, count: 4 },
+])(
+  'replays $count direct swaps and exact tip as complete sequential frames (reverse=$reverse)',
+  async ({ reverse, count }) => {
+    const { replayJitoCpmmBundleSettlement } =
+      await import('./jito-cpmm-bundle-replay');
+    const request = await bundleFixture(reverse, count);
+    const proof = await replayJitoCpmmBundleSettlement(
+      request,
+      new AbortController().signal,
+    );
+    expect(proof).toMatchObject({
+      feeTipSettlementChecked: true,
+      crossFrameContinuityChecked: true,
+      fullAccountVectorsChecked: true,
+      feeBankVerified: false,
+      bankVerified: false,
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+    expect(proof.swaps).toHaveLength(count);
+    expect(proof.transactionSha256s).toHaveLength(count + 1);
+    expect(proof.walletBalances[0]).toMatchObject({
+      initialLamports: '10000000',
+      finalLamports: String(10000000 - (count + 1) * 5000 - 1000),
+      networkFeeLamports: String((count + 1) * 5000),
+      tipLamports: '1000',
+      reserveLamports: '1000000',
+    });
+  },
+);
+
+it('refuses changed direct bundle fees, accounts, tip consent, reserve, bank, message and continuity', async () => {
+  const { replayJitoCpmmBundleSettlement } =
+    await import('./jito-cpmm-bundle-replay');
+  const original = await bundleFixture();
+  const cases: ((r: typeof original) => void)[] = [
+    (r) => {
+      r.tip.amountRaw = '1001';
+    },
+    (r) => {
+      r.tip.recipient = pub(90) as typeof r.tip.recipient;
+    },
+    (r) => {
+      r.walletReserves[0].reserveLamports = '10000000';
+    },
+    (r) => {
+      r.packets[0].expectedFeeLamports = '5001';
+    },
+    (r) => {
+      r.packets[0].maximumFeeLamports = '4999';
+    },
+    (r) => {
+      r.result.value.transactionResults[0].fee = '5001';
+    },
+    (r) => {
+      r.result.value.transactionResults[1].preExecutionAccounts[0]!.lamports =
+        '9994999';
+    },
+    (r) => {
+      r.result.value.transactionResults[1].postExecutionAccounts[1]!.lamports =
+        '51001';
+    },
+    (r) => {
+      r.result.value.transactionResults[0].postExecutionAccounts.pop();
+    },
+    (r) => {
+      r.bankAccounts.slot = 103;
+    },
+    (r) => {
+      r.simulationBankSlot = 103;
+    },
+    (r) => {
+      r.minimumSlot = 69;
+    },
+    (r) => {
+      r.swaps[0].expected.inputRaw = '1000001';
+    },
+    (r) => {
+      r.tip.transaction = r.swaps[0].transaction;
+    },
+    (r) => {
+      r.bankAccounts.after[0].dataBase64 = '';
+    },
+    (r) => {
+      r.bankAccounts.before.reverse();
+    },
+    (r) => {
+      r.result.value.summary = 'failed';
+    },
+  ];
+  for (const mutate of cases) {
+    const request = structuredClone(original);
+    mutate(request);
+    await expect(
+      replayJitoCpmmBundleSettlement(request, new AbortController().signal),
+    ).rejects.toThrow();
+  }
+  const cancelled = new AbortController();
+  cancelled.abort();
+  await expect(
+    replayJitoCpmmBundleSettlement(original, cancelled.signal),
+  ).rejects.toThrow();
+  const pending = replayJitoCpmmBundleSettlement(
+    original,
+    new AbortController().signal,
+  );
+  original.tip.amountRaw = '9999999';
+  expect(await pending).toMatchObject({ tipLamports: '1000' });
+});
+
+it.each([false, true])(
+  'checks four distinct payers and a shared pool sequentially (reverse=%s)',
+  async (reverse) => {
+    const { replayJitoCpmmBundleSettlement } =
+      await import('./jito-cpmm-bundle-replay');
+    const request = await bundleFixture(reverse, 4, true);
+    const proof = await replayJitoCpmmBundleSettlement(
+      request,
+      new AbortController().signal,
+    );
+    expect(proof.walletBalances).toHaveLength(4);
+    expect(proof.walletBalances.map((w) => w.networkFeeLamports)).toEqual([
+      '10000',
+      '5000',
+      '5000',
+      '5000',
+    ]);
+    expect(proof.walletBalances.map((w) => w.tipLamports)).toEqual([
+      '1000',
+      '0',
+      '0',
+      '0',
+    ]);
+    const missing = structuredClone(request);
+    missing.walletReserves.pop();
+    await expect(
+      replayJitoCpmmBundleSettlement(missing, new AbortController().signal),
+    ).rejects.toThrow();
+    const funding = structuredClone(request);
+    funding.walletReserves[3].reserveLamports = '9996000';
+    await expect(
+      replayJitoCpmmBundleSettlement(funding, new AbortController().signal),
+    ).rejects.toThrow();
+  },
+);
+
+it('refuses a signed, differently-lived or non-transfer tip even with balanced frame accounts', async () => {
+  const { replayJitoCpmmBundleSettlement } =
+    await import('./jito-cpmm-bundle-replay');
+  const original = await bundleFixture();
+  const mutations = [
+    (b: ReturnType<typeof Buffer.from>) => {
+      b[1] = 1;
+    },
+    (b: ReturnType<typeof Buffer.from>) => {
+      b[166] ^= 1;
+    },
+    (b: ReturnType<typeof Buffer.from>) => {
+      b[b.length - 13] = 3;
+    },
+  ];
+  for (const mutate of mutations) {
+    const request = structuredClone(original),
+      bytes = Buffer.from(request.tip.transaction, 'base64');
+    mutate(bytes);
+    request.tip.transaction = bytes.toString('base64');
+    request.packets.at(-1)!.transaction = request.tip.transaction;
+    await expect(
+      replayJitoCpmmBundleSettlement(request, new AbortController().signal),
+    ).rejects.toThrow();
+  }
+  const alien = structuredClone(original);
+  for (const accounts of [
+    alien.result.value.transactionResults.at(-1)!.preExecutionAccounts,
+    alien.result.value.transactionResults.at(-1)!.postExecutionAccounts,
+  ])
+    accounts[1]!.owner = TOKEN;
+  await expect(
+    replayJitoCpmmBundleSettlement(alien, new AbortController().signal),
+  ).rejects.toThrow();
+});
+
+it('uses actual Rent bytes for payer and existing tip-recipient coverage even with a zero declared reserve', async () => {
+  const { replayJitoCpmmBundleSettlement } =
+    await import('./jito-cpmm-bundle-replay');
+  const request = await bundleFixture();
+  request.walletReserves[0].reserveLamports = '0';
+  // Two 5,000-lamport fees plus a 1,000-lamport tip, leaving exactly the
+  // 890,880-lamport minimum derived from this fixture's actual Rent account.
+  const shift = 10000000n - (890880n + 11000n);
+  for (const f of request.result.value.transactionResults)
+    for (const accounts of [f.preExecutionAccounts, f.postExecutionAccounts])
+      accounts[0]!.lamports = (
+        BigInt(accounts[0]!.lamports) - shift
+      ).toString();
+  expect(
+    (
+      await replayJitoCpmmBundleSettlement(
+        request,
+        new AbortController().signal,
+      )
+    ).walletBalances[0],
+  ).toMatchObject({
+    finalLamports: '890880',
+    requiredSystemRentLamports: '890880',
+  });
+  const below = structuredClone(request);
+  for (const f of below.result.value.transactionResults)
+    for (const accounts of [f.preExecutionAccounts, f.postExecutionAccounts])
+      accounts[0]!.lamports = (BigInt(accounts[0]!.lamports) - 1n).toString();
+  await expect(
+    replayJitoCpmmBundleSettlement(below, new AbortController().signal),
+  ).rejects.toThrow();
+  const recipient = structuredClone(request),
+    last = recipient.result.value.transactionResults.at(-1)!;
+  last.preExecutionAccounts[1]!.lamports = '889879';
+  last.postExecutionAccounts[1]!.lamports = '890879';
+  await expect(
+    replayJitoCpmmBundleSettlement(recipient, new AbortController().signal),
+  ).rejects.toThrow();
+});
