@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex, 30 October2026 COMPLETE, bounded claim released: separately approved provider-observed unsigned research collector. Exact files `lib/jito-coherent-prefee-attempt.ts`, new `lib/jito-provider-observed-attempt.test.ts` and matching docs. Strict default/equal-bank rules remain unchanged. New profile has explicit provider-trust limits, no authority, app integration, provider setting, deployment or funded actions. Preserve other-agent drafts.
+
 - Codex, 30 October 2026 COMPLETE: simulator-selected-bank Helius diagnosis, bounded claim released. Only `scripts/probe-jito-helius-capability.mjs`, its subprocess test and corresponding `docs/CODEX-JITO-HELIUS-*` notes. Successful native discovery returned complete requested vectors; immediate exact-slot replay refused bank-unavailable. Six closed-transport tests pass. Separate diagnostic mode, no fallback in qualification or change to source/Clock/custody/fee checks. Existing original slot floor and32span retained. No purchases, provider changes, signing/send or deployment; preserve other agent drafts.
 
 - Codex, 30 October 2026 COMPLETE: existing Helius read-only capability check, bounded to new `scripts/probe-jito-helius-capability.mjs` and `docs/CODEX-JITO-HELIUS-CAPABILITY-20261030.md/.json`. One native unsigned exact-slot attempt returned bank-unavailable after three reads; no retry or fallback. 119 supporting parser/frame tests pass. No shared application, provider settings, signing, deploy or funded change. Bounded claim released; full qualification remains blocked.

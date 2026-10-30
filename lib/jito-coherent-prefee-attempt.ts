@@ -9,6 +9,7 @@ import {
 import { readJitoRpcBatchCapture } from './jito-rpc-batch-capture';
 import { readJitoSimulationPayload } from './jito-simulation-json';
 import { readJitoSimulationResponse } from './jito-simulation-response';
+import { getTransactionDecoder } from '@solana/kit';
 
 type Read = Readonly<{
   phase: 'discovery-batch' | 'exact';
@@ -71,19 +72,43 @@ function exact(value: Record<string, unknown>, keys: string[]) {
  * discovery are one actual wire batch; the unadmitted discovery chooses D only
  * after all real fee contexts equal D. A separate exact-slot simulation must
  * return D. The original floor never changes. No retries, fallback or authority. */
-export async function collectJitoCoherentPrefeeAttempt(input: {
-  packets: JitoBundleSimulationPacket[];
-  minimumSlot: number;
-  minimumReadSlot: number;
-  feeIdPrefix: string;
-  simulationRpcId: string;
-  verifySignatures: boolean;
-  signal: AbortSignal;
-  transport: (request: Read) => Promise<Response>;
-  /** Optional diagnostics only; never used to admit evidence or authorize execution. */
-  diagnosticTiming?: boolean;
-  singleBatch?: true;
-}) {
+export function collectJitoCoherentPrefeeAttempt(
+  input: Parameters<typeof collectPrefeeAttempt>[0],
+) {
+  return collectPrefeeAttempt(input, false);
+}
+
+/** Unsigned research only. Separate fresh fee observations do not establish
+ * the simulation's immutable bank identity. Never a strict-profile proof. */
+export async function collectJitoProviderObservedAttempt(
+  input: Parameters<typeof collectPrefeeAttempt>[0],
+) {
+  const result = await collectPrefeeAttempt(input, true);
+  return {
+    ...result,
+    diagnosticProfile: 'provider-observed-jito-v1' as const,
+    bankIdentityVerified: false as const,
+    feeBankIdentityVerified: false as const,
+    providerTrustRequired: true as const,
+  };
+}
+
+async function collectPrefeeAttempt(
+  input: {
+    packets: JitoBundleSimulationPacket[];
+    minimumSlot: number;
+    minimumReadSlot: number;
+    feeIdPrefix: string;
+    simulationRpcId: string;
+    verifySignatures: boolean;
+    signal: AbortSignal;
+    transport: (request: Read) => Promise<Response>;
+    /** Optional diagnostics only; never used to admit evidence or authorize execution. */
+    diagnosticTiming?: boolean;
+    singleBatch?: true;
+  },
+  providerObserved: boolean,
+) {
   const read = <K extends keyof typeof input>(key: K): (typeof input)[K] => {
     const descriptor = Object.getOwnPropertyDescriptor(input, key);
     if (!descriptor || !Object.hasOwn(descriptor, 'value'))
@@ -106,14 +131,18 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
     typeof simulationRpcId !== 'string' ||
     !/^[A-Za-z0-9._:-]{1,118}$/.test(simulationRpcId) ||
     typeof verifySignatures !== 'boolean' ||
+    (providerObserved && verifySignatures !== false) ||
     typeof transport !== 'function' ||
     interrupted(signal)
   )
     throw Error('Jito simulation attempt policy or signal differs.');
   const singleOption = Object.getOwnPropertyDescriptor(input, 'singleBatch');
-  if (singleOption && (!Object.hasOwn(singleOption, 'value') || singleOption.value !== true))
+  if (
+    singleOption &&
+    (!Object.hasOwn(singleOption, 'value') || singleOption.value !== true)
+  )
     throw Error('Invalid single batch option.');
-  const singleBatch = !!singleOption;
+  const singleBatch = providerObserved || !!singleOption;
   const owner = new AbortController();
   // A data-property boolean is the only opt-in. Never invoke a diagnostic
   // callback or a timing option getter from the collector.
@@ -254,6 +283,19 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
       minimumSlot,
       { bankEncoding: 'slot-object', verifySignatures },
     );
+    if (
+      providerObserved &&
+      prepared.packetBindings.some((p) =>
+        Object.values(
+          getTransactionDecoder().decode(Buffer.from(p.transaction, 'base64'))
+            .signatures,
+        ).some(
+          (signature) =>
+            signature !== null && signature.some((byte) => byte !== 0),
+        ),
+      )
+    )
+      return refuse('plan-refused');
     const plan = await buildJitoFeeBatchRequest({
       packets: prepared.packetBindings,
       minimumSlot: minimumReadSlot,
@@ -355,11 +397,11 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
     );
     if (
       fees.status !== 'observed' ||
-      fees.simulationBankSlot !== bank ||
+      (!providerObserved && fees.simulationBankSlot !== bank) ||
       fees.fees.some(
         (fee) =>
-          fee.slot !== bank ||
-          fee.slot < minimumSlot ||
+          (!providerObserved && fee.slot !== bank) ||
+          fee.slot < minimumReadSlot ||
           fee.slot - minimumSlot > 32,
       )
     ) {
@@ -386,7 +428,9 @@ export async function collectJitoCoherentPrefeeAttempt(input: {
     markDuration('exactBuildMs', exactBuildStart);
     if (singleBatch) sentSimulationBody = discoveryBody;
     phase = 'exact';
-    const response = singleBatch ? new Response(discoveryBytes) : await send(sentSimulationBody, 1);
+    const response = singleBatch
+      ? new Response(discoveryBytes)
+      : await send(sentSimulationBody, 1);
     if (!response)
       return refuse(
         reads.at(-1)?.status === 429 ? 'rate-limited' : 'http-refused',
