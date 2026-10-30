@@ -9,6 +9,7 @@ import {
 } from '@solana/kit';
 import { getExtensionEncoder } from '@solana-program/token-2022';
 import bs58 from 'bs58';
+import { JITO_TIP_PAYMENT_OWNER } from '../lib/jito-tip-account-evidence';
 import nacl from 'tweetnacl';
 import { nativeWarmupFixture } from './warmup-native-fixture';
 import { reviewUnsignedSwapOrder } from '../lib/unsigned-swap-order';
@@ -552,7 +553,7 @@ export async function jitoSequentialEconomicsFixture(
     sharedState.has(k)
       ? structuredClone(sharedState.get(k)!)
       : k === TIP_RECIPIENT
-        ? account('1000000')
+        ? account('1000000', JITO_TIP_PAYMENT_OWNER, 'ySH0dOBEYSg=')
         : account('1', LOADER, '', true),
   );
   const tipPost = structuredClone(tipPre);

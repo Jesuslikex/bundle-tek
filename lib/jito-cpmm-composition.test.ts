@@ -9,6 +9,7 @@ import { readJitoCpmmPriceComparison } from './jito-cpmm-price-evidence';
 import { inspectJitoCpmmUnsignedPacket } from './jito-cpmm-unsigned-packet';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 import type { TokenMarket } from './token-market';
+import { JITO_TIP_PAYMENT_OWNER } from './jito-tip-account-evidence';
 const CPMM = 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C';
 const TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const ATA = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
@@ -893,12 +894,20 @@ async function bundleFixture(
     err: null,
     preExecutionAccounts: [
       ordinary(payerLamports.toString()),
-      ordinary('1000000'),
+      {
+        ...ordinary('1000000'),
+        owner: JITO_TIP_PAYMENT_OWNER,
+        data: ['ySH0dOBEYSg=', 'base64'],
+      },
       executable(),
     ],
     postExecutionAccounts: [
       ordinary((payerLamports - 6000n).toString()),
-      ordinary('1001000'),
+      {
+        ...ordinary('1001000'),
+        owner: JITO_TIP_PAYMENT_OWNER,
+        data: ['ySH0dOBEYSg=', 'base64'],
+      },
       executable(),
     ],
     fee: '5000',
@@ -1120,11 +1129,14 @@ it('refuses a signed, differently-lived or non-transfer tip even with balanced f
   ).rejects.toThrow();
 });
 
-it('uses actual Rent bytes for payer and existing tip-recipient coverage even with a zero declared reserve', async () => {
+it('uses actual Rent bytes for the payer and eight-byte tip receiver even with a zero declared reserve', async () => {
   const { replayJitoCpmmBundleSettlement } =
     await import('./jito-cpmm-bundle-replay');
   const request = await bundleFixture();
   request.walletReserves[0].reserveLamports = '0';
+  const exactTip = request.result.value.transactionResults.at(-1)!;
+  exactTip.preExecutionAccounts[1]!.lamports = '946560';
+  exactTip.postExecutionAccounts[1]!.lamports = '947560';
   // Two 5,000-lamport fees plus a 1,000-lamport tip, leaving exactly the
   // 890,880-lamport minimum derived from this fixture's actual Rent account.
   const shift = 10000000n - (890880n + 11000n);
@@ -1153,10 +1165,27 @@ it('uses actual Rent bytes for payer and existing tip-recipient coverage even wi
   ).rejects.toThrow();
   const recipient = structuredClone(request),
     last = recipient.result.value.transactionResults.at(-1)!;
-  last.preExecutionAccounts[1]!.lamports = '889879';
-  last.postExecutionAccounts[1]!.lamports = '890879';
+  last.preExecutionAccounts[1]!.lamports = '946559';
+  last.postExecutionAccounts[1]!.lamports = '947559';
   await expect(
     replayJitoCpmmBundleSettlement(recipient, new AbortController().signal),
+  ).rejects.toThrow();
+});
+
+it('rejects a synthetic empty System tip receiver that the old replay accepted', async () => {
+  const { replayJitoCpmmBundleSettlement } =
+    await import('./jito-cpmm-bundle-replay');
+  const request = await bundleFixture();
+  const last = request.result.value.transactionResults.at(-1)!;
+  for (const vector of [
+    last.preExecutionAccounts,
+    last.postExecutionAccounts,
+  ]) {
+    vector[1]!.owner = '11111111111111111111111111111111';
+    vector[1]!.data = ['', 'base64'];
+  }
+  await expect(
+    replayJitoCpmmBundleSettlement(request, new AbortController().signal),
   ).rejects.toThrow();
 });
 

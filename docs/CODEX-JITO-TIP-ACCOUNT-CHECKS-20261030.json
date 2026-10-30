@@ -1,0 +1,186 @@
+{
+  "format": "jito-tip-and-native-archive-diagnostics-v1",
+  "tipReceiver": {
+    "format": "jito-tip-receiver-diagnostic-v1",
+    "observedAt": "2026-10-30T18:31:57.573Z",
+    "status": "all-eight-tip-receivers-observed",
+    "stage": "final-window",
+    "floor": 463387134,
+    "lastSlot": 463387135,
+    "calls": 3,
+    "responseBytes": 2017,
+    "rateLimited": false,
+    "evidence": [
+      {
+        "address": "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+        "seedIndex": 0,
+        "owner": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+        "accountBytes": 8,
+        "requiredRentLamports": "690880",
+        "lamports": "825217",
+        "pdaAndLayoutChecked": true,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      {
+        "address": "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+        "seedIndex": 1,
+        "owner": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+        "accountBytes": 8,
+        "requiredRentLamports": "690880",
+        "lamports": "712151",
+        "pdaAndLayoutChecked": true,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      {
+        "address": "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+        "seedIndex": 2,
+        "owner": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+        "accountBytes": 8,
+        "requiredRentLamports": "690880",
+        "lamports": "1854229",
+        "pdaAndLayoutChecked": true,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      {
+        "address": "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+        "seedIndex": 3,
+        "owner": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+        "accountBytes": 8,
+        "requiredRentLamports": "690880",
+        "lamports": "767915",
+        "pdaAndLayoutChecked": true,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      {
+        "address": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+        "seedIndex": 4,
+        "owner": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+        "accountBytes": 8,
+        "requiredRentLamports": "690880",
+        "lamports": "719083",
+        "pdaAndLayoutChecked": true,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      {
+        "address": "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+        "seedIndex": 5,
+        "owner": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+        "accountBytes": 8,
+        "requiredRentLamports": "690880",
+        "lamports": "714185",
+        "pdaAndLayoutChecked": true,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      {
+        "address": "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+        "seedIndex": 6,
+        "owner": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+        "accountBytes": 8,
+        "requiredRentLamports": "690880",
+        "lamports": "1933140",
+        "pdaAndLayoutChecked": true,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      {
+        "address": "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+        "seedIndex": 7,
+        "owner": "T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt",
+        "accountBytes": 8,
+        "requiredRentLamports": "690880",
+        "lamports": "894680",
+        "pdaAndLayoutChecked": true,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      }
+    ],
+    "bankVerified": false,
+    "providerQualified": false,
+    "fullSwapQualified": false,
+    "programApproved": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "transactionsBroadcast": 0
+  },
+  "nativeArchive": {
+    "format": "jito-current-archive-capability-v1",
+    "observedAt": "2026-10-30T18:24:26.451Z",
+    "status": "native-archive-diagnostic-observed",
+    "stage": "final-window",
+    "floor": 463385031,
+    "lastSlot": 463385033,
+    "calls": 4,
+    "responseBytes": 2457,
+    "rateLimited": false,
+    "rpcErrorCode": null,
+    "observations": {
+      "contextFields": [
+        "apiVersion",
+        "slot"
+      ],
+      "results": [
+        {
+          "slot": 463385031,
+          "status": "success",
+          "feeLamports": "5000",
+          "hashReplacementPresent": false,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463385031,
+          "status": "success",
+          "feeLamports": "5000",
+          "hashReplacementPresent": false,
+          "postAccountCount": 2
+        }
+      ]
+    },
+    "transactionsBroadcast": 0,
+    "simulatedTransactionsRequested": 2,
+    "overridesUsed": false,
+    "replaceRecentBlockhash": false,
+    "ownedWallet": false,
+    "liveJitoValidatorVerified": false,
+    "bankIdentityVerified": false,
+    "independentFeeBankVerified": false,
+    "fullSwapQualified": false,
+    "providerQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "limits": [
+    "Public source account layout and observed metadata only, not a Tip Payment binary approval.",
+    "Archive native simulations are not a full swap or synchronized validator/same-bank fee proof.",
+    "No signing, sending, provider settings or deployment authorization."
+  ]
+}

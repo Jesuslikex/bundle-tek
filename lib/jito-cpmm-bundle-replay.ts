@@ -13,6 +13,7 @@ import { replayJitoCpmmSwapState } from './jito-cpmm-state-replay';
 import { jitoTipLamports } from './jito-bundle';
 import { PUMP_GROUP_JITO_TIP_ACCOUNTS } from './pump-group-broadcast';
 import { PAIR_CLOCK } from './pair-stock-clock';
+import { inspectJitoTipReceiver } from './jito-tip-account-evidence';
 import {
   PAIR_RENT,
   inspectPairRentAccount,
@@ -47,8 +48,6 @@ function exact(
   )
     return fail();
 }
-const ordinary = (a: JitoSimulationAccount | null) =>
-  a !== null && a.owner === SYSTEM && !a.executable && a.data.length === 0;
 function raw(address: string, a: JitoSimulationAccount | null): Raw {
   if (!a) return fail();
   return {
@@ -202,11 +201,22 @@ export async function replayJitoCpmmBundleSettlement(
     data.readBigUInt64LE(4) !== tipAmount
   )
     return fail();
+  const tipReceiverEvidence = [];
+  for (const account of [last.preAccounts[1], last.postAccounts[1]]) {
+    if (!account) return fail();
+    tipReceiverEvidence.push(
+      await inspectJitoTipReceiver({
+        address: value.tip.recipient,
+        account: {
+          ...account,
+          data: [Buffer.from(account.data).toString('base64'), 'base64'],
+        },
+        rentAccount: { ...rentRaw, data: [rentRaw.dataBase64, 'base64'] },
+      }),
+    );
+    signal.throwIfAborted();
+  }
   if (
-    !ordinary(last.preAccounts[1]) ||
-    !ordinary(last.postAccounts[1]) ||
-    uint(last.preAccounts[1]!.lamports) < minimumSystemRent ||
-    uint(last.postAccounts[1]!.lamports) < minimumSystemRent ||
     uint(last.postAccounts[1]!.lamports) -
       uint(last.preAccounts[1]!.lamports) !==
       tipAmount ||
@@ -312,6 +322,8 @@ export async function replayJitoCpmmBundleSettlement(
     swaps,
     walletBalances,
     tipLamports: tipAmount.toString(),
+    tipReceiverEvidence,
+    tipReceiverRentCoverageChecked: true as const,
     feeTipSettlementChecked: true as const,
     crossFrameContinuityChecked: true as const,
     fullAccountVectorsChecked: true as const,

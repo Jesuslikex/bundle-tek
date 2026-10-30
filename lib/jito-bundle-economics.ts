@@ -1,4 +1,5 @@
 import bs58 from 'bs58';
+import { inspectJitoTipReceiver } from './jito-tip-account-evidence';
 import { buildOwnedJitoSignedVector } from './jito-owned-signed-vector';
 import {
   getTransactionDecoder,
@@ -649,9 +650,23 @@ async function replayJitoBundleEconomics(
     lastRecipient = last.postAccounts[1];
   const ordinary = (a: JitoSimulationAccount | null) =>
     a !== null && a.owner === SYSTEM && !a.executable && a.data.length === 0;
+  for (const [i, account] of [firstRecipient, lastRecipient].entries()) {
+    if (!account) return fail('exact tip debit credit fee or reserve differs');
+    try {
+      await inspectJitoTipReceiver({
+        address: tip.recipient,
+        account: {
+          ...account,
+          data: [Buffer.from(account.data).toString('base64'), 'base64'],
+        },
+        rentAccount:
+          i === 0 ? captured.rentAccounts.before : captured.rentAccounts.after,
+      });
+    } catch {
+      return fail('exact tip debit credit fee or reserve differs');
+    }
+  }
   if (
-    !ordinary(firstRecipient) ||
-    !ordinary(lastRecipient) ||
     uint(lastRecipient!.lamports) - uint(firstRecipient?.lamports ?? '0') !==
       uint(tip.amountRaw) ||
     uint(last.preAccounts[0]!.lamports) -

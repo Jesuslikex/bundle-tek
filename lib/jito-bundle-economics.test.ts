@@ -435,7 +435,7 @@ for (const remaining of [0n, 890880n, 890879n])
         expect((await verify(f)).minimumSystemReserveLamports).toBe('890880');
     },
   );
-it('requires an existing plain System tip recipient, even if full-frame conservation agrees', async () => {
+it('requires an existing Tip Payment recipient, even if full-frame conservation agrees', async () => {
   const f = await jitoSequentialEconomicsFixture(),
     tip = f.result.value.transactionResults.at(-1)!;
   tip.preExecutionAccounts[1] = null;
@@ -584,16 +584,38 @@ it('requires token-account rent to match the independently observed profile, not
     'token rent differs from independently observed Rent profile',
   );
 });
-for (const phase of ['before', 'after'])
-  it('requires plain System tip recipient ' + phase + ' state', async () => {
-    const f = await jitoSequentialEconomicsFixture(),
-      last = f.result.value.transactionResults.at(-1)!;
-    const states =
-      phase === 'before'
-        ? last.preExecutionAccounts
-        : last.postExecutionAccounts;
-    states[1]!.owner = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+it('rejects the former synthetic System recipient and an eight-byte receiver below actual rent', async () => {
+  for (const kind of ['system', 'rent']) {
+    const f = await jitoSequentialEconomicsFixture();
+    const last = f.result.value.transactionResults.at(-1)!;
+    for (const [i, accounts] of [
+      last.preExecutionAccounts,
+      last.postExecutionAccounts,
+    ].entries()) {
+      if (kind === 'system') {
+        accounts[1]!.owner = '11111111111111111111111111111111';
+        accounts[1]!.data = ['', 'base64'];
+      } else accounts[1]!.lamports = String(946559 + i * 1000);
+    }
     await expect(verify(f)).rejects.toThrow(
       'exact tip debit credit fee or reserve differs',
     );
-  });
+  }
+});
+
+for (const phase of ['before', 'after'])
+  it(
+    'requires reviewed Tip Payment recipient ' + phase + ' state',
+    async () => {
+      const f = await jitoSequentialEconomicsFixture(),
+        last = f.result.value.transactionResults.at(-1)!;
+      const states =
+        phase === 'before'
+          ? last.preExecutionAccounts
+          : last.postExecutionAccounts;
+      states[1]!.owner = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+      await expect(verify(f)).rejects.toThrow(
+        'exact tip debit credit fee or reserve differs',
+      );
+    },
+  );
