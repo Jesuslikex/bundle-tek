@@ -16,6 +16,7 @@ function reply(slot: number) {
     return {
       owner: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
       executable: false,
+      lamports: '1461600',
       data: [b.toString('base64'), 'base64'],
     };
   };
@@ -100,4 +101,28 @@ it('does not call the provider after cancellation', async () => {
     readJitoCpmmAssetEvidence(packet, 100, rpc, control.signal),
   ).rejects.toThrow();
   expect(rpc).not.toHaveBeenCalled();
+});
+it.each([0, 1])('refuses an underfunded mint at position %s', async (i) => {
+  const r = reply(100);
+  Object.assign(r.value[i], { lamports: '1461599' });
+  await expect(
+    readJitoCpmmAssetEvidence(
+      packet,
+      100,
+      vi.fn().mockResolvedValue(r),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('rent coverage');
+});
+it('checks mint rent coverage again in the final read', async () => {
+  const after = reply(101);
+  Object.assign(after.value[1], { lamports: '1' });
+  await expect(
+    readJitoCpmmAssetEvidence(
+      packet,
+      100,
+      vi.fn().mockResolvedValueOnce(reply(100)).mockResolvedValueOnce(after),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('rent coverage');
 });

@@ -67,8 +67,26 @@ export async function readJitoCpmmAssetEvidence(
     if (mints.some((m) => m.program !== SWAP_TOKEN))
       throw Error('CPMM token program refused.');
     const rent = inspectPairRentAccount(result.value[2]);
+    const requiredMintRent = BigInt(pairRentMinimumRaw(rent, 82));
+    const mintRentCoverage = result.value.slice(0, 2).map((raw, i) => {
+      const a = raw as { lamports?: unknown; data?: unknown };
+      if (
+        typeof a.lamports !== 'string' ||
+        !/^(0|[1-9]\d{0,19})$/.test(a.lamports) ||
+        BigInt(a.lamports) > (1n << 64n) - 1n ||
+        BigInt(a.lamports) < requiredMintRent ||
+        !Array.isArray(a.data) ||
+        Buffer.from(a.data[0], 'base64').length !== 82
+      )
+        throw Error('CPMM mint rent coverage refused.');
+      return {
+        address: keys[i],
+        lamports: a.lamports,
+        requiredRent: requiredMintRent.toString(),
+      };
+    });
     signal.throwIfAborted();
-    return { slot: Number(raw), mints, rent };
+    return { slot: Number(raw), mints, rent, mintRentCoverage };
   }
   const before = await read(minimumSlot),
     after = await read(before.slot);

@@ -93,3 +93,9 @@ The same eight-account pool response now includes the fixed Clock sysvar. Existi
 Sources: https://github.com/raydium-io/raydium-cp-swap/blob/cfdb70a8ca9ea62bb5c304d4492ac0fc371ae8ce/programs/cp-swap/src/instructions/admin/create_config.rs and https://github.com/raydium-io/raydium-cp-swap/blob/cfdb70a8ca9ea62bb5c304d4492ac0fc371ae8ce/programs/cp-swap/src/instructions/initialize.rs .
 
 Validation: 106 tests/five CPMM files, typecheck and scoped lint pass. Fixtures derive actual Solana PDAs and test config index/bump mutations, an internally linked wrong oracle PDA, Clock behind/+1 refusals and a future pool open time. Tests remain synthetic and isolated; no live provider, deploy, signing or funded run occurred. Remaining full qualification includes mint rent, full economic/fee/rent settlement and lifetime integration, authenticated source/build and same-bank provider evidence.
+
+## Actual mint rent coverage
+
+Both asset observations now require positive rent coverage for each decoded classic SPL mint: exact 82-byte account data, canonical u64 lamports, and lamports at least the rent minimum calculated from that observation's Rent sysvar. Per-mint actual and required lamports are retained in each observation. A mint rent shortfall on the final read is refused even if the initial read passed. This does not establish simulation post-state rent or a payer's whole-transaction fee budget.
+
+Validation: 111 tests across six focused CPMM/qualification files, typecheck and scoped lint pass. Added synthetic underfunded-input/output and final-read-shortfall regressions. Existing tests now supply actual mint lamports rather than leaving them absent. Program/source approval, same-bank provider proof, full economic/lifetime integration and live repeatability remain open; no qualification or signing flag changed. No live provider call, deploy or funded action occurred here.
