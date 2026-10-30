@@ -1,9 +1,130 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createJitoQualificationTransport } from './jito-qualification-transport';
+import { zstdCompressSync } from 'node:zlib';
 afterEach(() => vi.restoreAllMocks());
 const signal = () => new AbortController().signal;
 const body = (id = 'a', method = 'getGenesisHash') =>
   JSON.stringify({ jsonrpc: '2.0', id, method, params: [] });
+it('captures the exact compressed wire request and raw reply while preserving decoded metadata', async () => {
+  const bytes = Buffer.from('system_program'),
+    encoded = Buffer.from(zstdCompressSync(bytes)).toString('base64');
+  let wire = '';
+  const fetcher = vi.fn(async (_url, init) => {
+    const q = JSON.parse(String(init?.body));
+    expect(q.params[1].encoding).toBe('base64+zstd');
+    wire = JSON.stringify({
+      jsonrpc: '2.0',
+      id: q.id,
+      result: {
+        context: { slot: 101 },
+        value: [
+          {
+            owner: 'NativeLoader1111111111111111111111111111111',
+            executable: true,
+            space: bytes.length,
+            lamports: 1000000,
+            data: [encoded, 'base64+zstd'],
+          },
+        ],
+      },
+    });
+    return new Response(wire);
+  });
+  const t = createJitoQualificationTransport('runtime', 100, signal(), {
+    runtimeAccountEncoding: 'base64+zstd',
+    pace: async () => {},
+    fetcher: fetcher as typeof fetch,
+  });
+  const params = [
+    ['11111111111111111111111111111111'],
+    {
+      encoding: 'base64',
+      commitment: 'confirmed',
+      minContextSlot: 100,
+      dataSlice: { offset: 0, length: 45 },
+    },
+  ];
+  const value = await t.rpc('getMultipleAccounts', params, signal());
+  expect(value).toMatchObject({
+    context: { slot: '101' },
+    value: [
+      {
+        space: String(bytes.length),
+        lamports: '1000000',
+        data: [bytes.toString('base64'), 'base64'],
+      },
+    ],
+  });
+  expect((params[1] as { encoding: string }).encoding).toBe('base64');
+  expect(JSON.parse(t.captures()[0].requestBody).params[1].encoding).toBe(
+    'base64+zstd',
+  );
+  expect(Buffer.from(t.captures()[0].rawBody).toString()).toBe(wire);
+  t.close();
+});
+it('never enables compressed evidence for bundle/assets or malformed unbounded requests', async () => {
+  for (const stage of ['bundle', 'assets'] as const)
+    expect(() =>
+      createJitoQualificationTransport(stage, 100, signal(), {
+        runtimeAccountEncoding: 'base64+zstd',
+      }),
+    ).toThrow();
+  const fetcher = vi.fn();
+  const t = createJitoQualificationTransport('runtime', 100, signal(), {
+    runtimeAccountEncoding: 'base64+zstd',
+    fetcher: fetcher as typeof fetch,
+    pace: async () => {},
+  });
+  await expect(
+    t.rpc(
+      'getMultipleAccounts',
+      [
+        ['11111111111111111111111111111111'],
+        { encoding: 'base64', commitment: 'confirmed', minContextSlot: 100 },
+      ],
+      signal(),
+    ),
+  ).rejects.toThrow();
+  expect(fetcher).not.toHaveBeenCalled();
+  t.close();
+});
+it.each([false, true])(
+  'binds context admission to serialized request despite caller mutation, compressed=%s',
+  async (compressed) => {
+    const config = {
+      encoding: 'base64',
+      commitment: 'confirmed',
+      minContextSlot: 105,
+      dataSlice: { offset: 0, length: 45 },
+    };
+    const fetcher = vi.fn(async (_url, init) => {
+      const q = JSON.parse(String(init?.body));
+      expect(q.params[1].minContextSlot).toBe(105);
+      config.minContextSlot = 100;
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: q.id,
+          result: { context: { slot: 101 }, value: [] },
+        }),
+      );
+    });
+    const t = createJitoQualificationTransport('runtime', 100, signal(), {
+      ...(compressed ? { runtimeAccountEncoding: 'base64+zstd' as const } : {}),
+      fetcher: fetcher as typeof fetch,
+      pace: async () => {},
+    });
+    await expect(
+      t.rpc(
+        'getMultipleAccounts',
+        [['11111111111111111111111111111111'], config],
+        signal(),
+      ),
+    ).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(t.summary().terminal).toBe(true);
+  },
+);
 it('binds actual raw responses and reserves ordinary pacing once per batch method', async () => {
   const pace = vi.fn(async (_endpoint: string, _signal: AbortSignal) => {}),
     fetcher = vi.fn(

@@ -1,0 +1,1147 @@
+{
+  "format": "jito-cpmm-compressed-fixed-sample-v1",
+  "planned": 3,
+  "observed": 3,
+  "timingPasses": 3,
+  "attempts": [
+    {
+      "observedAt": "2026-10-30T19:51:18.970Z",
+      "captureSha256": "1bc18587f157aa4ce95962e8eba4b0d917842726e2d49389d0ab51c6651c68e8",
+      "runtime": {
+        "nodeVersion": "v24.22.1",
+        "requiredNodeMajor": 24
+      },
+      "status": "unsigned-setup-swap-tip-mutable-effects-observed",
+      "stage": "final-window",
+      "floor": 463409321,
+      "simulationSlot": 463409332,
+      "lastSlot": 463409352,
+      "spanSlots": 31,
+      "calls": 11,
+      "codeReads": 18,
+      "codeResponseJsonBytes": 590569,
+      "rateLimited": false,
+      "firstCode": {
+        "format": "jito-runtime-capture-v1",
+        "minimumSlot": 463409321,
+        "minimumReadSlot": 463409321,
+        "maximumSlot": 463409330,
+        "keys": [
+          "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+          "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2",
+          "FMmwToGqT9iwDgsqvzLg65vcKSzKme4szbWqX1kyCBCJ",
+          "v3YN4d7JRhKFcwtex7qNtyg2r5hKYW96Cayb6GivSvY",
+          "HG2WgeYsjqQhnjhwHj7QdTVvjyWpFRk6VREAQ8MURv2u",
+          "BeMRiScNtZrU1Ce4D6Kv5FYKLyhGTRbmMq2KPVxupuDv",
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "SysvarC1ock11111111111111111111111111111111",
+          "SysvarRent111111111111111111111111111111111",
+          "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+          "11111111111111111111111111111111",
+          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL"
+        ],
+        "programs": [
+          {
+            "address": "11111111111111111111111111111111",
+            "loader": "NativeLoader1111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+            "codeBytes": 21,
+            "identityKind": "native-system"
+          },
+          {
+            "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+            "loader": "BPFLoader2111111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "6804554e69fd3a58caa191dc4a58f4c67223d30ca28ab8987f39fc18d2f7374d",
+            "codeBytes": 105032,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
+            "deploymentSlot": "452376460",
+            "upgradeAuthority": "FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK",
+            "codeSha256": "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+            "codeBytes": 793824,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+            "deploymentSlot": "419472000",
+            "upgradeAuthority": null,
+            "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+            "codeBytes": 108600,
+            "identityKind": "elf-code"
+          }
+        ],
+        "reads": 9,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "diagnosticProfile": "cpmm-ata-matched-source-research",
+        "sha256": "612ae0a2114c22d84a47cca1e5d41de791234fdde489b5d84b584dd15845a0e0"
+      },
+      "lastCode": {
+        "format": "jito-runtime-capture-v1",
+        "minimumSlot": 463409321,
+        "minimumReadSlot": 463409332,
+        "maximumSlot": 463409347,
+        "keys": [
+          "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+          "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2",
+          "FMmwToGqT9iwDgsqvzLg65vcKSzKme4szbWqX1kyCBCJ",
+          "v3YN4d7JRhKFcwtex7qNtyg2r5hKYW96Cayb6GivSvY",
+          "HG2WgeYsjqQhnjhwHj7QdTVvjyWpFRk6VREAQ8MURv2u",
+          "BeMRiScNtZrU1Ce4D6Kv5FYKLyhGTRbmMq2KPVxupuDv",
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "SysvarC1ock11111111111111111111111111111111",
+          "SysvarRent111111111111111111111111111111111",
+          "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+          "11111111111111111111111111111111",
+          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL"
+        ],
+        "programs": [
+          {
+            "address": "11111111111111111111111111111111",
+            "loader": "NativeLoader1111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+            "codeBytes": 21,
+            "identityKind": "native-system"
+          },
+          {
+            "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+            "loader": "BPFLoader2111111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "6804554e69fd3a58caa191dc4a58f4c67223d30ca28ab8987f39fc18d2f7374d",
+            "codeBytes": 105032,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
+            "deploymentSlot": "452376460",
+            "upgradeAuthority": "FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK",
+            "codeSha256": "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+            "codeBytes": 793824,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+            "deploymentSlot": "419472000",
+            "upgradeAuthority": null,
+            "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+            "codeBytes": 108600,
+            "identityKind": "elf-code"
+          }
+        ],
+        "reads": 9,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "diagnosticProfile": "cpmm-ata-matched-source-research",
+        "sha256": "f8d39aa04686c0e2a5a6886a8c22f23102c381f6230256983ff5965a1ddf5037"
+      },
+      "reconstructedCpmmDigests": [
+        "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+        "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a"
+      ],
+      "requestAndBodyDigestsVerified": 18,
+      "writableReplay": {
+        "format": "jito-cpmm-sparse-state-replay-v1",
+        "transactionSha256": "53862d5b79eca294a43ae014e414472614e01e4c01bd756688684719be670e0a",
+        "slot": 463409332,
+        "poolTransitionChecked": true,
+        "oracleTransitionChecked": true,
+        "tokenTransitionChecked": true,
+        "outputRaw": "94382",
+        "rentCoverageChecked": true,
+        "sourceAuthenticated": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "accountProvenanceVerified": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "readonlyPostCoverage": false,
+        "fullSwapQualified": false
+      },
+      "setup": {
+        "format": "jito-cpmm-ata-setup-rent-v1",
+        "slot": 463409332,
+        "transactionSha256": "72548308785c8dc45da18e4deb02c172165ad25b4f1aaea504fbc13a744e1a09",
+        "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+        "requiredMintRentLamports": "1066800",
+        "createdAccountBytes": 165,
+        "createdRentLamports": "1488440",
+        "feeLamports": "5000",
+        "maximumFeeLamports": "10000",
+        "reserveLamports": "0",
+        "remainingLamports": "6942720",
+        "requiredSystemRentLamports": "650240",
+        "exactPayerDebitChecked": true,
+        "emptyCanonicalAccountChecked": true,
+        "feeBankVerified": false,
+        "accountProvenanceVerified": false,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "runtimePrivilegesVerified": false,
+        "automaticExecutionAllowed": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "marketComparison": {
+        "available": true,
+        "transactionSha256": "53862d5b79eca294a43ae014e414472614e01e4c01bd756688684719be670e0a",
+        "inputMarketPair": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+        "outputMarketPair": "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ",
+        "inputPriceUsd": "94.64",
+        "outputPriceUsd": "0.9982",
+        "inputObservedAt": "2026-10-30T19:51:12.539Z",
+        "outputObservedAt": "2026-10-30T19:51:12.564Z",
+        "minimumValueDifferenceBps": "-45",
+        "worse": true,
+        "acknowledgementRequired": false,
+        "expiresAt": "2026-10-30T19:56:12.539Z",
+        "priceVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "postCodeCustody": {
+        "slot": 463409349,
+        "comparisons": [
+          {
+            "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "beforeLamports": "8436160",
+            "afterLamports": "8436160",
+            "same": true
+          },
+          {
+            "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+            "beforeLamports": "985671083",
+            "afterLamports": "985671083",
+            "same": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "beforeLamports": null,
+            "afterLamports": null,
+            "same": true
+          }
+        ]
+      },
+      "lifetime": {
+        "format": "jito-cpmm-lifetime-observation-v1",
+        "transactionSha256": "53862d5b79eca294a43ae014e414472614e01e4c01bd756688684719be670e0a",
+        "blockhash": "4Y3Tu5qLbcAPQ2Laoo2WcEgDqDXc3uyuNevtY8MuAWiU",
+        "lastValidBlockHeight": "441431778",
+        "blockHeight": "441431647",
+        "minimumSlot": 463409321,
+        "validitySlot": 463409349,
+        "remainingBlocks": "131",
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetimeRecheckedAfterFinalCode": true,
+      "qualificationWallMs": 6961.054899999999,
+      "stages": [
+        {
+          "stage": "genesis",
+          "enteredAtMs": 0,
+          "finishedAtMs": 329.8122999999998
+        },
+        {
+          "stage": "blockhash",
+          "enteredAtMs": 329.8122999999998,
+          "finishedAtMs": 409.9245999999998
+        },
+        {
+          "stage": "first-four-program-code-scan",
+          "enteredAtMs": 409.9245999999998,
+          "finishedAtMs": 412.71489999999994
+        },
+        {
+          "stage": "first-code-and-issued-lifetime",
+          "enteredAtMs": 412.71489999999994,
+          "finishedAtMs": 2733.0337
+        },
+        {
+          "stage": "archive-base-prestate",
+          "enteredAtMs": 2733.0337,
+          "finishedAtMs": 3526.5098999999996
+        },
+        {
+          "stage": "strict-source-quote-candidate",
+          "enteredAtMs": 3526.5098999999996,
+          "finishedAtMs": 3552.3729
+        },
+        {
+          "stage": "full-setup-swap-tip-simulation",
+          "enteredAtMs": 3552.3729,
+          "finishedAtMs": 4192.0805
+        },
+        {
+          "stage": "observed-mutable-effects",
+          "enteredAtMs": 4192.0805,
+          "finishedAtMs": 4207.865599999999
+        },
+        {
+          "stage": "actual-pool-oracle-and-rent-replay",
+          "enteredAtMs": 4207.865599999999,
+          "finishedAtMs": 4238.6124
+        },
+        {
+          "stage": "native-fee-rent-and-tip-conservation",
+          "enteredAtMs": 4238.6124,
+          "finishedAtMs": 4246.5056
+        },
+        {
+          "stage": "independent-market-comparison",
+          "enteredAtMs": 4246.5056,
+          "finishedAtMs": 4255.646500000001
+        },
+        {
+          "stage": "final-four-program-code-scan",
+          "enteredAtMs": 4255.646500000001,
+          "finishedAtMs": 5949.6952
+        },
+        {
+          "stage": "post-code-custody-mint-and-lifetime",
+          "enteredAtMs": 5949.6952,
+          "finishedAtMs": 6752.801799999999
+        },
+        {
+          "stage": "final-window",
+          "enteredAtMs": 6752.801799999999,
+          "finishedAtMs": 6961.0538
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    },
+    {
+      "observedAt": "2026-10-30T19:51:54.917Z",
+      "captureSha256": "924e8314bcf4e98fe191eea48dec73d81fcc2398a5f88698cdc5d6691a70d298",
+      "runtime": {
+        "nodeVersion": "v24.22.1",
+        "requiredNodeMajor": 24
+      },
+      "status": "unsigned-setup-swap-tip-mutable-effects-observed",
+      "stage": "final-window",
+      "floor": 463409489,
+      "simulationSlot": 463409501,
+      "lastSlot": 463409521,
+      "spanSlots": 32,
+      "calls": 11,
+      "codeReads": 18,
+      "codeResponseJsonBytes": 590569,
+      "rateLimited": false,
+      "firstCode": {
+        "format": "jito-runtime-capture-v1",
+        "minimumSlot": 463409489,
+        "minimumReadSlot": 463409489,
+        "maximumSlot": 463409499,
+        "keys": [
+          "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+          "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2",
+          "FMmwToGqT9iwDgsqvzLg65vcKSzKme4szbWqX1kyCBCJ",
+          "v3YN4d7JRhKFcwtex7qNtyg2r5hKYW96Cayb6GivSvY",
+          "HG2WgeYsjqQhnjhwHj7QdTVvjyWpFRk6VREAQ8MURv2u",
+          "BeMRiScNtZrU1Ce4D6Kv5FYKLyhGTRbmMq2KPVxupuDv",
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "SysvarC1ock11111111111111111111111111111111",
+          "SysvarRent111111111111111111111111111111111",
+          "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+          "11111111111111111111111111111111",
+          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL"
+        ],
+        "programs": [
+          {
+            "address": "11111111111111111111111111111111",
+            "loader": "NativeLoader1111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+            "codeBytes": 21,
+            "identityKind": "native-system"
+          },
+          {
+            "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+            "loader": "BPFLoader2111111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "6804554e69fd3a58caa191dc4a58f4c67223d30ca28ab8987f39fc18d2f7374d",
+            "codeBytes": 105032,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
+            "deploymentSlot": "452376460",
+            "upgradeAuthority": "FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK",
+            "codeSha256": "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+            "codeBytes": 793824,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+            "deploymentSlot": "419472000",
+            "upgradeAuthority": null,
+            "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+            "codeBytes": 108600,
+            "identityKind": "elf-code"
+          }
+        ],
+        "reads": 9,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "diagnosticProfile": "cpmm-ata-matched-source-research",
+        "sha256": "7eca171acdfa8c11a91fb8acd32c373eb4e55ec5949b5468fa30abb785960992"
+      },
+      "lastCode": {
+        "format": "jito-runtime-capture-v1",
+        "minimumSlot": 463409489,
+        "minimumReadSlot": 463409501,
+        "maximumSlot": 463409515,
+        "keys": [
+          "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+          "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2",
+          "FMmwToGqT9iwDgsqvzLg65vcKSzKme4szbWqX1kyCBCJ",
+          "v3YN4d7JRhKFcwtex7qNtyg2r5hKYW96Cayb6GivSvY",
+          "HG2WgeYsjqQhnjhwHj7QdTVvjyWpFRk6VREAQ8MURv2u",
+          "BeMRiScNtZrU1Ce4D6Kv5FYKLyhGTRbmMq2KPVxupuDv",
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "SysvarC1ock11111111111111111111111111111111",
+          "SysvarRent111111111111111111111111111111111",
+          "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+          "11111111111111111111111111111111",
+          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL"
+        ],
+        "programs": [
+          {
+            "address": "11111111111111111111111111111111",
+            "loader": "NativeLoader1111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+            "codeBytes": 21,
+            "identityKind": "native-system"
+          },
+          {
+            "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+            "loader": "BPFLoader2111111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "6804554e69fd3a58caa191dc4a58f4c67223d30ca28ab8987f39fc18d2f7374d",
+            "codeBytes": 105032,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
+            "deploymentSlot": "452376460",
+            "upgradeAuthority": "FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK",
+            "codeSha256": "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+            "codeBytes": 793824,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+            "deploymentSlot": "419472000",
+            "upgradeAuthority": null,
+            "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+            "codeBytes": 108600,
+            "identityKind": "elf-code"
+          }
+        ],
+        "reads": 9,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "diagnosticProfile": "cpmm-ata-matched-source-research",
+        "sha256": "5015e44365a5f55801ff55c3e29bb1921df3d1af35c7baa4ab5fefd973d7bd84"
+      },
+      "reconstructedCpmmDigests": [
+        "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+        "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a"
+      ],
+      "requestAndBodyDigestsVerified": 18,
+      "writableReplay": {
+        "format": "jito-cpmm-sparse-state-replay-v1",
+        "transactionSha256": "219bcbbf34a5eeeaecbe8ef7c5cbe70483a3aa8dbf40b2e13dad1181d557ed40",
+        "slot": 463409501,
+        "poolTransitionChecked": true,
+        "oracleTransitionChecked": true,
+        "tokenTransitionChecked": true,
+        "outputRaw": "94440",
+        "rentCoverageChecked": true,
+        "sourceAuthenticated": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "accountProvenanceVerified": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "readonlyPostCoverage": false,
+        "fullSwapQualified": false
+      },
+      "setup": {
+        "format": "jito-cpmm-ata-setup-rent-v1",
+        "slot": 463409501,
+        "transactionSha256": "85434078778f0b097f79210d17a9b5b8eedbcb69d9760caf223f13b4408746f9",
+        "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+        "requiredMintRentLamports": "1066800",
+        "createdAccountBytes": 165,
+        "createdRentLamports": "1488440",
+        "feeLamports": "5000",
+        "maximumFeeLamports": "10000",
+        "reserveLamports": "0",
+        "remainingLamports": "6937720",
+        "requiredSystemRentLamports": "650240",
+        "exactPayerDebitChecked": true,
+        "emptyCanonicalAccountChecked": true,
+        "feeBankVerified": false,
+        "accountProvenanceVerified": false,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "runtimePrivilegesVerified": false,
+        "automaticExecutionAllowed": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "marketComparison": {
+        "available": true,
+        "transactionSha256": "219bcbbf34a5eeeaecbe8ef7c5cbe70483a3aa8dbf40b2e13dad1181d557ed40",
+        "inputMarketPair": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+        "outputMarketPair": "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ",
+        "inputPriceUsd": "94.66",
+        "outputPriceUsd": "0.9988",
+        "inputObservedAt": "2026-10-30T19:51:48.485Z",
+        "outputObservedAt": "2026-10-30T19:51:48.516Z",
+        "minimumValueDifferenceBps": "-35",
+        "worse": true,
+        "acknowledgementRequired": false,
+        "expiresAt": "2026-10-30T19:56:48.485Z",
+        "priceVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "postCodeCustody": {
+        "slot": 463409517,
+        "comparisons": [
+          {
+            "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "beforeLamports": "8431160",
+            "afterLamports": "8431160",
+            "same": true
+          },
+          {
+            "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+            "beforeLamports": "980134263",
+            "afterLamports": "980134263",
+            "same": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "beforeLamports": null,
+            "afterLamports": null,
+            "same": true
+          }
+        ]
+      },
+      "lifetime": {
+        "format": "jito-cpmm-lifetime-observation-v1",
+        "transactionSha256": "219bcbbf34a5eeeaecbe8ef7c5cbe70483a3aa8dbf40b2e13dad1181d557ed40",
+        "blockhash": "7A4CC4KpUmnuumaqMaTx8tiKJ4mhmHcvHVfffCCTtikm",
+        "lastValidBlockHeight": "441431943",
+        "blockHeight": "441431811",
+        "minimumSlot": 463409489,
+        "validitySlot": 463409518,
+        "remainingBlocks": "132",
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetimeRecheckedAfterFinalCode": true,
+      "qualificationWallMs": 7026.9299,
+      "stages": [
+        {
+          "stage": "genesis",
+          "enteredAtMs": 0,
+          "finishedAtMs": 348.2596
+        },
+        {
+          "stage": "blockhash",
+          "enteredAtMs": 348.2596,
+          "finishedAtMs": 421.9642
+        },
+        {
+          "stage": "first-four-program-code-scan",
+          "enteredAtMs": 421.9642,
+          "finishedAtMs": 425.50159999999994
+        },
+        {
+          "stage": "first-code-and-issued-lifetime",
+          "enteredAtMs": 425.50159999999994,
+          "finishedAtMs": 2806.0694000000003
+        },
+        {
+          "stage": "archive-base-prestate",
+          "enteredAtMs": 2806.0694000000003,
+          "finishedAtMs": 3570.9691000000003
+        },
+        {
+          "stage": "strict-source-quote-candidate",
+          "enteredAtMs": 3570.9691000000003,
+          "finishedAtMs": 3596.6140000000005
+        },
+        {
+          "stage": "full-setup-swap-tip-simulation",
+          "enteredAtMs": 3596.6140000000005,
+          "finishedAtMs": 4236.8809
+        },
+        {
+          "stage": "observed-mutable-effects",
+          "enteredAtMs": 4236.8809,
+          "finishedAtMs": 4257.951
+        },
+        {
+          "stage": "actual-pool-oracle-and-rent-replay",
+          "enteredAtMs": 4257.951,
+          "finishedAtMs": 4285.6718
+        },
+        {
+          "stage": "native-fee-rent-and-tip-conservation",
+          "enteredAtMs": 4285.6718,
+          "finishedAtMs": 4293.220600000001
+        },
+        {
+          "stage": "independent-market-comparison",
+          "enteredAtMs": 4293.220600000001,
+          "finishedAtMs": 4302.2731
+        },
+        {
+          "stage": "final-four-program-code-scan",
+          "enteredAtMs": 4302.2731,
+          "finishedAtMs": 6047.7434
+        },
+        {
+          "stage": "post-code-custody-mint-and-lifetime",
+          "enteredAtMs": 6047.7434,
+          "finishedAtMs": 6832.9115
+        },
+        {
+          "stage": "final-window",
+          "enteredAtMs": 6832.9115,
+          "finishedAtMs": 7026.929
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    },
+    {
+      "observedAt": "2026-10-30T19:52:09.163Z",
+      "captureSha256": "f4247c1149dd9146443ff142a5b4f93614431ada03f3a042ac1e926eb8800f06",
+      "runtime": {
+        "nodeVersion": "v24.22.1",
+        "requiredNodeMajor": 24
+      },
+      "status": "unsigned-setup-swap-tip-mutable-effects-observed",
+      "stage": "final-window",
+      "floor": 463409559,
+      "simulationSlot": 463409571,
+      "lastSlot": 463409587,
+      "spanSlots": 28,
+      "calls": 11,
+      "codeReads": 18,
+      "codeResponseJsonBytes": 590568,
+      "rateLimited": false,
+      "firstCode": {
+        "format": "jito-runtime-capture-v1",
+        "minimumSlot": 463409559,
+        "minimumReadSlot": 463409559,
+        "maximumSlot": 463409569,
+        "keys": [
+          "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+          "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2",
+          "FMmwToGqT9iwDgsqvzLg65vcKSzKme4szbWqX1kyCBCJ",
+          "v3YN4d7JRhKFcwtex7qNtyg2r5hKYW96Cayb6GivSvY",
+          "HG2WgeYsjqQhnjhwHj7QdTVvjyWpFRk6VREAQ8MURv2u",
+          "BeMRiScNtZrU1Ce4D6Kv5FYKLyhGTRbmMq2KPVxupuDv",
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "SysvarC1ock11111111111111111111111111111111",
+          "SysvarRent111111111111111111111111111111111",
+          "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+          "11111111111111111111111111111111",
+          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL"
+        ],
+        "programs": [
+          {
+            "address": "11111111111111111111111111111111",
+            "loader": "NativeLoader1111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+            "codeBytes": 21,
+            "identityKind": "native-system"
+          },
+          {
+            "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+            "loader": "BPFLoader2111111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "6804554e69fd3a58caa191dc4a58f4c67223d30ca28ab8987f39fc18d2f7374d",
+            "codeBytes": 105032,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
+            "deploymentSlot": "452376460",
+            "upgradeAuthority": "FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK",
+            "codeSha256": "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+            "codeBytes": 793824,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+            "deploymentSlot": "419472000",
+            "upgradeAuthority": null,
+            "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+            "codeBytes": 108600,
+            "identityKind": "elf-code"
+          }
+        ],
+        "reads": 9,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "diagnosticProfile": "cpmm-ata-matched-source-research",
+        "sha256": "87bcedde488647ddfe1a2c9865dba9b2040897e7361ea115484ffb7e0fc977c4"
+      },
+      "lastCode": {
+        "format": "jito-runtime-capture-v1",
+        "minimumSlot": 463409559,
+        "minimumReadSlot": 463409571,
+        "maximumSlot": 463409583,
+        "keys": [
+          "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+          "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2",
+          "FMmwToGqT9iwDgsqvzLg65vcKSzKme4szbWqX1kyCBCJ",
+          "v3YN4d7JRhKFcwtex7qNtyg2r5hKYW96Cayb6GivSvY",
+          "HG2WgeYsjqQhnjhwHj7QdTVvjyWpFRk6VREAQ8MURv2u",
+          "BeMRiScNtZrU1Ce4D6Kv5FYKLyhGTRbmMq2KPVxupuDv",
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "SysvarC1ock11111111111111111111111111111111",
+          "SysvarRent111111111111111111111111111111111",
+          "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+          "11111111111111111111111111111111",
+          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL"
+        ],
+        "programs": [
+          {
+            "address": "11111111111111111111111111111111",
+            "loader": "NativeLoader1111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+            "codeBytes": 21,
+            "identityKind": "native-system"
+          },
+          {
+            "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+            "loader": "BPFLoader2111111111111111111111111111111111",
+            "programData": null,
+            "deploymentSlot": null,
+            "upgradeAuthority": null,
+            "codeSha256": "6804554e69fd3a58caa191dc4a58f4c67223d30ca28ab8987f39fc18d2f7374d",
+            "codeBytes": 105032,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
+            "deploymentSlot": "452376460",
+            "upgradeAuthority": "FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK",
+            "codeSha256": "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+            "codeBytes": 793824,
+            "identityKind": "elf-code"
+          },
+          {
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+            "programData": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+            "deploymentSlot": "419472000",
+            "upgradeAuthority": null,
+            "codeSha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+            "codeBytes": 108600,
+            "identityKind": "elf-code"
+          }
+        ],
+        "reads": 9,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "diagnosticProfile": "cpmm-ata-matched-source-research",
+        "sha256": "6f3dd3ae3683998435650cd089d1af04541da1c6889f8bf3c25ea24a9ef9fdeb"
+      },
+      "reconstructedCpmmDigests": [
+        "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a",
+        "b6dbea8cefc2e7d490775ce6115e34a2ba480c0853c359e0bb4043b9381ef09a"
+      ],
+      "requestAndBodyDigestsVerified": 18,
+      "writableReplay": {
+        "format": "jito-cpmm-sparse-state-replay-v1",
+        "transactionSha256": "e8508e2d7ad1fd9304022030a04239115cd91f309e7c0e474b79d0e0cc5de12c",
+        "slot": 463409571,
+        "poolTransitionChecked": true,
+        "oracleTransitionChecked": true,
+        "tokenTransitionChecked": true,
+        "outputRaw": "94440",
+        "rentCoverageChecked": true,
+        "sourceAuthenticated": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "accountProvenanceVerified": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "readonlyPostCoverage": false,
+        "fullSwapQualified": false
+      },
+      "setup": {
+        "format": "jito-cpmm-ata-setup-rent-v1",
+        "slot": 463409571,
+        "transactionSha256": "288a65ccf9a105023b32a81972198115d18d594ed80265e328f4dbabcabb9e5b",
+        "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+        "requiredMintRentLamports": "1066800",
+        "createdAccountBytes": 165,
+        "createdRentLamports": "1488440",
+        "feeLamports": "5000",
+        "maximumFeeLamports": "10000",
+        "reserveLamports": "0",
+        "remainingLamports": "6932720",
+        "requiredSystemRentLamports": "650240",
+        "exactPayerDebitChecked": true,
+        "emptyCanonicalAccountChecked": true,
+        "feeBankVerified": false,
+        "accountProvenanceVerified": false,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "runtimePrivilegesVerified": false,
+        "automaticExecutionAllowed": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "marketComparison": {
+        "available": true,
+        "transactionSha256": "e8508e2d7ad1fd9304022030a04239115cd91f309e7c0e474b79d0e0cc5de12c",
+        "inputMarketPair": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+        "outputMarketPair": "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ",
+        "inputPriceUsd": "94.66",
+        "outputPriceUsd": "0.9988",
+        "inputObservedAt": "2026-10-30T19:52:03.293Z",
+        "outputObservedAt": "2026-10-30T19:52:03.291Z",
+        "minimumValueDifferenceBps": "-35",
+        "worse": true,
+        "acknowledgementRequired": false,
+        "expiresAt": "2026-10-30T19:57:03.291Z",
+        "priceVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "postCodeCustody": {
+        "slot": 463409585,
+        "comparisons": [
+          {
+            "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "beforeLamports": "8426160",
+            "afterLamports": "8426160",
+            "same": true
+          },
+          {
+            "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+            "beforeLamports": "975756196",
+            "afterLamports": "975756196",
+            "same": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "beforeLamports": null,
+            "afterLamports": null,
+            "same": true
+          }
+        ]
+      },
+      "lifetime": {
+        "format": "jito-cpmm-lifetime-observation-v1",
+        "transactionSha256": "e8508e2d7ad1fd9304022030a04239115cd91f309e7c0e474b79d0e0cc5de12c",
+        "blockhash": "5ucMe72JsK7wYZqRQbrNTD1azigMYYf3CiBry632j8sQ",
+        "lastValidBlockHeight": "441432013",
+        "blockHeight": "441431878",
+        "minimumSlot": 463409559,
+        "validitySlot": 463409586,
+        "remainingBlocks": "135",
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetimeRecheckedAfterFinalCode": true,
+      "qualificationWallMs": 6427.5738,
+      "stages": [
+        {
+          "stage": "genesis",
+          "enteredAtMs": 0,
+          "finishedAtMs": 319.4142999999999
+        },
+        {
+          "stage": "blockhash",
+          "enteredAtMs": 319.4142999999999,
+          "finishedAtMs": 401.08719999999994
+        },
+        {
+          "stage": "first-four-program-code-scan",
+          "enteredAtMs": 401.08719999999994,
+          "finishedAtMs": 404.9039
+        },
+        {
+          "stage": "first-code-and-issued-lifetime",
+          "enteredAtMs": 404.9039,
+          "finishedAtMs": 2781.1336
+        },
+        {
+          "stage": "archive-base-prestate",
+          "enteredAtMs": 2781.1336,
+          "finishedAtMs": 3361.6753
+        },
+        {
+          "stage": "strict-source-quote-candidate",
+          "enteredAtMs": 3361.6753,
+          "finishedAtMs": 3392.5709000000006
+        },
+        {
+          "stage": "full-setup-swap-tip-simulation",
+          "enteredAtMs": 3392.5709000000006,
+          "finishedAtMs": 3669.0614000000005
+        },
+        {
+          "stage": "observed-mutable-effects",
+          "enteredAtMs": 3669.0614000000005,
+          "finishedAtMs": 3684.5118
+        },
+        {
+          "stage": "actual-pool-oracle-and-rent-replay",
+          "enteredAtMs": 3684.5118,
+          "finishedAtMs": 3711.4991
+        },
+        {
+          "stage": "native-fee-rent-and-tip-conservation",
+          "enteredAtMs": 3711.4991,
+          "finishedAtMs": 3719.4194000000007
+        },
+        {
+          "stage": "independent-market-comparison",
+          "enteredAtMs": 3719.4194000000007,
+          "finishedAtMs": 3728.4700000000003
+        },
+        {
+          "stage": "final-four-program-code-scan",
+          "enteredAtMs": 3728.4700000000003,
+          "finishedAtMs": 5433.3818
+        },
+        {
+          "stage": "post-code-custody-mint-and-lifetime",
+          "enteredAtMs": 5433.3818,
+          "finishedAtMs": 6240.2199
+        },
+        {
+          "stage": "final-window",
+          "enteredAtMs": 6240.2199,
+          "finishedAtMs": 6427.5731000000005
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    }
+  ],
+  "compressionProbes": [
+    {
+      "captureSha256": "d39dcbc950325917def8573d449c3464b8e3de8f616f3b6d43b382ce22d40e79",
+      "format": "jito-cpmm-compression-probe-v1",
+      "observedAt": "2026-10-30T19:48:08.723Z",
+      "runtime": "v24.22.1",
+      "status": "refused",
+      "stage": "bounded-decompression",
+      "floor": 463408457,
+      "lastSlot": null,
+      "calls": 3,
+      "rateLimited": false,
+      "observations": {
+        "httpEncoding": "gzip",
+        "lastResponseBytes": 131623,
+        "lastRequestMs": 282.69809999999984
+      },
+      "diagnosticOnly": true,
+      "fullArtifactVerified": false,
+      "bankVerified": false,
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0,
+      "diagnosis": "Provider frame requires a 2 MiB codec window. One MiB window refused; output remained bounded to requested 524288 bytes. Offline cap diagnosis confirmed exact length and ELF prefix."
+    },
+    {
+      "captureSha256": "e1caad5f26d88b907e9a43fc51cb9bf29882c49868d95de4dc8927db0d720dca",
+      "format": "jito-cpmm-compression-probe-v1",
+      "observedAt": "2026-10-30T19:48:58.566Z",
+      "runtime": "v24.22.1",
+      "status": "bounded-compressed-code-observed",
+      "stage": "final-slot",
+      "floor": 463408690,
+      "lastSlot": 463408693,
+      "calls": 4,
+      "rateLimited": false,
+      "observations": {
+        "httpEncoding": null,
+        "lastResponseBytes": 43,
+        "lastRequestMs": 60.60490000000004,
+        "compression": {
+          "slot": 463408692,
+          "encoding": "base64+zstd",
+          "compressedBytes": 98517,
+          "decodedBytes": 524288,
+          "decodedSha256": "fa256ecefa4e828d5f37a753383a58dbc97a2f76759fa12622b4e0b4bee3ed92",
+          "matchedControlledArtifactPrefix": true,
+          "responseBytes": 131623,
+          "requestMs": 270.96770000000015,
+          "decodeMs": 1.6789000000001124,
+          "windowLogMax": 21,
+          "outputLimit": 524288
+        }
+      },
+      "diagnosticOnly": true,
+      "fullArtifactVerified": false,
+      "bankVerified": false,
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    }
+  ],
+  "limits": {
+    "diagnosticOnly": true,
+    "originalSlotLimit": 32,
+    "completeReadonlyPostImages": false,
+    "bankVerified": false,
+    "independentFeeBankVerified": false,
+    "contextlessHeightUpperBoundProven": false,
+    "referenceQuietnessVerified": false,
+    "fullSwapQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false,
+    "deployed": false
+  }
+}

@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex, 30 October 2026 ACTIVE: bounded optional code compression for read-only CPMM qualification. Exact paths: `lib/jito-cpmm-code-compression.ts`, its test, `lib/jito-qualification-transport.ts`, its test, `scripts/probe-jito-cpmm-compression.ts`, `scripts/probe-jito-cpmm-sequence.ts` and `docs/CODEX-JITO-CPMM-*`. Actual wire requests/responses stay captured; default transports, decoded slice/request bounds, artifact/header/floor checks, pacing and signing gates stay unchanged. No provider settings, deployment or funded action.
+
 - Codex, 30 October 2026 ACTIVE: opt-in serial mixed-loader packing for CPMM research only. Exact paths: `lib/pump-group-code-identity.ts`, `lib/pump-group-code-identity.test.ts`, `lib/jito-runtime-evidence.ts`, its relevant tests, `scripts/probe-jito-cpmm-sequence.ts` and `docs/CODEX-JITO-CPMM-*`. Group/default schedules, shared program policy, all guards and signing gates remain unchanged. No provider settings, deployment or funded action. Preserve the three unrelated recovery-password drafts.
 
 - Codex, 28 October 2026 ACTIVE: Jito v2 browser integration, recovery, compatibility and remount test migration on draft branch `codex/jito-v2-reservations-20261028`. See `docs/CODEX-JITO-SIGNING-RESERVATIONS-20261028.md` and `docs/CODEX-JITO-V2-remount-inventory-20261028.md`. The draft is not release-ready and must not be merged or deployed until the remaining coverage and rollout issues are resolved. No provider settings, hosted SQL, real-wallet or funded actions.

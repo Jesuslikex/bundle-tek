@@ -4,6 +4,7 @@ import { readJitoSimulationPayload } from './jito-simulation-json';
 import { snapshotJitoEvidence, jitoEvidenceSha256 } from './jito-evidence-json';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
 import bs58 from 'bs58';
+import { decodeJitoCpmmCompressedAccounts } from './jito-cpmm-code-compression';
 type CaptureTiming = {
   queuedAtMs: number;
   pacedAtMs: number | null;
@@ -56,12 +57,19 @@ export function createJitoQualificationTransport(
   stage: 'bundle' | 'assets' | 'runtime',
   minimumSlot: number,
   signal: AbortSignal,
-  dependencies: { fetcher?: typeof fetch; pace?: typeof paceWalletRpc } = {},
+  dependencies: {
+    fetcher?: typeof fetch;
+    pace?: typeof paceWalletRpc;
+    runtimeAccountEncoding?: 'base64+zstd';
+  } = {},
 ) {
+  const runtimeAccountEncoding = dependencies.runtimeAccountEncoding;
   if (
     !['bundle', 'assets', 'runtime'].includes(stage) ||
     !Number.isSafeInteger(minimumSlot) ||
-    minimumSlot < 0
+    minimumSlot < 0 ||
+    (runtimeAccountEncoding !== undefined &&
+      (stage !== 'runtime' || runtimeAccountEncoding !== 'base64+zstd'))
   )
     return fail();
   const endpoint = getSolanaHolderRpcEndpoint(),
@@ -169,8 +177,10 @@ export function createJitoQualificationTransport(
                 ...(stage === 'runtime' ? ['dataSlice'] : []),
               ].includes(k),
           ) ||
-          cfg?.encoding !== 'base64' ||
+          cfg?.encoding !== (runtimeAccountEncoding ?? 'base64') ||
           cfg.commitment !== 'confirmed' ||
+          (runtimeAccountEncoding &&
+            (!cfg.dataSlice || cfg.dataSlice.length < 1)) ||
           !Number.isSafeInteger(cfg.minContextSlot) ||
           cfg.minContextSlot < minimumSlot ||
           cfg.minContextSlot - minimumSlot > 32
@@ -304,12 +314,18 @@ export function createJitoQualificationTransport(
     }
   }
   const callRpc: PumpLaunchRpc = async (method, params, readSignal) => {
+    const wireParams = snapshotJitoEvidence(params);
+    if (runtimeAccountEncoding && method === 'getMultipleAccounts') {
+      const config = wireParams[1] as Record<string, unknown>;
+      if (!config || config.encoding !== 'base64') return fail();
+      config.encoding = runtimeAccountEncoding;
+    }
     const id = `jito-${stage}:${next++}`,
       body = JSON.stringify({
         jsonrpc: '2.0',
         id,
         method,
-        params: snapshotJitoEvidence(params),
+        params: wireParams,
       });
     const response = await request(body, readSignal);
     if (!response.ok) return fail();
@@ -338,7 +354,7 @@ export function createJitoQualificationTransport(
           value?: unknown;
         },
         slot = value?.context?.slot,
-        floor = (params[1] as { minContextSlot?: number })?.minContextSlot;
+        floor = (wireParams[1] as { minContextSlot?: number })?.minContextSlot;
       if (
         typeof slot !== 'bigint' ||
         typeof floor !== 'number' ||
@@ -348,7 +364,18 @@ export function createJitoQualificationTransport(
       )
         return fail();
     }
-    return strings(envelope.result);
+    const normalized = strings(envelope.result);
+    if (runtimeAccountEncoding && method === 'getMultipleAccounts') {
+      const config = wireParams[1] as {
+        dataSlice: { offset: number; length: number };
+      };
+      return decodeJitoCpmmCompressedAccounts(
+        normalized,
+        (wireParams[0] as string[]).length,
+        config.dataSlice,
+      );
+    }
+    return normalized;
   };
   const rpc: PumpLaunchRpc = (method, params, readSignal) =>
     callRpc(method, params, readSignal).catch(() => {

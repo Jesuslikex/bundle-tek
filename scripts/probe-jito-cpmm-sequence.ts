@@ -172,8 +172,11 @@ async function main() {
     contextSlot: string | null;
     httpStatus: number | null;
   }[] = [];
+  const withCompression =
+    process.argv.length === 6 && process.argv[5] === '--with-code-compression';
   const withMarket =
-    process.argv.length === 5 && process.argv[4] === '--with-market-comparison';
+    (process.argv.length === 5 || withCompression) &&
+    process.argv[4] === '--with-market-comparison';
   const withCode =
     (process.argv.length === 4 || withMarket) &&
     process.argv[3] === '--with-code-bracket';
@@ -463,6 +466,7 @@ async function main() {
         'runtime',
         floor,
         signal,
+        withCompression ? { runtimeAccountEncoding: 'base64+zstd' } : {},
       );
       firstCodeReady = collectJitoCpmmSetupResearchRuntimeEvidence(
         keys.slice(),
@@ -1122,6 +1126,7 @@ async function main() {
     lifetimeRecheckedAfterFinalCode:
       observations.lifetimeRecheckStatus === 'fulfilled',
     marketComparisonRequested: withMarket,
+    codeCompressionRequested: withCompression,
     overridesUsed: false,
     replaceRecentBlockhash: false,
     referenceQuietnessVerified: false,
