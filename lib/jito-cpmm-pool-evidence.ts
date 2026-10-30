@@ -2,6 +2,7 @@ import bs58 from 'bs58';
 import { address, getProgramDerivedAddress } from '@solana/kit';
 import { PAIR_CLOCK, pairClockUnixTimestamp } from './pair-stock-clock';
 import { calculateJitoCpmmConstantProduct } from './jito-cpmm-constant-product';
+import { calculateJitoCpmmCurrentQuote } from './jito-cpmm-current-quote';
 import { inspectJitoCpmmUnsignedPacket } from './jito-cpmm-unsigned-packet';
 import { readJitoCpmmAssetEvidence } from './jito-cpmm-asset-evidence';
 import { pairRentMinimumRaw } from './pair-rent-evidence';
@@ -19,6 +20,24 @@ export async function readJitoCpmmPoolEvidence(
   minimumSlot: number,
   rpc: PumpLaunchRpc,
   signal: AbortSignal,
+) {
+  return readPool(packet, minimumSlot, rpc, signal, false);
+}
+/** Explicit current-source research profile; no signing or provider policy. */
+export async function readJitoCpmmCurrentPoolEvidence(
+  packet: Parameters<typeof inspectJitoCpmmUnsignedPacket>[0],
+  minimumSlot: number,
+  rpc: PumpLaunchRpc,
+  signal: AbortSignal,
+) {
+  return readPool(packet, minimumSlot, rpc, signal, true);
+}
+async function readPool(
+  packet: Parameters<typeof inspectJitoCpmmUnsignedPacket>[0],
+  minimumSlot: number,
+  rpc: PumpLaunchRpc,
+  signal: AbortSignal,
+  current: boolean,
 ) {
   signal = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
   const original = snapshotJitoEvidence(packet, 16384);
@@ -111,6 +130,7 @@ export async function readJitoCpmmPoolEvidence(
   const reverse = key(200) === bound.inputMint && key(168) === bound.outputMint;
   if (
     b.subarray(0, 8).toString('hex') !== 'f7ede3f5d7c3de46' ||
+    Buffer.compare(b.subarray(168, 200), b.subarray(200, 232)) >= 0 ||
     (!forward && !reverse) ||
     key(8) !== bound.config ||
     key(296) !== bound.observation ||
@@ -132,14 +152,22 @@ export async function readJitoCpmmPoolEvidence(
   // Later releases reuse this padding for creator-fee state without changing
   // account lengths. The historical math below cannot safely interpret it.
   if (
-    b.subarray(389).some((byte: number) => byte !== 0) ||
-    c.subarray(108).some((byte: number) => byte !== 0) ||
-    o.subarray(4043).some((byte: number) => byte !== 0)
+    current
+      ? b[389] > 2 ||
+        b[390] > 1 ||
+        b.subarray(391, 397).some((byte: number) => byte !== 0) ||
+        b.subarray(413).some((byte: number) => byte !== 0) ||
+        c.subarray(124).some((byte: number) => byte !== 0) ||
+        o.subarray(4051).some((byte: number) => byte !== 0)
+      : b.subarray(389).some((byte: number) => byte !== 0) ||
+        c.subarray(108).some((byte: number) => byte !== 0) ||
+        o.subarray(4043).some((byte: number) => byte !== 0)
   )
     return fail();
   const unixTimestamp = pairClockUnixTimestamp(result.value[7], Number(slot));
   if (
     b.readBigUInt64LE(373) > BigInt(unixTimestamp) ||
+    (current && o.readBigUInt64LE(4043) > BigInt(unixTimestamp)) ||
     (o[8] === 1 &&
       o.readUInt16LE(9) < 100 &&
       o.readBigUInt64LE(43 + o.readUInt16LE(9) * 40) > BigInt(unixTimestamp))
@@ -148,6 +176,14 @@ export async function readJitoCpmmPoolEvidence(
   const tradeFee = c.readBigUInt64LE(12),
     protocolFee = c.readBigUInt64LE(20),
     fundFee = c.readBigUInt64LE(28);
+  const configuredCreatorFee = current ? c.readBigUInt64LE(108) : 0n;
+  const creatorFee = current && b[390] === 1 ? configuredCreatorFee : 0n;
+  if (
+    current &&
+    (tradeFee + configuredCreatorFee >= 1000000n ||
+      c.readBigUInt64LE(116) > 1000000n)
+  )
+    return fail();
   if (
     c.subarray(0, 8).toString('hex') !== 'daf42168cbcb2b6f' ||
     c[9] > 1 ||
@@ -244,11 +280,16 @@ export async function readJitoCpmmPoolEvidence(
   ).b.readBigUInt64LE(64);
   const inputFeeOffset = forward ? 341 : 349,
     outputFeeOffset = forward ? 349 : 341;
+  const inputCreatorOffset = forward ? 397 : 405,
+    outputCreatorOffset = forward ? 405 : 397;
   const inputFees =
-    b.readBigUInt64LE(inputFeeOffset) + b.readBigUInt64LE(inputFeeOffset + 16);
+    b.readBigUInt64LE(inputFeeOffset) +
+    b.readBigUInt64LE(inputFeeOffset + 16) +
+    (current ? b.readBigUInt64LE(inputCreatorOffset) : 0n);
   const outputFees =
     b.readBigUInt64LE(outputFeeOffset) +
-    b.readBigUInt64LE(outputFeeOffset + 16);
+    b.readBigUInt64LE(outputFeeOffset + 16) +
+    (current ? b.readBigUInt64LE(outputCreatorOffset) : 0n);
   if (
     sourceBalance < BigInt(bound.inputRaw) ||
     inputFees >= inputVaultBalance ||
@@ -256,7 +297,7 @@ export async function readJitoCpmmPoolEvidence(
     inputVaultBalance + BigInt(bound.inputRaw) > (1n << 64n) - 1n
   )
     return fail();
-  const curve = calculateJitoCpmmConstantProduct({
+  const quoteInput = {
     inputRaw: bound.inputRaw,
     minimumOutputRaw: bound.minimumOutputRaw,
     inputReserveRaw: (inputVaultBalance - inputFees).toString(),
@@ -264,7 +305,26 @@ export async function readJitoCpmmPoolEvidence(
     tradeFeeMillionths: tradeFee.toString(),
     protocolFeeMillionths: protocolFee.toString(),
     fundFeeMillionths: fundFee.toString(),
-  });
+  };
+  const creatorFeeOnInput =
+    b[389] === 0 || (b[389] === 1 && forward) || (b[389] === 2 && reverse);
+  const curve = current
+    ? calculateJitoCpmmCurrentQuote({
+        ...quoteInput,
+        creatorFeeMillionths: creatorFee.toString(),
+        creatorFeeOnInput,
+      })
+    : calculateJitoCpmmConstantProduct(quoteInput);
+  if (
+    current &&
+    'creatorFeeRaw' in curve &&
+    b.readBigUInt64LE(
+      creatorFeeOnInput ? inputCreatorOffset : outputCreatorOffset,
+    ) +
+      BigInt(curve.creatorFeeRaw) >
+      (1n << 64n) - 1n
+  )
+    return fail();
   if (
     b.readBigUInt64LE(inputFeeOffset) + BigInt(curve.protocolFeeRaw) >
       (1n << 64n) - 1n ||
@@ -274,7 +334,9 @@ export async function readJitoCpmmPoolEvidence(
     return fail();
   signal.throwIfAborted();
   return {
-    format: 'jito-cpmm-pool-observation-v1' as const,
+    format: current
+      ? ('jito-cpmm-current-pool-observation-v1' as const)
+      : ('jito-cpmm-pool-observation-v1' as const),
     transactionSha256: bound.transactionSha256,
     slot: Number(slot),
     assets,

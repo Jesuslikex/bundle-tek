@@ -1,7 +1,10 @@
 import { address, getProgramDerivedAddress } from '@solana/kit';
 import bs58 from 'bs58';
 import { expect, it, vi } from 'vitest';
-import { readJitoCpmmPoolEvidence } from './jito-cpmm-pool-evidence';
+import {
+  readJitoCpmmPoolEvidence,
+  readJitoCpmmCurrentPoolEvidence,
+} from './jito-cpmm-pool-evidence';
 import { readJitoCpmmPriceComparison } from './jito-cpmm-price-evidence';
 import { inspectJitoCpmmUnsignedPacket } from './jito-cpmm-unsigned-packet';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
@@ -15,10 +18,12 @@ const RENT = 'SysvarRent111111111111111111111111111111111';
 const CLOCK = 'SysvarC1ock11111111111111111111111111111111';
 const SYSVAR = 'Sysvar1111111111111111111111111111111111111';
 const pub = (i: number) => bs58.encode(new Uint8Array(32).fill(i));
-async function fixture() {
+async function fixture(reverse = false) {
   const now = Date.now(),
     payer = pub(1),
     pool = pub(5);
+  const inputMint = reverse ? USDC : WSOL,
+    outputMint = reverse ? WSOL : USDC;
   const pda = (seeds: Uint8Array[], program = CPMM) =>
     getProgramDerivedAddress({ programAddress: address(program), seeds });
   const text = (s: string) => new TextEncoder().encode(s);
@@ -29,22 +34,22 @@ async function fixture() {
   ]);
   const [oracle] = await pda([text('observation'), bs58.decode(pool)]);
   const [source] = await pda(
-    [bs58.decode(payer), bs58.decode(TOKEN), bs58.decode(WSOL)],
+    [bs58.decode(payer), bs58.decode(TOKEN), bs58.decode(inputMint)],
     ATA,
   );
   const [destination] = await pda(
-    [bs58.decode(payer), bs58.decode(TOKEN), bs58.decode(USDC)],
+    [bs58.decode(payer), bs58.decode(TOKEN), bs58.decode(outputMint)],
     ATA,
   );
   const [inputVault] = await pda([
     text('pool_vault'),
     bs58.decode(pool),
-    bs58.decode(WSOL),
+    bs58.decode(inputMint),
   ]);
   const [outputVault] = await pda([
     text('pool_vault'),
     bs58.decode(pool),
-    bs58.decode(USDC),
+    bs58.decode(outputMint),
   ]);
   const metas = [
     payer,
@@ -57,8 +62,8 @@ async function fixture() {
     outputVault,
     TOKEN,
     TOKEN,
-    WSOL,
-    USDC,
+    inputMint,
+    outputMint,
     oracle,
   ].map((address, i) => ({
     address,
@@ -73,8 +78,8 @@ async function fixture() {
     keys = [...writable, ...readonly];
   const data = Buffer.alloc(24);
   Buffer.from('8fbe5adac41e33de', 'hex').copy(data);
-  data.writeBigUInt64LE(1000000n, 8);
-  data.writeBigUInt64LE(99000n, 16);
+  data.writeBigUInt64LE(reverse ? 100000n : 1000000n, 8);
+  data.writeBigUInt64LE(reverse ? 990000n : 99000n, 16);
   const wire = Buffer.from([
     1,
     ...new Uint8Array(64),
@@ -97,10 +102,10 @@ async function fixture() {
     transaction: wire.toString('base64'),
     expected: {
       payer,
-      inputMint: WSOL,
-      outputMint: USDC,
-      inputRaw: '1000000',
-      minimumOutputRaw: '99000',
+      inputMint,
+      outputMint,
+      inputRaw: reverse ? '100000' : '1000000',
+      minimumOutputRaw: reverse ? '990000' : '99000',
     },
   };
   const raw = (
@@ -143,16 +148,22 @@ async function fixture() {
     }
     return raw(b, TOKEN, 2039280n + (mint === WSOL ? amount : 0n));
   };
-  accounts.set(source, token(WSOL, payer, 5000000n));
-  accounts.set(destination, token(USDC, payer, 500000n));
-  accounts.set(inputVault, token(WSOL, authority, 1000000000000n));
-  accounts.set(outputVault, token(USDC, authority, 100000000000n));
+  accounts.set(source, token(inputMint, payer, 5000000n));
+  accounts.set(destination, token(outputMint, payer, 500000n));
+  accounts.set(
+    inputVault,
+    token(inputMint, authority, reverse ? 100000000000n : 1000000000000n),
+  );
+  accounts.set(
+    outputVault,
+    token(outputMint, authority, reverse ? 1000000000000n : 100000000000n),
+  );
   const poolData = Buffer.alloc(637);
   Buffer.from('f7ede3f5d7c3de46', 'hex').copy(poolData);
   for (const [offset, key] of [
     [8, config],
-    [72, inputVault],
-    [104, outputVault],
+    [72, reverse ? outputVault : inputVault],
+    [104, reverse ? inputVault : outputVault],
     [168, WSOL],
     [200, USDC],
     [232, TOKEN],
@@ -206,7 +217,7 @@ async function fixture() {
       pairs: [
         {
           address:
-            address === WSOL ? selection.inputPair : selection.outputPair,
+            address === inputMint ? selection.inputPair : selection.outputPair,
           dex: 'reference',
           url: '',
           quoteSymbol: 'USD',
@@ -229,6 +240,8 @@ async function fixture() {
     observe,
     pool,
     source,
+    config,
+    oracle,
   };
 }
 it('composes real packet bytes, canonical PDAs, native rent, raw accounts and independent-price units', async () => {
@@ -316,6 +329,110 @@ it('refuses a source account that cannot cover the encoded input', async () => {
   raw.lamports = (2039280n + 999999n).toString();
   await expect(
     readJitoCpmmPoolEvidence(
+      f.packet,
+      100,
+      f.rpc,
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+});
+it.each(
+  [false, true].flatMap((reverse) =>
+    [0, 1, 2].map((mode) => ({ reverse, mode })),
+  ),
+)(
+  'handles current creator-fee mode $mode with reverse=$reverse',
+  async ({ reverse, mode }) => {
+    const f = await fixture(reverse),
+      p = f.accounts.get(f.pool)!,
+      c = f.accounts.get(f.config)!;
+    const poolBytes = Buffer.from(p.data[0], 'base64');
+    poolBytes[389] = mode;
+    poolBytes[390] = 1;
+    p.data[0] = poolBytes.toString('base64');
+    const configBytes = Buffer.from(c.data[0], 'base64');
+    configBytes.writeBigUInt64LE(1000n, 108);
+    c.data[0] = configBytes.toString('base64');
+    const result = await readJitoCpmmCurrentPoolEvidence(
+      f.packet,
+      100,
+      f.rpc,
+      new AbortController().signal,
+    );
+    const onInput =
+      mode === 0 || (mode === 1 && !reverse) || (mode === 2 && reverse);
+    expect(result).toMatchObject({
+      format: 'jito-cpmm-current-pool-observation-v1',
+      poolVerified: false,
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+    expect(result.curve).toMatchObject({
+      creatorFeeOnInput: onInput,
+      creatorFeeRaw: onInput
+        ? reverse
+          ? '100'
+          : '1000'
+        : reverse
+          ? '998'
+          : '100',
+    });
+    await expect(
+      readJitoCpmmPoolEvidence(
+        f.packet,
+        100,
+        f.rpc,
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow();
+  },
+);
+it('excludes current accrued creator fees from both reserve sides', async () => {
+  const f = await fixture(),
+    p = f.accounts.get(f.pool)!,
+    b = Buffer.from(p.data[0], 'base64');
+  b.writeBigUInt64LE(100000000000n, 397);
+  b.writeBigUInt64LE(1000000000n, 405);
+  p.data[0] = b.toString('base64');
+  const r = await readJitoCpmmCurrentPoolEvidence(
+    f.packet,
+    100,
+    f.rpc,
+    new AbortController().signal,
+  );
+  expect(BigInt(r.curve.expectedOutputRaw) > 99749n).toBe(true);
+});
+it.each([
+  [389, 3],
+  [390, 2],
+  [391, 1],
+  [413, 1],
+])(
+  'refuses current-profile unknown pool bytes at %s',
+  async (offset, value) => {
+    const f = await fixture(),
+      p = f.accounts.get(f.pool)!,
+      b = Buffer.from(p.data[0], 'base64');
+    b[offset] = value;
+    p.data[0] = b.toString('base64');
+    await expect(
+      readJitoCpmmCurrentPoolEvidence(
+        f.packet,
+        100,
+        f.rpc,
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow();
+  },
+);
+it('refuses a future current oracle last-update timestamp', async () => {
+  const f = await fixture(),
+    o = f.accounts.get(f.oracle)!,
+    b = Buffer.from(o.data[0], 'base64');
+  b.writeBigUInt64LE(BigInt(Math.floor(f.now / 1000) + 60), 4043);
+  o.data[0] = b.toString('base64');
+  await expect(
+    readJitoCpmmCurrentPoolEvidence(
       f.packet,
       100,
       f.rpc,

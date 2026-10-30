@@ -1,0 +1,2124 @@
+{
+  "format": "cpmm-current-rust-reference-v1",
+  "sourceRevision": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+  "sourceHashes": {
+    "calculator.rs": "aee16991f81d755a72eae70cdf929816fc9571144cf8570f5049f42af0e7f7f8",
+    "constant_product.rs": "5a6ab835ba35e872df53d12df58f98f0b5919592450872eb25e273ce18255077",
+    "fees.rs": "0d0b005123cd9e9e8f4ce92d41a5fedfac390471d17db4d63b700ac5b5ad7ffb"
+  },
+  "vectorCount": 96,
+  "vectors": [
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "102",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "102",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "55",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "224",
+        "newOutputReserveRaw": "46"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "224",
+        "newOutputReserveRaw": "46"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "55",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "46"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "55",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "46"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "55",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "46"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "46"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "55",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "46"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "100",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000101",
+        "newOutputReserveRaw": "1"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "1000101",
+        "newOutputReserveRaw": "1"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "100",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1000",
+        "newInputReserveRaw": "999101",
+        "newOutputReserveRaw": "1"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "100",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "997601",
+        "newOutputReserveRaw": "1"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "100",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "997601",
+        "newOutputReserveRaw": "1"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "997601",
+        "newOutputReserveRaw": "1"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "100",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "1000",
+        "newInputReserveRaw": "996601",
+        "newOutputReserveRaw": "1"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "980392156",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "102",
+        "newOutputReserveRaw": "99019607844"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "979411763",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "980393",
+        "newInputReserveRaw": "102",
+        "newOutputReserveRaw": "99019607844"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "101",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54910714285",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "224",
+        "newOutputReserveRaw": "45089285715"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54855803570",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "54910715",
+        "newInputReserveRaw": "224",
+        "newOutputReserveRaw": "45089285715"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54708520179",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "45291479821"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54708520179",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "45291479821"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54708520179",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "45291479821"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54653811658",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "54708521",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "45291479821"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "54708520179",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "223",
+        "newOutputReserveRaw": "45291479821"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99989901019",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000101",
+        "newOutputReserveRaw": "10098981"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99889911117",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "99989902",
+        "newInputReserveRaw": "1000101",
+        "newOutputReserveRaw": "10098981"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99989890911",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1000",
+        "newInputReserveRaw": "999101",
+        "newOutputReserveRaw": "10109089"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99989875711",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "997601",
+        "newOutputReserveRaw": "10124289"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99989875711",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "997601",
+        "newOutputReserveRaw": "10124289"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99889885835",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "99989876",
+        "newInputReserveRaw": "997601",
+        "newOutputReserveRaw": "10124289"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "101",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99989865553",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "1000",
+        "newInputReserveRaw": "996601",
+        "newOutputReserveRaw": "10134447"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000001",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000001",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000123",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000123",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000001000000",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000001000000",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1000",
+        "newInputReserveRaw": "1000000999000",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000997500",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000997500",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000997500",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "101",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "1000",
+        "newInputReserveRaw": "1000000996500",
+        "newOutputReserveRaw": "101"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000001",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000001",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "0",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000000",
+        "newOutputReserveRaw": "100000000000"
+      },
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "12",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000123",
+        "newOutputReserveRaw": "99999999988"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "11",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "1000000000123",
+        "newOutputReserveRaw": "99999999988"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "12",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "99999999988"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "12",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "99999999988"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "12",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "99999999988"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "11",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "99999999988"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "123",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "12",
+        "tradeFeeRaw": "1",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000000122",
+        "newOutputReserveRaw": "99999999988"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99999",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000001000000",
+        "newOutputReserveRaw": "99999900001"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": null,
+      "accepted": false
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99899",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "100",
+        "newInputReserveRaw": "1000001000000",
+        "newOutputReserveRaw": "99999900001"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "0",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99899",
+        "tradeFeeRaw": "0",
+        "protocolFeeRaw": "0",
+        "fundFeeRaw": "0",
+        "creatorFeeRaw": "1000",
+        "newInputReserveRaw": "1000000999000",
+        "newOutputReserveRaw": "99999900101"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99749",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000997500",
+        "newOutputReserveRaw": "99999900251"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99749",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "0",
+        "newInputReserveRaw": "1000000997500",
+        "newOutputReserveRaw": "99999900251"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": false,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99649",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "100",
+        "newInputReserveRaw": "1000000997500",
+        "newOutputReserveRaw": "99999900251"
+      },
+      "accepted": true
+    },
+    {
+      "input": {
+        "inputReserveRaw": "1000000000000",
+        "outputReserveRaw": "100000000000",
+        "inputRaw": "1000000",
+        "tradeFeeMillionths": "2500",
+        "creatorFeeMillionths": "1000",
+        "creatorFeeOnInput": true,
+        "protocolFeeMillionths": "120000",
+        "fundFeeMillionths": "40000",
+        "minimumOutputRaw": "1"
+      },
+      "expected": {
+        "expectedOutputRaw": "99649",
+        "tradeFeeRaw": "2500",
+        "protocolFeeRaw": "300",
+        "fundFeeRaw": "100",
+        "creatorFeeRaw": "1000",
+        "newInputReserveRaw": "1000000996500",
+        "newOutputReserveRaw": "99999900351"
+      },
+      "accepted": true
+    }
+  ]
+}
