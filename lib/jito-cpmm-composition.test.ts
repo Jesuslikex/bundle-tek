@@ -440,3 +440,76 @@ it('refuses a future current oracle last-update timestamp', async () => {
     ),
   ).rejects.toThrow();
 });
+
+it.each([false, true])(
+  'binds real packet bytes to all four raw token transitions (reverse=%s)',
+  async (reverse) => {
+    const { inspectJitoCpmmPacketBalanceTransition } =
+      await import('./jito-cpmm-unsigned-packet');
+    const f = await fixture(reverse);
+    const bound = await inspectJitoCpmmUnsignedPacket(f.packet);
+    const before = [
+      bound.source,
+      bound.destination,
+      bound.inputVault,
+      bound.outputVault,
+    ].map((address) => {
+      const a = f.accounts.get(address)!;
+      return {
+        address,
+        owner: a.owner,
+        executable: a.executable,
+        lamports: a.lamports,
+        dataBase64: a.data[0],
+      };
+    });
+    const after = structuredClone(before);
+    const input = BigInt(bound.inputRaw),
+      output = BigInt(bound.minimumOutputRaw);
+    for (const [i, delta] of [
+      [0, -input],
+      [1, output],
+      [2, input],
+      [3, -output],
+    ] as const) {
+      const a = after[i],
+        bytes = Buffer.from(a.dataBase64, 'base64');
+      bytes.writeBigUInt64LE(bytes.readBigUInt64LE(64) + delta, 64);
+      if (bytes.readUInt32LE(109) === 1)
+        a.lamports = (BigInt(a.lamports) + delta).toString();
+      a.dataBase64 = bytes.toString('base64');
+    }
+    const request = { packet: f.packet, before, after };
+    expect(await inspectJitoCpmmPacketBalanceTransition(request)).toMatchObject(
+      {
+        transactionSha256: bound.transactionSha256,
+        inputRaw: input.toString(),
+        outputRaw: output.toString(),
+        instructionBoundToPacket: true,
+        bankVerified: false,
+        economicOutputVerified: false,
+        signingAllowed: false,
+      },
+    );
+    const swapped = structuredClone(request);
+    swapped.before.reverse();
+    await expect(
+      inspectJitoCpmmPacketBalanceTransition(swapped),
+    ).rejects.toThrow();
+    const changed = structuredClone(request);
+    changed.packet.expected.inputRaw = (input + 1n).toString();
+    await expect(
+      inspectJitoCpmmPacketBalanceTransition(changed),
+    ).rejects.toThrow();
+    const injected = { ...request, instruction: {} };
+    await expect(
+      inspectJitoCpmmPacketBalanceTransition(injected),
+    ).rejects.toThrow();
+    const pending = inspectJitoCpmmPacketBalanceTransition(request);
+    request.after[1].dataBase64 = '';
+    expect(await pending).toMatchObject({ outputRaw: output.toString() });
+    await expect(
+      inspectJitoCpmmPacketBalanceTransition(request),
+    ).rejects.toThrow();
+  },
+);

@@ -6,11 +6,12 @@ import {
 } from '@solana/kit';
 import { snapshotJitoEvidence, jitoEvidenceSha256 } from './jito-evidence-json';
 import { inspectJitoCpmmCandidateInstruction } from './jito-cpmm-candidate-instruction';
+import { inspectJitoCpmmCandidateBalanceTransition } from './jito-cpmm-candidate-balances';
 const fail = (): never => {
   throw Error('CPMM unsigned packet refused.');
 };
 /** Narrow packet profile: one unsigned v0 swap, existing ATAs, no lookups or auxiliary instructions. */
-export async function inspectJitoCpmmUnsignedPacket(input: {
+async function decodePacket(input: {
   transaction: string;
   expected: Parameters<
     typeof inspectJitoCpmmCandidateInstruction
@@ -77,7 +78,7 @@ export async function inspectJitoCpmmUnsignedPacket(input: {
     new Set([ix.programAddressIndex, ...indices]).size !== keys.length
   )
     return fail();
-  const inspected = await inspectJitoCpmmCandidateInstruction({
+  const instruction = {
     program: keys[ix.programAddressIndex],
     dataHex: Buffer.from(ix.data ?? []).toString('hex'),
     accounts: indices.map((i) => ({
@@ -86,13 +87,55 @@ export async function inspectJitoCpmmUnsignedPacket(input: {
       writable: writable(i),
     })),
     expected: value.expected,
+  };
+  const inspected = await inspectJitoCpmmCandidateInstruction(instruction);
+  return {
+    instruction,
+    inspection: {
+      ...inspected,
+      format: 'jito-cpmm-unsigned-packet-v1' as const,
+      transactionSha256: await jitoEvidenceSha256(bytes),
+      messageSha256: await jitoEvidenceSha256(Uint8Array.from(tx.messageBytes)),
+      blockhash: String(message.lifetimeToken),
+      instructionBoundToPacket: true as const,
+    },
+  };
+}
+
+export async function inspectJitoCpmmUnsignedPacket(
+  input: Parameters<typeof decodePacket>[0],
+) {
+  return (await decodePacket(input)).inspection;
+}
+
+/** Supplied raw states only: binding is not simulation provenance or full settlement proof. */
+export async function inspectJitoCpmmPacketBalanceTransition(input: {
+  packet: Parameters<typeof decodePacket>[0];
+  before: Parameters<
+    typeof inspectJitoCpmmCandidateBalanceTransition
+  >[0]['before'];
+  after: Parameters<
+    typeof inspectJitoCpmmCandidateBalanceTransition
+  >[0]['after'];
+}) {
+  const value = snapshotJitoEvidence(input, 32768);
+  if (
+    !value ||
+    Object.keys(value).length !== 3 ||
+    !['packet', 'before', 'after'].every((k) => Object.hasOwn(value, k))
+  )
+    return fail();
+  const decoded = await decodePacket(value.packet);
+  const balances = await inspectJitoCpmmCandidateBalanceTransition({
+    instruction: decoded.instruction,
+    before: value.before,
+    after: value.after,
   });
   return {
-    ...inspected,
-    format: 'jito-cpmm-unsigned-packet-v1' as const,
-    transactionSha256: await jitoEvidenceSha256(bytes),
-    messageSha256: await jitoEvidenceSha256(Uint8Array.from(tx.messageBytes)),
-    blockhash: String(message.lifetimeToken),
+    ...balances,
+    format: 'jito-cpmm-packet-balances-v1' as const,
+    transactionSha256: decoded.inspection.transactionSha256,
+    messageSha256: decoded.inspection.messageSha256,
     instructionBoundToPacket: true as const,
   };
 }
