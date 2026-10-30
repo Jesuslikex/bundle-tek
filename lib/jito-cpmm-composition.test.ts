@@ -729,12 +729,22 @@ async function bundleFixture(
   reverse = false,
   count = 1,
   distinctWallets = false,
+  emptyFirstDestination = false,
 ) {
   const kit = await import('@solana/kit');
   const { PUMP_GROUP_JITO_TIP_ACCOUNTS } =
     await import('./pump-group-broadcast');
   const f = await fixture(reverse),
     bound = await inspectJitoCpmmUnsignedPacket(f.packet);
+  if (emptyFirstDestination) {
+    const account = f.accounts.get(bound.destination)!;
+    const data = Buffer.from(account.data[0], 'base64');
+    const amount = data.readBigUInt64LE(64);
+    data.writeBigUInt64LE(0n, 64);
+    if (bound.outputMint === WSOL)
+      account.lamports = (BigInt(account.lamports) - amount).toString();
+    account.data[0] = data.toString('base64');
+  }
   const system = '11111111111111111111111111111111',
     recipient = PUMP_GROUP_JITO_TIP_ACCOUNTS[0];
   const ordinary = (lamports: string) => ({
@@ -1187,6 +1197,206 @@ it('rejects a synthetic empty System tip receiver that the old replay accepted',
   await expect(
     replayJitoCpmmBundleSettlement(request, new AbortController().signal),
   ).rejects.toThrow();
+});
+
+async function setupBundleFixture(
+  reverse = false,
+  count = 1,
+  distinctWallets = false,
+) {
+  const base = await bundleFixture(reverse, count, distinctWallets, true);
+  const kit = await import('@solana/kit');
+  const sdk = await import('@solana-program/token');
+  const bound = await inspectJitoCpmmUnsignedPacket(base.swaps[0]);
+  const payer = kit.createNoopSigner(address(bound.payer));
+  const message = kit.compileTransactionMessage(
+    kit.appendTransactionMessageInstructions(
+      [
+        sdk.getCreateAssociatedTokenIdempotentInstruction({
+          payer,
+          ata: address(bound.destination),
+          owner: payer.address,
+          mint: address(bound.outputMint),
+        }),
+      ],
+      kit.setTransactionMessageLifetimeUsingBlockhash(
+        {
+          blockhash: kit.blockhash(bound.blockhash),
+          lastValidBlockHeight: 999n,
+        },
+        kit.setTransactionMessageFeePayer(
+          payer.address,
+          kit.createTransactionMessage({ version: 0 }),
+        ),
+      ),
+    ),
+  );
+  const messageBytes = kit
+    .getCompiledTransactionMessageEncoder()
+    .encode(message) as import('@solana/kit').TransactionMessageBytes;
+  const transaction = Buffer.from(
+    kit.getTransactionEncoder().encode({
+      messageBytes,
+      signatures: Object.fromEntries([[payer.address, null]]),
+    }),
+  ).toString('base64');
+  const firstMessage = kit
+    .getCompiledTransactionMessageDecoder()
+    .decode(
+      kit
+        .getTransactionDecoder()
+        .decode(Buffer.from(base.swaps[0].transaction, 'base64')).messageBytes,
+    );
+  const firstKeys = firstMessage.staticAccounts.map(String);
+  const first = base.result.value.transactionResults[0];
+  type Raw = NonNullable<(typeof first.preExecutionAccounts)[number]>;
+  const source = (key: string): Raw => {
+    if (key === '11111111111111111111111111111111') {
+      const account =
+        base.result.value.transactionResults.at(-1)!.preExecutionAccounts[2];
+      if (!account) throw Error('Fixture System account missing');
+      return structuredClone(account);
+    }
+    if (key === 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+      return {
+        owner: 'BPFLoaderUpgradeab1e11111111111111111111111',
+        executable: true,
+        lamports: '1',
+        data: [
+          Buffer.concat([
+            Buffer.from([2, 0, 0, 0]),
+            Buffer.from(bs58.decode(pub(77))),
+          ]).toString('base64'),
+          'base64',
+        ],
+      };
+    const account = first.preExecutionAccounts[firstKeys.indexOf(key)];
+    if (!account) throw Error('Fixture setup account missing');
+    return structuredClone(account);
+  };
+  const keys = message.staticAccounts.map(String);
+  const post = keys.map(source);
+  const pre: (Raw | null)[] = structuredClone(post);
+  pre[1] = null;
+  const rent = BigInt(post[1].lamports);
+  pre[0]!.lamports = (BigInt(post[0].lamports) + rent + 5000n).toString();
+  const prefix = {
+    err: null,
+    preExecutionAccounts: pre,
+    postExecutionAccounts: post,
+    fee: '5000',
+    unitsConsumed: 25000,
+    loadedAccountsDataSize: '0',
+  };
+  const frames = [prefix, ...base.result.value.transactionResults];
+  return {
+    setup: {
+      transaction,
+      expected: {
+        payer: bound.payer,
+        mint: bound.outputMint,
+        destination: bound.destination,
+        blockhash: bound.blockhash,
+      },
+    },
+    bundle: {
+      ...base,
+      packets: [
+        {
+          transaction,
+          loadedAddresses: null,
+          maximumFeeLamports: '10000',
+          expectedFeeLamports: '5000',
+        },
+        ...base.packets,
+      ],
+      result: {
+        ...base.result,
+        value: { ...base.result.value, transactionResults: frames },
+      },
+    },
+  };
+}
+
+it.each([
+  { reverse: false, count: 1, distinct: false },
+  { reverse: true, count: 3, distinct: false },
+  { reverse: false, count: 3, distinct: true },
+])(
+  'checks every setup/swap/tip frame and original invariants for %j',
+  async (options) => {
+    const { replayJitoCpmmSetupBundle } =
+      await import('./jito-cpmm-setup-bundle-replay');
+    const f = await setupBundleFixture(
+      options.reverse,
+      options.count,
+      options.distinct,
+    );
+    const proof = await replayJitoCpmmSetupBundle(
+      f,
+      new AbortController().signal,
+    );
+    expect(proof).toMatchObject({
+      setupFrameChecked: true,
+      allSuppliedFramesChecked: true,
+      sourceAuthenticated: false,
+      bankVerified: false,
+      signingAllowed: false,
+      setup: {
+        createdRentLamports: '2039280',
+        emptyCanonicalAccountChecked: true,
+      },
+    });
+    expect(proof.transactionSha256s).toHaveLength(options.count + 2);
+    expect(
+      BigInt(proof.walletBalances[0].initialLamports) -
+        BigInt(proof.walletBalances[0].finalLamports),
+    ).toBe(
+      2039280n + BigInt(proof.walletBalances[0].networkFeeLamports) + 1000n,
+    );
+  },
+);
+
+it('keeps five-packet capacity, continuity, exact fees, setup context and full readonly vectors', async () => {
+  const { replayJitoCpmmSetupBundle } =
+    await import('./jito-cpmm-setup-bundle-replay');
+  await expect(
+    replayJitoCpmmSetupBundle(
+      await setupBundleFixture(false, 4),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+  const original = await setupBundleFixture();
+  for (const kind of [
+    'continuity',
+    'payer',
+    'mint',
+    'hash',
+    'fee',
+    'readonly',
+    'missing',
+    'reserve',
+  ]) {
+    const f = structuredClone(original);
+    if (kind === 'continuity')
+      f.bundle.result.value.transactionResults[1].preExecutionAccounts[0]!.lamports =
+        '10000001';
+    if (kind === 'payer') f.setup.expected.payer = pub(90);
+    if (kind === 'mint') f.setup.expected.mint = WSOL;
+    if (kind === 'hash') f.setup.expected.blockhash = pub(90);
+    if (kind === 'fee')
+      f.bundle.result.value.transactionResults[0].fee = '5001';
+    if (kind === 'readonly')
+      f.bundle.result.value.transactionResults[0].postExecutionAccounts[2]!.lamports =
+        '0';
+    if (kind === 'missing')
+      f.bundle.result.value.transactionResults[0].postExecutionAccounts.pop();
+    if (kind === 'reserve')
+      f.bundle.walletReserves[0].reserveLamports = '999999999';
+    await expect(
+      replayJitoCpmmSetupBundle(f, new AbortController().signal),
+    ).rejects.toThrow();
+  }
 });
 
 it('composes immutable owned code and lifetime captures with real packet/frame replay on one reader', async () => {
