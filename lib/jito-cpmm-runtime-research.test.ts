@@ -1,0 +1,197 @@
+import bs58 from 'bs58';
+import { expect, it, vi } from 'vitest';
+import { CPMM_MATCHED_SOURCE_IDENTITY } from './jito-cpmm-source-identity';
+import { PAIR_TRUSTED_PROGRAMS } from './pair-trusted-programs';
+import {
+  collectPumpProgramIdentities,
+  type PumpProgramIdentity,
+} from './pump-group-code-identity';
+import {
+  collectJitoCpmmResearchRuntimeEvidence,
+  verifyJitoCpmmResearchRuntimeBracket,
+  collectJitoRuntimeEvidence,
+  verifyJitoRuntimeBracket,
+} from './jito-runtime-evidence';
+import type { JitoBundleSimulationFrames } from './jito-bundle-simulation-frames';
+import type { PumpLaunchRpc } from './pump-launch-simulation';
+vi.mock('./pump-group-code-identity', () => ({
+  collectPumpProgramIdentities: vi.fn(),
+}));
+const system = '11111111111111111111111111111111',
+  token = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+function fixture() {
+  const identities: PumpProgramIdentity[] = [system, token]
+    .map((address) => {
+      const p = PAIR_TRUSTED_PROGRAMS.find((p) => p.address === address)!;
+      return {
+        address,
+        loader: p.loader,
+        identityKind:
+          address === system
+            ? ('native-system' as const)
+            : ('elf-code' as const),
+        programData:
+          address === system ? null : bs58.encode(new Uint8Array(32).fill(70)),
+        deploymentSlot: address === system ? null : '1',
+        upgradeAuthority: p.upgradeAuthority,
+        codeSha256: p.codeSha256[0],
+        codeBytes: address === system ? 21 : 108600,
+      };
+    })
+    .concat([{ ...CPMM_MATCHED_SOURCE_IDENTITY }]);
+  vi.mocked(collectPumpProgramIdentities).mockImplementation(
+    async (selected) =>
+      ({
+        format: 'pump-program-code-identities-v1',
+        network: 'mainnet',
+        minimumSlot: 100,
+        maximumSlot: 102,
+        reads: 1,
+        totalCodeBytes: identities.reduce((n, p) => n + p.codeBytes, 0),
+        observedAt: new Date().toISOString(),
+        codeIdentityVerified: true,
+        semanticAuditEstablished: false,
+        signingAllowed: false,
+        executionAllowed: false,
+        programs: structuredClone(
+          identities.filter((p) => selected.includes(p.address)),
+        ),
+      }) as Awaited<ReturnType<typeof collectPumpProgramIdentities>>,
+  );
+  const keys = identities.map((p) => p.address);
+  const accounts = identities.map((p) => {
+    const data = p.programData
+      ? Buffer.concat([
+          Buffer.from([2, 0, 0, 0]),
+          Buffer.from(bs58.decode(p.programData)),
+        ])
+      : Buffer.from('solana_system_program');
+    return { owner: p.loader, lamports: '1', executable: true, data };
+  });
+  const rpc: PumpLaunchRpc = async (method, params) =>
+    method === 'getGenesisHash'
+      ? '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
+      : {
+          context: { slot: '102' },
+          value: (params[0] as string[]).map((k) => {
+            const a = accounts[keys.indexOf(k)];
+            return {
+              owner: a.owner,
+              lamports: a.lamports,
+              executable: a.executable,
+              data: [a.data.toString('base64'), 'base64'],
+            };
+          }),
+        };
+  // Isolate profile/capture/writable binding with a mocked scanner. This is not
+  // a byte-scan or complete bundle simulation test; those run separately.
+  const frames = {
+    slot: 102,
+    frames: [
+      {
+        keys,
+        invokedProgramIndexes: [0, 1, 2],
+        requestedWritable: [false, false, false],
+        preAccounts: structuredClone(accounts),
+        postAccounts: structuredClone(accounts),
+      },
+    ],
+  } as unknown as JitoBundleSimulationFrames;
+  return { identities, keys, rpc, frames };
+}
+const signal = () => new AbortController().signal;
+it('binds research captures to two complete identical scans while the default profile still refuses CPMM', async () => {
+  const f = fixture();
+  const first = await collectJitoCpmmResearchRuntimeEvidence(
+      f.keys,
+      100,
+      100,
+      signal(),
+      f.rpc,
+    ),
+    last = await collectJitoCpmmResearchRuntimeEvidence(
+      f.keys,
+      100,
+      102,
+      signal(),
+      f.rpc,
+    );
+  expect(first).toMatchObject({
+    diagnosticProfile: 'cpmm-matched-source-research',
+    signingAllowed: false,
+  });
+  expect(
+    await verifyJitoCpmmResearchRuntimeBracket(first, last, f.frames, signal()),
+  ).toMatchObject({
+    matchedSourceIdentityChecked: true,
+    reviewedCodePolicyMatched: false,
+    programApproved: false,
+    runtimeAttested: false,
+    signingAllowed: false,
+  });
+  expect(
+    vi
+      .mocked(collectPumpProgramIdentities)
+      .mock.calls.every((c) => c[4] === 1 && c[5] === 100),
+  ).toBe(true);
+  await expect(
+    verifyJitoRuntimeBracket(first, last, f.frames, signal()),
+  ).rejects.toThrow();
+  await expect(
+    collectJitoRuntimeEvidence(f.keys, 100, 100, signal(), f.rpc),
+  ).rejects.toThrow();
+  await expect(
+    verifyJitoCpmmResearchRuntimeBracket(
+      { ...first },
+      last,
+      f.frames,
+      signal(),
+    ),
+  ).rejects.toThrow();
+  const ordinary = await collectJitoRuntimeEvidence(
+    [system],
+    100,
+    100,
+    signal(),
+    f.rpc,
+  );
+  await expect(
+    verifyJitoCpmmResearchRuntimeBracket(ordinary, last, f.frames, signal()),
+  ).rejects.toThrow();
+});
+it('retains reserved-write, exact account coverage and second-code-scan constraints', async () => {
+  const f = fixture(),
+    first = await collectJitoCpmmResearchRuntimeEvidence(
+      f.keys,
+      100,
+      100,
+      signal(),
+      f.rpc,
+    ),
+    last = await collectJitoCpmmResearchRuntimeEvidence(
+      f.keys,
+      100,
+      102,
+      signal(),
+      f.rpc,
+    );
+  const reserved = structuredClone(f.frames);
+  reserved.frames[0].requestedWritable[0] = true;
+  await expect(
+    verifyJitoCpmmResearchRuntimeBracket(first, last, reserved, signal()),
+  ).rejects.toThrow();
+  const missing = structuredClone(f.frames);
+  missing.frames[0].keys.pop();
+  await expect(
+    verifyJitoCpmmResearchRuntimeBracket(first, last, missing, signal()),
+  ).rejects.toThrow();
+  const malformed = structuredClone(f.frames);
+  malformed.frames[0].postAccounts[2]!.data[4] ^= 1;
+  await expect(
+    verifyJitoCpmmResearchRuntimeBracket(first, last, malformed, signal()),
+  ).rejects.toThrow();
+  f.identities[2].codeSha256 = '0'.repeat(64);
+  await expect(
+    collectJitoCpmmResearchRuntimeEvidence(f.keys, 100, 102, signal(), f.rpc),
+  ).rejects.toThrow();
+});

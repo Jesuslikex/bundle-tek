@@ -13,6 +13,7 @@ import {
 } from './jito-evidence-json';
 import type { PumpLaunchRpc, PumpRpcAccount } from './pump-launch-simulation';
 import type { JitoBundleSimulationFrames } from './jito-bundle-simulation-frames';
+import { requireJitoCpmmResearchIdentities } from './jito-cpmm-source-identity';
 const SYSTEM = '11111111111111111111111111111111',
   COMPUTE = 'ComputeBudget111111111111111111111111111111',
   NATIVE = 'NativeLoader1111111111111111111111111111111';
@@ -92,10 +93,15 @@ export type JitoRuntimeCapture = {
   reads: number;
   signingAllowed: false;
   executionAllowed: false;
+  diagnosticProfile?: 'cpmm-matched-source-research';
 };
 const issued = new WeakMap<
   object,
-  { value: JitoRuntimeCapture; inventory: PumpRpcAccount[] }
+  {
+    value: JitoRuntimeCapture;
+    inventory: PumpRpcAccount[];
+    profile: 'reviewed' | 'cpmm-research';
+  }
 >();
 const fail = (): never => {
   throw Error('Jito runtime evidence differs or is incomplete.');
@@ -148,6 +154,40 @@ export async function collectJitoRuntimeEvidence(
   minimumReadSlot: number,
   signal: AbortSignal,
   rpc: PumpLaunchRpc,
+): Promise<JitoRuntimeCapture> {
+  return collectRuntime(
+    keysInput,
+    minimumSlot,
+    minimumReadSlot,
+    signal,
+    rpc,
+    'reviewed',
+  );
+}
+/** Isolated unsigned research entry; cannot be consumed by the reviewed-policy verifier. */
+export async function collectJitoCpmmResearchRuntimeEvidence(
+  keysInput: string[],
+  minimumSlot: number,
+  minimumReadSlot: number,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc,
+): Promise<JitoRuntimeCapture> {
+  return collectRuntime(
+    keysInput,
+    minimumSlot,
+    minimumReadSlot,
+    signal,
+    rpc,
+    'cpmm-research',
+  );
+}
+async function collectRuntime(
+  keysInput: string[],
+  minimumSlot: number,
+  minimumReadSlot: number,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc,
+  profile: 'reviewed' | 'cpmm-research',
 ): Promise<JitoRuntimeCapture> {
   signal = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
   const keys = snapshotJitoEvidence(keysInput);
@@ -260,8 +300,12 @@ export async function collectJitoRuntimeEvidence(
   // The first scan alone can refuse an unreviewed program immediately; it can
   // never create policy by copying today's observed hash into an allowlist.
   try {
-    requirePairTrustedPrograms(identities, identities);
+    if (profile === 'cpmm-research')
+      requireJitoCpmmResearchIdentities(identities, identities);
+    else requirePairTrustedPrograms(identities, identities);
   } catch {
+    if (profile === 'cpmm-research')
+      throw Error('Jito CPMM research source identity refused.');
     const differences = identities.flatMap((observed) => {
       const expected = PAIR_TRUSTED_PROGRAMS.find(
         (p) => p.address === observed.address,
@@ -297,11 +341,15 @@ export async function collectJitoRuntimeEvidence(
     reads,
     signingAllowed: false as const,
     executionAllowed: false as const,
+    ...(profile === 'cpmm-research'
+      ? { diagnosticProfile: 'cpmm-matched-source-research' as const }
+      : {}),
   };
   const value = { ...base, sha256: await checksum(base) };
   issued.set(value, {
     value: snapshotJitoEvidence(value),
     inventory: snapshotJitoEvidence(inventory),
+    profile,
   });
   signal.throwIfAborted();
   return value;
@@ -314,10 +362,43 @@ export async function verifyJitoRuntimeBracket(
   frames: JitoBundleSimulationFrames,
   signal: AbortSignal,
 ) {
+  const value = await verifyRuntime(first, last, frames, signal, 'reviewed');
+  return { ...value, reviewedCodePolicyMatched: true as const };
+}
+/** Same serial scanner and conservative writable checks, with matched-source research scope only. */
+export async function verifyJitoCpmmResearchRuntimeBracket(
+  first: JitoRuntimeCapture,
+  last: JitoRuntimeCapture,
+  frames: JitoBundleSimulationFrames,
+  signal: AbortSignal,
+) {
+  const value = await verifyRuntime(
+    first,
+    last,
+    frames,
+    signal,
+    'cpmm-research',
+  );
+  return {
+    ...value,
+    format: 'jito-cpmm-research-runtime-bracket-v1' as const,
+    matchedSourceIdentityChecked: true as const,
+    reviewedCodePolicyMatched: false as const,
+    programApproved: false as const,
+    sourceAuthenticated: false as const,
+  };
+}
+async function verifyRuntime(
+  first: JitoRuntimeCapture,
+  last: JitoRuntimeCapture,
+  frames: JitoBundleSimulationFrames,
+  signal: AbortSignal,
+  profile: 'reviewed' | 'cpmm-research',
+) {
   const copiedFrames = structuredClone(frames);
   const a = issued.get(first),
     b = issued.get(last);
-  if (!a || !b) return fail();
+  if (!a || !b || a.profile !== profile || b.profile !== profile) return fail();
   if (
     JSON.stringify(snapshotJitoEvidence(first)) !== JSON.stringify(a.value) ||
     JSON.stringify(snapshotJitoEvidence(last)) !== JSON.stringify(b.value) ||
@@ -328,7 +409,9 @@ export async function verifyJitoRuntimeBracket(
     b.value.maximumSlot - a.value.minimumSlot > 32
   )
     return fail();
-  requirePairTrustedPrograms(a.value.programs, b.value.programs);
+  if (profile === 'cpmm-research')
+    requireJitoCpmmResearchIdentities(a.value.programs, b.value.programs);
+  else requirePairTrustedPrograms(a.value.programs, b.value.programs);
   const keys = [...new Set(copiedFrames.frames.flatMap((f) => f.keys))];
   if (JSON.stringify(keys) !== JSON.stringify(a.value.keys)) return fail();
   const identities = new Map(a.value.programs.map((p) => [p.address, p]));
@@ -399,7 +482,7 @@ export async function verifyJitoRuntimeBracket(
     slot: copiedFrames.slot,
     programs: snapshotJitoEvidence(a.value.programs),
     fullCodeScansMatched: true as const,
-    reviewedCodePolicyMatched: true as const,
+    reviewedCodePolicyMatched: profile === 'reviewed',
     reservedWritableKeysRefused: true as const,
     requestedExecutableWritableRefused: true as const,
     conservativeRuntimeChecksPassed: true as const,
