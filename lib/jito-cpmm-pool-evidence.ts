@@ -1,4 +1,6 @@
 import bs58 from 'bs58';
+import { address, getProgramDerivedAddress } from '@solana/kit';
+import { PAIR_CLOCK, pairClockUnixTimestamp } from './pair-stock-clock';
 import { inspectJitoCpmmUnsignedPacket } from './jito-cpmm-unsigned-packet';
 import { readJitoCpmmAssetEvidence } from './jito-cpmm-asset-evidence';
 import { pairRentMinimumRaw } from './pair-rent-evidence';
@@ -34,6 +36,7 @@ export async function readJitoCpmmPoolEvidence(
     bound.outputVault,
     bound.config,
     bound.observation,
+    PAIR_CLOCK,
   ];
   signal.throwIfAborted();
   const result = snapshotJitoEvidence(
@@ -65,7 +68,7 @@ export async function readJitoCpmmPoolEvidence(
     Number(slot) < assets.after.slot ||
     Number(slot) - minimumSlot > 32 ||
     !Array.isArray(result.value) ||
-    result.value.length !== 7
+    result.value.length !== 8
   )
     return fail();
   function decode(raw: unknown, owner: string, size: number) {
@@ -125,6 +128,14 @@ export async function readJitoCpmmPoolEvidence(
   const oracle = decode(result.value[6], CPMM, 4075);
   const c = config.b,
     o = oracle.b;
+  const unixTimestamp = pairClockUnixTimestamp(result.value[7], Number(slot));
+  if (
+    b.readBigUInt64LE(373) > BigInt(unixTimestamp) ||
+    (o[8] === 1 &&
+      o.readUInt16LE(9) < 100 &&
+      o.readBigUInt64LE(43 + o.readUInt16LE(9) * 40) > BigInt(unixTimestamp))
+  )
+    return fail();
   const tradeFee = c.readBigUInt64LE(12),
     protocolFee = c.readBigUInt64LE(20),
     fundFee = c.readBigUInt64LE(28);
@@ -139,6 +150,36 @@ export async function readJitoCpmmPoolEvidence(
     o[8] > 1 ||
     o.readUInt16LE(9) >= 100 ||
     bs58.encode(o.subarray(11, 43)) !== bound.pool
+  )
+    return fail();
+  const configIndex = Buffer.alloc(2);
+  configIndex.writeUInt16BE(c.readUInt16LE(10));
+  const seeds = [
+    [new TextEncoder().encode('amm_config'), configIndex],
+    [new TextEncoder().encode('observation'), bs58.decode(bound.pool)],
+    [
+      new TextEncoder().encode('pool_vault'),
+      bs58.decode(bound.pool),
+      bs58.decode(bound.inputMint),
+    ],
+    [
+      new TextEncoder().encode('pool_vault'),
+      bs58.decode(bound.pool),
+      bs58.decode(bound.outputMint),
+    ],
+  ];
+  const derived = await Promise.all(
+    seeds.map((seeds) =>
+      getProgramDerivedAddress({ programAddress: address(CPMM), seeds }),
+    ),
+  );
+  signal.throwIfAborted();
+  if (
+    derived[0][0] !== bound.config ||
+    derived[0][1] !== c[8] ||
+    derived[1][0] !== bound.observation ||
+    derived[2][0] !== bound.inputVault ||
+    derived[3][0] !== bound.outputVault
   )
     return fail();
   const coverage = keys.slice(0, 5).map((address, i) => {
@@ -190,6 +231,9 @@ export async function readJitoCpmmPoolEvidence(
     rentCoverageChecked: true as const,
     configLayoutChecked: true as const,
     oraclePoolBindingChecked: true as const,
+    configOracleVaultPdasChecked: true as const,
+    poolOpenAtObservedClock: true as const,
+    unixTimestamp,
     tradeFeeMillionths: tradeFee.toString(),
     poolVerified: false as const,
     priceVerified: false as const,

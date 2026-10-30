@@ -83,3 +83,13 @@ The pool collector now requests the packet-bound config and observation accounts
 Source references: https://github.com/raydium-io/raydium-cp-swap/blob/cfdb70a8ca9ea62bb5c304d4492ac0fc371ae8ce/programs/cp-swap/src/states/config.rs and https://github.com/raydium-io/raydium-cp-swap/blob/cfdb70a8ca9ea62bb5c304d4492ac0fc371ae8ce/programs/cp-swap/src/states/oracle.rs . Exact source-to-deployed-binary matching, config/oracle PDA derivation, pool open-time/Clock and full runtime admission remain open. No signing, provider or bank authority flag was enabled.
 
 Focused pool tests cover seven new corruption/fee/ring-index cases (23 pool tests total). Typecheck and scoped lint pass. These are synthetic fixtures, with no live RPC, funded transaction or deployment in this step.
+
+## Canonical PDAs and pool opening time
+
+The config index is decoded little-endian from account bytes and encoded big-endian for the published `amm_config` PDA seeds; address and stored bump must both match. The observation PDA uses `observation` plus pool bytes, and vault PDAs use `pool_vault` plus pool and exact mint bytes. PoolState itself is not forced to a PDA: the referenced Raydium initialization explicitly permits a random signed pool account.
+
+The same eight-account pool response now includes the fixed Clock sysvar. Existing `pairClockUnixTimestamp` enforces exact Clock/context slot equality and its unchanged 30-second wall-time bound. Pool open_time must be no later than this Clock, and an initialized oracle's latest ring entry cannot be future-dated against it. This uses ordinary equality, never the stock-only +1 rule. These observations are still not proof that simulation and independent fee reads share a bank, nor a verified source/binary policy.
+
+Sources: https://github.com/raydium-io/raydium-cp-swap/blob/cfdb70a8ca9ea62bb5c304d4492ac0fc371ae8ce/programs/cp-swap/src/instructions/admin/create_config.rs and https://github.com/raydium-io/raydium-cp-swap/blob/cfdb70a8ca9ea62bb5c304d4492ac0fc371ae8ce/programs/cp-swap/src/instructions/initialize.rs .
+
+Validation: 106 tests/five CPMM files, typecheck and scoped lint pass. Fixtures derive actual Solana PDAs and test config index/bump mutations, an internally linked wrong oracle PDA, Clock behind/+1 refusals and a future pool open time. Tests remain synthetic and isolated; no live provider, deploy, signing or funded run occurred. Remaining full qualification includes mint rent, full economic/fee/rent settlement and lifetime integration, authenticated source/build and same-bank provider evidence.
