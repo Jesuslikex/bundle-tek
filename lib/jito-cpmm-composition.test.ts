@@ -742,11 +742,28 @@ async function bundleFixture(
     lamports,
     data: ['', 'base64'],
   });
-  const executable = () => ({
-    owner: 'BPFLoader2111111111111111111111111111111111',
+  const executable = (key = system) => ({
+    owner:
+      key === system
+        ? 'NativeLoader1111111111111111111111111111111'
+        : 'BPFLoaderUpgradeab1e11111111111111111111111',
     executable: true,
     lamports: '1',
-    data: ['', 'base64'],
+    data: [
+      key === system
+        ? Buffer.from('solana_system_program').toString('base64')
+        : Buffer.concat([
+            Buffer.from([2, 0, 0, 0]),
+            Buffer.from(
+              bs58.decode(
+                key === CPMM
+                  ? 'DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU'
+                  : '3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2',
+              ),
+            ),
+          ]).toString('base64'),
+      'base64',
+    ],
   });
   const swaps = [],
     packets = [],
@@ -797,7 +814,7 @@ async function bundleFixture(
       key === bound.payer
         ? ordinary(payerLamports.toString())
         : key === CPMM || key === TOKEN
-          ? executable()
+          ? executable(key)
           : structuredClone(f.accounts.get(key) ?? null);
     const preExecutionAccounts = keys.map(read);
     for (const [key, delta] of [
@@ -1141,4 +1158,260 @@ it('uses actual Rent bytes for payer and existing tip-recipient coverage even wi
   await expect(
     replayJitoCpmmBundleSettlement(recipient, new AbortController().signal),
   ).rejects.toThrow();
+});
+
+it('composes immutable owned code and lifetime captures with real packet/frame replay on one reader', async () => {
+  const identityModule = await import('./pump-group-code-identity');
+  const { CPMM_MATCHED_SOURCE_IDENTITY } =
+    await import('./jito-cpmm-source-identity');
+  const { PAIR_TRUSTED_PROGRAMS } = await import('./pair-trusted-programs');
+  const { SOLANA_MAINNET_GENESIS } = await import('./wallet-balances');
+  const { collectJitoCpmmResearchRuntimeEvidence } =
+    await import('./jito-runtime-evidence');
+  const { captureJitoCpmmLifetime } = await import('./jito-cpmm-lifetime');
+  const { verifyJitoCpmmOwnedResearchBracket } =
+    await import('./jito-cpmm-owned-research-bracket');
+  const { verifyJitoBundleSimulationFrames } =
+    await import('./jito-bundle-simulation-frames');
+  const request = await bundleFixture();
+  const frames = await verifyJitoBundleSimulationFrames({
+    packets: request.packets,
+    minimumSlot: request.minimumSlot,
+    simulationBankSlot: request.simulationBankSlot,
+    result: request.result,
+  });
+  const keys = [...new Set(frames.frames.flatMap((f) => f.keys))];
+  const initial = new Map<
+    string,
+    (typeof frames.frames)[0]['preAccounts'][number]
+  >();
+  for (const f of frames.frames)
+    f.keys.forEach((k, i) => {
+      if (!initial.has(k)) initial.set(k, f.preAccounts[i]);
+    });
+  // The scanner alone is mocked: this test checks owned capture composition,
+  // not full binary hashing. The real two-scan probe covers that separately.
+  const scanner = vi
+    .spyOn(identityModule, 'collectPumpProgramIdentities')
+    .mockImplementation(async () => {
+      const standard = [...initial]
+        .filter(
+          ([k]) => k === TOKEN || k === '11111111111111111111111111111111',
+        )
+        .map(([address, a]) => {
+          const p = PAIR_TRUSTED_PROGRAMS.find((p) => p.address === address)!;
+          return {
+            address,
+            loader: p.loader,
+            identityKind:
+              address === TOKEN
+                ? ('elf-code' as const)
+                : ('native-system' as const),
+            programData:
+              address === TOKEN
+                ? '3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2'
+                : null,
+            deploymentSlot: address === TOKEN ? '419472000' : null,
+            upgradeAuthority: p.upgradeAuthority,
+            codeSha256: p.codeSha256[0],
+            codeBytes: a!.data.length === 21 ? 21 : 108600,
+          };
+        });
+      return {
+        format: 'pump-program-code-identities-v1',
+        network: 'mainnet',
+        minimumSlot: 100,
+        maximumSlot: 103,
+        programs: [...standard, { ...CPMM_MATCHED_SOURCE_IDENTITY }],
+        reads: 1,
+        totalCodeBytes: 902445,
+        observedAt: new Date().toISOString(),
+        codeIdentityVerified: true,
+        semanticAuditEstablished: false,
+        signingAllowed: false,
+        executionAllowed: false,
+      };
+    });
+  let at = 100,
+    valid = true;
+  let onHeight: () => void = () => {};
+  const calls: { method: string; params: unknown[] }[] = [];
+  const rpc: PumpLaunchRpc = async (method, params) => {
+    calls.push({ method, params });
+    if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
+    if (method === 'getLatestBlockhash')
+      return {
+        context: { slot: String(at) },
+        value: {
+          blockhash: '11111111111111111111111111111111',
+          lastValidBlockHeight: '900',
+        },
+      };
+    if (method === 'isBlockhashValid')
+      return { context: { slot: '104' }, value: valid };
+    if (method === 'getBlockHeight') {
+      onHeight();
+      return '890';
+    }
+    if (method !== 'getMultipleAccounts') throw Error('unexpected method');
+    const slice = (
+      params[1] as { dataSlice: { offset: number; length: number } }
+    ).dataSlice;
+    return {
+      context: { slot: String(at) },
+      value: (params[0] as string[]).map((k) => {
+        const a = initial.get(k);
+        return a
+          ? {
+              owner: a.owner,
+              lamports: a.lamports,
+              executable: a.executable,
+              data: [
+                Buffer.from(
+                  a.data.slice(slice.offset, slice.offset + slice.length),
+                ).toString('base64'),
+                'base64',
+              ],
+            }
+          : null;
+      }),
+    };
+  };
+  try {
+    const signal = new AbortController().signal,
+      lifetime = await captureJitoCpmmLifetime(100, rpc, signal);
+    at = 101;
+    const before = await collectJitoCpmmResearchRuntimeEvidence(
+      keys,
+      100,
+      100,
+      signal,
+      rpc,
+    );
+    at = 103;
+    const after = await collectJitoCpmmResearchRuntimeEvidence(
+      keys,
+      100,
+      102,
+      signal,
+      rpc,
+    );
+    const proof = await verifyJitoCpmmOwnedResearchBracket(
+      request,
+      lifetime,
+      before,
+      after,
+      rpc,
+      signal,
+    );
+    expect(proof).toMatchObject({
+      originalMinimumSlot: 100,
+      maximumObservedContextSlot: 104,
+      sameRpcDependencyChecked: true,
+      ownedCapturesChecked: true,
+      transportRequestBound: false,
+      liveSimulationVerified: false,
+      bankVerified: false,
+      signingAllowed: false,
+    });
+    expect(proof.lifetime).toMatchObject({
+      remainingBlocks: '10',
+      validitySlot: 104,
+    });
+    expect(calls.find((c) => c.method === 'isBlockhashValid')?.params).toEqual([
+      '11111111111111111111111111111111',
+      { commitment: 'confirmed', minContextSlot: 103 },
+    ]);
+    // Change the public slot precisely after settlement and restore it during
+    // the height read. Only the retained private snapshot may set the floor.
+    const settlementModule = await import('./jito-cpmm-bundle-replay');
+    const originalReplay = settlementModule.replayJitoCpmmBundleSettlement;
+    const race = vi
+      .spyOn(settlementModule, 'replayJitoCpmmBundleSettlement')
+      .mockImplementation(async (...args) => {
+        const result = await originalReplay(...args);
+        after.maximumSlot = 102;
+        return result;
+      });
+    onHeight = () => {
+      after.maximumSlot = 103;
+    };
+    calls.length = 0;
+    try {
+      await verifyJitoCpmmOwnedResearchBracket(
+        request,
+        lifetime,
+        before,
+        after,
+        rpc,
+        signal,
+      );
+      expect(race).toHaveBeenCalledOnce();
+      expect(
+        calls.find((c) => c.method === 'isBlockhashValid')?.params,
+      ).toEqual([
+        '11111111111111111111111111111111',
+        { commitment: 'confirmed', minContextSlot: 103 },
+      ]);
+    } finally {
+      race.mockRestore();
+      onHeight = () => {};
+      after.maximumSlot = 103;
+    }
+    const wrongReader: PumpLaunchRpc = (...args) => rpc(...args);
+    await expect(
+      verifyJitoCpmmOwnedResearchBracket(
+        request,
+        lifetime,
+        before,
+        after,
+        wrongReader,
+        signal,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      verifyJitoCpmmOwnedResearchBracket(
+        request,
+        { ...lifetime },
+        before,
+        after,
+        rpc,
+        signal,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      verifyJitoCpmmOwnedResearchBracket(
+        request,
+        lifetime,
+        { ...before },
+        after,
+        rpc,
+        signal,
+      ),
+    ).rejects.toThrow();
+    const changedFloor = { ...request, minimumSlot: 99 };
+    await expect(
+      verifyJitoCpmmOwnedResearchBracket(
+        changedFloor,
+        lifetime,
+        before,
+        after,
+        rpc,
+        signal,
+      ),
+    ).rejects.toThrow();
+    valid = false;
+    await expect(
+      verifyJitoCpmmOwnedResearchBracket(
+        request,
+        lifetime,
+        before,
+        after,
+        rpc,
+        signal,
+      ),
+    ).rejects.toThrow();
+  } finally {
+    scanner.mockRestore();
+  }
 });

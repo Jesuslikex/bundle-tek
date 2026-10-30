@@ -27,6 +27,23 @@ const issued = new WeakMap<
 const fail = (): never => {
   throw Error('CPMM captured lifetime refused.');
 };
+/** Dependency/original-floor binding only. Not a provider or bank attestation. */
+export function requireJitoCpmmLifetimeScope(
+  capture: Lifetime,
+  rpc: PumpLaunchRpc,
+  minimumSlot: number,
+) {
+  const owned = issued.get(capture);
+  if (
+    !owned ||
+    owned.rpc !== rpc ||
+    owned.snapshot.minimumSlot !== minimumSlot ||
+    JSON.stringify(snapshotJitoEvidence(capture)) !==
+      JSON.stringify(owned.snapshot)
+  )
+    return fail();
+  return snapshotJitoEvidence(owned.snapshot);
+}
 function uint(value: unknown) {
   if (typeof value !== 'string' || !/^(0|[1-9]\d{0,19})$/.test(value))
     return fail();

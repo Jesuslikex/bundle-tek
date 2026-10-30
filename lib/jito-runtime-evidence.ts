@@ -101,11 +101,27 @@ const issued = new WeakMap<
     value: JitoRuntimeCapture;
     inventory: PumpRpcAccount[];
     profile: 'reviewed' | 'cpmm-research';
+    rpc: PumpLaunchRpc;
   }
 >();
 const fail = (): never => {
   throw Error('Jito runtime evidence differs or is incomplete.');
 };
+/** Only binds an issued immutable capture to its original reader dependency. */
+export function requireJitoRuntimeRpcScope(
+  capture: JitoRuntimeCapture,
+  rpc: PumpLaunchRpc,
+) {
+  const owned = issued.get(capture);
+  if (
+    !owned ||
+    owned.rpc !== rpc ||
+    JSON.stringify(snapshotJitoEvidence(capture)) !==
+      JSON.stringify(owned.value)
+  )
+    return fail();
+  return snapshotJitoEvidence(owned.value);
+}
 const address = (v: string) => {
   const b = bs58.decode(v);
   if (b.length !== 32 || bs58.encode(b) !== v) fail();
@@ -350,6 +366,7 @@ async function collectRuntime(
     value: snapshotJitoEvidence(value),
     inventory: snapshotJitoEvidence(inventory),
     profile,
+    rpc,
   });
   signal.throwIfAborted();
   return value;
