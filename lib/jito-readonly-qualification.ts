@@ -19,7 +19,10 @@ import {
 } from './jito-runtime-evidence';
 import { createJitoQualificationTransport } from './jito-qualification-transport';
 import { collectJitoCoherentSimulationAttempt } from './jito-coherent-simulation-attempt';
-import { collectJitoCoherentPrefeeAttempt } from './jito-coherent-prefee-attempt';
+import {
+  collectJitoCoherentPrefeeAttempt,
+  collectJitoProviderObservedAttempt,
+} from './jito-coherent-prefee-attempt';
 import { buildJitoBundleSimulationRequest } from './jito-bundle-simulation-frames';
 import { verifyJitoBundleEconomicObservation } from './jito-bundle-economics';
 import {
@@ -50,6 +53,7 @@ const authority = {
 type QualificationDependencies = {
   fetcher?: typeof fetch;
   pace?: typeof paceWalletRpc;
+  heliusResearch?: true;
 };
 
 export async function collectJitoReadOnlyQualification(
@@ -85,12 +89,35 @@ export async function collectJitoReadOnlyPrefeeExperiment(
   return { ...result, diagnosticProfile: 'prefee-experiment' as const };
 }
 
+/** Separate unsigned research composition. Existing strict entry points unchanged. */
+export async function collectJitoProviderObservedQualification(
+  manifest: JitoBundleManifest,
+  capsules: JitoSwapSimulationCapture[],
+  signal: AbortSignal,
+  dependencies: Omit<QualificationDependencies, 'heliusResearch'> = {},
+) {
+  const result = await collectQualification(
+    manifest,
+    capsules,
+    signal,
+    { ...dependencies, heliusResearch: true },
+    'provider-observed',
+  );
+  return {
+    ...result,
+    diagnosticProfile: 'provider-observed-jito-v1' as const,
+    bankIdentityVerified: false as const,
+    feeBankIdentityVerified: false as const,
+    providerTrustRequired: true as const,
+  };
+}
+
 async function collectQualification(
   manifestInput: JitoBundleManifest,
   capsulesInput: JitoSwapSimulationCapture[],
   signal: AbortSignal,
   dependencies: QualificationDependencies,
-  profile: 'legacy' | 'prefee',
+  profile: 'legacy' | 'prefee' | 'provider-observed',
 ) {
   // Each invocation owns its diagnostics, including when campaigns overlap.
   let stage = 'setup';
@@ -405,9 +432,11 @@ async function collectQualification(
     stage = 'exact-simulation';
     mark('exact-simulation', 'begin');
     const runAttempt =
-      profile === 'prefee'
-        ? collectJitoCoherentPrefeeAttempt
-        : collectJitoCoherentSimulationAttempt;
+      profile === 'provider-observed'
+        ? collectJitoProviderObservedAttempt
+        : profile === 'prefee'
+          ? collectJitoCoherentPrefeeAttempt
+          : collectJitoCoherentSimulationAttempt;
     attempt = await runAttempt({
       packets,
       minimumSlot,
@@ -424,6 +453,12 @@ async function collectQualification(
     if (lookups.some((lookup) => lookup && lookup.observedSlot > bank))
       return fail();
     slots.push(bank);
+    if (
+      profile === 'provider-observed' &&
+      'fees' in attempt &&
+      attempt.fees?.status === 'observed'
+    )
+      slots.push(...attempt.fees.fees.map((f) => f.slot));
     floor();
     // Independent post-simulation branches all begin at the admitted bank floor.
     // Later lookup reads chain their own observations, never a sibling's timing.

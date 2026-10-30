@@ -2,13 +2,30 @@ import { expect, it, vi } from 'vitest';
 import { jitoSequentialEconomicsFixture } from '../test/jito-sequential-economics-fixture';
 import { nativeWarmupFixture } from '../test/warmup-native-fixture';
 import { captureJitoSwapSimulation } from './jito-swap-simulation-capture';
-import { collectJitoReadOnlyQualification } from './jito-readonly-qualification';
+import {
+  collectJitoReadOnlyQualification,
+  collectJitoProviderObservedQualification,
+} from './jito-readonly-qualification';
 it('rejects omitted or fabricated raw baseline capsules before all provider work', async () => {
   const f = await jitoSequentialEconomicsFixture(),
     fetcher = vi.fn();
   for (const sources of [[], [{}]])
     await expect(
       collectJitoReadOnlyQualification(
+        f.manifest,
+        sources as never,
+        new AbortController().signal,
+        { fetcher: fetcher as typeof fetch },
+      ),
+    ).rejects.toThrow();
+  expect(fetcher).not.toHaveBeenCalled();
+});
+it('provider-observed runtime also requires genuine owned raw baselines before I/O', async () => {
+  const f = await jitoSequentialEconomicsFixture(),
+    fetcher = vi.fn();
+  for (const sources of [[], [{}]])
+    await expect(
+      collectJitoProviderObservedQualification(
         f.manifest,
         sources as never,
         new AbortController().signal,

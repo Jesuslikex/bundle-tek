@@ -1,0 +1,571 @@
+{
+  "runs": [
+    {
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "refused",
+        "stage": "lifetime-before",
+        "requests": 7,
+        "methods": 7,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463477680,
+        "refusal": "guard-or-transport-refusal"
+      },
+      "feeRefusal": null,
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "40dd7a7397035655d5f874685cac02c8467d061d4f1a3deb85f22ae1afdca29e",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "b786b0c6c45c530034ce2b949a2a51bba4d67898ca5160f8f1254618b5aff710",
+          "responseSha256": "9ab3aa362bcf1724d6dba7488b88d0d4a5b756e9c3d8b425a6624835765037a8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "8beea0c8e9db123f1ee678eab81ea4c27dbdf1577e01a9e8583e46c209dc7d05",
+          "responseSha256": "6e9e534ed14d07df4a0bb7346e33899fec35bc040499efe060807ba9fca9117d",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "8d03e03fe9c684b99bede6f56ae30540823b10d7ffee4bc23b7bd66dfb249ba4",
+          "responseSha256": "6387fad90c3eb4f5f804f84bac2f65dc20ee5910a727d21dd74b68ebbe9af285",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "a03a81d399610708a84d0d122309fcf6aeecc55661f2bfb1ce879fc8cc0aba8e",
+          "responseSha256": "f1bdf9e59e2756854d674eab6a7c82dafdb15e474b2cafea84e14eba81bf86a4",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "0e9de44f8e41ff774cf9f0a4b17b97cc4c57b3364324c02b5826e6a237478693",
+          "responseSha256": "6184aa2e3415665a9e467f76c596da5f4c54e15136b422f79fb71aff1b2d80d4",
+          "httpStatus": 200
+        }
+      ]
+    },
+    {
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "native-runtime-checks-passed-not-full-swap",
+        "stage": "lifetime-after",
+        "requests": 19,
+        "methods": 21,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463477827,
+        "attemptStatus": "captured",
+        "simulationSlot": 463477838,
+        "feeSlots": [
+          463477837,
+          463477837
+        ],
+        "runtimeProof": {
+          "format": "jito-runtime-bracket-v1",
+          "slot": 463477838,
+          "programs": [
+            {
+              "address": "11111111111111111111111111111111",
+              "loader": "NativeLoader1111111111111111111111111111111",
+              "programData": null,
+              "deploymentSlot": null,
+              "upgradeAuthority": null,
+              "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+              "codeBytes": 21,
+              "identityKind": "native-system"
+            }
+          ],
+          "fullCodeScansMatched": true,
+          "reviewedCodePolicyMatched": true,
+          "reservedWritableKeysRefused": true,
+          "requestedExecutableWritableRefused": true,
+          "conservativeRuntimeChecksPassed": true,
+          "runtimeModel": "pinned Jito reserved-key superset; only requested-readonly program/executable keys",
+          "runtimePrivilegesVerified": false,
+          "runtimeAttested": false,
+          "providerQualified": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "lifetime": {
+          "validitySlot": 463477844,
+          "height": "441500106",
+          "lastValidBlockHeight": "441500246"
+        },
+        "maximumSlot": 463477846
+      },
+      "feeRefusal": null,
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "b42204769c8ab92ffed34e2a074000323b9be0e829b42a1c1261f52e37bcbbba",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "860368678e8f8d2d93f4a16907e5601b50a3a9432581ee6383f8b8bf117d2799",
+          "responseSha256": "ff56e3813db5dfa6a28639e87b43c2c694b3b99147f53b3f4726b78e92fae480",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "8beea0c8e9db123f1ee678eab81ea4c27dbdf1577e01a9e8583e46c209dc7d05",
+          "responseSha256": "6e9e534ed14d07df4a0bb7346e33899fec35bc040499efe060807ba9fca9117d",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "ca33371ae0dbeed01fc98a638039fe0330f3410bf95a0304be034435fb19c88a",
+          "responseSha256": "f59062ea6fb426881b36508d17c62a16a0da7d4108908531c2c51f5a8c8d3c52",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "5695d784aa478b348a5a5807d8edf6f805a3176e1fc3e7ffa8f6b174968f3ba6",
+          "responseSha256": "9c743801e338b7b53de9cf5f9e8444f3c1fd6a90217e9a267fe36a9aa05e5f19",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "0e9de44f8e41ff774cf9f0a4b17b97cc4c57b3364324c02b5826e6a237478693",
+          "responseSha256": "6184aa2e3415665a9e467f76c596da5f4c54e15136b422f79fb71aff1b2d80d4",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "21e0a24dbbe3eb9ec65fd4bb71dca76ecc2b25db2b276d916480f27707998efa",
+          "responseSha256": "2944c78944d60cf6e9f8d9e37aa24d2c361e99dde3e98bbcbf70ecd0e17bc543",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "620046f116e531b0ba7c4a568d8c2e76d3e85246677aa66dc4fca8a88c9c59ae",
+          "responseSha256": "da68f1fd31583c2a5a2bec002929477e5ec9f1ca5f5747fd9ae7599580ba63aa",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "ff75704cac3af92498094b49fb7c52355712fa6d044db63820e7938d31c91b83",
+          "responseSha256": "2d4e6f2a3aee129fe5ca915742a7e56e820549fde3612d680f074e4fb92c9108",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "2a779dd6863e943403aead5dee906b55fd9691f2479a498eb386fde7b14e064e",
+          "responseSha256": "afb68a0a319ab260d9860393e0b28cff211903a1315ab76065dadf076aaaebd1",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "f99ca304966476a323c49334ca37c1db38e850f1c7f6d64fa2a4a1412d4eb3e0",
+          "responseSha256": "3da4e090caac8e55a102b7a4133b051359676b0e376a863689dc6b6c6d6f92a6",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "4b761bfc13d20f865e4ae2b1cd47665c467fb516a47ab7419b44ab102d18b1ad",
+          "responseSha256": "32146ec84beb40d20691d042311678ae0a825b3dfbcc3d94c5d8aa6aae665a92",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "b5a03a3baec3214234c18b75c1e739cf8e609c53bbf0d737e651db34c909135b",
+          "responseSha256": "feb4fea7a4156165faa04469dfbad5dcf04aa1120d21f7d5c76209b5da8f3043",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "ffcb67e27d77bdae5db6e22f41f5555dcb0c821e21a26e4a681f458baca11eea",
+          "responseSha256": "4624b4f0ab2bb3afcb31ac9d54a60628f87df2b1d66f8d224e560d8c6433f098",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "dbb830782d575a19241b9b4485168b02e2b5178c176ffec32ae6a659e94f7e1c",
+          "responseSha256": "d04b35a3c6280acd659ebead0d0337892ff2c14e9ae0d9c736cb296e604a7b00",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fe991676a2de84653168ae1f19aa378c43c2200422b59992f322dcb80e15fb10",
+          "responseSha256": "ee2b2673711a9f26d6eb3ed7c19ac4e5daf619818c04464833cf8ae55f663c81",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "160a2ce4d12c780bdaa68503b786c5b23dd5402a880e7ae6ab3ce1d80735edcb",
+          "responseSha256": "d963a6e34574f572289a6da2f0a2931abcc01e8c9f779798f0a1de7cffdae694",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "08e0c97293d15735cb6f620647db426217fdf9eb8dd2bdd443e5466fa221826d",
+          "responseSha256": "2821475a269a78647b6ddbd985460d302cf47d9f5832e89a4ba7fdeecad7f699",
+          "httpStatus": 200
+        }
+      ]
+    },
+    {
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "refused",
+        "stage": "custody-after",
+        "requests": 17,
+        "methods": 19,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463478026,
+        "attemptStatus": "captured",
+        "simulationSlot": 463478037,
+        "feeSlots": [
+          463478037,
+          463478037
+        ],
+        "runtimeProof": {
+          "format": "jito-runtime-bracket-v1",
+          "slot": 463478037,
+          "programs": [
+            {
+              "address": "11111111111111111111111111111111",
+              "loader": "NativeLoader1111111111111111111111111111111",
+              "programData": null,
+              "deploymentSlot": null,
+              "upgradeAuthority": null,
+              "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+              "codeBytes": 21,
+              "identityKind": "native-system"
+            }
+          ],
+          "fullCodeScansMatched": true,
+          "reviewedCodePolicyMatched": true,
+          "reservedWritableKeysRefused": true,
+          "requestedExecutableWritableRefused": true,
+          "conservativeRuntimeChecksPassed": true,
+          "runtimeModel": "pinned Jito reserved-key superset; only requested-readonly program/executable keys",
+          "runtimePrivilegesVerified": false,
+          "runtimeAttested": false,
+          "providerQualified": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "refusal": "guard-or-transport-refusal"
+      },
+      "feeRefusal": null,
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "02fac578deecf0160898d6f771b1c0e647dcc67d24b0b4c71d4191513c6f63f8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "af1aa7ed61133c4991edddd829d3ff474c46fa0e036a0a9bec93313d755c132e",
+          "responseSha256": "df8b5d42eb98b9a9dd172d18081048e5f472bd82fa848878383422170176f983",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "362a8eca9ba5720e567e724a8f5a5d2f6e5d7d6ce9c77e238db95be7c46ff12a",
+          "responseSha256": "4a9ab2699367943a242a43248360505f1ab1bdffdc44b91da963c7c006867ed8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fac6617485cf15d1d77c41bc1130d1b9e29f84d81df88de6f1f4ff1373081e1b",
+          "responseSha256": "ba7af7230a978eaf5523d222a4986e05770a886a9988933a095ad12e910839e8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "2800accfc62a2005a2da8b0c472fc1b691b419b0b70663187414ef1c873bf952",
+          "responseSha256": "6e317d774fa1125bc331e2239ab2988f574800eb02a1f4ec0b18d7504111142f",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "bf86a9412119db8a4408f056e282ef2c3eff8acdfa15a2304458486d3e28e9ac",
+          "responseSha256": "f80710d13335b9ec6b4e68506e2722ebe81985a3df22b5736872489f0bb28f6a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "21e0a24dbbe3eb9ec65fd4bb71dca76ecc2b25db2b276d916480f27707998efa",
+          "responseSha256": "2944c78944d60cf6e9f8d9e37aa24d2c361e99dde3e98bbcbf70ecd0e17bc543",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "914fea47e01a28de34e201011e539f0b5a7aa7c3659b8fd2e57c764a474dc162",
+          "responseSha256": "8eb2c3d815b8db9fd19036aaaf36fb2921b78ab6d6b2aa03345c14936e98bec9",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "cfdf68b620f830cd91198e8b32a57903f0f7fe7be60ffbabc4b30e2ae6c8fd0c",
+          "responseSha256": "26d8a313835a649bff61d2890f0a121027f1d0292d54fb39ced08279db7331ea",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "171b824e7f81e97a7eff587ea30655ac70da5ff25d787811fc21d52075e7a732",
+          "responseSha256": "9479cc05cb4563034bd2d4e4ad8ca21ffd292e5fab143fe80bad21602f70090a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "0a8dcc3bbba8bb1dc98984fee18ad7334ed1a02fc483902a40ef68d9df4ffff2",
+          "responseSha256": "59be5ba54f4f4b87218e0f0ca2473de29352f5f385ebc601bf60df2126fe02fe",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fe4f49955e085ca92a962141c7f3aa999d4cd8ef467d7f6f6469d387f5b494b8",
+          "responseSha256": "fed5c1a8494286074b87f3f12c3560d521a2500dad5287d0f979415f6181f41a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "a0922bf9e0cad4eea142d0514bead8f3ffad4d38ac4874e907a5d241cfd26c35",
+          "responseSha256": "13331c9555217540abf37aca4fb141ebefb155efb9e52b89fd164406a298e30a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "b014be32e29022021870771dec18e2d56056fe6f7f3cdde4fe260040955d1c93",
+          "responseSha256": "75fc4387575bae681372e146089fc4519eba4de63684fce9427adfd1080d6cac",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "123132eee7e976b6481b0a5a22c01a6771733185b33f679fdb2b88482a37aa15",
+          "responseSha256": "49188a32500206f6cc0c872a4ea9af074409c279f9349bc45f211907db66d970",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "2129a08c39b58ca840dba1dea6f892c1cb40a0e0c9a756b2b262ba5b4bb7c6de",
+          "responseSha256": "28f770b37be92dabbff564ba4d2751a70de7d92cd40910d0eb19b8486a837eef",
+          "httpStatus": 200
+        }
+      ]
+    },
+    {
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "refused",
+        "stage": "custody-after",
+        "requests": 17,
+        "methods": 19,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463478194,
+        "attemptStatus": "captured",
+        "simulationSlot": 463478203,
+        "feeSlots": [
+          463478204,
+          463478204
+        ],
+        "runtimeProof": {
+          "format": "jito-runtime-bracket-v1",
+          "slot": 463478203,
+          "programs": [
+            {
+              "address": "11111111111111111111111111111111",
+              "loader": "NativeLoader1111111111111111111111111111111",
+              "programData": null,
+              "deploymentSlot": null,
+              "upgradeAuthority": null,
+              "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+              "codeBytes": 21,
+              "identityKind": "native-system"
+            }
+          ],
+          "fullCodeScansMatched": true,
+          "reviewedCodePolicyMatched": true,
+          "reservedWritableKeysRefused": true,
+          "requestedExecutableWritableRefused": true,
+          "conservativeRuntimeChecksPassed": true,
+          "runtimeModel": "pinned Jito reserved-key superset; only requested-readonly program/executable keys",
+          "runtimePrivilegesVerified": false,
+          "runtimeAttested": false,
+          "providerQualified": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "refusal": "guard-or-transport-refusal"
+      },
+      "feeRefusal": null,
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "cd6bdc6a707433fbfbd3c3eb42baf577bd917935e9b67f860e2043876d3cf52f",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "1fe88dcb9df07de686c9c61b199816d776a73531a554eec8eccf18af6f0f5a5a",
+          "responseSha256": "132343dd64e6778d84b927472fc4b8c46386745141c24aff24563f24adc884d9",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "6529aab98f64ce46dea047c6e0f0001162e9f2146b41c12b7a68a56b57ce227d",
+          "responseSha256": "728fa2ecd93d24c973dbeea193a2b4ff05b28aa1d4a4841f4fb8d6867e0f4b6e",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fac6617485cf15d1d77c41bc1130d1b9e29f84d81df88de6f1f4ff1373081e1b",
+          "responseSha256": "ba7af7230a978eaf5523d222a4986e05770a886a9988933a095ad12e910839e8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "e24d83a1cfa648d2bf82ae8042131c8648c887658ad22db58cb4ce735fa4d572",
+          "responseSha256": "f0487f0596c2ff7300d408c708e6b2bf3268c7484810dcba0745d6ca2d77d0bc",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "871210f7b2110726f8e1577c56a239252af92ed86526e779f93668fc7009752f",
+          "responseSha256": "c791ad04cb93b2c622be4bf75d982ab6cd7649048c9860bf0c38ccc42ed34897",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "21e0a24dbbe3eb9ec65fd4bb71dca76ecc2b25db2b276d916480f27707998efa",
+          "responseSha256": "2944c78944d60cf6e9f8d9e37aa24d2c361e99dde3e98bbcbf70ecd0e17bc543",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "914fea47e01a28de34e201011e539f0b5a7aa7c3659b8fd2e57c764a474dc162",
+          "responseSha256": "8eb2c3d815b8db9fd19036aaaf36fb2921b78ab6d6b2aa03345c14936e98bec9",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "8cc90eb39a2972dc9e20ac66b7c5928324f6957693b2864d50cbcfa1f1cd3f11",
+          "responseSha256": "390a64cd27630b0d6d1dbdb9428d3ffde7bcb5ac8819daf910cd69aef7a002dd",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "3cc69f4751c671e65f0b10f6bee88ae6cd6283945d0fb0a8b4ed80d59930b03b",
+          "responseSha256": "bf5fdb897e9c51b8103e99e7724ed02893fc7094da45147c0d12a9d7ba3e3ed6",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "3175543326440674fbfda07d1dcacf268b1912578464b0be251cfb1cea59ac1b",
+          "responseSha256": "ba88ec5a1ae8cecffde357d04ff64c94971c3b2c58d2a85cba89357245408dba",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fe4f49955e085ca92a962141c7f3aa999d4cd8ef467d7f6f6469d387f5b494b8",
+          "responseSha256": "fed5c1a8494286074b87f3f12c3560d521a2500dad5287d0f979415f6181f41a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "25c548b32d7e9ceac6b791a565f832a6262441e397a3390af8f50922cc35f277",
+          "responseSha256": "eb87d86105345d404765efb052bfe2be4cf6d7f08a9a4644c72193085689bf4d",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "c33577626ef9e6156616877e504800d9a32e41b0d51b47df596ada9d9438844e",
+          "responseSha256": "aea7f91ef2109479614ed648c84171ac70e4d55f7048b0f3172c6163dc3cc81c",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "123132eee7e976b6481b0a5a22c01a6771733185b33f679fdb2b88482a37aa15",
+          "responseSha256": "49188a32500206f6cc0c872a4ea9af074409c279f9349bc45f211907db66d970",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "3ec2ae45628a8f7a1f2a0d3fb785bfd146607563927164b16efe42b2af959899",
+          "responseSha256": "d6a9924d5db4ba3b972f1a10b2c6dbe95a5e4ce1d04ae45025e86acd9b22e8b9",
+          "httpStatus": 200
+        }
+      ]
+    },
+    {
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "refused",
+        "stage": "provider-observed-bundle",
+        "requests": 11,
+        "methods": 13,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463478235,
+        "attemptStatus": "refused",
+        "attemptReason": "fees-refused",
+        "refusal": "guard-or-transport-refusal"
+      },
+      "feeRefusal": "fee banks differ: 463478243,463478244",
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "cb9d6e43a3214fb90fd2f92e9de98a3bc453b8bf2ec20aaa63b3d9f3532c5aa3",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "bf03c097e1a507b3ef48fa899dd9344bb64a7699dd0889464c6443634d80758e",
+          "responseSha256": "39e5304a3b06d60ccf3736f498e5eb6975fe33e3fa55c7a69d74b988911640dc",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "61334d6536b9a436308e80b04f0208f6562baa4e5f200f93b71af6aa79289837",
+          "responseSha256": "ef0a73ac069ca1756465a5a8758ca23617706722d1f067d6fc26de82284849ab",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fac6617485cf15d1d77c41bc1130d1b9e29f84d81df88de6f1f4ff1373081e1b",
+          "responseSha256": "ba7af7230a978eaf5523d222a4986e05770a886a9988933a095ad12e910839e8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "27879b32260091c42878c2b41550848b09b3e1c22c34b6a1f7e71f68e0876c4f",
+          "responseSha256": "5bda4c4e41aa14474c1acbbb8baea86ef55e5517dcdb16a005b3570308780dcb",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "c3b4f8a44202218836e3b3d2d6d1b537fc08ab681e99ce53a8e3331e54ce5c7e",
+          "responseSha256": "51465521b23c5c8533841e7e65f471caa9ee3d5f2dd8135c014a3011991baf74",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "21e0a24dbbe3eb9ec65fd4bb71dca76ecc2b25db2b276d916480f27707998efa",
+          "responseSha256": "2944c78944d60cf6e9f8d9e37aa24d2c361e99dde3e98bbcbf70ecd0e17bc543",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "914fea47e01a28de34e201011e539f0b5a7aa7c3659b8fd2e57c764a474dc162",
+          "responseSha256": "8eb2c3d815b8db9fd19036aaaf36fb2921b78ab6d6b2aa03345c14936e98bec9",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "b1aed81f40fa6ab8a11bd52d3a427e4e1163081fb51b17d78185bb69cbdf09ee",
+          "responseSha256": "5f8e343d23417a1fd8d0091306c3d4372c787757beb7f0aaad85fc9e5f042219",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "a0a8390d1c1fba419466aa135440ddede85c8fc8b321398f466e4154ee7099f5",
+          "responseSha256": "4aad98ccf60cb5adaecaf376698098a31601e48f49b420ab0fa3dd395e70a979",
+          "httpStatus": 200
+        }
+      ]
+    }
+  ],
+  "finalGuardedSample": {
+    "attempts": 3,
+    "passes": 0,
+    "refused": 3
+  },
+  "fullSwapQualified": false
+}

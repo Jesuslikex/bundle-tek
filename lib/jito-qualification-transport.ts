@@ -1,4 +1,5 @@
 import { getSolanaHolderRpcEndpoint } from './solana-rpc';
+import { env } from './server-env';
 import { paceWalletRpc } from './wallet-rpc-pacing';
 import { readJitoSimulationPayload } from './jito-simulation-json';
 import { snapshotJitoEvidence, jitoEvidenceSha256 } from './jito-evidence-json';
@@ -61,6 +62,7 @@ export function createJitoQualificationTransport(
     fetcher?: typeof fetch;
     pace?: typeof paceWalletRpc;
     runtimeAccountEncoding?: 'base64+zstd';
+    heliusResearch?: true;
   } = {},
 ) {
   const runtimeAccountEncoding = dependencies.runtimeAccountEncoding;
@@ -72,14 +74,22 @@ export function createJitoQualificationTransport(
       (stage !== 'runtime' || runtimeAccountEncoding !== 'base64+zstd'))
   )
     return fail();
-  const endpoint = getSolanaHolderRpcEndpoint(),
+  if (
+    dependencies.heliusResearch !== undefined &&
+    dependencies.heliusResearch !== true
+  )
+    return fail();
+  const endpoint = dependencies.heliusResearch
+      ? (env.SOLANA_MAINNET_RPC_URL ?? fail())
+      : getSolanaHolderRpcEndpoint(),
     url = new URL(endpoint);
   if (
     url.protocol !== 'https:' ||
     url.username ||
     url.password ||
     url.hash ||
-    url.port
+    url.port ||
+    (dependencies.heliusResearch && url.hostname !== 'mainnet.helius-rpc.com')
   )
     return fail();
   // Process-monotonic diagnostics only. Neither these timestamps nor their

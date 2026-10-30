@@ -3,6 +3,40 @@ import { createJitoQualificationTransport } from './jito-qualification-transport
 import { zstdCompressSync } from 'node:zlib';
 afterEach(() => vi.restoreAllMocks());
 const signal = () => new AbortController().signal;
+it('selects only the existing Helius HTTPS setting for explicit research', async () => {
+  const previous = process.env.SOLANA_MAINNET_RPC_URL;
+  try {
+    process.env.SOLANA_MAINNET_RPC_URL =
+      'https://mainnet.helius-rpc.com/?api-key=synthetic';
+    const fetcher = vi.fn(
+      async (_url: unknown, init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: JSON.parse(init?.body as string).id,
+            result: 'genesis',
+          }),
+        ),
+    );
+    const t = createJitoQualificationTransport('bundle', 100, signal(), {
+      heliusResearch: true,
+      fetcher: fetcher as typeof fetch,
+      pace: async () => {},
+    });
+    await t.rpc('getGenesisHash', [], signal());
+    expect(fetcher.mock.calls[0][0]).toBe(process.env.SOLANA_MAINNET_RPC_URL);
+    t.close();
+    process.env.SOLANA_MAINNET_RPC_URL = 'https://example.com/';
+    expect(() =>
+      createJitoQualificationTransport('bundle', 100, signal(), {
+        heliusResearch: true,
+      }),
+    ).toThrow();
+  } finally {
+    if (previous === undefined) delete process.env.SOLANA_MAINNET_RPC_URL;
+    else process.env.SOLANA_MAINNET_RPC_URL = previous;
+  }
+});
 const body = (id = 'a', method = 'getGenesisHash') =>
   JSON.stringify({ jsonrpc: '2.0', id, method, params: [] });
 it('captures the exact compressed wire request and raw reply while preserving decoded metadata', async () => {
@@ -10,7 +44,7 @@ it('captures the exact compressed wire request and raw reply while preserving de
     encoded = Buffer.from(zstdCompressSync(bytes)).toString('base64');
   let wire = '';
   const fetcher = vi.fn(async (_url, init) => {
-    const q = JSON.parse(String(init?.body));
+    const q = JSON.parse(init?.body as string);
     expect(q.params[1].encoding).toBe('base64+zstd');
     wire = JSON.stringify({
       jsonrpc: '2.0',
@@ -98,7 +132,7 @@ it.each([false, true])(
       dataSlice: { offset: 0, length: 45 },
     };
     const fetcher = vi.fn(async (_url, init) => {
-      const q = JSON.parse(String(init?.body));
+      const q = JSON.parse(init?.body as string);
       expect(q.params[1].minContextSlot).toBe(105);
       config.minContextSlot = 100;
       return new Response(
@@ -131,7 +165,7 @@ it('binds actual raw responses and reserves ordinary pacing once per batch metho
       async (_u, init) =>
         new Response(
           JSON.stringify(
-            JSON.parse(String(init?.body)).map((r: { id: string }) => ({
+            JSON.parse(init?.body as string).map((r: { id: string }) => ({
               jsonrpc: '2.0',
               id: r.id,
               result: 'mainnet',
@@ -220,7 +254,7 @@ it('never admits send/unknown methods, an unbounded account request or an origin
 });
 it('enforces the unchanged bundle12HTTP/18method cap', async () => {
   const fetcher = vi.fn(async (_u, init) => {
-    const r = JSON.parse(String(init?.body));
+    const r = JSON.parse(init?.body as string);
     return new Response(
       JSON.stringify({ jsonrpc: '2.0', id: r.id, result: 'network' }),
     );
