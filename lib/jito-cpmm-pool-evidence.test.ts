@@ -334,3 +334,27 @@ it('excludes accrued protocol/fund fees from swap reserves', async () => {
     ),
   ).rejects.toThrow();
 });
+it.each([
+  [0, 389],
+  [0, 390],
+  [0, 397],
+  [5, 108],
+  [5, 116],
+  [6, 4043],
+])(
+  'refuses reused historical padding for account %s at %s',
+  async (i, offset) => {
+    const r = await fixture(),
+      b = Buffer.from(r.value[i].data[0], 'base64');
+    b[offset] = 1;
+    r.value[i].data[0] = b.toString('base64');
+    await expect(
+      readJitoCpmmPoolEvidence(
+        packet,
+        100,
+        vi.fn().mockResolvedValue(r),
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow();
+  },
+);

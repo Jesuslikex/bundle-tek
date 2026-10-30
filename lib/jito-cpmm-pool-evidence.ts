@@ -129,6 +129,14 @@ export async function readJitoCpmmPoolEvidence(
   const oracle = decode(result.value[6], CPMM, 4075);
   const c = config.b,
     o = oracle.b;
+  // Later releases reuse this padding for creator-fee state without changing
+  // account lengths. The historical math below cannot safely interpret it.
+  if (
+    b.subarray(389).some((byte: number) => byte !== 0) ||
+    c.subarray(108).some((byte: number) => byte !== 0) ||
+    o.subarray(4043).some((byte: number) => byte !== 0)
+  )
+    return fail();
   const unixTimestamp = pairClockUnixTimestamp(result.value[7], Number(slot));
   if (
     b.readBigUInt64LE(373) > BigInt(unixTimestamp) ||
