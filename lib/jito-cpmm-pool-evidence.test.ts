@@ -85,7 +85,16 @@ function fixture() {
     b[108] = 1;
     return raw(b, TOKEN);
   });
-  return { context: { slot: '102' }, value: [raw(p, CPMM), ...tokens] };
+  const config = Buffer.alloc(236);
+  Buffer.from('daf42168cbcb2b6f', 'hex').copy(config);
+  config.writeBigUInt64LE(2500n, 12);
+  const oracle = Buffer.alloc(4075);
+  Buffer.from('7aaec5358109a584', 'hex').copy(oracle);
+  Buffer.from(bs58.decode(bound.pool)).copy(oracle, 11);
+  return {
+    context: { slot: '102' },
+    value: [raw(p, CPMM), ...tokens, raw(config, CPMM), raw(oracle, CPMM)],
+  };
 }
 const packet = {} as Parameters<typeof readJitoCpmmPoolEvidence>[0];
 it('checks pool bindings and actual account rent without granting qualification', async () => {
@@ -95,7 +104,7 @@ it('checks pool bindings and actual account rent without granting qualification'
     vi.fn().mockResolvedValue(fixture()),
     new AbortController().signal,
   );
-  expect(result.coverage).toHaveLength(5);
+  expect(result.coverage).toHaveLength(7);
   expect(result).toMatchObject({
     rentCoverageChecked: true,
     poolRelationshipsChecked: true,
@@ -153,6 +162,55 @@ it('refuses swap-disabled pool', async () => {
 it('refuses an observation past the original 32-slot limit', async () => {
   const r = fixture();
   r.context.slot = '133';
+  await expect(
+    readJitoCpmmPoolEvidence(
+      packet,
+      100,
+      vi.fn().mockResolvedValue(r),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+});
+
+it.each([
+  [5, 0],
+  [5, 9],
+  [6, 0],
+  [6, 8],
+  [6, 11],
+])('refuses config/oracle corruption %s %s', async (i, offset) => {
+  const r = fixture(),
+    b = Buffer.from(r.value[i].data[0], 'base64');
+  b[offset] = 255;
+  r.value[i].data[0] = b.toString('base64');
+  await expect(
+    readJitoCpmmPoolEvidence(
+      packet,
+      100,
+      vi.fn().mockResolvedValue(r),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+});
+it('refuses a trade fee equal to the entire input', async () => {
+  const r = fixture(),
+    b = Buffer.from(r.value[5].data[0], 'base64');
+  b.writeBigUInt64LE(1000000n, 12);
+  r.value[5].data[0] = b.toString('base64');
+  await expect(
+    readJitoCpmmPoolEvidence(
+      packet,
+      100,
+      vi.fn().mockResolvedValue(r),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+});
+it('refuses an out-of-range oracle ring index', async () => {
+  const r = fixture(),
+    b = Buffer.from(r.value[6].data[0], 'base64');
+  b.writeUInt16LE(100, 9);
+  r.value[6].data[0] = b.toString('base64');
   await expect(
     readJitoCpmmPoolEvidence(
       packet,

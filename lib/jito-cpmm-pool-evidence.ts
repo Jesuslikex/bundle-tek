@@ -32,6 +32,8 @@ export async function readJitoCpmmPoolEvidence(
     bound.destination,
     bound.inputVault,
     bound.outputVault,
+    bound.config,
+    bound.observation,
   ];
   signal.throwIfAborted();
   const result = snapshotJitoEvidence(
@@ -63,7 +65,7 @@ export async function readJitoCpmmPoolEvidence(
     Number(slot) < assets.after.slot ||
     Number(slot) - minimumSlot > 32 ||
     !Array.isArray(result.value) ||
-    result.value.length !== 5
+    result.value.length !== 7
   )
     return fail();
   function decode(raw: unknown, owner: string, size: number) {
@@ -84,7 +86,7 @@ export async function readJitoCpmmPoolEvidence(
       a.data.length !== 2 ||
       a.data[1] !== 'base64' ||
       typeof a.data[0] !== 'string' ||
-      a.data[0].length > 1024
+      a.data[0].length > 5500
     )
       return fail();
     const b = Buffer.from(a.data[0], 'base64'),
@@ -119,7 +121,27 @@ export async function readJitoCpmmPoolEvidence(
     b[forward ? 332 : 331] !== assets.after.mints[1].decimals
   )
     return fail();
-  const coverage = keys.map((address, i) => {
+  const config = decode(result.value[5], CPMM, 236);
+  const oracle = decode(result.value[6], CPMM, 4075);
+  const c = config.b,
+    o = oracle.b;
+  const tradeFee = c.readBigUInt64LE(12),
+    protocolFee = c.readBigUInt64LE(20),
+    fundFee = c.readBigUInt64LE(28);
+  if (
+    c.subarray(0, 8).toString('hex') !== 'daf42168cbcb2b6f' ||
+    c[9] > 1 ||
+    tradeFee >= 1000000n ||
+    protocolFee > 1000000n ||
+    fundFee > 1000000n ||
+    protocolFee + fundFee > 1000000n ||
+    o.subarray(0, 8).toString('hex') !== '7aaec5358109a584' ||
+    o[8] > 1 ||
+    o.readUInt16LE(9) >= 100 ||
+    bs58.encode(o.subarray(11, 43)) !== bound.pool
+  )
+    return fail();
+  const coverage = keys.slice(0, 5).map((address, i) => {
     const decoded = i === 0 ? pool : decode(result.value![i], TOKEN, 165);
     if (i) {
       const t = decoded.b,
@@ -150,6 +172,13 @@ export async function readJitoCpmmPoolEvidence(
       requiredRent: decoded.rent.toString(),
     };
   });
+  coverage.push(
+    ...[config, oracle].map((v, i) => ({
+      address: keys[i + 5],
+      lamports: v.lamports.toString(),
+      requiredRent: v.rent.toString(),
+    })),
+  );
   signal.throwIfAborted();
   return {
     format: 'jito-cpmm-pool-observation-v1' as const,
@@ -159,6 +188,9 @@ export async function readJitoCpmmPoolEvidence(
     coverage,
     poolRelationshipsChecked: true as const,
     rentCoverageChecked: true as const,
+    configLayoutChecked: true as const,
+    oraclePoolBindingChecked: true as const,
+    tradeFeeMillionths: tradeFee.toString(),
     poolVerified: false as const,
     priceVerified: false as const,
     bankVerified: false as const,
