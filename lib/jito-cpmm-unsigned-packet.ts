@@ -92,6 +92,7 @@ export async function inspectJitoCpmmUnsignedPacket(input: {
     format: 'jito-cpmm-unsigned-packet-v1' as const,
     transactionSha256: await jitoEvidenceSha256(bytes),
     messageSha256: await jitoEvidenceSha256(Uint8Array.from(tx.messageBytes)),
+    blockhash: String(message.lifetimeToken),
     instructionBoundToPacket: true as const,
   };
 }
