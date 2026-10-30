@@ -51,3 +51,11 @@ Added `lib/jito-cpmm-unsigned-packet.ts`: canonical transaction and message deco
 Validation: two candidate test files pass 59 tests including an independently constructed raw-wire packet and signed/header/trailing-byte/amount mutations. Typecheck and scoped lint pass.
 
 `instructionBoundToPacket` is true only after byte binding. `packetVerified`, `accountStateVerified`, `priceVerified`, `economicOutputVerified`, program/source/provider approval and signing/execution remain false. Blockhash lifetime, pool/config/oracle and raw mint/rent/independent price evidence are still missing, as are actual same-bank provenance and the full runtime qualification. No call site enables this module for signing. No new live provider or funded run was made in this step.
+
+## Packet-bound mint and Rent read collector
+
+`lib/jito-cpmm-asset-evidence.ts` derives the two mint addresses from the unsigned packet inspector and reads them with the fixed Rent sysvar through an injected read-only RPC. It uses the existing mint and Rent parsers, allows only the classic SPL Token profile, repeats observations at a monotonic floor, and refuses a changed mint transfer policy or Rent profile. Both observations must fall inside the original 32-slot window. Reads have cancellation, a 30-second collector deadline and bounded JSON snapshots; no retries or fallback provider. The returned rent minimum is for a 165-byte token account, not proof that any actual account is rent-exempt or that creation funding is sufficient.
+
+The collector is unmounted research code, not a runtime admission proof. RPC provenance is supplied by the caller and not independently authenticated. The two reads do not surround an actual swap simulation, and no same-bank claim is made. Pool/config/oracle verification, independent market-price evidence, full mint/account/rent conservation, source-to-binary approval and actual same-bank qualification remain incomplete. The existing false authority fields remain false.
+
+Validation: 65 tests across the three CPMM test files, typecheck and scoped lint passed. After adding the explicit timeout, all six new collector tests passed again. New tests mock the packet inspector and RPC to isolate collector behavior; separate packet tests test real synthetic transaction bytes. No live provider run, deployment or funded action occurred in this step.
