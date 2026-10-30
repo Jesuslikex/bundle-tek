@@ -16,6 +16,8 @@ const { bound, assets } = vi.hoisted(() => ({
     config: '',
     observation: '',
     authorityBump: 254,
+    inputRaw: '123',
+    minimumOutputRaw: '100',
     transactionSha256: 'a'.repeat(64),
   },
   assets: {
@@ -110,6 +112,7 @@ async function fixture() {
     ).copy(b);
     Buffer.from(bs58.decode(i < 2 ? bound.payer : bound.authority)).copy(b, 32);
     b[108] = 1;
+    b.writeBigUInt64LE(1000000n, 64);
     return raw(b, TOKEN);
   });
   const config = Buffer.alloc(236);
@@ -307,6 +310,20 @@ it('refuses a pool whose open time is after the observed Clock', async () => {
   const r = await fixture(),
     b = Buffer.from(r.value[0].data[0], 'base64');
   b.writeBigUInt64LE(BigInt(Math.floor(Date.now() / 1000) + 60), 373);
+  r.value[0].data[0] = b.toString('base64');
+  await expect(
+    readJitoCpmmPoolEvidence(
+      packet,
+      100,
+      vi.fn().mockResolvedValue(r),
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+});
+it('excludes accrued protocol/fund fees from swap reserves', async () => {
+  const r = await fixture(),
+    b = Buffer.from(r.value[0].data[0], 'base64');
+  b.writeBigUInt64LE(1000000n, 341);
   r.value[0].data[0] = b.toString('base64');
   await expect(
     readJitoCpmmPoolEvidence(

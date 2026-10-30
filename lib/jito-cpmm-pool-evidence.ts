@@ -1,6 +1,7 @@
 import bs58 from 'bs58';
 import { address, getProgramDerivedAddress } from '@solana/kit';
 import { PAIR_CLOCK, pairClockUnixTimestamp } from './pair-stock-clock';
+import { calculateJitoCpmmConstantProduct } from './jito-cpmm-constant-product';
 import { inspectJitoCpmmUnsignedPacket } from './jito-cpmm-unsigned-packet';
 import { readJitoCpmmAssetEvidence } from './jito-cpmm-asset-evidence';
 import { pairRentMinimumRaw } from './pair-rent-evidence';
@@ -220,6 +221,49 @@ export async function readJitoCpmmPoolEvidence(
       requiredRent: v.rent.toString(),
     })),
   );
+  const sourceBalance = decode(result.value[1], TOKEN, 165).b.readBigUInt64LE(
+    64,
+  );
+  const inputVaultBalance = decode(
+    result.value[3],
+    TOKEN,
+    165,
+  ).b.readBigUInt64LE(64);
+  const outputVaultBalance = decode(
+    result.value[4],
+    TOKEN,
+    165,
+  ).b.readBigUInt64LE(64);
+  const inputFeeOffset = forward ? 341 : 349,
+    outputFeeOffset = forward ? 349 : 341;
+  const inputFees =
+    b.readBigUInt64LE(inputFeeOffset) + b.readBigUInt64LE(inputFeeOffset + 16);
+  const outputFees =
+    b.readBigUInt64LE(outputFeeOffset) +
+    b.readBigUInt64LE(outputFeeOffset + 16);
+  if (
+    sourceBalance < BigInt(bound.inputRaw) ||
+    inputFees >= inputVaultBalance ||
+    outputFees >= outputVaultBalance ||
+    inputVaultBalance + BigInt(bound.inputRaw) > (1n << 64n) - 1n
+  )
+    return fail();
+  const curve = calculateJitoCpmmConstantProduct({
+    inputRaw: bound.inputRaw,
+    minimumOutputRaw: bound.minimumOutputRaw,
+    inputReserveRaw: (inputVaultBalance - inputFees).toString(),
+    outputReserveRaw: (outputVaultBalance - outputFees).toString(),
+    tradeFeeMillionths: tradeFee.toString(),
+    protocolFeeMillionths: protocolFee.toString(),
+    fundFeeMillionths: fundFee.toString(),
+  });
+  if (
+    b.readBigUInt64LE(inputFeeOffset) + BigInt(curve.protocolFeeRaw) >
+      (1n << 64n) - 1n ||
+    b.readBigUInt64LE(inputFeeOffset + 16) + BigInt(curve.fundFeeRaw) >
+      (1n << 64n) - 1n
+  )
+    return fail();
   signal.throwIfAborted();
   return {
     format: 'jito-cpmm-pool-observation-v1' as const,
@@ -235,6 +279,7 @@ export async function readJitoCpmmPoolEvidence(
     poolOpenAtObservedClock: true as const,
     unixTimestamp,
     tradeFeeMillionths: tradeFee.toString(),
+    curve,
     poolVerified: false as const,
     priceVerified: false as const,
     bankVerified: false as const,
