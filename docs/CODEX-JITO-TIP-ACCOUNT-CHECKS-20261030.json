@@ -182,5 +182,74 @@
     "Public source account layout and observed metadata only, not a Tip Payment binary approval.",
     "Archive native simulations are not a full swap or synchronized validator/same-bank fee proof.",
     "No signing, sending, provider settings or deployment authorization."
-  ]
+  ],
+  "nativeArchiveWithPrestate": {
+    "format": "jito-current-archive-capability-v1",
+    "observedAt": "2026-10-30T18:40:09.748Z",
+    "status": "native-archive-diagnostic-observed",
+    "stage": "final-window",
+    "floor": 463389425,
+    "lastSlot": 463389427,
+    "calls": 4,
+    "responseBytes": 4372,
+    "rateLimited": false,
+    "rpcErrorCode": null,
+    "observations": {
+      "contextFields": [
+        "apiVersion",
+        "slot"
+      ],
+      "preAccountCount": 7,
+      "preClockTimestamp": "1793385608",
+      "mints": [
+        {
+          "address": "So11111111111111111111111111111111111111112",
+          "program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "decimals": 9,
+          "policySha256": "b0f919425a529f4971ef8dabd535aec34947d5c8c4885df80dae91635b98c5f3",
+          "requiredRentLamports": "1066800",
+          "lamports": "1862418443264"
+        },
+        {
+          "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "decimals": 6,
+          "policySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+          "requiredRentLamports": "1066800",
+          "lamports": "557413303855"
+        }
+      ],
+      "nativeSequentialEffectsChecked": true,
+      "rentPrestateObserved": true,
+      "rentPoststateObserved": false,
+      "results": [
+        {
+          "slot": 463389425,
+          "status": "success",
+          "feeLamports": "5000",
+          "hashReplacementPresent": false,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463389425,
+          "status": "success",
+          "feeLamports": "5000",
+          "hashReplacementPresent": false,
+          "postAccountCount": 2
+        }
+      ]
+    },
+    "transactionsBroadcast": 0,
+    "simulatedTransactionsRequested": 2,
+    "overridesUsed": false,
+    "replaceRecentBlockhash": false,
+    "ownedWallet": false,
+    "liveJitoValidatorVerified": false,
+    "bankIdentityVerified": false,
+    "independentFeeBankVerified": false,
+    "fullSwapQualified": false,
+    "providerQualified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  }
 }

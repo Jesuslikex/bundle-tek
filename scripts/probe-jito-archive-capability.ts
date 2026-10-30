@@ -5,6 +5,14 @@ import { paceWalletRpc } from '../lib/wallet-rpc-pacing';
 import { readJitoSimulationPayload } from '../lib/jito-simulation-json';
 import { solanaTransferMessage } from '../lib/solana-transfer-message';
 import { SOLANA_MAINNET_GENESIS } from '../lib/wallet-balances';
+import { inspectJitoTipReceiver } from '../lib/jito-tip-account-evidence';
+import {
+  inspectPairRentAccount,
+  pairRentMinimumRaw,
+  PAIR_RENT,
+} from '../lib/pair-rent-evidence';
+import { PAIR_CLOCK, pairClockUnixTimestamp } from '../lib/pair-stock-clock';
+import { inspectSwapMintAccount } from '../lib/swap-token-program-evidence';
 const PAYER = '2k5hrzuykwyTbUe8L7UriYAQhr5hijNLgBvEB4B9pP5y',
   RECIPIENT = '96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5',
   SYSTEM = '11111111111111111111111111111111';
@@ -15,6 +23,37 @@ function integer(v: unknown) {
   if (typeof v !== 'bigint' || v < 0n || v > BigInt(Number.MAX_SAFE_INTEGER))
     return fail();
   return Number(v);
+}
+function account(v: unknown) {
+  const a = v as Record<string, unknown> | null;
+  if (
+    !a ||
+    typeof a.lamports !== 'bigint' ||
+    a.lamports < 0n ||
+    a.lamports > (1n << 64n) - 1n ||
+    typeof a.owner !== 'string' ||
+    typeof a.executable !== 'boolean' ||
+    !Array.isArray(a.data) ||
+    a.data.length !== 2 ||
+    a.data[1] !== 'base64' ||
+    typeof a.data[0] !== 'string'
+  )
+    return fail();
+  return {
+    owner: a.owner,
+    executable: a.executable,
+    lamports: a.lamports.toString(),
+    data: a.data,
+    ...(a.space === undefined ? {} : { space: integer(a.space).toString() }),
+  };
+}
+function vector(v: unknown, keys: readonly string[]) {
+  if (!Array.isArray(v) || v.length !== keys.length) return fail();
+  return v.map((entry, i) => {
+    if (!entry || typeof entry !== 'object' || entry.address !== keys[i])
+      return fail();
+    return account(entry.account);
+  });
 }
 async function main() {
   if (process.argv.length !== 3 || process.argv[2] !== '--live-readonly')
@@ -129,6 +168,18 @@ async function main() {
       ]).toString('base64'),
     );
     stage = 'single-current-slot-archive-probe';
+    const mintKeys = [
+      'So11111111111111111111111111111111111111112',
+      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    ];
+    const beforeKeys = [
+      PAYER,
+      RECIPIENT,
+      SYSTEM,
+      PAIR_CLOCK,
+      PAIR_RENT,
+      ...mintKeys,
+    ];
     // Native-only diagnostics, no caller balance/Clock/account overrides and no
     // replacement hash. Not a full swap or a Jito block-engine send.
     const result = (await rpc('simulateTransactionsAtSlot', [
@@ -137,6 +188,10 @@ async function main() {
           slot: floor,
           encodedTransaction,
         })),
+        preExecutionAccountsConfigs: {
+          accounts: beforeKeys,
+          encoding: 'base64',
+        },
         postExecutionAccountsConfigs: {
           accounts: [
             PAYER,
@@ -153,7 +208,10 @@ async function main() {
       },
     ])) as {
       context?: Record<string, unknown>;
-      value?: { simulationResults?: Record<string, unknown>[] };
+      value?: {
+        simulationResults?: Record<string, unknown>[];
+        preExecutionAccounts?: unknown;
+      };
     };
     observations.contextFields = result.context
       ? Object.keys(result.context)
@@ -187,6 +245,73 @@ async function main() {
       )
     )
       return fail();
+    stage = 'same-response-prestate';
+    observations.preAccountCount = Array.isArray(
+      result.value.preExecutionAccounts,
+    )
+      ? result.value.preExecutionAccounts.length
+      : null;
+    const pre = vector(result.value.preExecutionAccounts, beforeKeys);
+    const rent = inspectPairRentAccount(pre[4]);
+    observations.preClockTimestamp = pairClockUnixTimestamp(pre[3], floor);
+    observations.mints = [];
+    const mints = [];
+    for (const [i, mint] of mintKeys.entries()) {
+      const raw = pre[i + 5];
+      const evidence = await inspectSwapMintAccount(raw, mint);
+      const minimum = pairRentMinimumRaw(rent, 82);
+      if (
+        raw.owner !== 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' ||
+        raw.data[0].length !== 112 ||
+        BigInt(raw.lamports) < BigInt(minimum) ||
+        evidence.decimals !== (i === 0 ? 9 : 6)
+      )
+        return fail();
+      mints.push({
+        ...evidence,
+        requiredRentLamports: minimum,
+        lamports: raw.lamports,
+      });
+    }
+    observations.mints = mints;
+    const states = [
+      pre.slice(0, 2),
+      ...result.value.simulationResults.map((r) =>
+        vector(r.postExecutionAccounts, [PAYER, RECIPIENT]),
+      ),
+    ];
+    for (const state of states) {
+      const payer = state[0];
+      if (
+        payer.owner !== SYSTEM ||
+        payer.executable ||
+        payer.data[0] !== '' ||
+        BigInt(payer.lamports) < BigInt(pairRentMinimumRaw(rent, 0))
+      )
+        return fail();
+      await inspectJitoTipReceiver({
+        address: RECIPIENT,
+        account: state[1],
+        rentAccount: pre[4],
+      });
+    }
+    for (let i = 0; i < 2; i++) {
+      const fee = result.value.simulationResults[i].feeLamports,
+        amount = 1000n + BigInt(i);
+      if (
+        typeof fee !== 'bigint' ||
+        fee < 1n ||
+        fee > 10000n ||
+        BigInt(states[i][0].lamports) - BigInt(states[i + 1][0].lamports) !==
+          fee + amount ||
+        BigInt(states[i + 1][1].lamports) - BigInt(states[i][1].lamports) !==
+          amount
+      )
+        return fail();
+    }
+    observations.nativeSequentialEffectsChecked = true;
+    observations.rentPrestateObserved = true;
+    observations.rentPoststateObserved = false;
     stage = 'final-window';
     lastSlot = integer(
       await rpc('getSlot', [
