@@ -1,0 +1,156 @@
+{
+  "format": "jito-exact-archive-account-diagnostics-v1",
+  "attempts": [
+    {
+      "format": "jito-exact-archive-account-diagnostic-v1",
+      "observedAt": "2026-10-30T18:43:32.056Z",
+      "status": "refused",
+      "stage": "commitment-distance",
+      "confirmedSlot": 463390366,
+      "finalizedSlot": 463390367,
+      "finalConfirmedSlot": null,
+      "calls": 3,
+      "responseBytes": 221,
+      "rateLimited": false,
+      "rpcErrorCode": null,
+      "observations": {
+        "initialFinalityDistance": -1
+      },
+      "ownershipClaimed": false,
+      "bankVerified": false,
+      "independentFeeBankVerified": false,
+      "fullSwapQualified": false,
+      "providerQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    },
+    {
+      "format": "jito-exact-archive-account-diagnostic-v1",
+      "observedAt": "2026-10-30T18:44:07.039Z",
+      "status": "exact-archive-accounts-observed",
+      "stage": "final-32-slot-window",
+      "confirmedSlot": 463390527,
+      "bracketConfirmedSlot": 463390529,
+      "finalizedSlot": 463390528,
+      "finalConfirmedSlot": 463390532,
+      "calls": 8,
+      "responseBytes": 1079,
+      "rateLimited": false,
+      "rpcErrorCode": null,
+      "observations": {
+        "initialFinalityDistance": -1,
+        "bracketFinalityDistance": 1,
+        "archiveReads": [
+          {
+            "address": "SysvarRent111111111111111111111111111111111",
+            "requestedSlot": 463390528,
+            "returnedSlot": 463390528,
+            "present": true
+          },
+          {
+            "address": "SysvarC1ock11111111111111111111111111111111",
+            "requestedSlot": 463390528,
+            "returnedSlot": 463390528,
+            "present": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "requestedSlot": 463390528,
+            "returnedSlot": 463390528,
+            "present": false
+          }
+        ],
+        "rent": {
+          "lamportsPerByte": "5080",
+          "exemptionThreshold": 1,
+          "burnPercent": 50,
+          "dataBase64": "2BMAAAAAAAAAAAAAAADwPzI="
+        },
+        "reportedClock": {
+          "slot": "463390528",
+          "unixTimestamp": "1793385845",
+          "serverTimeMilliseconds": 1793385846759
+        },
+        "clockTimestamp": "1793385845",
+        "destinationPresent": false,
+        "finalitySpan": 4,
+        "within32Slots": true
+      },
+      "ownershipClaimed": false,
+      "bankVerified": false,
+      "independentFeeBankVerified": false,
+      "fullSwapQualified": false,
+      "providerQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    },
+    {
+      "format": "jito-exact-archive-account-diagnostic-v1",
+      "observedAt": "2026-10-30T18:51:32.342Z",
+      "status": "exact-archive-accounts-observed",
+      "stage": "final-32-slot-window",
+      "confirmedSlot": 463392600,
+      "bracketConfirmedSlot": 463392603,
+      "finalizedSlot": 463392601,
+      "finalConfirmedSlot": 463392608,
+      "calls": 8,
+      "responseBytes": 1079,
+      "rateLimited": false,
+      "rpcErrorCode": null,
+      "observations": {
+        "initialFinalityDistance": -1,
+        "bracketFinalityDistance": 2,
+        "archiveReads": [
+          {
+            "address": "SysvarRent111111111111111111111111111111111",
+            "requestedSlot": 463392601,
+            "returnedSlot": 463392601,
+            "present": true
+          },
+          {
+            "address": "SysvarC1ock11111111111111111111111111111111",
+            "requestedSlot": 463392601,
+            "returnedSlot": 463392601,
+            "present": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "requestedSlot": 463392601,
+            "returnedSlot": 463392601,
+            "present": false
+          }
+        ],
+        "rent": {
+          "lamportsPerByte": "5080",
+          "exemptionThreshold": 1,
+          "burnPercent": 50,
+          "dataBase64": "2BMAAAAAAAAAAAAAAADwPzI="
+        },
+        "reportedClock": {
+          "slot": "463392601",
+          "unixTimestamp": "1793386290",
+          "serverTimeMilliseconds": 1793386292038
+        },
+        "clockTimestamp": "1793386290",
+        "destinationPresent": false,
+        "finalitySpan": 7,
+        "within32Slots": true
+      },
+      "ownershipClaimed": false,
+      "bankVerified": false,
+      "independentFeeBankVerified": false,
+      "fullSwapQualified": false,
+      "providerQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    }
+  ],
+  "limits": [
+    "Sequential commitment samples need a later confirmed bracket.",
+    "Historical account replies are not validator/bank/fee attestations.",
+    "Destination absent at the observed slot; no wallet ownership or quietness proof."
+  ]
+}

@@ -20,6 +20,14 @@ A follow-up native archive probe requested seven pre-execution accounts in that 
 
 This resolves availability of raw mint and Rent **pre-state** for the native archive diagnostic. It does not demonstrate a pool swap, retain readonly post-images omitted by that API, or prove independent fees, current validator identity, bank identity or the height-read upper bound. The sanitized follow-up is appended as `nativeArchiveWithPrestate`, preserving the first result. The script retains every read-only outcome under ignored `work/` and has no signer or broadcaster. No full-swap qualification flag was promoted. Only the diagnostic script and evidence changed after the 552-test run; final TypeScript and scoped script lint passed.
 
+### Exact-slot account reads and destination diagnosis
+
+[Alchemy's Account Archive](https://www.alchemy.com/docs/solana/account-archive) documents the `slot` extension on `getAccountInfo`; it is mutually exclusive with `minContextSlot`. The isolated diagnostic asks for an exact finalized slot and refuses any different response context rather than substituting a floor. It leaves production readers unchanged. The first sample stopped on a diagnostic comparison between two sequential commitment reads (confirmed 463390366, then finalized 463390367). A later confirmed bracket is required for a valid temporal comparison; this correction applies only to the diagnostic, not financial policy.
+
+The bracketed sample read Rent, Clock and the public reference's USDC destination at exact slot 463390528. All three reply contexts matched the requested slot. Clock equality and wall-time checks passed, the later confirmed slot was 463390532 (four-slot span), eight requests, 1,079 response bytes, no 429. Both samples are retained in `CODEX-JITO-EXACT-ARCHIVE-ACCOUNTS-20261030.json`. This proves capability of the requested account read, not validator identity, independently verified fees or full-swap qualification.
+
+At that new slot the canonical USDC destination `CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5` for public reference `2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo` was absent (`value: null`). The prior search's generic refusal did not supply comparable raw evidence for its earlier slot. A complete route for this new observation requires an explicitly verified ATA creation with actual rent and payer debit coverage. The existing one-swap/existing-ATA packet profile must not be weakened or fed a fabricated existing account. No wallet was created or funded, and no ownership or quietness is inferred.
+
 These checks are isolated research code and are not connected to the Jito qualification, UI, signing or sending paths. They retain `sourceAuthenticated`, `programApproved`, `packetVerified`, `economicOutputVerified`, `providerQualified`, `signingAllowed`, and `executionAllowed` as false. No policy, slot, bank, signing or execution guard was changed.
 
 ## Implemented
