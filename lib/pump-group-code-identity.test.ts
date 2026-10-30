@@ -10,6 +10,217 @@ import type { PumpLaunchRpc } from './pump-launch-simulation';
 const program = bs58.encode(new Uint8Array(32).fill(2)),
   dataKey = bs58.encode(new Uint8Array(32).fill(3)),
   system = '11111111111111111111111111111111';
+function mixedLoaderFixture(kind = 'ok', declared = true) {
+  const legacy = bs58.encode(new Uint8Array(32).fill(50)),
+    token = bs58.encode(new Uint8Array(32).fill(52)),
+    tokenData = bs58.encode(new Uint8Array(32).fill(53));
+  const raw = new Map<
+    string,
+    { owner: string; executable: boolean; bytes: Uint8Array }
+  >();
+  for (const [key, link, size] of [
+    [program, dataKey, 793824],
+    [legacy, null, 105032],
+    [token, tokenData, 108600],
+  ] as const) {
+    const code = new Uint8Array(size);
+    for (let i = 0; i < size; i++) code[i] = i % 256;
+    code.set([127, 69, 76, 70]);
+    if (link) {
+      const pointer = new Uint8Array(36);
+      new DataView(pointer.buffer).setUint32(0, 2, true);
+      pointer.set(bs58.decode(link), 4);
+      const data = new Uint8Array(size + 45),
+        view = new DataView(data.buffer);
+      view.setUint32(0, 3, true);
+      view.setBigUint64(4, 90n, true);
+      data[12] = 1;
+      data.fill(4, 13, 45);
+      data.set(code, 45);
+      raw.set(key, {
+        owner: PUMP_UPGRADEABLE_LOADER,
+        executable: true,
+        bytes: pointer,
+      });
+      raw.set(link, {
+        owner: PUMP_UPGRADEABLE_LOADER,
+        executable: false,
+        bytes: data,
+      });
+    } else
+      raw.set(key, {
+        owner: 'BPFLoader2111111111111111111111111111111111',
+        executable: true,
+        bytes: code,
+      });
+  }
+  raw.set(system, {
+    owner: 'NativeLoader1111111111111111111111111111111',
+    executable: true,
+    bytes: Buffer.from('system_program'),
+  });
+  const slices: { keys: string[]; offset: number; length: number }[] = [];
+  let active = 0,
+    maximum = 0,
+    slot = 100,
+    codeReads = 0;
+  const rpc: PumpLaunchRpc = async (method, params, signal) => {
+    signal.throwIfAborted();
+    if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
+    if (method !== 'getMultipleAccounts') throw Error('Unexpected method');
+    const keys = params[0] as string[],
+      cfg = params[1] as {
+        minContextSlot: number;
+        dataSlice: { offset: number; length: number };
+      },
+      slice = cfg.dataSlice;
+    const isCode = slice.length > 45;
+    // Header rechecks intentionally overlap; each code slice remains serial
+    // and must use the latest completed response's floor.
+    if (
+      (isCode && cfg.minContextSlot !== slot) ||
+      cfg.minContextSlot > slot ||
+      cfg.minContextSlot < 100
+    )
+      throw Error('Floor did not advance');
+    if (isCode) {
+      codeReads++;
+      active++;
+      maximum = Math.max(maximum, active);
+      slices.push({ keys: [...keys], ...slice });
+      await Promise.resolve();
+    }
+    if (isCode && kind === 'rate-limit') {
+      active--;
+      throw new WalletRpcError(429);
+    }
+    const value = keys.map((key) => {
+      const a = raw.get(key)!;
+      let bytes = a.bytes.slice(slice.offset, slice.offset + slice.length);
+      if (isCode && key === dataKey && kind === 'header') bytes[13] ^= 1;
+      if (isCode && key === dataKey && kind === 'truncate')
+        bytes = bytes.slice(1);
+      return {
+        owner: isCode && key === legacy && kind === 'owner' ? system : a.owner,
+        executable: a.executable,
+        lamports: '1000000',
+        ...(declared ? { space: String(a.bytes.length) } : {}),
+        data: [Buffer.from(bytes).toString('base64'), 'base64'],
+      };
+    });
+    if (isCode) {
+      active--;
+      expect(slice.length).toBeLessThanOrEqual(720 * 1024);
+      expect(keys.length * slice.length).toBeLessThanOrEqual(1048576);
+    }
+    slot++;
+    return {
+      context: { slot: String(kind === 'drift' && isCode ? slot - 2 : slot) },
+      value,
+    };
+  };
+  return {
+    rpc,
+    programs: [program, legacy, token, system],
+    slices,
+    stats: () => ({ maximum, codeReads }),
+  };
+}
+it('packs mixed loaders only for explicit serial CPMM research with identical full identities and advancing floors', async () => {
+  const ordinary = mixedLoaderFixture(),
+    packed = mixedLoaderFixture();
+  const a = await collectPumpProgramIdentities(
+    ordinary.programs,
+    100,
+    new AbortController().signal,
+    ordinary.rpc,
+  );
+  const b = await collectPumpProgramIdentities(
+    packed.programs,
+    100,
+    new AbortController().signal,
+    packed.rpc,
+    1,
+    100,
+    'serial-cpmm-research',
+  );
+  expect(b.programs).toEqual(a.programs);
+  expect(b.totalCodeBytes).toBe(a.totalCodeBytes);
+  expect(ordinary.stats()).toEqual({ maximum: 1, codeReads: 3 });
+  expect(packed.stats()).toEqual({ maximum: 1, codeReads: 2 });
+  expect(ordinary.slices.map((s) => [s.offset, s.keys.length])).toEqual([
+    [0, 1],
+    [45, 2],
+    [524333, 1],
+  ]);
+  expect(packed.slices.map((s) => [s.offset, s.keys.length])).toEqual([
+    [0, 3],
+    [348160, 1],
+  ]);
+});
+it.each(['header', 'truncate', 'owner', 'drift', 'rate-limit'])(
+  'serial mixed-loader packing refuses %s without a fallback',
+  async (kind) => {
+    const f = mixedLoaderFixture(kind);
+    await expect(
+      collectPumpProgramIdentities(
+        f.programs,
+        100,
+        new AbortController().signal,
+        f.rpc,
+        1,
+        100,
+        'serial-cpmm-research',
+      ),
+    ).rejects.toThrow();
+    expect(f.stats().maximum).toBe(1);
+    if (kind === 'rate-limit') expect(f.stats().codeReads).toBe(1);
+  },
+);
+it('preserves the unknown-size serial schedule even when mixed-loader research is requested', async () => {
+  const a = mixedLoaderFixture('ok', false),
+    b = mixedLoaderFixture('ok', false);
+  const ordinary = await collectPumpProgramIdentities(
+    a.programs,
+    100,
+    new AbortController().signal,
+    a.rpc,
+  );
+  const packed = await collectPumpProgramIdentities(
+    b.programs,
+    100,
+    new AbortController().signal,
+    b.rpc,
+    1,
+    100,
+    'serial-cpmm-research',
+  );
+  expect(packed.programs).toEqual(ordinary.programs);
+  expect(b.slices).toEqual(a.slices);
+  expect(b.stats().maximum).toBe(1);
+});
+it.each([
+  [4, 100, 'serial-cpmm-research'],
+  [1, 5, 'serial-cpmm-research'],
+  [1, 100, 'unrecognized'],
+])(
+  'rejects incompatible research packing %s/%s/%s before any RPC',
+  async (concurrency, cap, packing) => {
+    const f = mixedLoaderFixture();
+    await expect(
+      collectPumpProgramIdentities(
+        f.programs,
+        100,
+        new AbortController().signal,
+        f.rpc,
+        concurrency as 1 | 4,
+        cap as 5 | 100,
+        packing as 'serial-cpmm-research',
+      ),
+    ).rejects.toThrow();
+    expect(f.slices).toHaveLength(0);
+  },
+);
 function fixture(kind = 'ok', space = true, size = 300000) {
   let headerReads = 0;
   const calls: string[] = [];

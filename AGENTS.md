@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Codex, 30 October 2026 ACTIVE: opt-in serial mixed-loader packing for CPMM research only. Exact paths: `lib/pump-group-code-identity.ts`, `lib/pump-group-code-identity.test.ts`, `lib/jito-runtime-evidence.ts`, its relevant tests, `scripts/probe-jito-cpmm-sequence.ts` and `docs/CODEX-JITO-CPMM-*`. Group/default schedules, shared program policy, all guards and signing gates remain unchanged. No provider settings, deployment or funded action. Preserve the three unrelated recovery-password drafts.
+
 - Codex, 28 October 2026 ACTIVE: Jito v2 browser integration, recovery, compatibility and remount test migration on draft branch `codex/jito-v2-reservations-20261028`. See `docs/CODEX-JITO-SIGNING-RESERVATIONS-20261028.md` and `docs/CODEX-JITO-V2-remount-inventory-20261028.md`. The draft is not release-ready and must not be merged or deployed until the remaining coverage and rollout issues are resolved. No provider settings, hosted SQL, real-wallet or funded actions.
 
 - Codex + helper, 28 October 2026: local Jito v2 durable server signing-reservation migration 0163, metadata journal and server/API draft are checkpointed on the same draft branch. Preserve old data, quarantine legacy ambiguity, exact cryptographic registration and all existing consent/one-send safeguards. Migration numbering must be rechecked before any merge; no hosted SQL, provider settings, real wallet, funded action or deployment.

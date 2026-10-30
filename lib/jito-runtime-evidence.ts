@@ -323,6 +323,7 @@ async function collectRuntime(
           call,
           1,
           100,
+          profile === 'cpmm-ata-research' ? 'serial-cpmm-research' : 'default',
         )
       ).programs
     : [];

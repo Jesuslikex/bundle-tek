@@ -36,6 +36,7 @@ export async function collectPumpProgramIdentities(
   rpc: PumpLaunchRpc,
   maxConcurrentCodeReads: 1 | 4 = 1,
   maximumAccountsPerRead: 5 | 100 = 100,
+  packing: 'default' | 'serial-cpmm-research' = 'default',
 ) {
   if (
     !programs.length ||
@@ -45,7 +46,10 @@ export async function collectPumpProgramIdentities(
     minimumSlot < 0 ||
     ![1, 4].includes(maxConcurrentCodeReads) ||
     ![5, 100].includes(maximumAccountsPerRead) ||
-    (maximumAccountsPerRead === 5 && maxConcurrentCodeReads !== 4)
+    (maximumAccountsPerRead === 5 && maxConcurrentCodeReads !== 4) ||
+    !['default', 'serial-cpmm-research'].includes(packing) ||
+    (packing === 'serial-cpmm-research' &&
+      (maxConcurrentCodeReads !== 1 || maximumAccountsPerRead !== 100))
   )
     throw new Error('Program identity scope differs.');
   programs.forEach(address);
@@ -189,11 +193,11 @@ export async function collectPumpProgramIdentities(
       },
     ];
   });
-  // The explicit stock profile can align full declared accounts at absolute
+  // Explicit stock or serial CPMM research can align declared accounts at absolute
   // offset zero. Legacy code and upgradeable data then share a bounded read;
   // group/default and unknown-size paths keep their original slice schedule.
   const mixedDeclared =
-    maxConcurrentCodeReads === 4 &&
+    (maxConcurrentCodeReads === 4 || packing === 'serial-cpmm-research') &&
     profiles.every((item) => item.space !== null) &&
     profiles.some((item) => item.start === 0) &&
     profiles.some((item) => item.start === 45);
