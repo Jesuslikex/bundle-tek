@@ -60,6 +60,16 @@ async function candidate() {
   };
 }
 describe('Raydium CPMM candidate instruction inspection', () => {
+  it.each(Array.from({ length: 13 }, (_, i) => i))(
+    'refuses the executable program in account role %s',
+    async (i) => {
+      const value = await candidate();
+      value.accounts[i].address = PROGRAM;
+      await expect(inspectJitoCpmmCandidateInstruction(value)).rejects.toThrow(
+        'refused',
+      );
+    },
+  );
   it('binds the exact amounts, payer, canonical ATAs and program authority without granting execution', async () => {
     const value = await inspectJitoCpmmCandidateInstruction(await candidate());
     expect(value).toMatchObject({

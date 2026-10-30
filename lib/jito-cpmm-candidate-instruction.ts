@@ -109,6 +109,7 @@ export async function inspectJitoCpmmCandidateInstruction(input: Candidate) {
     accounts[11].address !== outputMint ||
     accounts[8].address !== TOKEN ||
     accounts[9].address !== TOKEN ||
+    accounts.some((a) => a.address === CPMM) ||
     !accounts[0].signer ||
     accounts.slice(1).some((a) => a.signer) ||
     [3, 4, 5, 6, 7, 12].some((i) => !accounts[i].writable) ||

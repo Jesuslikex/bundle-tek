@@ -22,3 +22,24 @@ The OtterSec status endpoint again reported `is_verified: false`, `last_verified
 - Keep signing and execution disabled until the full existing qualification succeeds. No deployed or funded actions were taken.
 
 Sources: https://github.com/raydium-io/raydium-cp-swap/blob/cfdb70a8ca9ea62bb5c304d4492ac0fc371ae8ce/programs/cp-swap/src/instructions/swap_base_input.rs ; https://solana.com/docs/programs/verified-builds ; https://verify.osec.io/status/CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C
+
+## Follow-up audit, 30 October 2026
+
+The candidate inspectors remain imported only by each other and their tests, not by an application API, UI or Jito admission path. Their false authority flags are intentional. A caller can supply internally consistent synthetic instruction/account data, so passing these inspectors alone cannot establish a safe real swap.
+
+Fixed a candidate shape gap: the CPMM executable address is now forbidden in every one of the thirteen data-account roles. Added thirteen regression cases plus exact minimum-output boundary cases (110 accepted, 111 refused against an actual output of 110). This tightens checks without changing any production policy.
+
+Current completion map:
+
+| Layer                                                                        | State                                                      |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Candidate instruction structure, canonical ATAs and amount binding           | Implemented and unit tested; caller inputs unauthenticated |
+| Four supplied SPL account balance transitions                                | Implemented and unit tested; provenance unauthenticated    |
+| Exact transaction decoding, complete instruction coverage and lookup binding | Missing for this direct-route adapter                      |
+| Pool/config/vault/oracle ownership, mint/rent and independent price evidence | Missing for this direct-route adapter                      |
+| Deployed Raydium binary matched to a reproducible reviewed source build      | Not established                                            |
+| Raydium trusted program policy approval                                      | Absent; existing refusal preserved                         |
+| Authenticated same-bank simulation and independent fees                      | Not established                                            |
+| Full swap with both runtime scans inside 32 slots                            | Not qualified                                              |
+
+No production/live-site audit, complete product parity, deployment or funded verification is claimed by this source audit. Preserve the three unrelated untracked recovery-password files.

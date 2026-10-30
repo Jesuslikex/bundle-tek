@@ -99,6 +99,19 @@ function mutate(
   a.dataBase64 = bytes.toString('base64');
 }
 describe('CPMM candidate SPL balance transition', () => {
+  it.each([110n, 111n])(
+    'enforces the encoded minimum at the exact boundary %s',
+    async (minimum) => {
+      const value = await fixture();
+      const data = Buffer.from(value.instruction.dataHex, 'hex');
+      data.writeBigUInt64LE(minimum, 16);
+      value.instruction.dataHex = data.toString('hex');
+      value.instruction.expected.minimumOutputRaw = minimum.toString();
+      const pending = inspectJitoCpmmCandidateBalanceTransition(value);
+      if (minimum === 110n) expect((await pending).outputRaw).toBe('110');
+      else await expect(pending).rejects.toThrow('refused');
+    },
+  );
   it.each([false, true])(
     'checks exact token conservation including native=%s without granting authority',
     async (native) => {
