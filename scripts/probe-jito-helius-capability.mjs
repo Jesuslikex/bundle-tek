@@ -5,10 +5,11 @@ import { build } from 'esbuild';
 
 // Diagnostic only: no signature material, submission method or environment write.
 async function main() {
+  const simulatorBank = process.argv[3] === '--simulator-bank';
   if (
     process.versions.node.split('.')[0] !== '24' ||
     process.argv[2] !== '--live-readonly' ||
-    process.argv.length !== 3
+    (process.argv.length !== 3 && !(simulatorBank && process.argv.length === 4))
   )
     throw Error('Startup scope refused');
   const endpoint = process.env.SOLANA_MAINNET_RPC_URL;
@@ -44,6 +45,9 @@ async function main() {
     captures = [];
   const summary = {
     provider: 'Helius',
+    mode: simulatorBank
+      ? 'simulator-selected-then-exact'
+      : 'ordinary-rpc-exact',
     node: process.versions.node,
     status: 'refused',
     stage: 'genesis',
@@ -74,7 +78,7 @@ async function main() {
         'getFeeForMessage',
         'getSlot',
       ].includes(method) ||
-      ++summary.calls > 6
+      ++summary.calls > (simulatorBank ? 7 : 6)
     )
       fail();
     await paceWalletRpc(endpoint, signal);
@@ -115,7 +119,7 @@ async function main() {
           ? 'method-not-found'
           : p.error?.code === -32602n &&
               p.error?.message ===
-                `bank not found for the provided slot: ${summary.floor}`
+                `bank not found for the provided slot: ${summary.requestedBankSlot ?? summary.floor}`
             ? 'bank-unavailable'
             : 'rpc-refusal';
       fail();
@@ -151,12 +155,11 @@ async function main() {
         'base64',
       ),
     );
-    summary.stage = 'exact-bank-bundle';
-    const result = await rpc('simulateBundle', [
+    const bundleParams = (bank) => [
       { encodedTransactions: packets },
       {
         transactionEncoding: 'base64',
-        simulationBank: { slot: summary.floor },
+        simulationBank: bank,
         skipSigVerify: true,
         replaceRecentBlockhash: false,
         preExecutionAccountsConfigs: packets.map(() => ({
@@ -168,10 +171,50 @@ async function main() {
           encoding: 'base64',
         })),
       },
-    ]);
+    ];
+    summary.requestedBankSlot = summary.floor;
+    if (simulatorBank) {
+      // Separate capability experiment, never a fallback or qualification input.
+      summary.stage = 'simulator-bank-discovery';
+      const discovery = await rpc(
+        'simulateBundle',
+        bundleParams({ commitment: { commitment: 'confirmed' } }),
+      );
+      summary.discoveryContextFields = Object.keys(discovery.context ?? {});
+      summary.discoverySlot = integer(discovery.context?.slot);
+      summary.discoverySucceeded = discovery.value?.summary === 'succeeded';
+      summary.discoveryFrames = Array.isArray(
+        discovery.value?.transactionResults,
+      )
+        ? discovery.value.transactionResults.map((row) => ({
+            preCount: row.preExecutionAccounts?.length ?? null,
+            postCount: row.postExecutionAccounts?.length ?? null,
+            error: row.err === null ? null : 'simulation-error',
+          }))
+        : null;
+      if (
+        summary.discoverySlot < summary.floor ||
+        summary.discoverySlot - summary.floor > 32 ||
+        !summary.discoverySucceeded ||
+        summary.discoveryFrames?.length !== 2 ||
+        summary.discoveryFrames.some(
+          (row) =>
+            row.error !== null ||
+            row.preCount !== addresses.length ||
+            row.postCount !== addresses.length,
+        )
+      )
+        fail();
+      summary.requestedBankSlot = summary.discoverySlot;
+    }
+    summary.stage = 'exact-bank-bundle';
+    const result = await rpc(
+      'simulateBundle',
+      bundleParams({ slot: summary.requestedBankSlot }),
+    );
     summary.contextFields = Object.keys(result.context ?? {});
     summary.simulationSlot = integer(result.context?.slot);
-    if (summary.simulationSlot !== summary.floor) fail();
+    if (summary.simulationSlot !== summary.requestedBankSlot) fail();
     const rows = result.value?.transactionResults;
     summary.bundleSucceeded = result.value?.summary === 'succeeded';
     if (!Array.isArray(rows) || rows.length !== 2) fail();
@@ -195,16 +238,19 @@ async function main() {
     summary.stage = 'separate-fee-observation';
     const fee = await rpc('getFeeForMessage', [
       messages[0].toString('base64'),
-      { commitment: 'confirmed', minContextSlot: summary.floor },
+      { commitment: 'confirmed', minContextSlot: summary.requestedBankSlot },
     ]);
     summary.feeSlot = integer(fee.context?.slot);
     summary.feeLamports = integer(fee.value);
-    if (summary.feeSlot < summary.floor || summary.feeSlot - summary.floor > 32)
+    if (
+      summary.feeSlot < summary.requestedBankSlot ||
+      summary.feeSlot - summary.floor > 32
+    )
       fail();
     summary.stage = 'final-slot';
     summary.finalSlot = integer(
       await rpc('getSlot', [
-        { commitment: 'confirmed', minContextSlot: summary.floor },
+        { commitment: 'confirmed', minContextSlot: summary.requestedBankSlot },
       ]),
     );
     if (

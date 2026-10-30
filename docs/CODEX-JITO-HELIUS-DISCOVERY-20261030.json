@@ -1,0 +1,115 @@
+{
+  "runs": [
+    {
+      "summary": {
+        "provider": "Helius",
+        "mode": "simulator-selected-then-exact",
+        "node": "24.22.1",
+        "status": "refused",
+        "stage": "simulator-bank-discovery",
+        "calls": 3,
+        "rateLimited": false,
+        "diagnosticOnly": true,
+        "bankVerified": false,
+        "feeBankVerified": false,
+        "fullSwapQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "lastHttpStatus": 200,
+        "floor": 463422965,
+        "requestedBankSlot": 463422965,
+        "rpcErrorCode": "-32602",
+        "refusal": "rpc-refusal"
+      },
+      "captures": [
+        {
+          "method": "getGenesisHash",
+          "httpStatus": 200,
+          "requestSha256": "b6df863d2691e7d417024a68756f6c64f608af714e8b9cbdccf2554909445a73",
+          "responseSha256": "40bd87eb2de76dce8f4b8b68d2433835df368b5899302d89b47df9bc8ce7e7de"
+        },
+        {
+          "method": "getLatestBlockhash",
+          "httpStatus": 200,
+          "requestSha256": "aae52519fce366b1ef451e92cec5e64be0feaece529ead90e50ef43c3f620307",
+          "responseSha256": "4eed3c52405d38b49b277e25344eebdb5d78cb10342f0d3e1595dc33c8fc8bab"
+        },
+        {
+          "method": "simulateBundle",
+          "httpStatus": 200,
+          "requestSha256": "154c926067bef0d6562b5cd4ed40d1cebd8672237f0510074fdefa84a14c6114",
+          "responseSha256": "4b2a8da36994966540842ed12a258b11a0116f1e1c1a2aceca03e9eb268b250d"
+        }
+      ]
+    },
+    {
+      "summary": {
+        "provider": "Helius",
+        "mode": "simulator-selected-then-exact",
+        "node": "24.22.1",
+        "status": "refused",
+        "stage": "exact-bank-bundle",
+        "calls": 4,
+        "rateLimited": false,
+        "diagnosticOnly": true,
+        "bankVerified": false,
+        "feeBankVerified": false,
+        "fullSwapQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "lastHttpStatus": 200,
+        "floor": 463423144,
+        "requestedBankSlot": 463423145,
+        "discoveryContextFields": [
+          "apiVersion",
+          "slot"
+        ],
+        "discoverySlot": 463423145,
+        "discoverySucceeded": true,
+        "discoveryFrames": [
+          {
+            "preCount": 5,
+            "postCount": 5,
+            "error": null
+          },
+          {
+            "preCount": 5,
+            "postCount": 5,
+            "error": null
+          }
+        ],
+        "rpcErrorCode": "-32602",
+        "refusal": "bank-unavailable"
+      },
+      "captures": [
+        {
+          "method": "getGenesisHash",
+          "httpStatus": 200,
+          "requestSha256": "b6df863d2691e7d417024a68756f6c64f608af714e8b9cbdccf2554909445a73",
+          "responseSha256": "40bd87eb2de76dce8f4b8b68d2433835df368b5899302d89b47df9bc8ce7e7de"
+        },
+        {
+          "method": "getLatestBlockhash",
+          "httpStatus": 200,
+          "requestSha256": "aae52519fce366b1ef451e92cec5e64be0feaece529ead90e50ef43c3f620307",
+          "responseSha256": "8009083fc362d98e0b54874c5c7d8bcd5e125aacaf283829682987daa76594e4"
+        },
+        {
+          "method": "simulateBundle",
+          "httpStatus": 200,
+          "requestSha256": "bc50015908e347767b96183e67aafc0f382a2d4792b9c7f1a8268162707c4f21",
+          "responseSha256": "bd665bfbe2231543cdafd0ac90a60a1cbb87e7668fd497a47392845022bb102e"
+        },
+        {
+          "method": "simulateBundle",
+          "httpStatus": 200,
+          "requestSha256": "5aaf18976be88e86091f1c396f72ad3ecfd4da2208e723d5d3a1003e0e66f8c9",
+          "responseSha256": "87d0ff4f5b3a94aba17b6bc69c8ae3beba60d602a0260dd4d4d51fb0d132aaa5"
+        }
+      ]
+    }
+  ],
+  "hashesVerified": true,
+  "identicalUnsignedPacketsVerified": true,
+  "fullSwapQualified": false
+}
