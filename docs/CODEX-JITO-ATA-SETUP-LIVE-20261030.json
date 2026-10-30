@@ -1,0 +1,158 @@
+{
+  "format": "jito-cpmm-ata-setup-live-diagnostics-v1",
+  "attempts": [
+    {
+      "format": "jito-cpmm-ata-setup-diagnostic-v1",
+      "observedAt": "2026-10-30T18:54:44.547Z",
+      "status": "refused",
+      "stage": "same-response-setup-simulation",
+      "floor": 463393506,
+      "lastSlot": null,
+      "calls": 3,
+      "responseBytes": 146218,
+      "rateLimited": false,
+      "rpcErrorCode": null,
+      "observations": {
+        "packet": {
+          "format": "jito-cpmm-ata-setup-packet-v1",
+          "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "blockhash": "7ReJMtcPW4Gw4vVzwUszCQmtQXnu85DEYq1m6VJ5uSvC",
+          "transactionSha256": "0430ec7646447b19b974060c1038c9eb3db274f1450aae1950f26aa47af0b6c1",
+          "messageSha256": "9842f68910ec8d55ef03eaf80938e7c26dd819c70645b34920bc9197b8c6001d",
+          "instructionBoundToPacket": true,
+          "sourceAuthenticated": false,
+          "bankVerified": false,
+          "providerQualified": false,
+          "programApproved": false,
+          "packetVerified": false,
+          "economicOutputVerified": false,
+          "runtimePrivilegesVerified": false,
+          "automaticExecutionAllowed": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "result": {
+          "status": "success",
+          "slot": 463393506,
+          "feeLamports": "5000",
+          "changedWritableAccounts": [
+            "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5"
+          ],
+          "err": null,
+          "preAccountCount": 8,
+          "postAccountCount": 2
+        }
+      },
+      "overridesUsed": false,
+      "replaceRecentBlockhash": false,
+      "ownershipClaimed": false,
+      "fullSwapQualified": false,
+      "bankVerified": false,
+      "independentFeeBankVerified": false,
+      "providerQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    },
+    {
+      "format": "jito-cpmm-ata-setup-diagnostic-v1",
+      "observedAt": "2026-10-30T18:55:44.959Z",
+      "status": "unsigned-ata-setup-observed",
+      "stage": "final-window",
+      "floor": 463393787,
+      "lastSlot": 463393791,
+      "calls": 4,
+      "responseBytes": 146273,
+      "rateLimited": false,
+      "rpcErrorCode": null,
+      "observations": {
+        "packet": {
+          "format": "jito-cpmm-ata-setup-packet-v1",
+          "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "blockhash": "AeumSByCMupmUFMQWsT3sz5FAiCFjetaosiVnzMTUUap",
+          "transactionSha256": "4fff186891bbf9d9f172830b4e4ee4bdb49a0eb856e650e0607763c0745b7508",
+          "messageSha256": "c7a9556ed398f451fbd399782cde3b01e8e5240148d4f12b0d1e223a49afbe2c",
+          "instructionBoundToPacket": true,
+          "sourceAuthenticated": false,
+          "bankVerified": false,
+          "providerQualified": false,
+          "programApproved": false,
+          "packetVerified": false,
+          "economicOutputVerified": false,
+          "runtimePrivilegesVerified": false,
+          "automaticExecutionAllowed": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "result": {
+          "status": "success",
+          "slot": 463393787,
+          "feeLamports": "5000",
+          "changedWritableAccounts": [
+            "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5"
+          ],
+          "err": null,
+          "preAccountCount": 8,
+          "postAccountCount": 2
+        },
+        "lookupCounts": {
+          "readonly": 0,
+          "writable": 0
+        },
+        "clockTimestamp": "1793386543",
+        "transition": {
+          "format": "jito-cpmm-ata-setup-rent-v1",
+          "slot": 463393787,
+          "transactionSha256": "4fff186891bbf9d9f172830b4e4ee4bdb49a0eb856e650e0607763c0745b7508",
+          "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+          "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+          "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+          "requiredMintRentLamports": "1066800",
+          "createdAccountBytes": 165,
+          "createdRentLamports": "1488440",
+          "feeLamports": "5000",
+          "maximumFeeLamports": "10000",
+          "reserveLamports": "0",
+          "remainingLamports": "6912720",
+          "requiredSystemRentLamports": "650240",
+          "exactPayerDebitChecked": true,
+          "emptyCanonicalAccountChecked": true,
+          "feeBankVerified": false,
+          "accountProvenanceVerified": false,
+          "sourceAuthenticated": false,
+          "bankVerified": false,
+          "providerQualified": false,
+          "programApproved": false,
+          "packetVerified": false,
+          "economicOutputVerified": false,
+          "runtimePrivilegesVerified": false,
+          "automaticExecutionAllowed": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        }
+      },
+      "overridesUsed": false,
+      "replaceRecentBlockhash": false,
+      "ownershipClaimed": false,
+      "fullSwapQualified": false,
+      "bankVerified": false,
+      "independentFeeBankVerified": false,
+      "providerQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0
+    }
+  ],
+  "limits": [
+    "Public reference only; no ownership, signing or transaction submission.",
+    "Setup simulation only; no swap, independent fee bank, final code scan or qualification.",
+    "First refusal retained; exact empty v0 lookup metadata validated in final run."
+  ]
+}

@@ -38,6 +38,14 @@ The 25 new tests use SDK-built USDC/WSOL setup packets and exercise substitution
 
 The final exact-archive diagnostic also repeats with the final confirmed read floored at the later confirmed bracket: bank slot 463392601, final confirmed slot 463392608, seven-slot span, eight calls and no 429. The destination was again absent at that independently observed slot. The third receipt is preserved alongside both earlier outcomes. No comparison is promoted to wallet ownership, quietness or bank/fee attestation.
 
+### Live unsigned ATA setup
+
+The bounded `scripts/probe-jito-cpmm-ata-setup.ts --live-readonly` diagnostic uses the existing Alchemy configuration and only genesis, blockhash, simulation and slot reads. It never signs, submits, funds a wallet, or changes provider settings. One zero-signature SDK-built CreateIdempotent packet creates the missing USDC ATA inside the archive simulation overlay only. Before-images contain all six packet accounts plus Clock and Rent; after-images contain the two actual writable accounts. No readonly post-images are invented.
+
+The first run's simulation succeeded, but the diagnostic refused its lookup metadata because the initial parser incorrectly expected `null` for a v0 message. Actual metadata was exactly `{readonly: [], writable: []}`. The v0 diagnostic now requires both arrays empty with exactly those two fields; nonempty, missing or extraneous mapping still refuses. No swap/group parser or financial policy changed. Both outcomes are retained in `CODEX-JITO-ATA-SETUP-LIVE-20261030.json`.
+
+The final sample at slot 463393787 passed the packet, status, no-replacement, exact writable-set, Clock equality/wall-time, token layout, mint policy, rent, upfront fee-cap and payer reserve checks. It charged 1,488,440 simulated lamports of actual account rent plus a 5,000-lamport fee, leaving 6,912,720 lamports above the 650,240 System-account minimum. Four RPC reads, 146,273 response bytes, final slot 463393791 (four slots), no 429, no state override and no blockhash replacement. This proves the native/token setup arithmetic in that response, not independently verified fees, program-code brackets, current validator/bank identity, real wallet ownership, or a pool swap. All authority and full-swap qualification flags remain false.
+
 These checks are isolated research code and are not connected to the Jito qualification, UI, signing or sending paths. They retain `sourceAuthenticated`, `programApproved`, `packetVerified`, `economicOutputVerified`, `providerQualified`, `signingAllowed`, and `executionAllowed` as false. No policy, slot, bank, signing or execution guard was changed.
 
 ## Implemented
