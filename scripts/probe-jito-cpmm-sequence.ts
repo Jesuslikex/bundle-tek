@@ -45,6 +45,16 @@ import {
 import { requireJitoCpmmSetupResearchIdentities } from '../lib/jito-cpmm-source-identity';
 import { createJitoQualificationTransport } from '../lib/jito-qualification-transport';
 import { inspectSwapMintAccount } from '../lib/swap-token-program-evidence';
+import {
+  captureJitoCpmmLifetime,
+  recheckJitoCpmmLifetime,
+} from '../lib/jito-cpmm-lifetime';
+import { snapshotJitoEvidence } from '../lib/jito-evidence-json';
+import { inspectJitoSimulationDecimal } from '../lib/jito-simulation-json';
+import type { PumpLaunchRpc } from '../lib/pump-launch-simulation';
+import { inspectJitoCpmmSparseSwapState } from '../lib/jito-cpmm-state-replay';
+import { observeTokenMarket, type TokenMarket } from '../lib/token-market';
+import { readJitoCpmmPriceComparison } from '../lib/jito-cpmm-price-evidence';
 const PAYER = '2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo',
   TIP = '96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5';
 const SYSTEM = '11111111111111111111111111111111',
@@ -124,7 +134,7 @@ function exactWrites(v: unknown, keys: string[]) {
     return fail();
 }
 function noLookups(value: unknown, legacy: boolean) {
-  if (legacy) return value === null;
+  if (legacy && value === null) return true;
   if (
     !value ||
     typeof value !== 'object' ||
@@ -141,8 +151,11 @@ function noLookups(value: unknown, legacy: boolean) {
   );
 }
 async function main() {
+  const withMarket =
+    process.argv.length === 5 && process.argv[4] === '--with-market-comparison';
   const withCode =
-    process.argv.length === 4 && process.argv[3] === '--with-code-bracket';
+    (process.argv.length === 4 || withMarket) &&
+    process.argv[3] === '--with-code-bracket';
   if (
     (!withCode && process.argv.length !== 3) ||
     process.argv[2] !== '--live-readonly'
@@ -178,26 +191,34 @@ async function main() {
   > | null = null;
   let firstCode: JitoRuntimeCapture | null = null,
     lastCode: JitoRuntimeCapture | null = null;
-  async function rpc(method: string, params: unknown[]) {
+  let lifetime: Awaited<ReturnType<typeof captureJitoCpmmLifetime>> | null =
+    null;
+  let lifetimeFloor = 0;
+  let firstCodeReady: Promise<JitoRuntimeCapture> | null = null;
+  let markets: Promise<PromiseSettledResult<TokenMarket>[]> | null = null;
+  async function rpc(method: string, params: unknown[], readSignal = signal) {
+    const requestSignal = AbortSignal.any([signal, readSignal]);
+    const callId = ++calls;
     if (
       ![
         'getGenesisHash',
         'getLatestBlockhash',
         'simulateTransactionsAtSlot',
         'getSlot',
-        ...(withCode ? ['getMultipleAccounts'] : []),
+        'getMultipleAccounts',
+        ...(withCode ? ['isBlockhashValid', 'getBlockHeight'] : []),
       ].includes(method) ||
-      ++calls > (withCode ? 7 : 5)
+      callId > (withCode ? 11 : 5)
     )
       return fail();
-    await paceWalletRpc(endpoint, signal);
-    const id = 'cpmm-sequence:' + calls,
+    await paceWalletRpc(endpoint, requestSignal);
+    const id = 'cpmm-sequence:' + callId,
       request = JSON.stringify({ jsonrpc: '2.0', id, method, params });
     const r = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: request,
-      signal,
+      signal: requestSignal,
       redirect: 'error',
       cache: 'no-store',
     });
@@ -212,7 +233,7 @@ async function main() {
     // Every slot, fee and account lamport below still requires exact bigint.
     let body;
     try {
-      body = await readJitoSimulationPayload(r.body, signal, 1048576, {
+      body = await readJitoSimulationPayload(r.body, requestSignal, 1048576, {
         allowDecimalTokens: true,
       });
     } catch (error) {
@@ -241,8 +262,71 @@ async function main() {
       return fail();
     }
     if (!Object.hasOwn(p, 'result')) return fail();
+    const result = p.result as {
+      context?: { slot?: unknown };
+      value?: unknown;
+    } | null;
+    const trace = (observations.rpcEvidence ??= []) as unknown[];
+    trace.push({
+      method,
+      slot:
+        typeof result?.context?.slot === 'bigint'
+          ? result.context.slot.toString()
+          : null,
+      ...(method === 'isBlockhashValid'
+        ? { valid: result?.value === true }
+        : {}),
+      ...(method === 'getBlockHeight'
+        ? {
+            blockHeight:
+              typeof p.result === 'bigint' ? p.result.toString() : 'invalid',
+          }
+        : {}),
+    });
     return p.result;
   }
+  function lifetimeValue(v: unknown): unknown {
+    if (typeof v === 'bigint') return v.toString();
+    if (v === null || typeof v === 'string' || typeof v === 'boolean') return v;
+    if (inspectJitoSimulationDecimal(v) !== null) return fail();
+    if (Array.isArray(v)) return v.map(lifetimeValue);
+    if (v && typeof v === 'object')
+      return Object.fromEntries(
+        Object.entries(v).map(([k, value]) => [k, lifetimeValue(value)]),
+      );
+    return fail();
+  }
+  const lifetimeRpc: PumpLaunchRpc = async (method, params, readSignal) => {
+    if (
+      ![
+        'getGenesisHash',
+        'getLatestBlockhash',
+        'isBlockhashValid',
+        'getBlockHeight',
+      ].includes(method)
+    )
+      return fail();
+    if (method === 'getLatestBlockhash' && firstCodeReady) {
+      const completed = await firstCodeReady;
+      lifetimeFloor = Math.max(lifetimeFloor, completed.maximumSlot);
+    }
+    const copy = snapshotJitoEvidence(params, 4096);
+    if (method !== 'getGenesisHash') {
+      const i = method === 'isBlockhashValid' ? 1 : 0;
+      const config = copy[i] as Record<string, unknown>;
+      if (
+        !config ||
+        typeof config.minContextSlot !== 'number' ||
+        !Number.isSafeInteger(config.minContextSlot)
+      )
+        return fail();
+      copy[i] = {
+        ...config,
+        minContextSlot: Math.max(config.minContextSlot, lifetimeFloor),
+      };
+    }
+    return lifetimeValue(await rpc(method, copy, readSignal));
+  };
   try {
     if ((await rpc('getGenesisHash', [])) !== SOLANA_MAINNET_GENESIS)
       return fail();
@@ -256,6 +340,12 @@ async function main() {
     floor = integer(latest.context.slot);
     if (floor < 1) return fail();
     simulationSlot = floor;
+    if (withMarket)
+      markets = Promise.allSettled(
+        [WSOL, USDC].map((mint) =>
+          observeTokenMarket({ chain: 'Solana', address: mint }, signal),
+        ),
+      );
     const payer = createNoopSigner(address(PAYER));
     const [source] = await findAssociatedTokenPda({
       owner: payer.address,
@@ -299,18 +389,37 @@ async function main() {
         floor,
         signal,
       );
-      firstCode = await collectJitoCpmmSetupResearchRuntimeEvidence(
+      firstCodeReady = collectJitoCpmmSetupResearchRuntimeEvidence(
         keys.slice(),
         floor,
         floor,
         signal,
         codeTransport.rpc,
       );
-      observations.firstCode = firstCode;
-      stage = 'quote-blockhash-after-first-code-scan';
-      latest = (await rpc('getLatestBlockhash', [
-        { commitment: 'confirmed', minContextSlot: firstCode.maximumSlot },
-      ])) as typeof latest;
+      stage = 'first-code-and-issued-lifetime';
+      const initial = await Promise.allSettled([
+        firstCodeReady,
+        captureJitoCpmmLifetime(floor, lifetimeRpc, signal),
+      ]);
+      if (initial[0].status === 'fulfilled') {
+        firstCode = initial[0].value;
+        observations.firstCode = firstCode;
+      }
+      if (initial[1].status === 'fulfilled') lifetime = initial[1].value;
+      if (
+        !firstCode ||
+        !lifetime ||
+        initial.some((result) => result.status !== 'fulfilled')
+      )
+        return fail();
+      observations.lifetimeCapture = lifetime;
+      latest = {
+        context: { slot: BigInt(lifetime.slot) },
+        value: {
+          blockhash: lifetime.blockhash,
+          lastValidBlockHeight: BigInt(lifetime.lastValidBlockHeight),
+        },
+      };
       simulationSlot = integer(latest.context.slot);
       if (simulationSlot < firstCode.maximumSlot || simulationSlot - floor > 32)
         return fail();
@@ -517,7 +626,13 @@ async function main() {
         sigVerify: false,
         replaceRecentBlockhash: false,
       },
-    ])) as typeof initial;
+    ])) as {
+      context: { slot: unknown };
+      value: {
+        preExecutionAccounts: unknown;
+        simulationResults: Record<string, unknown>[];
+      };
+    };
     if (
       integer(result.context.slot) !== simulationSlot ||
       !Array.isArray(result.value.simulationResults) ||
@@ -535,6 +650,16 @@ async function main() {
         ? row.postExecutionAccounts.length
         : null,
     }));
+    observations.lookupCounts = rows.map((row) => {
+      const v = row.loadedAddresses as {
+        readonly?: unknown;
+        writable?: unknown;
+      } | null;
+      return {
+        readonly: Array.isArray(v?.readonly) ? v.readonly.length : null,
+        writable: Array.isArray(v?.writable) ? v.writable.length : null,
+      };
+    });
     if (
       rows.some(
         (row, i) =>
@@ -549,12 +674,28 @@ async function main() {
       return fail();
     stage = 'observed-mutable-effects';
     const base = image(result.value.preExecutionAccounts, keys);
-    if (
-      keys.some(
+    const prestateDifferences = keys
+      .filter(
         (key) => JSON.stringify(base.get(key)) !== JSON.stringify(pre.get(key)),
       )
-    )
-      return fail();
+      .map((key) => ({
+        address: key,
+        fields: ['owner', 'executable', 'lamports', 'data'].filter(
+          (field) =>
+            JSON.stringify(
+              (base.get(key) as unknown as Record<string, unknown> | null)?.[
+                field
+              ],
+            ) !==
+            JSON.stringify(
+              (pre.get(key) as unknown as Record<string, unknown> | null)?.[
+                field
+              ],
+            ),
+        ),
+      }));
+    observations.prestateDifferences = prestateDifferences;
+    if (prestateDifferences.length) return fail();
     const expectedWrites = [
       [PAYER, destination as string],
       [
@@ -618,6 +759,35 @@ async function main() {
         after: tokenKeys.map((key) => raw(key, posts[1].get(key))),
       },
     );
+    stage = 'actual-pool-oracle-and-rent-replay';
+    const replayKeys = [
+      POOL,
+      source as string,
+      destination as string,
+      VAULT0,
+      VAULT1,
+      CONFIG,
+      ORACLE,
+      PAIR_CLOCK,
+      WSOL,
+      USDC,
+      PAIR_RENT,
+    ];
+    observations.writableReplay = await inspectJitoCpmmSparseSwapState(
+      {
+        packet,
+        minimumSlot: floor,
+        slot: simulationSlot,
+        before: replayKeys.map((key) =>
+          raw(key, key === destination ? posts[0].get(key) : base.get(key)),
+        ),
+        after: replayKeys
+          .filter((key) => posts[1].has(key))
+          .map((key) => raw(key, posts[1].get(key))),
+      },
+      signal,
+    );
+    stage = 'native-fee-rent-and-tip-conservation';
     for (const [i, post] of posts.entries()) {
       const fee = rows[i].feeLamports as bigint;
       if (fee < 1n || fee > 10000n) return fail();
@@ -651,6 +821,68 @@ async function main() {
     observations.readonlyPostCoverage = false;
     observations.poolAndOracleReplayComplete = false;
     observations.allThreeStatusesSuccessful = true;
+    if (withMarket) {
+      stage = 'independent-market-comparison';
+      if (!markets) return fail();
+      const prices = await markets;
+      observations.marketReadStatuses = prices.map((value) => value.status);
+      if (prices.some((value) => value.status !== 'fulfilled')) return fail();
+      const observed = prices.map(
+        (value) => (value as PromiseFulfilledResult<TokenMarket>).value,
+      );
+      const selections = observed.map(
+        (value) =>
+          value.pairs.find(
+            (pair) => pair.address !== POOL && pair.priceUsd !== null,
+          )?.address,
+      );
+      if (selections.some((value) => !value)) return fail();
+      const originalFloor = floor,
+        originalSlot = simulationSlot;
+      // Explicit supplied-state adapter, not another live mint bracket. Mint
+      // policy is rechecked on chain after the final code scan below.
+      const suppliedMints: PumpLaunchRpc = async (method, params, s) => {
+        s.throwIfAborted();
+        const requested = params[0] as string[],
+          cfg = params[1] as { minContextSlot: number };
+        if (
+          method !== 'getMultipleAccounts' ||
+          JSON.stringify(requested) !==
+            JSON.stringify([WSOL, USDC, PAIR_RENT]) ||
+          !cfg ||
+          !Number.isSafeInteger(cfg.minContextSlot) ||
+          cfg.minContextSlot < originalFloor ||
+          cfg.minContextSlot > originalSlot
+        )
+          return fail();
+        return {
+          context: { slot: String(originalSlot) },
+          value: requested.map((key) => base.get(key)),
+        };
+      };
+      observations.marketComparison = await readJitoCpmmPriceComparison(
+        packet,
+        { inputPair: selections[0]!, outputPair: selections[1]! },
+        floor,
+        suppliedMints,
+        signal,
+        {
+          observe: async (source) => {
+            const value = observed.find(
+              (value) => value.address === source.address,
+            );
+            if (!value) return fail();
+            return value;
+          },
+        },
+      );
+      observations.marketComparisonMintEvidence =
+        'supplied-archive-prestate-with-later-live-policy-recheck';
+      observations.marketSelectionPolicy =
+        'first-priced-base-token-pair-by-existing-liquidity-sort-excluding-execution-pool';
+      if (!(observations.marketComparison as { available: boolean }).available)
+        return fail();
+    }
     if (withCode) {
       if (!firstCode || !codeTransport) return fail();
       stage = 'final-four-program-code-scan';
@@ -673,7 +905,9 @@ async function main() {
       )
         return fail();
       observations.fourProgramArtifactBracketObserved = true;
-      stage = 'post-code-custody-and-mint-read';
+      stage = 'post-code-custody-mint-and-lifetime';
+      if (!lifetime) return fail();
+      lifetimeFloor = lastCode.maximumSlot;
       const custodyKeys = [
         PAYER,
         source as string,
@@ -683,14 +917,29 @@ async function main() {
         PAIR_RENT,
         PAIR_CLOCK,
       ];
-      const custody = (await rpc('getMultipleAccounts', [
-        custodyKeys,
-        {
-          commitment: 'confirmed',
-          encoding: 'base64',
-          minContextSlot: lastCode.maximumSlot,
-        },
-      ])) as { context: { slot: unknown }; value: unknown[] };
+      const settled = await Promise.allSettled([
+        rpc('getMultipleAccounts', [
+          custodyKeys,
+          {
+            commitment: 'confirmed',
+            encoding: 'base64',
+            minContextSlot: lastCode.maximumSlot,
+          },
+        ]),
+        recheckJitoCpmmLifetime(packet, lifetime, lastCode.maximumSlot, signal),
+      ]);
+      observations.lifetimeRecheckStatus = settled[1].status;
+      if (settled[1].status === 'fulfilled')
+        observations.lifetime = settled[1].value;
+      if (
+        settled[0].status !== 'fulfilled' ||
+        settled[1].status !== 'fulfilled'
+      )
+        return fail();
+      const custody = settled[0].value as {
+        context: { slot: unknown };
+        value: unknown[];
+      };
       const custodySlot = integer(custody.context.slot);
       if (
         custodySlot < lastCode.maximumSlot ||
@@ -726,7 +975,10 @@ async function main() {
       }
       observations.custodyCheckedFromSimulationBase = true;
       observations.postCodeMintPoliciesMatched = true;
-      observations.finalReadFloor = custodySlot;
+      observations.finalReadFloor = Math.max(
+        custodySlot,
+        settled[1].value.validitySlot,
+      );
     }
     stage = 'final-window';
     lastSlot = integer(
@@ -750,6 +1002,7 @@ async function main() {
     process.exitCode = 1;
   }
   codeTransport?.close();
+  if (markets) await markets;
   const receipt = {
     format: 'jito-cpmm-sequence-diagnostic-v1',
     observedAt: new Date().toISOString(),
@@ -767,7 +1020,9 @@ async function main() {
     rpcErrorCode,
     observations,
     codeTransport: codeTransport?.summary() ?? null,
-    lifetimeRecheckedAfterFinalCode: false,
+    lifetimeRecheckedAfterFinalCode:
+      observations.lifetimeRecheckStatus === 'fulfilled',
+    marketComparisonRequested: withMarket,
     overridesUsed: false,
     replaceRecentBlockhash: false,
     referenceQuietnessVerified: false,

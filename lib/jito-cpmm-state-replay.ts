@@ -80,6 +80,29 @@ export async function replayJitoCpmmSwapState(
   },
   signal: AbortSignal,
 ) {
+  return replayState(input, signal, false);
+}
+
+/** Checks only actually returned writable post-images. Never supplies missing
+ * readonly post-state or satisfies the complete-frame qualification contract. */
+export async function inspectJitoCpmmSparseSwapState(
+  input: Parameters<typeof replayJitoCpmmSwapState>[0],
+  signal: AbortSignal,
+) {
+  const result = await replayState(input, signal, true);
+  return {
+    ...result,
+    format: 'jito-cpmm-sparse-state-replay-v1' as const,
+    readonlyPostCoverage: false as const,
+    fullSwapQualified: false as const,
+  };
+}
+
+async function replayState(
+  input: Parameters<typeof replayJitoCpmmSwapState>[0],
+  signal: AbortSignal,
+  sparse: boolean,
+) {
   signal = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
   const value = snapshotJitoEvidence(input, 65536);
   if (
@@ -110,8 +133,9 @@ export async function replayJitoCpmmSwapState(
     bound.outputMint,
     PAIR_RENT,
   ];
-  function accounts(raw: Raw[]) {
-    if (!Array.isArray(raw) || raw.length !== keys.length) return fail();
+  const writableKeys = [...keys.slice(0, 5), bound.observation];
+  function accounts(raw: Raw[], expected: string[]) {
+    if (!Array.isArray(raw) || raw.length !== expected.length) return fail();
     const out = new Map<string, Raw>();
     for (const a of raw) {
       if (
@@ -120,7 +144,7 @@ export async function replayJitoCpmmSwapState(
         !['address', 'owner', 'executable', 'lamports', 'dataBase64'].every(
           (k) => Object.hasOwn(a, k),
         ) ||
-        !keys.includes(a.address) ||
+        !expected.includes(a.address) ||
         out.has(a.address) ||
         typeof a.owner !== 'string' ||
         typeof a.executable !== 'boolean' ||
@@ -136,9 +160,9 @@ export async function replayJitoCpmmSwapState(
     }
     return out;
   }
-  const pre = accounts(value.before),
-    post = accounts(value.after);
-  for (const k of keys) {
+  const pre = accounts(value.before, keys),
+    post = accounts(value.after, sparse ? writableKeys : keys);
+  for (const k of sparse ? writableKeys : keys) {
     const a = pre.get(k)!,
       b = post.get(k)!;
     if (a.owner !== b.owner || a.executable !== b.executable) return fail();

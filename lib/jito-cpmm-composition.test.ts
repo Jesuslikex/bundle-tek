@@ -567,7 +567,7 @@ it.each([
 ])(
   'replays pool fees, epoch, rent and oracle bytes for $reverse/$initialized/$index/$elapsed',
   async (scenario) => {
-    const { replayJitoCpmmSwapState } =
+    const { replayJitoCpmmSwapState, inspectJitoCpmmSparseSwapState } =
       await import('./jito-cpmm-state-replay');
     const f = await fixture(scenario.reverse),
       signal = new AbortController().signal;
@@ -701,6 +701,45 @@ it.each([
       bankVerified: false,
       signingAllowed: false,
     });
+    const writable = [
+      bound.pool,
+      bound.source,
+      bound.destination,
+      bound.inputVault,
+      bound.outputVault,
+      bound.observation,
+    ];
+    const sparse = {
+      ...request,
+      after: request.after.filter((a) => writable.includes(a.address)),
+    };
+    expect(await inspectJitoCpmmSparseSwapState(sparse, signal)).toMatchObject({
+      format: 'jito-cpmm-sparse-state-replay-v1',
+      poolTransitionChecked: true,
+      oracleTransitionChecked: true,
+      tokenTransitionChecked: true,
+      rentCoverageChecked: true,
+      outputRaw: quote.expectedOutputRaw,
+      readonlyPostCoverage: false,
+      fullSwapQualified: false,
+      bankVerified: false,
+      signingAllowed: false,
+    });
+    await expect(replayJitoCpmmSwapState(sparse, signal)).rejects.toThrow();
+    await expect(
+      inspectJitoCpmmSparseSwapState(request, signal),
+    ).rejects.toThrow();
+    for (const invalid of [
+      sparse.after.slice(1),
+      [...sparse.after.slice(1), sparse.after[1]],
+      sparse.after.map((a) => ({
+        ...a,
+        address: a.address === bound.pool ? f.config : a.address,
+      })),
+    ])
+      await expect(
+        inspectJitoCpmmSparseSwapState({ ...sparse, after: invalid }, signal),
+      ).rejects.toThrow();
     for (const [key, offset] of [
       [f.pool, 333],
       [f.pool, protocol],
@@ -718,10 +757,29 @@ it.each([
       b[offset] ^= 1;
       a.dataBase64 = b.toString('base64');
       await expect(replayJitoCpmmSwapState(bad, signal)).rejects.toThrow();
+      if (writable.includes(key))
+        await expect(
+          inspectJitoCpmmSparseSwapState(
+            {
+              ...bad,
+              after: bad.after.filter((a) => writable.includes(a.address)),
+            },
+            signal,
+          ),
+        ).rejects.toThrow();
     }
     const rentLoss = structuredClone(request);
     rentLoss.after.find((a) => a.address === f.pool)!.lamports = '0';
     await expect(replayJitoCpmmSwapState(rentLoss, signal)).rejects.toThrow();
+    await expect(
+      inspectJitoCpmmSparseSwapState(
+        {
+          ...rentLoss,
+          after: rentLoss.after.filter((a) => writable.includes(a.address)),
+        },
+        signal,
+      ),
+    ).rejects.toThrow();
   },
 );
 

@@ -1,0 +1,1611 @@
+{
+  "format": "jito-cpmm-lifetime-and-pool-diagnostics-v1",
+  "attempts": [
+    {
+      "observedAt": "2026-10-30T19:24:36.889Z",
+      "status": "refused",
+      "stage": "full-setup-swap-tip-simulation",
+      "floor": 463401860,
+      "simulationSlot": 463401872,
+      "lastSlot": null,
+      "calls": 6,
+      "responseBytes": 321738,
+      "rateLimited": false,
+      "responseDecodeReason": null,
+      "rpcErrorCode": null,
+      "lifetimeRecheckedAfterFinalCode": false,
+      "captureSha256": "d6aaf22dd6a07a0a92c5a1e922fbd4f0ec35f8bd232b2f8dbce2df98ff781461",
+      "spanSlots": null,
+      "codeScans": {
+        "firstCode": {
+          "minimumSlot": 463401860,
+          "minimumReadSlot": 463401860,
+          "maximumSlot": 463401870,
+          "reads": 10,
+          "sha256": "2ca88b87f91b91cc9b48c10c1280234994472c632820ab2acb9958aef70f704c"
+        },
+        "lastCode": null
+      },
+      "ordinaryRpcEvidence": [
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463401860"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463401872"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463401872"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463401872"
+        }
+      ],
+      "codeReadCount": 10,
+      "quote": {
+        "inputRaw": "1000000",
+        "minimumOutputRaw": "93917",
+        "expectedOutputRaw": "93917",
+        "grossOutputRaw": "93917",
+        "inputCurveAmountRaw": "999950",
+        "tradeFeeRaw": "50",
+        "creatorFeeRaw": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeRaw": "6",
+        "fundFeeRaw": "2",
+        "sourceProfile": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+        "programApproved": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "minimumPolicy": "exact-source-expected-output",
+        "pool": "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2"
+      },
+      "setup": null,
+      "tokenTransition": null,
+      "writableReplay": null,
+      "lifetimeCapture": {
+        "blockhash": "EEAahS9byWzFiZAcZMvrp7szfgbPLU1raAU9d4Qon27N",
+        "lastValidBlockHeight": "441424318",
+        "minimumSlot": 463401860,
+        "slot": 463401872,
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetime": null,
+      "postCodeCustody": null,
+      "marketComparison": null,
+      "marketComparisonMintEvidence": null,
+      "prestateProbe": {
+        "purpose": "read-only-base-state",
+        "amountRaw": "1000",
+        "independentFromFinalBundle": true
+      },
+      "simulationResults": [
+        {
+          "slot": 463401872,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463401872,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 7
+        },
+        {
+          "slot": 463401872,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        }
+      ],
+      "lookupCounts": null,
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0,
+      "ordinaryRequestIdsUnique": true,
+      "diagnosis": "Legacy empty lookup arrays refused by diagnostic parser; exact empty metadata now admitted, nonempty/missing/extra fields still refuse."
+    },
+    {
+      "observedAt": "2026-10-30T19:25:10.388Z",
+      "status": "refused",
+      "stage": "final-window",
+      "floor": 463402003,
+      "simulationSlot": 463402015,
+      "lastSlot": 463402037,
+      "calls": 11,
+      "responseBytes": 323668,
+      "rateLimited": false,
+      "responseDecodeReason": null,
+      "rpcErrorCode": null,
+      "lifetimeRecheckedAfterFinalCode": true,
+      "captureSha256": "5a07d16d25e009cfe2657181eb3d976d0225557f3a5181d135fcf86b48c5b7de",
+      "spanSlots": 34,
+      "codeScans": {
+        "firstCode": {
+          "minimumSlot": 463402003,
+          "minimumReadSlot": 463402003,
+          "maximumSlot": 463402013,
+          "reads": 10,
+          "sha256": "c17b120df45b05b9f774247cb4753e401eb1253036c2981ae67b38ab11f68287"
+        },
+        "lastCode": {
+          "minimumSlot": 463402003,
+          "minimumReadSlot": 463402015,
+          "maximumSlot": 463402032,
+          "reads": 10,
+          "sha256": "316947c97ca64b0ec3ebdba6b31ffa763477d735fdbdc35700a6151884f5a8bc"
+        }
+      },
+      "ordinaryRpcEvidence": [
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463402003"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463402015"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463402015"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463402015"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "slot": "463402034"
+        },
+        {
+          "method": "isBlockhashValid",
+          "slot": "463402035",
+          "valid": true
+        },
+        {
+          "method": "getBlockHeight",
+          "slot": null,
+          "blockHeight": "441424332"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getSlot",
+          "slot": null
+        }
+      ],
+      "codeReadCount": 20,
+      "quote": {
+        "inputRaw": "1000000",
+        "minimumOutputRaw": "93952",
+        "expectedOutputRaw": "93952",
+        "grossOutputRaw": "93952",
+        "inputCurveAmountRaw": "999950",
+        "tradeFeeRaw": "50",
+        "creatorFeeRaw": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeRaw": "6",
+        "fundFeeRaw": "2",
+        "sourceProfile": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+        "programApproved": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "minimumPolicy": "exact-source-expected-output",
+        "pool": "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2"
+      },
+      "setup": {
+        "format": "jito-cpmm-ata-setup-rent-v1",
+        "slot": 463402015,
+        "transactionSha256": "635771a7eab34e0758342fe341efccf590d305324ebd44682ac3574adb128f1c",
+        "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+        "requiredMintRentLamports": "1066800",
+        "createdAccountBytes": 165,
+        "createdRentLamports": "1488440",
+        "feeLamports": "5000",
+        "maximumFeeLamports": "10000",
+        "reserveLamports": "0",
+        "remainingLamports": "6932720",
+        "requiredSystemRentLamports": "650240",
+        "exactPayerDebitChecked": true,
+        "emptyCanonicalAccountChecked": true,
+        "feeBankVerified": false,
+        "accountProvenanceVerified": false,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "runtimePrivilegesVerified": false,
+        "automaticExecutionAllowed": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "tokenTransition": {
+        "format": "jito-cpmm-packet-balances-v1",
+        "inputRaw": "1000000",
+        "outputRaw": "93952",
+        "sourceAuthenticated": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "accountProvenanceVerified": false,
+        "priceVerified": false,
+        "bankVerified": false,
+        "economicOutputVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "transactionSha256": "93dc0b687c925ac93fbaadeee8b4e645bf90161fd67ffad8b3f74f2ab0558093",
+        "messageSha256": "8bad256e7438f92a0aa16d2548ed98b2d980ff5f743513d87966c88031dad0d5",
+        "instructionBoundToPacket": true
+      },
+      "writableReplay": null,
+      "lifetimeCapture": {
+        "blockhash": "64oEEg4WYf75kkXycLL8CwnqeYfELcnxow6R2Cipr6ZJ",
+        "lastValidBlockHeight": "441424461",
+        "minimumSlot": 463402003,
+        "slot": 463402015,
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetime": {
+        "format": "jito-cpmm-lifetime-observation-v1",
+        "transactionSha256": "93dc0b687c925ac93fbaadeee8b4e645bf90161fd67ffad8b3f74f2ab0558093",
+        "blockhash": "64oEEg4WYf75kkXycLL8CwnqeYfELcnxow6R2Cipr6ZJ",
+        "lastValidBlockHeight": "441424461",
+        "blockHeight": "441424332",
+        "minimumSlot": 463402003,
+        "validitySlot": 463402035,
+        "remainingBlocks": "129",
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "postCodeCustody": {
+        "slot": 463402034,
+        "comparisons": [
+          {
+            "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "beforeLamports": "8426160",
+            "afterLamports": "8426160",
+            "same": true
+          },
+          {
+            "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+            "beforeLamports": "619487706",
+            "afterLamports": "619487706",
+            "same": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "beforeLamports": null,
+            "afterLamports": null,
+            "same": true
+          }
+        ]
+      },
+      "marketComparison": null,
+      "marketComparisonMintEvidence": null,
+      "prestateProbe": {
+        "purpose": "read-only-base-state",
+        "amountRaw": "1000",
+        "independentFromFinalBundle": true
+      },
+      "simulationResults": [
+        {
+          "slot": 463402015,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463402015,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 7
+        },
+        {
+          "slot": 463402015,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        }
+      ],
+      "lookupCounts": [
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0,
+      "ordinaryRequestIdsUnique": false
+    },
+    {
+      "observedAt": "2026-10-30T19:29:25.518Z",
+      "status": "refused",
+      "stage": "observed-mutable-effects",
+      "floor": 463403219,
+      "simulationSlot": 463403232,
+      "lastSlot": null,
+      "calls": 6,
+      "responseBytes": 319517,
+      "rateLimited": false,
+      "responseDecodeReason": null,
+      "rpcErrorCode": null,
+      "lifetimeRecheckedAfterFinalCode": false,
+      "captureSha256": "1ea8689ff931cf3b4ff76a87fc63ed0010dee471fc11c635a2c93978c039f56d",
+      "spanSlots": null,
+      "codeScans": {
+        "firstCode": {
+          "minimumSlot": 463403219,
+          "minimumReadSlot": 463403219,
+          "maximumSlot": 463403230,
+          "reads": 10,
+          "sha256": "01ed46fe45d395df372ad73203a6673c00a84af45a294358727b7e6227fc6cd4"
+        },
+        "lastCode": null
+      },
+      "ordinaryRpcEvidence": [
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463403219"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463403231"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "slot": "463403232"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463403232"
+        }
+      ],
+      "codeReadCount": 10,
+      "quote": {
+        "inputRaw": "1000000",
+        "minimumOutputRaw": "94161",
+        "expectedOutputRaw": "94161",
+        "grossOutputRaw": "94161",
+        "inputCurveAmountRaw": "999950",
+        "tradeFeeRaw": "50",
+        "creatorFeeRaw": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeRaw": "6",
+        "fundFeeRaw": "2",
+        "sourceProfile": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+        "programApproved": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "minimumPolicy": "exact-source-expected-output",
+        "pool": "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2"
+      },
+      "setup": null,
+      "tokenTransition": null,
+      "writableReplay": null,
+      "lifetimeCapture": {
+        "blockhash": "8hBbphfC8T477JJVR5pEHWqfnbTfnC3KNbhvMDBapGne",
+        "lastValidBlockHeight": "441425677",
+        "minimumSlot": 463403219,
+        "slot": 463403231,
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetime": null,
+      "postCodeCustody": null,
+      "marketComparison": null,
+      "marketComparisonMintEvidence": null,
+      "prestateProbe": {
+        "purpose": "finalized-account-snapshot",
+        "commitment": "finalized",
+        "independentFromFinalBundle": true
+      },
+      "simulationResults": [
+        {
+          "slot": 463403232,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463403232,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 7
+        },
+        {
+          "slot": 463403232,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        }
+      ],
+      "lookupCounts": [
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0,
+      "ordinaryRequestIdsUnique": true,
+      "clockDifference": {
+        "readContext": 463403232,
+        "readClockSlot": "463403232",
+        "readClockUnix": "1793388564",
+        "simulationContext": 463403232,
+        "simulationClockSlot": "463403232",
+        "simulationClockUnix": "1793388563"
+      },
+      "diagnosis": "Finalized account snapshot and archive simulation disagree on Clock bytes. Exact comparison refused; finalized substitution removed without normalization or tolerance."
+    },
+    {
+      "observedAt": "2026-10-30T19:30:59.926Z",
+      "status": "unsigned-setup-swap-tip-mutable-effects-observed",
+      "stage": "final-window",
+      "floor": 463403635,
+      "simulationSlot": 463403646,
+      "lastSlot": 463403666,
+      "calls": 11,
+      "responseBytes": 323668,
+      "rateLimited": false,
+      "responseDecodeReason": null,
+      "rpcErrorCode": null,
+      "lifetimeRecheckedAfterFinalCode": true,
+      "captureSha256": "610bef7ef718d304de3b7d656766df6e513d474d955037a032760ccf6947d037",
+      "spanSlots": 31,
+      "codeScans": {
+        "firstCode": {
+          "minimumSlot": 463403635,
+          "minimumReadSlot": 463403635,
+          "maximumSlot": 463403644,
+          "reads": 10,
+          "sha256": "f45c9541027446f92242e0fd00a2c883720abf719e858915d58c13a489703489"
+        },
+        "lastCode": {
+          "minimumSlot": 463403635,
+          "minimumReadSlot": 463403646,
+          "maximumSlot": 463403661,
+          "reads": 10,
+          "sha256": "4ddf09a149a9618f6ca7562f4b857b41ff3cdbdbabd70c0f10e1a7f0c7559b91"
+        }
+      },
+      "ordinaryRpcEvidence": [
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463403635"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463403646"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463403646"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463403646"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "slot": "463403663"
+        },
+        {
+          "method": "isBlockhashValid",
+          "slot": "463403664",
+          "valid": true
+        },
+        {
+          "method": "getBlockHeight",
+          "slot": null,
+          "blockHeight": "441425961"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getSlot",
+          "slot": null
+        }
+      ],
+      "codeReadCount": 20,
+      "quote": {
+        "inputRaw": "1000000",
+        "minimumOutputRaw": "94161",
+        "expectedOutputRaw": "94161",
+        "grossOutputRaw": "94161",
+        "inputCurveAmountRaw": "999950",
+        "tradeFeeRaw": "50",
+        "creatorFeeRaw": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeRaw": "6",
+        "fundFeeRaw": "2",
+        "sourceProfile": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+        "programApproved": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "minimumPolicy": "exact-source-expected-output",
+        "pool": "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2"
+      },
+      "setup": {
+        "format": "jito-cpmm-ata-setup-rent-v1",
+        "slot": 463403646,
+        "transactionSha256": "23cb6948ca392010a59babd65e4d0b45ce2600648ef4692b3157e80df8089193",
+        "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+        "requiredMintRentLamports": "1066800",
+        "createdAccountBytes": 165,
+        "createdRentLamports": "1488440",
+        "feeLamports": "5000",
+        "maximumFeeLamports": "10000",
+        "reserveLamports": "0",
+        "remainingLamports": "6917720",
+        "requiredSystemRentLamports": "650240",
+        "exactPayerDebitChecked": true,
+        "emptyCanonicalAccountChecked": true,
+        "feeBankVerified": false,
+        "accountProvenanceVerified": false,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "runtimePrivilegesVerified": false,
+        "automaticExecutionAllowed": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "tokenTransition": {
+        "format": "jito-cpmm-packet-balances-v1",
+        "inputRaw": "1000000",
+        "outputRaw": "94161",
+        "sourceAuthenticated": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "accountProvenanceVerified": false,
+        "priceVerified": false,
+        "bankVerified": false,
+        "economicOutputVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "transactionSha256": "361acba5765449f55f54a7d122b665ef051b5acfd4be39c6dbb66746ea7dda7d",
+        "messageSha256": "29ae0e5019807a6285365a7332083a033213f93bb467bd5c255e5fa2647ad25d",
+        "instructionBoundToPacket": true
+      },
+      "writableReplay": null,
+      "lifetimeCapture": {
+        "blockhash": "EXQECkE8cwVXVwdm9TXX9KJ1RkjbmES8FTJmGpJbjmFV",
+        "lastValidBlockHeight": "441426092",
+        "minimumSlot": 463403635,
+        "slot": 463403646,
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetime": {
+        "format": "jito-cpmm-lifetime-observation-v1",
+        "transactionSha256": "361acba5765449f55f54a7d122b665ef051b5acfd4be39c6dbb66746ea7dda7d",
+        "blockhash": "EXQECkE8cwVXVwdm9TXX9KJ1RkjbmES8FTJmGpJbjmFV",
+        "lastValidBlockHeight": "441426092",
+        "blockHeight": "441425961",
+        "minimumSlot": 463403635,
+        "validitySlot": 463403664,
+        "remainingBlocks": "131",
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "postCodeCustody": {
+        "slot": 463403663,
+        "comparisons": [
+          {
+            "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "beforeLamports": "8411160",
+            "afterLamports": "8411160",
+            "same": true
+          },
+          {
+            "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+            "beforeLamports": "607791509",
+            "afterLamports": "607791509",
+            "same": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "beforeLamports": null,
+            "afterLamports": null,
+            "same": true
+          }
+        ]
+      },
+      "marketComparison": null,
+      "marketComparisonMintEvidence": null,
+      "prestateProbe": {
+        "purpose": "read-only-base-state",
+        "amountRaw": "1000",
+        "independentFromFinalBundle": true
+      },
+      "simulationResults": [
+        {
+          "slot": 463403646,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463403646,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 7
+        },
+        {
+          "slot": 463403646,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        }
+      ],
+      "lookupCounts": [
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0,
+      "ordinaryRequestIdsUnique": false
+    },
+    {
+      "observedAt": "2026-10-30T19:31:44.033Z",
+      "status": "unsigned-setup-swap-tip-mutable-effects-observed",
+      "stage": "final-window",
+      "floor": 463403839,
+      "simulationSlot": 463403851,
+      "lastSlot": 463403871,
+      "calls": 11,
+      "responseBytes": 323668,
+      "rateLimited": false,
+      "responseDecodeReason": null,
+      "rpcErrorCode": null,
+      "lifetimeRecheckedAfterFinalCode": true,
+      "captureSha256": "91716c7e09f6ff3642994044bc9b7a6ce34a7cc00866a570382fe5a0fde7109b",
+      "spanSlots": 32,
+      "codeScans": {
+        "firstCode": {
+          "minimumSlot": 463403839,
+          "minimumReadSlot": 463403839,
+          "maximumSlot": 463403850,
+          "reads": 10,
+          "sha256": "94859c49ee078f4f82f40d6d41381930118e5825253d3fd2b0af80040cf556cd"
+        },
+        "lastCode": {
+          "minimumSlot": 463403839,
+          "minimumReadSlot": 463403851,
+          "maximumSlot": 463403866,
+          "reads": 10,
+          "sha256": "ebfb66c712f5b95d081b281f9716fbe03001666075550335c389cf4ffb969ca0"
+        }
+      },
+      "ordinaryRpcEvidence": [
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463403839"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463403851"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463403851"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463403851"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "slot": "463403869"
+        },
+        {
+          "method": "isBlockhashValid",
+          "slot": "463403870",
+          "valid": true
+        },
+        {
+          "method": "getBlockHeight",
+          "slot": null,
+          "blockHeight": "441426166"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getSlot",
+          "slot": null
+        }
+      ],
+      "codeReadCount": 20,
+      "quote": {
+        "inputRaw": "1000000",
+        "minimumOutputRaw": "94125",
+        "expectedOutputRaw": "94125",
+        "grossOutputRaw": "94125",
+        "inputCurveAmountRaw": "999950",
+        "tradeFeeRaw": "50",
+        "creatorFeeRaw": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeRaw": "6",
+        "fundFeeRaw": "2",
+        "sourceProfile": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+        "programApproved": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "minimumPolicy": "exact-source-expected-output",
+        "pool": "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2"
+      },
+      "setup": {
+        "format": "jito-cpmm-ata-setup-rent-v1",
+        "slot": 463403851,
+        "transactionSha256": "636f981536f4a2d6a7fcd9790bb45426a85e627f0d0f3cd0965b53a74163fe38",
+        "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+        "requiredMintRentLamports": "1066800",
+        "createdAccountBytes": 165,
+        "createdRentLamports": "1488440",
+        "feeLamports": "5000",
+        "maximumFeeLamports": "10000",
+        "reserveLamports": "0",
+        "remainingLamports": "6912720",
+        "requiredSystemRentLamports": "650240",
+        "exactPayerDebitChecked": true,
+        "emptyCanonicalAccountChecked": true,
+        "feeBankVerified": false,
+        "accountProvenanceVerified": false,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "runtimePrivilegesVerified": false,
+        "automaticExecutionAllowed": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "tokenTransition": {
+        "format": "jito-cpmm-packet-balances-v1",
+        "inputRaw": "1000000",
+        "outputRaw": "94125",
+        "sourceAuthenticated": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "accountProvenanceVerified": false,
+        "priceVerified": false,
+        "bankVerified": false,
+        "economicOutputVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "transactionSha256": "226f61d2edde9857255f895813cc7d88cc61ac58e738718af5f293721ff26c27",
+        "messageSha256": "28e7a85ed1f8420ddb9aed0c2e6d4c6e6f6914da9a5b118c6d35edd2ef77913a",
+        "instructionBoundToPacket": true
+      },
+      "writableReplay": {
+        "format": "jito-cpmm-sparse-state-replay-v1",
+        "transactionSha256": "226f61d2edde9857255f895813cc7d88cc61ac58e738718af5f293721ff26c27",
+        "slot": 463403851,
+        "poolTransitionChecked": true,
+        "oracleTransitionChecked": true,
+        "tokenTransitionChecked": true,
+        "outputRaw": "94125",
+        "rentCoverageChecked": true,
+        "sourceAuthenticated": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "accountProvenanceVerified": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "readonlyPostCoverage": false,
+        "fullSwapQualified": false
+      },
+      "lifetimeCapture": {
+        "blockhash": "BVWdPTxijk78uacdv7pGMpDbb9UoxxdEKffU8ZBCxQR1",
+        "lastValidBlockHeight": "441426297",
+        "minimumSlot": 463403839,
+        "slot": 463403851,
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetime": {
+        "format": "jito-cpmm-lifetime-observation-v1",
+        "transactionSha256": "226f61d2edde9857255f895813cc7d88cc61ac58e738718af5f293721ff26c27",
+        "blockhash": "BVWdPTxijk78uacdv7pGMpDbb9UoxxdEKffU8ZBCxQR1",
+        "lastValidBlockHeight": "441426297",
+        "blockHeight": "441426166",
+        "minimumSlot": 463403839,
+        "validitySlot": 463403870,
+        "remainingBlocks": "131",
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "postCodeCustody": {
+        "slot": 463403869,
+        "comparisons": [
+          {
+            "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "beforeLamports": "8406160",
+            "afterLamports": "8406160",
+            "same": true
+          },
+          {
+            "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+            "beforeLamports": "597791509",
+            "afterLamports": "597791509",
+            "same": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "beforeLamports": null,
+            "afterLamports": null,
+            "same": true
+          }
+        ]
+      },
+      "marketComparison": null,
+      "marketComparisonMintEvidence": null,
+      "prestateProbe": {
+        "purpose": "read-only-base-state",
+        "amountRaw": "1000",
+        "independentFromFinalBundle": true
+      },
+      "simulationResults": [
+        {
+          "slot": 463403851,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463403851,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 7
+        },
+        {
+          "slot": 463403851,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        }
+      ],
+      "lookupCounts": [
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0,
+      "ordinaryRequestIdsUnique": false
+    },
+    {
+      "observedAt": "2026-10-30T19:34:16.167Z",
+      "status": "refused",
+      "stage": "final-window",
+      "floor": 463404548,
+      "simulationSlot": 463404560,
+      "lastSlot": 463404582,
+      "calls": 11,
+      "responseBytes": 323667,
+      "rateLimited": false,
+      "responseDecodeReason": null,
+      "rpcErrorCode": null,
+      "lifetimeRecheckedAfterFinalCode": true,
+      "captureSha256": "1a40bdc7260ce13fcecdbc438589c3fd3e700e5a0399d5ba4806a656396bf349",
+      "spanSlots": 34,
+      "codeScans": {
+        "firstCode": {
+          "minimumSlot": 463404548,
+          "minimumReadSlot": 463404548,
+          "maximumSlot": 463404558,
+          "reads": 10,
+          "sha256": "78280c7e793f34c84731cfce6c0067327a352a4a68380fd614e76c7b31b23588"
+        },
+        "lastCode": {
+          "minimumSlot": 463404548,
+          "minimumReadSlot": 463404560,
+          "maximumSlot": 463404577,
+          "reads": 10,
+          "sha256": "f2c92ce3add13c7b5ae5b71c757d21b7c457c9034c6234ced133fe8e3addaa88"
+        }
+      },
+      "ordinaryRpcEvidence": [
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463404548"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463404560"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463404560"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463404560"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "slot": "463404578"
+        },
+        {
+          "method": "isBlockhashValid",
+          "slot": "463404580",
+          "valid": true
+        },
+        {
+          "method": "getBlockHeight",
+          "slot": null,
+          "blockHeight": "441426877"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getSlot",
+          "slot": null
+        }
+      ],
+      "codeReadCount": 20,
+      "quote": {
+        "inputRaw": "1000000",
+        "minimumOutputRaw": "94044",
+        "expectedOutputRaw": "94044",
+        "grossOutputRaw": "94044",
+        "inputCurveAmountRaw": "999950",
+        "tradeFeeRaw": "50",
+        "creatorFeeRaw": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeRaw": "6",
+        "fundFeeRaw": "2",
+        "sourceProfile": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+        "programApproved": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "minimumPolicy": "exact-source-expected-output",
+        "pool": "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2"
+      },
+      "setup": {
+        "format": "jito-cpmm-ata-setup-rent-v1",
+        "slot": 463404560,
+        "transactionSha256": "f718dd276480c1c342b5f9dadf58d639118b9eb46eaf5767c507c89e594f8d29",
+        "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+        "requiredMintRentLamports": "1066800",
+        "createdAccountBytes": 165,
+        "createdRentLamports": "1488440",
+        "feeLamports": "5000",
+        "maximumFeeLamports": "10000",
+        "reserveLamports": "0",
+        "remainingLamports": "6902720",
+        "requiredSystemRentLamports": "650240",
+        "exactPayerDebitChecked": true,
+        "emptyCanonicalAccountChecked": true,
+        "feeBankVerified": false,
+        "accountProvenanceVerified": false,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "runtimePrivilegesVerified": false,
+        "automaticExecutionAllowed": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "tokenTransition": {
+        "format": "jito-cpmm-packet-balances-v1",
+        "inputRaw": "1000000",
+        "outputRaw": "94044",
+        "sourceAuthenticated": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "accountProvenanceVerified": false,
+        "priceVerified": false,
+        "bankVerified": false,
+        "economicOutputVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "transactionSha256": "7c6361d28f980b5ec718ebce3907bd1c6a295ee395794e597777f966731fbf15",
+        "messageSha256": "9c2010e8179d7267edec6fb1954381b972400c19d16c62589400caa9445f73cc",
+        "instructionBoundToPacket": true
+      },
+      "writableReplay": {
+        "format": "jito-cpmm-sparse-state-replay-v1",
+        "transactionSha256": "7c6361d28f980b5ec718ebce3907bd1c6a295ee395794e597777f966731fbf15",
+        "slot": 463404560,
+        "poolTransitionChecked": true,
+        "oracleTransitionChecked": true,
+        "tokenTransitionChecked": true,
+        "outputRaw": "94044",
+        "rentCoverageChecked": true,
+        "sourceAuthenticated": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "accountProvenanceVerified": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "readonlyPostCoverage": false,
+        "fullSwapQualified": false
+      },
+      "lifetimeCapture": {
+        "blockhash": "7ecg3Ntn3McNHZ8yz9mFyQRGJyedTUdThWYcXvPv5Ta",
+        "lastValidBlockHeight": "441427006",
+        "minimumSlot": 463404548,
+        "slot": 463404560,
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetime": {
+        "format": "jito-cpmm-lifetime-observation-v1",
+        "transactionSha256": "7c6361d28f980b5ec718ebce3907bd1c6a295ee395794e597777f966731fbf15",
+        "blockhash": "7ecg3Ntn3McNHZ8yz9mFyQRGJyedTUdThWYcXvPv5Ta",
+        "lastValidBlockHeight": "441427006",
+        "blockHeight": "441426877",
+        "minimumSlot": 463404548,
+        "validitySlot": 463404580,
+        "remainingBlocks": "129",
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "postCodeCustody": {
+        "slot": 463404578,
+        "comparisons": [
+          {
+            "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "beforeLamports": "8396160",
+            "afterLamports": "8396160",
+            "same": true
+          },
+          {
+            "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+            "beforeLamports": "588556421",
+            "afterLamports": "588556421",
+            "same": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "beforeLamports": null,
+            "afterLamports": null,
+            "same": true
+          }
+        ]
+      },
+      "marketComparison": {
+        "available": true,
+        "transactionSha256": "7c6361d28f980b5ec718ebce3907bd1c6a295ee395794e597777f966731fbf15",
+        "inputMarketPair": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+        "outputMarketPair": "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ",
+        "inputPriceUsd": "94.21",
+        "outputPriceUsd": "0.9995",
+        "inputObservedAt": "2026-10-30T19:34:09.225Z",
+        "outputObservedAt": "2026-10-30T19:34:09.346Z",
+        "minimumValueDifferenceBps": "-22",
+        "worse": true,
+        "acknowledgementRequired": false,
+        "expiresAt": "2026-10-30T19:39:09.225Z",
+        "priceVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "marketComparisonMintEvidence": "supplied-archive-prestate-with-later-live-policy-recheck",
+      "prestateProbe": {
+        "purpose": "read-only-base-state",
+        "amountRaw": "1000",
+        "independentFromFinalBundle": true
+      },
+      "simulationResults": [
+        {
+          "slot": 463404560,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463404560,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 7
+        },
+        {
+          "slot": 463404560,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        }
+      ],
+      "lookupCounts": [
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0,
+      "ordinaryRequestIdsUnique": false
+    },
+    {
+      "observedAt": "2026-10-30T19:35:44.998Z",
+      "status": "refused",
+      "stage": "final-window",
+      "floor": 463404968,
+      "simulationSlot": 463404981,
+      "lastSlot": 463405002,
+      "calls": 11,
+      "responseBytes": 323672,
+      "rateLimited": false,
+      "responseDecodeReason": null,
+      "rpcErrorCode": null,
+      "lifetimeRecheckedAfterFinalCode": true,
+      "captureSha256": "8e98051f5ed3c7a90bd641b56dddf81ca5f5d20b71e170901023532788b40305",
+      "spanSlots": 34,
+      "codeScans": {
+        "firstCode": {
+          "minimumSlot": 463404968,
+          "minimumReadSlot": 463404968,
+          "maximumSlot": 463404979,
+          "reads": 10,
+          "sha256": "bcdb631462392f9db2ab1454e8b96af8e61657306f692387b8b31b54dd3445e7"
+        },
+        "lastCode": {
+          "minimumSlot": 463404968,
+          "minimumReadSlot": 463404981,
+          "maximumSlot": 463404997,
+          "reads": 10,
+          "sha256": "8c9071e43d9433c3707281607c67ad039a87cbbc65340c154d3f40bfb6ea4f15"
+        }
+      },
+      "ordinaryRpcEvidence": [
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463404968"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getLatestBlockhash",
+          "slot": "463404981"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463404981"
+        },
+        {
+          "method": "simulateTransactionsAtSlot",
+          "slot": "463404981"
+        },
+        {
+          "method": "getMultipleAccounts",
+          "slot": "463404998"
+        },
+        {
+          "method": "isBlockhashValid",
+          "slot": "463404999",
+          "valid": true
+        },
+        {
+          "method": "getBlockHeight",
+          "slot": null,
+          "blockHeight": "441427297"
+        },
+        {
+          "method": "getGenesisHash",
+          "slot": null
+        },
+        {
+          "method": "getSlot",
+          "slot": null
+        }
+      ],
+      "codeReadCount": 20,
+      "quote": {
+        "inputRaw": "1000000",
+        "minimumOutputRaw": "94044",
+        "expectedOutputRaw": "94044",
+        "grossOutputRaw": "94044",
+        "inputCurveAmountRaw": "999950",
+        "tradeFeeRaw": "50",
+        "creatorFeeRaw": "0",
+        "creatorFeeOnInput": true,
+        "protocolFeeRaw": "6",
+        "fundFeeRaw": "2",
+        "sourceProfile": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+        "programApproved": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "minimumPolicy": "exact-source-expected-output",
+        "pool": "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2"
+      },
+      "setup": {
+        "format": "jito-cpmm-ata-setup-rent-v1",
+        "slot": 463404981,
+        "transactionSha256": "b3b9465fa847b4d363b03fecdd84e2b3107359406790cb9cb6c033aa3f2b5b1c",
+        "destination": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+        "payer": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+        "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "mintPolicySha256": "c69e08ee227278022c91e6bafebbe08ff629b720ca0bb653b7cc28d879c2ad85",
+        "requiredMintRentLamports": "1066800",
+        "createdAccountBytes": 165,
+        "createdRentLamports": "1488440",
+        "feeLamports": "5000",
+        "maximumFeeLamports": "10000",
+        "reserveLamports": "0",
+        "remainingLamports": "6892720",
+        "requiredSystemRentLamports": "650240",
+        "exactPayerDebitChecked": true,
+        "emptyCanonicalAccountChecked": true,
+        "feeBankVerified": false,
+        "accountProvenanceVerified": false,
+        "sourceAuthenticated": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "runtimePrivilegesVerified": false,
+        "automaticExecutionAllowed": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "tokenTransition": {
+        "format": "jito-cpmm-packet-balances-v1",
+        "inputRaw": "1000000",
+        "outputRaw": "94044",
+        "sourceAuthenticated": false,
+        "programApproved": false,
+        "packetVerified": false,
+        "accountProvenanceVerified": false,
+        "priceVerified": false,
+        "bankVerified": false,
+        "economicOutputVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "transactionSha256": "c34d29819793f2b79fa220d00d3d877f8dfb8ade2274836210bcc9e0ec10e08b",
+        "messageSha256": "560f870cb12543778f34707e3d5b7169c7a4482dbaffdbf45cf5233338590500",
+        "instructionBoundToPacket": true
+      },
+      "writableReplay": {
+        "format": "jito-cpmm-sparse-state-replay-v1",
+        "transactionSha256": "c34d29819793f2b79fa220d00d3d877f8dfb8ade2274836210bcc9e0ec10e08b",
+        "slot": 463404981,
+        "poolTransitionChecked": true,
+        "oracleTransitionChecked": true,
+        "tokenTransitionChecked": true,
+        "outputRaw": "94044",
+        "rentCoverageChecked": true,
+        "sourceAuthenticated": false,
+        "packetVerified": false,
+        "economicOutputVerified": false,
+        "accountProvenanceVerified": false,
+        "bankVerified": false,
+        "providerQualified": false,
+        "programApproved": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "readonlyPostCoverage": false,
+        "fullSwapQualified": false
+      },
+      "lifetimeCapture": {
+        "blockhash": "5onNQ3fwhAU8PfPSEnr8hX7cyvGQzS3fVFzdhGBESyKp",
+        "lastValidBlockHeight": "441427427",
+        "minimumSlot": 463404968,
+        "slot": 463404981,
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "lifetime": {
+        "format": "jito-cpmm-lifetime-observation-v1",
+        "transactionSha256": "c34d29819793f2b79fa220d00d3d877f8dfb8ade2274836210bcc9e0ec10e08b",
+        "blockhash": "5onNQ3fwhAU8PfPSEnr8hX7cyvGQzS3fVFzdhGBESyKp",
+        "lastValidBlockHeight": "441427427",
+        "blockHeight": "441427297",
+        "minimumSlot": 463404968,
+        "validitySlot": 463404999,
+        "remainingBlocks": "130",
+        "providerQualified": false,
+        "bankVerified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "postCodeCustody": {
+        "slot": 463404998,
+        "comparisons": [
+          {
+            "address": "2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo",
+            "beforeLamports": "8386160",
+            "afterLamports": "8386160",
+            "same": true
+          },
+          {
+            "address": "11JWZfSbeKxYvAdQnqhtzod5ts25jB979nYaKYkHZN3",
+            "beforeLamports": "576259122",
+            "afterLamports": "576259122",
+            "same": true
+          },
+          {
+            "address": "CTdmuBWoZWzBbSRJkrpn4S1bM7uD11KMQ8e9EDCLV2h5",
+            "beforeLamports": null,
+            "afterLamports": null,
+            "same": true
+          }
+        ]
+      },
+      "marketComparison": {
+        "available": true,
+        "transactionSha256": "c34d29819793f2b79fa220d00d3d877f8dfb8ade2274836210bcc9e0ec10e08b",
+        "inputMarketPair": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+        "outputMarketPair": "DJNtGuBGEQiUCWE8F981M2C3ZghZt2XLD8f2sQdZ6rsZ",
+        "inputPriceUsd": "94.18",
+        "outputPriceUsd": "0.9998",
+        "inputObservedAt": "2026-10-30T19:35:38.157Z",
+        "outputObservedAt": "2026-10-30T19:35:38.161Z",
+        "minimumValueDifferenceBps": "-16",
+        "worse": true,
+        "acknowledgementRequired": false,
+        "expiresAt": "2026-10-30T19:40:38.157Z",
+        "priceVerified": false,
+        "providerQualified": false,
+        "signingAllowed": false,
+        "executionAllowed": false
+      },
+      "marketComparisonMintEvidence": "supplied-archive-prestate-with-later-live-policy-recheck",
+      "prestateProbe": {
+        "purpose": "read-only-base-state",
+        "amountRaw": "1000",
+        "independentFromFinalBundle": true
+      },
+      "simulationResults": [
+        {
+          "slot": 463404981,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        },
+        {
+          "slot": 463404981,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 7
+        },
+        {
+          "slot": 463404981,
+          "status": "success",
+          "feeLamports": "5000",
+          "err": null,
+          "postAccountCount": 2
+        }
+      ],
+      "lookupCounts": [
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        },
+        {
+          "readonly": 0,
+          "writable": 0
+        }
+      ],
+      "fullSwapQualified": false,
+      "signingAllowed": false,
+      "executionAllowed": false,
+      "transactionsBroadcast": 0,
+      "ordinaryRequestIdsUnique": true
+    }
+  ],
+  "limits": {
+    "originalSlotLimit": 32,
+    "completeReadonlyPostImages": false,
+    "bankIdentityProven": false,
+    "independentFeeBankProven": false,
+    "contextlessBlockHeightUpperBoundProven": false,
+    "quietReferenceProven": false,
+    "independentPriceAttestation": false,
+    "appIntegration": false,
+    "signingEnabled": false,
+    "executionAllowed": false,
+    "deployed": false
+  }
+}
