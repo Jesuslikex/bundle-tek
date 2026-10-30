@@ -513,3 +513,213 @@ it.each([false, true])(
     ).rejects.toThrow();
   },
 );
+
+it.each([
+  {
+    reverse: false,
+    initialized: false,
+    index: 0,
+    elapsed: 0,
+    legacy: false,
+    wrap: false,
+  },
+  {
+    reverse: true,
+    initialized: false,
+    index: 99,
+    elapsed: 0,
+    legacy: false,
+    wrap: false,
+  },
+  {
+    reverse: false,
+    initialized: true,
+    index: 3,
+    elapsed: 0,
+    legacy: false,
+    wrap: false,
+  },
+  {
+    reverse: true,
+    initialized: true,
+    index: 3,
+    elapsed: 14,
+    legacy: true,
+    wrap: false,
+  },
+  {
+    reverse: false,
+    initialized: true,
+    index: 3,
+    elapsed: 15,
+    legacy: false,
+    wrap: false,
+  },
+  {
+    reverse: true,
+    initialized: true,
+    index: 99,
+    elapsed: 23,
+    legacy: false,
+    wrap: true,
+  },
+])(
+  'replays pool fees, epoch, rent and oracle bytes for $reverse/$initialized/$index/$elapsed',
+  async (scenario) => {
+    const { replayJitoCpmmSwapState } =
+      await import('./jito-cpmm-state-replay');
+    const f = await fixture(scenario.reverse),
+      signal = new AbortController().signal;
+    const bound = await inspectJitoCpmmUnsignedPacket(f.packet);
+    const mutate = (
+      key: string,
+      action: (b: ReturnType<typeof Buffer.from>) => void,
+    ) => {
+      const a = f.accounts.get(key)!,
+        b = Buffer.from(a.data[0], 'base64');
+      action(b);
+      a.data[0] = b.toString('base64');
+    };
+    mutate(f.pool, (b) => {
+      b[390] = 1;
+      b[389] = scenario.reverse ? 1 : 0;
+    });
+    mutate(f.config, (b) => {
+      b.writeBigUInt64LE(500n, 108);
+      b.writeBigUInt64LE(100000n, 20);
+      b.writeBigUInt64LE(200000n, 28);
+    });
+    const timestamp = BigInt(Math.floor(f.now / 1000)),
+      offset = 43 + scenario.index * 40;
+    const initial0 = scenario.wrap ? (1n << 128n) - 2n : 100n,
+      initial1 = 200n;
+    const put128 = (
+      b: ReturnType<typeof Buffer.from>,
+      o: number,
+      n: bigint,
+    ) => {
+      b.writeBigUInt64LE(n & ((1n << 64n) - 1n), o);
+      b.writeBigUInt64LE(n >> 64n, o + 8);
+    };
+    mutate(f.oracle, (b) => {
+      b[8] = Number(scenario.initialized);
+      b.writeUInt16LE(scenario.index, 9);
+      b.writeBigUInt64LE(timestamp - BigInt(scenario.elapsed), offset);
+      put128(b, offset + 8, initial0);
+      put128(b, offset + 24, initial1);
+      b.writeBigUInt64LE(
+        scenario.legacy ? 0n : timestamp - BigInt(scenario.elapsed),
+        4043,
+      );
+    });
+    const quote = (
+      await readJitoCpmmCurrentPoolEvidence(f.packet, 100, f.rpc, signal)
+    ).curve;
+    if (!('creatorFeeRaw' in quote)) throw Error('current quote required');
+    const before = [...f.accounts].map(([address, a]) => ({
+      address,
+      owner: a.owner,
+      executable: a.executable,
+      lamports: a.lamports,
+      dataBase64: a.data[0],
+    }));
+    const after = structuredClone(before),
+      byKey = new Map(after.map((a) => [a.address, a]));
+    for (const [key, delta] of [
+      [bound.source, -BigInt(quote.inputRaw)],
+      [bound.destination, BigInt(quote.expectedOutputRaw)],
+      [bound.inputVault, BigInt(quote.inputRaw)],
+      [bound.outputVault, -BigInt(quote.expectedOutputRaw)],
+    ] as const) {
+      const a = byKey.get(key)!,
+        b = Buffer.from(a.dataBase64, 'base64');
+      b.writeBigUInt64LE(b.readBigUInt64LE(64) + delta, 64);
+      if (b.readUInt32LE(109) === 1)
+        a.lamports = (BigInt(a.lamports) + delta).toString();
+      a.dataBase64 = b.toString('base64');
+    }
+    const p = byKey.get(f.pool)!,
+      pb = Buffer.from(p.dataBase64, 'base64'),
+      protocol = scenario.reverse ? 349 : 341;
+    pb.writeBigUInt64LE(BigInt(quote.protocolFeeRaw), protocol);
+    pb.writeBigUInt64LE(BigInt(quote.fundFeeRaw), protocol + 16);
+    // Both scenarios charge creator fees in token0, on input forward and output reverse.
+    pb.writeBigUInt64LE(BigInt(quote.creatorFeeRaw), 397);
+    pb.writeBigUInt64LE(
+      Buffer.from(f.accounts.get(CLOCK)!.data[0], 'base64').readBigUInt64LE(16),
+      381,
+    );
+    p.dataBase64 = pb.toString('base64');
+    const o = byKey.get(f.oracle)!,
+      ob = Buffer.from(o.dataBase64, 'base64');
+    if (!scenario.initialized) {
+      ob[8] = 1;
+      ob.writeBigUInt64LE(timestamp, offset);
+      put128(ob, offset + 8, 0n);
+      put128(ob, offset + 24, 0n);
+      ob.writeBigUInt64LE(timestamp, 4043);
+    } else {
+      if (scenario.legacy)
+        ob.writeBigUInt64LE(timestamp - BigInt(scenario.elapsed), 4043);
+      if (scenario.elapsed) {
+        const next =
+            scenario.elapsed < 15 ? scenario.index : (scenario.index + 1) % 100,
+          target = 43 + next * 40;
+        if (next !== scenario.index) {
+          ob.writeUInt16LE(next, 9);
+          ob.writeBigUInt64LE(timestamp, target);
+        }
+        put128(
+          ob,
+          target + 8,
+          (initial0 + 429496729n * BigInt(scenario.elapsed)) &
+            ((1n << 128n) - 1n),
+        );
+        put128(
+          ob,
+          target + 24,
+          (initial1 + 42949672960n * BigInt(scenario.elapsed)) &
+            ((1n << 128n) - 1n),
+        );
+        ob.writeBigUInt64LE(timestamp, 4043);
+      }
+    }
+    o.dataBase64 = ob.toString('base64');
+    const request = {
+      packet: f.packet,
+      minimumSlot: 100,
+      slot: 102,
+      before,
+      after,
+    };
+    expect(await replayJitoCpmmSwapState(request, signal)).toMatchObject({
+      poolTransitionChecked: true,
+      oracleTransitionChecked: true,
+      rentCoverageChecked: true,
+      outputRaw: quote.expectedOutputRaw,
+      bankVerified: false,
+      signingAllowed: false,
+    });
+    for (const [key, offset] of [
+      [f.pool, 333],
+      [f.pool, protocol],
+      [f.pool, 381],
+      [f.oracle, 43],
+      [f.oracle, 4043],
+      [f.config, 12],
+      [bound.inputMint, 44],
+      [RENT, 0],
+      [CLOCK, 0],
+    ] as const) {
+      const bad = structuredClone(request),
+        a = bad.after.find((a) => a.address === key)!,
+        b = Buffer.from(a.dataBase64, 'base64');
+      b[offset] ^= 1;
+      a.dataBase64 = b.toString('base64');
+      await expect(replayJitoCpmmSwapState(bad, signal)).rejects.toThrow();
+    }
+    const rentLoss = structuredClone(request);
+    rentLoss.after.find((a) => a.address === f.pool)!.lamports = '0';
+    await expect(replayJitoCpmmSwapState(rentLoss, signal)).rejects.toThrow();
+  },
+);
