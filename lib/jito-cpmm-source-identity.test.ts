@@ -3,6 +3,8 @@ import {
   CPMM_MATCHED_SOURCE_IDENTITY,
   requireJitoCpmmResearchIdentities,
   requireJitoCpmmSetupResearchIdentities,
+  CPMM_INITIALIZE_V2_SOURCE_IDENTITY,
+  requireJitoCpmmV2SetupResearchIdentities,
 } from './jito-cpmm-source-identity';
 import {
   PAIR_TRUSTED_PROGRAMS,
@@ -87,6 +89,41 @@ function setupIdentities(): PairObservedProgram[] {
     },
   ];
 }
+it('isolates the independently built initialize_v2 artifact from old and shared profiles', () => {
+  const old = setupIdentities(),
+    current = setupIdentities();
+  Object.assign(
+    current.find((p) => p.address === CPMM_MATCHED_SOURCE_IDENTITY.address)!,
+    CPMM_INITIALIZE_V2_SOURCE_IDENTITY,
+  );
+  expect(
+    requireJitoCpmmV2SetupResearchIdentities(current, structuredClone(current)),
+  ).toMatchObject({
+    sourceRevision: '40cbd81ee1014eee27c123d8846558c402f6c5fb',
+    matchedSourceIdentityChecked: true,
+    programApproved: false,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  expect(() => requireJitoCpmmV2SetupResearchIdentities(old, old)).toThrow();
+  expect(() =>
+    requireJitoCpmmSetupResearchIdentities(current, current),
+  ).toThrow();
+  expect(() => requirePairTrustedPrograms(current, current)).toThrow();
+});
+it.each(Object.keys(CPMM_INITIALIZE_V2_SOURCE_IDENTITY))(
+  'refuses changed v2 %s even across identical scans',
+  (key) => {
+    const a = setupIdentities();
+    const cp = a.find(
+      (p) => p.address === CPMM_MATCHED_SOURCE_IDENTITY.address,
+    )!;
+    Object.assign(cp, CPMM_INITIALIZE_V2_SOURCE_IDENTITY);
+    (cp as unknown as Record<string, unknown>)[key] =
+      key === 'codeBytes' ? 793825 : 'changed';
+    expect(() => requireJitoCpmmV2SetupResearchIdentities(a, a)).toThrow();
+  },
+);
 it('isolates the four-program setup profile and retains every shared pin', () => {
   const a = setupIdentities();
   expect(

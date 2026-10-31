@@ -1,6 +1,9 @@
 import bs58 from 'bs58';
 import { expect, it, vi } from 'vitest';
-import { CPMM_MATCHED_SOURCE_IDENTITY } from './jito-cpmm-source-identity';
+import {
+  CPMM_MATCHED_SOURCE_IDENTITY,
+  CPMM_INITIALIZE_V2_SOURCE_IDENTITY,
+} from './jito-cpmm-source-identity';
 import { PAIR_TRUSTED_PROGRAMS } from './pair-trusted-programs';
 import {
   collectPumpProgramIdentities,
@@ -11,6 +14,9 @@ import {
   verifyJitoCpmmResearchRuntimeBracket,
   collectJitoRuntimeEvidence,
   verifyJitoRuntimeBracket,
+  collectJitoCpmmV2SetupResearchRuntimeEvidence,
+  verifyJitoCpmmSetupResearchRuntimeBracket,
+  jitoRuntimePolicyRefusal,
 } from './jito-runtime-evidence';
 import type { JitoBundleSimulationFrames } from './jito-bundle-simulation-frames';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
@@ -97,9 +103,68 @@ function fixture() {
       },
     ],
   } as unknown as JitoBundleSimulationFrames;
-  return { identities, keys, rpc, frames };
+  return { identities, keys, rpc, frames, accounts };
 }
 const signal = () => new AbortController().signal;
+it('issues the v2 profile separately and retains public identity diagnostics on refusal', async () => {
+  const f = fixture(),
+    ata = PAIR_TRUSTED_PROGRAMS.find(
+      (p) => p.address === 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+    )!;
+  Object.assign(f.identities[2], CPMM_INITIALIZE_V2_SOURCE_IDENTITY);
+  f.identities.push({
+    address: ata.address,
+    loader: ata.loader,
+    identityKind: 'elf-code',
+    programData: null,
+    deploymentSlot: null,
+    upgradeAuthority: ata.upgradeAuthority,
+    codeSha256: ata.codeSha256[0],
+    codeBytes: 105032,
+  });
+  f.keys.push(ata.address);
+  f.accounts.push({
+    owner: ata.loader,
+    lamports: '1',
+    executable: true,
+    data: Buffer.alloc(1),
+  });
+  const first = await collectJitoCpmmV2SetupResearchRuntimeEvidence(
+    f.keys,
+    100,
+    100,
+    signal(),
+    f.rpc,
+  );
+  expect(first).toMatchObject({
+    diagnosticProfile: 'cpmm-ata-v2-matched-source-research',
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  await expect(
+    verifyJitoCpmmSetupResearchRuntimeBracket(first, first, f.frames, signal()),
+  ).rejects.toThrow();
+  f.identities[2].codeSha256 = '0'.repeat(64);
+  try {
+    await collectJitoCpmmV2SetupResearchRuntimeEvidence(
+      f.keys,
+      100,
+      100,
+      signal(),
+      f.rpc,
+    );
+    throw Error('unexpected acceptance');
+  } catch (error) {
+    expect(jitoRuntimePolicyRefusal(error)).toMatchObject({
+      reason: 'program-policy-refused',
+      observedPrograms: expect.arrayContaining([
+        expect.objectContaining({ codeSha256: '0'.repeat(64) }),
+      ]),
+      signingAllowed: false,
+      executionAllowed: false,
+    });
+  }
+});
 it('binds research captures to two complete identical scans while the default profile still refuses CPMM', async () => {
   const f = fixture();
   const first = await collectJitoCpmmResearchRuntimeEvidence(

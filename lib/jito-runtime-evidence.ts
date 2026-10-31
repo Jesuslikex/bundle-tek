@@ -16,8 +16,13 @@ import type { JitoBundleSimulationFrames } from './jito-bundle-simulation-frames
 import {
   requireJitoCpmmResearchIdentities,
   requireJitoCpmmSetupResearchIdentities,
+  requireJitoCpmmV2SetupResearchIdentities,
 } from './jito-cpmm-source-identity';
-type RuntimeProfile = 'reviewed' | 'cpmm-research' | 'cpmm-ata-research';
+type RuntimeProfile =
+  | 'reviewed'
+  | 'cpmm-research'
+  | 'cpmm-ata-research'
+  | 'cpmm-ata-v2-research';
 function requireRuntimePrograms(
   profile: RuntimeProfile,
   first: Identity[],
@@ -27,6 +32,8 @@ function requireRuntimePrograms(
     requireJitoCpmmResearchIdentities(first, last);
   else if (profile === 'cpmm-ata-research')
     requireJitoCpmmSetupResearchIdentities(first, last);
+  else if (profile === 'cpmm-ata-v2-research')
+    requireJitoCpmmV2SetupResearchIdentities(first, last);
   else requirePairTrustedPrograms(first, last);
 }
 const SYSTEM = '11111111111111111111111111111111',
@@ -110,7 +117,8 @@ export type JitoRuntimeCapture = {
   executionAllowed: false;
   diagnosticProfile?:
     | 'cpmm-matched-source-research'
-    | 'cpmm-ata-matched-source-research';
+    | 'cpmm-ata-matched-source-research'
+    | 'cpmm-ata-v2-matched-source-research';
 };
 const issued = new WeakMap<
   object,
@@ -232,6 +240,23 @@ export async function collectJitoCpmmSetupResearchRuntimeEvidence(
   );
 }
 
+/** Current matched initialize_v2 artifact, explicit research-only profile. */
+export async function collectJitoCpmmV2SetupResearchRuntimeEvidence(
+  keys: string[],
+  minimumSlot: number,
+  minimumReadSlot: number,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc,
+) {
+  return collectRuntime(
+    keys,
+    minimumSlot,
+    minimumReadSlot,
+    signal,
+    rpc,
+    'cpmm-ata-v2-research',
+  );
+}
 async function collectRuntime(
   keysInput: string[],
   minimumSlot: number,
@@ -323,7 +348,9 @@ async function collectRuntime(
           call,
           1,
           100,
-          profile === 'cpmm-ata-research' ? 'serial-cpmm-research' : 'default',
+          profile === 'cpmm-ata-research' || profile === 'cpmm-ata-v2-research'
+            ? 'serial-cpmm-research'
+            : 'default',
         )
       ).programs
     : [];
@@ -354,8 +381,22 @@ async function collectRuntime(
   try {
     requireRuntimePrograms(profile, identities, identities);
   } catch {
-    if (profile !== 'reviewed')
-      throw Error('Jito CPMM research source identity refused.');
+    if (profile !== 'reviewed') {
+      const error = Error('Jito CPMM research source identity refused.');
+      // Public decoded identities only. Preserve the exact refusal; diagnostics
+      // cannot add a hash, bypass admission or issue a runtime capture.
+      policyRefusals.set(
+        error,
+        snapshotJitoEvidence({
+          reason: 'program-policy-refused',
+          observedPrograms: identities,
+          differences: [],
+          signingAllowed: false,
+          executionAllowed: false,
+        }),
+      );
+      throw error;
+    }
     const differences = identities.flatMap((observed) => {
       const expected = PAIR_TRUSTED_PROGRAMS.find(
         (p) => p.address === observed.address,
@@ -394,9 +435,11 @@ async function collectRuntime(
     ...(profile !== 'reviewed'
       ? {
           diagnosticProfile:
-            profile === 'cpmm-research'
-              ? ('cpmm-matched-source-research' as const)
-              : ('cpmm-ata-matched-source-research' as const),
+            profile === 'cpmm-ata-v2-research'
+              ? ('cpmm-ata-v2-matched-source-research' as const)
+              : profile === 'cpmm-research'
+                ? ('cpmm-matched-source-research' as const)
+                : ('cpmm-ata-matched-source-research' as const),
         }
       : {}),
   };
@@ -468,6 +511,29 @@ export async function verifyJitoCpmmSetupResearchRuntimeBracket(
   };
 }
 
+export async function verifyJitoCpmmV2SetupResearchRuntimeBracket(
+  first: JitoRuntimeCapture,
+  last: JitoRuntimeCapture,
+  frames: JitoBundleSimulationFrames,
+  signal: AbortSignal,
+) {
+  const value = await verifyRuntime(
+    first,
+    last,
+    frames,
+    signal,
+    'cpmm-ata-v2-research',
+  );
+  return {
+    ...value,
+    format: 'jito-cpmm-v2-setup-research-runtime-bracket-v1' as const,
+    matchedSourceIdentityChecked: true as const,
+    ataSetupProgramChecked: true as const,
+    sourceRevision: '40cbd81ee1014eee27c123d8846558c402f6c5fb' as const,
+    programApproved: false as const,
+    sourceAuthenticated: false as const,
+  };
+}
 async function verifyRuntime(
   first: JitoRuntimeCapture,
   last: JitoRuntimeCapture,

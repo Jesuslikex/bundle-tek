@@ -1,0 +1,33 @@
+{
+  "format": "cpmm-source-build-comparison-v1",
+  "sourceRepository": "https://github.com/raydium-io/raydium-cp-swap",
+  "sourceRevision": "40cbd81ee1014eee27c123d8846558c402f6c5fb",
+  "sourceWorkingTreeClean": true,
+  "buildImage": "solanafoundation/solana-verifiable-build@sha256:f71be5ca7620b7e40933b7f1294fa44e01d08c1fc5ba1f375a2478f5a01580d3",
+  "lockfileSha256": "9fd6ae76c394140ed7f2840b29ee4af0fbd857bc8bd7099fc6c35adbd6b1e183",
+  "anchorTomlSha256": "90291619f263e630a3b11420665a3370e6fd7505c869ff9ef561f1341ab89421",
+  "buildCommand": [
+    "cargo",
+    "build-sbf",
+    "--manifest-path",
+    "/build/programs/cp-swap/Cargo.toml",
+    "--",
+    "--locked"
+  ],
+  "buildExitCode": 0,
+  "builtBytes": 749848,
+  "builtSha256": "2d9e1c76fd3f760542b19067f3eafaef5febb66bcbfe86bb09f5c7c7b16591de",
+  "builtNormalizedSha256": "7e691824f591590ed44f5716ffc5e1040914e3aaa9ee4effdc47f50951a4f83e",
+  "observedBytes": 793824,
+  "observedSha256": "c383e1c5b1f578f3d1bf42f12360fca67225b9adda0f3b6c293ad0d6b966818d",
+  "observedDeploymentSlot": "463522946",
+  "observationMinimumSlot": 463537742,
+  "paddedFullByteEquality": true,
+  "normalizedByteEquality": true,
+  "swapCurveAndStateSourceUnchangedFrom": "f4b9b26342afe9122d5ff67cd7a4f19ded4ac0a5",
+  "securityAuditPassed": false,
+  "programApproved": false,
+  "providerQualified": false,
+  "signingAllowed": false,
+  "executionAllowed": false
+}
