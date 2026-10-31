@@ -127,6 +127,7 @@ const issued = new WeakMap<
     inventory: PumpRpcAccount[];
     profile: RuntimeProfile;
     rpc: PumpLaunchRpc;
+    opening?: { slot: number; accounts: unknown[] };
   }
 >();
 const fail = (): never => {
@@ -146,6 +147,30 @@ export function requireJitoRuntimeRpcScope(
   )
     return fail();
   return snapshotJitoEvidence(owned.value);
+}
+/** Complete custody-sized original opening response from this issued reader.
+ * Its slot is the actual inventory context, never the later scan maximum. */
+export function readJitoCpmmV2OpeningAccounts(
+  capture: JitoRuntimeCapture,
+  rpc: PumpLaunchRpc,
+) {
+  requireJitoRuntimeRpcScope(capture, rpc);
+  const owned = issued.get(capture)!;
+  if (
+    owned.profile !== 'cpmm-ata-v2-research' ||
+    capture.keys.length > 100 ||
+    !owned.opening ||
+    owned.opening.accounts.length !== capture.keys.length
+  )
+    return fail();
+  return snapshotJitoEvidence(
+    {
+      keys: capture.keys,
+      slot: owned.opening.slot,
+      accounts: owned.opening.accounts,
+    },
+    65536,
+  );
 }
 const address = (v: string) => {
   const b = bs58.decode(v);
@@ -283,6 +308,7 @@ async function collectRuntime(
   let maximumSlot = minimumReadSlot,
     reads = 0;
   const inventory: PumpRpcAccount[] = [];
+  const openingRows: unknown[] = [];
   const call: PumpLaunchRpc = async (method, params, readSignal) => {
     signal.throwIfAborted();
     readSignal.throwIfAborted();
@@ -328,12 +354,17 @@ async function collectRuntime(
           encoding: 'base64',
           commitment: 'confirmed',
           minContextSlot: maximumSlot,
-          dataSlice: { offset: 0, length: 128 },
+          dataSlice: {
+            offset: 0,
+            length: profile === 'cpmm-ata-v2-research' ? 165 : 128,
+          },
         },
       ],
       signal,
     )) as { value: unknown[] };
     inventory.push(...response.value.map(account));
+    if (profile === 'cpmm-ata-v2-research')
+      openingRows.push(...snapshotJitoEvidence(response.value));
   }
   const programs = keys.filter((_, i) => inventory[i]?.executable);
   if (!programs.length || programs.length > 16) return fail();
@@ -449,6 +480,9 @@ async function collectRuntime(
     inventory: snapshotJitoEvidence(inventory),
     profile,
     rpc,
+    ...(profile === 'cpmm-ata-v2-research' && keys.length <= 100
+      ? { opening: { slot: beforeCode, accounts: openingRows } }
+      : {}),
   });
   signal.throwIfAborted();
   return value;

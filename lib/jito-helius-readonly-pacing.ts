@@ -1,7 +1,13 @@
 import { paceWalletRpc } from './wallet-rpc-pacing';
+export const JITO_HELIUS_WIRE_PACING = Object.freeze({
+  methods: 8,
+  windowMs: 1250,
+  millisecondsPerMethod: 150,
+});
 /** Local unsigned research only. Opt into the existing Helius qualification
  * queue, then additionally cap actual wire admissions (batch units together)
- * at nine methods per guarded rolling second. No provider retry or settings. */
+ * below the existing ceiling, with a guarded rolling window and a weighted
+ * post-batch gap. No provider retry or settings. */
 export function createJitoHeliusReadonlyPacer(
   endpoint: string,
   signal: AbortSignal,
@@ -17,6 +23,7 @@ export function createJitoHeliusReadonlyPacer(
   )
     throw Error('Helius research pacing scope refused.');
   let tail = Promise.resolve();
+  let nextWire = 0;
   const sent: { at: number; units: number }[] = [];
   return async (units: number) => {
     if (!Number.isInteger(units) || units < 1 || units > 5)
@@ -27,9 +34,21 @@ export function createJitoHeliusReadonlyPacer(
       for (;;) {
         signal.throwIfAborted();
         const now = Date.now();
-        while (sent.length && sent[0].at <= now - 1025) sent.shift();
-        if (sent.reduce((sum, s) => sum + s.units, 0) + units <= 9) {
+        while (
+          sent.length &&
+          sent[0].at <= now - JITO_HELIUS_WIRE_PACING.windowMs
+        )
+          sent.shift();
+        const capacityAt =
+          sent.reduce((sum, s) => sum + s.units, 0) + units >
+          JITO_HELIUS_WIRE_PACING.methods
+            ? sent[0].at + JITO_HELIUS_WIRE_PACING.windowMs
+            : now;
+        const at = Math.max(now, nextWire, capacityAt);
+        if (at === now) {
           sent.push({ at: now, units });
+          nextWire =
+            now + units * JITO_HELIUS_WIRE_PACING.millisecondsPerMethod;
           return;
         }
         await new Promise<void>((resolve, reject) => {
@@ -43,7 +62,7 @@ export function createJitoHeliusReadonlyPacer(
               signal.removeEventListener('abort', abort);
               resolve();
             },
-            Math.max(1, sent[0].at + 1025 - now),
+            Math.max(1, at - now),
           );
           signal.addEventListener('abort', abort, { once: true });
           if (signal.aborted) abort();

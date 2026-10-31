@@ -29,6 +29,7 @@ import {
   collectJitoCpmmV2SetupResearchRuntimeEvidence as collectJitoCpmmSetupResearchRuntimeEvidence,
   verifyJitoCpmmV2SetupResearchRuntimeBracket as verifyJitoCpmmSetupResearchRuntimeBracket,
   jitoRuntimePolicyRefusal,
+  readJitoCpmmV2OpeningAccounts,
 } from '../lib/jito-runtime-evidence';
 import {
   captureJitoCpmmLifetime,
@@ -48,7 +49,10 @@ import { readJitoCpmmPriceComparison } from '../lib/jito-cpmm-price-evidence';
 import { solanaTransferMessage } from '../lib/solana-transfer-message';
 import type { PumpLaunchRpc } from '../lib/pump-launch-simulation';
 import { decodeJitoCpmmCompressedAccounts } from '../lib/jito-cpmm-code-compression';
-const PAYER = '2BrxKZyzZ64TgS38ghWHdZU4wSf2C9USuoB6nDkk9Kgo',
+// Public research reference only; no ownership or signing claim. Selected by
+// bounded read-only discovery after the old reference's exact custody refusal.
+// Every qualification still independently checks its actual unchanged custody.
+const PAYER = '2yik7ZsLfFKAmmr9cCHhL1dTabiECnFKDeSVyTbxeETU',
   TIP = '96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5';
 const CPMM = 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C';
 const WSOL = 'So11111111111111111111111111111111111111112',
@@ -86,6 +90,8 @@ export async function qualifyJitoCpmmProviderObserved(
     });
   };
   summary.profile = 'provider-observed-raydium-cpmm-runtime-v1';
+  summary.referenceWallet = PAYER;
+  summary.referenceOwnershipClaimed = false;
   let first: Awaited<
     ReturnType<typeof collectJitoCpmmSetupResearchRuntimeEvidence>
   > | null = null;
@@ -165,15 +171,20 @@ export async function qualifyJitoCpmmProviderObserved(
       VAULT1,
       ORACLE,
     ];
-    async function state(at: number) {
-      const r = (await rpc(
-        'getMultipleAccounts',
-        [
-          stateKeys,
-          { encoding: 'base64', commitment: 'confirmed', minContextSlot: at },
-        ],
-        signal,
-      )) as { context: { slot: string }; value: (Account | null)[] };
+    async function state(
+      at: number,
+      supplied?: { context: { slot: string }; value: (Account | null)[] },
+    ) {
+      const r =
+        supplied ??
+        ((await rpc(
+          'getMultipleAccounts',
+          [
+            stateKeys,
+            { encoding: 'base64', commitment: 'confirmed', minContextSlot: at },
+          ],
+          signal,
+        )) as { context: { slot: string }; value: (Account | null)[] });
       const slot = Number(r.context.slot);
       if (
         !Number.isSafeInteger(slot) ||
@@ -360,20 +371,22 @@ export async function qualifyJitoCpmmProviderObserved(
       ),
     ];
     stage('first-code-and-state');
-    const opening = await Promise.allSettled([
-      collectJitoCpmmSetupResearchRuntimeEvidence(
-        keys,
-        floor,
-        floor,
-        signal,
-        runtimeRpc,
-      ),
-      state(floor),
-    ]);
-    if (opening[0].status !== 'fulfilled') throw opening[0].reason;
-    if (opening[1].status !== 'fulfilled') throw opening[1].reason;
-    first = opening[0].value;
-    const before = opening[1].value;
+    first = await collectJitoCpmmSetupResearchRuntimeEvidence(
+      keys,
+      floor,
+      floor,
+      signal,
+      runtimeRpc,
+    );
+    const opening = readJitoCpmmV2OpeningAccounts(first, runtimeRpc);
+    if (stateKeys.some((k) => !opening.keys.includes(k))) fail();
+    const before = await state(floor, {
+      context: { slot: String(opening.slot) },
+      value: stateKeys.map(
+        (k) => opening.accounts[opening.keys.indexOf(k)],
+      ) as (Account | null)[],
+    });
+    summary.openingCustodySource = 'issued-runtime-inventory-original-context';
     retained.before = before;
     retained.first = first;
     stage('fresh-quote-and-lifetime');

@@ -32,7 +32,19 @@ async function main() {
     file = `work/jito-provider-observed-${stamp}.mjs`;
   const built = await build({
     stdin: {
-      contents: `export {createJitoHeliusReadonlyPacer} from './lib/jito-helius-readonly-pacing';export {qualifyJitoCpmmProviderObserved} from './scripts/qualify-jito-cpmm-provider-observed';export {inspectJitoNativeTipCustody} from './lib/jito-native-tip-custody';export {inspectPairRentAccount,pairRentMinimumRaw} from './lib/pair-rent-evidence';export {collectJitoProviderObservedAttempt} from './lib/jito-coherent-prefee-attempt';export {collectJitoRuntimeEvidence,verifyJitoRuntimeBracket} from './lib/jito-runtime-evidence';export {captureJitoCpmmLifetime,recheckJitoCpmmLifetime} from './lib/jito-cpmm-lifetime';export {solanaTransferMessage} from './lib/solana-transfer-message';export {paceWalletRpc} from './lib/wallet-rpc-pacing';export {readJitoSimulationPayload} from './lib/jito-simulation-json';`,
+      contents: [
+        "export {createJitoHeliusReadonlyPacer,JITO_HELIUS_WIRE_PACING} from './lib/jito-helius-readonly-pacing';",
+        "export {classifyJitoHeliusRefusal} from './lib/jito-helius-refusal';",
+        "export {qualifyJitoCpmmProviderObserved} from './scripts/qualify-jito-cpmm-provider-observed';",
+        "export {inspectJitoNativeTipCustody} from './lib/jito-native-tip-custody';",
+        "export {inspectPairRentAccount,pairRentMinimumRaw} from './lib/pair-rent-evidence';",
+        "export {collectJitoProviderObservedAttempt} from './lib/jito-coherent-prefee-attempt';",
+        "export {collectJitoRuntimeEvidence,verifyJitoRuntimeBracket} from './lib/jito-runtime-evidence';",
+        "export {captureJitoCpmmLifetime,recheckJitoCpmmLifetime} from './lib/jito-cpmm-lifetime';",
+        "export {solanaTransferMessage} from './lib/solana-transfer-message';",
+        "export {paceWalletRpc} from './lib/wallet-rpc-pacing';",
+        "export {readJitoSimulationPayload} from './lib/jito-simulation-json';",
+      ].join('\n'),
       resolveDir: process.cwd(),
     },
     platform: 'node',
@@ -67,8 +79,9 @@ async function main() {
       : null;
   if (raydium)
     summary.pacingProfile = researchPacer
-      ? 'existing-helius-9-methods-with-actual-wire-cap'
+      ? 'helius-guarded-wire-headroom'
       : 'configured-wallet-pacing';
+  if (researchPacer) summary.wirePacing = api.JITO_HELIUS_WIRE_PACING;
   const hash = (b) => createHash('sha256').update(b).digest('hex');
   const fail = () => {
     throw Error('Evidence refused');
@@ -111,6 +124,7 @@ async function main() {
         void row;
         await api.paceWalletRpc(endpoint, signal);
       }
+    if (summary.rateLimited || signal.aborted) fail();
     const sentAtMs = Date.now();
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -122,15 +136,38 @@ async function main() {
     });
     if (response.status === 429) {
       summary.rateLimited = true;
-      captures.push({
+      const record = {
         request: body,
         requestSha256: hash(body),
         httpStatus: 429,
         sentAtMs,
         capturedAtMs: Date.now(),
         responseBodyRetained: false,
-      });
-      await response.body?.cancel();
+      };
+      captures.push(record);
+      let value = null;
+      try {
+        const raw = await api.readJitoSimulationPayload(
+          response.body,
+          AbortSignal.any([signal, AbortSignal.timeout(1500)]),
+          8192,
+          { allowDecimalTokens: true },
+        );
+        Object.assign(record, {
+          responseBodyRetained: true,
+          responseBase64: Buffer.from(raw.rawBody).toString('base64'),
+          responseSha256: hash(raw.rawBody),
+        });
+        value = raw.value;
+      } catch {
+        await response.body?.cancel().catch(() => {});
+      }
+      const retry = response.headers.get('retry-after');
+      summary.rateLimitEvidence = {
+        kind: 'http-429',
+        ...api.classifyJitoHeliusRefusal(value, 429),
+        retryAfterSeconds: /^\d{1,5}$/.test(retry ?? '') ? Number(retry) : null,
+      };
       owner.abort(Error('Helius research rate limit; no retry.'));
       fail();
     }
@@ -150,9 +187,10 @@ async function main() {
       capturedAtMs: Date.now(),
     });
     if (!response.ok) fail();
-    const members = Array.isArray(raw.value) ? raw.value : [raw.value];
-    if (members.some((x) => x.error?.code === 429n)) {
+    const refusal = api.classifyJitoHeliusRefusal(raw.value, response.status);
+    if (refusal.rateLimited) {
       summary.rateLimited = true;
+      summary.rateLimitEvidence = { kind: 'json-rpc', ...refusal };
       owner.abort(Error('Helius research rate limit; no retry.'));
       fail();
     }

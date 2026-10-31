@@ -17,6 +17,7 @@ import {
   collectJitoCpmmV2SetupResearchRuntimeEvidence,
   verifyJitoCpmmSetupResearchRuntimeBracket,
   jitoRuntimePolicyRefusal,
+  readJitoCpmmV2OpeningAccounts,
 } from './jito-runtime-evidence';
 import type { JitoBundleSimulationFrames } from './jito-bundle-simulation-frames';
 import type { PumpLaunchRpc } from './pump-launch-simulation';
@@ -223,6 +224,98 @@ it('binds research captures to two complete identical scans while the default pr
   await expect(
     verifyJitoCpmmResearchRuntimeBracket(ordinary, last, f.frames, signal()),
   ).rejects.toThrow();
+});
+it('retains complete custody bytes at the actual opening slot, without exposing another profile or reader', async () => {
+  const f = fixture(),
+    ata = PAIR_TRUSTED_PROGRAMS.find(
+      (p) => p.address === 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+    )!;
+  Object.assign(f.identities[2], CPMM_INITIALIZE_V2_SOURCE_IDENTITY);
+  f.identities.push({
+    address: ata.address,
+    loader: ata.loader,
+    identityKind: 'elf-code',
+    programData: null,
+    deploymentSlot: null,
+    upgradeAuthority: ata.upgradeAuthority,
+    codeSha256: ata.codeSha256[0],
+    codeBytes: 105032,
+  });
+  const custody = bs58.encode(new Uint8Array(32).fill(88));
+  f.keys.push(ata.address, custody);
+  f.accounts.push(
+    {
+      owner: ata.loader,
+      lamports: '1',
+      executable: true,
+      data: Buffer.alloc(1),
+    },
+    {
+      owner: token,
+      lamports: '2000000',
+      executable: false,
+      data: Buffer.alloc(165, 8),
+    },
+  );
+  const configs: unknown[] = [];
+  const rpc: PumpLaunchRpc = async (method, params, s) => {
+    const r = (await f.rpc(method, params, s)) as {
+      context?: { slot: string };
+    };
+    if (method === 'getMultipleAccounts') {
+      configs.push(params[1]);
+      if ((params[1] as { minContextSlot: number }).minContextSlot === 104)
+        r.context!.slot = '104';
+    }
+    return r;
+  };
+  const original = vi
+    .mocked(collectPumpProgramIdentities)
+    .getMockImplementation()!;
+  vi.mocked(collectPumpProgramIdentities).mockImplementationOnce(
+    async (...args) => {
+      await args[3](
+        'getMultipleAccounts',
+        [
+          [system],
+          { encoding: 'base64', commitment: 'confirmed', minContextSlot: 104 },
+        ],
+        args[2],
+      );
+      return original(...args);
+    },
+  );
+  const first = await collectJitoCpmmV2SetupResearchRuntimeEvidence(
+    f.keys,
+    100,
+    100,
+    signal(),
+    rpc,
+  );
+  const opening = readJitoCpmmV2OpeningAccounts(first, rpc);
+  expect(configs[0]).toMatchObject({ dataSlice: { offset: 0, length: 165 } });
+  expect(first.maximumSlot).toBe(104);
+  expect(opening.slot).toBe(102);
+  const a = opening.accounts.at(-1) as { data: string[] };
+  expect(Buffer.from(a.data[0], 'base64')).toHaveLength(165);
+  a.data[0] = '';
+  expect(
+    (
+      readJitoCpmmV2OpeningAccounts(first, rpc).accounts.at(-1) as {
+        data: string[];
+      }
+    ).data[0],
+  ).not.toBe('');
+  expect(() => readJitoCpmmV2OpeningAccounts({ ...first }, rpc)).toThrow();
+  expect(() => readJitoCpmmV2OpeningAccounts(first, f.rpc)).toThrow();
+  const ordinary = await collectJitoRuntimeEvidence(
+    [system],
+    100,
+    100,
+    signal(),
+    f.rpc,
+  );
+  expect(() => readJitoCpmmV2OpeningAccounts(ordinary, f.rpc)).toThrow();
 });
 it('retains reserved-write, exact account coverage and second-code-scan constraints', async () => {
   const f = fixture(),

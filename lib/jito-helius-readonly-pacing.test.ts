@@ -8,7 +8,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
 });
-it('counts all five batch methods at actual admission and waits before the tenth', async () => {
+it('counts all five batch methods, preserves the weighted gap, and waits before the ninth', async () => {
   vi.useFakeTimers();
   vi.setSystemTime(10000);
   const signal = new AbortController().signal,
@@ -17,17 +17,24 @@ it('counts all five batch methods at actual admission and waits before the tenth
       signal,
     );
   await p(5);
-  await p(4);
+  let middle = false;
+  const three = p(3).then(() => {
+    middle = true;
+  });
+  await vi.advanceTimersByTimeAsync(749);
+  expect(middle).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await three;
   let done = false;
   const pending = p(1).then(() => {
     done = true;
   });
-  await vi.advanceTimersByTimeAsync(1024);
+  await vi.advanceTimersByTimeAsync(499);
   expect(done).toBe(false);
   await vi.advanceTimersByTimeAsync(1);
   await pending;
   expect(done).toBe(true);
-  expect(vi.mocked(paceWalletRpc).mock.calls).toHaveLength(10);
+  expect(vi.mocked(paceWalletRpc).mock.calls).toHaveLength(9);
   expect(
     vi
       .mocked(paceWalletRpc)
@@ -46,9 +53,9 @@ it('serializes concurrent batches without a burst above nine methods', async () 
     p(5).then(() => times.push(Date.now())),
     p(5).then(() => times.push(Date.now())),
   ]);
-  await vi.advanceTimersByTimeAsync(1025);
+  await vi.advanceTimersByTimeAsync(1250);
   await all;
-  expect(times).toEqual([10000, 11025]);
+  expect(times).toEqual([10000, 11250]);
 });
 it('cancels queued admissions and refuses oversized counts or another endpoint', async () => {
   vi.useFakeTimers();
@@ -58,7 +65,9 @@ it('cancels queued admissions and refuses oversized counts or another endpoint',
       c.signal,
     );
   await p(5);
-  await p(4);
+  const three = p(3);
+  await vi.advanceTimersByTimeAsync(750);
+  await three;
   const pending = p(1);
   const assertion = expect(pending).rejects.toThrow();
   await vi.advanceTimersByTimeAsync(0);
