@@ -18,6 +18,7 @@ import {
 import { POST as recoverImportedApproval } from '../signing/route';
 import { prepareJitoBundle } from '@/lib/jito-bundle-preparation';
 import { JitoJsonError, readJitoJson } from '@/lib/jito-json';
+import { JITO_RUNTIME_SIGNING_ENABLED } from '@/lib/jito-cpmm-unsigned-review';
 import {
   JITO_OWNER_SCOPE_HEADER,
   jitoOwnerScope,
@@ -74,10 +75,20 @@ export async function GET(request: Request) {
       .first();
     if (!owned) return reply({ error: 'Owned session unavailable.' }, 404);
     if (bundleId === null && request.headers.get('x-jito-protocol') !== '2') {
-      const newer = await db.prepare(
-        'SELECT 1 AS present FROM jito_bundles b JOIN jito_bundle_protocol v ON v.owner_id=b.owner_id AND v.bundle_id=b.id WHERE b.owner_id=? AND b.project_id=? AND b.session_id=? LIMIT 1',
-      ).bind(user.userId, projectId, sessionId).first();
-      if (newer) return reply({ error: 'Bundle client update required to see complete bundle history.' }, 409);
+      const newer = await db
+        .prepare(
+          'SELECT 1 AS present FROM jito_bundles b JOIN jito_bundle_protocol v ON v.owner_id=b.owner_id AND v.bundle_id=b.id WHERE b.owner_id=? AND b.project_id=? AND b.session_id=? LIMIT 1',
+        )
+        .bind(user.userId, projectId, sessionId)
+        .first();
+      if (newer)
+        return reply(
+          {
+            error:
+              'Bundle client update required to see complete bundle history.',
+          },
+          409,
+        );
     }
     if (bundleId !== null) {
       const ownedBundle = await db
@@ -269,9 +280,20 @@ export async function POST(request: Request) {
   // The current sequential check is unsigned and does not qualify the exact
   // registered signed vector at its simulation bank. Do not enter the sender
   // until a separate, verified qualification is wired here.
+  if (body.action === 'begin-signing' && !JITO_RUNTIME_SIGNING_ENABLED)
+    return reply(
+      {
+        error:
+          'New Jito signing is disabled. Unsigned Raydium research evidence does not authorize a wallet prompt. Existing evidence recovery remains available.',
+      },
+      409,
+    );
   if (body.action === 'submit')
     return reply(
-      { error: 'Jito bundle submission is unavailable until the exact signed transactions pass runtime qualification.' },
+      {
+        error:
+          'Jito bundle submission is unavailable until the exact signed transactions pass runtime qualification.',
+      },
       409,
     );
   try {

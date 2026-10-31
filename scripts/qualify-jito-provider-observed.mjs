@@ -226,6 +226,16 @@ async function main() {
       signal,
     );
     const receipt = `work/jito-cpmm-provider-observed-${stamp}.json`;
+    if (
+      evidence.unsignedReview &&
+      summary.status === 'unsigned-cpmm-checks-passed-provider-trust-required'
+    ) {
+      summary.unsignedReviewFile = `work/jito-cpmm-unsigned-review-${stamp}.json`;
+      await writeFile(
+        summary.unsignedReviewFile,
+        JSON.stringify(evidence.unsignedReview, null, 2),
+      );
+    }
     await writeFile(
       receipt,
       JSON.stringify(

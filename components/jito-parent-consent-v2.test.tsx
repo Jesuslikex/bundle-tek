@@ -4,6 +4,12 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
+// Exercise historical consent handlers under synthetic prompt mode only.
+// Default false is separately checked through the real DOM and route gate.
+vi.mock('@/lib/jito-cpmm-unsigned-review', async (original) => ({
+  ...(await original<typeof import('@/lib/jito-cpmm-unsigned-review')>()),
+  JITO_RUNTIME_SIGNING_ENABLED: true,
+}));
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import type { TradeSession } from '@/lib/imported-trade-session';
 import type { JitoBundleRecord } from '@/lib/jito-bundle';
@@ -14,7 +20,9 @@ import {
 // The underlying consent handler is exercised directly in this suite. The
 // real button remains disabled and its DOM behavior is checked separately.
 vi.mock('./ui/button', () => ({
-  Button: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} />,
+  Button: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button {...props} />
+  ),
 }));
 vi.mock('better-auth/react', () => ({
   createAuthClient: () => ({
@@ -316,7 +324,9 @@ it('rejects a stale submit click after consent is unchecked and rechecked', asyn
   expect(f.posts).toEqual([]);
   // Exercise the retained consent handler separately from the disabled DOM
   // control; the real API rejects all submission while qualification is off.
-  await act(async () => captured(button('Submit complete Jito bundle'), 'onClick')({}));
+  await act(async () =>
+    captured(button('Submit complete Jito bundle'), 'onClick')({}),
+  );
   await vi.waitFor(() => expect(f.posts).toEqual(['submit']));
 });
 it('rejects a stale submit click after the parent is locked', async () => {
@@ -503,7 +513,9 @@ it('rejects stale pending-bundle metadata reads while a fresh load remains usabl
   await click('Reserve mock pending packet');
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(container.textContent).toContain('Signer preparation is in progress');
+    expect(container.textContent).toContain(
+      'Signer preparation is in progress',
+    );
   });
   history.bundles = [];
   await click('Load bundle approvals');

@@ -17,6 +17,12 @@ import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
 import * as locatorModule from '@/lib/jito-recovery-locator';
 import { bundleFingerprint } from '@/lib/jito-bundle';
 import type { JitoAttempt } from '@/lib/jito-sign-attempt-client';
+// Historical synthetic prompt/recovery contracts remain exercised explicitly.
+// Production defaults stay off and are checked by the route/parent gate suites.
+vi.mock('@/lib/jito-cpmm-unsigned-review', async (original) => ({
+  ...(await original<typeof import('@/lib/jito-cpmm-unsigned-review')>()),
+  JITO_RUNTIME_SIGNING_ENABLED: true,
+}));
 
 const journal = vi.hoisted(() => ({ rows: new Map<string, unknown>() }));
 vi.mock('@/lib/jito-recovery-journal-store', () => ({

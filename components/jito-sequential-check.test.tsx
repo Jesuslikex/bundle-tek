@@ -84,10 +84,10 @@ it('performs no automatic read and explains unsigned-only availability', async (
   expect(fetcher).not.toHaveBeenCalled();
   expect(button().disabled).toBe(false);
   expect(container.textContent).toContain(
-    'This check is optional. Sign and Submit do not depend on this check;',
+    'This check is optional. Signing and submission are disabled',
   );
   expect(container.textContent).toContain(
-    'each still requires its own checks and approval.',
+    'this diagnostic cannot enable them.',
   );
   expect(container.textContent).toContain(
     'does not establish provider readiness or complete bundle economic and runtime qualification.',
@@ -127,7 +127,7 @@ it('sends only the explicit saved identity and renders an exact-bank refusal wit
     'exact simulation bank is unavailable',
   );
   expect(container.textContent).toContain(
-    'This check is optional. Sign and Submit do not depend on this check;',
+    'This check is optional. Signing and submission are disabled',
   );
   expect(container.textContent).toContain(
     'does not establish provider readiness or complete bundle economic and runtime qualification.',

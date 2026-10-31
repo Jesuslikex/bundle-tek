@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   captureJitoSwapSimulation,
@@ -10,6 +11,7 @@ import {
   readJitoAssetEvidence,
 } from '../lib/jito-asset-evidence';
 import type { SolanaSwapPreparation } from '../lib/warmup-swap-quote';
+import * as simulationModule from '../lib/imported-swap-simulation';
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -41,21 +43,46 @@ it('replays an actual complete unsigned public swap baseline through the unchang
     .spyOn(globalThis, 'fetch')
     .mockRejectedValue(Error('network forbidden'));
   let next = 0;
+  const used = new Set<number>();
+  let originalRefusal: unknown;
+  const simulate = simulationModule.simulateImportedSwap;
+  vi.spyOn(simulationModule, 'simulateImportedSwap').mockImplementation(
+    async (...args) => {
+      try {
+        return await simulate(...args);
+      } catch (error) {
+        originalRefusal = error;
+        throw error;
+      }
+    },
+  );
   const fetcher: typeof fetch = async (_url, init) => {
-    const raw = saved.reads[next++];
-    expect(raw).toBeDefined();
-    // The capture pins the block height at finalized commitment, which the
-    // recording predates, so compare the call shape rather than the raw body.
-    const got = JSON.parse(String(init?.body)) as {
-      method: string;
-      params?: unknown[];
-    };
-    const want = JSON.parse(raw.requestBody) as {
-      method: string;
-      params?: unknown[];
-    };
-    expect(got.method).toBe(want.method);
-    expect(got.params?.length ?? 0).toBe(want.params?.length ?? 0);
+    // Height and fee reads start together. Asynchronous request hashing can
+    // reverse their wire arrival. Match complete requests, not arrival order.
+    // Only two known request options postdate this historical recording:
+    // finalized height commitment and explicitly requesting the retained logs.
+    if (typeof init?.body !== 'string')
+      throw Error('Expected an exact JSON request body.');
+    const got = JSON.parse(init.body);
+    const index = saved.reads.findIndex((read, i) => {
+      if (used.has(i)) return false;
+      const want = JSON.parse(read.requestBody);
+      if (want.method === 'getBlockHeight')
+        want.params = [{ commitment: 'finalized' }];
+      if (
+        want.method === 'simulateTransaction' &&
+        !Object.hasOwn(want.params[1], 'logs')
+      ) {
+        if (!Array.isArray(JSON.parse(read.rawBody).result?.value?.logs))
+          return false;
+        want.params[1].logs = true;
+      }
+      return isDeepStrictEqual(got, want);
+    });
+    expect(index).toBeGreaterThanOrEqual(0);
+    const raw = saved.reads[index];
+    used.add(index);
+    next++;
     expect(hash(raw.requestBody)).toBe(raw.requestSha256);
     expect(hash(raw.rawBody)).toBe(raw.rawSha256);
     return new Response(raw.rawBody);
@@ -64,7 +91,9 @@ it('replays an actual complete unsigned public swap baseline through the unchang
     saved.order,
     new AbortController().signal,
     fetcher,
-  );
+  ).catch((error) => {
+    throw originalRefusal ?? error;
+  });
   expect(next).toBe(saved.reads.length);
   expect(result.simulation.settlementEvidence).not.toBeNull();
   expect(result.simulation.succeeded).toBe(true);

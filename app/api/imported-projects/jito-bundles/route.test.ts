@@ -183,7 +183,7 @@ it('requires authentication, JSON, origin and explicit action-time approval befo
   expect(mocks.register).not.toHaveBeenCalled();
   expect(mocks.submit).not.toHaveBeenCalled();
 });
-it('requires v2, the current account scope and separate approval for a signing reservation', async () => {
+it('requires v2, current scope and approval but still refuses new signing before any database reservation', async () => {
   const scope = await jitoOwnerScope('owner');
   const body = {
     action: 'begin-signing',
@@ -217,12 +217,12 @@ it('requires v2, the current account scope and separate approval for a signing r
   const response = await POST(
     request(body, { [JITO_OWNER_SCOPE_HEADER]: scope, 'x-jito-protocol': '2' }),
   );
-  expect(response.status).toBe(200);
+  expect(response.status).toBe(409);
   expect(await response.json()).toEqual({
-    attempt: { state: 'unknown' },
-    mayInvokeSigner: true,
+    error: expect.stringContaining('New Jito signing is disabled'),
   });
-  expect(mocks.begin.mock.calls[0][1]).toBe('owner');
+  expect(mocks.begin).not.toHaveBeenCalled();
+  expect(mocks.database).not.toHaveBeenCalled();
 });
 it('refuses an old client registration before the signer result reaches the writer', async () => {
   const scope = await jitoOwnerScope('owner');
@@ -461,12 +461,20 @@ it('rate-limits provider work and leaves retained recovery state intact on failu
   expect(mocks.submit).not.toHaveBeenCalled();
 });
 it('refuses approved v2 submission before database or sender work', async () => {
-  const response = await POST(request(
-    { action: 'submit', id, sha256: 'ab'.repeat(32), approved: true },
-    { 'x-jito-protocol': '2', [JITO_OWNER_SCOPE_HEADER]: await jitoOwnerScope('owner') },
-  ));
+  const response = await POST(
+    request(
+      { action: 'submit', id, sha256: 'ab'.repeat(32), approved: true },
+      {
+        'x-jito-protocol': '2',
+        [JITO_OWNER_SCOPE_HEADER]: await jitoOwnerScope('owner'),
+      },
+    ),
+  );
   expect(response.status).toBe(409);
-  expect(await response.json()).toEqual({ error: 'Jito bundle submission is unavailable until the exact signed transactions pass runtime qualification.' });
+  expect(await response.json()).toEqual({
+    error:
+      'Jito bundle submission is unavailable until the exact signed transactions pass runtime qualification.',
+  });
   expect(mocks.database).not.toHaveBeenCalled();
   expect(mocks.submit).not.toHaveBeenCalled();
   expect(mocks.register).not.toHaveBeenCalled();

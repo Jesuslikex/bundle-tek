@@ -18,6 +18,7 @@ const sources = [
     'runtime-evidence',
     'cpmm-source-identity',
     'cpmm-unsigned-packet',
+    'cpmm-unsigned-review',
     'cpmm-state-replay',
     'cpmm-candidate-instruction',
     'cpmm-candidate-balances',

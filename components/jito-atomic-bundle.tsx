@@ -21,6 +21,8 @@ import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import { JitoPacketSigning } from './jito-packet-signing';
 import { JitoBundleTimeline } from './jito-bundle-timeline';
 import { JitoSequentialCheck } from './jito-sequential-check';
+import { JitoCpmmUnsignedReviewPanel } from './jito-cpmm-unsigned-review';
+import { JITO_RUNTIME_SIGNING_ENABLED } from '@/lib/jito-cpmm-unsigned-review';
 import { requireJitoFinalization } from '@/lib/jito-finalization';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -1023,6 +1025,20 @@ function JitoAtomicBundleForContext({
           bundle.
         </p>
         <TransactionDeliveryNotice transport="jito-bundle" />
+        {ownerScope && (
+          <JitoCpmmUnsignedReviewPanel
+            ownerScope={ownerScope}
+            projectId={projectId}
+            sessionId={session.id}
+            disabled={busy || !historyVerified || coordinator.operationActive()}
+            isContextCurrent={isContextCurrent}
+          />
+        )}
+        <p>
+          New Jito signing is disabled. Existing signed evidence can still be
+          inspected and recovered; research results never enable wallet prompts
+          or submission.
+        </p>
         {coordinator.operationActive() && (
           <p>Another Jito action is in progress.</p>
         )}
@@ -1304,7 +1320,8 @@ function JitoAtomicBundleForContext({
             Array.from({ length: m.swaps.length + 1 }, (_, packet) =>
               coordinator.has(ownerScope!, m.id, packet),
             ).some(Boolean);
-          const canSign = canRegister && !hasPendingPacket && !unresolved;
+          const canReview = canRegister && !hasPendingPacket && !unresolved;
+          const canSign = JITO_RUNTIME_SIGNING_ENABLED && canReview;
           const snapshotStillCurrent = () => {
             const activeSnapshot = isLocated
               ? locatedNow.current?.snapshot
@@ -1389,7 +1406,7 @@ function JitoAtomicBundleForContext({
                 key={m.sha256}
                 manifest={m}
                 ownerScope={ownerScope ?? ''}
-                disabled={!canSign || bundle.signatures.some(Boolean)}
+                disabled={!canReview || bundle.signatures.some(Boolean)}
               />
               <p>
                 State: {bundle.state}.{' '}
@@ -1399,9 +1416,9 @@ function JitoAtomicBundleForContext({
               </p>
               {bundle.state === 'reviewed' && (
                 <p>
-                  Submission is unavailable until these exact signed transactions
-                  pass runtime qualification. Saved signing and recovery evidence
-                  remains available.
+                  Submission is unavailable until these exact signed
+                  transactions pass runtime qualification. Saved signing and
+                  recovery evidence remains available.
                 </p>
               )}
               {bundle.state === 'submitting' && (

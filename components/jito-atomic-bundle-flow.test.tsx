@@ -229,6 +229,33 @@ function button(text: string) {
 async function click(text: string) {
   await act(async () => button(text).click());
 }
+it('keeps every new signer disabled even for a fresh verified unsigned plan while allowing read-only checks', async () => {
+  const { f, session, bundle, history } = await fixture();
+  bundle.signatures = [null, null];
+  const scope = await jitoOwnerScope('alice');
+  fetcher.mockImplementation(async (url, init) => {
+    expect(init?.method).not.toBe('POST');
+    return Response.json(
+      String(url).includes('bundleId=') ? exact(f, bundle) : history,
+      { headers: { [JITO_OWNER_SCOPE_HEADER]: scope } },
+    );
+  });
+  await render(session);
+  await click('Load bundle approvals');
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('Check sequential simulation').disabled).toBe(false);
+  });
+  const signers = [
+    ...container.querySelectorAll('[data-testid="mock-signer"]'),
+  ];
+  expect(signers).toHaveLength(2);
+  expect(
+    signers.every((node) => node.getAttribute('data-disabled') === 'true'),
+  ).toBe(true);
+  expect(container.textContent).toContain('New Jito signing is disabled');
+  expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
 it('disables unqualified submission and still recovers a prior ambiguous outcome', async () => {
   const { f, session, bundle, history } = await fixture();
   const scope = await jitoOwnerScope('alice');
@@ -264,9 +291,11 @@ it('disables unqualified submission and still recovers a prior ambiguous outcome
     .find((l) => l.textContent?.includes('I approve submitting'))!
     .querySelector('input')!;
   expect(approval.checked).toBe(false);
-  await vi.waitFor(() => expect(approval.disabled).toBe(false));
+  expect(approval.disabled).toBe(true);
   await act(async () => approval.click());
-  expect(container.textContent).toContain('Submission is unavailable until these exact signed transactions');
+  expect(container.textContent).toContain(
+    'Submission is unavailable until these exact signed transactions',
+  );
   expect(button('Submit complete Jito bundle').disabled).toBe(true);
   await click('Submit complete Jito bundle');
   expect(posts).toEqual([]);

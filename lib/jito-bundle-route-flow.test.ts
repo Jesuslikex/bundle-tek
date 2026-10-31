@@ -1,6 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest';
+// Native SQLite/synthetic signer route contracts, not production admission.
+// The real gate's default false and pre-DB 409 are separately asserted.
+vi.mock('@/lib/jito-cpmm-unsigned-review', async (original) => ({
+  ...(await original<typeof import('@/lib/jito-cpmm-unsigned-review')>()),
+  JITO_RUNTIME_SIGNING_ENABLED: true,
+}));
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import { jitoDatabase } from '../test/jito-sqlite';
+import { submitJitoBundle } from './jito-bundle-server';
 import { unsignedPreparationSummary } from './imported-swap-preparation-history';
 import type { JitoBundleRecord } from './jito-bundle';
 const control = vi.hoisted(() => ({
@@ -200,10 +207,18 @@ for (const token2022 of [false, true])
       }
       expect(calls).toEqual([]);
       const result = await post({ action: 'submit', ...identity });
-      expect(result.status).toBe(200);
-      expect(
-        ((await result.json()) as { bundle: JitoBundleRecord }).bundle.state,
-      ).toBe(unknown ? 'submitting' : 'submitted');
+      expect(result.status).toBe(409);
+      expect(sends).toHaveLength(0);
+      // Only the synthetic legacy service fixture may create an old in-flight
+      // record. The application HTTP boundary stays blocked in every mode.
+      const prior = await submitJitoBundle(
+        d.db,
+        'owner',
+        f.manifest.id,
+        f.manifest.sha256,
+        new AbortController().signal,
+      );
+      expect(prior.state).toBe(unknown ? 'submitting' : 'submitted');
       expect(sends).toEqual([[packets, { encoding: 'base64' }]]);
       d.sqlite.exec('DELETE FROM wallet_balance_gates');
       await post({ action: 'submit', ...identity });

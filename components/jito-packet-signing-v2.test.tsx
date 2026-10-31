@@ -20,6 +20,11 @@ import { createJitoPacketRecovery } from '@/lib/jito-packet-recovery';
 import * as packetRecovery from '@/lib/jito-packet-recovery';
 import type { JitoAttempt } from '@/lib/jito-sign-attempt-client';
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
+// Test-only synthetic prompt/recovery mode. The real gate remains false.
+vi.mock('@/lib/jito-cpmm-unsigned-review', async (original) => ({
+  ...(await original<typeof import('@/lib/jito-cpmm-unsigned-review')>()),
+  JITO_RUNTIME_SIGNING_ENABLED: true,
+}));
 import {
   JitoPacketSigning,
   type JitoPacketV2Snapshot,

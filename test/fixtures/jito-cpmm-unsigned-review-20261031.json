@@ -1,0 +1,38 @@
+{
+  "format": "jito-cpmm-unsigned-review-v1",
+  "purpose": "public-reference-research",
+  "capturedAt": "2026-10-31T04:54:56.253Z",
+  "payer": "2yik7ZsLfFKAmmr9cCHhL1dTabiECnFKDeSVyTbxeETU",
+  "pool": "fAjTnZ9QqJkUmrr8cXutkYhpVge2qqtSZNt9qKn7YC2",
+  "inputMint": "So11111111111111111111111111111111111111112",
+  "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "inputRaw": "1000000",
+  "expectedOutputRaw": "95411",
+  "minimumOutputRaw": "95411",
+  "tipLamports": "1000",
+  "networkFeeLamports": "20000",
+  "maximumFeeLamports": "80000",
+  "createdRentLamports": "1488440",
+  "retainedRentLamports": "650240",
+  "minimumSlot": "463561401",
+  "simulationSlot": "463561414",
+  "maximumSlot": "463561428",
+  "blockhash": "BTgPGARFhvFFUM11HnasyRfnECEC5Z36rZtVmVG5Nx2u",
+  "lastValidBlockHeight": "441583488",
+  "priceDifferenceBps": "0",
+  "packetSha256s": [
+    "231adeeb6ec9587ec020b2b63d5f4d4ce3c61f0d56ddfd84f131ff6c13041d28",
+    "29da0ff07326538a67f960324e96663d7e7b9adc99a10ad29548efc298772567",
+    "19a453d16582c26f7916ee528fd5453de016a9583e58dac669e51ce12b159d7c",
+    "d1dc9d68fdf6152470b64ac32ee62e49f757345c2a0c7368c7fffedcac1c13bc"
+  ],
+  "authority": {
+    "sourceAuthenticated": false,
+    "providerQualified": false,
+    "bankVerified": false,
+    "walletOwnershipVerified": false,
+    "signingAllowed": false,
+    "executionAllowed": false
+  },
+  "sha256": "0b9105d23bde520fe3d5a04394b67b14e0a1044b8767b1410b8c5ac4cb0d68ab"
+}

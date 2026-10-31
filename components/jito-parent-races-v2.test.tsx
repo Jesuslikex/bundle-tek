@@ -19,6 +19,11 @@ import type { TradeSession } from '@/lib/imported-trade-session';
 import type { JitoAttempt } from '@/lib/jito-sign-attempt-client';
 import { jitoBundleFixture } from '../test/jito-bundle-fixture';
 import { JitoAtomicBundle } from './jito-atomic-bundle';
+// Preserve race coverage for synthetic prompts without enabling production.
+vi.mock('@/lib/jito-cpmm-unsigned-review', async (original) => ({
+  ...(await original<typeof import('@/lib/jito-cpmm-unsigned-review')>()),
+  JITO_RUNTIME_SIGNING_ENABLED: true,
+}));
 
 const env = vi.hoisted(() => ({
   owner: 'alice',
@@ -668,9 +673,7 @@ it('refreshes a changed recent bundle explicitly after the locator follow-up, wi
   );
   await click('Open original bundle');
   await until(() =>
-    expect(container.textContent).toContain(
-      'Bundle details need verification',
-    ),
+    expect(container.textContent).toContain('Bundle details need verification'),
   );
   expect(container.textContent).not.toContain(
     `Signed: ${f.f.swap.signed.signature}`,

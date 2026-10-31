@@ -151,10 +151,9 @@ function JitoSequentialCheckForContext({
         bundle.
       </p>
       <p>
-        This check is optional. Sign and Submit do not depend on this check;
-        each still requires its own checks and approval. This check does not
-        establish provider readiness or complete bundle economic and runtime
-        qualification.
+        This check is optional. Signing and submission are disabled, and this
+        diagnostic cannot enable them. It does not establish provider readiness
+        or complete bundle economic and runtime qualification.
       </p>
       <Button
         variant="outline"

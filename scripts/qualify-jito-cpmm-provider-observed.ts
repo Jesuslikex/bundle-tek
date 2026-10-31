@@ -48,6 +48,7 @@ import { observeTokenMarket } from '../lib/token-market';
 import { readJitoCpmmPriceComparison } from '../lib/jito-cpmm-price-evidence';
 import { solanaTransferMessage } from '../lib/solana-transfer-message';
 import type { PumpLaunchRpc } from '../lib/pump-launch-simulation';
+import { createJitoCpmmUnsignedReview } from '../lib/jito-cpmm-unsigned-review';
 import { decodeJitoCpmmCompressedAccounts } from '../lib/jito-cpmm-code-compression';
 // Public research reference only; no ownership or signing claim. Selected by
 // bounded read-only discovery after the old reference's exact custody refusal.
@@ -702,7 +703,7 @@ export async function qualifyJitoCpmmProviderObserved(
       },
     );
     summary.price = price;
-    if (!price.available || price.acknowledgementRequired) fail();
+    if (!price.available || price.acknowledgementRequired) return fail();
     stage('lifetime-after');
     summary.lifetime = lifetime;
     const end = Number(
@@ -725,6 +726,33 @@ export async function qualifyJitoCpmmProviderObserved(
     )
       fail();
     summary.slotSpan = end - floor;
+    // Compact display-only recovery artifact, issued only after every existing
+    // stage passed. No packet bytes, credentials or signing authority escape.
+    retained.unsignedReview = await createJitoCpmmUnsignedReview({
+      capturedAt: new Date().toISOString(),
+      payer: PAYER,
+      pool: POOL,
+      inputMint: WSOL,
+      outputMint: USDC,
+      inputRaw: candidate.swapPacket.expected.inputRaw,
+      expectedOutputRaw: q.expectedOutputRaw,
+      minimumOutputRaw: candidate.swapPacket.expected.minimumOutputRaw,
+      tipLamports: '1000',
+      networkFeeLamports: frames.frames
+        .reduce((sum, f) => sum + BigInt(f.feeLamports), 0n)
+        .toString(),
+      maximumFeeLamports: maximumFees.toString(),
+      createdRentLamports: settlement.setup.createdRentLamports,
+      retainedRentLamports:
+        settlement.walletBalances[0].requiredSystemRentLamports,
+      minimumSlot: String(floor),
+      simulationSlot: String(bank),
+      maximumSlot: String(end),
+      blockhash: life.blockhash,
+      lastValidBlockHeight: life.lastValidBlockHeight,
+      priceDifferenceBps: price.minimumValueDifferenceBps,
+      packetSha256s: frames.frames.map((f) => f.transactionSha256),
+    });
     summary.status = 'unsigned-cpmm-checks-passed-provider-trust-required';
     summary.completeSwapEvidenceChecked = true;
     summary.fullSwapQualified = false;
