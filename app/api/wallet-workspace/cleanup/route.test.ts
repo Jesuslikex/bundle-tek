@@ -403,6 +403,29 @@ it('sells leftover tokens as their own reviewed batch, then allows close and swe
   }
 });
 
+it('sells only the named token when a Sniper Guard Nuke asks for one', async () => {
+  env.JUPITER_API_KEY = 'test-key';
+  try {
+    const other = bs58.encode(new Uint8Array(32).fill(99));
+    const none = (await (
+      await prepare({ stage: 'sell', mint: other })
+    ).json()) as { cleanups: unknown[]; empty: string[] };
+    expect(none.cleanups).toEqual([]);
+    expect(none.empty).toEqual([f.wallet]);
+    expect((await prepare({ mint: other })).status).toBe(400);
+    expect((await prepare({ stage: 'sell', mint: 'nope' })).status).toBe(400);
+    const held = bs58.encode(new Uint8Array(32).fill(12));
+    const sold = await body(await prepare({ stage: 'sell', mint: held }));
+    expect(sold.cleanups).toHaveLength(1);
+    expect(sold.cleanups[0].document).toMatchObject({
+      format: 'wallet-cleanup-sell-v1',
+      mint: held,
+    });
+  } finally {
+    delete env.JUPITER_API_KEY;
+  }
+});
+
 it('refuses the sell stage when Jupiter is not configured', async () => {
   const result = await prepare({ stage: 'sell' });
   expect(result.status).toBe(503);

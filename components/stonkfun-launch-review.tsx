@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { VenueLaunchLive } from './venue-launch-live';
 import {
   useVenueLaunchRecovery,
   VenueLaunchRecoveryHistory,
@@ -541,6 +542,9 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
             Recover saved launch status
           </Button>
         </div>
+      )}
+      {sent && ['submitted', 'finalized'].includes(sent.state) && (
+        <VenueLaunchLive venue="stonkfun" id={sent.id} />
       )}
       {error && (
         <p role="alert" className="inspection-error">
