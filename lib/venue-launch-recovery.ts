@@ -16,6 +16,15 @@ import { verifyVenueLaunchSignedPacket } from './venue-launch-signed-packet';
 import { getSolanaRpcEndpoint, rpcCall } from './solana-rpc';
 import { PumpPreflightError } from './owned-pump-preflight';
 import {
+  isStonkBundleReview,
+  prepareStonkBundle,
+  verifyStonkBundleReview,
+  type StonkBundleReview,
+  type StonkBundleTerms,
+} from './stonkfun-bundle-service';
+import { verifyStonkBundleSigned } from './stonkfun-bundle';
+import { jitoRpc } from './jito-provider';
+import {
   prepareLaunchLabLaunch,
   submitLaunchLabLaunch,
   type LaunchLabReview,
@@ -23,8 +32,16 @@ import {
 } from './launchlab-launch-service';
 
 export type LaunchRecoveryVenue = 'meteora-dbc' | 'stonkfun' | 'launchlab';
-type Review = MeteoraDbcReview | StonkLaunchReview | LaunchLabReview;
-type Terms = MeteoraDbcTerms | StonkLaunchTerms | LaunchLabTerms;
+type Review =
+  | MeteoraDbcReview
+  | StonkLaunchReview
+  | StonkBundleReview
+  | LaunchLabReview;
+type Terms =
+  | MeteoraDbcTerms
+  | StonkLaunchTerms
+  | StonkBundleTerms
+  | LaunchLabTerms;
 type Rpc = (
   method: string,
   params: unknown[],
@@ -78,7 +95,10 @@ function tableForVenue(venue: LaunchRecoveryVenue) {
 }
 async function verifyPacket(review: Review, packet: string, status = 409) {
   try {
-    return await verifyVenueLaunchSignedPacket(review, packet);
+    return await verifyVenueLaunchSignedPacket(
+      review as Exclude<Review, StonkBundleReview>,
+      packet,
+    );
   } catch {
     return fail(
       'Signed launch does not match the exact saved review and signatures.',
@@ -190,6 +210,12 @@ type Deps = {
   submitStonk?: typeof submitStonkLaunch;
   prepareLaunchLab?: typeof prepareLaunchLabLaunch;
   submitLaunchLab?: typeof submitLaunchLabLaunch;
+  prepareStonkBundle?: typeof prepareStonkBundle;
+  /** Jito block engine handoff for a StonkFun holder bundle; one attempt only. */
+  sendBundle?: (
+    transactions: string[],
+    signal: AbortSignal,
+  ) => Promise<unknown>;
 };
 export async function prepareVenueLaunchRecovery(
   db: D1Database,
@@ -232,21 +258,29 @@ export async function prepareVenueLaunchRecovery(
           signal,
           { rpc: deps.rpc },
         )
-      : venue === 'stonkfun'
-        ? await (deps.prepareStonk ?? prepareStonkLaunch)(
+      : venue === 'stonkfun' && 'holders' in terms
+        ? await (deps.prepareStonkBundle ?? prepareStonkBundle)(
             db,
             owner,
-            terms,
+            terms as StonkBundleTerms,
             signal,
             { rpc: deps.rpc },
           )
-        : await (deps.prepareLaunchLab ?? prepareLaunchLabLaunch)(
-            db,
-            owner,
-            terms as LaunchLabTerms,
-            signal,
-            { rpc: deps.rpc },
-          );
+        : venue === 'stonkfun'
+          ? await (deps.prepareStonk ?? prepareStonkLaunch)(
+              db,
+              owner,
+              terms as StonkLaunchTerms,
+              signal,
+              { rpc: deps.rpc },
+            )
+          : await (deps.prepareLaunchLab ?? prepareLaunchLabLaunch)(
+              db,
+              owner,
+              terms as LaunchLabTerms,
+              signal,
+              { rpc: deps.rpc },
+            );
   signal.throwIfAborted();
   if (!Number.isSafeInteger(review.minimumSlot) || review.minimumSlot! < 0)
     throw new VenueLaunchPreparationNotSavedError(
@@ -309,6 +343,7 @@ const actionSchema = z.discriminatedUnion('action', [
       action: z.literal('approve'),
       id,
       sha256: hash,
+      bundleSha256: hash.optional(),
       approved: z.literal(true),
     })
     .strict(),
@@ -324,6 +359,12 @@ const actionSchema = z.discriminatedUnion('action', [
       action: z.literal('submit'),
       id,
       sha256: hash,
+      bundleSha256: hash.optional(),
+      bundleTransactions: z
+        .array(z.string().min(1).max(1800))
+        .min(1)
+        .max(4)
+        .optional(),
       approved: z.literal(true),
     })
     .strict(),
@@ -346,6 +387,22 @@ export async function actVenueLaunchRecovery(
   const action = parsed.data;
   let row = await getRow(db, owner, venue, action.id);
   const review = JSON.parse(row.review) as Review;
+  const bundle = venue === 'stonkfun' && isStonkBundleReview(review);
+  if (action.action === 'approve' || action.action === 'submit') {
+    if (bundle) {
+      if (action.bundleSha256 !== review.bundle.sha256)
+        return fail('Approve the exact saved holder bundle.');
+      try {
+        await verifyStonkBundleReview(review);
+      } catch {
+        return fail('Saved holder bundle differs from its review.');
+      }
+    } else if (
+      action.bundleSha256 !== undefined ||
+      (action.action === 'submit' && action.bundleTransactions !== undefined)
+    )
+      return fail('This saved launch has no holder bundle.', 400);
+  }
   const rpc = deps.rpc ?? rpcDefault;
   const change = async (
     state: Row['state'],
@@ -405,6 +462,21 @@ export async function actVenueLaunchRecovery(
       return fail(
         'Launch review expired. Recover the saved launch; do not resend.',
       );
+    let bundleSigned: string[] = [];
+    if (bundle) {
+      try {
+        verifyStonkBundleSigned(
+          (review as StonkBundleReview).bundle.packets,
+          action.bundleTransactions,
+        );
+      } catch {
+        return fail(
+          'Sign every holder and tip packet of the exact saved bundle.',
+          400,
+        );
+      }
+      bundleSigned = action.bundleTransactions!;
+    }
     let claimed = false;
     const guardedRpc: Rpc = async (method, params, readSignal) => {
       readSignal.throwIfAborted();
@@ -426,6 +498,18 @@ export async function actVenueLaunchRecovery(
         await change('submitting'); // Acknowledged durable marker before any network handoff.
         claimed = true;
         readSignal.throwIfAborted();
+        if (bundle) {
+          // One atomic Jito bundle: create first, then holders, then the tip.
+          const transactions = [row.signed!, ...bundleSigned];
+          const bundleId = await (
+            deps.sendBundle ??
+            ((txs: string[], s: AbortSignal) =>
+              jitoRpc('sendBundle', [txs, { encoding: 'base64' }], s))
+          )(transactions, readSignal);
+          if (typeof bundleId !== 'string' || !bundleId)
+            throw new Error('Jito bundle outcome is unknown.');
+          return row.signature;
+        }
       }
       return rpc(method, params, readSignal);
     };
@@ -445,7 +529,7 @@ export async function actVenueLaunchRecovery(
           ? await (deps.submitStonk ?? submitStonkLaunch)(
               db,
               owner,
-              terms,
+              terms as StonkLaunchTerms,
               review.input as StonkLaunchReview['input'],
               row.signed,
               signal,

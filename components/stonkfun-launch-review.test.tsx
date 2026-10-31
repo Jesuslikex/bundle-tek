@@ -96,3 +96,38 @@ it('loads the project mint key without generating or requesting a quote', async 
   expect(container.textContent).toContain('could not be read');
   expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
+
+it('offers saved holder wallets for a Jito bundle without any request', async () => {
+  const holder = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
+  const withHolders = {
+    ...project,
+    document: {
+      options: {
+        wallets: {
+          chain: 'Solana',
+          deployer: { ...project.payer, folderRevision: 0, root: true },
+          recipients: [
+            { address: holder, revision: 2, folderRevision: 0, root: true },
+          ],
+        },
+      },
+    },
+  } as unknown as Parameters<typeof StonkfunLaunchReview>[0]['project'];
+  await act(async () =>
+    root.render(
+      <StonkfunLaunchReview
+        project={withHolders}
+        plan={plan}
+        releaseId={'a'.repeat(64)}
+      />,
+    ),
+  );
+  expect(container.textContent).toContain(
+    'Holder wallet buys in the same Jito bundle',
+  );
+  expect(container.textContent).toContain('7xKX…gAsU buy (SPYX)');
+  expect(container.textContent).toContain(
+    'Jito tip (SOL, paid by the deployer)',
+  );
+  expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
