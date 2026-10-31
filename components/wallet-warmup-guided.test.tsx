@@ -421,31 +421,26 @@ it('rejects an organic hold that cannot fit inside the delay', async () => {
   expect(host.textContent).toContain('fit inside the cycle delay');
 });
 
-it('offers routing and wallet order, and reflects Axiom in the fee hint', async () => {
+it('shows Alternative Routing as unavailable and keeps wallet order', async () => {
   await mount();
   const platform = host.querySelector(
     '[data-warmup-field="platform"]',
-  ) as unknown as HTMLSelectElement;
+  ) as unknown as HTMLInputElement;
   const schedule = host.querySelector(
     '[data-warmup-field="schedule"]',
   ) as unknown as HTMLSelectElement;
-  expect(platform.value).toBe('none');
+  expect(platform.type).toBe('checkbox');
+  expect(platform.checked).toBe(false);
+  expect(platform.disabled).toBe(true);
+  expect(host.textContent).toContain('Alternative Routing (Axiom)');
+  expect(host.textContent).toContain('Unavailable');
+  expect(host.textContent).toContain('adds no fee');
+  expect(host.textContent).not.toContain('declared intent');
   expect(schedule.value).toBe('staggered');
-  expect(Array.from(platform.options).map((o) => o.value)).toEqual([
-    'none',
-    'axiom',
-  ]);
   expect(Array.from(schedule.options).map((o) => o.value)).toEqual([
     'staggered',
     'sequential',
   ]);
-  expect(host.textContent).toContain('reviewed direct swap route');
-  await act(async () => {
-    platform.value = 'axiom';
-    platform.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  expect(host.textContent).toContain('declared intent');
-  expect(host.textContent).toContain('Confirm the real route on chain');
 });
 
 it('picks wallets from the roster through the Wallets field', async () => {

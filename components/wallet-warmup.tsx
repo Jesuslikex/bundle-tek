@@ -131,9 +131,10 @@ export function WalletWarmup({
     const fixed = per.toFixed(unit.decimals);
     return fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed;
   }, [volumeTarget, addresses.length, cycles, unit.decimals]);
-  const [platform, setPlatform] = useState<WarmupPlatform>(
-    initialPlan?.document.platform ?? 'none',
-  );
+  // Alternative routing is shown like Proxima's but cannot be turned on:
+  // Axiom has no public route Bundle's browser-held keys can use, so every
+  // plan is saved with the direct route and no extra routing fee.
+  const platform: WarmupPlatform = 'none';
   const [schedule, setSchedule] = useState<WarmupSchedule>(
     initialPlan?.document.schedule ?? 'staggered',
   );
@@ -702,17 +703,18 @@ export function WalletWarmup({
         </fieldset>
         <fieldset className={styles.routingNote}>
           <legend>Routing and order</legend>
-          <label htmlFor={`${id}-platform`}>
-            Alternative routing
-            <select
+          <label className={styles.routingToggle} htmlFor={`${id}-platform`}>
+            <input
               id={`${id}-platform`}
-              {...fieldProps('platform')}
-              value={platform}
-              onChange={(e) => edit(() => setPlatform(e.target.value as WarmupPlatform))}
-            >
-              <option value="none">Direct swap route</option>
-              <option value="axiom">Axiom</option>
-            </select>
+              type="checkbox"
+              data-warmup-field="platform"
+              checked={false}
+              readOnly
+              disabled
+              aria-describedby={`${id}-platform-note`}
+            />
+            Alternative Routing (Axiom)
+            <em>Unavailable</em>
           </label>
           <label htmlFor={`${id}-schedule`}>
             Wallet order
@@ -726,10 +728,10 @@ export function WalletWarmup({
               <option value="sequential">One wallet at a time</option>
             </select>
           </label>
-          <span>
-            {platform === 'axiom'
-              ? `Axiom routing is a declared intent and needs about ${warmupSuggestedReserve('axiom', Math.max(1, Number(cycles) || 1), unit.decimals)} ${unit.symbol} of fees per wallet. Confirm the real route on chain.`
-              : 'Every loop uses the reviewed direct swap route. Axiom makes the activity look like third-party platform usage.'}
+          <span id={`${id}-platform-note`}>
+            Axiom has no public trading route for wallets whose keys stay in your
+            browser, so this option is off and adds no fee. Every loop uses the
+            reviewed direct swap route.
           </span>
         </fieldset>
         {estimate && (
@@ -853,7 +855,6 @@ export function WalletWarmup({
             );
             setLossOn(!!doc.feeReserve);
             setMaxLoss(doc.feeReserve ?? '');
-            setPlatform(doc.platform ?? 'none');
             setSchedule(doc.schedule ?? 'staggered');
             setOrganicMode(!!doc.organicTerms);
             if (doc.organicTerms) {
