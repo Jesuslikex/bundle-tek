@@ -1,6 +1,7 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import { address, isOffCurveAddress } from '@solana/kit';
+import { validateStonkBundleHolders } from '@/lib/stonkfun-bundle-service';
 import {
   StonkLaunchError,
   stonkLaunchStatus,
@@ -33,8 +34,13 @@ function terms(v: unknown, origin: string): StonkLaunchTerms | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
   const b = v as Record<string, unknown>;
   try {
+    const bundled = 'holders' in b || 'tipLamports' in b;
     if (
-      Object.keys(b).sort().join(',') !== TERM_KEYS.join(',') ||
+      Object.keys(b).sort().join(',') !==
+        (bundled
+          ? [...TERM_KEYS, 'holders', 'tipLamports'].sort()
+          : TERM_KEYS
+        ).join(',') ||
       typeof b.projectId !== 'string' ||
       !b.projectId ||
       b.projectId.length > 128 ||
@@ -55,6 +61,10 @@ function terms(v: unknown, origin: string): StonkLaunchTerms | null {
       b.payer === b.mint
     )
       return null;
+    if (bundled)
+      validateStonkBundleHolders(
+        b as Parameters<typeof validateStonkBundleHolders>[0],
+      );
   } catch {
     return null;
   }
@@ -71,7 +81,7 @@ async function readBody(request: Request) {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > 12288) {
+      if (size > 16384) {
         await reader.cancel();
         return 'too-large' as const;
       }

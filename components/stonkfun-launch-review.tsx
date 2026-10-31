@@ -28,12 +28,21 @@ import { quoteCatalog } from '@/lib/quote-catalog';
 import type { LaunchPlanInput } from '@/lib/launch-plan';
 import type { StonkLaunchReview } from '@/lib/stonkfun-launch-service';
 import { signStonkLaunch } from '@/lib/stonkfun-launch-signing';
+import type { StonkBundleReview } from '@/lib/stonkfun-bundle-service';
+import { STONKFUN_BUNDLE_MAX_HOLDERS } from '@/lib/stonkfun-bundle';
+import { signStonkBundlePackets } from '@/lib/stonkfun-bundle-signing';
+import type { ProjectDocument } from '@/lib/workspace-project';
 
 type Project = {
   id: string;
   updatedAt: string;
   payer?: { address: string; revision: number };
+  document?: ProjectDocument;
 };
+type AnyReview = StonkLaunchReview | StonkBundleReview;
+const bundleOf = (r: AnyReview | null) =>
+  r && 'bundle' in r && r.bundle ? (r as StonkBundleReview) : null;
+const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 type Props = { project: Project; plan: LaunchPlanInput; releaseId: string };
 
 /** Decimal quote amount to raw units without floating point. */
@@ -86,14 +95,17 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
   const [payerPass, setPayerPass] = useState('');
   const [devBuy, setDevBuy] = useState('0');
   const [solLimit, setSolLimit] = useState('0.05');
-  const [review, setReview] = useState<StonkLaunchReview | null>(null);
+  const [review, setReview] = useState<AnyReview | null>(null);
+  const recipients = (
+    project.document?.options.wallets?.recipients ?? []
+  ).filter((r) => r.address !== project.payer?.address);
+  const [holderBuys, setHolderBuys] = useState<Record<string, string>>({});
+  const [tip, setTip] = useState('0.001');
+  const [broadcastPass, setBroadcastPass] = useState('');
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(saved.error);
-  const recovery = useVenueLaunchRecovery<StonkLaunchReview>(
-    'stonkfun',
-    project.id,
-  );
+  const recovery = useVenueLaunchRecovery<AnyReview>('stonkfun', project.id);
   const [broadcastApproved, setBroadcastApproved] = useState(false);
   const sent =
     recovery.record &&
@@ -124,7 +136,19 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
   const terms = () => {
     if (!project.payer || !backup || !quote)
       throw new Error('Missing launch setup.');
+    const holders = recipients
+      .map((r) => ({
+        address: r.address,
+        revision: r.revision,
+        buyRaw: toRaw(holderBuys[r.address] ?? '0', quote.decimals),
+      }))
+      .filter((h) => h.buyRaw !== '0');
+    if (holders.length > STONKFUN_BUNDLE_MAX_HOLDERS)
+      throw new Error(
+        `A StonkFun bundle holds at most ${STONKFUN_BUNDLE_MAX_HOLDERS} holder wallets.`,
+      );
     return {
+      ...(holders.length ? { holders, tipLamports: toRaw(tip, 9) } : {}),
       projectId: project.id,
       updatedAt: project.updatedAt,
       releaseId,
@@ -159,8 +183,21 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
     setBroadcastApproved(false);
     setPayerPass('');
     setMintPass('');
+    setBroadcastPass('');
     if (row) {
       setReview(row.review);
+      const saved = bundleOf(row.review);
+      if (saved) {
+        setHolderBuys(
+          Object.fromEntries(
+            saved.terms.holders.map((h) => [
+              h.address,
+              fromRaw(h.buyRaw, row.review.summary.quoteDecimals),
+            ]),
+          ),
+        );
+        setTip(fromRaw(saved.terms.tipLamports, 9));
+      }
       setDevBuy(
         fromRaw(row.review.terms.devBuyRaw, row.review.summary.quoteDecimals),
       );
@@ -181,6 +218,8 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
     review.input.name === plan.tokenName &&
     review.input.symbol === plan.ticker;
   const expired = review ? Date.parse(review.expiresAt) <= now : false;
+  const reviewBundle = bundleOf(review);
+  const sentBundle = sent ? bundleOf(sent.review) : null;
   const ready = !!project.payer && !!releaseId && !!quote;
 
   return (
@@ -277,6 +316,50 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
               }}
             />
           </label>
+          {recipients.length > 0 && (
+            <fieldset className="min-w-0 space-y-2">
+              <legend>
+                Holder wallet buys in the same Jito bundle (optional, up to{' '}
+                {STONKFUN_BUNDLE_MAX_HOLDERS})
+              </legend>
+              <p className="source-note">
+                Each saved holder wallet buys right after the creation, in one
+                atomic Jito bundle: all transactions land together or none do.
+                Leave 0 to skip a wallet.
+              </p>
+              {recipients.map((r) => (
+                <label key={r.address} htmlFor={`${id}-holder-${r.address}`}>
+                  {short(r.address)} buy ({plan.currency})
+                  <Input
+                    id={`${id}-holder-${r.address}`}
+                    inputMode="decimal"
+                    value={holderBuys[r.address] ?? '0'}
+                    disabled={busy}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setHolderBuys((v) => ({ ...v, [r.address]: value }));
+                      setReview(null);
+                      setApproved(false);
+                    }}
+                  />
+                </label>
+              ))}
+              <label htmlFor={id + '-tip'}>
+                Jito tip (SOL, paid by the deployer)
+                <Input
+                  id={id + '-tip'}
+                  inputMode="decimal"
+                  value={tip}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setTip(e.target.value);
+                    setReview(null);
+                    setApproved(false);
+                  }}
+                />
+              </label>
+            </fieldset>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -350,6 +433,44 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
                   <code>{review.summary.pool}</code>
                 </td>
               </tr>
+              {reviewBundle?.bundle.holders.map((h) => (
+                <tr key={h.holder}>
+                  <th scope="row">Holder {short(h.holder)}</th>
+                  <td>
+                    {fromRaw(h.buyRaw, review.summary.quoteDecimals)}{' '}
+                    {review.summary.quoteSymbol} for about{' '}
+                    {fromRaw(h.expectedTokensOutRaw, 6)} (at least{' '}
+                    {fromRaw(h.minTokensOutRaw, 6)})
+                  </td>
+                </tr>
+              ))}
+              {reviewBundle && (
+                <>
+                  <tr>
+                    <th scope="row">Holders total</th>
+                    <td>
+                      {fromRaw(reviewBundle.bundle.holdersTokensOutRaw, 6)} (
+                      {(reviewBundle.bundle.holdersSupplyBps / 100).toFixed(2)}%
+                      of supply)
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Jito tip</th>
+                    <td>
+                      {fromRaw(reviewBundle.bundle.tipLamports, 9)} SOL to{' '}
+                      <code>{short(reviewBundle.bundle.tipAccount)}</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Bundle check</th>
+                    <td>
+                      {reviewBundle.bundle.bundleSimulated
+                        ? 'Whole bundle simulated in order.'
+                        : 'Creation simulated; holder outputs computed from the created curve.'}
+                    </td>
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
           <p>
@@ -364,7 +485,12 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
               disabled={busy || expired}
               onChange={(e) => setApproved(e.target.checked)}
             />
-            <span> I approve this exact StonkFun launch transaction.</span>
+            <span>
+              {' '}
+              {reviewBundle
+                ? `I approve this exact StonkFun launch bundle (${reviewBundle.bundle.packets.length + 1} transactions).`
+                : 'I approve this exact StonkFun launch transaction.'}
+            </span>
           </label>
           <label htmlFor={id + '-payer'}>
             Wallet vault passphrase
@@ -426,6 +552,9 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
                     );
                   const approvedRow = await recovery.write('approve', {
                     sha256: reviewed.sha256,
+                    ...(bundleOf(reviewed)
+                      ? { bundleSha256: bundleOf(reviewed)!.bundle.sha256 }
+                      : {}),
                     approved: true,
                   });
                   check();
@@ -501,8 +630,23 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
                   }
                   onChange={(e) => setBroadcastApproved(e.target.checked)}
                 />{' '}
-                I approve broadcasting this exact saved signed launch once.
+                I approve broadcasting this exact saved signed launch once
+                {sentBundle ? ' as one Jito bundle with its holder buys' : ''}.
               </label>
+              {sentBundle && (
+                <label htmlFor={id + '-bundle-pass'}>
+                  Wallet vault passphrase (signs the holder and tip
+                  transactions)
+                  <Input
+                    id={id + '-bundle-pass'}
+                    type="password"
+                    autoComplete="current-password"
+                    value={broadcastPass}
+                    disabled={busy}
+                    onChange={(e) => setBroadcastPass(e.target.value)}
+                  />
+                </label>
+              )}
               <Button
                 type="button"
                 disabled={
@@ -510,21 +654,56 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
                   expired ||
                   !broadcastApproved ||
                   recovery.uncertain ||
-                  !matchesContext
+                  !matchesContext ||
+                  (!!sentBundle && !broadcastPass)
                 }
                 onClick={() =>
                   void run(async () => {
                     if (Date.now() >= Date.parse(sent.review.expiresAt))
                       throw Error('Original launch broadcast window expired.');
                     setBroadcastApproved(false);
-                    await recovery.write('submit', {
-                      sha256: sent.review.sha256,
-                      approved: true,
-                    });
+                    if (!sentBundle) {
+                      await recovery.write('submit', {
+                        sha256: sent.review.sha256,
+                        approved: true,
+                      });
+                      return;
+                    }
+                    const pass = broadcastPass;
+                    setBroadcastPass('');
+                    const vault = localStorage.getItem(VAULT_STORAGE_KEY);
+                    if (!vault)
+                      throw new Error(
+                        'Import the holder wallets into your browser wallet vault first.',
+                      );
+                    let session: VaultSession | undefined;
+                    try {
+                      session = await unlockVault(vault, pass);
+                      const check = () => {
+                        if (!alive.current)
+                          throw new Error('Launch view closed.');
+                        recovery.current();
+                      };
+                      const packets = await signStonkBundlePackets(
+                        session,
+                        sentBundle,
+                        check,
+                      );
+                      await recovery.write('submit', {
+                        sha256: sentBundle.sha256,
+                        bundleSha256: sentBundle.bundle.sha256,
+                        bundleTransactions: packets,
+                        approved: true,
+                      });
+                    } finally {
+                      if (session) clearMintSession(session);
+                    }
                   })
                 }
               >
-                Broadcast saved launch once
+                {sentBundle
+                  ? 'Sign holders and send bundle once'
+                  : 'Broadcast saved launch once'}
               </Button>
             </>
           )}
