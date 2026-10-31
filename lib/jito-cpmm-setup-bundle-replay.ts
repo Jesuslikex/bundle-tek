@@ -7,6 +7,7 @@ import { replayJitoCpmmBundleSettlement } from './jito-cpmm-bundle-replay';
 import {
   inspectJitoCpmmAtaSetupPacket,
   inspectJitoCpmmAtaRentTransition,
+  inspectJitoCpmmAtaRentTransitionWithMissingImage,
 } from './jito-cpmm-ata-setup';
 import { inspectJitoCpmmUnsignedPacket } from './jito-cpmm-unsigned-packet';
 const fail = (): never => {
@@ -30,12 +31,29 @@ function wire(a: JitoSimulationAccount | null) {
 
 /** Complete supplied frames only. One explicit setup + 1..3 swaps + final tip.
  * No omitted readonly post-images are reconstructed or treated as observed. */
+type SetupInput = {
+  setup: Parameters<typeof inspectJitoCpmmAtaSetupPacket>[0];
+  bundle: Bundle;
+};
 export async function replayJitoCpmmSetupBundle(
+  input: SetupInput,
+  signal: AbortSignal,
+) {
+  return replaySetup(input, signal, false);
+}
+export async function replayJitoCpmmSetupBundleWithMissingImage(
+  input: SetupInput,
+  signal: AbortSignal,
+) {
+  return replaySetup(input, signal, true);
+}
+async function replaySetup(
   input: {
     setup: Parameters<typeof inspectJitoCpmmAtaSetupPacket>[0];
     bundle: Bundle;
   },
   signal: AbortSignal,
+  allowMissingImage: boolean,
 ) {
   signal = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
   const value = snapshotJitoEvidence(input, 4 * 1024 * 1024);
@@ -93,7 +111,11 @@ export async function replayJitoCpmmSetupBundle(
   )
     return fail();
   const reserve = bundle.walletReserves[0].reserveLamports;
-  const transition = await inspectJitoCpmmAtaRentTransition({
+  const transition = await (
+    allowMissingImage
+      ? inspectJitoCpmmAtaRentTransitionWithMissingImage
+      : inspectJitoCpmmAtaRentTransition
+  )({
     packet: value.setup,
     minimumSlot: bundle.minimumSlot,
     slot: full.slot,

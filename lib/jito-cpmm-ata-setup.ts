@@ -185,7 +185,7 @@ function raw(v: unknown) {
 
 /** Supplied pre/post images only. The future bundle verifier must bind the
  * complete frame, unchanged readonly accounts, program scans and real transport. */
-export async function inspectJitoCpmmAtaRentTransition(input: {
+type RentTransitionInput = {
   packet: Packet;
   minimumSlot: number;
   slot: number;
@@ -196,7 +196,24 @@ export async function inspectJitoCpmmAtaRentTransition(input: {
   feeLamports: string;
   maximumFeeLamports: string;
   reserveLamports: string;
-}) {
+};
+export async function inspectJitoCpmmAtaRentTransition(
+  input: RentTransitionInput,
+) {
+  return inspectRentTransition(input, false);
+}
+/** Separate observed-image research profile. Solana may return a nonexistent
+ * account as the exact empty, zero-lamport System image. No occupied/funded
+ * image is admitted and every fee/rent/owner/debit check remains identical. */
+export async function inspectJitoCpmmAtaRentTransitionWithMissingImage(
+  input: RentTransitionInput,
+) {
+  return inspectRentTransition(input, true);
+}
+async function inspectRentTransition(
+  input: RentTransitionInput,
+  allowMissingImage: boolean,
+) {
   const value = snapshotJitoEvidence(input, 32768);
   exact(value, [
     'packet',
@@ -217,10 +234,19 @@ export async function inspectJitoCpmmAtaRentTransition(input: {
     value.minimumSlot < 0 ||
     !Number.isSafeInteger(value.slot) ||
     value.slot < value.minimumSlot ||
-    value.slot - value.minimumSlot > 32 ||
-    value.before.destination !== null
+    value.slot - value.minimumSlot > 32
   )
     return fail();
+  if (value.before.destination !== null) {
+    if (!allowMissingImage) return fail();
+    const missing = raw(value.before.destination);
+    if (
+      missing.owner !== SYSTEM ||
+      missing.lamports !== 0n ||
+      missing.bytes.length !== 0
+    )
+      return fail();
+  }
   const bound = await inspectJitoCpmmAtaSetupPacket(value.packet);
   const rent = inspectPairRentAccount(value.rentAccount);
   const minimum = BigInt(pairRentMinimumRaw(rent, 165)),

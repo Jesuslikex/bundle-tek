@@ -1376,6 +1376,52 @@ async function setupBundleFixture(
   };
 }
 
+it('admits only the exact empty zero-lamport System missing image through a separate research replay', async () => {
+  const {
+    replayJitoCpmmSetupBundle,
+    replayJitoCpmmSetupBundleWithMissingImage,
+  } = await import('./jito-cpmm-setup-bundle-replay');
+  const f = await setupBundleFixture();
+  f.bundle.result.value.transactionResults[0].preExecutionAccounts[1] = {
+    owner: '11111111111111111111111111111111',
+    executable: false,
+    lamports: '0',
+    data: ['', 'base64'],
+  };
+  await expect(
+    replayJitoCpmmSetupBundle(f, new AbortController().signal),
+  ).rejects.toThrow();
+  expect(
+    await replayJitoCpmmSetupBundleWithMissingImage(
+      f,
+      new AbortController().signal,
+    ),
+  ).toMatchObject({
+    setupFrameChecked: true,
+    allSuppliedFramesChecked: true,
+    signingAllowed: false,
+    executionAllowed: false,
+  });
+  for (const patch of [
+    { lamports: '1' },
+    { owner: TOKEN },
+    { executable: true },
+    { data: ['AA==', 'base64'] },
+  ]) {
+    const changed = structuredClone(f);
+    Object.assign(
+      changed.bundle.result.value.transactionResults[0]
+        .preExecutionAccounts[1]!,
+      patch,
+    );
+    await expect(
+      replayJitoCpmmSetupBundleWithMissingImage(
+        changed,
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow();
+  }
+});
 it.each([
   { reverse: false, count: 1, distinct: false },
   { reverse: true, count: 3, distinct: false },
