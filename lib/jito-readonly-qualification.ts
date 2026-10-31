@@ -253,6 +253,7 @@ async function collectQualification(
   let attempt:
     | Awaited<ReturnType<typeof collectJitoCoherentSimulationAttempt>>
     | Awaited<ReturnType<typeof collectJitoCoherentPrefeeAttempt>>
+    | Awaited<ReturnType<typeof collectJitoProviderObservedAttempt>>
     | null = null;
   const evidence = (terminal: 'finish' | 'refused') => {
     mark('collector', terminal);

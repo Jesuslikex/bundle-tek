@@ -156,6 +156,41 @@ export async function readJitoFeeBatchResponse(
   body: ReadableStream<Uint8Array> | null,
   signal: AbortSignal,
 ) {
+  const result = await readFeeResponse(plan, body, signal, false);
+  if (result.status !== 'observed') return result;
+  return {
+    ...result,
+    simulationBankSlot: result.fees[0].slot,
+    feeBankCoherent: true as const,
+  };
+}
+
+/** Separate provider-trusted research observations. No common-bank assertion. */
+export async function readJitoProviderObservedFees(
+  plan: JitoFeeBatchRequest,
+  body: ReadableStream<Uint8Array> | null,
+  signal: AbortSignal,
+) {
+  const result = await readFeeResponse(plan, body, signal, true);
+  if (result.status !== 'observed') return result;
+  const {
+    simulationBankSlot: _slot,
+    feeBankCoherent: _coherent,
+    ...rest
+  } = result;
+  return {
+    ...rest,
+    feeContextSlots: result.fees.map((f) => f.slot),
+    feeBankCoherent: false as const,
+  };
+}
+
+async function readFeeResponse(
+  plan: JitoFeeBatchRequest,
+  body: ReadableStream<Uint8Array> | null,
+  signal: AbortSignal,
+  providerObserved: boolean,
+) {
   const state = states.get(plan);
   if (!state) return fail('unrecognized fee request plan');
   const aborted = () =>
@@ -240,7 +275,7 @@ export async function readJitoFeeBatchResponse(
       });
     }
     // Every fee must be observed at the same bank as the bound simulation.
-    if (fees.some((f) => f.slot !== fees[0].slot))
+    if (!providerObserved && fees.some((f) => f.slot !== fees[0].slot))
       return refused('fee banks differ: ' + fees.map((f) => f.slot).join(','));
     if (aborted()) return refused('fee read interrupted');
     const packets = state.packets.map((p, i) => ({

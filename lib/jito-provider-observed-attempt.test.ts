@@ -173,3 +173,19 @@ it('refuses a packet containing signature bytes before transport', async () => {
   });
   expect(f.transport).not.toHaveBeenCalled();
 });
+
+it('retains each fresh fee context without asserting a shared fee bank', async () => {
+  const f = await fixture((rows) => {
+    fee(rows[0]).result.context.slot = 103n;
+  });
+  const strict = await collectJitoCoherentPrefeeAttempt(f.input);
+  expect(strict.status).toBe('refused');
+  const result = await collectJitoProviderObservedAttempt(f.input);
+  expect(result.status).toBe('captured');
+  expect(result.fees).toMatchObject({
+    status: 'observed',
+    feeBankCoherent: false,
+  });
+  expect(result.fees).not.toHaveProperty('simulationBankSlot');
+  expect(result.fees?.fees[0].slot).toBe(103);
+});

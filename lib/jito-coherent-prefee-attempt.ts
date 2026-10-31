@@ -1,6 +1,7 @@
 import {
   buildJitoFeeBatchRequest,
   readJitoFeeBatchResponse,
+  readJitoProviderObservedFees,
 } from './jito-fee-batch';
 import {
   buildJitoBundleSimulationRequest,
@@ -72,10 +73,17 @@ function exact(value: Record<string, unknown>, keys: string[]) {
  * discovery are one actual wire batch; the unadmitted discovery chooses D only
  * after all real fee contexts equal D. A separate exact-slot simulation must
  * return D. The original floor never changes. No retries, fallback or authority. */
-export function collectJitoCoherentPrefeeAttempt(
+export async function collectJitoCoherentPrefeeAttempt(
   input: Parameters<typeof collectPrefeeAttempt>[0],
 ) {
-  return collectPrefeeAttempt(input, false);
+  const result = await collectPrefeeAttempt(input, false);
+  const fees = result.fees;
+  if (fees?.status === 'observed' && !('simulationBankSlot' in fees))
+    throw Error('Strict fee profile differs.');
+  return {
+    ...result,
+    fees: fees as Awaited<ReturnType<typeof readJitoFeeBatchResponse>> | null,
+  };
 }
 
 /** Unsigned research only. Separate fresh fee observations do not establish
@@ -200,7 +208,10 @@ async function collectPrefeeAttempt(
   let batch: Awaited<ReturnType<typeof readJitoRpcBatchCapture>> | null = null;
   let discovery: Awaited<ReturnType<typeof readJitoSimulationPayload>> | null =
     null;
-  let fees: Awaited<ReturnType<typeof readJitoFeeBatchResponse>> | null = null;
+  let fees:
+    | Awaited<ReturnType<typeof readJitoFeeBatchResponse>>
+    | Awaited<ReturnType<typeof readJitoProviderObservedFees>>
+    | null = null;
   let simulation: Awaited<
     ReturnType<typeof readJitoSimulationResponse>
   > | null = null;
@@ -390,14 +401,14 @@ async function collectPrefeeAttempt(
     }
     derived[offset] = 93;
     feeProjection = { kind: 'derived-member-array-not-wire', rawBody: derived };
-    fees = await readJitoFeeBatchResponse(
-      plan,
-      new Response(derived).body,
-      deadline,
-    );
+    fees = await (
+      providerObserved ? readJitoProviderObservedFees : readJitoFeeBatchResponse
+    )(plan, new Response(derived).body, deadline);
     if (
       fees.status !== 'observed' ||
-      (!providerObserved && fees.simulationBankSlot !== bank) ||
+      (!providerObserved &&
+        (!('simulationBankSlot' in fees) ||
+          fees.simulationBankSlot !== bank)) ||
       fees.fees.some(
         (fee) =>
           (!providerObserved && fee.slot !== bank) ||

@@ -1,0 +1,685 @@
+{
+  "runs": [
+    {
+      "id": "1793415973402",
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "refused",
+        "stage": "custody-after",
+        "requests": 17,
+        "methods": 19,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463531017,
+        "attemptStatus": "captured",
+        "simulationSlot": 463531026,
+        "feeSlots": [
+          463531027,
+          463531026
+        ],
+        "runtimeProof": {
+          "format": "jito-runtime-bracket-v1",
+          "slot": 463531026,
+          "programs": [
+            {
+              "address": "11111111111111111111111111111111",
+              "loader": "NativeLoader1111111111111111111111111111111",
+              "programData": null,
+              "deploymentSlot": null,
+              "upgradeAuthority": null,
+              "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+              "codeBytes": 21,
+              "identityKind": "native-system"
+            }
+          ],
+          "fullCodeScansMatched": true,
+          "reviewedCodePolicyMatched": true,
+          "reservedWritableKeysRefused": true,
+          "requestedExecutableWritableRefused": true,
+          "conservativeRuntimeChecksPassed": true,
+          "runtimeModel": "pinned Jito reserved-key superset; only requested-readonly program/executable keys",
+          "runtimePrivilegesVerified": false,
+          "runtimeAttested": false,
+          "providerQualified": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "refusal": "guard-or-transport-refusal"
+      },
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "06be452f45132cf0602be774c23ba36a12e1da9239e2de122dce9c8887740d79",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "1cecedda2d369e087bcbd79cd229c5310e7abe92bbe426f0e34488355b4be1ee",
+          "responseSha256": "922338ef6d242a5ddb429ab5ba21329559a77355d73cfc75f583dc50ce457303",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "15ae6a0a0eafac995a5b0c345834773c9c07e12146a1d9b56e33a760557cc7f0",
+          "responseSha256": "311651192d0c54454c468ecbe2b9a41bce0090c3aea6600d80b273c58ef3c706",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fac6617485cf15d1d77c41bc1130d1b9e29f84d81df88de6f1f4ff1373081e1b",
+          "responseSha256": "ba7af7230a978eaf5523d222a4986e05770a886a9988933a095ad12e910839e8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "151308525d3b05d5ef9b17d979e160ad48a6b0ede632bb18e1f6cf7db389c745",
+          "responseSha256": "30423495fd0ab6c0cf949739b9c7683cf55ee9c854b96b6d92de1a12e038ca54",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "d3af48e80a28777dd53687f8a2048eb4b58c288d6f1eb79e38b5472ce060f7ea",
+          "responseSha256": "e77e2495b92931744238573748df16f936df20260c5554fa27ff1a4f96830640",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "21e0a24dbbe3eb9ec65fd4bb71dca76ecc2b25db2b276d916480f27707998efa",
+          "responseSha256": "2944c78944d60cf6e9f8d9e37aa24d2c361e99dde3e98bbcbf70ecd0e17bc543",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "914fea47e01a28de34e201011e539f0b5a7aa7c3659b8fd2e57c764a474dc162",
+          "responseSha256": "8eb2c3d815b8db9fd19036aaaf36fb2921b78ab6d6b2aa03345c14936e98bec9",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "e5192dcf74183a27daad441d5929b0f28c292698be49b0ea905fbdb09101a75c",
+          "responseSha256": "b41dc3f9c3f88645c6477544ee4876e07c891a23b62986562274884a725bf6ab",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "a49cadc1644aa27509cfda97b27e26d29b4b87caa2b3ede6bd84d473e5f122d6",
+          "responseSha256": "4f5ffeb7daf349b679d69570b64149cba44d241272f543390838d4d196fb7991",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "0b331f842c62085857d4ff987d611e99c1399659013d5ca4ef90773e2218d0b9",
+          "responseSha256": "59dc14baf2cbbef3e71974e5e9cf2bb3eeeb8b6c1e152744ddf3cae72825dedb",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fe4f49955e085ca92a962141c7f3aa999d4cd8ef467d7f6f6469d387f5b494b8",
+          "responseSha256": "fed5c1a8494286074b87f3f12c3560d521a2500dad5287d0f979415f6181f41a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "190b535cf4f07f5b57d8f6bc3e4f66192a80ffddaee7bfc73efbd8377298110e",
+          "responseSha256": "5f1ff879c064f679620462bd884b5e6fca902a4b5f1876bbacb9d5523c6a30da",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "ae2ee4a121532f0b62e8b8be69e09a17db986ab6c400b123cba91e8317a6764a",
+          "responseSha256": "288c76a637bbbf7b8ce90fd751f0624ba3cbc0989b3dd77966620a3de3694fdd",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "123132eee7e976b6481b0a5a22c01a6771733185b33f679fdb2b88482a37aa15",
+          "responseSha256": "49188a32500206f6cc0c872a4ea9af074409c279f9349bc45f211907db66d970",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "5524e6e2c91a8af564d1d56635541c62afccbd995548e24e435e401708322284",
+          "responseSha256": "a9d501b85e74d8e0a541c14ee2e67788bb38558917f2a7cf16ec1d57b4f4e277",
+          "httpStatus": 200
+        }
+      ]
+    },
+    {
+      "id": "1793416020066",
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "native-runtime-checks-passed-not-full-swap",
+        "stage": "lifetime-after",
+        "requests": 21,
+        "methods": 23,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463531233,
+        "attemptStatus": "captured",
+        "simulationSlot": 463531241,
+        "feeSlots": [
+          463531241,
+          463531241
+        ],
+        "runtimeProof": {
+          "format": "jito-runtime-bracket-v1",
+          "slot": 463531241,
+          "programs": [
+            {
+              "address": "11111111111111111111111111111111",
+              "loader": "NativeLoader1111111111111111111111111111111",
+              "programData": null,
+              "deploymentSlot": null,
+              "upgradeAuthority": null,
+              "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+              "codeBytes": 21,
+              "identityKind": "native-system"
+            }
+          ],
+          "fullCodeScansMatched": true,
+          "reviewedCodePolicyMatched": true,
+          "reservedWritableKeysRefused": true,
+          "requestedExecutableWritableRefused": true,
+          "conservativeRuntimeChecksPassed": true,
+          "runtimeModel": "pinned Jito reserved-key superset; only requested-readonly program/executable keys",
+          "runtimePrivilegesVerified": false,
+          "runtimeAttested": false,
+          "providerQualified": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "custodyRoles": {
+          "payerUnchanged": true,
+          "tipIdentityRentUnchanged": true,
+          "externalTipBalanceDelta": "-32993",
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "custodyClockRent": {
+          "beforeSlot": 463531234,
+          "afterSlot": 463531249,
+          "unchangedPayerCustody": true,
+          "unchangedRent": true,
+          "clockExact": true
+        },
+        "lifetime": {
+          "validitySlot": 463531249,
+          "height": "441553449",
+          "lastValidBlockHeight": "441553588"
+        },
+        "maximumSlot": 463531252
+      },
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "0f5393358a311a73415bdd1f6637f87387eb452e196a3141ffadbd5815b6f21f",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "9488eb4370bc6c95c59fdc047d5949e73c8d45d169768502733e3bd736181cc6",
+          "responseSha256": "5116ea9627ea2fdf53750a44269919103ba1252e5f06b965291df57723ceb334",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "90d14e7b984bf43df4fea8ad108d160c5fa59a6f42be9bca7c7aba57209ef407",
+          "responseSha256": "e13c2ad5820cdab44d1fc0a95f8afb053731eb362b963c69e1d4df745d0495e2",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fac6617485cf15d1d77c41bc1130d1b9e29f84d81df88de6f1f4ff1373081e1b",
+          "responseSha256": "ba7af7230a978eaf5523d222a4986e05770a886a9988933a095ad12e910839e8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "0986b8e0e87364b7abe9e94b4c497135394c1db756e0a120eae351a382f48881",
+          "responseSha256": "bc89efddb3abc7efe2e671d6d40c1551f2bc3d519d9889b23a4deabc509aa927",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "22c46e983422862cf296c5f2211fda6de16ae09082b452ad3bac4c95b8d6ff7b",
+          "responseSha256": "f743eadb51485ea1652f6063d33b70f2ddd4c90d10fb33320a28e198fbdf3f71",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "21e0a24dbbe3eb9ec65fd4bb71dca76ecc2b25db2b276d916480f27707998efa",
+          "responseSha256": "2944c78944d60cf6e9f8d9e37aa24d2c361e99dde3e98bbcbf70ecd0e17bc543",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "914fea47e01a28de34e201011e539f0b5a7aa7c3659b8fd2e57c764a474dc162",
+          "responseSha256": "8eb2c3d815b8db9fd19036aaaf36fb2921b78ab6d6b2aa03345c14936e98bec9",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "33dfcff8455d561ed55a3daeb0940f4ffb8399be264b66d595f1944b720fce9f",
+          "responseSha256": "ecc9dbe5a33d5fc503c5ea441feab33b82e5c72276dbbd4b76e220615d041a42",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "7601f704ffc3b7adb22afbc3066b35fbd820d6656c133de6573a9f0b6a7384c8",
+          "responseSha256": "ee439964cb4dc05dee599fe67d0b643254cb9e7d4204d40007c61d18505af3e7",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "32b54fba534a7543e19dad666348d4f9869829421909e727ed2b0a3e705d8feb",
+          "responseSha256": "c9d65420f72eab652becac84d8815b9a3ea2ed2a7e97081d0d03fb949f34b059",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fe4f49955e085ca92a962141c7f3aa999d4cd8ef467d7f6f6469d387f5b494b8",
+          "responseSha256": "fed5c1a8494286074b87f3f12c3560d521a2500dad5287d0f979415f6181f41a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "d2a0af9bd6c3b0c0afd0fa3882a8ef55965c28b3f59484956ff8bdb8e434e381",
+          "responseSha256": "a0187f2b29843c85119bbba8c707ee55accfd38193a3db00c56bc564fc3aa8dc",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "78d36ebd57ebc4cae03dad675a5d87edf2c6fbb7c3a7d16e4144904676146c2a",
+          "responseSha256": "0fb724e15c783bc48c7d4fa4855655d22e138b7b643cbb8d31f0d8990a700edf",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "123132eee7e976b6481b0a5a22c01a6771733185b33f679fdb2b88482a37aa15",
+          "responseSha256": "49188a32500206f6cc0c872a4ea9af074409c279f9349bc45f211907db66d970",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "100d43ab03dbc33b6b651a4995a19032b2ff5188a0112bff13318d672e83b042",
+          "responseSha256": "4c5b18653d4e1669f998acadd3dde7a4c1ad1a1e473050444051b92138018752",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "4372f84d675858a931089233102bd036f9693073d251e6b2100bda0210ebdfec",
+          "responseSha256": "05d358d7e4eb57aebc89bcbda53576b8aae553c760fa67f5d60b60e9d2f3bfa6",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "4cc99ff6c4e6852a9616fc1e096d621df08bb4aecd66de304f797aec8e01c6a0",
+          "responseSha256": "32f9f2954317ef853e309dd1d63c8b4cb745e0b0f50b5868cc68ac16413c12a6",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "c11cce4bd6955b0204bcbafbfc11cba76744253c01241432b5c0e33a28f14929",
+          "responseSha256": "7680f650770726fff23b4d53c9090c9652c7266bf03b1a5cb1d3575fcb179375",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "52f5a882cabafb935d0b4e9e4069e1f733e9b3b4d37c1868cdddc33b03579660",
+          "responseSha256": "4f0611ce76623afeb66f5d44076a1982eebbe5636a998c88111f2564e02ab3e7",
+          "httpStatus": 200
+        }
+      ]
+    },
+    {
+      "id": "1793416047424",
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "native-runtime-checks-passed-not-full-swap",
+        "stage": "lifetime-after",
+        "requests": 21,
+        "methods": 23,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463531355,
+        "attemptStatus": "captured",
+        "simulationSlot": 463531366,
+        "feeSlots": [
+          463531365,
+          463531366
+        ],
+        "runtimeProof": {
+          "format": "jito-runtime-bracket-v1",
+          "slot": 463531366,
+          "programs": [
+            {
+              "address": "11111111111111111111111111111111",
+              "loader": "NativeLoader1111111111111111111111111111111",
+              "programData": null,
+              "deploymentSlot": null,
+              "upgradeAuthority": null,
+              "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+              "codeBytes": 21,
+              "identityKind": "native-system"
+            }
+          ],
+          "fullCodeScansMatched": true,
+          "reviewedCodePolicyMatched": true,
+          "reservedWritableKeysRefused": true,
+          "requestedExecutableWritableRefused": true,
+          "conservativeRuntimeChecksPassed": true,
+          "runtimeModel": "pinned Jito reserved-key superset; only requested-readonly program/executable keys",
+          "runtimePrivilegesVerified": false,
+          "runtimeAttested": false,
+          "providerQualified": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "custodyRoles": {
+          "payerUnchanged": true,
+          "tipIdentityRentUnchanged": true,
+          "externalTipBalanceDelta": "-11331",
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "custodyClockRent": {
+          "beforeSlot": 463531356,
+          "afterSlot": 463531372,
+          "unchangedPayerCustody": true,
+          "unchangedRent": true,
+          "clockExact": true
+        },
+        "lifetime": {
+          "validitySlot": 463531373,
+          "height": "441553572",
+          "lastValidBlockHeight": "441553711"
+        },
+        "maximumSlot": 463531375
+      },
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "caa92bb5a24ebe4b3a641f62ee75747c31a28719fba344fa3a40efed7775aa0b",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "51e6770859201e39d3c99be3de7d998750dd426adc369b4d3155bd71efee3c40",
+          "responseSha256": "84b9af31171184dffe13caa8bc6537b1ad082037856b5ebe324a4cc3716dc9aa",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "2f3e55b6fb492facee30b253a466bbfd0af3f18f694c2ff4bbad33bc086d0c72",
+          "responseSha256": "ac3373320b1b59df4aa4518c3f692821b70e1992759faeb6f0231d8a1abd33da",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fac6617485cf15d1d77c41bc1130d1b9e29f84d81df88de6f1f4ff1373081e1b",
+          "responseSha256": "ba7af7230a978eaf5523d222a4986e05770a886a9988933a095ad12e910839e8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "a01014e0d18b6e1fe09f9a92907e96b60270ffd4965212b8d721a814b5925a98",
+          "responseSha256": "318b83b90d44b79db870f660ead78848e30a01de9802d20106ab2c7956ba6ada",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "4d198bcbeed45a0cdf042e73edb7368f2bb3079f0f784d82a4640a8d3a02de9a",
+          "responseSha256": "7ddd3075d514fd0200ad3feeb1db3e5c6e9ff39b0e32a64a3c391132097cb9b0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "21e0a24dbbe3eb9ec65fd4bb71dca76ecc2b25db2b276d916480f27707998efa",
+          "responseSha256": "2944c78944d60cf6e9f8d9e37aa24d2c361e99dde3e98bbcbf70ecd0e17bc543",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "914fea47e01a28de34e201011e539f0b5a7aa7c3659b8fd2e57c764a474dc162",
+          "responseSha256": "8eb2c3d815b8db9fd19036aaaf36fb2921b78ab6d6b2aa03345c14936e98bec9",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "4f3811eb40e04622b80359b0d156991459a933b55d66c99fa6d2671a4679ba8f",
+          "responseSha256": "d0485ab2210f3d4cfaba07718cc7a7b1c9ffaed90478ac93db475c86510c52eb",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "ed822fec3e49ae7813a0a342f024976924d7d374b70762a6aa01fd8832a9f1a6",
+          "responseSha256": "626a70cb9d3f779134ca1ec154011335b98bc0df78de9849130ec80efe5090de",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "0f9326433eac9ab0850154a3bed479af93559ee507a7a910c8e927af346d0c2a",
+          "responseSha256": "59b72c546d76907e1948372d22f42f1a9ba9ed2850621b677280872eb57f3f65",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fe4f49955e085ca92a962141c7f3aa999d4cd8ef467d7f6f6469d387f5b494b8",
+          "responseSha256": "fed5c1a8494286074b87f3f12c3560d521a2500dad5287d0f979415f6181f41a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "c968ab7a7a68f945cc349f3d3c22317b2051b4aa014964b1a7780642d0aebc4f",
+          "responseSha256": "18923d8e768790812eeeb8ed537972a09c92d6e2bc62bec6e6866fd0096596fa",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "557a1a8fb2fe1c98f9d48d0bb988c2f0632e4d7e990fa666d7fde590dcb5127c",
+          "responseSha256": "f20f463a09014cd05747efacae868ffea5e8b0f9790fe5da962097cc2721e895",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "123132eee7e976b6481b0a5a22c01a6771733185b33f679fdb2b88482a37aa15",
+          "responseSha256": "49188a32500206f6cc0c872a4ea9af074409c279f9349bc45f211907db66d970",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "6ed79caf957b635d51b62374e6c165301fd5def32b5e8c763fb7b54c91466d7e",
+          "responseSha256": "9a97b5d59446cbdbc001562ab7d62496e7ca80cc2d7fa326b5bca13b8cda6d8e",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "e93e227a492d3e5e8e09f0de80b479b6fa1ce16f28c46533c16872c4cea16ce2",
+          "responseSha256": "c9658b0073c3f2f80199cdbf016d45b306bbaa88c3f9c68a76877b36e88407a3",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "4e6c310f56b12fe318d305ddb194a36f5a37b404598560570955976d9a1211cc",
+          "responseSha256": "716973dda57bfc09174c732b4a1a422328c03544fe03678770f63844019929cd",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "37547c61316ca80ee28db9eaf51dee1a00b7ccd8d842722667fe1d585e9478c7",
+          "responseSha256": "c47ba52e35432c48e78383c1ec40440cedc091636d3813396a5b517c6e7506d0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "52f5a882cabafb935d0b4e9e4069e1f733e9b3b4d37c1868cdddc33b03579660",
+          "responseSha256": "4f0611ce76623afeb66f5d44076a1982eebbe5636a998c88111f2564e02ab3e7",
+          "httpStatus": 200
+        }
+      ]
+    },
+    {
+      "id": "1793416063343",
+      "summary": {
+        "profile": "provider-observed-native-runtime-v1",
+        "status": "native-runtime-checks-passed-not-full-swap",
+        "stage": "lifetime-after",
+        "requests": 21,
+        "methods": 23,
+        "rateLimited": false,
+        "signingAllowed": false,
+        "executionAllowed": false,
+        "fullSwapQualified": false,
+        "bankIdentityVerified": false,
+        "feeBankIdentityVerified": false,
+        "floor": 463531431,
+        "attemptStatus": "captured",
+        "simulationSlot": 463531442,
+        "feeSlots": [
+          463531442,
+          463531442
+        ],
+        "runtimeProof": {
+          "format": "jito-runtime-bracket-v1",
+          "slot": 463531442,
+          "programs": [
+            {
+              "address": "11111111111111111111111111111111",
+              "loader": "NativeLoader1111111111111111111111111111111",
+              "programData": null,
+              "deploymentSlot": null,
+              "upgradeAuthority": null,
+              "codeSha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03",
+              "codeBytes": 21,
+              "identityKind": "native-system"
+            }
+          ],
+          "fullCodeScansMatched": true,
+          "reviewedCodePolicyMatched": true,
+          "reservedWritableKeysRefused": true,
+          "requestedExecutableWritableRefused": true,
+          "conservativeRuntimeChecksPassed": true,
+          "runtimeModel": "pinned Jito reserved-key superset; only requested-readonly program/executable keys",
+          "runtimePrivilegesVerified": false,
+          "runtimeAttested": false,
+          "providerQualified": false,
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "custodyRoles": {
+          "payerUnchanged": true,
+          "tipIdentityRentUnchanged": true,
+          "externalTipBalanceDelta": "-10123",
+          "signingAllowed": false,
+          "executionAllowed": false
+        },
+        "custodyClockRent": {
+          "beforeSlot": 463531431,
+          "afterSlot": 463531448,
+          "unchangedPayerCustody": true,
+          "unchangedRent": true,
+          "clockExact": true
+        },
+        "lifetime": {
+          "validitySlot": 463531449,
+          "height": "441553648",
+          "lastValidBlockHeight": "441553787"
+        },
+        "maximumSlot": 463531451
+      },
+      "captures": [
+        {
+          "requestSha256": "09441311cc901f03b350ed541349c466836f712b32d8d5226bd64df6969ae6b3",
+          "responseSha256": "4cc23a74bc8a452f7ecaf9ec3c5e5304645d7b286dd510dea9cfcbb5c58ca0e0",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "47a8ac322685cc559d6ee59bc51745080189ef1eaa6e4e9aca7d97aeb182905a",
+          "responseSha256": "ce156e05098b95bf6a0ef42ceb97a94b9af1611b1e7201e6f3cd7837f40a8fbc",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "e51e46cd3d340c27e64607229e85dde29ce9e72a1b791b8fdebeab217b6babcf",
+          "responseSha256": "0f23723a498b7e29a428ddf912d12a78a6739ae47e89c5dbe1150137cf433e6a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "562607b282ba61189da0b678759b75aa57cd6b7433660342de2d02070e593071",
+          "responseSha256": "5370fdbc4ba60716d61212799f8f58ab187ae1c8f82eef29a414f17a9057e1cb",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fac6617485cf15d1d77c41bc1130d1b9e29f84d81df88de6f1f4ff1373081e1b",
+          "responseSha256": "ba7af7230a978eaf5523d222a4986e05770a886a9988933a095ad12e910839e8",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "52d143c7c7e8d1d344132f2fa6d1d5ea42dcac68cadbeb5be87794a43cc0ccca",
+          "responseSha256": "f330f1764ed8c0866f65568cbbd14f6ac79a4817acfe9a17b23071f14bc6aa42",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "7d859add07d6dc9b019b6e5a10659122ac1d25280c6cbc827dc2a6e5f5dcc4b9",
+          "responseSha256": "c6513a1616b9cda88386fca4f86e2ff8591ebb082c79281e48eae615ff8de7d3",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "21e0a24dbbe3eb9ec65fd4bb71dca76ecc2b25db2b276d916480f27707998efa",
+          "responseSha256": "2944c78944d60cf6e9f8d9e37aa24d2c361e99dde3e98bbcbf70ecd0e17bc543",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "914fea47e01a28de34e201011e539f0b5a7aa7c3659b8fd2e57c764a474dc162",
+          "responseSha256": "8eb2c3d815b8db9fd19036aaaf36fb2921b78ab6d6b2aa03345c14936e98bec9",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "896b7d9c33b5096020e17748be0e079b9e0184df4b1a579040a234e72bcd3a41",
+          "responseSha256": "e28769b280de6f8d74d83e10ce47c26f06265ebb964c840bb0dc01e1594cd064",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "9b8222fde3c884c25105c0e26ecadb940f19b1a100b084232875c775a0e683b1",
+          "responseSha256": "e80618e4dbbc86002cfe02ec85133cd1d54dd39334a962dfaf061c92b463f59a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "28ffa129f27194ab40322d437ce9b49317c4bc21516d0b1ea5cb7c2f0900712f",
+          "responseSha256": "533fd390aec3adbe886d10d4ecfc2b69c6d6bb3805db5789339bd78dde47d71b",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "fe4f49955e085ca92a962141c7f3aa999d4cd8ef467d7f6f6469d387f5b494b8",
+          "responseSha256": "fed5c1a8494286074b87f3f12c3560d521a2500dad5287d0f979415f6181f41a",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "4c327b747d832ec1cbb06f7595f9bb074e87ee042c0685b6777a2c4d73287d8c",
+          "responseSha256": "0fb2549fd3e511e1e3979a688dc672b7c870cfe90af99cab2acc9d5097911c16",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "438662be56a2ce59a9d9b2e0e7b81a2f80b634431cf5bfd10ea5c40a5013ecd4",
+          "responseSha256": "deb1ab0aae00270d8f9558b440190da28f78c193a8ffc1b80f57f437a23c4f80",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "123132eee7e976b6481b0a5a22c01a6771733185b33f679fdb2b88482a37aa15",
+          "responseSha256": "49188a32500206f6cc0c872a4ea9af074409c279f9349bc45f211907db66d970",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "1fa74a535dd91ace6fc4b89ba049d3909aedc736fab58c092a4627c3e44e8044",
+          "responseSha256": "c4c4166e84c088b1ecad751f253b9048b4d02372edee652a65890a28fa56ff9c",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "2d8a730a7dad9d1f2807d617e7e857df36a18a213ee9819a33e02723391364d8",
+          "responseSha256": "bbf86e09558f3f33f66cc6688ce3402dc7fc5aa3042b69b0e2b5448b16e16cc2",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "909f9064e8ac9d092515eecdfb47a32b3c5bdea5ba03693ccfd43e873e2a0417",
+          "responseSha256": "1f1b1ba6e5a187207b532689fda19a694c4c5cffeedf0fcc17647fe8909fd9ae",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "438e1f2018fb33017815121e9452c8f30e9285fb9722a3dca2aaa72edc188f1b",
+          "responseSha256": "b3a8a28353f4c833f63c7655a07790bb8d6811a95fd4c60c64a1db4d8c6b03cb",
+          "httpStatus": 200
+        },
+        {
+          "requestSha256": "52f5a882cabafb935d0b4e9e4069e1f733e9b3b4d37c1868cdddc33b03579660",
+          "responseSha256": "4f0611ce76623afeb66f5d44076a1982eebbe5636a998c88111f2564e02ab3e7",
+          "httpStatus": 200
+        }
+      ]
+    }
+  ],
+  "finalFixedSample": {
+    "attempts": 3,
+    "passes": 3,
+    "slotSpans": [
+      19,
+      20,
+      20
+    ]
+  },
+  "rawHashesVerified": true,
+  "zeroSignaturesVerified": true,
+  "fullSwapQualified": false
+}

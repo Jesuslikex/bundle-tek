@@ -26,7 +26,7 @@ async function main() {
     file = `work/jito-provider-observed-${stamp}.mjs`;
   const built = await build({
     stdin: {
-      contents: `export {inspectPairRentAccount,pairRentMinimumRaw} from './lib/pair-rent-evidence';export {collectJitoProviderObservedAttempt} from './lib/jito-coherent-prefee-attempt';export {collectJitoRuntimeEvidence,verifyJitoRuntimeBracket} from './lib/jito-runtime-evidence';export {captureJitoCpmmLifetime,recheckJitoCpmmLifetime} from './lib/jito-cpmm-lifetime';export {solanaTransferMessage} from './lib/solana-transfer-message';export {paceWalletRpc} from './lib/wallet-rpc-pacing';export {readJitoSimulationPayload} from './lib/jito-simulation-json';`,
+      contents: `export {inspectJitoNativeTipCustody} from './lib/jito-native-tip-custody';export {inspectPairRentAccount,pairRentMinimumRaw} from './lib/pair-rent-evidence';export {collectJitoProviderObservedAttempt} from './lib/jito-coherent-prefee-attempt';export {collectJitoRuntimeEvidence,verifyJitoRuntimeBracket} from './lib/jito-runtime-evidence';export {captureJitoCpmmLifetime,recheckJitoCpmmLifetime} from './lib/jito-cpmm-lifetime';export {solanaTransferMessage} from './lib/solana-transfer-message';export {paceWalletRpc} from './lib/wallet-rpc-pacing';export {readJitoSimulationPayload} from './lib/jito-simulation-json';`,
       resolveDir: process.cwd(),
     },
     platform: 'node',
@@ -258,6 +258,18 @@ async function main() {
       afterFloor = Math.max(bank, ...feeSlots, first.maximumSlot);
     summary.simulationSlot = bank;
     summary.feeSlots = feeSlots;
+    for (const [i, frame] of attempt.simulation.frames.frames.entries()) {
+      const amount = [1000n, 1001n][i];
+      if (
+        BigInt(frame.postAccounts[1].lamports) -
+          BigInt(frame.preAccounts[1].lamports) !==
+          amount ||
+        BigInt(frame.preAccounts[0].lamports) -
+          BigInt(frame.postAccounts[0].lamports) !==
+          amount + BigInt(frame.feeLamports)
+      )
+        fail();
+    }
     summary.stage = 'second-code-scan';
     last = await api.collectJitoRuntimeEvidence(
       keys,
@@ -276,30 +288,28 @@ async function main() {
     summary.runtimeProof = proof;
     summary.stage = 'custody-after';
     const afterState = await state(last.maximumSlot);
-    if (
-      JSON.stringify(beforeState.value.slice(0, 2)) !==
-        JSON.stringify(afterState.value.slice(0, 2)) ||
-      JSON.stringify(beforeState.value[3]) !==
-        JSON.stringify(afterState.value[3])
-    )
-      fail();
+    summary.custodyRoles = await api.inspectJitoNativeTipCustody({
+      tip,
+      before: beforeState.value,
+      after: afterState.value,
+    });
     summary.custodyClockRent = {
       beforeSlot: beforeState.slot,
       afterSlot: afterState.slot,
-      unchangedCustody: true,
+      unchangedPayerCustody: true,
       unchangedRent: true,
       clockExact: true,
     };
     summary.stage = 'lifetime-after';
     const validity = await rpc('isBlockhashValid', [
       lifetime.blockhash,
-      { commitment: 'confirmed', minContextSlot: last.maximumSlot },
+      { commitment: 'confirmed', minContextSlot: afterState.slot },
     ]);
     const validitySlot = Number(validity.context?.slot);
     if (
       validity.value !== true ||
       !Number.isSafeInteger(validitySlot) ||
-      validitySlot < last.maximumSlot ||
+      validitySlot < afterState.slot ||
       validitySlot - floor > 32
     )
       fail();
