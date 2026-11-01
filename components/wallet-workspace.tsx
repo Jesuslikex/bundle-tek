@@ -2027,8 +2027,11 @@ export function WalletWorkspace({
                           className="wallet-row-action"
                           disabled={busy || loading || w.archived}
                           aria-label={
-                            'Generate activity for ' + (w.label || w.address)
+                            // The reference's equivalent action opens a fake
+                            // volume session; this one opens warm-up, so say so.
+                            'Warm-up activity for ' + (w.label || w.address)
                           }
+                          title="Opens the warm-up plan, not the volume bot."
                           onClick={() => {
                             setQuery('');
                             setSelected([w.address]);
