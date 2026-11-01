@@ -47,7 +47,8 @@ function SavedMetadataReview({
   onCreateOnly,
 }: Props) {
   const [consent, setConsent] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<'recover' | 'publish' | null>(null);
+  const busy = operation !== null;
   const [uri, setUri] = useState('');
   const [error, setError] = useState('');
   const pending = useRef<AbortController | null>(null);
@@ -86,7 +87,7 @@ function SavedMetadataReview({
     if (!project || busy || saving || pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
-    setBusy(true);
+    setOperation('recover');
     setError('');
     try {
       const params = new URLSearchParams({
@@ -120,7 +121,7 @@ function SavedMetadataReview({
     } finally {
       if (pending.current === controller) {
         pending.current = null;
-        setBusy(false);
+        setOperation(null);
       }
     }
   }
@@ -136,7 +137,7 @@ function SavedMetadataReview({
       return;
     const controller = new AbortController();
     pending.current = controller;
-    setBusy(true);
+    setOperation('publish');
     setError('');
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -186,7 +187,7 @@ function SavedMetadataReview({
       if (timeout) clearTimeout(timeout);
       if (pending.current === controller) {
         pending.current = null;
-        setBusy(false);
+        setOperation(null);
       }
     }
   }
@@ -270,7 +271,9 @@ function SavedMetadataReview({
                   disabled={busy || saving}
                   onClick={() => void recover()}
                 >
-                  Recover published metadata
+                  {operation === 'recover'
+                    ? 'Checking published metadata…'
+                    : 'Recover published metadata'}
                 </Button>
                 <label
                   style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}
@@ -291,19 +294,22 @@ function SavedMetadataReview({
                   disabled={!consent || !artworkReady || busy || saving}
                   onClick={() => void publish()}
                 >
-                  {busy ? 'Publishing metadata…' : 'Publish reviewed metadata'}
+                  {operation === 'publish'
+                    ? 'Publishing metadata…'
+                    : 'Publish reviewed metadata'}
                 </Button>
               </>
             )}
           </>
         )}
         <div aria-live="polite" style={{ overflowWrap: 'anywhere' }}>
-          {busy && (
+          {operation === 'publish' && (
             <p>
               Keep this review open. If interrupted, publication may still
               complete.
             </p>
           )}
+          {operation === 'recover' && <p>Checking for published metadata.</p>}
           {error && (
             <p role="alert" className="inspection-error">
               {error}

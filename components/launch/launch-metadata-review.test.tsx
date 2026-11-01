@@ -105,6 +105,26 @@ it('recovers the exact published metadata after remount without publishing or gr
   ).toBe(false);
 });
 
+it('describes a pending recovery as a read rather than a publication', async () => {
+  let finish!: (response: Response) => void;
+  fetcher.mockImplementation(
+    () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render();
+  act(() => {
+    [...container.querySelectorAll('button')]
+      .find((b) => b.textContent === 'Recover published metadata')!
+      .click();
+  });
+  expect(container.textContent).toContain('Checking for published metadata.');
+  expect(container.textContent).not.toContain('publication may still');
+  expect(fetcher.mock.calls[0][1].method).toBeUndefined();
+  await act(async () => finish(Response.json({ release: null })));
+});
+
 it('refuses a recovered release for a different identity', async () => {
   fetcher.mockResolvedValue(
     Response.json({
