@@ -4,6 +4,7 @@ import { holdersBuyUnit } from './launch-buy';
 // Static validation paths: computeValidationState / resolveMaxTotalBuyPercentage.
 // Supply totals apply to supply-input modes. Developer bounds remain independent.
 import type { LaunchPlanInput } from './launch-plan';
+import { venueCapabilityLimits } from './venue-capabilities';
 const PROFILES: Record<string, { total: number; developer: number }> = {
   'Arc/Argus': {
     total: 99,
@@ -189,7 +190,25 @@ export function developerSupplyLimit(
 ) {
   return PROFILES[`${plan.chain}/${plan.launchpad}`]?.developer ?? null;
 }
+/**
+ * Captured per-venue ceiling. The shipped client rejects a supply buy whose
+ * total including the developer buy exceeds the venue's
+ * max_total_buy_percentage ("Supply Buy % can't exceed N%"). Save-time only:
+ * stored plans above it stay readable.
+ */
+export function validateVenueSupplyCeiling(plan: LaunchPlanInput) {
+  if (holdersBuyUnit(plan) !== 'supply') return;
+  const cap = venueCapabilityLimits(
+    plan.chain,
+    plan.launchpad,
+  )?.maxTotalBuyPercentage;
+  if (cap !== undefined && plan.developerBuy + plan.holdersBuy > cap)
+    throw new Error(
+      `${plan.launchpad} supply buy cannot exceed ${cap}% including the developer buy.`,
+    );
+}
 export function validateSequencedSupply(plan: LaunchPlanInput) {
+  validateVenueSupplyCeiling(plan);
   const limits = sequencedSupplyLimits(plan);
   const developer = developerSupplyLimit(plan);
   if (developer !== null && plan.developerBuy > developer)
