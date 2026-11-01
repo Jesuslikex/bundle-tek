@@ -132,6 +132,9 @@ export function BundleAccount({
           <Link href="/sign-in">Sign in</Link>
         )}
         {pathname !== '/settings' && <Link href="/settings">Settings</Link>}
+        {session && pathname !== '/recover' && (
+          <Link href="/recover">Recover funds</Link>
+        )}
         {error && <span role="alert">{error}</span>}
       </aside>
     </>
