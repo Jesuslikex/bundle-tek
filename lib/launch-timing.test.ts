@@ -21,8 +21,13 @@ describe('launch pacing', () => {
       expect(() =>
         parseLaunchTiming({ buyDelayMs: v, initialBuyDelayMs: 0 }),
       ).toThrow();
+    // Captured launch-form clamp is [0, 3e5] on the initial delay.
+    expect(
+      parseLaunchTiming({ buyDelayMs: 0, initialBuyDelayMs: 300_000 })
+        ?.initialBuyDelayMs,
+    ).toBe(300_000);
     expect(() =>
-      parseLaunchTiming({ buyDelayMs: 0, initialBuyDelayMs: 86400001 }),
+      parseLaunchTiming({ buyDelayMs: 0, initialBuyDelayMs: 300001 }),
     ).toThrow();
     expect(() => parseLaunchTiming([])).toThrow();
   });

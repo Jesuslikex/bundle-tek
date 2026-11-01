@@ -1,6 +1,10 @@
 'use client';
 import type { LaunchPlanInput } from '@/lib/launch-plan';
-import { launchTimingBounds, ZERO_LAUNCH_TIMING } from '@/lib/launch-timing';
+import {
+  launchTimingBounds,
+  ZERO_LAUNCH_TIMING,
+  LAUNCH_INITIAL_BUY_DELAY_MAX_MS,
+} from '@/lib/launch-timing';
 import { holdersBuyUnit } from '@/lib/launch-buy';
 import { MEV_SLIDER_MAX, MEV_SLIDER_MIN } from '@/lib/bubble-map-estimate';
 import { BubbleMapEstimate } from '@/components/bubble-map-estimate';
@@ -53,7 +57,7 @@ export function LaunchTimingForm({
               aria-label="Initial buy delay milliseconds"
               type="number"
               min={0}
-              max={86400000}
+              max={LAUNCH_INITIAL_BUY_DELAY_MAX_MS}
               step={1}
               value={timing.initialBuyDelayMs}
               onChange={(e) => update('initialBuyDelayMs', e.target.value)}

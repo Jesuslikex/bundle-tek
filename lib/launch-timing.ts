@@ -1,6 +1,8 @@
 import type { LaunchPlanInput } from './launch-plan';
 import { venueLaunchMethods } from './launch-methods';
 import { LAUNCH_TIMING_LIMITS } from './launch-timing-limits';
+// Captured launch-form clamp: initialBuyDelay:[0,3e5] in its local bounds table.
+export const LAUNCH_INITIAL_BUY_DELAY_MAX_MS = 300_000;
 export type LaunchTiming = { buyDelayMs: number; initialBuyDelayMs: number };
 export const ZERO_LAUNCH_TIMING: LaunchTiming = {
   buyDelayMs: 0,
@@ -18,14 +20,14 @@ export function parseLaunchTiming(value: unknown): LaunchTiming | undefined {
     raw.buyDelayMs > 60000
   )
     throw new Error('Buy delay must be whole milliseconds from 0 to 60000.');
-  // Local storage bound, not a captured venue maximum.
+  // Captured local bound: the launch form clamps initialBuyDelay to [0, 3e5].
   if (
     !Number.isSafeInteger(raw.initialBuyDelayMs) ||
     raw.initialBuyDelayMs < 0 ||
-    raw.initialBuyDelayMs > 86400000
+    raw.initialBuyDelayMs > LAUNCH_INITIAL_BUY_DELAY_MAX_MS
   )
     throw new Error(
-      'Initial buy delay must be whole milliseconds from 0 to 86400000.',
+      `Initial buy delay must be whole milliseconds from 0 to ${LAUNCH_INITIAL_BUY_DELAY_MAX_MS}.`,
     );
   return {
     buyDelayMs: raw.buyDelayMs,
