@@ -1,0 +1,160 @@
+.launcher {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--primary, #7892ff);
+  border-radius: var(--bundle-button-radius, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  margin: 8px 0;
+}
+.panel {
+  position: fixed;
+  z-index: 60;
+  width: min(340px, calc(100vw - 16px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  background: color-mix(in srgb, var(--card, #18181f) 92%, transparent);
+  color: var(--foreground, #fcfcfc);
+  border: 1px solid var(--border, #22242d);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  font-size: 13px;
+}
+.panel button {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: var(--bundle-button-radius, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.panel button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.panel button[aria-pressed='true'] {
+  border-color: var(--primary, #7892ff);
+  box-shadow: 0 0 0 1px var(--primary, #7892ff) inset;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grip {
+  cursor: grab;
+  touch-action: none;
+}
+.scope {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.folderBar,
+.quick,
+.sides,
+.modes,
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.modes {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.wallets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+}
+.wallets li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wallets label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wallets small,
+.scope > small,
+.note {
+  color: #9a9dab;
+  font-size: 11px;
+}
+.sides button {
+  flex: 1;
+}
+.sides button[data-side='Buy'][aria-pressed='true'],
+.submit[data-side='Buy'] {
+  border-color: var(--bundle-chart-up, #2ebd85);
+  box-shadow: 0 0 0 1px var(--bundle-chart-up, #2ebd85) inset;
+}
+.sides button[data-side='Sell'][aria-pressed='true'],
+.submit[data-side='Sell'] {
+  border-color: var(--bundle-chart-down, #ed3a7a);
+  box-shadow: 0 0 0 1px var(--bundle-chart-down, #ed3a7a) inset;
+}
+.quick kbd {
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 120px;
+}
+.panel input:not([type='checkbox']):not([type='range']) {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: 6px;
+  background: var(--background, #101114);
+  color: inherit;
+}
+.submit {
+  flex: 1;
+  font-weight: 600;
+}
+.error {
+  color: var(--bundle-danger, #ed3a7a);
+  margin: 0;
+}
+.outcomes {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+.outcomes li[data-ok='false'] {
+  color: var(--bundle-danger, #ed3a7a);
+}
+.look label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
