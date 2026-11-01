@@ -13,6 +13,8 @@ import {
   type PumpLaunchRpc,
 } from './pump-launch-simulation';
 import { SOLANA_MAINNET_GENESIS } from './wallet-balances';
+import { validateProjectDocument } from './workspace-project';
+import { planSnipeBuys, snipeDeferred } from './launch-snipe';
 import {
   planPumpOrganicSequence,
   type PumpOrganicMode,
@@ -81,26 +83,15 @@ async function requireOwnedHolders(
   }
 }
 
-/** Reads the live curve and fee config, plans the schedule and saves it. */
-export async function planOwnedPumpOrganicSequence(
-  db: D1Database,
-  owner: string,
-  supplied: PumpOrganicPlanTerms,
+/** Reads the live curve and fee config of a created token on mainnet. */
+async function readLiveCurve(
+  mint: string,
   signal: AbortSignal,
   rpc: PumpLaunchRpc,
 ) {
-  const terms = structuredClone(supplied);
-  const launch = await readFinalizedLaunch(db, owner, terms.launchReviewId);
-  if (terms.buys.some((b) => b.address === launch.create.payer))
-    fail('The deployer cannot be an organic holder.', 400);
-  await requireOwnedHolders(
-    db,
-    owner,
-    terms.buys.map((b) => b.address),
-  );
   if ((await rpc('getGenesisHash', [], signal)) !== SOLANA_MAINNET_GENESIS)
     fail('Organic holder buys require Solana mainnet.');
-  const { bondingCurve } = await pumpCreateAddresses(launch.create.mint);
+  const { bondingCurve } = await pumpCreateAddresses(mint);
   const result = (await rpc(
     'getMultipleAccounts',
     [
@@ -120,13 +111,7 @@ export async function planOwnedPumpOrganicSequence(
   ) as Record<string, unknown>;
   if (curve.complete !== false)
     fail('The curve has completed; organic curve buys no longer apply.');
-  const plan = planPumpOrganicSequence({
-    mode: terms.mode,
-    buys: terms.buys,
-    delayMinMs: terms.delayMinMs,
-    delayMaxMs: terms.delayMaxMs,
-    slippageBps: terms.slippageBps,
-    quoteMint: launch.create.quoteMint,
+  return {
     curve: {
       virtualTokensRaw: String(curve.virtual_token_reserves),
       virtualQuoteRaw: String(curve.virtual_quote_reserves),
@@ -135,7 +120,26 @@ export async function planOwnedPumpOrganicSequence(
     feeConfig: decodePumpInitialBuyState(
       'FeeConfig',
       pumpAccountBytes(feeAccount),
-    ),
+    ) as Record<string, unknown>,
+  };
+}
+
+async function planAndSave(
+  db: D1Database,
+  owner: string,
+  launch: Awaited<ReturnType<typeof readFinalizedLaunch>>,
+  terms: PumpOrganicPlanTerms,
+  live: Awaited<ReturnType<typeof readLiveCurve>>,
+) {
+  const plan = planPumpOrganicSequence({
+    mode: terms.mode,
+    buys: terms.buys,
+    delayMinMs: terms.delayMinMs,
+    delayMaxMs: terms.delayMaxMs,
+    slippageBps: terms.slippageBps,
+    quoteMint: launch.create.quoteMint,
+    curve: live.curve,
+    feeConfig: live.feeConfig,
   });
   return savePumpOrganicSequence(db, owner, {
     projectId: launch.projectId,
@@ -144,6 +148,86 @@ export async function planOwnedPumpOrganicSequence(
     rentAllowanceRaw: terms.rentAllowanceRaw,
     plan,
   });
+}
+
+/** Reads the live curve and fee config, plans the schedule and saves it. */
+export async function planOwnedPumpOrganicSequence(
+  db: D1Database,
+  owner: string,
+  supplied: PumpOrganicPlanTerms,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc,
+) {
+  const terms = structuredClone(supplied);
+  const launch = await readFinalizedLaunch(db, owner, terms.launchReviewId);
+  if (terms.buys.some((b) => b.address === launch.create.payer))
+    fail('The deployer cannot be an organic holder.', 400);
+  await requireOwnedHolders(
+    db,
+    owner,
+    terms.buys.map((b) => b.address),
+  );
+  const live = await readLiveCurve(launch.create.mint, signal, rpc);
+  return planAndSave(db, owner, launch, terms, live);
+}
+
+export type PumpSnipeTerms = Omit<PumpOrganicPlanTerms, 'buys'>;
+
+/**
+ * Snipe: start the holder buys saved in a Manual-mode plan after its token is
+ * deployed. Wallets, total budget and distribution come from the saved
+ * project, never from the request; the result is an ordinary organic sequence
+ * whose every batch still needs its own review, approval, signing and send.
+ */
+export async function snipeOwnedPumpLaunch(
+  db: D1Database,
+  owner: string,
+  supplied: PumpSnipeTerms,
+  signal: AbortSignal,
+  rpc: PumpLaunchRpc,
+) {
+  const terms = structuredClone(supplied);
+  const launch = await readFinalizedLaunch(db, owner, terms.launchReviewId);
+  const project = await db
+    .prepare(
+      'SELECT document,archived FROM workspace_projects WHERE owner_id=? AND id=?',
+    )
+    .bind(owner, launch.projectId)
+    .first<{ document: string; archived: number }>();
+  if (!project || project.archived)
+    return fail('Active launch project not found.', 404);
+  const document = validateProjectDocument(JSON.parse(project.document));
+  if (!snipeDeferred(document.plan))
+    fail(
+      'Snipe starts holder buys for Manual mode launches. This plan already ran its holder buys at launch.',
+    );
+  const existing = await db
+    .prepare(
+      "SELECT 1 AS open FROM pump_organic_sequences WHERE owner_id=? AND launch_review_id=? AND state='active'",
+    )
+    .bind(owner, terms.launchReviewId)
+    .first<{ open: number }>();
+  if (existing)
+    fail('Snipe already started for this launch. Continue or stop it below.');
+  const live = await readLiveCurve(launch.create.mint, signal, rpc);
+  let buys: { address: string; tokenAmountRaw: string }[];
+  try {
+    buys = planSnipeBuys({
+      document,
+      deployer: launch.create.payer,
+      quoteMint: launch.create.quoteMint,
+      curve: live.curve,
+      feeConfig: live.feeConfig,
+    }).buys.map(({ address, tokenAmountRaw }) => ({ address, tokenAmountRaw }));
+  } catch (e) {
+    return fail((e as Error).message);
+  }
+  await requireOwnedHolders(
+    db,
+    owner,
+    buys.map((b) => b.address),
+  );
+  return planAndSave(db, owner, launch, { ...terms, buys }, live);
 }
 
 /**

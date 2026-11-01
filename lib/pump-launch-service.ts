@@ -1,3 +1,4 @@
+import { snipeDeferred } from './launch-snipe';
 import {
   readPumpHistoryPage,
   type PumpHistoryPage,
@@ -76,8 +77,11 @@ async function project(db: D1Database, owner: string, id: string) {
   const doc = validateProjectDocument(JSON.parse(row.document));
   if (
     doc.plan.developerBuy !== 0 ||
-    doc.plan.holdersBuy !== 0 ||
-    Number(doc.plan.holdersBuyQuote ?? 0) !== 0 ||
+    // Manual mode defers holder buys to Snipe after deploy; they are never in
+    // this create-only packet.
+    (!snipeDeferred(doc.plan) &&
+      (doc.plan.holdersBuy !== 0 ||
+        Number(doc.plan.holdersBuyQuote ?? 0) !== 0)) ||
     doc.plan.scheduled
   )
     fail(

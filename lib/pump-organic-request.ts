@@ -1,11 +1,15 @@
 import bs58 from 'bs58';
 import { validSolanaSigningKey } from './solana-signature';
 import { PumpPreflightError } from './owned-pump-preflight';
-import type { PumpOrganicPlanTerms } from './pump-organic-preparation';
+import type {
+  PumpOrganicPlanTerms,
+  PumpSnipeTerms,
+} from './pump-organic-preparation';
 import type { PumpOrganicBatchConsent } from './pump-organic-batch';
 
 export type PumpOrganicRequest =
   | { action: 'plan'; terms: PumpOrganicPlanTerms }
+  | { action: 'snipe'; terms: PumpSnipeTerms }
   | { action: 'prepare-batch'; sequenceId: string; batch: number }
   | {
       action: 'register';
@@ -76,6 +80,30 @@ export function parsePumpOrganicRequest(value: unknown): PumpOrganicRequest {
       )
         return fail();
       return { action: 'plan', terms: t as PumpOrganicPlanTerms };
+    }
+    case 'snipe': {
+      const t = v.terms;
+      if (
+        !keys(v, ['action', 'terms']) ||
+        !record(t) ||
+        !keys(t, [
+          'launchReviewId',
+          'mode',
+          'delayMinMs',
+          'delayMaxMs',
+          'slippageBps',
+          'rentAllowanceRaw',
+        ]) ||
+        !uuid(t.launchReviewId) ||
+        (t.mode !== 'Organic' && t.mode !== 'Stagger') ||
+        !Number.isSafeInteger(t.delayMinMs) ||
+        !Number.isSafeInteger(t.delayMaxMs) ||
+        !Number.isSafeInteger(t.slippageBps) ||
+        typeof t.rentAllowanceRaw !== 'string' ||
+        !/^(0|[1-9]\d{0,9})$/.test(t.rentAllowanceRaw)
+      )
+        return fail();
+      return { action: 'snipe', terms: t as PumpSnipeTerms };
     }
     case 'prepare-batch':
       if (

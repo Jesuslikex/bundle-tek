@@ -35,6 +35,8 @@ Added 18 October 2026 at julian's request. Snapshot at writing: local `main` at 
 
 ### Current claims
 
+- Claude, 1 November 2026: Manual mode + Snipe (Pump). New `lib/launch-snipe*`, `components/launch-snipe-panel*`; new `snipe` action in `lib/pump-organic-request.ts`, `lib/pump-organic-preparation.ts`, `app/api/launch/pump/organic/route.ts`; Manual create-only allowance in `lib/pump-launch-service.ts`; mount + Manual deploy copy in `components/launch/pump-launch-review.tsx` and its test (not in Codex's active diff). No migration or env var.
+
 - Claude, 1 November 2026: StonkFun holder bundle requires whole-bundle simulateBundle at review and signed replay before send (fail closed). Previous claim line: Claude, 31 October 2026: StonkFun multi-wallet holder bundle (create + up to 6 saved holder buys + deployer Jito tip in one atomic Jito bundle). New `lib/stonkfun-bundle*`, `test/stonkfun-curve-sdk-golden.json`; edits in `lib/venue-launch-recovery.ts` (bundle prepare/approve/submit branch), `app/api/stonkfun/launch/route.ts`, `components/stonkfun-launch-review.tsx`. No migration (reuses 0145 rows), no env var.
 
 - Codex + helper, 28 October 2026 COMPLETE, claim released: browser-only encrypted Jito recovery journal foundation. See docs/CODEX-JITO-ENCRYPTED-JOURNAL-FOUNDATION-20261028.md. It is not yet integrated or a cross-device/server reservation; no wallet, signing, provider, database migration or deployment changes.

@@ -3,6 +3,8 @@ import { OpenLaunchChartButton } from '@/components/open-launch-chart-button';
 import { useEffectEvent, useEffect, useId, useRef, useState } from 'react';
 import { PumpHolderLaunchReview } from './pump-holder-launch-review';
 import { PumpOrganicHolderBuys } from './pump-organic-holder-buys';
+import { LaunchSnipePanel } from '@/components/launch-snipe-panel';
+import { snipeDeferred } from '@/lib/launch-snipe';
 import { LaunchLayerPlanningEntry } from './launch-layer-planning-entry';
 import {
   PumpLaunchHistory,
@@ -198,9 +200,11 @@ function PumpLaunchReviewContent({
     ? savedReview.source === '/api/launch/pump/initial-buy'
     : plan.developerBuy > 0;
   const endpoint = atomic ? '/api/launch/pump/initial-buy' : '/api/launch/pump';
+  // Manual mode deploys with only the Dev Buy; holder buys wait for Snipe.
   const hasBuys =
     plan.scheduled ||
     (!atomic &&
+      !snipeDeferred(plan) &&
       (plan.holdersBuy !== 0 || Number(plan.holdersBuyQuote ?? 0) !== 0));
   const creation = (r: Launch['review']) =>
     'create' in r.input ? r.input.create : r.input;
@@ -488,6 +492,8 @@ function PumpLaunchReviewContent({
             plan.developerBuy +
             '% of total supply in the creation transaction.'
           : 'initial buys are included.'}{' '}
+        {snipeDeferred(plan) &&
+          'Manual mode: holder buys wait until you press Snipe after the token is live. '}
         Signing and broadcasting require separate approval.
       </p>
       <p className={`source-note ${styles.wrap}`}>
@@ -974,6 +980,7 @@ function PumpLaunchReviewWorkspace(
   props: Parameters<typeof PumpLaunchReviewContent>[0],
 ) {
   const [selected, setSelected] = useState<SavedLaunchSelection | null>(null);
+  const [organicKey, setOrganicKey] = useState(0);
   const reviewPanel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (selected) {
@@ -986,9 +993,11 @@ function PumpLaunchReviewWorkspace(
   }, [selected]);
   const holder = selected
     ? selected.source === '/api/launch/pump/holders'
-    : holdersBuyUnit(props.plan) === 'supply'
-      ? props.plan.holdersBuy > 0
-      : /[1-9]/.test(props.plan.holdersBuyQuote ?? '');
+    : snipeDeferred(props.plan)
+      ? false
+      : holdersBuyUnit(props.plan) === 'supply'
+        ? props.plan.holdersBuy > 0
+        : /[1-9]/.test(props.plan.holdersBuyQuote ?? '');
   return (
     <>
       {selected && (
@@ -1034,7 +1043,12 @@ function PumpLaunchReviewWorkspace(
         projectId={props.project.id}
         onOpenReview={setSelected}
       />
-      <PumpOrganicHolderBuys projectId={props.project.id} />
+      <LaunchSnipePanel
+        projectId={props.project.id}
+        plan={props.plan}
+        onStarted={() => setOrganicKey((k) => k + 1)}
+      />
+      <PumpOrganicHolderBuys key={organicKey} projectId={props.project.id} />
     </>
   );
 }

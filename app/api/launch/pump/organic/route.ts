@@ -5,6 +5,7 @@ import { pumpLaunchRpc } from '@/lib/pump-launch-service';
 import { parsePumpOrganicRequest } from '@/lib/pump-organic-request';
 import {
   planOwnedPumpOrganicSequence,
+  snipeOwnedPumpLaunch,
   preparePumpOrganicBatch,
 } from '@/lib/pump-organic-preparation';
 import {
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
     const action = parsePumpOrganicRequest(body),
       db = getD1(),
       signal = AbortSignal.any([request.signal, AbortSignal.timeout(60000)]);
-    if (['plan', 'prepare-batch', 'stop'].includes(action.action)) {
+    if (['plan', 'snipe', 'prepare-batch', 'stop'].includes(action.action)) {
       const now = Date.now(),
         key = JSON.stringify(['pump-organic-v1', user.userId, action.action]);
       const claimed = await db
@@ -85,6 +86,16 @@ export async function POST(request: Request) {
       case 'plan':
         return json(
           await planOwnedPumpOrganicSequence(
+            db,
+            user.userId,
+            action.terms,
+            signal,
+            pumpLaunchRpc(),
+          ),
+        );
+      case 'snipe':
+        return json(
+          await snipeOwnedPumpLaunch(
             db,
             user.userId,
             action.terms,
