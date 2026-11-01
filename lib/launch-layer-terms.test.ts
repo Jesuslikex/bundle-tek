@@ -353,3 +353,67 @@ it('refuses moving context while the asynchronous digest is pending', async () =
     spy.mockRestore();
   }
 });
+
+// Adds owned front wallets so a count can exceed a supplied ceiling.
+function addFront(
+  input: LaunchLayerRequest,
+  context: LaunchLayerContext,
+  count: number,
+) {
+  for (let i = 0; i < count; i += 1) {
+    const addr = address(40 + i);
+    input.roles.front.push({
+      wallet: { address: addr, revision: 2, root: true, folderRevision: 0 },
+      maximumBuyQuoteRaw: '1000',
+      maximumNetworkFeeLamports: '5000',
+      maximumAccountRentLamports: '2000000',
+      retainedNativeReserveLamports: '100000',
+    });
+    context.workspace.wallets.push({
+      address: addr,
+      chain: 'Solana',
+      folderId: '',
+      label: 'Synthetic owned public address',
+      role: 'Recipient',
+      revision: 2,
+      archived: false,
+      updatedAt: '2026-10-18T03:00:00.000Z',
+    } as LaunchLayerContext['workspace']['wallets'][number]);
+  }
+}
+
+it('stays silent about Front MEV when the plan carries no ceiling', async () => {
+  const { input, context } = fixture();
+  addFront(input, context, 5);
+  await expect(createLaunchLayerTerms(input, context)).resolves.toBeDefined();
+});
+
+it('refuses Front MEV wallets above a supplied ceiling', async () => {
+  const { input, context } = fixture();
+  addFront(input, context, 3);
+  context.savedPlan.maxFrontMevCount = 2;
+  await expect(createLaunchLayerTerms(input, context)).rejects.toThrow(
+    /Maximum Front MEV wallets is 2\. Current: 4\./,
+  );
+});
+
+it('uses the post-migration ceiling once the buy reaches the threshold', async () => {
+  const { input, context } = fixture();
+  addFront(input, context, 3);
+  context.savedPlan.maxFrontMevCount = 4;
+  context.savedPlan.maxFrontMevPostMigration = 2;
+  // The default plan buys 5 + 20 = 25, so a 10 threshold is already passed.
+  context.savedPlan.migrationThreshold = 10;
+  await expect(createLaunchLayerTerms(input, context)).rejects.toThrow(
+    /With this buy amount, maximum Front MEV wallets is 2\. Current: 4\. Reduce Front MEV count first\./,
+  );
+});
+
+it('keeps the plain ceiling below the threshold', async () => {
+  const { input, context } = fixture();
+  addFront(input, context, 3);
+  context.savedPlan.maxFrontMevCount = 4;
+  context.savedPlan.maxFrontMevPostMigration = 2;
+  context.savedPlan.migrationThreshold = 90;
+  await expect(createLaunchLayerTerms(input, context)).resolves.toBeDefined();
+});

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import bs58 from 'bs58';
 import { validateLaunchPlan, type SavedLaunchPlan } from './launch-plan';
 import { quoteCatalog } from './quote-catalog';
+import { frontMevRefusal } from './front-mev-limit';
 import { walletReferenceFolderMatches } from './launch-wallets';
 import type { WalletWorkspace } from './wallet-workspace';
 
@@ -194,6 +195,16 @@ function buildTerms(
     );
   if (!request.roles.temporary.length && request.delays.backToTemporaryDelayMs)
     throw new Error('A temporary layer is required for its delay.');
+  // Captured mint-supplied ceiling. Silent unless the plan carries a cap, so
+  // the StonkFun 12 check above still governs plans without one.
+  const frontRefusal = frontMevRefusal({
+    frontCount: request.roles.front.length,
+    buy: plan.developerBuy + plan.holdersBuy,
+    migrationThreshold: plan.migrationThreshold,
+    maxFrontMevCount: plan.maxFrontMevCount,
+    maxFrontMevPostMigration: plan.maxFrontMevPostMigration,
+  });
+  if (frontRefusal) throw new Error(frontRefusal);
   const candidates = quoteCatalog(plan.chain, plan.launchpad).assets.filter(
     (asset) =>
       asset.symbol === plan.currency &&

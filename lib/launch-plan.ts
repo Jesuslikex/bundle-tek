@@ -204,6 +204,11 @@ export type LaunchPlanInput = {
   mevSlider?: number;
   supplyCostBps?: number;
   estimatedDurationMs?: number;
+  // Captured front-MEV ceilings. Only enforced when maxFrontMevCount is set.
+  maxFrontMevCount?: number;
+  maxFrontMevPostMigration?: number;
+  // Migration point in the same unit as developerBuy + holdersBuy.
+  migrationThreshold?: number;
   useHusher: boolean;
   scheduled: boolean;
   simulationSafety: SimulationSafetyPolicy;
@@ -398,7 +403,13 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     throw new Error('Routing emphasis must be 0-100');
   // Optional captured MEV estimate inputs; absent means "not chosen".
   const optionalNumber = (
-    key: 'mevSlider' | 'supplyCostBps' | 'estimatedDurationMs',
+    key:
+      | 'mevSlider'
+      | 'supplyCostBps'
+      | 'estimatedDurationMs'
+      | 'maxFrontMevCount'
+      | 'maxFrontMevPostMigration'
+      | 'migrationThreshold',
   ) =>
     body[key] === undefined || body[key] === null
       ? undefined
@@ -427,6 +438,28 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     throw new Error(
       'Estimated duration must be whole milliseconds from 0 to 86400000.',
     );
+  // Front-MEV ceilings are whole counts; the threshold shares the buy unit.
+  const maxFrontMevCount = optionalNumber('maxFrontMevCount');
+  if (
+    maxFrontMevCount !== undefined &&
+    (!Number.isSafeInteger(maxFrontMevCount) || maxFrontMevCount < 0)
+  )
+    throw new Error('Max Front MEV count must be a whole number of 0 or more.');
+  const maxFrontMevPostMigration = optionalNumber('maxFrontMevPostMigration');
+  if (
+    maxFrontMevPostMigration !== undefined &&
+    (!Number.isSafeInteger(maxFrontMevPostMigration) ||
+      maxFrontMevPostMigration < 0)
+  )
+    throw new Error(
+      'Max Front MEV after migration must be a whole number of 0 or more.',
+    );
+  const migrationThreshold = optionalNumber('migrationThreshold');
+  if (
+    migrationThreshold !== undefined &&
+    (!Number.isFinite(migrationThreshold) || migrationThreshold < 0)
+  )
+    throw new Error('Migration threshold must be 0 or more.');
   if (typeof body.useHusher !== 'boolean')
     throw new Error('useHusher must be boolean');
   if (typeof body.scheduled !== 'boolean')
@@ -462,6 +495,11 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     ...(mevSlider !== undefined ? { mevSlider } : {}),
     ...(supplyCostBps !== undefined ? { supplyCostBps } : {}),
     ...(estimatedDurationMs !== undefined ? { estimatedDurationMs } : {}),
+    ...(maxFrontMevCount !== undefined ? { maxFrontMevCount } : {}),
+    ...(maxFrontMevPostMigration !== undefined
+      ? { maxFrontMevPostMigration }
+      : {}),
+    ...(migrationThreshold !== undefined ? { migrationThreshold } : {}),
     useHusher: body.useHusher,
     scheduled: body.scheduled,
     simulationSafety,
