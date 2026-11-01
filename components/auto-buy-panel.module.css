@@ -1,0 +1,120 @@
+.panel {
+  margin: 8px 0;
+  border: 1px solid var(--border, #22242d);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: grid;
+  gap: 8px;
+}
+.panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.panel button {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: var(--bundle-button-radius, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.panel button[aria-pressed='true'] {
+  border-color: var(--primary, #7892ff);
+  box-shadow: 0 0 0 1px var(--primary, #7892ff) inset;
+}
+.panel button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.note,
+.panel small {
+  color: #9a9dab;
+  font-size: 12px;
+  margin: 0;
+}
+.strategy {
+  border: 1px solid var(--border, #22242d);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.strategy legend {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.kinds,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.rows {
+  display: grid;
+  gap: 6px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  min-width: 0;
+}
+.field input,
+.field textarea,
+.actions input {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: 6px;
+  background: var(--background, #101114);
+  color: inherit;
+}
+.field textarea {
+  min-height: 54px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.wallets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12px;
+  align-items: center;
+}
+.wallets label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.error {
+  color: var(--bundle-danger, #ed3a7a);
+  margin: 0;
+}
+.status ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.status li[data-kind='error'] {
+  color: var(--bundle-danger, #ed3a7a);
+}
+.status p {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
