@@ -41,3 +41,34 @@ test('renders the four panels and links to existing flows', () => {
   act(() => root.unmount());
   host.remove();
 });
+test('offers Fund all and Return all only on Solana with a picked funder', () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const render = (chain: 'Solana' | 'Base') =>
+    act(() =>
+      root.render(
+        <LaunchWorkspacePanels
+          chain={chain}
+          onFund={() => {}}
+          onOpenWallets={() => {}}
+        />,
+      ),
+    );
+  window.localStorage.removeItem('bundle:funder:Solana');
+  render('Solana');
+  expect(host.textContent).not.toContain('Fund all');
+  window.localStorage.setItem(
+    'bundle:funder:Solana',
+    '11111111111111111111111111111112',
+  );
+  window.dispatchEvent(new Event('bundle:funder-change'));
+  render('Solana');
+  expect(host.textContent).toContain('Fund all');
+  expect(host.textContent).toContain('Return all');
+  render('Base');
+  expect(host.textContent).not.toContain('Fund all');
+  act(() => root.unmount());
+  host.remove();
+  window.localStorage.removeItem('bundle:funder:Solana');
+});

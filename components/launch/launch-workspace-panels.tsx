@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { SolDistributionDialog } from '@/components/sol-distribution-dialog';
 import { useFunderAddress } from '@/components/sidebar-funder';
 import type { LaunchChain } from '@/lib/launch-plan';
 
@@ -10,8 +12,8 @@ function short(address: string) {
 
 /**
  * Proxima-style Funding Wallet / Auto Sell / Sniper Guard row at the top of
- * Launch Settings. It only links to existing reviewed flows; nothing here
- * signs, funds or arms anything.
+ * Launch Settings. Fund all / Return all open a reviewed one-approval
+ * dialog that signs in the browser vault; nothing else here signs or arms.
  */
 export function LaunchWorkspacePanels({
   chain,
@@ -23,6 +25,8 @@ export function LaunchWorkspacePanels({
   onOpenWallets: () => void;
 }) {
   const funder = useFunderAddress(chain);
+  const [distribute, setDistribute] = useState<'fund' | 'return' | null>(null);
+  const canDistribute = chain === 'Solana' && Boolean(funder);
   return (
     <div className="launch-ws-panels">
       <section aria-labelledby="ws-funding-title">
@@ -42,6 +46,24 @@ export function LaunchWorkspacePanels({
             My wallets
           </Button>
         </div>
+        {canDistribute && (
+          <div className="launch-ws-panel-actions">
+            <Button onClick={() => setDistribute('fund')}>Fund all</Button>
+            <Button variant="outline" onClick={() => setDistribute('return')}>
+              Return all
+            </Button>
+          </div>
+        )}
+        {canDistribute && distribute && (
+          <SolDistributionDialog
+            mode={distribute}
+            funder={funder}
+            open
+            onOpenChange={(open) => {
+              if (!open) setDistribute(null);
+            }}
+          />
+        )}
       </section>
       <section aria-labelledby="ws-autosell-title">
         <h2 id="ws-autosell-title">Auto Sell</h2>

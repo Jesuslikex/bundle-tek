@@ -3705,6 +3705,90 @@ body {
   padding: 8px;
   resize: none;
 }
+.sol-distribution-dialog {
+  display: grid;
+  gap: 12px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.sol-distribution-dialog code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.sol-distribution-amount {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #30303c;
+  border-radius: 8px;
+  padding: 12px;
+}
+.sol-distribution-modes,
+.sol-distribution-range {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sol-distribution-modes label,
+.sol-distribution-amount label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.sol-distribution-list {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #30303c;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.sol-distribution-list label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.sol-distribution-list .sol-distribution-all {
+  grid-template-columns: auto 1fr;
+  border-bottom: 1px solid #30303c;
+}
+.sol-distribution-balance {
+  color: #a7a7b8;
+  font-size: 12px;
+}
+.sol-distribution-review {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #30303c;
+  border-radius: 8px;
+  padding: 12px;
+}
+.sol-distribution-review dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+.sol-distribution-review dd {
+  margin: 0;
+  text-align: right;
+}
+.sol-distribution-plan,
+.sol-distribution-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 12px;
+}
+.sol-distribution-plan li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
 .browser-vault-import {
   border: 1px solid #30303c;
   padding: 14px;
