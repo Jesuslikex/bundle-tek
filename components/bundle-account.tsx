@@ -3,6 +3,7 @@ import { createAuthClient } from 'better-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { UserThemeSync } from './user-theme-sync';
 const auth = createAuthClient();
 export function BundleAccount({
   googleEnabled = false,
@@ -70,64 +71,69 @@ export function BundleAccount({
     }
   }
   // The sign-in page has its own form; a floating "Sign in" link there is redundant.
-  if (isPending || pathname === '/sign-in') return null;
+  if (isPending || pathname === '/sign-in') return <UserThemeSync />;
   return (
-    <aside
-      aria-label="Bundle account"
-      style={{
-        position: 'fixed',
-        bottom: 12,
-        right: 12,
-        zIndex: 50,
-        padding: '8px 12px',
-        background: '#161720',
-        border: '1px solid #383b4b',
-        borderRadius: 8,
-        fontSize: 12,
-        maxWidth: 'calc(100vw - 24px)',
-        display: 'flex',
-        gap: 8,
-        alignItems: 'center',
-        flexWrap: 'wrap',
-      }}
-    >
-      {session ? (
-        <>
-          <span title={session.user.email}>{session.user.name}</span>{' '}
-          {canLinkGoogle &&
-            (googleLinked === true ? (
-              <span>Google linked</span>
-            ) : (
-              <button
-                disabled={busy || googleLinked === null}
-                onClick={linkGoogle}
-              >
-                {googleLinked === null ? 'Checking Google…' : 'Link Google'}
-              </button>
-            ))}
-          <button
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setError('');
-              try {
-                const result = await auth.signOut();
-                if (result.error) setError('Unable to sign out.');
-                else window.location.assign('/sign-in');
-              } catch {
-                setError('Unable to connect.');
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Sign out
-          </button>
-        </>
-      ) : (
-        <Link href="/sign-in">Sign in</Link>
-      )}
-      {error && <span role="alert">{error}</span>}
-    </aside>
+    <>
+      <UserThemeSync />
+      <aside
+        aria-label="Bundle account"
+        style={{
+          position: 'fixed',
+          bottom: 12,
+          right: 12,
+          zIndex: 50,
+          padding: '8px 12px',
+          background: 'var(--card, #161720)',
+          color: 'var(--foreground, #fcfcfc)',
+          border: '1px solid var(--border, #383b4b)',
+          borderRadius: 8,
+          fontSize: 12,
+          maxWidth: 'calc(100vw - 24px)',
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
+        {session ? (
+          <>
+            <span title={session.user.email}>{session.user.name}</span>{' '}
+            {canLinkGoogle &&
+              (googleLinked === true ? (
+                <span>Google linked</span>
+              ) : (
+                <button
+                  disabled={busy || googleLinked === null}
+                  onClick={linkGoogle}
+                >
+                  {googleLinked === null ? 'Checking Google…' : 'Link Google'}
+                </button>
+              ))}
+            <button
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError('');
+                try {
+                  const result = await auth.signOut();
+                  if (result.error) setError('Unable to sign out.');
+                  else window.location.assign('/sign-in');
+                } catch {
+                  setError('Unable to connect.');
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Sign out
+            </button>
+          </>
+        ) : (
+          <Link href="/sign-in">Sign in</Link>
+        )}
+        {pathname !== '/settings' && <Link href="/settings">Settings</Link>}
+        {error && <span role="alert">{error}</span>}
+      </aside>
+    </>
   );
 }
