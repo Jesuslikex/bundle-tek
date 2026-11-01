@@ -35,6 +35,7 @@ import {
 } from '@/lib/imported-swap-simulation';
 import { balanceRpc, SOLANA_MAINNET_GENESIS } from '@/lib/wallet-balances';
 import { getSolanaRpcEndpoint } from '@/lib/solana-rpc';
+import { raceSendTransaction } from '@/lib/provider-race';
 import { decodeWarmupReceipt } from '@/lib/warmup-buy-receipt';
 import type { SavedSwapPreparation } from '@/lib/imported-swap-preparation-history';
 import {
@@ -208,6 +209,7 @@ export async function POST(request: Request) {
     preparationId?: string;
     id?: string;
     transaction?: string;
+    race?: boolean;
   };
   try {
     const text = await request.text();
@@ -220,7 +222,9 @@ export async function POST(request: Request) {
       ) ||
       (body.action === 'review'
         ? !body.preparationId || !UUID.test(body.preparationId)
-        : !body.id || !UUID.test(body.id))
+        : !body.id || !UUID.test(body.id)) ||
+      (body.race !== undefined &&
+        (body.action !== 'submit' || typeof body.race !== 'boolean'))
     )
       throw new Error();
   } catch {
@@ -739,16 +743,17 @@ export async function POST(request: Request) {
         409,
       );
     try {
-      const returned = await rpc('sendTransaction', [
-        body.transaction,
-        {
-          encoding: 'base64',
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 0,
-        },
-      ]);
-      if (returned !== signature) throw new Error();
+      // Same signed bytes to every provider (opt-in racing): one signature,
+      // so it can land at most once.
+      await raceSendTransaction({
+        primary: endpoint,
+        transaction: body.transaction!,
+        signature,
+        race: body.race === true,
+        signal,
+        send: (url, method, params, s) =>
+          balanceRpc(url, method, params, s, fetch),
+      });
       return json({ state: 'submitted', signature });
     } catch {
       return json(

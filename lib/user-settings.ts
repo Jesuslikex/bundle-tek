@@ -28,7 +28,11 @@ export type BalanceDisplay = 'Tokens' | 'SupplyPercent';
 export type UserSettings = {
   version: 1;
   general: { balanceDisplay: BalanceDisplay; nukeValueAsHoldings: boolean };
-  tradePanel: { instantTrade: boolean; confirmDevTrades: boolean };
+  tradePanel: {
+    instantTrade: boolean;
+    confirmDevTrades: boolean;
+    providerRacing: boolean;
+  };
   walletTrades: {
     individualInstant: boolean;
     buyAmounts: string[];
@@ -114,7 +118,11 @@ export function defaultUserSettings(): UserSettings {
   return {
     version: 1,
     general: { balanceDisplay: 'Tokens', nukeValueAsHoldings: false },
-    tradePanel: { instantTrade: false, confirmDevTrades: true },
+    tradePanel: {
+      instantTrade: false,
+      confirmDevTrades: true,
+      providerRacing: false,
+    },
     walletTrades: {
       individualInstant: false,
       buyAmounts: ['0.1', '0.25', '0.5', '1'],
@@ -204,6 +212,7 @@ export function normalizeUserSettings(raw: unknown): UserSettings {
     tradePanel: {
       instantTrade: bool(t.instantTrade, false),
       confirmDevTrades: bool(t.confirmDevTrades, true),
+      providerRacing: bool(t.providerRacing, false),
     },
     walletTrades: {
       individualInstant: bool(w.individualInstant, false),

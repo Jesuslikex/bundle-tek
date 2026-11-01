@@ -471,6 +471,48 @@ it.each([
     ).toBe(404);
   },
 );
+it('Provider Racing sends the same signed packet to every provider once and accepts any exact echo', async () => {
+  const id = await reviewed();
+  expect(
+    (
+      await post({
+        action: 'register',
+        id,
+        transaction: f.signed.transaction,
+        race: true,
+      })
+    ).status,
+  ).toBe(400);
+  await post({ action: 'register', id, transaction: f.signed.transaction });
+  mocks.rpc.mockImplementation(async (endpoint, method) => {
+    if (method === 'getGenesisHash') return SOLANA_MAINNET_GENESIS;
+    if (method !== 'sendTransaction') return null;
+    if (!String(endpoint).includes('jito')) throw new Error('down');
+    return f.signed.signature;
+  });
+  const sent = await post({
+    action: 'submit',
+    id,
+    transaction: f.signed.transaction,
+    race: true,
+  });
+  expect(sent.status).toBe(200);
+  const sends = mocks.rpc.mock.calls.filter((c) => c[1] === 'sendTransaction');
+  expect(new Set(sends.map((c) => c[0])).size).toBe(sends.length);
+  expect(sends.length).toBeGreaterThanOrEqual(2);
+  for (const c of sends)
+    expect((c[2] as unknown[])[0]).toBe(f.signed.transaction);
+  expect(
+    (
+      await post({
+        action: 'submit',
+        id,
+        transaction: f.signed.transaction,
+        race: true,
+      })
+    ).status,
+  ).toBe(409);
+});
 it('retains an unknown send outcome and only releases a failed reservation after exact finalized packet verification', async () => {
   const id = await reviewed();
   await post({ action: 'register', id, transaction: f.signed.transaction });
