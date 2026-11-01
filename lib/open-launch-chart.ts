@@ -36,9 +36,11 @@ async function json(response: Response) {
  * chain apart from the existing token identity lookup.
  */
 export async function openLaunchChart(mint: string, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const list = await json(
     await fetch('/api/imported-projects', { signal, cache: 'no-store' }),
   );
+  signal?.throwIfAborted();
   if (!Array.isArray(list.projects))
     throw new Error('Imported projects could not be verified.');
   let project = list.projects.find((p) => matchesProject(p, mint));
@@ -55,10 +57,12 @@ export async function openLaunchChart(mint: string, signal?: AbortSignal) {
         }),
       }),
     );
+    signal?.throwIfAborted();
     project = created.project;
     if (!matchesProject(project, mint))
       throw new Error('Imported token differs from this launch.');
   }
+  signal?.throwIfAborted();
   window.dispatchEvent(
     new CustomEvent(OPEN_IMPORTED_PROJECT_EVENT, {
       detail: { id: project.id },
