@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { isUploadedArtwork } from '@/lib/artwork';
 import { hasLaunchMetadataReview } from '@/lib/launch-review-availability';
@@ -47,8 +47,8 @@ function SavedMetadataReview({
   onCreateOnly,
 }: Props) {
   const [consent, setConsent] = useState(false);
-  const [operation, setOperation] = useState<'recover' | 'publish' | null>(null);
-  const busy = operation !== null;
+  const [busy, setBusy] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [uri, setUri] = useState('');
   const [error, setError] = useState('');
   const pending = useRef<AbortController | null>(null);
@@ -83,48 +83,69 @@ function SavedMetadataReview({
       throw new Error(interrupted);
     return expected;
   }
-  async function recover() {
+  async function recover(automatic = false) {
     if (!project || busy || saving || pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
-    setOperation('recover');
+    setBusy(true);
+    setRecovering(true);
     setError('');
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const params = new URLSearchParams({
         projectId: project.id,
         updatedAt: project.updatedAt,
       });
-      const response = await fetch(`/api/launch/metadata?${params}`, {
-        cache: 'no-store',
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(10000),
-        ]),
-      });
-      const body: unknown = await readPanelJson(
-        response,
-        'Unable to recover metadata.',
-      );
+      const [response, body] = await Promise.race([
+        (async () => {
+          const response = await fetch(`/api/launch/metadata?${params}`, {
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+          return [
+            response,
+            await readPanelJson(response, 'Unable to recover metadata.'),
+          ] as const;
+        })(),
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error('Recovery timed out.')),
+            10000,
+          );
+        }),
+      ]);
       if (pending.current !== controller || controller.signal.aborted) return;
       if (!response.ok || !isRecord(body))
         throw new Error('Unable to recover metadata.');
-      if (body.release === null) {
+      if (body.release === null && !automatic) {
         setError(
           'No published metadata matches this saved version. Review and publish it if needed.',
         );
-      } else {
+      } else if (body.release !== null) {
         setUri(checkedUri(body.release));
       }
     } catch {
       if (pending.current === controller && !controller.signal.aborted)
         setError('Published metadata could not be verified. Try again.');
     } finally {
+      if (timeout) clearTimeout(timeout);
       if (pending.current === controller) {
         pending.current = null;
-        setOperation(null);
+        controller.abort();
+        setBusy(false);
+        setRecovering(false);
       }
     }
   }
+  const autoRecover = useEffectEvent(() => {
+    if (project && artworkReady && !saving) void recover(true);
+  });
+  useEffect(() => {
+    // The complete draft context keys this component, so a change aborts the
+    // old request before scheduling the next lookup.
+    const timer = setTimeout(() => autoRecover(), 0);
+    return () => clearTimeout(timer);
+  }, []);
   async function publish() {
     if (
       !project ||
@@ -137,7 +158,7 @@ function SavedMetadataReview({
       return;
     const controller = new AbortController();
     pending.current = controller;
-    setOperation('publish');
+    setBusy(true);
     setError('');
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -187,7 +208,7 @@ function SavedMetadataReview({
       if (timeout) clearTimeout(timeout);
       if (pending.current === controller) {
         pending.current = null;
-        setOperation(null);
+        setBusy(false);
       }
     }
   }
@@ -271,7 +292,7 @@ function SavedMetadataReview({
                   disabled={busy || saving}
                   onClick={() => void recover()}
                 >
-                  {operation === 'recover'
+                  {recovering
                     ? 'Checking published metadata…'
                     : 'Recover published metadata'}
                 </Button>
@@ -294,22 +315,24 @@ function SavedMetadataReview({
                   disabled={!consent || !artworkReady || busy || saving}
                   onClick={() => void publish()}
                 >
-                  {operation === 'publish'
-                    ? 'Publishing metadata…'
-                    : 'Publish reviewed metadata'}
+                  {recovering
+                    ? 'Checking published metadata…'
+                    : busy
+                      ? 'Publishing metadata…'
+                      : 'Publish reviewed metadata'}
                 </Button>
               </>
             )}
           </>
         )}
         <div aria-live="polite" style={{ overflowWrap: 'anywhere' }}>
-          {operation === 'publish' && (
+          {busy && !recovering && (
             <p>
               Keep this review open. If interrupted, publication may still
               complete.
             </p>
           )}
-          {operation === 'recover' && <p>Checking for published metadata.</p>}
+          {recovering && <p>Checking for published metadata.</p>}
           {error && (
             <p role="alert" className="inspection-error">
               {error}

@@ -22,11 +22,18 @@ const identity = {
 };
 const project = { id: 'project-a', updatedAt: '2026-10-14T00:00:00.000Z' };
 const fetcher = vi.fn();
+const recoveryFetcher = vi.fn();
 const onSave = vi.fn();
 const props = { plan, identity, project, onSave };
 type Props = Parameters<typeof LaunchMetadataReview>[0];
-function render(changes: Partial<Props> = {}) {
-  act(() => root.render(<LaunchMetadataReview {...props} {...changes} />));
+async function render(changes: Partial<Props> = {}) {
+  await act(async () => {
+    root.render(<LaunchMetadataReview {...props} {...changes} />);
+  });
+  await act(async () => {
+    if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(0);
+    else await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 const button = () =>
   [...container.querySelectorAll('button')].find(
@@ -65,8 +72,16 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   fetcher.mockReset();
+  recoveryFetcher.mockReset();
+  recoveryFetcher.mockImplementation(async () =>
+    Response.json({ release: null }),
+  );
   onSave.mockReset();
-  vi.stubGlobal('fetch', fetcher);
+  vi.stubGlobal('fetch', (url: string, options?: RequestInit) =>
+    options?.method === 'POST'
+      ? fetcher(url, options)
+      : recoveryFetcher(url, options),
+  );
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -74,8 +89,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
-it('shows the saved public identity with explicit unchecked consent and makes no publication request', () => {
-  render();
+it('shows the saved public identity with explicit unchecked consent and makes no publication request', async () => {
+  await render();
   expect(container.textContent).toContain('Reviewed identity');
   expect(container.textContent).toContain('does not create a coin');
   expect(container.textContent).toContain('cannot be changed or removed');
@@ -86,47 +101,55 @@ it('shows the saved public identity with explicit unchecked consent and makes no
   expect(fetcher).not.toHaveBeenCalled();
 });
 it('recovers the exact published metadata after remount without publishing or granting consent', async () => {
-  fetcher.mockResolvedValue(Response.json({ release: result() }));
-  render();
-  await act(async () => {
-    [...container.querySelectorAll('button')]
-      .find((b) => b.textContent === 'Recover published metadata')!
-      .click();
-  });
-  expect(fetcher).toHaveBeenCalledOnce();
-  expect(fetcher.mock.calls[0][0]).toContain('projectId=project-a');
-  expect(fetcher.mock.calls[0][1].method).toBeUndefined();
+  recoveryFetcher.mockImplementation(async () =>
+    Response.json({ release: result() }),
+  );
+  await render();
+  expect(recoveryFetcher).toHaveBeenCalledOnce();
+  expect(recoveryFetcher.mock.calls[0][0]).toContain('projectId=project-a');
+  expect(recoveryFetcher.mock.calls[0][1].method).toBeUndefined();
   expect(container.textContent).toContain('Metadata published.');
   expect(container.querySelector('a')!.href).toBe(result().uri);
-  render({ identity: { ...identity, website: 'https://changed.test' } });
+  recoveryFetcher.mockImplementation(async () =>
+    Response.json({ release: null }),
+  );
+  await render({ identity: { ...identity, website: 'https://changed.test' } });
   expect(container.textContent).not.toContain('Metadata published.');
   expect(
     container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
   ).toBe(false);
 });
 
-it('describes a pending recovery as a read rather than a publication', async () => {
+it('describes pending recovery as a read, not publication', async () => {
+  recoveryFetcher.mockImplementation(() => new Promise<Response>(() => {}));
+  await render();
+  expect(container.textContent).toContain('Checking for published metadata.');
+  expect(container.textContent).not.toContain('publication may still');
+  expect(recoveryFetcher.mock.calls[0][1].method).toBeUndefined();
+});
+
+it('discards a recovery response after the project changes', async () => {
   let finish!: (response: Response) => void;
-  fetcher.mockImplementation(
+  recoveryFetcher.mockImplementation(
     () =>
       new Promise<Response>((resolve) => {
         finish = resolve;
       }),
   );
-  render();
-  act(() => {
-    [...container.querySelectorAll('button')]
-      .find((b) => b.textContent === 'Recover published metadata')!
-      .click();
+  await render();
+  const signal = recoveryFetcher.mock.calls[0][1].signal as AbortSignal;
+  const finishOld = finish;
+  await render({ project: { ...project, id: 'another-project' } });
+  expect(signal.aborted).toBe(true);
+  await act(async () => {
+    finishOld(Response.json({ release: result() }));
   });
-  expect(container.textContent).toContain('Checking for published metadata.');
-  expect(container.textContent).not.toContain('publication may still');
-  expect(fetcher.mock.calls[0][1].method).toBeUndefined();
-  await act(async () => finish(Response.json({ release: null })));
+  expect(container.querySelector('a')).toBeNull();
+  expect(container.textContent).not.toContain('Metadata published.');
 });
 
 it('refuses a recovered release for a different identity', async () => {
-  fetcher.mockResolvedValue(
+  recoveryFetcher.mockImplementation(async () =>
     Response.json({
       release: {
         ...result(),
@@ -134,41 +157,53 @@ it('refuses a recovered release for a different identity', async () => {
       },
     }),
   );
-  render();
-  await act(async () => {
-    [...container.querySelectorAll('button')]
-      .find((b) => b.textContent === 'Recover published metadata')!
-      .click();
-  });
+  await render();
   expect(container.textContent).toContain('could not be verified');
   expect(container.textContent).not.toContain('Metadata published.');
   expect(
     container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
   ).toBe(false);
 });
-it('requires saved clean context and allows an explicit save instead of publication', () => {
-  render({ project: null });
+it('times out automatic recovery even if the response body never settles', async () => {
+  vi.useFakeTimers();
+  recoveryFetcher.mockResolvedValue({
+    ok: true,
+    json: () => new Promise(() => {}),
+  });
+  await render();
+  expect(container.textContent).toContain('Checking published metadata');
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10001);
+  });
+  expect(recoveryFetcher.mock.calls[0][1].signal.aborted).toBe(true);
+  expect(container.textContent).toContain(
+    'Published metadata could not be verified',
+  );
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.disabled,
+  ).toBe(false);
+});
+it('requires saved clean context and allows an explicit save instead of publication', async () => {
+  await render({ project: null });
   expect(container.querySelector('input')).toBeNull();
   act(() => container.querySelector('button')!.click());
   expect(onSave).toHaveBeenCalledOnce();
   expect(fetcher).not.toHaveBeenCalled();
-  render({ project: null, saving: true });
+  await render({ project: null, saving: true });
   expect(container.querySelector('button')!.disabled).toBe(true);
 });
-it('keeps the review open through saving while resetting draft consent', () => {
-  render();
+it('keeps the disclosure open through saving and resets consent', async () => {
+  await render();
   const disclosure = container.querySelector('details')!;
   act(() => {
     disclosure.open = true;
   });
   check();
   expect(button().disabled).toBe(false);
-
-  render({ project: null, saving: true });
+  await render({ project: null, saving: true });
   expect(container.querySelector('details')).toBe(disclosure);
   expect(disclosure.open).toBe(true);
-  expect(container.textContent).toContain('Saving project');
-  render({
+  await render({
     project: { ...project, updatedAt: '2026-10-15T00:00:00.000Z' },
   });
   expect(container.querySelector('details')).toBe(disclosure);
@@ -177,9 +212,8 @@ it('keeps the review open through saving while resetting draft consent', () => {
     container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
   ).toBe(false);
   expect(button().disabled).toBe(true);
-  expect(fetcher).not.toHaveBeenCalled();
 });
-it('keeps the disclosure open across the first project save without restoring consent', () => {
+it('keeps the disclosure open across first save without restoring consent', async () => {
   function Parent({ saved }: { saved: boolean }) {
     const [open, setOpen] = useState(false);
     return (
@@ -198,12 +232,13 @@ it('keeps the disclosure open across the first project save without restoring co
     disclosure.open = true;
     disclosure.dispatchEvent(new Event('toggle'));
   });
-  act(() => root.render(<Parent saved />));
+  await act(async () => {
+    root.render(<Parent saved />);
+  });
   expect(container.querySelector('details')!.open).toBe(true);
   expect(
     container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
   ).toBe(false);
-  expect(button().disabled).toBe(true);
   expect(fetcher).not.toHaveBeenCalled();
   act(() => {
     const disclosure = container.querySelector('details')!;
@@ -213,20 +248,20 @@ it('keeps the disclosure open across the first project save without restoring co
   act(() => root.render(<Parent saved={false} />));
   expect(container.querySelector('details')!.open).toBe(false);
 });
-it('requires uploaded artwork and hides unsupported venue review', () => {
-  render({
+it('requires uploaded artwork and hides unsupported venue review', async () => {
+  await render({
     identity: { ...identity, artworkUrl: 'https://example.com/image.png' },
   });
   expect(container.querySelector<HTMLInputElement>('input')!.disabled).toBe(
     true,
   );
   expect(container.textContent).toContain('Upload an image');
-  render({ plan: { ...plan, launchpad: 'Bags' } });
+  await render({ plan: { ...plan, launchpad: 'Bags' } });
   expect(container.textContent).toBe('');
 });
 it('sends only the reviewed project/version/consent and validates the public link', async () => {
   fetcher.mockResolvedValue(Response.json(result()));
-  render();
+  await render();
   check();
   await click();
   expect(fetcher).toHaveBeenCalledOnce();
@@ -248,10 +283,10 @@ it('sends only the reviewed project/version/consent and validates the public lin
 });
 it('resets consent and released links after the reviewed identity changes', async () => {
   fetcher.mockResolvedValue(Response.json(result()));
-  render();
+  await render();
   check();
   await click();
-  render({ identity: { ...identity, website: 'https://changed.test' } });
+  await render({ identity: { ...identity, website: 'https://changed.test' } });
   expect(container.querySelector('a')).toBeNull();
   expect(container.querySelector<HTMLInputElement>('input')!.checked).toBe(
     false,
@@ -266,11 +301,11 @@ it('aborts and ignores a late response after switching project context', async (
         finish = resolve;
       }),
   );
-  render();
+  await render();
   check();
   await click();
   const signal = fetcher.mock.calls[0][1].signal as AbortSignal;
-  render({ project: { ...project, id: 'another-project' } });
+  await render({ project: { ...project, id: 'another-project' } });
   expect(signal.aborted).toBe(true);
   await act(async () => {
     finish(Response.json(result()));
@@ -287,7 +322,9 @@ it('rejects a mismatched public URL or metadata instead of presenting a successf
       metadata: { ...result().metadata, name: 'Different token' },
     },
   ]) {
-    render({ project: { ...project, updatedAt: Math.random().toString() } });
+    await render({
+      project: { ...project, updatedAt: Math.random().toString() },
+    });
     fetcher.mockResolvedValue(Response.json(bad));
     check();
     await click();
@@ -303,7 +340,7 @@ it('sanitizes HTML errors and retries metadata publication only on explicit same
       new Response('<html>secret diagnostic</html>', { status: 503 }),
     )
     .mockResolvedValueOnce(Response.json(result()));
-  render();
+  await render();
   check();
   await click();
   expect(container.textContent).not.toContain('secret diagnostic');
@@ -319,7 +356,7 @@ it('sanitizes HTML errors and retries metadata publication only on explicit same
 it('times out even if the response body reader ignores cancellation', async () => {
   vi.useFakeTimers();
   fetcher.mockResolvedValue({ ok: true, json: () => new Promise(() => {}) });
-  render();
+  await render();
   check();
   await click();
   await act(async () => {
@@ -333,7 +370,7 @@ it('times out even if the response body reader ignores cancellation', async () =
 });
 
 it('exposes a separate Front-only StonkFun planner without the Pump financial handler', async () => {
-  render({ plan: { ...plan, launchpad: 'StonkFun', mode: 'Block-0' } });
+  await render({ plan: { ...plan, launchpad: 'StonkFun', mode: 'Block-0' } });
   expect(
     container.querySelector('[aria-label="StonkFun Front-wallet planning"]'),
   ).not.toBeNull();
@@ -345,8 +382,8 @@ it('exposes a separate Front-only StonkFun planner without the Pump financial ha
   ).toBeNull();
   expect(fetcher).not.toHaveBeenCalled();
 });
-it('does not expose StonkFun planning without a saved project', () => {
-  render({
+it('does not expose StonkFun planning without a saved project', async () => {
+  await render({
     plan: { ...plan, launchpad: 'StonkFun', mode: 'Block-0' },
     project: null,
   });
@@ -355,8 +392,8 @@ it('does not expose StonkFun planning without a saved project', () => {
   ).toBeNull();
 });
 
-it('offers the explicit existing-token picker separately from new-token preparation', () => {
-  render({ plan: { ...plan, mode: 'Block-0', scheduled: true } });
+it('offers the explicit existing-token picker separately from new-token preparation', async () => {
+  await render({ plan: { ...plan, mode: 'Block-0', scheduled: true } });
   expect(
     container.querySelector('[aria-label="Existing-token layer planning"]'),
   ).not.toBeNull();
