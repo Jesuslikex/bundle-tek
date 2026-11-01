@@ -6120,6 +6120,55 @@ td.wallet-row-actions-cell {
   line-height: 1.45;
 }
 
+.cex-source-count {
+  color: var(--mute);
+}
+
+.cex-source-empty {
+  margin: 0 0 12px;
+  color: var(--mute);
+  font-size: 0.8rem;
+}
+
+.cex-source-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 46vh;
+  overflow: auto;
+  display: grid;
+  gap: 2px;
+}
+
+.cex-source-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cex-source-item:hover {
+  border-color: var(--border);
+}
+
+.cex-source-item.is-on {
+  border-color: var(--border);
+  background: rgb(255 255 255 / 6%);
+}
+
+.cex-source-all {
+  font-weight: 600;
+}
+
 .wallet-table-settings-fixed {
   font-size: 0.72rem;
   color: var(--mute);
