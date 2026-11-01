@@ -613,6 +613,7 @@ describe('owner-scoped project API on actual local D1', () => {
       launchpad: 'Clanker',
       currency: 'ETH',
       mode: 'Quick',
+      timing: { buyDelayMs: 0, initialBuyDelayMs: 0 },
     };
     const response = await post(payload({ plan }));
     expect(response.status).toBe(200);
@@ -1203,6 +1204,9 @@ describe('owner-scoped project API on actual local D1', () => {
     };
     const initial = (await read(await post(payload({ plan })))).project;
     const invalid = { ...plan, holdersBuy: 30 };
+    expect(
+      (await post(payload({ id: 'new-over-cap', plan: invalid }))).status,
+    ).toBe(400);
     expect(
       (
         await post({

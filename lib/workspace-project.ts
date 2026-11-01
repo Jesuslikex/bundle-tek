@@ -139,11 +139,14 @@ export const DEFAULT_VENUE_OPTIONS: VenueOptions = {
   settings: DEFAULT_VENUE_SETTINGS,
 };
 
-export function validateProjectDocument(value: unknown): ProjectDocument {
+export function validateProjectDocument(
+  value: unknown,
+  validation?: { allowHistoricalVenueCap?: boolean },
+): ProjectDocument {
   if (!value || typeof value !== 'object')
     throw new Error('Project must be an object.');
   const body = value as Record<string, unknown>;
-  const plan = validateLaunchPlan(body.plan);
+  const plan = validateLaunchPlan(body.plan, validation);
   const rawIdentity = body.identity as Record<string, unknown> | undefined;
   const identity = { ...EMPTY_IDENTITY };
   for (const key of ['artworkUrl', 'website', 'twitter', 'telegram'] as const) {
