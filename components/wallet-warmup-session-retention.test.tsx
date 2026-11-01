@@ -17,7 +17,9 @@ let host: HTMLDivElement,
 const at = Date.parse('2026-10-20T12:00:00Z'),
   onBusy = () => {};
 beforeEach(() => {
-  vi.useFakeTimers();
+  // Only the clock is faked: faking setTimeout/setImmediate can stall the
+  // fetch Response body read and webcrypto chain under load.
+  vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(at);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('crypto', webcrypto);
@@ -56,7 +58,21 @@ async function click(text: string) {
   await act(async () => button(text).click());
 }
 async function done(test: () => void) {
-  await act(async () => vi.waitFor(test, { timeout: 5000 }));
+  // Poll between short act() scopes: React only commits updates queued inside
+  // an act() scope when that scope ends, so polling inside one act() misses a
+  // slow async chain until the timeout.
+  const end = performance.now() + 5000;
+  for (;;) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    try {
+      test();
+      return;
+    } catch (error) {
+      if (performance.now() >= end) throw error;
+    }
+  }
 }
 function response(selection: WarmupSessionRecovery) {
   const { contextKey: _contextKey, ...document } = view.review;

@@ -62,6 +62,25 @@ async function flush() {
     }
   }
 }
+// React commits updates queued inside an act() scope only when that scope
+// ends, so the DOM cannot settle while still inside one. Poll between short
+// act() scopes until the rendered output stops changing.
+async function settle() {
+  const end = performance.now() + 5000;
+  let previous = host.innerHTML;
+  let stable = 0;
+  while (stable < 5 && performance.now() < end) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    const current = host.innerHTML;
+    if (current === previous) stable++;
+    else {
+      stable = 0;
+      previous = current;
+    }
+  }
+}
 async function render(disabled = false, now = at, invalidated = false) {
   await act(async () => {
     root.render(
@@ -75,6 +94,7 @@ async function render(disabled = false, now = at, invalidated = false) {
     );
     await flush();
   });
+  await settle();
 }
 const button = (text: string) => {
   const b = [...host.querySelectorAll('button')].find(
@@ -88,6 +108,7 @@ async function click(text: string) {
     button(text).click();
     await flush();
   });
+  await settle();
 }
 async function check(text = 'Request this exact unsigned quote') {
   await act(async () => {
@@ -99,6 +120,7 @@ async function check(text = 'Request this exact unsigned quote') {
     input.click();
     await flush();
   });
+  await settle();
 }
 beforeEach(async () => {
   admission.block = false;
@@ -174,6 +196,7 @@ afterEach(async () => {
     root.unmount();
     await flush();
   });
+  await settle();
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -318,6 +341,7 @@ it('remounts a lost response without a fetch, then recovers with GET and no new 
     root.unmount();
     await flush();
   });
+  await settle();
   root = createRoot(host);
   await render();
   expect(posts).toBe(1);
@@ -392,6 +416,7 @@ it('a context change aborts an active preview and refuses a late successful resu
     release(Response.json(f.response(id)));
     await flush();
   });
+  await settle();
   expect(host.textContent).not.toContain('Exact input:');
   expect(JSON.parse(sessionStorage.getItem(key())!).id).toBe(id);
 });
@@ -418,6 +443,7 @@ it('a parent history read disables new requests without cancelling an already ru
     release(Response.json(f.response(id)));
     await flush();
   });
+  await settle();
   expect(host.textContent).toContain('Exact input:');
   expect(posts).toBe(1);
 });
@@ -547,6 +573,7 @@ async function chooseRuntime() {
     input.click();
     await flush();
   });
+  await settle();
 }
 it('runtime checks require their own initially unchecked approval and retain the selected mode before one POST', async () => {
   await render();
@@ -574,6 +601,7 @@ it('a lost runtime response remounts without fetching and recovers its original 
     root.unmount();
     await flush();
   });
+  await settle();
   root = createRoot(host);
   await render();
   expect(posts).toBe(1);
@@ -634,6 +662,7 @@ it('invalidating the source aborts runtime work and refuses its late result', as
     release(Response.json(body));
     await flush();
   });
+  await settle();
   expect(host.textContent).not.toContain('Account observations span');
   expect(posts).toBe(1);
   expect(JSON.parse(sessionStorage.getItem(key())!).id).toBe(id);
@@ -726,6 +755,7 @@ it.each(['mode', 'uncheck', 'unmount'] as const)(
         root.unmount();
         await flush();
       });
+      await settle();
       root = createRoot(host);
     }
     await act(async () => {
@@ -733,6 +763,7 @@ it.each(['mode', 'uncheck', 'unmount'] as const)(
       await until(() => admission.returned);
       await flush();
     });
+    await settle();
     expect(posts).toBe(0);
     expect(sessionStorage.getItem(key())).toBeNull();
   },
@@ -773,6 +804,7 @@ it('shows the shared expiry and gates the next request by its later bound, then 
     ).click();
     await flush();
   });
+  await settle();
   expect(button('Request next unsigned attempt').disabled).toBe(true);
   expect(posts).toBe(1);
 });
@@ -798,6 +830,7 @@ it('waits for local reminder admission before enabling saved-only discovery', as
     await until(() => admission.returned);
     await flush();
   });
+  await settle();
   await click('Recover unsigned request');
   expect(gets).toBe(1);
   expect(posts).toBe(0);
@@ -872,6 +905,7 @@ it('never adopts a late discovered result after a context change', async () => {
     release(Response.json({ mode: 'preview', ...f.response(id) }));
     await flush();
   });
+  await settle();
   expect(sessionStorage.getItem(key())).toBeNull();
   expect(host.textContent).not.toContain('Exact input:');
   expect(gets).toBe(2);

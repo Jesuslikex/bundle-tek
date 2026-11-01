@@ -30,6 +30,9 @@ vi.mock('@/lib/wallet-balances', async (original) => {
 });
 vi.mock('@/lib/warmup-swap-quote', async (original) => ({
   ...(await original<typeof import('@/lib/warmup-swap-quote')>()),
+  // The fixture packets carry their own reviewed blockhash; never reach the
+  // real mainnet RPC from this test.
+  refreshPacketBlockhash: async () => null,
   prepareSolanaSwap: (...args: unknown[]) =>
     ((args[0] as { side?: string }).side === 'Buy'
       ? (f.buy.deps.prepare as (...a: unknown[]) => unknown)
@@ -443,7 +446,7 @@ const run = (extra: object = {}) =>
     ...extra,
   });
 
-it('runs Proxima\'s cleanup payload as one sell per round into the buyer', async () => {
+it("runs Proxima's cleanup payload as one sell per round into the buyer", async () => {
   env.JUPITER_API_KEY = 'test-key';
   try {
     const response = await run();
@@ -472,7 +475,7 @@ it('runs Proxima\'s cleanup payload as one sell per round into the buyer', async
   }
 });
 
-it('rejects Proxima\'s payload with its own copy', async () => {
+it("rejects Proxima's payload with its own copy", async () => {
   const slow = await run({ min_delay_ms: 400 });
   expect(slow.status).toBe(400);
   expect(await slow.json()).toEqual({
@@ -493,13 +496,13 @@ it('rejects Proxima\'s payload with its own copy', async () => {
 it('refuses a run for a wallet that is not on the roster', async () => {
   env.JUPITER_API_KEY = 'test-key';
   try {
-  const missing = await run({
-    input_wallet_pubkeys: ['9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'],
-  });
-  expect(missing.status).toBe(400);
-  expect(await missing.json()).toEqual({
-    error: 'A cleanup wallet changed or is archived. Reload the roster.',
-  });
+    const missing = await run({
+      input_wallet_pubkeys: ['9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'],
+    });
+    expect(missing.status).toBe(400);
+    expect(await missing.json()).toEqual({
+      error: 'A cleanup wallet changed or is archived. Reload the roster.',
+    });
   } finally {
     delete env.JUPITER_API_KEY;
   }
