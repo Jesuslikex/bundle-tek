@@ -156,7 +156,7 @@ function SavedMetadataReview({
       }}
     >
       <summary style={{ cursor: 'pointer' }}>
-        Review public token metadata
+        Publish metadata and review launch
       </summary>
       <div style={{ display: 'grid', gap: 12, paddingTop: 16, minWidth: 0 }}>
         <p className="source-note">

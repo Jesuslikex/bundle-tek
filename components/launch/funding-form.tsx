@@ -103,7 +103,7 @@ export function FundingForm({
     <div className="settings-scroll launch-flow-scroll">
       <div className="page-title">
         <span className="eyebrow">
-          <Landmark /> LAUNCH PLAN / STEP 04
+          <Landmark /> LAUNCH PLAN / FUNDING
         </span>
         <h1>Wallet &amp; funding</h1>
         <p>
