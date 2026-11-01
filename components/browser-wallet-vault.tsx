@@ -22,6 +22,7 @@ import {
   generateVaultWallets,
   importVaultWallets,
   exportVaultPrivateKeys,
+  revealVaultPrivateKey,
   parseVaultEnvelope,
   saveBrowserVault,
   type VaultSession,
@@ -78,6 +79,12 @@ export function BrowserWalletVault({
   const [exporting, setExporting] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [revealTarget, setRevealTarget] = useState<VaultWallet | null>(null);
+  const [revealed, setRevealed] = useState<{
+    address: string;
+    key: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
   const privateInput = useRef<HTMLTextAreaElement>(null);
   const [verification, setVerification] = useState<{
     walletId: string;
@@ -107,6 +114,9 @@ export function BrowserWalletVault({
     setExporting(false);
     setAcknowledged(false);
     setImporting(false);
+    setRevealTarget(null);
+    setRevealed(null);
+    setCopied(false);
     if (privateInput.current) privateInput.current.value = '';
   }, []);
   useEffect(() => {
@@ -152,6 +162,14 @@ export function BrowserWalletVault({
       document.removeEventListener('keydown', active);
     };
   }, [unlocked, lock]);
+  useEffect(() => {
+    if (!revealed) return;
+    const timer = window.setTimeout(() => {
+      setRevealed(null);
+      setCopied(false);
+    }, 60_000);
+    return () => window.clearTimeout(timer);
+  }, [revealed]);
   async function operate(action: (current: () => boolean) => Promise<void>) {
     const generation = epoch.current;
     const current = () => epoch.current === generation;
@@ -675,6 +693,25 @@ export function BrowserWalletVault({
                       {verifiedAddresses.includes(wallet.address) && (
                         <small>Signature verified</small>
                       )}
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        aria-label={`Show private key for ${wallet.address}`}
+                        onClick={() => {
+                          setRevealTarget(wallet);
+                          setRevealed(null);
+                          setCopied(false);
+                          setPassphrase('');
+                          setAcknowledged(false);
+                          setExporting(false);
+                          setImporting(false);
+                          setVerification(null);
+                          if (privateInput.current)
+                            privateInput.current.value = '';
+                        }}
+                      >
+                        Show private key
+                      </Button>
                     </div>
                   </div>
                 ))
@@ -682,6 +719,135 @@ export function BrowserWalletVault({
                 <p>No {family === 'solana' ? 'Solana' : 'EVM'} keys yet.</p>
               )}
             </div>
+            {revealTarget && !revealed && (
+              <form
+                className="browser-vault-reveal"
+                aria-label="Show private key"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const target = revealTarget;
+                  void operate(async (current) => {
+                    if (!acknowledged)
+                      throw new Error('Confirm the private-key warning.');
+                    const stored = localStorage.getItem(VAULT_STORAGE_KEY);
+                    if (stored === null || stored !== persisted.current)
+                      throw new Error('Vault changed. Lock and unlock again.');
+                    const authenticated = await unlockVault(stored, passphrase);
+                    if (
+                      !current() ||
+                      localStorage.getItem(VAULT_STORAGE_KEY) !== stored
+                    )
+                      return;
+                    const key = revealVaultPrivateKey(authenticated, target.id);
+                    setAcknowledged(false);
+                    setCopied(false);
+                    setRevealed({ address: target.address, key });
+                  });
+                }}
+              >
+                <h3>Show private key</h3>
+                <p>
+                  <code>{revealTarget.address}</code>
+                </p>
+                <p>
+                  Anyone who sees this key controls the wallet and its funds.
+                  Never share it or paste it into a website. It is shown only in
+                  this browser and never sent to the server.
+                </p>
+                <label htmlFor={`${id}-reveal`}>Re-enter wallet password</label>
+                <Input
+                  id={`${id}-reveal`}
+                  type="password"
+                  autoComplete="current-password"
+                  value={passphrase}
+                  onChange={(event) => setPassphrase(event.target.value)}
+                  disabled={busy}
+                  required
+                />
+                <label className="browser-vault-ack">
+                  <input
+                    type="checkbox"
+                    checked={acknowledged}
+                    onChange={(event) => setAcknowledged(event.target.checked)}
+                    disabled={busy}
+                  />
+                  I understand anyone with this key can take my funds.
+                </label>
+                <div className="browser-vault-export">
+                  <Button
+                    type="submit"
+                    disabled={busy || !acknowledged || !passphrase}
+                  >
+                    Show key
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      setRevealTarget(null);
+                      setAcknowledged(false);
+                      setPassphrase('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+            {revealed && (
+              <section
+                className="browser-vault-reveal"
+                aria-label="Private key"
+              >
+                <h3>Private key</h3>
+                <p>
+                  <code>{revealed.address}</code>
+                </p>
+                <label htmlFor={`${id}-revealed`}>
+                  {family === 'solana'
+                    ? 'Base58 private key (imports into Phantom, Solflare, Backpack)'
+                    : 'Hex private key (imports into MetaMask, Rabby)'}
+                </label>
+                <textarea
+                  id={`${id}-revealed`}
+                  readOnly
+                  rows={3}
+                  spellCheck={false}
+                  autoComplete="off"
+                  value={revealed.key}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+                <div className="browser-vault-export">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const text = revealed.key;
+                      void navigator.clipboard
+                        ?.writeText(text)
+                        .then(() => setCopied(true))
+                        .catch(() =>
+                          setError('Copy failed. Select the key and copy it.'),
+                        );
+                    }}
+                  >
+                    {copied ? 'Copied' : 'Copy key'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setRevealed(null);
+                      setRevealTarget(null);
+                      setCopied(false);
+                    }}
+                  >
+                    Hide key
+                  </Button>
+                </div>
+                <small>Hides automatically after 60 seconds.</small>
+              </section>
+            )}
             {verification && (
               <section
                 className="browser-vault-ownership"
@@ -793,6 +959,8 @@ export function BrowserWalletVault({
                 onClick={() => {
                   setExporting(!exporting);
                   setImporting(false);
+                  setRevealTarget(null);
+                  setRevealed(null);
                   if (privateInput.current) privateInput.current.value = '';
                   setPassphrase('');
                   setAcknowledged(false);

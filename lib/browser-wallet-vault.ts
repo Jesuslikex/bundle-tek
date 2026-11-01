@@ -409,6 +409,32 @@ export function importVaultWallets(
     importedIds: added.map((wallet) => wallet.id),
   };
 }
+// Call only after a fresh passphrase unlock and an explicit per-wallet reveal.
+// Returns the key in the format wallets such as Phantom or MetaMask import:
+// a base58 64-byte keypair for Solana, 0x-prefixed hex for EVM.
+export function revealVaultPrivateKey(
+  session: VaultSession,
+  walletId: string,
+): string {
+  validatePayload(session.payload);
+  const wallet = session.payload.wallets.find((entry) => entry.id === walletId);
+  if (!wallet) throw new Error('This wallet is not in the vault.');
+  const seed = bytes(wallet.seed, 32);
+  try {
+    if (addressFor(wallet.family, seed) !== wallet.address)
+      throw new Error('Vault key does not match its address.');
+    if (wallet.family === 'evm') return `0x${wallet.seed}`;
+    const pair = nacl.sign.keyPair.fromSeed(seed);
+    try {
+      return bs58.encode(pair.secretKey);
+    } finally {
+      pair.secretKey.fill(0);
+    }
+  } finally {
+    seed.fill(0);
+  }
+}
+
 // Call only after a fresh passphrase unlock and explicit user export action.
 export function exportVaultPrivateKeys(session: VaultSession): string {
   validatePayload(session.payload);
