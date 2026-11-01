@@ -135,6 +135,30 @@ it('requires saved clean context and allows an explicit save instead of publicat
   render({ project: null, saving: true });
   expect(container.querySelector('button')!.disabled).toBe(true);
 });
+it('keeps the review open through saving while resetting draft consent', () => {
+  render();
+  const disclosure = container.querySelector('details')!;
+  act(() => {
+    disclosure.open = true;
+  });
+  check();
+  expect(button().disabled).toBe(false);
+
+  render({ project: null, saving: true });
+  expect(container.querySelector('details')).toBe(disclosure);
+  expect(disclosure.open).toBe(true);
+  expect(container.textContent).toContain('Saving project');
+  render({
+    project: { ...project, updatedAt: '2026-10-15T00:00:00.000Z' },
+  });
+  expect(container.querySelector('details')).toBe(disclosure);
+  expect(disclosure.open).toBe(true);
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+  expect(button().disabled).toBe(true);
+  expect(fetcher).not.toHaveBeenCalled();
+});
 it('requires uploaded artwork and hides unsupported venue review', () => {
   render({
     identity: { ...identity, artworkUrl: 'https://example.com/image.png' },

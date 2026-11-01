@@ -189,17 +189,7 @@ function SavedMetadataReview({
     }
   }
   return (
-    <details
-      className="metadata-review"
-      style={{
-        borderTop: '1px solid var(--border)',
-        paddingTop: 16,
-        marginTop: 20,
-      }}
-    >
-      <summary style={{ cursor: 'pointer' }}>
-        Publish metadata and review launch
-      </summary>
+    <>
       <div style={{ display: 'grid', gap: 12, paddingTop: 16, minWidth: 0 }}>
         <p className="source-note">
           Prepare the image and details wallets will display. Publishing
@@ -375,7 +365,7 @@ function SavedMetadataReview({
           onCreateOnly={onCreateOnly}
         />
       )}
-    </details>
+    </>
   );
 }
 
@@ -388,5 +378,19 @@ export function LaunchMetadataReview(props: Props) {
     props.plan,
     props.identity,
   ]);
-  return <SavedMetadataReview key={context} {...props} />;
+  return (
+    <details
+      className="metadata-review"
+      style={{
+        borderTop: '1px solid var(--border)',
+        paddingTop: 16,
+        marginTop: 20,
+      }}
+    >
+      <summary style={{ cursor: 'pointer' }}>
+        Publish metadata and review launch
+      </summary>
+      <SavedMetadataReview key={context} {...props} />
+    </details>
+  );
 }
