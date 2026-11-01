@@ -2,9 +2,18 @@
 import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { afterEach, it, expect, vi } from 'vitest';
-const social = vi.hoisted(() => vi.fn());
+const { social, email, verifyTotp, verifyBackupCode } = vi.hoisted(() => ({
+  social: vi.fn(),
+  email: vi.fn(),
+  verifyTotp: vi.fn(),
+  verifyBackupCode: vi.fn(),
+}));
 vi.mock('better-auth/react', () => ({
-  createAuthClient: () => ({ signIn: { social }, signUp: { email: vi.fn() } }),
+  createAuthClient: () => ({
+    signIn: { social, email },
+    signUp: { email: vi.fn() },
+    twoFactor: { verifyTotp, verifyBackupCode },
+  }),
 }));
 import { SignInForm } from './sign-in-form';
 (
@@ -82,5 +91,36 @@ it('requires eight characters only for account creation, not existing sign-in', 
   await act(async () => toggle.click());
   expect(password().hasAttribute('minlength')).toBe(false);
   expect(element.querySelector('#account-password-help')).toBeNull();
+  await act(async () => root.unmount());
+});
+it('asks for an authenticator code after a 2FA password sign-in, then signs in', async () => {
+  email.mockResolvedValue({ data: { twoFactorRedirect: true } });
+  verifyTotp.mockResolvedValue({ data: { token: 't' } });
+  const assign = vi.fn();
+  vi.stubGlobal('location', { assign });
+  const element = document.createElement('div');
+  document.body.appendChild(element);
+  const root = createRoot(element);
+  await act(async () => root.render(<SignInForm googleEnabled={false} />));
+  const set = (input: HTMLInputElement, v: string) => {
+    Reflect.set(HTMLInputElement.prototype, 'value', v, input);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  set(element.querySelector<HTMLInputElement>('input[type=email]')!, 'a@b.co');
+  set(
+    element.querySelector<HTMLInputElement>('input[type=password]')!,
+    'password1',
+  );
+  await act(async () => element.querySelector('form')!.requestSubmit());
+  expect(assign).not.toHaveBeenCalled();
+  expect(element.textContent).toContain('Two-factor check');
+  set(element.querySelector<HTMLInputElement>('input[name=code]')!, '123456');
+  await act(async () => element.querySelector('form')!.requestSubmit());
+  expect(verifyTotp).toHaveBeenCalledWith({
+    code: '123456',
+    trustDevice: false,
+  });
+  expect(assign).toHaveBeenCalledWith('/');
+  vi.unstubAllGlobals();
   await act(async () => root.unmount());
 });

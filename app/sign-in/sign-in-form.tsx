@@ -1,5 +1,6 @@
 'use client';
 import { createAuthClient } from 'better-auth/react';
+import { twoFactorClient } from 'better-auth/client/plugins';
 import { useState } from 'react';
 import Link from 'next/link';
 import styles from './sign-in.module.css';
@@ -10,7 +11,7 @@ function value(form: FormData, name: string) {
   if (typeof field !== 'string') throw new Error('Invalid form field');
   return field;
 }
-const auth = createAuthClient();
+const auth = createAuthClient({ plugins: [twoFactorClient()] });
 export function SignInForm({
   googleEnabled,
   initialError = '',
@@ -20,7 +21,31 @@ export function SignInForm({
 }) {
   const [register, setRegister] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(initialError);
+    [error, setError] = useState(initialError),
+    [needsCode, setNeedsCode] = useState(false),
+    [useBackup, setUseBackup] = useState(false);
+  async function submitCode(event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    const form = new FormData(event.currentTarget);
+    try {
+      const code = value(form, 'code').trim();
+      const result = useBackup
+        ? await auth.twoFactor.verifyBackupCode({ code })
+        : await auth.twoFactor.verifyTotp({
+            code,
+            trustDevice: form.get('trust') === 'on',
+          });
+      if (result.error) setError(result.error.message || 'Wrong code.');
+      else window.location.assign('/');
+    } catch {
+      setError('Unable to connect. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -36,6 +61,11 @@ export function SignInForm({
         ? await auth.signUp.email({ ...data, name: value(form, 'name') })
         : await auth.signIn.email(data);
       if (result.error) setError(result.error.message || 'Unable to sign in.');
+      else if (
+        (result.data as { twoFactorRedirect?: boolean } | null)
+          ?.twoFactorRedirect
+      )
+        setNeedsCode(true);
       else window.location.assign('/');
     } catch {
       setError('Unable to connect. Please try again.');
@@ -62,6 +92,50 @@ export function SignInForm({
       setBusy(false);
     }
   }
+  if (needsCode)
+    return (
+      <main className={styles.panel}>
+        <Link href="/">Bundle Tek</Link>
+        <h1>Two-factor check</h1>
+        <p>
+          {useBackup
+            ? 'Enter one of your saved backup codes. Each code works once.'
+            : 'Enter the 6-digit code from your authenticator app.'}
+        </p>
+        <form onSubmit={submitCode} style={{ display: 'grid', gap: 16 }}>
+          <label>
+            {useBackup ? 'Backup code' : 'Authenticator code'}
+            <input
+              name="code"
+              required
+              maxLength={40}
+              autoComplete="one-time-code"
+              inputMode={useBackup ? 'text' : 'numeric'}
+            />
+          </label>
+          {!useBackup && (
+            <label>
+              <input name="trust" type="checkbox" /> Trust this device for 30
+              days
+            </label>
+          )}
+          {error && <p role="alert">{error}</p>}
+          <button disabled={busy} type="submit">
+            {busy ? 'Please wait…' : 'Verify'}
+          </button>
+        </form>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            setUseBackup(!useBackup);
+            setError('');
+          }}
+        >
+          {useBackup ? 'Use authenticator code' : 'Use a backup code'}
+        </button>
+      </main>
+    );
   return (
     <main className={styles.panel}>
       <Link href="/">Bundle Tek</Link>
