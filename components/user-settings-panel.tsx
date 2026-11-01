@@ -15,6 +15,7 @@ import {
   type UserSettings,
 } from '@/lib/user-settings';
 import styles from './user-settings-panel.module.css';
+import { TwoFactorSettings } from './two-factor-settings';
 
 const auth = createAuthClient();
 type SessionRow = {
@@ -144,7 +145,11 @@ function AmountList({
   );
 }
 
-export function UserSettingsPanel() {
+export function UserSettingsPanel({
+  twoFactorAvailable = false,
+}: {
+  twoFactorAvailable?: boolean;
+}) {
   const s = useUserSettings();
   const [themeJson, setThemeJson] = useState('');
   const [notice, setNotice] = useState('');
@@ -426,6 +431,12 @@ export function UserSettingsPanel() {
           onChange={(style) => set('theme', { style })}
         />
       </Section>
+
+      {twoFactorAvailable && (
+        <Section title="Two-factor">
+          <TwoFactorSettings />
+        </Section>
+      )}
 
       <Section title="Sessions">
         {!session ? (
