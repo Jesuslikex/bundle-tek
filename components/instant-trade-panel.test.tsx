@@ -14,7 +14,7 @@ vi.mock('@/lib/browser-wallet-vault', () => ({
 vi.mock('@/lib/imported-trade-execute', async (orig) => ({
   ...(await orig<typeof import('@/lib/imported-trade-execute')>()),
   executeImportedTrade: mocks.execute,
-  readTradeWalletBalance: mocks.balance,
+  readGroupTokenBalances: mocks.balance,
 }));
 import { InstantTradePanel } from './instant-trade-panel';
 import { USER_SETTINGS_KEY, defaultUserSettings } from '@/lib/user-settings';
@@ -58,7 +58,7 @@ beforeEach(() => {
     signature: 'sig',
     preparationId: 'p',
   }));
-  mocks.balance.mockResolvedValue({ nativeRaw: 1000000000n, tokenRaw: 2000n });
+  mocks.balance.mockResolvedValue({ [A]: 2000n, [D]: 2000n });
 });
 const roots: { unmount(): void }[] = [];
 afterEach(() => {

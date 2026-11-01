@@ -168,6 +168,68 @@ export async function readTradeWalletBalance(
 }
 
 /**
+ * Reads unfrozen token units for many wallets with one gated server read per
+ * 25 wallets (the account's 15-second wallet-read gate is waited out between
+ * chunks). Returns token raw units keyed by wallet address.
+ */
+export async function readGroupTokenBalances(
+  ctx: Pick<
+    ImportedTradeContext,
+    'projectId' | 'projectRevision' | 'mint' | 'fetcher' | 'sleep'
+  >,
+  wallets: TradeWallet[],
+  signal: AbortSignal,
+): Promise<Record<string, bigint>> {
+  const fetcher = ctx.fetcher ?? fetch;
+  const sleep = ctx.sleep ?? abortableSleep;
+  const out: Record<string, bigint> = {};
+  for (let i = 0; i < wallets.length; i += 25) {
+    const chunk = wallets.slice(i, i + 25);
+    const data = await withRateRetry(
+      () =>
+        postJson(
+          fetcher,
+          '/api/imported-projects/inventory/refresh',
+          {
+            id: ctx.projectId,
+            revision: ctx.projectRevision,
+            scope: 'mint',
+            wallets: chunk.map((w) => ({
+              address: w.address,
+              revision: w.revision,
+            })),
+          },
+          signal,
+        ),
+      sleep,
+      signal,
+    );
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (
+      data.id !== ctx.projectId ||
+      data.mint !== ctx.mint ||
+      items.length !== chunk.length
+    )
+      throw new Error('Holdings refresh does not match these wallets.');
+    for (const item of items as {
+      wallet?: string;
+      observation?: { unfrozenRaw?: string } | null;
+    }[]) {
+      const raw = item.observation?.unfrozenRaw;
+      if (
+        !item.wallet ||
+        !chunk.some((w) => w.address === item.wallet) ||
+        typeof raw !== 'string' ||
+        !/^(0|[1-9]\d{0,19})$/.test(raw)
+      )
+        throw new Error('Holdings refresh does not match these wallets.');
+      out[item.wallet] = BigInt(raw);
+    }
+  }
+  return out;
+}
+
+/**
  * Executes one trade. `inputRaw` is lamports for a Buy and token units for a
  * Sell. Throws TradeUncertainError once a signature exists.
  */
