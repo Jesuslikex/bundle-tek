@@ -36,7 +36,7 @@ function ChartButton({ mint }: { mint: string }) {
             .then(() => {
               if (!controller.signal.aborted)
                 setNote(
-                  'Chart import is ready. Confirm any navigation prompt to open it, or find it under Imports.',
+                  'Import is ready. Confirm any navigation prompt to open it; restore it first if it is archived.',
                 );
             })
             .catch((e: unknown) => {

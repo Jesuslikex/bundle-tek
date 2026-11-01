@@ -26,6 +26,20 @@ it('opens an already imported coin without importing it again', async () => {
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 
+it('opens an archived import for explicit restoration without writing', async () => {
+  const archived = { ...project('archived', 'Mint'), archived: true };
+  const fetcher = vi.fn(async () => Response.json({ projects: [archived] }));
+  vi.stubGlobal('fetch', fetcher);
+  const listener = vi.fn();
+  window.addEventListener(OPEN_IMPORTED_PROJECT_EVENT, listener);
+  expect(await openLaunchChart('Mint')).toBe('archived');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({
+    id: 'archived',
+  });
+  window.removeEventListener(OPEN_IMPORTED_PROJECT_EVENT, listener);
+});
+
 it('does not import or navigate after a cancelled list request completes late', async () => {
   let finish!: (value: Response) => void;
   const fetcher = vi.fn(
