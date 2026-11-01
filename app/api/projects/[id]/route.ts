@@ -52,7 +52,9 @@ export async function GET(
     const project = validateOwnedProjectResponse(
       {
         project: {
-          ...validateProjectDocument(JSON.parse(row.document)),
+          ...validateProjectDocument(JSON.parse(row.document), {
+            allowHistoricalVenueCap: true,
+          }),
           id: row.id,
           archived: row.archived === 1,
           updatedAt: row.updatedAt,

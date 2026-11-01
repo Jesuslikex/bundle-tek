@@ -75,7 +75,9 @@ export function validateOwnedProjectResponse(
     )
       throw new OwnedProjectReadError(502);
     // Keep the same canonical document parser used by the project library.
-    const document = validateProjectDocument(project);
+    const document = validateProjectDocument(project, {
+      allowHistoricalVenueCap: true,
+    });
     const result = {
       ...document,
       id: project.id,
