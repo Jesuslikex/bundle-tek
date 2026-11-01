@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // History intentionally loads three sources on mount and has its own integration
@@ -158,6 +158,40 @@ it('keeps the review open through saving while resetting draft consent', () => {
   ).toBe(false);
   expect(button().disabled).toBe(true);
   expect(fetcher).not.toHaveBeenCalled();
+});
+it('keeps the disclosure open across the first project save without restoring consent', () => {
+  function Parent({ saved }: { saved: boolean }) {
+    const [open, setOpen] = useState(false);
+    return (
+      <LaunchMetadataReview
+        key={saved ? project.id : 'new-project'}
+        {...props}
+        project={saved ? project : null}
+        disclosureOpen={open}
+        onDisclosureOpenChange={setOpen}
+      />
+    );
+  }
+  act(() => root.render(<Parent saved={false} />));
+  act(() => {
+    const disclosure = container.querySelector('details')!;
+    disclosure.open = true;
+    disclosure.dispatchEvent(new Event('toggle'));
+  });
+  act(() => root.render(<Parent saved />));
+  expect(container.querySelector('details')!.open).toBe(true);
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+  expect(button().disabled).toBe(true);
+  expect(fetcher).not.toHaveBeenCalled();
+  act(() => {
+    const disclosure = container.querySelector('details')!;
+    disclosure.open = false;
+    disclosure.dispatchEvent(new Event('toggle'));
+  });
+  act(() => root.render(<Parent saved={false} />));
+  expect(container.querySelector('details')!.open).toBe(false);
 });
 it('requires uploaded artwork and hides unsupported venue review', () => {
   render({

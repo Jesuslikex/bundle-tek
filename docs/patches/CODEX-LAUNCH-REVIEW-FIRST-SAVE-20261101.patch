@@ -1,0 +1,12 @@
+diff --git a/app/page.tsx b/app/page.tsx
+index 3741baf..024cde7 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -879,6 +879,7 @@ function PulseInsights({
+ export default function Home() {
+   const revision = useRef(new DraftRevision());
+   const [saveBusy, setSaveBusy] = useState(false);
++  const [launchReviewOpen, setLaunchReviewOpen] = useState(false);
+   const [exploringRobinhood, setExploringRobinhood] = useState(false);
+   const [robinhoodVenue, setRobinhoodVenue] = useState('hood.fun');
+   const [view, setView] = useState<View>('dashboard');

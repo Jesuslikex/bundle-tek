@@ -28,6 +28,8 @@ type Props = {
   onSave?: () => void;
   saving?: boolean;
   onCreateOnly?: () => void;
+  disclosureOpen?: boolean;
+  onDisclosureOpenChange?: (open: boolean) => void;
 };
 const interrupted =
   'Publication may have completed. Retry this same saved draft to recover its link.';
@@ -381,6 +383,10 @@ export function LaunchMetadataReview(props: Props) {
   return (
     <details
       className="metadata-review"
+      open={props.disclosureOpen}
+      onToggle={(event) =>
+        props.onDisclosureOpenChange?.(event.currentTarget.open)
+      }
       style={{
         borderTop: '1px solid var(--border)',
         paddingTop: 16,

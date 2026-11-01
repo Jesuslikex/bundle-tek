@@ -39,6 +39,8 @@ export function TokenDetailsForm({
   metadataProject,
   onSave,
   saving,
+  reviewOpen,
+  onReviewOpenChange,
 }: {
   plan: LaunchPlanInput;
   onChange: (change: Partial<LaunchPlanInput>) => void;
@@ -49,6 +51,8 @@ export function TokenDetailsForm({
   metadataProject?: MetadataProject | null;
   onSave?: () => void;
   saving?: boolean;
+  reviewOpen?: boolean;
+  onReviewOpenChange?: (open: boolean) => void;
 }) {
   const [failedImage, setFailedImage] = useState('');
   const limits = venueLimits(plan.chain, plan.launchpad);
@@ -334,6 +338,8 @@ export function TokenDetailsForm({
           project={metadataProject}
           onSave={onSave}
           saving={saving}
+          disclosureOpen={reviewOpen}
+          onDisclosureOpenChange={onReviewOpenChange}
           onCreateOnly={() =>
             onChange({
               developerBuy: 0,
