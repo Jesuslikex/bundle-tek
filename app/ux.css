@@ -3681,6 +3681,30 @@ body {
   display: grid;
   gap: 10px;
 }
+.browser-vault-reveal {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #7f1d1d;
+  padding: 14px;
+  border-radius: 8px;
+}
+.browser-vault-reveal code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.browser-vault-reveal textarea {
+  width: 100%;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+  background: #0b0b10;
+  color: #f4f4f5;
+  border: 1px solid #30303c;
+  border-radius: 6px;
+  padding: 8px;
+  resize: none;
+}
 .browser-vault-import {
   border: 1px solid #30303c;
   padding: 14px;

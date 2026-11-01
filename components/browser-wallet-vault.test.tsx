@@ -6,6 +6,7 @@ import { BrowserWalletVault } from './browser-wallet-vault';
 const vault = vi.hoisted(() => ({
   createVault: vi.fn(),
   unlockVault: vi.fn(),
+  revealVaultPrivateKey: vi.fn(),
   generateVaultWallets: vi.fn(),
   encryptVault: vi.fn(),
   saveBrowserVault: vi.fn(),
@@ -236,4 +237,95 @@ it('never promises warmup for EVM custody even when a warmup host is supplied', 
   await click('Done');
   expect(onOpenWarmup).not.toHaveBeenCalled();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('reveals one wallet key only after a fresh password and warning, with copy and hide', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText },
+    configurable: true,
+  });
+  const session = { wallets: [{ id: 'fixture', family: 'solana', address }] };
+  vault.unlockVault.mockResolvedValue(session);
+  vault.revealVaultPrivateKey.mockReturnValue('fixture-base58-key');
+  await click('Close');
+  localStorage.setItem('fixture-vault', 'existing-fixture');
+  await click('Browser vault');
+  await input('Wallet password', 'synthetic-test-only');
+  await submit();
+  const show = document.querySelector(
+    `button[aria-label="Show private key for ${address}"]`,
+  ) as HTMLButtonElement;
+  expect(show).toBeTruthy();
+  await act(async () => show.click());
+  expect(document.body.textContent).toContain('Anyone who sees this key');
+  const submitButton = textButton('Show key');
+  expect(submitButton.disabled).toBe(true);
+  await input('Re-enter wallet password', 'synthetic-test-only');
+  expect(textButton('Show key').disabled).toBe(true);
+  const ack = document.querySelector(
+    '.browser-vault-reveal input[type="checkbox"]',
+  ) as HTMLInputElement;
+  await act(async () => ack.click());
+  await act(async () =>
+    document
+      .querySelector('form.browser-vault-reveal')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+  );
+  expect(vault.unlockVault).toHaveBeenLastCalledWith(
+    'existing-fixture',
+    'synthetic-test-only',
+  );
+  expect(vault.revealVaultPrivateKey).toHaveBeenCalledExactlyOnceWith(
+    session,
+    'fixture',
+  );
+  const box = document.querySelector(
+    '.browser-vault-reveal textarea',
+  ) as HTMLTextAreaElement;
+  expect(box.value).toBe('fixture-base58-key');
+  expect(document.body.textContent).toContain('Phantom');
+  await click('Copy key');
+  expect(writeText).toHaveBeenCalledExactlyOnceWith('fixture-base58-key');
+  expect(textButton('Copied')).toBeTruthy();
+  await click('Hide key');
+  expect(document.querySelector('.browser-vault-reveal textarea')).toBeNull();
+  expect(document.body.textContent).not.toContain('fixture-base58-key');
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+it('clears a revealed key when the vault locks', async () => {
+  const session = { wallets: [{ id: 'fixture', family: 'solana', address }] };
+  vault.unlockVault.mockResolvedValue(session);
+  vault.revealVaultPrivateKey.mockReturnValue('fixture-base58-key');
+  await click('Close');
+  localStorage.setItem('fixture-vault', 'existing-fixture');
+  await click('Browser vault');
+  await input('Wallet password', 'synthetic-test-only');
+  await submit();
+  await act(async () =>
+    (
+      document.querySelector(
+        `button[aria-label="Show private key for ${address}"]`,
+      ) as HTMLButtonElement
+    ).click(),
+  );
+  await input('Re-enter wallet password', 'synthetic-test-only');
+  await act(async () =>
+    (
+      document.querySelector(
+        '.browser-vault-reveal input[type="checkbox"]',
+      ) as HTMLInputElement
+    ).click(),
+  );
+  await act(async () =>
+    document
+      .querySelector('form.browser-vault-reveal')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+  );
+  expect(document.body.textContent).toContain('Private key');
+  await act(async () => window.dispatchEvent(new Event('pagehide')));
+  expect(document.body.textContent).not.toContain('fixture-base58-key');
 });

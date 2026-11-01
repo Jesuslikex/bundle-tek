@@ -10,6 +10,7 @@ import {
   importVaultWallets,
   publicVaultWallets,
   exportVaultPrivateKeys,
+  revealVaultPrivateKey,
   parseVaultEnvelope,
   saveBrowserVault,
   VAULT_STORAGE_KEY,
@@ -101,6 +102,37 @@ describe('encrypted browser custody', () => {
         (wallet) => !('seed' in wallet) && !('privateKey' in wallet),
       ),
     ).toBe(true);
+  });
+  it('reveals one wallet key in wallet-importable form that round-trips', async () => {
+    const mixed = generateVaultWallets(
+      generateVaultWallets(await createVault(passphrase), 'solana', 2),
+      'evm',
+      1,
+    );
+    const [solA, solB, evm] = mixed.payload.wallets;
+    const solKey = revealVaultPrivateKey(mixed, solB.id);
+    const pair = bs58.decode(solKey);
+    expect(pair).toHaveLength(64);
+    expect(bs58.encode(nacl.sign.keyPair.fromSecretKey(pair).publicKey)).toBe(
+      solB.address,
+    );
+    expect(solKey).not.toBe(revealVaultPrivateKey(mixed, solA.id));
+    const evmKey = revealVaultPrivateKey(mixed, evm.id);
+    expect(evmKey).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(privateKeyToAddress(evmKey as `0x${string}`)).toBe(evm.address);
+    const reimported = importVaultWallets(
+      await createVault(passphrase),
+      'solana',
+      solKey,
+    );
+    expect(publicVaultWallets(reimported.session)[0].address).toBe(
+      solB.address,
+    );
+    expect(() => revealVaultPrivateKey(mixed, 'missing')).toThrow(
+      'not in the vault',
+    );
+    mixed.payload.wallets[0].address = solB.address;
+    expect(() => revealVaultPrivateKey(mixed, solA.id)).toThrow();
   });
   it('rejects a key/address mismatch before persistence or export', async () => {
     const session = generateVaultWallets(
