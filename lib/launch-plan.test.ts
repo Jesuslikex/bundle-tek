@@ -174,12 +174,12 @@ describe('captured venue supply-buy ceiling', () => {
   });
 
   it('leaves an uncaptured venue on the universal ceiling only', () => {
-    // Robinhood venues are absent from the captured Solana-only table, so no
-    // per-venue ceiling exists and only the universal 100% rule applies.
+    // Robinhood Uniswap V4 is the one offered venue the capture never
+    // describes, so no per-venue ceiling exists and only 100% applies.
     const uncaptured = {
       ...DEFAULT_LAUNCH_PLAN,
       chain: 'Robinhood' as const,
-      launchpad: 'flap.sh',
+      launchpad: 'Uniswap V4',
       currency: 'ETH',
     };
     expect(
