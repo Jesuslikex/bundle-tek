@@ -11,7 +11,11 @@ import {
   type StonkLaunchReview,
   type StonkLaunchTerms,
 } from './stonkfun-launch-service';
-import { WRAPPED_SOL, LAUNCHLAB_PROGRAM } from './stonkfun-launch';
+import {
+  WRAPPED_SOL,
+  LAUNCHLAB_PROGRAM,
+  TOKEN_2022_PROGRAM,
+} from './stonkfun-launch';
 import {
   buildStonkBundle,
   verifyStonkBundleReview,
@@ -40,6 +44,8 @@ export type StonkBundleSummary = {
   holders: (StonkHolderBuy & {
     revision: number;
     expectedTokensOutRaw: string;
+    /** Exact holder output from the whole-bundle replay at review time. */
+    simulatedTokensOutRaw?: string;
     solCostLamports: string;
   })[];
   packets: StonkBundlePacket[];
@@ -47,8 +53,8 @@ export type StonkBundleSummary = {
   holdersBuyRaw: string;
   holdersTokensOutRaw: string;
   holdersSupplyBps: number;
-  /** True only when the configured RPC replayed the whole unsigned bundle in order. */
-  bundleSimulated: boolean;
+  /** Always true: review requires a successful in-order whole-bundle replay. */
+  bundleSimulated: true;
 };
 export { verifyStonkBundleReview };
 export type StonkBundleReview = Omit<StonkLaunchReview, 'terms'> & {
@@ -371,38 +377,16 @@ export async function prepareStonkBundle(
     return fail(
       `The deployer needs ${payerNeed.toString()} lamports for the launch and Jito tip.`,
     );
-  // Best effort: replay the whole unsigned bundle in order when the RPC supports it.
-  let bundleSimulated = false;
-  try {
-    const replay = (await rpc(
-      'simulateBundle',
-      [
-        {
-          encodedTransactions: [
-            base.transaction,
-            ...bundle.packets.map((p) => p.transaction),
-          ],
-        },
-        {
-          transactionEncoding: 'base64',
-          skipSigVerify: true,
-          replaceRecentBlockhash: false,
-          preExecutionAccountsConfigs: Array(bundle.packets.length + 1).fill(
-            null,
-          ),
-          postExecutionAccountsConfigs: Array(bundle.packets.length + 1).fill(
-            null,
-          ),
-        },
-      ],
-      signal,
-    )) as { value?: { summary?: unknown } } | undefined;
-    if (replay?.value?.summary === 'succeeded') bundleSimulated = true;
-    else if (replay?.value?.summary)
-      return fail('Bundle simulation rejected the holder buys.');
-  } catch (error) {
-    if (error instanceof StonkLaunchError) throw error;
-  }
+  // Required: replay the whole unsigned bundle in order. No replay, no review.
+  const simulatedOut = await simulateStonkBundle(
+    rpc,
+    [base.transaction, ...bundle.packets.map((p) => p.transaction)],
+    { input: launch, bundle: { packets: bundle.packets, holders: sized } },
+    signal,
+    true,
+  );
+  sized.forEach((h, i) => (h.simulatedTokensOutRaw = simulatedOut[i]));
+  const bundleSimulated = true;
   const projectAfter = await ownedHolders(db, owner, t);
   if (projectAfter !== projectBefore)
     return fail('The project changed during review. Review again.');
@@ -422,4 +406,103 @@ export async function prepareStonkBundle(
       bundleSimulated,
     },
   };
+}
+
+type BundleSimulation = {
+  summary?: unknown;
+  transactionResults?: {
+    err?: unknown;
+    postExecutionAccounts?: AccountInfo[] | null;
+  }[];
+};
+/**
+ * Replays create, holder and tip packets in order with simulateBundle and
+ * fails closed: unsupported RPC, any failed transaction, or any holder output
+ * below its signed minimum refuses. Returns exact simulated holder outputs.
+ */
+export async function simulateStonkBundle(
+  rpc: NonNullable<StonkDeps['rpc']>,
+  transactions: string[],
+  review: {
+    input: { mint: string };
+    bundle: Pick<StonkBundleSummary, 'packets'> & {
+      holders: Pick<StonkHolderBuy, 'holder' | 'minTokensOutRaw'>[];
+    };
+  },
+  signal: AbortSignal,
+  unsigned: boolean,
+) {
+  const { packets, holders } = review.bundle;
+  if (transactions.length !== packets.length + 1)
+    return fail('Bundle simulation needs every packet.');
+  const ata = async (owner: string) =>
+    (
+      await findAssociatedTokenPda({
+        mint: address(review.input.mint),
+        owner: address(owner),
+        tokenProgram: address(TOKEN_2022_PROGRAM),
+      })
+    )[0] as string;
+  const watched: (string[] | null)[] = [null];
+  for (const p of packets)
+    watched.push(
+      p.kind === 'holders' ? await Promise.all(p.signers.map(ata)) : null,
+    );
+  let raw: unknown;
+  try {
+    raw = await rpc(
+      'simulateBundle',
+      [
+        { encodedTransactions: transactions },
+        {
+          transactionEncoding: 'base64',
+          skipSigVerify: unsigned,
+          replaceRecentBlockhash: false,
+          preExecutionAccountsConfigs: watched.map(() => null),
+          postExecutionAccountsConfigs: watched.map((addresses) =>
+            addresses ? { encoding: 'base64', addresses } : null,
+          ),
+        },
+      ],
+      signal,
+    );
+  } catch {
+    return fail(
+      'Whole-bundle simulation is unavailable on the configured RPC. Nothing was sent.',
+      502,
+    );
+  }
+  const result = (
+    raw && typeof raw === 'object' && 'value' in raw
+      ? (raw as { value: unknown }).value
+      : raw
+  ) as BundleSimulation | null;
+  if (
+    !result ||
+    result.summary !== 'succeeded' ||
+    !Array.isArray(result.transactionResults) ||
+    result.transactionResults.length !== transactions.length ||
+    result.transactionResults.some((r) => !r || r.err)
+  )
+    return fail(
+      'Bundle simulation rejected the launch bundle. Nothing was sent.',
+    );
+  const out = new Map<string, bigint>();
+  packets.forEach((p, i) => {
+    if (p.kind !== 'holders') return;
+    const accounts = result.transactionResults![i + 1].postExecutionAccounts;
+    if (!Array.isArray(accounts) || accounts.length !== p.signers.length)
+      fail('Bundle simulation omitted holder token accounts.');
+    p.signers.forEach((holder, j) =>
+      out.set(holder, tokenAmount(accounts![j], review.input.mint, holder)),
+    );
+  });
+  return holders.map((h) => {
+    const got = out.get(h.holder);
+    if (got === undefined || got < BigInt(h.minTokensOutRaw))
+      return fail(
+        `Bundle simulation gives holder ${h.holder.slice(0, 4)}…${h.holder.slice(-4)} less than its minimum. Nothing was sent.`,
+      );
+    return got.toString();
+  });
 }

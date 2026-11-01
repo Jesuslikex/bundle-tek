@@ -22,6 +22,7 @@ import {
 } from './stonkfun-bundle-service';
 import type { StonkLaunchReview } from './stonkfun-launch-service';
 import { verifyStonkBundleReview } from './stonkfun-bundle';
+import { fakeBundleSimulation } from '@/test/stonkfun-bundle-simulation';
 
 const key = (n: number) =>
   bs58.encode(nacl.sign.keyPair.fromSeed(new Uint8Array(32).fill(n)).publicKey);
@@ -34,7 +35,7 @@ async function setup(
     holderLamports?: number;
     recipients?: { address: string; revision: number }[];
     tokensOutRaw?: string;
-    simulateBundle?: 'unsupported' | 'succeeded' | 'failed';
+    simulateBundle?: 'unsupported' | 'succeeded' | 'failed' | 'short';
   } = {},
 ) {
   const input: StonkLaunchInput = {
@@ -128,36 +129,40 @@ async function setup(
     owner: LAUNCHLAB_PROGRAM,
     lamports,
   });
-  const rpc = vi.fn(async (method: string): Promise<unknown> => {
-    if (method === 'getMultipleAccounts')
-      return {
-        value: [
-          account(config),
-          account(platform),
-          ...holders.map(() => ({
-            data: ['', 'base64'],
-            owner: '11111111111111111111111111111111',
-            lamports: opts.holderLamports ?? 2_000_000_000,
-          })),
-        ],
-      };
-    if (method === 'getBalance') return { value: 5_000_000_000 };
-    if (method === 'simulateTransaction')
-      return { value: { err: null, accounts: [account(pool)] } };
-    if (method === 'simulateBundle') {
-      if (!opts.simulateBundle || opts.simulateBundle === 'unsupported')
-        throw new Error('Method not found');
-      return {
-        value: {
-          summary:
-            opts.simulateBundle === 'succeeded'
-              ? 'succeeded'
-              : { failed: { error: 'x' } },
-        },
-      };
-    }
-    throw new Error('unexpected ' + method);
-  });
+  const rpc = vi.fn(
+    async (method: string, params: unknown[]): Promise<unknown> => {
+      if (method === 'getMultipleAccounts')
+        return {
+          value: [
+            account(config),
+            account(platform),
+            ...holders.map(() => ({
+              data: ['', 'base64'],
+              owner: '11111111111111111111111111111111',
+              lamports: opts.holderLamports ?? 2_000_000_000,
+            })),
+          ],
+        };
+      if (method === 'getBalance') return { value: 5_000_000_000 };
+      if (method === 'simulateTransaction')
+        return { value: { err: null, accounts: [account(pool)] } };
+      if (method === 'simulateBundle') {
+        const mode = opts.simulateBundle ?? 'succeeded';
+        if (mode === 'unsupported') throw new Error('Method not found');
+        return fakeBundleSimulation(
+          params,
+          key(2),
+          {
+            [key(10)]: BigInt(golden.steps[1].tokensOut),
+            [key(11)]:
+              mode === 'short' ? 1n : BigInt(golden.steps[2].tokensOut),
+          },
+          mode === 'failed' ? { failed: { error: 'x' } } : 'succeeded',
+        );
+      }
+      throw new Error('unexpected ' + method);
+    },
+  );
   const document = JSON.stringify({
     options: {
       wallets: {
@@ -212,22 +217,34 @@ describe('prepareStonkBundle', () => {
         (BigInt(h.expectedTokensOutRaw) * 9900n) / 10000n,
       );
     expect(review.bundle.tipAccount).toBe(TIP);
-    expect(review.bundle.bundleSimulated).toBe(false);
+    expect(review.bundle.bundleSimulated).toBe(true);
+    expect(review.bundle.holders.map((h) => h.simulatedTokensOutRaw)).toEqual([
+      golden.steps[1].tokensOut,
+      golden.steps[2].tokensOut,
+    ]);
+    const call = s.rpc.mock.calls.find(([m]) => m === 'simulateBundle')!;
+    const cfg = call[1][1] as {
+      skipSigVerify: boolean;
+      postExecutionAccountsConfigs: unknown[];
+    };
+    expect(cfg.skipSigVerify).toBe(true);
+    expect(cfg.postExecutionAccountsConfigs).toHaveLength(3);
     expect(review.terms.holders).toEqual(s.terms.holders);
     expect(review.sha256).toBe(s.base.sha256);
     await expect(verifyStonkBundleReview(review)).resolves.toBeTruthy();
   });
 
-  it('marks a successful whole-bundle replay and refuses a failed one', async () => {
-    const ok = await setup({ simulateBundle: 'succeeded' });
-    expect(
-      (await prepareStonkBundle(ok.db, 'owner', ok.terms, signal(), ok.deps))
-        .bundle.bundleSimulated,
-    ).toBe(true);
-    const bad = await setup({ simulateBundle: 'failed' });
-    await expect(
-      prepareStonkBundle(bad.db, 'owner', bad.terms, signal(), bad.deps),
-    ).rejects.toThrow(/Bundle simulation rejected/);
+  it('fails closed when the whole-bundle replay is unavailable, fails or falls short', async () => {
+    for (const [mode, message] of [
+      ['unsupported', /unavailable on the configured RPC/],
+      ['failed', /rejected the launch bundle/],
+      ['short', /less than its minimum/],
+    ] as const) {
+      const bad = await setup({ simulateBundle: mode });
+      await expect(
+        prepareStonkBundle(bad.db, 'owner', bad.terms, signal(), bad.deps),
+      ).rejects.toThrow(message);
+    }
   });
 
   it('refuses wallets that are not saved project holders', async () => {

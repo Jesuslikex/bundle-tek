@@ -464,9 +464,8 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
                   <tr>
                     <th scope="row">Bundle check</th>
                     <td>
-                      {reviewBundle.bundle.bundleSimulated
-                        ? 'Whole bundle simulated in order.'
-                        : 'Creation simulated; holder outputs computed from the created curve.'}
+                      Whole bundle simulated in order; it is simulated again,
+                      signed, right before sending.
                     </td>
                   </tr>
                 </>

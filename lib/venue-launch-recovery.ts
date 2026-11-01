@@ -18,6 +18,7 @@ import { PumpPreflightError } from './owned-pump-preflight';
 import {
   isStonkBundleReview,
   prepareStonkBundle,
+  simulateStonkBundle,
   verifyStonkBundleReview,
   type StonkBundleReview,
   type StonkBundleTerms,
@@ -476,6 +477,14 @@ export async function actVenueLaunchRecovery(
         );
       }
       bundleSigned = action.bundleTransactions!;
+      // Fail closed: the exact signed bundle must replay in order before the send marker.
+      await simulateStonkBundle(
+        rpc,
+        [row.signed, ...bundleSigned],
+        review as StonkBundleReview,
+        signal,
+        false,
+      );
     }
     let claimed = false;
     const guardedRpc: Rpc = async (method, params, readSignal) => {
