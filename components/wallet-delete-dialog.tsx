@@ -80,10 +80,12 @@ export function WalletDeleteDialog({
           Deleting does not withdraw anything. Funds stay in the wallet, so
           empty it first if these wallets still hold SOL or tokens.
         </p>
-        {onWithdrawAndDelete && count === 1 && (
+        {onWithdrawAndDelete && (
           <div className="wallet-delete-withdraw">
             <label htmlFor={`${id}-destination`}>
-              Withdraw to public address
+              {count === 1
+                ? 'Withdraw to public address'
+                : 'Withdraw all selected to public address'}
               <Input
                 id={`${id}-destination`}
                 aria-label="Withdraw destination address"

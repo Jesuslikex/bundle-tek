@@ -169,9 +169,9 @@ export function WalletWorkspace({
   const [warmupOpen, setWarmupOpen] = useState(false);
   const [initialWarmup, setInitialWarmup] = useState<SavedWarmup | null>(null);
   const [tableSettingsOpen, setTableSettingsOpen] = useState(false);
-  const [deletingWallet, setDeletingWallet] = useState<{
-    address: string;
-    revision: number;
+  // One wallet from a row, or the whole selection from the bulk bar.
+  const [deletingWallets, setDeletingWallets] = useState<{
+    wallets: { address: string; revision: number }[];
     label: string;
   } | null>(null);
   const walletDeleteFocus = useRef<HTMLButtonElement | null>(null);
@@ -515,7 +515,7 @@ export function WalletWorkspace({
 
     setError('');
 
-    setNotice('Refreshing native balances…');
+    setNotice('Refreshing native balancesÃ¢â‚¬Â¦');
 
     try {
       const response = await fetch('/api/wallet-workspace/balances', {
@@ -1018,7 +1018,7 @@ export function WalletWorkspace({
                   (archived ? 'Archived wallets' : 'All wallets')}
               </h2>
               <small>
-                {rows.length} {rows.length === 1 ? 'address' : 'addresses'} ·{' '}
+                {rows.length} {rows.length === 1 ? 'address' : 'addresses'} Ã‚Â·{' '}
                 {chain}
               </small>
             </div>
@@ -1465,34 +1465,41 @@ export function WalletWorkspace({
               )}
               <Button
                 variant="outline"
-
                 disabled={busy || picks.length > 100}
-
-                onClick={() =>
-                  void mutate(
-                    {
-                      action: archived ? 'wallet.restore' : 'wallet.archive',
-
-                      wallets: picks.map((w) => ({
-                        address: w.address,
-
-                        revision: w.revision,
-                      })),
-                    },
-                    archived
-                      ? 'Selected wallets restored.'
-                      : 'Selected wallets archived.',
-                  )
-                }
+                onClick={() => {
+                  // Restoring is reversible; deleting confirms first and can
+                  // withdraw the whole selection.
+                  if (archived) {
+                    void mutate(
+                      {
+                        action: 'wallet.restore',
+                        wallets: picks.map((w) => ({
+                          address: w.address,
+                          revision: w.revision,
+                        })),
+                      },
+                      'Selected wallets restored.',
+                    );
+                    return;
+                  }
+                  walletDeleteFocus.current = null;
+                  setDeletingWallets({
+                    wallets: picks.map((w) => ({
+                      address: w.address,
+                      revision: w.revision,
+                    })),
+                    label: `${picks.length} selected wallets`,
+                  });
+                }}
               >
-                {archived ? 'Restore selected' : 'Archive selected'}
+                {archived ? 'Restore selected' : 'Delete selected'}
               </Button>
             </div>
           )}
           <div className="wallet-balance-summary">
             <div>
               <small>
-                {picks.length ? 'SELECTED WALLETS' : 'CURRENT PAGE'} · NATIVE
+                {picks.length ? 'SELECTED WALLETS' : 'CURRENT PAGE'} Ã‚Â· NATIVE
                 BALANCE
               </small>
               <strong>
@@ -1502,7 +1509,7 @@ export function WalletWorkspace({
               </strong>
               <p>
                 {combined
-                  ? `${combined.count} ${combined.count === 1 ? 'address' : 'addresses'} · ${chain === 'Solana' ? 'slot' : 'block'} ${combined.blockNumber} · ${combined.commitment} · observed ${new Date(combined.observedAt).toLocaleString()}`
+                  ? `${combined.count} ${combined.count === 1 ? 'address' : 'addresses'} Ã‚Â· ${chain === 'Solana' ? 'slot' : 'block'} ${combined.blockNumber} Ã‚Â· ${combined.commitment} Ã‚Â· observed ${new Date(combined.observedAt).toLocaleString()}`
                   : 'Refresh balances or change the selection to load a snapshot.'}
               </p>
               <small>
@@ -1536,19 +1543,21 @@ export function WalletWorkspace({
             onReset={() => updateTableSettings(DEFAULT_WALLET_TABLE_SETTINGS)}
             onClose={() => setTableSettingsOpen(false)}
           />
-          {deletingWallet && (
+          {deletingWallets && (
             <WalletDeleteDialog
-              label={deletingWallet.label}
-              count={1}
+              label={deletingWallets.label}
+              count={deletingWallets.wallets.length}
               returnFocus={walletDeleteFocus}
               busy={busy}
               error={error}
-              onClose={() => setDeletingWallet(null)}
+              onClose={() => setDeletingWallets(null)}
               onWithdrawAndDelete={async (destination, password) => {
                 // Empty first, archive only once the sweep is submitted.
                 try {
                   await withdrawWalletTo({
-                    walletAddress: deletingWallet.address,
+                    walletAddresses: deletingWallets.wallets.map(
+                      (wallet) => wallet.address,
+                    ),
                     destination,
                     password,
                   });
@@ -1559,42 +1568,33 @@ export function WalletWorkspace({
                 return mutate(
                   {
                     action: 'wallet.archive',
-                    wallets: [
-                      {
-                        address: deletingWallet.address,
-                        revision: deletingWallet.revision,
-                      },
-                    ],
+                    wallets: deletingWallets.wallets,
                   },
-                  'Wallet withdrawn and archived.',
+                  'Wallets withdrawn and archived.',
                 );
               }}
               onWithdraw={() => {
                 // Cleanup already sweeps selected wallets to a destination, so
-                // hand off by selecting this one and closing the dialog.
-                setSelected([deletingWallet.address]);
-                setDeletingWallet(null);
+                // hand off by selecting them and closing the dialog.
+                setSelected(
+                  deletingWallets.wallets.map((wallet) => wallet.address),
+                );
+                setDeletingWallets(null);
                 requestAnimationFrame(() =>
                   document
                     .getElementById('wallet-cleanup')
                     ?.scrollIntoView({ block: 'start' }),
                 );
               }}
-              onDelete={async () => {
-                const ok = await mutate(
+              onDelete={async () =>
+                mutate(
                   {
                     action: 'wallet.archive',
-                    wallets: [
-                      {
-                        address: deletingWallet.address,
-                        revision: deletingWallet.revision,
-                      },
-                    ],
+                    wallets: deletingWallets.wallets,
                   },
-                  'Wallet archived.',
-                );
-                return ok;
-              }}
+                  'Wallets archived.',
+                )
+              }
             />
           )}
           {warmupOpen &&
@@ -1728,7 +1728,7 @@ export function WalletWorkspace({
               </select>
             </label>
             <output>
-              {rows.length} matching wallets · page {pageIndex + 1} of{' '}
+              {rows.length} matching wallets Ã‚Â· page {pageIndex + 1} of{' '}
               {pageCount}. Showing {pageRows.length}.
             </output>
             <small>
@@ -1886,12 +1886,12 @@ export function WalletWorkspace({
                       )}
                       <code title={w.address}>{w.address}</code>
                       <small className="wallet-row-meta">
-                        {w.role} ·{' '}
+                        {w.role} Ã‚Â·{' '}
                         {folders
                           .filter((f) => walletFolderIds(w).includes(f.id))
                           .map((f) => f.name)
                           .join(', ') || 'No folder'}
-                        {' · '}
+                        {' Ã‚Â· '}
                         {proofs.has(w.address) ? (
                           <span
                             className="wallet-signature-verified"
@@ -1913,7 +1913,7 @@ export function WalletWorkspace({
                               {balances.get(w.address)!.currency}
                             </strong>
                             <small
-                              title={`${balances.get(w.address)!.source} · ${chain === 'Solana' ? 'slot' : 'block'} ${balances.get(w.address)!.blockNumber}${balances.get(w.address)!.blockHash ? ` · ${balances.get(w.address)!.blockHash}` : ''}`}
+                              title={`${balances.get(w.address)!.source} Ã‚Â· ${chain === 'Solana' ? 'slot' : 'block'} ${balances.get(w.address)!.blockNumber}${balances.get(w.address)!.blockHash ? ` Ã‚Â· ${balances.get(w.address)!.blockHash}` : ''}`}
                             >
                               Observed{' '}
                               {new Date(
@@ -2048,9 +2048,10 @@ export function WalletWorkspace({
                             // Deleting now confirms first, as the reference does.
                             if (!archived) {
                               walletDeleteFocus.current = event.currentTarget;
-                              setDeletingWallet({
-                                address: w.address,
-                                revision: w.revision,
+                              setDeletingWallets({
+                                wallets: [
+                                  { address: w.address, revision: w.revision },
+                                ],
                                 label: w.label || w.address,
                               });
                               return;
@@ -2091,7 +2092,7 @@ export function WalletWorkspace({
               <Folder />
               <h3>
                 {loading
-                  ? 'Loading wallets…'
+                  ? 'Loading walletsÃ¢â‚¬Â¦'
                   : query
                     ? 'No matching wallets'
                     : archived

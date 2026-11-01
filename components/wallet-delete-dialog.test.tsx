@@ -147,9 +147,12 @@ it('shows the withdraw fields only when the caller supports them', async () => {
   expect(field('Vault password')).not.toBeNull();
 });
 
-it('hides the inline withdraw for a batch', async () => {
+it('offers the withdraw for a whole batch, with a plural label', async () => {
   await render({ count: 3, onWithdrawAndDelete: async () => true });
-  expect(field('Withdraw destination address')).toBeNull();
+  expect(field('Withdraw destination address')).not.toBeNull();
+  expect(document.body.textContent).toContain(
+    'Withdraw all selected to public address',
+  );
 });
 
 it('blocks Withdraw and delete until both fields are filled', async () => {

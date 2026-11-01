@@ -49,21 +49,24 @@ async function request(body: object, signal?: AbortSignal) {
 const PENDING = ['awaiting_signature', 'signing', 'pending'];
 
 export async function withdrawWalletTo(input: {
-  walletAddress: string;
+  walletAddresses: string[];
   destination: string;
   password: string;
   signal?: AbortSignal;
   onStep?: (step: WithdrawStep) => void;
 }): Promise<WithdrawResult> {
-  const { walletAddress, destination, password, signal, onStep } = input;
+  const { walletAddresses, destination, password, signal, onStep } = input;
   if (!password) throw new WalletWithdrawError('Enter the vault password.');
-  if (walletAddress === destination)
+  if (!walletAddresses.length)
+    throw new WalletWithdrawError('Select at least one wallet to empty.');
+  if (walletAddresses.includes(destination))
     throw new WalletWithdrawError(
-      'The destination must differ from the wallet being emptied.',
+      'The destination must differ from every wallet being emptied.',
     );
 
   const payload = cleanupPayload({
-    inputWalletPubkeys: [walletAddress],
+    // One destination reused round-robin across inputs is native to cleanup.
+    inputWalletPubkeys: walletAddresses,
     outputWalletPubkeys: [destination],
     minDelayMs: CLEANUP_DEFAULT_DELAY_MS,
     maxDelayMs: CLEANUP_DEFAULT_MAX_DELAY_MS,

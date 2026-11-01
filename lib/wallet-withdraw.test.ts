@@ -14,7 +14,7 @@ import { signWalletCleanupBatch } from './wallet-cleanup';
 import { WalletWithdrawError, withdrawWalletTo } from './wallet-withdraw';
 
 const WALLET = {
-  walletAddress: 'seller',
+  walletAddresses: ['seller'],
   destination: 'buyer',
   password: 'pw',
 };
@@ -153,5 +153,26 @@ describe('withdrawWalletTo', () => {
     const steps: string[] = [];
     await withdrawWalletTo({ ...WALLET, onStep: (step) => steps.push(step) });
     expect(steps).toEqual(['preparing', 'signing', 'submitting']);
+  });
+
+  it('sends every wallet as input with the single destination', async () => {
+    await withdrawWalletTo({ ...WALLET, walletAddresses: ['a', 'b', 'c'] });
+    expect(calls[0]).toMatchObject({
+      input_wallet_pubkeys: ['a', 'b', 'c'],
+      output_wallet_pubkeys: ['buyer'],
+    });
+  });
+
+  it('needs at least one wallet', async () => {
+    await expect(
+      withdrawWalletTo({ ...WALLET, walletAddresses: [] }),
+    ).rejects.toThrow(/at least one wallet/);
+    expect(actions()).toEqual([]);
+  });
+
+  it('refuses a destination that is one of the wallets', async () => {
+    await expect(
+      withdrawWalletTo({ ...WALLET, walletAddresses: ['a', 'buyer'] }),
+    ).rejects.toThrow(/must differ/);
   });
 });
