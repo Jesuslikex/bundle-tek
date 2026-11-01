@@ -11,7 +11,7 @@ import {
   executeAcrossWallets,
   executeImportedTrade,
   percentOfBalance,
-  readTradeWalletBalance,
+  readGroupTokenBalances,
   type MultiWalletOutcome,
   type TradeSide,
 } from '@/lib/imported-trade-execute';
@@ -73,9 +73,8 @@ export function InstantTradePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [outcomes, setOutcomes] = useState<MultiWalletOutcome[]>([]);
-  const [balances, setBalances] = useState<
-    Record<string, { nativeRaw: bigint; tokenRaw: bigint }>
-  >({});
+  const [balances, setBalances] = useState<Record<string, bigint>>({});
+  const [balanceError, setBalanceError] = useState('');
   const [pos, setPos] = useState({ x: 24, y: 96 });
   const [look, setLook] = useState<Look>({ opacity: 1, blur: 0 });
   const vault = useRef<VaultSession | null>(null);
@@ -117,24 +116,23 @@ export function InstantTradePanel({
     [project.id, project.revision, token.address, token.decimals],
   );
 
+  // One gated group read for up to 25 wallets; failures propagate to Sell.
   const refreshBalances = useCallback(async () => {
-    const controller = new AbortController();
-    const next: Record<string, { nativeRaw: bigint; tokenRaw: bigint }> = {};
-    await Promise.all(
-      scope.map(async (w) => {
-        try {
-          next[w.address] = await readTradeWalletBalance(
-            ctx,
-            w,
-            controller.signal,
-          );
-        } catch {
-          /* shown as unknown */
-        }
-      }),
-    );
-    setBalances(next);
-    return next;
+    setBalanceError('');
+    try {
+      const next = await readGroupTokenBalances(
+        ctx,
+        scope,
+        new AbortController().signal,
+      );
+      setBalances(next);
+      return next;
+    } catch (e) {
+      setBalanceError(
+        e instanceof Error ? e.message : 'Holdings refresh unavailable.',
+      );
+      throw e;
+    }
   }, [ctx, scope]);
 
   async function unlock() {
@@ -208,8 +206,8 @@ export function InstantTradePanel({
           const fresh = await refreshBalances();
           for (const w of scope) {
             const bal = fresh[w.address];
-            if (bal)
-              sizes[w.address] = percentOfBalance(bal.tokenRaw, tradeAmount);
+            if (bal !== undefined)
+              sizes[w.address] = percentOfBalance(bal, tradeAmount);
           }
         }
         const targets = scope.filter((w) => (sizes[w.address] ?? 0n) > 0n);
@@ -225,7 +223,7 @@ export function InstantTradePanel({
           undefined,
           (o) => setOutcomes((list) => [...list, o]),
         );
-        void refreshBalances();
+        void refreshBalances().catch(() => {});
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Trade failed.');
       } finally {
@@ -307,11 +305,7 @@ export function InstantTradePanel({
   if (token.chain !== 'Solana') return null;
   if (!open)
     return (
-      <button
-        type="button"
-        className={styles.launcher}
-        onClick={openPanel}
-      >
+      <button type="button" className={styles.launcher} onClick={openPanel}>
         Instant Trade
       </button>
     );
@@ -321,12 +315,9 @@ export function InstantTradePanel({
       : (settings?.walletTrades.sellPercents ?? []);
   const keysList =
     side === 'Buy' ? settings?.hotkeys.buyKeys : settings?.hotkeys.sellKeys;
-  const totals = scope.reduce(
-    (t, w) => {
-      const b = balances[w.address];
-      return b ? { sol: t.sol + b.nativeRaw, tok: t.tok + b.tokenRaw } : t;
-    },
-    { sol: 0n, tok: 0n },
+  const totalTokens = scope.reduce(
+    (t, w) => t + (balances[w.address] ?? 0n),
+    0n,
   );
   return (
     <section
@@ -408,8 +399,8 @@ export function InstantTradePanel({
                   {w.role === 'Deployer' && <em> dev</em>}
                 </label>
                 <small>
-                  {b
-                    ? `${rawToDecimal(b.nativeRaw, 9)} SOL · ${rawToDecimal(b.tokenRaw, token.decimals)}`
+                  {b !== undefined
+                    ? `${rawToDecimal(b, token.decimals)} ${token.symbol}`
                     : '—'}
                 </small>
               </li>
@@ -419,14 +410,15 @@ export function InstantTradePanel({
         <button
           type="button"
           disabled={!scope.length}
-          onClick={() => void refreshBalances()}
+          onClick={() => void refreshBalances().catch(() => {})}
         >
           Refresh balances
         </button>
+        {balanceError && <small role="alert">{balanceError}</small>}
         {scope.length > 0 && (
           <small>
-            Selected: {scope.length} · {rawToDecimal(totals.sol, 9)} SOL ·{' '}
-            {rawToDecimal(totals.tok, token.decimals)} {token.symbol}
+            Selected: {scope.length} ·{' '}
+            {rawToDecimal(totalTokens, token.decimals)} {token.symbol}
           </small>
         )}
       </fieldset>

@@ -4,6 +4,7 @@ import {
   executeAcrossWallets,
   executeImportedTrade,
   percentOfBalance,
+  readGroupTokenBalances,
   readTradeWalletBalance,
   SOL_MINT,
   TradeUncertainError,
@@ -278,5 +279,53 @@ describe('createRotatingTrader', () => {
       t2(100000000n, new AbortController().signal),
     ).rejects.toBeInstanceOf(TradeUncertainError);
     expect(s2.calls.filter((x) => x.url.endsWith('/prepare'))).toHaveLength(1);
+  });
+});
+
+describe('readGroupTokenBalances', () => {
+  it('reads 25 wallets per gated call and waits out a 429', async () => {
+    const wallets = Array.from({ length: 30 }, (_, i) => ({
+      address: `w${i}`,
+      revision: 1,
+    }));
+    let calls = 0;
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      calls++;
+      if (calls === 2) return ok({ error: 'Wait 15 seconds' }, 429);
+      const body = JSON.parse(init.body as string);
+      return ok({
+        id: 'p1',
+        mint: MINT,
+        items: body.wallets.map((w: { address: string }) => ({
+          wallet: w.address,
+          observation: { unfrozenRaw: '7' },
+        })),
+      });
+    }) as unknown as typeof fetch;
+    const sleep = vi.fn(async () => {});
+    const out = await readGroupTokenBalances(
+      { projectId: 'p1', projectRevision: 2, mint: MINT, fetcher, sleep },
+      wallets,
+      new AbortController().signal,
+    );
+    expect(Object.keys(out)).toHaveLength(30);
+    expect(out.w29).toBe(7n);
+    expect(sleep).toHaveBeenCalledWith(15250, expect.anything());
+  });
+  it('rejects a response for other wallets', async () => {
+    const fetcher = vi.fn(async () =>
+      ok({
+        id: 'p1',
+        mint: MINT,
+        items: [{ wallet: 'other', observation: { unfrozenRaw: '1' } }],
+      }),
+    ) as unknown as typeof fetch;
+    await expect(
+      readGroupTokenBalances(
+        { projectId: 'p1', projectRevision: 2, mint: MINT, fetcher },
+        [{ address: 'w', revision: 1 }],
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow(/match/);
   });
 });
