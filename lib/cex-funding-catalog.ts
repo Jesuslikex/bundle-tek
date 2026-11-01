@@ -34,6 +34,10 @@ export const CEX_FUNDING_FALLBACK_SOURCES: readonly CexFundingSource[] =
     },
   ]);
 
+export const CEX_FUNDING_IDS: readonly string[] = Object.freeze(
+  CEX_FUNDING_FALLBACK_SOURCES.map((source) => source.id),
+);
+
 // Funding stores a single free-text source label, so the picker writes the
 // chosen names into it rather than needing a new field.
 export function cexSourcesLabel(

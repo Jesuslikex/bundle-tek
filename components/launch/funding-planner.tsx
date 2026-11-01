@@ -390,9 +390,13 @@ export function FundingPlanner({
           Source type
           <select
             value={draft.source}
-            onChange={(e) =>
-              change({ source: e.target.value as FundingInput['source'] })
-            }
+            onChange={(e) => {
+              const source = e.target.value as FundingInput['source'];
+              // Ids only mean anything for a CEX source; the label stays.
+              change(
+                source === 'CEX' ? { source } : { source, cexSources: [] },
+              );
+            }}
           >
             {['Manual', 'Wallet', 'CEX'].map((s) => (
               <option key={s}>{s}</option>
@@ -429,9 +433,11 @@ export function FundingPlanner({
         {cexOpen && (
           <CexFundingSourcesDialog
             sources={CEX_FUNDING_FALLBACK_SOURCES}
-            selected={cexIdsFromLabel(draft.sourceLabel)}
+            selected={draft.cexSources ?? cexIdsFromLabel(draft.sourceLabel)}
             onClose={() => setCexOpen(false)}
-            onChange={(ids) => change({ sourceLabel: cexSourcesLabel(ids) })}
+            onChange={(ids) =>
+              change({ cexSources: ids, sourceLabel: cexSourcesLabel(ids) })
+            }
             onConfirm={() => setCexOpen(false)}
           />
         )}

@@ -1,6 +1,7 @@
 import { chainQuoteAssets } from './quote-catalog';
 import bs58 from 'bs58';
 import { CHAINS, CURRENCIES_BY_CHAIN, type LaunchChain } from './launch-plan';
+import { CEX_FUNDING_IDS } from './cex-funding-catalog';
 
 export type FundingInput = {
   name: string;
@@ -9,6 +10,8 @@ export type FundingInput = {
   assetAddress?: string;
   source: 'Wallet' | 'CEX' | 'Manual';
   sourceLabel: string;
+  // Captured CEX ids backing a 'CEX' source. The label stays the display text.
+  cexSources?: string[];
   funderAddress: string;
   startAt: string;
   delaySeconds: number;
@@ -59,6 +62,24 @@ function decimal(atoms: bigint, decimals: number) {
   const fraction = padded.slice(-decimals).replace(/0+$/, '');
   return padded.slice(0, -decimals) + (fraction ? '.' + fraction : '');
 }
+// Captured CEX ids are optional and only meaningful for a CEX source. Unknown
+// ids and duplicates are refused rather than silently dropped, so a stored
+// selection always matches what the picker could have produced.
+export function parseCexSources(value: unknown, source: string) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new Error('Invalid CEX sources.');
+  const ids = value as unknown[];
+  if (ids.length > CEX_FUNDING_IDS.length)
+    throw new Error('Too many CEX sources.');
+  for (const id of ids)
+    if (typeof id !== 'string' || !CEX_FUNDING_IDS.includes(id))
+      throw new Error('Unknown CEX source.');
+  if (new Set(ids).size !== ids.length)
+    throw new Error('CEX sources must be unique.');
+  // A non-CEX source keeps no ids.
+  return source === 'CEX' ? (ids as string[]) : [];
+}
+
 export function validateFunding(value: unknown): FundingDocument {
   if (!value || typeof value !== 'object')
     throw new Error('Invalid funding plan.');
@@ -90,6 +111,7 @@ export function validateFunding(value: unknown): FundingDocument {
     v.sourceLabel.length > 80
   )
     throw new Error('Invalid funding source. Use a label only.');
+  const cexSources = parseCexSources(v.cexSources, v.source);
   if (typeof v.funderAddress !== 'string')
     throw new Error('Invalid funder address.');
   const funderAddress = v.funderAddress.trim()
@@ -182,6 +204,7 @@ export function validateFunding(value: unknown): FundingDocument {
     ...(asset ? { assetAddress: asset.address } : {}),
     source: v.source,
     sourceLabel: v.sourceLabel.trim(),
+    ...(cexSources.length ? { cexSources } : {}),
     funderAddress,
     startAt: v.startAt,
     delaySeconds: v.delaySeconds,
