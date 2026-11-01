@@ -57,6 +57,7 @@ import { WalletWarmupEntry } from '@/components/wallet-warmup-entry';
 import { WalletTableSettingsDialog } from '@/components/wallet-table-settings';
 import { WalletDeleteDialog } from '@/components/wallet-delete-dialog';
 import { withdrawWalletTo } from '@/lib/wallet-withdraw';
+import { VolumeBotLauncher } from '@/components/volume-bot-launcher';
 import {
   DEFAULT_WALLET_TABLE_SETTINGS,
   WALLET_TABLE_SETTINGS_KEY,
@@ -169,6 +170,7 @@ export function WalletWorkspace({
   const [warmupOpen, setWarmupOpen] = useState(false);
   const [initialWarmup, setInitialWarmup] = useState<SavedWarmup | null>(null);
   const [tableSettingsOpen, setTableSettingsOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   // One wallet from a row, or the whole selection from the bulk bar.
   const [deletingWallets, setDeletingWallets] = useState<{
     wallets: { address: string; revision: number }[];
@@ -515,7 +517,7 @@ export function WalletWorkspace({
 
     setError('');
 
-    setNotice('Refreshing native balancesÃ¢â‚¬Â¦');
+    setNotice('Refreshing native balancesÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦');
 
     try {
       const response = await fetch('/api/wallet-workspace/balances', {
@@ -1018,8 +1020,8 @@ export function WalletWorkspace({
                   (archived ? 'Archived wallets' : 'All wallets')}
               </h2>
               <small>
-                {rows.length} {rows.length === 1 ? 'address' : 'addresses'} Ã‚Â·{' '}
-                {chain}
+                {rows.length} {rows.length === 1 ? 'address' : 'addresses'}{' '}
+                ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {chain}
               </small>
             </div>
           </div>
@@ -1499,8 +1501,8 @@ export function WalletWorkspace({
           <div className="wallet-balance-summary">
             <div>
               <small>
-                {picks.length ? 'SELECTED WALLETS' : 'CURRENT PAGE'} Ã‚Â· NATIVE
-                BALANCE
+                {picks.length ? 'SELECTED WALLETS' : 'CURRENT PAGE'}{' '}
+                ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· NATIVE BALANCE
               </small>
               <strong>
                 {combined
@@ -1509,7 +1511,7 @@ export function WalletWorkspace({
               </strong>
               <p>
                 {combined
-                  ? `${combined.count} ${combined.count === 1 ? 'address' : 'addresses'} Ã‚Â· ${chain === 'Solana' ? 'slot' : 'block'} ${combined.blockNumber} Ã‚Â· ${combined.commitment} Ã‚Â· observed ${new Date(combined.observedAt).toLocaleString()}`
+                  ? `${combined.count} ${combined.count === 1 ? 'address' : 'addresses'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${chain === 'Solana' ? 'slot' : 'block'} ${combined.blockNumber} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${combined.commitment} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· observed ${new Date(combined.observedAt).toLocaleString()}`
                   : 'Refresh balances or change the selection to load a snapshot.'}
               </p>
               <small>
@@ -1595,6 +1597,13 @@ export function WalletWorkspace({
                   'Wallets archived.',
                 )
               }
+            />
+          )}
+          {activityOpen && (
+            <VolumeBotLauncher
+              wallets={data.wallets}
+              locked={busy}
+              onClose={() => setActivityOpen(false)}
             />
           )}
           {warmupOpen &&
@@ -1728,8 +1737,8 @@ export function WalletWorkspace({
               </select>
             </label>
             <output>
-              {rows.length} matching wallets Ã‚Â· page {pageIndex + 1} of{' '}
-              {pageCount}. Showing {pageRows.length}.
+              {rows.length} matching wallets ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· page{' '}
+              {pageIndex + 1} of {pageCount}. Showing {pageRows.length}.
             </output>
             <small>
               Selection persists across pages, up to 500 wallets. Sorting uses
@@ -1886,12 +1895,12 @@ export function WalletWorkspace({
                       )}
                       <code title={w.address}>{w.address}</code>
                       <small className="wallet-row-meta">
-                        {w.role} Ã‚Â·{' '}
+                        {w.role} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·{' '}
                         {folders
                           .filter((f) => walletFolderIds(w).includes(f.id))
                           .map((f) => f.name)
                           .join(', ') || 'No folder'}
-                        {' Ã‚Â· '}
+                        {' ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· '}
                         {proofs.has(w.address) ? (
                           <span
                             className="wallet-signature-verified"
@@ -1913,7 +1922,7 @@ export function WalletWorkspace({
                               {balances.get(w.address)!.currency}
                             </strong>
                             <small
-                              title={`${balances.get(w.address)!.source} Ã‚Â· ${chain === 'Solana' ? 'slot' : 'block'} ${balances.get(w.address)!.blockNumber}${balances.get(w.address)!.blockHash ? ` Ã‚Â· ${balances.get(w.address)!.blockHash}` : ''}`}
+                              title={`${balances.get(w.address)!.source} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${chain === 'Solana' ? 'slot' : 'block'} ${balances.get(w.address)!.blockNumber}${balances.get(w.address)!.blockHash ? ` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${balances.get(w.address)!.blockHash}` : ''}`}
                             >
                               Observed{' '}
                               {new Date(
@@ -2028,14 +2037,15 @@ export function WalletWorkspace({
                           disabled={busy || loading || w.archived}
                           aria-label={
                             // The reference's equivalent action opens a fake
-                            // volume session; this one opens warm-up, so say so.
-                            'Warm-up activity for ' + (w.label || w.address)
+                            // volume session, so lead with volume and keep the
+                            // warm-up shortcut on the title.
+                            'Generate activity for ' + (w.label || w.address)
                           }
-                          title="Opens the warm-up plan, not the volume bot."
+                          title="Pick an imported token to generate volume on."
                           onClick={() => {
                             setQuery('');
                             setSelected([w.address]);
-                            setWarmupOpen(true);
+                            setActivityOpen(true);
                           }}
                         >
                           <Sparkles size={9} aria-hidden />
@@ -2095,7 +2105,7 @@ export function WalletWorkspace({
               <Folder />
               <h3>
                 {loading
-                  ? 'Loading walletsÃ¢â‚¬Â¦'
+                  ? 'Loading walletsÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦'
                   : query
                     ? 'No matching wallets'
                     : archived

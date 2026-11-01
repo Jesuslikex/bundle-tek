@@ -6308,6 +6308,53 @@ td.wallet-row-actions-cell {
   background: var(--accent, #6ea8fe);
 }
 
+.volume-launcher-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.volume-launcher-note {
+  margin: 0 0 10px;
+  color: var(--mute);
+  font-size: 0.8rem;
+}
+
+.volume-launcher-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 40vh;
+  overflow: auto;
+  display: grid;
+  gap: 2px;
+}
+
+.volume-launcher-list button {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.volume-launcher-list button:hover {
+  border-color: var(--border);
+}
+
+.volume-launcher-list code {
+  font-size: 0.7rem;
+  color: var(--mute);
+}
+
 .wallet-table-settings-fixed {
   font-size: 0.72rem;
   color: var(--mute);
