@@ -1,5 +1,17 @@
 # Google consent release handoff
 
+## Completion evidence
+
+PR75 merged as e10f0be3965990ef376ce6c4c7705983adc3f27b. Claude was the sole deploy owner, explicitly tasked with committed e10f0be. Vercel deployment dpl_53ojPfwjgVu71uKGpjjajWaULDS9 is READY and aliases bundle-tek.vercel.app. Its API metadata has no Git source SHA, so source attribution relies on Claude's release evidence rather than READY alone.
+
+Google now visibly shows In Production / External after Julian approved the final publication confirmation. The saved homepage is /about and privacy URL /privacy. Independent production HTTP checks: /about, /privacy and /sign-in 200, signed-out /api/launch/pump/groups 401. Google button rendered.
+
+Actual existing Chrome flow reached Google's account/identity consent with exact production callback, PKCE S256 and only openid, email, profile scopes. Julian approved the first sign-in as the project owner's Google identity; the existing tab returned to the production dashboard showing JulianDerChiller1995, Google linked and Sign out. This verifies a completed real Google session, not just a visible button. No wallet unlock, signing, transaction submission or funded testing occurred.
+
+Signed-in screenshot retained in ignored work/google-signed-in-production.png; Google production status in work/google-production.png. No secret, session cookie, authorization code or OAuth state saved in this handoff. Final result sent directly to the existing Claude release thread. The public-page claim is complete; follow-up auth policy, dependency-security work, 2FA and migration0163 remain separate.
+
+The sections below retain the pre-release plan and validation history; their Testing/pending language describes that earlier checkpoint.
+
 1 November 2026. Codex owns this bounded change; existing Claude Opus release thread is the sole deploy owner. Base origin/main: 1d30b4b. Primary Desktop/Bundle dirty files preserved; separate codex/google-consent-20261101 worktree.
 
 ## Configuration completed
