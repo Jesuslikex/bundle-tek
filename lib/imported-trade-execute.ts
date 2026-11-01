@@ -380,3 +380,39 @@ export function percentOfBalance(balanceRaw: bigint, percent: string) {
   if (units <= 0n) throw new Error('Use a percent from 0.0001 to 100.');
   return (balanceRaw * units) / 1_000_000n;
 }
+
+/**
+ * Trades from the selected wallets in rotation. A wallet that fails before
+ * signing is skipped for the next one; a signed trade is never retried.
+ */
+export function createRotatingTrader(
+  ctx: ImportedTradeContext,
+  wallets: TradeWallet[],
+  side: TradeSide,
+) {
+  let next = 0;
+  return async (inputRaw: bigint, signal: AbortSignal) => {
+    if (!wallets.length) throw new Error('No wallets selected.');
+    const errors: string[] = [];
+    for (let i = 0; i < wallets.length; i++) {
+      const wallet = wallets[(next + i) % wallets.length];
+      try {
+        const r = await executeImportedTrade(
+          ctx,
+          wallet,
+          side,
+          inputRaw,
+          signal,
+        );
+        next = (next + i + 1) % wallets.length;
+        return r;
+      } catch (error) {
+        if (signal.aborted || error instanceof TradeUncertainError) throw error;
+        errors.push(
+          `${wallet.address.slice(0, 4)}…: ${error instanceof Error ? error.message : 'failed'}`,
+        );
+      }
+    }
+    throw new Error(errors.join(' · '));
+  };
+}

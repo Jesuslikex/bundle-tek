@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  createRotatingTrader,
   executeAcrossWallets,
   executeImportedTrade,
   percentOfBalance,
@@ -246,4 +247,36 @@ it('percentOfBalance handles 4 decimals and bounds', () => {
   expect(percentOfBalance(1000000n, '100')).toBe(1000000n);
   expect(() => percentOfBalance(1n, '101')).toThrow();
   expect(() => percentOfBalance(1n, '0')).toThrow();
+});
+
+describe('createRotatingTrader', () => {
+  it('rotates wallets and falls through pre-sign failures but not signed ones', async () => {
+    const s = server('Buy');
+    const c = ctx(s);
+    const W2 = 'So11111111111111111111111111111111111111112';
+    const trader = createRotatingTrader(
+      c,
+      [
+        { address: W2, revision: 1 },
+        { address: W, revision: 1 },
+      ],
+      'Buy',
+    );
+    // W2's preparation mismatches the server's fixed wallet, so it falls through to W
+    const r = await trader(100000000n, new AbortController().signal);
+    expect(r.wallet).toBe(W);
+    const s2 = server('Buy', { submitFails: true });
+    const t2 = createRotatingTrader(
+      ctx(s2),
+      [
+        { address: W, revision: 1 },
+        { address: W2, revision: 1 },
+      ],
+      'Buy',
+    );
+    await expect(
+      t2(100000000n, new AbortController().signal),
+    ).rejects.toBeInstanceOf(TradeUncertainError);
+    expect(s2.calls.filter((x) => x.url.endsWith('/prepare'))).toHaveLength(1);
+  });
 });

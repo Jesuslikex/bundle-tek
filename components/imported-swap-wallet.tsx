@@ -3,6 +3,7 @@ import { subscribeImportedWalletReview } from '@/lib/imported-wallet-review-even
 import { ImportedTradeSessions } from './imported-trade-sessions';
 import { AutoSell } from './auto-sell-modal';
 import { InstantTradePanel } from './instant-trade-panel';
+import { AutoBuyPanel } from './auto-buy-panel';
 import { MarketCleanupPanel } from './market-cleanup-panel';
 import { ImportedPairTradeWalletReview } from './imported-pair-trade-wallet-review';
 import { subscribeImportedReceiptSaved } from '@/lib/imported-receipt-events';
@@ -418,6 +419,14 @@ export function ImportedSwapWallet({
           project={project}
           wallets={wallets}
           folders={folders}
+          locked={locked || saving}
+        />
+      )}
+      {!loading && project.document.token.chain === 'Solana' && (
+        <AutoBuyPanel
+          key={`auto-buy:${project.id}:${project.revision}`}
+          project={project}
+          wallets={wallets}
           locked={locked || saving}
         />
       )}
