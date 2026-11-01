@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, type RefObject } from 'react';
+import { useId, useState, type RefObject } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -13,8 +14,9 @@ import {
 
 // Captured Proxima asks "Are you sure you want to delete these wallets?" before
 // dropping funded wallets and warns that the action cannot be undone. Deletion
-// here archives the wallet, and nothing withdraws its funds, so the text says so
-// rather than borrowing the reference's "Withdraw and Delete" label.
+// here archives the wallet. Withdrawing inline is optional: the caller may offer
+// it, in which case the wallet is emptied first and only then archived, matching
+// the reference's withdraw-then-delete order.
 export function WalletDeleteDialog({
   label,
   count,
@@ -24,6 +26,7 @@ export function WalletDeleteDialog({
   onClose,
   onDelete,
   onWithdraw,
+  onWithdrawAndDelete,
 }: {
   label: string;
   count: number;
@@ -33,8 +36,18 @@ export function WalletDeleteDialog({
   onClose: () => void;
   onDelete: () => Promise<boolean>;
   onWithdraw?: () => void;
+  /** Empty the wallet to this address, then archive it. */
+  onWithdrawAndDelete?: (
+    destination: string,
+    password: string,
+  ) => Promise<boolean>;
 }) {
   const [submitted, setSubmitted] = useState(false);
+  const [destination, setDestination] = useState('');
+  const [password, setPassword] = useState('');
+  const id = useId();
+  const canWithdraw =
+    !!onWithdrawAndDelete && !!destination.trim() && !!password && !busy;
   return (
     <Dialog
       open
@@ -67,6 +80,49 @@ export function WalletDeleteDialog({
           Deleting does not withdraw anything. Funds stay in the wallet, so
           empty it first if these wallets still hold SOL or tokens.
         </p>
+        {onWithdrawAndDelete && count === 1 && (
+          <div className="wallet-delete-withdraw">
+            <label htmlFor={`${id}-destination`}>
+              Withdraw to public address
+              <Input
+                id={`${id}-destination`}
+                aria-label="Withdraw destination address"
+                value={destination}
+                disabled={busy}
+                onChange={(e) => setDestination(e.target.value)}
+              />
+            </label>
+            <label htmlFor={`${id}-password`}>
+              Vault password
+              <Input
+                id={`${id}-password`}
+                aria-label="Vault password"
+                type="password"
+                value={password}
+                disabled={busy}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+            <Button
+              variant="outline"
+              disabled={!canWithdraw}
+              onClick={() => {
+                if (!canWithdraw) return;
+                setSubmitted(true);
+                void onWithdrawAndDelete!(destination.trim(), password).then(
+                  (ok) => {
+                    if (ok) {
+                      setPassword('');
+                      onClose();
+                    }
+                  },
+                );
+              }}
+            >
+              Withdraw and delete
+            </Button>
+          </div>
+        )}
         {submitted && error && (
           <p role="alert" className="tracker-error">
             {error}

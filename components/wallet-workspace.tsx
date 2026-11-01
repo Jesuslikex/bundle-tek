@@ -56,6 +56,7 @@ import { WalletWarmup } from '@/components/wallet-warmup';
 import { WalletWarmupEntry } from '@/components/wallet-warmup-entry';
 import { WalletTableSettingsDialog } from '@/components/wallet-table-settings';
 import { WalletDeleteDialog } from '@/components/wallet-delete-dialog';
+import { withdrawWalletTo } from '@/lib/wallet-withdraw';
 import {
   DEFAULT_WALLET_TABLE_SETTINGS,
   WALLET_TABLE_SETTINGS_KEY,
@@ -1543,6 +1544,31 @@ export function WalletWorkspace({
               busy={busy}
               error={error}
               onClose={() => setDeletingWallet(null)}
+              onWithdrawAndDelete={async (destination, password) => {
+                // Empty first, archive only once the sweep is submitted.
+                try {
+                  await withdrawWalletTo({
+                    walletAddress: deletingWallet.address,
+                    destination,
+                    password,
+                  });
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'Withdraw failed.');
+                  return false;
+                }
+                return mutate(
+                  {
+                    action: 'wallet.archive',
+                    wallets: [
+                      {
+                        address: deletingWallet.address,
+                        revision: deletingWallet.revision,
+                      },
+                    ],
+                  },
+                  'Wallet withdrawn and archived.',
+                );
+              }}
               onWithdraw={() => {
                 // Cleanup already sweeps selected wallets to a destination, so
                 // hand off by selecting this one and closing the dialog.

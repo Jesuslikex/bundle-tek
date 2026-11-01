@@ -126,3 +126,72 @@ it('offers the withdraw handoff without deleting', async () => {
   expect(onWithdraw).toHaveBeenCalledTimes(1);
   expect(onDelete).not.toHaveBeenCalled();
 });
+
+const typeInto = async (input: HTMLInputElement, value: string) =>
+  act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+const field = (label: string) =>
+  document.body.querySelector<HTMLInputElement>(`[aria-label="${label}"]`);
+
+it('shows the withdraw fields only when the caller supports them', async () => {
+  await render({});
+  expect(field('Withdraw destination address')).toBeNull();
+  await render({ onWithdrawAndDelete: async () => true });
+  expect(field('Withdraw destination address')).not.toBeNull();
+  expect(field('Vault password')).not.toBeNull();
+});
+
+it('hides the inline withdraw for a batch', async () => {
+  await render({ count: 3, onWithdrawAndDelete: async () => true });
+  expect(field('Withdraw destination address')).toBeNull();
+});
+
+it('blocks Withdraw and delete until both fields are filled', async () => {
+  await render({ onWithdrawAndDelete: async () => true });
+  const action = () =>
+    buttons().find((b) => b.textContent === 'Withdraw and delete')!;
+  expect((action() as HTMLButtonElement).disabled).toBe(true);
+  await typeInto(field('Withdraw destination address')!, 'buyer');
+  expect((action() as HTMLButtonElement).disabled).toBe(true);
+  await typeInto(field('Vault password')!, 'pw');
+  expect((action() as HTMLButtonElement).disabled).toBe(false);
+});
+
+it('withdraws to the trimmed destination then closes on success', async () => {
+  const onWithdrawAndDelete = vi.fn(async () => true);
+  const onClose = vi.fn();
+  const onDelete = vi.fn(async () => true);
+  await render({ onWithdrawAndDelete, onClose, onDelete });
+  await typeInto(field('Withdraw destination address')!, '  buyer  ');
+  await typeInto(field('Vault password')!, 'pw');
+  await act(async () => {
+    buttons()
+      .find((b) => b.textContent === 'Withdraw and delete')!
+      .click();
+    await Promise.resolve();
+  });
+  expect(onWithdrawAndDelete).toHaveBeenCalledWith('buyer', 'pw');
+  expect(onDelete).not.toHaveBeenCalled();
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+it('stays open when the withdraw fails', async () => {
+  const onWithdrawAndDelete = vi.fn(async () => false);
+  const onClose = vi.fn();
+  await render({ onWithdrawAndDelete, onClose });
+  await typeInto(field('Withdraw destination address')!, 'buyer');
+  await typeInto(field('Vault password')!, 'pw');
+  await act(async () => {
+    buttons()
+      .find((b) => b.textContent === 'Withdraw and delete')!
+      .click();
+    await Promise.resolve();
+  });
+  expect(onClose).not.toHaveBeenCalled();
+});
