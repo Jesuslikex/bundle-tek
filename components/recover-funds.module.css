@@ -1,0 +1,122 @@
+.panel {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 16px 64px;
+  color: var(--foreground, #fcfcfc);
+  display: grid;
+  gap: 16px;
+}
+.panel h1 {
+  font-size: 32px;
+  margin: 8px 0;
+  letter-spacing: -0.03em;
+}
+.panel header p {
+  color: #9a9dab;
+  line-height: 1.5;
+  margin: 0;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: #9a9dab;
+}
+.card {
+  border: 1px solid var(--border, #22242d);
+  background: var(--card, #18181f);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  overflow-x: auto;
+}
+.card small {
+  color: #9a9dab;
+  font-size: 12px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  min-width: 0;
+}
+.field input,
+.field select,
+.actions input {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: 6px;
+  background: var(--background, #101114);
+  color: inherit;
+}
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  min-height: 36px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.card button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: var(--bundle-button-radius, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.card button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 560px;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 8px 6px;
+  border-top: 1px solid var(--border, #22242d);
+  vertical-align: top;
+}
+.table td small {
+  display: block;
+}
+.table em {
+  color: #9a9dab;
+  font-size: 11px;
+}
+.error {
+  color: var(--bundle-danger, #ed3a7a);
+  margin: 0;
+}
+.log {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.footer {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
