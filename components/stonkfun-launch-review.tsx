@@ -319,13 +319,15 @@ function StonkfunLaunchReviewInner({ project, plan, releaseId }: Props) {
           {recipients.length > 0 && (
             <fieldset className="min-w-0 space-y-2">
               <legend>
-                Holder wallet buys in the same Jito bundle (optional, up to{' '}
-                {STONKFUN_BUNDLE_MAX_HOLDERS})
+                Front MEV: holder wallet buys in the same Jito bundle (optional,
+                up to {STONKFUN_BUNDLE_MAX_HOLDERS})
               </legend>
               <p className="source-note">
                 Each saved holder wallet buys right after the creation, in one
-                atomic Jito bundle: all transactions land together or none do.
-                Leave 0 to skip a wallet.
+                atomic Jito bundle: all transactions land together or none do,
+                so these are block-0 buys. They are your own team wallets and
+                their tokens show on chain as early holder supply. Leave 0 to
+                skip a wallet.
               </p>
               {recipients.map((r) => (
                 <label key={r.address} htmlFor={`${id}-holder-${r.address}`}>

@@ -123,7 +123,7 @@ it('offers saved holder wallets for a Jito bundle without any request', async ()
     ),
   );
   expect(container.textContent).toContain(
-    'Holder wallet buys in the same Jito bundle',
+    'Front MEV: holder wallet buys in the same Jito bundle',
   );
   expect(container.textContent).toContain('7xKX…gAsU buy (SPYX)');
   expect(container.textContent).toContain(
