@@ -1973,6 +1973,7 @@ export default function Home() {
                   validationError={planValidation.error}
                   onChange={updateLaunchPlan}
                   onNext={() => setView('distribution')}
+                  onOpenOperations={() => changeView('live')}
                   onOpenLaunchReview={
                     hasLaunchMetadataReview(launchPlan)
                       ? openLaunchReview
