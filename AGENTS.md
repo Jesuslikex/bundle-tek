@@ -410,3 +410,9 @@ Claude: no active PR27 claim after merge. Add a new claim before further impleme
 - Claude, 19 October 2026: Proxima-style launch picker (julian approved editing Codex launch files): new `components/launch/venue-mark.tsx`, `public/logos/*`, chain/venue cards in `components/launch/chain-launch-form.tsx`, `.venue-mark`/`.chain-card-*` rules in `app/ux.css`. Visual only, no migration or env var.
 - Claude, 19 October 2026: Proxima-style app shell and status-bar prices merged in PR #32/#33; claim released. Proposals for Codex-owned screens: `docs/CLAUDE-PROXIMA-LAYOUT-PROPOSALS-20261019.md`.
 - Claude, 19 October 2026: Base launch options (Bankr mode, dev buy, vault) completed in PR #28; claim released. Open follow-up for Codex/julian: mount `ClankerLaunchPanel venue="Bankr"` for `Base / Bankr` plans in `components/launch/live-operations-form.tsx` (exact line in the PR).
+
+## Google consent coordination, 1 November 2026
+
+Codex owns only app/privacy/page.tsx, app/privacy/privacy.module.css and docs/CODEX-GOOGLE-CONSENT-20261101.md on codex/google-consent-20261101. Claude Opus notified directly in existing parity thread. Existing Google credentials configured in Vercel Production, no values in Git. Homepage/consent audience and release coordination in progress. No auth rules, account linking, migrations or signing changes. Claude remains sole deploy owner; do not rotate credentials or bundle unreviewed migrations.
+
+`nThe same bounded consent claim also owns app/about/page.tsx as a public OAuth homepage linking the privacy notice. No protected shell or sign-in component edits.
