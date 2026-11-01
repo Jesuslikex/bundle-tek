@@ -26,6 +26,51 @@ it('opens an already imported coin without importing it again', async () => {
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 
+it('does not import or navigate after a cancelled list request completes late', async () => {
+  let finish!: (value: Response) => void;
+  const fetcher = vi.fn(
+    () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  const listener = vi.fn();
+  window.addEventListener(OPEN_IMPORTED_PROJECT_EVENT, listener);
+  const controller = new AbortController();
+  const pending = openLaunchChart('Mint', controller.signal);
+  controller.abort();
+  finish(Response.json({ projects: [] }));
+  await expect(pending).rejects.toThrow();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(listener).not.toHaveBeenCalled();
+  window.removeEventListener(OPEN_IMPORTED_PROJECT_EVENT, listener);
+});
+
+it('does not navigate after a cancelled import completes late', async () => {
+  let finish!: (value: Response) => void;
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ projects: [] }))
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+  vi.stubGlobal('fetch', fetcher);
+  const listener = vi.fn();
+  window.addEventListener(OPEN_IMPORTED_PROJECT_EVENT, listener);
+  const controller = new AbortController();
+  const pending = openLaunchChart('Mint', controller.signal);
+  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+  controller.abort();
+  finish(Response.json({ project: project('c', 'Mint') }));
+  await expect(pending).rejects.toThrow();
+  expect(listener).not.toHaveBeenCalled();
+  window.removeEventListener(OPEN_IMPORTED_PROJECT_EVENT, listener);
+});
+
 it('imports a new coin once and refuses a different token', async () => {
   const fetcher = vi
     .fn()
