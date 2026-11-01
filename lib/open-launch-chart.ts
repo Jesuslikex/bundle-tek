@@ -7,6 +7,19 @@ type Project = {
   document: { token: { chain: string; address: string } };
 };
 
+function matchesProject(value: unknown, mint: string): value is Project {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const project = value as Partial<Project>;
+  return (
+    typeof project.id === 'string' &&
+    project.id.length > 0 &&
+    project.id.length <= 128 &&
+    project.archived === false &&
+    project.document?.token?.chain === 'Solana' &&
+    project.document?.token?.address === mint
+  );
+}
+
 async function json(response: Response) {
   const value = (await response.json().catch(() => ({}))) as {
     error?: string;
@@ -26,12 +39,9 @@ export async function openLaunchChart(mint: string, signal?: AbortSignal) {
   const list = await json(
     await fetch('/api/imported-projects', { signal, cache: 'no-store' }),
   );
-  let project = list.projects?.find(
-    (p) =>
-      !p.archived &&
-      p.document.token.chain === 'Solana' &&
-      p.document.token.address === mint,
-  );
+  if (!Array.isArray(list.projects))
+    throw new Error('Imported projects could not be verified.');
+  let project = list.projects.find((p) => matchesProject(p, mint));
   if (!project) {
     const created = await json(
       await fetch('/api/imported-projects', {
@@ -46,7 +56,7 @@ export async function openLaunchChart(mint: string, signal?: AbortSignal) {
       }),
     );
     project = created.project;
-    if (!project || project.document.token.address !== mint)
+    if (!matchesProject(project, mint))
       throw new Error('Imported token differs from this launch.');
   }
   window.dispatchEvent(

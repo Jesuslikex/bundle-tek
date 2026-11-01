@@ -20,7 +20,7 @@ export function OpenLaunchChartButton({ mint }: { mint: string }) {
           openLaunchChart(mint)
             .then(() =>
               setNote(
-                'Opening the chart. You can also find this coin under Imports.',
+                'Chart import is ready. Confirm any navigation prompt to open it, or find it under Imports.',
               ),
             )
             .catch((e: unknown) =>

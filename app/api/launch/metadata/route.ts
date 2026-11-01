@@ -2,8 +2,11 @@ import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getD1 } from '@/db';
 import {
   MetadataReleaseError,
+  launchMetadataReleaseId,
   releaseLaunchMetadata,
 } from '@/lib/launch-metadata-release';
+import { validateProjectDocument } from '@/lib/workspace-project';
+import { verifyReleasedLaunchIdentity } from '@/lib/released-launch-identity';
 
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) =>
@@ -11,6 +14,84 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { 'cache-control': 'no-store' },
   });
+
+/** Recover only a release matching the current owned, saved identity. */
+export async function GET(request: Request) {
+  const user = await getChatGPTUser();
+  if (!user) return json({ error: 'Sign in to recover metadata.' }, 401);
+  const url = new URL(request.url);
+  if (
+    [...url.searchParams.keys()].sort().join(',') !== 'projectId,updatedAt' ||
+    !url.searchParams.get('projectId') ||
+    url.searchParams.get('projectId')!.length > 128 ||
+    !Number.isFinite(Date.parse(url.searchParams.get('updatedAt') || ''))
+  )
+    return json({ error: 'Choose a saved project.' }, 400);
+  try {
+    const db = getD1(),
+      projectId = url.searchParams.get('projectId')!,
+      updatedAt = url.searchParams.get('updatedAt')!;
+    const project = await db
+      .prepare(
+        'SELECT document FROM workspace_projects WHERE owner_id=? AND id=? AND updated_at=? AND archived=0',
+      )
+      .bind(user.userId, projectId, updatedAt)
+      .first<{ document: string }>();
+    if (!project) return json({ release: null });
+    const doc = validateProjectDocument(JSON.parse(project.document));
+    let id: string;
+    try {
+      id = await launchMetadataReleaseId(
+        user.userId,
+        projectId,
+        url.origin,
+        doc,
+      );
+    } catch (error) {
+      if (error instanceof MetadataReleaseError) return json({ release: null });
+      throw error;
+    }
+    const row = await db
+      .prepare(`SELECT r.source_document,r.metadata,r.image,r.mime FROM launch_metadata_releases r
+      JOIN workspace_projects p ON p.owner_id=r.owner_id AND p.id=r.project_id
+      WHERE r.id=? AND p.owner_id=? AND p.id=? AND p.updated_at=? AND p.archived=0 AND p.document=?`)
+      .bind(id, user.userId, projectId, updatedAt, project.document)
+      .first<{
+        source_document: string;
+        metadata: string;
+        image: number[];
+        mime: string;
+      }>();
+    if (!row) return json({ release: null });
+    const { uri } = await verifyReleasedLaunchIdentity(
+      doc,
+      row,
+      url.origin,
+      id,
+    );
+    const current = await db
+      .prepare(
+        'SELECT 1 AS found FROM workspace_projects WHERE owner_id=? AND id=? AND updated_at=? AND archived=0 AND document=?',
+      )
+      .bind(user.userId, projectId, updatedAt, project.document)
+      .first<{ found: number }>();
+    if (!current)
+      return json(
+        { error: 'The saved project changed. Reload and review it again.' },
+        409,
+      );
+    return json({
+      release: {
+        id,
+        uri,
+        metadata: JSON.parse(row.metadata),
+        executionAllowed: false,
+      },
+    });
+  } catch {
+    return json({ error: 'Published metadata could not be recovered.' }, 503);
+  }
+}
 
 export async function POST(request: Request) {
   const user = await getChatGPTUser();

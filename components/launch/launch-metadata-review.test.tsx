@@ -85,6 +85,47 @@ it('shows the saved public identity with explicit unchecked consent and makes no
   );
   expect(fetcher).not.toHaveBeenCalled();
 });
+it('recovers the exact published metadata after remount without publishing or granting consent', async () => {
+  fetcher.mockResolvedValue(Response.json({ release: result() }));
+  render();
+  await act(async () => {
+    [...container.querySelectorAll('button')]
+      .find((b) => b.textContent === 'Recover published metadata')!
+      .click();
+  });
+  expect(fetcher).toHaveBeenCalledOnce();
+  expect(fetcher.mock.calls[0][0]).toContain('projectId=project-a');
+  expect(fetcher.mock.calls[0][1].method).toBeUndefined();
+  expect(container.textContent).toContain('Metadata published.');
+  expect(container.querySelector('a')!.href).toBe(result().uri);
+  render({ identity: { ...identity, website: 'https://changed.test' } });
+  expect(container.textContent).not.toContain('Metadata published.');
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+});
+
+it('refuses a recovered release for a different identity', async () => {
+  fetcher.mockResolvedValue(
+    Response.json({
+      release: {
+        ...result(),
+        metadata: { ...result().metadata, symbol: 'OTHER' },
+      },
+    }),
+  );
+  render();
+  await act(async () => {
+    [...container.querySelectorAll('button')]
+      .find((b) => b.textContent === 'Recover published metadata')!
+      .click();
+  });
+  expect(container.textContent).toContain('could not be verified');
+  expect(container.textContent).not.toContain('Metadata published.');
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+});
 it('requires saved clean context and allows an explicit save instead of publication', () => {
   render({ project: null });
   expect(container.querySelector('input')).toBeNull();

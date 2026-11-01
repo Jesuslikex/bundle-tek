@@ -42,3 +42,23 @@ it('imports a new coin once and refuses a different token', async () => {
   });
   await expect(openLaunchChart('Mint')).rejects.toThrow(/differs/);
 });
+
+it('refuses malformed project lists and an imported result from another chain', async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({}))
+    .mockResolvedValueOnce(Response.json({ projects: [] }))
+    .mockResolvedValueOnce(
+      Response.json({
+        project: {
+          ...project('c', 'Mint'),
+          document: { token: { chain: 'Base', address: 'Mint' } },
+        },
+      }),
+    );
+  vi.stubGlobal('fetch', fetcher);
+  await expect(openLaunchChart('Mint')).rejects.toThrow(
+    /could not be verified/,
+  );
+  await expect(openLaunchChart('Mint')).rejects.toThrow(/differs/);
+});

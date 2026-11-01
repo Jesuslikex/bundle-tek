@@ -1,5 +1,7 @@
 'use client';
 import { OPEN_IMPORTED_PROJECT_EVENT } from '@/lib/open-launch-chart';
+import { hasLaunchMetadataReview } from '@/lib/launch-review-availability';
+import { useLaunchReviewReturn } from '@/components/launch/use-launch-review-return';
 import type { NarrativeDraft } from '@/lib/narratives';
 import {
   validateHoldersQuoteAmount,
@@ -1249,6 +1251,8 @@ export default function Home() {
     setMobileNav(false);
   };
 
+  const openLaunchReview = useLaunchReviewReturn(view, changeView);
+
   const guardDraft = (action: () => void) => {
     if (saveBusy) return;
     if (hasEdits) setPendingNavigation(() => action);
@@ -1393,7 +1397,7 @@ export default function Home() {
   useEffect(() => {
     const open = (event: Event) => {
       const id = (event as CustomEvent<{ id?: unknown }>).detail?.id;
-      if (typeof id === 'string') openImportedProject(id);
+      if (typeof id === 'string') guardDraft(() => openImportedProject(id));
     };
     window.addEventListener(OPEN_IMPORTED_PROJECT_EVENT, open);
     return () => window.removeEventListener(OPEN_IMPORTED_PROJECT_EVENT, open);
@@ -1969,6 +1973,11 @@ export default function Home() {
                   validationError={planValidation.error}
                   onChange={updateLaunchPlan}
                   onNext={() => setView('distribution')}
+                  onOpenLaunchReview={
+                    hasLaunchMetadataReview(launchPlan)
+                      ? openLaunchReview
+                      : undefined
+                  }
                 />
               ) : view === 'live' ? (
                 <LiveOperationsForm
@@ -2204,6 +2213,11 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="launch-action-bar">
+                    {hasLaunchMetadataReview(launchPlan) && (
+                      <Button variant="outline" onClick={openLaunchReview}>
+                        Open launch review
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       disabled={saveBusy}

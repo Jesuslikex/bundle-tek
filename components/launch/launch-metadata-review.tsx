@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { isUploadedArtwork } from '@/lib/artwork';
+import { hasLaunchMetadataReview } from '@/lib/launch-review-availability';
 import type { LaunchPlanInput } from '@/lib/launch-plan';
 import type { TokenIdentity, ProjectDocument } from '@/lib/workspace-project';
 import { readPanelJson } from '@/components/read-panel-json';
@@ -12,10 +13,7 @@ import { ImportedLayerPlanning } from './imported-layer-planning';
 import { StonkfunLaunchReview } from '@/components/stonkfun-launch-review';
 import { LaunchLabLaunchReview } from '@/components/launchlab-launch-review';
 import { MeteoraDbcLaunchReview } from '@/components/meteora-dbc-launch-review';
-import {
-  LAUNCHLAB_VENUES,
-  isLaunchLabVenue,
-} from '@/lib/launchlab-platform-launch';
+import { isLaunchLabVenue } from '@/lib/launchlab-platform-launch';
 
 export type MetadataProject = {
   document?: ProjectDocument;
@@ -60,6 +58,70 @@ function SavedMetadataReview({
     [],
   );
   const artworkReady = isUploadedArtwork(identity.artworkUrl);
+  function checkedUri(body: unknown) {
+    const id = isRecord(body) && typeof body.id === 'string' ? body.id : '';
+    const expected = `${window.location.origin}/api/launch/metadata/${id}`;
+    if (
+      !isRecord(body) ||
+      !/^[a-f0-9]{64}$/.test(id) ||
+      body.uri !== expected ||
+      body.executionAllowed !== false ||
+      !isRecord(body.metadata) ||
+      body.metadata.name !== plan.tokenName ||
+      body.metadata.symbol !== plan.ticker ||
+      body.metadata.description !== plan.description ||
+      body.metadata.image !== `${expected}/image` ||
+      ['website', 'twitter', 'telegram'].some(
+        (key) =>
+          (body.metadata as Record<string, unknown>)[key] !==
+          (identity[key as 'website'] || undefined),
+      )
+    )
+      throw new Error(interrupted);
+    return expected;
+  }
+  async function recover() {
+    if (!project || busy || saving || pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({
+        projectId: project.id,
+        updatedAt: project.updatedAt,
+      });
+      const response = await fetch(`/api/launch/metadata?${params}`, {
+        cache: 'no-store',
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(10000),
+        ]),
+      });
+      const body: unknown = await readPanelJson(
+        response,
+        'Unable to recover metadata.',
+      );
+      if (pending.current !== controller || controller.signal.aborted) return;
+      if (!response.ok || !isRecord(body))
+        throw new Error('Unable to recover metadata.');
+      if (body.release === null) {
+        setError(
+          'No published metadata matches this saved version. Review and publish it if needed.',
+        );
+      } else {
+        setUri(checkedUri(body.release));
+      }
+    } catch {
+      if (pending.current === controller && !controller.signal.aborted)
+        setError('Published metadata could not be verified. Try again.');
+    } finally {
+      if (pending.current === controller) {
+        pending.current = null;
+        setBusy(false);
+      }
+    }
+  }
   async function publish() {
     if (
       !project ||
@@ -112,27 +174,7 @@ function SavedMetadataReview({
                 : interrupted,
         );
       }
-      const id = isRecord(body) && typeof body.id === 'string' ? body.id : '';
-      const expected = `${window.location.origin}/api/launch/metadata/${id}`;
-      if (
-        !isRecord(body) ||
-        !/^[a-f0-9]{64}$/.test(id) ||
-        body.uri !== expected ||
-        body.executionAllowed !== false ||
-        !isRecord(body.metadata) ||
-        body.metadata.name !== plan.tokenName ||
-        body.metadata.symbol !== plan.ticker ||
-        body.metadata.description !== plan.description ||
-        body.metadata.image !== `${expected}/image` ||
-        ['website', 'twitter', 'telegram'].some(
-          (key) =>
-            body.metadata &&
-            (body.metadata as Record<string, unknown>)[key] !==
-              (identity[key as 'website'] || undefined),
-        )
-      )
-        throw new Error(interrupted);
-      setUri(expected);
+      setUri(checkedUri(body));
     } catch (cause) {
       if (pending.current === controller)
         setError(
@@ -230,6 +272,14 @@ function SavedMetadataReview({
             </p>
             {!uri && (
               <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || saving}
+                  onClick={() => void recover()}
+                >
+                  Recover published metadata
+                </Button>
                 <label
                   style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}
                 >
@@ -330,13 +380,7 @@ function SavedMetadataReview({
 }
 
 export function LaunchMetadataReview(props: Props) {
-  if (
-    props.plan.chain !== 'Solana' ||
-    !['PumpFun', 'StonkFun', 'Meteora DBC', ...LAUNCHLAB_VENUES].includes(
-      props.plan.launchpad,
-    )
-  )
-    return null;
+  if (!hasLaunchMetadataReview(props.plan)) return null;
   // Consent, outstanding responses and links belong only to this exact draft.
   const context = JSON.stringify([
     props.project,
