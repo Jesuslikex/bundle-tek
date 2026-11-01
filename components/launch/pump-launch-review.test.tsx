@@ -418,6 +418,7 @@ it('routes a holder plan to the complete holder flow instead of omitting its buy
     ),
   );
   expect(container.textContent).toContain('Create coin with holder buys');
+  expect(container.textContent).toContain('lands in block 0');
   expect(
     container.querySelector('[aria-label="Saved launch recovery"]'),
   ).not.toBeNull();

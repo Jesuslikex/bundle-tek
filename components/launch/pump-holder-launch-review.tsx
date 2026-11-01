@@ -725,6 +725,11 @@ function PumpHolderLaunchReviewContent({
   return (
     <section aria-label="PumpFun holder launch review" className={styles.panel}>
       <h3>Create coin with holder buys</h3>
+      <p className="source-note">
+        Front MEV: every holder buy below is signed into the same creation
+        packet, so it lands in block 0 with the coin. These are your own team
+        wallets and their tokens show on chain as early holder supply.
+      </p>
       <ol aria-label="Holder launch steps" className={styles.steps}>
         {steps.map((step, index) => (
           <li
