@@ -25,6 +25,7 @@ export function FundingForm({
   onChange,
   onNext,
   onOpenLaunchReview,
+  onOpenOperations,
   launchWallets,
 }: {
   plan: LaunchPlanInput;
@@ -33,6 +34,7 @@ export function FundingForm({
   onChange: (change: Partial<LaunchPlanInput>) => void;
   onNext: () => void;
   onOpenLaunchReview?: () => void;
+  onOpenOperations?: () => void;
   launchWallets?: LaunchWalletAssignments;
 }) {
   const updateSafety = (change: Partial<SimulationSafetyPolicy>) =>
@@ -133,6 +135,15 @@ export function FundingForm({
                 Operations. This page&apos;s wallet verification tool uses
                 Solana devnet.
               </small>
+              {onOpenOperations && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onOpenOperations}
+                >
+                  Open Operations preview
+                </Button>
+              )}
             </span>
           </div>
         )}
