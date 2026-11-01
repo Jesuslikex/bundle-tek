@@ -120,6 +120,60 @@ export function LaunchTimingForm({
               />
               <small>Estimated total cleanup duration.</small>
             </label>
+            <label htmlFor="plan-max-front-mev">
+              Max Front MEV wallets
+              <Input
+                id="plan-max-front-mev"
+                aria-label="Max Front MEV wallets"
+                type="number"
+                min={0}
+                step={1}
+                value={plan.maxFrontMevCount ?? ''}
+                onChange={(e) =>
+                  onChange({ maxFrontMevCount: optional(e.target.value) })
+                }
+              />
+              <small>
+                Left empty means uncapped. Taken from the mint when known.
+              </small>
+            </label>
+            <label htmlFor="plan-max-front-mev-post">
+              Max Front MEV after migration
+              <Input
+                id="plan-max-front-mev-post"
+                aria-label="Max Front MEV wallets after migration"
+                type="number"
+                min={0}
+                step={1}
+                value={plan.maxFrontMevPostMigration ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    maxFrontMevPostMigration: optional(e.target.value),
+                  })
+                }
+              />
+              <small>
+                Cap once the buy reaches the threshold. An explicit 0 lifts the
+                cap after migration.
+              </small>
+            </label>
+            <label htmlFor="plan-migration-threshold">
+              Migration threshold
+              <Input
+                id="plan-migration-threshold"
+                aria-label="Migration threshold"
+                type="number"
+                min={0}
+                step={1}
+                value={plan.migrationThreshold ?? ''}
+                onChange={(e) =>
+                  onChange({ migrationThreshold: optional(e.target.value) })
+                }
+              />
+              <small>
+                In the same unit as the developer and holder buy percentages.
+              </small>
+            </label>
           </div>
           <BubbleMapEstimate
             buyDelayMs={timing.buyDelayMs}

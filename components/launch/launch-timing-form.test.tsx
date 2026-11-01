@@ -27,6 +27,16 @@ const render = (props: Parameters<typeof LaunchTimingForm>[0]) =>
 const byLabel = (label: string) =>
   host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`);
 
+// Assign through the prototype setter so React sees a change, then fire input.
+const typeInto = async (input: HTMLInputElement, value: string) =>
+  act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
 it('shows the MEV estimate panel on a sequenced plan', async () => {
   await render({ plan: DEFAULT_LAUNCH_PLAN, onChange: vi.fn() });
   expect(host.textContent).toContain('Bubble Maps');
@@ -47,15 +57,7 @@ it('hides the panel off the sequenced method', async () => {
 it('reports slider edits', async () => {
   const onChange = vi.fn();
   await render({ plan: DEFAULT_LAUNCH_PLAN, onChange });
-  const slider = byLabel('Detection mode slider')!;
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      'value',
-    )!.set!;
-    setter.call(slider, '1.4');
-    slider.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await typeInto(byLabel('Detection mode slider')!, '1.4');
   expect(onChange).toHaveBeenCalledWith({ mevSlider: 1.4 });
 });
 
@@ -66,14 +68,7 @@ it('clears an optional estimate field rather than writing zero', async () => {
     onChange,
   });
   const input = byLabel('Supply cost basis points')!;
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      'value',
-    )!.set!;
-    setter.call(input, '');
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await typeInto(input, '');
   expect(onChange).toHaveBeenCalledWith({ supplyCostBps: undefined });
 });
 
@@ -106,4 +101,48 @@ it('renders a cleanliness label from the buy delay', async () => {
     onChange: vi.fn(),
   });
   expect(host.textContent).toContain('Likely clean');
+});
+
+it('offers the captured Front MEV ceilings', async () => {
+  await render({ plan: DEFAULT_LAUNCH_PLAN, onChange: vi.fn() });
+  expect(byLabel('Max Front MEV wallets')).not.toBeNull();
+  expect(byLabel('Max Front MEV wallets after migration')).not.toBeNull();
+  expect(byLabel('Migration threshold')).not.toBeNull();
+});
+
+it('hides the ceilings off the sequenced method', async () => {
+  await render({
+    plan: { ...DEFAULT_LAUNCH_PLAN, mode: 'Stagger' },
+    onChange: vi.fn(),
+  });
+  expect(byLabel('Max Front MEV wallets')).toBeNull();
+});
+
+it('reports each ceiling edit', async () => {
+  const onChange = vi.fn();
+  await render({ plan: DEFAULT_LAUNCH_PLAN, onChange });
+  await typeInto(byLabel('Max Front MEV wallets')!, '6');
+  await typeInto(byLabel('Max Front MEV wallets after migration')!, '2');
+  await typeInto(byLabel('Migration threshold')!, '40');
+  expect(onChange).toHaveBeenNthCalledWith(1, { maxFrontMevCount: 6 });
+  expect(onChange).toHaveBeenNthCalledWith(2, { maxFrontMevPostMigration: 2 });
+  expect(onChange).toHaveBeenNthCalledWith(3, { migrationThreshold: 40 });
+});
+
+it('clears a ceiling to uncapped rather than zero', async () => {
+  const onChange = vi.fn();
+  await render({
+    plan: { ...DEFAULT_LAUNCH_PLAN, maxFrontMevCount: 4 },
+    onChange,
+  });
+  await typeInto(byLabel('Max Front MEV wallets')!, '');
+  expect(onChange).toHaveBeenCalledWith({ maxFrontMevCount: undefined });
+});
+
+it('shows a stored ceiling', async () => {
+  await render({
+    plan: { ...DEFAULT_LAUNCH_PLAN, maxFrontMevCount: 3 },
+    onChange: vi.fn(),
+  });
+  expect(byLabel('Max Front MEV wallets')!.value).toBe('3');
 });
