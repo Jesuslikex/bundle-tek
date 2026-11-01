@@ -315,26 +315,30 @@ it('keeps funding seconds and layer milliseconds exact and refuses inactive or m
     'public address',
   );
 });
-it('refuses duplicate roles, wrong holder counts and absent layer delays', async () => {
+it('refuses duplicate roles, wrong holder counts and a temporary layer without a back layer', async () => {
   const { input, context } = fixture();
   input.roles.back[0].wallet = { ...input.roles.front[0].wallet };
   await expect(createLaunchLayerTerms(input, context)).rejects.toThrow(
     'unique',
   );
   input.roles.back = [];
+  // A temporary layer still needs something to sit behind.
   await expect(createLaunchLayerTerms(input, context)).rejects.toThrow(
     'Back layer',
   );
   input.roles.temporary = [];
-  input.delays.frontToBackDelayMs = 0;
-  await expect(createLaunchLayerTerms(input, context)).rejects.toThrow(
-    'temporary layer',
-  );
-  input.delays.backToTemporaryDelayMs = 0;
   context.savedPlan.holderCount = 3;
   await expect(createLaunchLayerTerms(input, context)).rejects.toThrow(
     'holder count',
   );
+});
+
+it('treats a delay whose layer is absent as inert', async () => {
+  const { input, context } = fixture();
+  // The fixture carries 700 ms front-to-back and 500 ms back-to-temporary.
+  input.roles.back = [];
+  input.roles.temporary = [];
+  await expect(createLaunchLayerTerms(input, context)).resolves.toBeDefined();
 });
 it('refuses moving context while the asynchronous digest is pending', async () => {
   const { input, context } = fixture();

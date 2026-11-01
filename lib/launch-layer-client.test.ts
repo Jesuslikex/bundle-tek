@@ -110,6 +110,9 @@ it('binds loaded context to the exact source and public mint with all authority 
 it('locks saved developer and ordered holders without inventing budget defaults', () => {
   const f = layerUiFixture(),
     draft = initialLayerDraft(f.context);
+  // The captured form seeds both layer delays at 500 ms.
+  expect(draft.frontToBackDelayMs).toBe('500');
+  expect(draft.backToTemporaryDelayMs).toBe('500');
   expect(draft.rows.map((r) => r.role)).toEqual([
     'funder',
     'developer',

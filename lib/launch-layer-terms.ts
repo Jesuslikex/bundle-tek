@@ -186,15 +186,13 @@ function buildTerms(
     throw new Error(
       'StonkFun supports at most 12 Front wallets and no Back or temporary layer.',
     );
-  if (
-    !request.roles.back.length &&
-    (request.roles.temporary.length || request.delays.frontToBackDelayMs)
-  )
+  // The captured form always carries a value for both delays (it seeds 500),
+  // so a delay whose layer is absent is inert rather than an error. Only a
+  // temporary layer genuinely needs a Back layer to sit behind.
+  if (!request.roles.back.length && request.roles.temporary.length)
     throw new Error(
       'A Back layer is required for this buyback protocol and its delay.',
     );
-  if (!request.roles.temporary.length && request.delays.backToTemporaryDelayMs)
-    throw new Error('A temporary layer is required for its delay.');
   // Captured mint-supplied ceiling. Silent unless the plan carries a cap, so
   // the StonkFun 12 check above still governs plans without one.
   const frontRefusal = frontMevRefusal({

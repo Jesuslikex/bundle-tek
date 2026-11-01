@@ -229,8 +229,8 @@ export function initialLayerDraft(context: LayerPlanningContext): LayerDraft {
       ...wallets.recipients.map((ref) => newLayerRow('holders', ref)),
     ],
     fundingDelaySeconds: '0',
-    frontToBackDelayMs: '0',
-    backToTemporaryDelayMs: '0',
+    frontToBackDelayMs: '500',
+    backToTemporaryDelayMs: '500',
   };
 }
 export function layerAmount(value: string, decimals: number) {
