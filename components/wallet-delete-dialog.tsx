@@ -23,6 +23,7 @@ export function WalletDeleteDialog({
   error,
   onClose,
   onDelete,
+  onWithdraw,
 }: {
   label: string;
   count: number;
@@ -31,6 +32,7 @@ export function WalletDeleteDialog({
   error: string;
   onClose: () => void;
   onDelete: () => Promise<boolean>;
+  onWithdraw?: () => void;
 }) {
   const [submitted, setSubmitted] = useState(false);
   return (
@@ -71,6 +73,11 @@ export function WalletDeleteDialog({
           </p>
         )}
         <div className="wallet-folder-editor-actions">
+          {onWithdraw && (
+            <Button variant="outline" disabled={busy} onClick={onWithdraw}>
+              Withdraw first
+            </Button>
+          )}
           <Button variant="outline" disabled={busy} onClick={onClose}>
             Cancel
           </Button>

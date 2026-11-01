@@ -108,3 +108,21 @@ it('cancels without deleting', async () => {
   expect(onDelete).not.toHaveBeenCalled();
   expect(onClose).toHaveBeenCalledTimes(1);
 });
+
+it('omits the withdraw handoff when the caller cannot offer one', async () => {
+  await render({});
+  expect(buttons().some((b) => b.textContent === 'Withdraw first')).toBe(false);
+});
+
+it('offers the withdraw handoff without deleting', async () => {
+  const onWithdraw = vi.fn();
+  const onDelete = vi.fn(async () => true);
+  await render({ onWithdraw, onDelete });
+  await act(async () => {
+    buttons()
+      .find((b) => b.textContent === 'Withdraw first')!
+      .click();
+  });
+  expect(onWithdraw).toHaveBeenCalledTimes(1);
+  expect(onDelete).not.toHaveBeenCalled();
+});

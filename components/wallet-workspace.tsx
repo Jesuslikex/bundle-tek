@@ -1543,6 +1543,17 @@ export function WalletWorkspace({
               busy={busy}
               error={error}
               onClose={() => setDeletingWallet(null)}
+              onWithdraw={() => {
+                // Cleanup already sweeps selected wallets to a destination, so
+                // hand off by selecting this one and closing the dialog.
+                setSelected([deletingWallet.address]);
+                setDeletingWallet(null);
+                requestAnimationFrame(() =>
+                  document
+                    .getElementById('wallet-cleanup')
+                    ?.scrollIntoView({ block: 'start' }),
+                );
+              }}
               onDelete={async () => {
                 const ok = await mutate(
                   {
@@ -1616,14 +1627,16 @@ export function WalletWorkspace({
           )}
           {chain === 'Solana' && <TokenToolsPanel wallets={data.wallets} />}
           {chain === 'Solana' && !archived && (
-            <WalletCleanupPanel
-              wallets={data.wallets}
-              balances={data.balances}
-              folders={data.folders.filter(
-                (folder) => folder.chain === chain && !folder.archived,
-              )}
-              selected={picks}
-            />
+            <div id="wallet-cleanup">
+              <WalletCleanupPanel
+                wallets={data.wallets}
+                balances={data.balances}
+                folders={data.folders.filter(
+                  (folder) => folder.chain === chain && !folder.archived,
+                )}
+                selected={picks}
+              />
+            </div>
           )}
           {chain === 'Solana' && (
             <CreatorFeeClaimPanel wallets={data.wallets} />
