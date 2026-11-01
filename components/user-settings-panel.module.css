@@ -1,0 +1,191 @@
+.panel {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 16px 64px;
+  color: var(--foreground);
+}
+.panel h1 {
+  font-size: 32px;
+  margin: 8px 0;
+  letter-spacing: -0.03em;
+}
+.panel header p {
+  color: #9a9dab;
+  line-height: 1.5;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: #9a9dab;
+}
+.section {
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 4px;
+}
+.section h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+fieldset.row,
+fieldset.presets {
+  margin: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+fieldset.presets {
+  border-top: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  min-height: 44px;
+}
+.row > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+.row small {
+  color: #9a9dab;
+  font-size: 12px;
+}
+.row input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+}
+.segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.segment button,
+.actions button,
+.presets button,
+.sessions button,
+.section > button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--bundle-button-radius, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.segment button[aria-pressed='true'],
+.presets button[aria-pressed='true'] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary) inset;
+}
+.text {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 8px;
+  background: var(--background);
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.error {
+  color: #ed3a7a;
+  flex-basis: 100%;
+}
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  font-size: 12px;
+}
+.keys kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-right: 4px;
+}
+.presets,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+}
+.colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  padding: 8px 0;
+}
+.colors label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.colors input {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: none;
+}
+.json {
+  width: 100%;
+  min-height: 90px;
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--background);
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.sessions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.sessions li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.sessions li span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 240px;
+  overflow-wrap: anywhere;
+}
+.sessions small {
+  color: #9a9dab;
+  font-size: 12px;
+}
+.footer {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+.row > span.segment {
+  display: inline-flex;
+  flex: 0 1 auto;
+  grid-auto-flow: column;
+}
