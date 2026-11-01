@@ -431,6 +431,26 @@ it('routes a holder plan to the complete holder flow instead of omitting its buy
   expect(fetcher.mock.calls.filter(([, init]) => init?.body)).toHaveLength(0);
 });
 
+it('deploys a Manual plan with only its Dev Buy and offers Snipe for the saved holder buys', async () => {
+  await act(async () =>
+    root.render(
+      <PumpLaunchReview
+        project={project}
+        plan={{ ...plan, mode: 'Manual', holdersBuyQuote: '0.3' }}
+        releaseId={'a'.repeat(64)}
+      />,
+    ),
+  );
+  expect(container.textContent).toContain('Create your PumpFun coin');
+  expect(container.textContent).not.toContain('Create coin with holder buys');
+  expect(container.textContent).not.toContain(
+    'Holder buys require their own execution flow',
+  );
+  expect(container.textContent).toContain('wait until you press Snipe');
+  expect(button('Snipe')).toBeDefined();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.body)).toHaveLength(0);
+});
+
 it('renders an expired unobserved recovery without calling it a finalized failure', async () => {
   fetcher.mockImplementation(async () =>
     Response.json({
