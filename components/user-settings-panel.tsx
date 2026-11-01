@@ -233,6 +233,12 @@ export function UserSettingsPanel() {
             set('tradePanel', { confirmDevTrades })
           }
         />
+        <Toggle
+          label="Provider Racing"
+          hint="Send each signed trade through the main RPC plus Solana's public RPC and Jito at once. Same signature, so it can only land once."
+          checked={s.tradePanel.providerRacing}
+          onChange={(providerRacing) => set('tradePanel', { providerRacing })}
+        />
       </Section>
 
       <Section title="Wallet trades">

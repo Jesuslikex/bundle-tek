@@ -22,6 +22,7 @@ describe('user settings', () => {
     expect(s.tradePanel).toEqual({
       instantTrade: true,
       confirmDevTrades: true,
+      providerRacing: false,
     });
     expect(s.walletTrades.buyAmounts).toEqual(d.walletTrades.buyAmounts);
     expect(s.walletTrades.sellPercents).toEqual(d.walletTrades.sellPercents);

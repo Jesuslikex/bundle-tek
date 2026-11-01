@@ -1,6 +1,7 @@
 import { rawToDecimal } from './auto-sell';
 import { abortableSleep } from './auto-sell-execute';
 import { readBoundedPanelJson } from './read-bounded-panel-json';
+import { readUserSettings } from './user-settings';
 import type { VaultSession } from './browser-wallet-vault';
 import {
   signApprovedWarmupPacket,
@@ -353,7 +354,12 @@ export async function executeImportedTrade(
     const submitted = await postJson(
       fetcher,
       '/api/imported-projects/signing',
-      { action: 'submit', id: review.id, transaction: packet.transaction },
+      {
+        action: 'submit',
+        id: review.id,
+        transaction: packet.transaction,
+        ...(readUserSettings().tradePanel.providerRacing ? { race: true } : {}),
+      },
       AbortSignal.timeout(40000),
     );
     if (
