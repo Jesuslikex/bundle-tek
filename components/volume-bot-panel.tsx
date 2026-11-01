@@ -3,6 +3,7 @@ import { TransactionDeliveryNotice } from '@/components/transaction-delivery-not
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
+import { VolumeRunProgress } from './volume-run-progress';
 import {
   VAULT_STORAGE_KEY,
   unlockVault,
@@ -179,6 +180,19 @@ function VolumeBotWorkspace({
   locked: boolean;
 }) {
   const id = useId();
+  // Planned window of the in-flight run, for the progress card.
+  const [runWindow, setRunWindow] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+  const [runNow, setRunNow] = useState(0);
+  // One ticker for the whole run; idle when nothing is running.
+  useEffect(() => {
+    if (!runWindow) return;
+    setRunNow(Date.now());
+    const timer = setInterval(() => setRunNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [runWindow]);
   const [targetUnit, setTargetUnit] = useState<'SOL' | 'USD'>('USD'),
     [target, setTarget] = useState('100'),
     [durationParts, setDurationParts] = useState(() =>
@@ -325,7 +339,9 @@ function VolumeBotWorkspace({
       ...(mode === 'Bundle'
         ? { mode }
         : {
-            ...(waveIntensity === 0 ? {} : { waveIntensityTenths: waveIntensity }),
+            ...(waveIntensity === 0
+              ? {}
+              : { waveIntensityTenths: waveIntensity }),
           }),
       ...(feeTarget.trim()
         ? { feeTargetLamports: lamports(feeTarget, 'Fee target') }
@@ -446,7 +462,9 @@ function VolumeBotWorkspace({
     feeTarget,
     selected,
   ]);
-  const autoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const autoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   // Proxima re-estimates on a 300ms debounce instead of waiting for a button.
   useEffect(() => {
     if (locked || !selected.length || !validDuration) return;
@@ -554,6 +572,7 @@ function VolumeBotWorkspace({
           ),
         );
       const last = Math.max(...batch.review.trades.map((t) => t.batchOffsetMs));
+      setRunWindow({ start: started, end: started + last });
       for (const delay of [8_000, 20_000, 40_000, 90_000])
         timers.current.push(setTimeout(() => observe(batch.id), last + delay));
       await refresh();
@@ -611,6 +630,13 @@ function VolumeBotWorkspace({
         Plan buy/sell round trips toward a volume target. Review each group
         before approving it. Sending only runs while this panel is open.
       </p>
+      {runWindow && (
+        <VolumeRunProgress
+          startedAt={runWindow.start}
+          endsAt={runWindow.end}
+          now={runNow || runWindow.start}
+        />
+      )}
       <section aria-label="Volume execution mode" className={styles.mode}>
         <strong>Mode: Scheduled swaps</strong>
         <p className={styles.note}>
@@ -729,19 +755,22 @@ function VolumeBotWorkspace({
             </Button>
           )}
           {targetUnit === 'USD' && usdQuote && (
-                <p className={styles.note}>
-                  ${usdQuote.targetUsd} converts to{' '}
-                  {sol(usdQuote.targetVolumeLamports)} at $
-                  {usdQuote.solPriceUsd}/SOL. Source: {usdQuote.source}.
-                  Captured {usdQuote.observedAt}.{' '}
-                  {Date.parse(usdQuote.expiresAt) <= now
-                    ? 'Conversion expired. Capture it again.'
-                    : `Expires ${usdQuote.expiresAt}.`}{' '}
-                  This fixes a SOL turnover target. It does not guarantee USD
-                  turnover or profit.
-                </p>
+            <p className={styles.note}>
+              ${usdQuote.targetUsd} converts to{' '}
+              {sol(usdQuote.targetVolumeLamports)} at ${usdQuote.solPriceUsd}
+              /SOL. Source: {usdQuote.source}. Captured {usdQuote.observedAt}.{' '}
+              {Date.parse(usdQuote.expiresAt) <= now
+                ? 'Conversion expired. Capture it again.'
+                : `Expires ${usdQuote.expiresAt}.`}{' '}
+              This fixes a SOL turnover target. It does not guarantee USD
+              turnover or profit.
+            </p>
           )}
-          <div className={styles.segmented} role="group" aria-label="End condition">
+          <div
+            className={styles.segmented}
+            role="group"
+            aria-label="End condition"
+          >
             <button
               type="button"
               aria-pressed={endCondition === 'time'}
@@ -763,7 +792,9 @@ function VolumeBotWorkspace({
                 setEndCondition('delay');
                 // Proxima ticks the custom-amount control as soon as Delay is
                 // picked, so Fixed is preselected with an empty field.
-                setSizing((current) => (current === 'auto' ? 'fixed' : current));
+                setSizing((current) =>
+                  current === 'auto' ? 'fixed' : current,
+                );
               }}
             >
               Delay
@@ -824,79 +855,79 @@ function VolumeBotWorkspace({
               </p>
             </>
           )}
-            {endCondition === 'delay' && (
-              <>
-                <p className={styles.heading}>
-                  Amount per trade <span className={styles.required}>*</span>
-                </p>
-                <p className={styles.note}>
-                  {sizing === 'fixed'
-                    ? 'Fixed amount per trade in SOL.'
-                    : 'Min and max amount per trade in SOL.'}
-                </p>
-                <div
-                  className={styles.segmented}
-                  role="group"
-                  aria-label="Amount per trade"
+          {endCondition === 'delay' && (
+            <>
+              <p className={styles.heading}>
+                Amount per trade <span className={styles.required}>*</span>
+              </p>
+              <p className={styles.note}>
+                {sizing === 'fixed'
+                  ? 'Fixed amount per trade in SOL.'
+                  : 'Min and max amount per trade in SOL.'}
+              </p>
+              <div
+                className={styles.segmented}
+                role="group"
+                aria-label="Amount per trade"
+              >
+                <button
+                  type="button"
+                  aria-pressed={sizing === 'fixed'}
+                  disabled={busy || locked}
+                  onClick={() => {
+                    changed();
+                    setSizing('fixed');
+                  }}
                 >
-                  <button
-                    type="button"
-                    aria-pressed={sizing === 'fixed'}
-                    disabled={busy || locked}
-                    onClick={() => {
-                      changed();
-                      setSizing('fixed');
-                    }}
-                  >
-                    Fixed
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={sizing === 'range'}
-                    disabled={busy || locked}
-                    onClick={() => {
-                      changed();
-                      setSizing('range');
-                    }}
-                  >
-                    Random
-                  </button>
-                </div>
-                {sizing === 'fixed' ? (
-                  <Input
-                    id={`${id}-amount-fixed`}
-                    aria-label="Fixed amount in SOL"
-                    inputMode="decimal"
-                    placeholder="0.1"
-                    value={fixed}
-                    onChange={(e) => setFixed(e.target.value)}
-                  />
-                ) : (
-                  <div className={styles.pair}>
-                    <div className={styles.amountCell}>
-                      <span className={styles.prefix}>Min.</span>
-                      <Input
-                        aria-label="Minimum amount in SOL"
-                        inputMode="decimal"
-                        placeholder="0.05"
-                        value={rangeMin}
-                        onChange={(e) => setRangeMin(e.target.value)}
-                      />
-                    </div>
-                    <div className={styles.amountCell}>
-                      <span className={styles.prefix}>Max.</span>
-                      <Input
-                        aria-label="Maximum amount in SOL"
-                        inputMode="decimal"
-                        placeholder="0.15"
-                        value={rangeMax}
-                        onChange={(e) => setRangeMax(e.target.value)}
-                      />
-                    </div>
+                  Fixed
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={sizing === 'range'}
+                  disabled={busy || locked}
+                  onClick={() => {
+                    changed();
+                    setSizing('range');
+                  }}
+                >
+                  Random
+                </button>
+              </div>
+              {sizing === 'fixed' ? (
+                <Input
+                  id={`${id}-amount-fixed`}
+                  aria-label="Fixed amount in SOL"
+                  inputMode="decimal"
+                  placeholder="0.1"
+                  value={fixed}
+                  onChange={(e) => setFixed(e.target.value)}
+                />
+              ) : (
+                <div className={styles.pair}>
+                  <div className={styles.amountCell}>
+                    <span className={styles.prefix}>Min.</span>
+                    <Input
+                      aria-label="Minimum amount in SOL"
+                      inputMode="decimal"
+                      placeholder="0.05"
+                      value={rangeMin}
+                      onChange={(e) => setRangeMin(e.target.value)}
+                    />
                   </div>
-                )}
-              </>
-            )}
+                  <div className={styles.amountCell}>
+                    <span className={styles.prefix}>Max.</span>
+                    <Input
+                      aria-label="Maximum amount in SOL"
+                      inputMode="decimal"
+                      placeholder="0.15"
+                      value={rangeMax}
+                      onChange={(e) => setRangeMax(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <details ref={tradeSettings} className={styles.settings}>
             <summary>Trade settings</summary>
             <p className={styles.note}>
@@ -971,7 +1002,8 @@ function VolumeBotWorkspace({
                 <p className={styles.note}>
                   Controls how long buy and sell streaks last before reversing.
                   Streaks stay inside the eligible wallets and at most six buys
-                  in a row, and each wallet sells only after its own buy settles.
+                  in a row, and each wallet sells only after its own buy
+                  settles.
                 </p>
               </>
             )}

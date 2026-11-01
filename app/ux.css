@@ -6266,6 +6266,36 @@ td.wallet-row-actions-cell {
   white-space: nowrap;
 }
 
+.volume-run-progress {
+  margin: 10px 0;
+}
+
+.volume-run-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: var(--mute);
+}
+
+.volume-run-head p {
+  margin: 0;
+}
+
+.volume-run-bar {
+  margin-top: 6px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 9%);
+  overflow: hidden;
+}
+
+.volume-run-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent, #6ea8fe);
+}
+
 .wallet-table-settings-fixed {
   font-size: 0.72rem;
   color: var(--mute);
