@@ -105,6 +105,30 @@ it('recovers the exact published metadata after remount without publishing or gr
   ).toBe(false);
 });
 
+it('discards a recovery response after the project changes', async () => {
+  let finish!: (response: Response) => void;
+  fetcher.mockImplementation(
+    () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render();
+  await act(async () => {
+    [...container.querySelectorAll('button')]
+      .find((b) => b.textContent === 'Recover published metadata')!
+      .click();
+  });
+  const signal = fetcher.mock.calls[0][1].signal as AbortSignal;
+  render({ project: { ...project, id: 'another-project' } });
+  expect(signal.aborted).toBe(true);
+  await act(async () => {
+    finish(Response.json({ release: result() }));
+  });
+  expect(container.querySelector('a')).toBeNull();
+  expect(container.textContent).not.toContain('Metadata published.');
+});
+
 it('refuses a recovered release for a different identity', async () => {
   fetcher.mockResolvedValue(
     Response.json({
