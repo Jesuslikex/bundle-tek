@@ -191,3 +191,73 @@ describe('captured venue supply-buy ceiling', () => {
     ).toThrow(/Combined allocation/);
   });
 });
+
+describe('captured MEV estimate inputs', () => {
+  it('defaults the slider to the captured midpoint', () => {
+    expect(DEFAULT_LAUNCH_PLAN.mevSlider).toBe(1);
+    expect(validateLaunchPlan(DEFAULT_LAUNCH_PLAN).mevSlider).toBe(1);
+  });
+
+  it('accepts the captured slider bounds inclusive', () => {
+    expect(
+      validateLaunchPlan({ ...DEFAULT_LAUNCH_PLAN, mevSlider: 0.4 }).mevSlider,
+    ).toBe(0.4);
+    expect(
+      validateLaunchPlan({ ...DEFAULT_LAUNCH_PLAN, mevSlider: 1.6 }).mevSlider,
+    ).toBe(1.6);
+  });
+
+  it('rejects a slider outside the captured bounds', () => {
+    for (const mevSlider of [0.39, 1.61, 0, 2, Number.NaN])
+      expect(() =>
+        validateLaunchPlan({ ...DEFAULT_LAUNCH_PLAN, mevSlider }),
+      ).toThrow(/MEV slider/);
+  });
+
+  it('keeps the estimate inputs optional', () => {
+    const plan = validateLaunchPlan({
+      ...DEFAULT_LAUNCH_PLAN,
+      supplyCostBps: undefined,
+      estimatedDurationMs: undefined,
+    });
+    expect(plan.supplyCostBps).toBeUndefined();
+    expect(plan.estimatedDurationMs).toBeUndefined();
+  });
+
+  it('accepts whole supply cost basis points up to 10000', () => {
+    expect(
+      validateLaunchPlan({ ...DEFAULT_LAUNCH_PLAN, supplyCostBps: 0 })
+        .supplyCostBps,
+    ).toBe(0);
+    expect(
+      validateLaunchPlan({ ...DEFAULT_LAUNCH_PLAN, supplyCostBps: 10000 })
+        .supplyCostBps,
+    ).toBe(10000);
+  });
+
+  it('rejects fractional or oversized supply cost', () => {
+    for (const supplyCostBps of [1.5, -1, 10001])
+      expect(() =>
+        validateLaunchPlan({ ...DEFAULT_LAUNCH_PLAN, supplyCostBps }),
+      ).toThrow(/Supply cost/);
+  });
+
+  it('bounds the estimated duration in whole milliseconds', () => {
+    expect(
+      validateLaunchPlan({ ...DEFAULT_LAUNCH_PLAN, estimatedDurationMs: 0 })
+        .estimatedDurationMs,
+    ).toBe(0);
+    expect(() =>
+      validateLaunchPlan({
+        ...DEFAULT_LAUNCH_PLAN,
+        estimatedDurationMs: 86_400_001,
+      }),
+    ).toThrow(/Estimated duration/);
+    expect(() =>
+      validateLaunchPlan({
+        ...DEFAULT_LAUNCH_PLAN,
+        estimatedDurationMs: 1.5,
+      }),
+    ).toThrow(/Estimated duration/);
+  });
+});

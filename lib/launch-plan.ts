@@ -200,6 +200,10 @@ export type LaunchPlanInput = {
   holdersDistribution?: HolderDistribution;
   holderCount: number;
   routingEmphasis: number;
+  // Captured MEV estimate inputs. Read-only Bubble Maps cards derive from these.
+  mevSlider?: number;
+  supplyCostBps?: number;
+  estimatedDurationMs?: number;
   useHusher: boolean;
   scheduled: boolean;
   simulationSafety: SimulationSafetyPolicy;
@@ -220,6 +224,7 @@ export const DEFAULT_LAUNCH_PLAN: LaunchPlanInput = {
   holdersBuy: 20,
   holderCount: 10,
   routingEmphasis: 46,
+  mevSlider: 1,
   useHusher: false,
   scheduled: false,
   simulationSafety: {
@@ -391,6 +396,37 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     routingEmphasis > 100
   )
     throw new Error('Routing emphasis must be 0-100');
+  // Optional captured MEV estimate inputs; absent means "not chosen".
+  const optionalNumber = (
+    key: 'mevSlider' | 'supplyCostBps' | 'estimatedDurationMs',
+  ) =>
+    body[key] === undefined || body[key] === null
+      ? undefined
+      : Number(body[key]);
+  const mevSlider = optionalNumber('mevSlider');
+  if (
+    mevSlider !== undefined &&
+    (!Number.isFinite(mevSlider) || mevSlider < 0.4 || mevSlider > 1.6)
+  )
+    throw new Error('MEV slider must be between 0.4 and 1.6.');
+  const supplyCostBps = optionalNumber('supplyCostBps');
+  if (
+    supplyCostBps !== undefined &&
+    (!Number.isSafeInteger(supplyCostBps) ||
+      supplyCostBps < 0 ||
+      supplyCostBps > 10000)
+  )
+    throw new Error('Supply cost must be whole basis points from 0 to 10000.');
+  const estimatedDurationMs = optionalNumber('estimatedDurationMs');
+  if (
+    estimatedDurationMs !== undefined &&
+    (!Number.isSafeInteger(estimatedDurationMs) ||
+      estimatedDurationMs < 0 ||
+      estimatedDurationMs > 86400000)
+  )
+    throw new Error(
+      'Estimated duration must be whole milliseconds from 0 to 86400000.',
+    );
   if (typeof body.useHusher !== 'boolean')
     throw new Error('useHusher must be boolean');
   if (typeof body.scheduled !== 'boolean')
@@ -423,6 +459,9 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     ...(holdersDistribution ? { holdersDistribution } : {}),
     holderCount,
     routingEmphasis,
+    ...(mevSlider !== undefined ? { mevSlider } : {}),
+    ...(supplyCostBps !== undefined ? { supplyCostBps } : {}),
+    ...(estimatedDurationMs !== undefined ? { estimatedDurationMs } : {}),
     useHusher: body.useHusher,
     scheduled: body.scheduled,
     simulationSafety,
