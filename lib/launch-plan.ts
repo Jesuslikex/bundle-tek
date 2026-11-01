@@ -225,6 +225,10 @@ export const DEFAULT_LAUNCH_PLAN: LaunchPlanInput = {
   description: '',
   mode: 'Block-0',
   preset: 'Clean',
+  // Captured default: the form seeds the buy delay at 800 ms on Solana and 0
+  // off it (useState(f ? 0 : 800), with an effect forcing 0 for non-Solana).
+  // timingAfterPlanChange applies the same rule on a chain change.
+  timing: { buyDelayMs: 800, initialBuyDelayMs: 0 },
   developerBuy: 5,
   holdersBuy: 20,
   holderCount: 10,

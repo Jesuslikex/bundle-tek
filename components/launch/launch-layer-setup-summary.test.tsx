@@ -44,8 +44,10 @@ it('shows bound role counts and preserves subsecond timing without inventing rea
     );
     expect(host.querySelector('button,input')).toBeNull();
     expect(host.querySelector('details')!.open).toBe(false);
-    expect(values['Buy delay']).toBe('0s (none saved)');
-    expect(values['Initial buy delay']).toBe('0s (none saved)');
+    // The captured default seeds an 800 ms buy delay and a 0 ms initial delay,
+    // so both now read as saved values rather than "none saved".
+    expect(values['Buy delay']).toBe('0.8s');
+    expect(values['Initial buy delay']).toBe('0s');
     expect(host.textContent).toContain('Saved name: $TOKEN Untitled Plan');
     expect(JSON.stringify(envelope)).toBe(before);
   } finally {

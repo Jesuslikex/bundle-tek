@@ -90,6 +90,10 @@ export function timingAfterPlanChange(
   const timing = { ...(current.timing ?? ZERO_LAUNCH_TIMING) };
   const bounds = launchTimingBounds({ ...current, ...change, mode });
   if (bounds.maxMs === 0) timing.buyDelayMs = 0;
+  // The captured form forces the buy delay to 0 off Solana
+  // (useState(f ? 0 : 800) plus an effect zeroing it), so a chain change must
+  // not carry Solana pacing across.
+  if ((change.chain ?? current.chain) !== 'Solana') timing.buyDelayMs = 0;
   if (!bounds.initialEnabled) timing.initialBuyDelayMs = 0;
   return current.timing || timing.buyDelayMs || timing.initialBuyDelayMs
     ? timing

@@ -97,3 +97,27 @@ describe('launch pacing', () => {
     ).toEqual({ buyDelayMs: 0, initialBuyDelayMs: 0 });
   });
 });
+
+describe('captured default pacing', () => {
+  it('seeds the buy delay at the captured 800 ms on Solana', () => {
+    expect(DEFAULT_LAUNCH_PLAN.timing).toEqual({
+      buyDelayMs: 800,
+      initialBuyDelayMs: 0,
+    });
+    // And it validates for the default sequenced method.
+    expect(validateLaunchPlan(DEFAULT_LAUNCH_PLAN).timing?.buyDelayMs).toBe(
+      800,
+    );
+  });
+
+  it('zeroes the default pacing when the chain has no captured timing', () => {
+    // Non-Solana venues have no captured limits, and the reference forces 0.
+    expect(
+      timingAfterPlanChange(
+        DEFAULT_LAUNCH_PLAN,
+        { chain: 'Robinhood', launchpad: 'flap.sh', currency: 'ETH' },
+        'Block-0',
+      )?.buyDelayMs,
+    ).toBe(0);
+  });
+});
