@@ -6183,6 +6183,89 @@ td.wallet-row-actions-cell {
   line-height: 1.4;
 }
 
+.bubble-map-estimate {
+  margin: 12px 0;
+}
+
+.bubble-map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.bubble-map-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.bubble-map-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.bubble-map-label {
+  font-size: 0.76rem;
+  color: var(--mute);
+}
+
+.bubble-map-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.bubble-map-track,
+.bubble-map-track-split {
+  display: flex;
+  height: 5px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 9%);
+  overflow: hidden;
+}
+
+.bubble-map-track-split {
+  gap: 2px;
+  background: none;
+}
+
+.bubble-map-half {
+  flex: 1;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 9%);
+}
+
+.bubble-map-half.is-filled,
+.bubble-map-fill {
+  background: var(--accent, #6ea8fe);
+}
+
+.bubble-map-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.bubble-map-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: 0.68rem;
+  color: var(--mute);
+}
+
+.bubble-map-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .wallet-table-settings-fixed {
   font-size: 0.72rem;
   color: var(--mute);
