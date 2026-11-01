@@ -16,6 +16,7 @@ import {
 } from './venue-launch-recovery';
 import { buildStonkBundle } from './stonkfun-bundle';
 import type { StonkLaunchInput } from './stonkfun-launch';
+import { fakeBundleSimulation } from '../test/stonkfun-bundle-simulation';
 import type { StonkBundleReview } from './stonkfun-bundle-service';
 import { signStonkBundlePackets } from './stonkfun-bundle-signing';
 import type { VaultSession } from './browser-wallet-vault';
@@ -72,14 +73,34 @@ async function bundled() {
       holdersBuyRaw: '350000000',
       holdersTokensOutRaw: '2997',
       holdersSupplyBps: 0,
-      bundleSimulated: false,
+      bundleSimulated: true,
     },
   };
   const sendBundle = vi.fn(
     async (_txs: string[], _s: AbortSignal): Promise<unknown> => 'bundle-id-1',
   );
+  const sim = { mode: 'succeeded' as 'succeeded' | 'failed' | 'short' };
+  const rpc = vi.fn(
+    async (method: string, params: unknown[], s: AbortSignal) => {
+      if (method !== 'simulateBundle') return f.rpc(method, params, s);
+      return fakeBundleSimulation(
+        params,
+        f.review.input.mint,
+        Object.fromEntries(
+          sized.map((h, i) => [
+            h.holder,
+            sim.mode === 'short' && i === 2
+              ? 1n
+              : BigInt(h.expectedTokensOutRaw),
+          ]),
+        ),
+        sim.mode === 'failed' ? { failed: { error: 'x' } } : 'succeeded',
+      );
+    },
+  );
   const deps = {
     ...f.deps,
+    rpc,
     prepareStonkBundle: vi.fn(async () => structuredClone(review)),
     sendBundle,
   };
@@ -93,7 +114,7 @@ async function bundled() {
       })),
     },
   } as unknown as VaultSession;
-  return { f, review, deps, terms, sendBundle, session };
+  return { f, review, deps, terms, sendBundle, session, sim, rpc };
 }
 
 async function signedRow(b: Awaited<ReturnType<typeof bundled>>) {
@@ -203,6 +224,18 @@ describe('StonkFun holder bundle saved launch', () => {
     );
     expect(result.state).toBe('submitted');
     expect(b.sendBundle).toHaveBeenCalledOnce();
+    // The exact signed bundle was replayed with signature checks before sending.
+    const sims = b.rpc.mock.calls.filter(([m]) => m === 'simulateBundle');
+    expect(sims).toHaveLength(1);
+    expect(sims[0][1][0]).toEqual({
+      encodedTransactions: [b.f.signed, ...packets],
+    });
+    expect((sims[0][1][1] as { skipSigVerify: boolean }).skipSigVerify).toBe(
+      false,
+    );
+    expect(
+      b.rpc.mock.invocationCallOrder[b.rpc.mock.calls.indexOf(sims[0])],
+    ).toBeLessThan(b.sendBundle.mock.invocationCallOrder[0]);
     expect(b.sendBundle.mock.calls[0][0]).toEqual([b.f.signed, ...packets]);
     expect(
       b.f.rpc.mock.calls.filter(([m]) => m === 'sendTransaction'),
@@ -271,6 +304,36 @@ describe('StonkFun holder bundle saved launch', () => {
     expect(
       (await read(b.f.db, b.f.owner, 'stonkfun', p.recoveryId)).state,
     ).toBe('signed');
+  });
+
+  it('never sends when the signed bundle replay fails or falls short', async () => {
+    for (const mode of ['failed', 'short'] as const) {
+      const b = await bundled();
+      const p = await signedRow(b);
+      const packets = await signStonkBundlePackets(b.session, b.review);
+      b.sim.mode = mode;
+      await expect(
+        act(
+          b.f.db,
+          b.f.owner,
+          'stonkfun',
+          {
+            action: 'submit',
+            id: p.recoveryId,
+            sha256: p.sha256,
+            bundleSha256: b.review.bundle.sha256,
+            bundleTransactions: packets,
+            approved: true,
+          },
+          signal(),
+          b.deps,
+        ),
+      ).rejects.toThrow(/Nothing was sent/);
+      expect(b.sendBundle).not.toHaveBeenCalled();
+      expect(
+        (await read(b.f.db, b.f.owner, 'stonkfun', p.recoveryId)).state,
+      ).toBe('signed');
+    }
   });
 
   it('keeps an unknown Jito outcome in submitting for recovery', async () => {
