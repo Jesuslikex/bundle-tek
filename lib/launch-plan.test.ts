@@ -1,3 +1,4 @@
+import { validateSequencedSupply } from './launch-supply';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LAUNCH_PLAN,
@@ -120,6 +121,12 @@ describe('simulation safety policy', () => {
 
 describe('captured venue supply-buy ceiling', () => {
   // StonkFun's captured max_total_buy_percentage is 79; PumpFun's is 99.
+  // Save-time rule: parse, then the same supply check both save APIs run.
+  const save = (value: unknown) => {
+    const plan = validateLaunchPlan(value);
+    validateSequencedSupply(plan);
+    return plan;
+  };
   const stonk = {
     ...DEFAULT_LAUNCH_PLAN,
     launchpad: 'StonkFun',
@@ -127,22 +134,21 @@ describe('captured venue supply-buy ceiling', () => {
   };
 
   it('rejects a supply buy above the venue ceiling and accepts the boundary', () => {
-    expect(() =>
-      validateLaunchPlan({ ...stonk, developerBuy: 40, holdersBuy: 40 }),
-    ).toThrow(/cannot exceed 79%/);
+    expect(() => save({ ...stonk, developerBuy: 40, holdersBuy: 40 })).toThrow(
+      /cannot exceed 79%/,
+    );
     expect(
-      validateLaunchPlan({ ...stonk, developerBuy: 40, holdersBuy: 39 })
-        .holdersBuy,
+      save({ ...stonk, developerBuy: 40, holdersBuy: 39 }).holdersBuy,
     ).toBe(39);
   });
 
   it('binds on the venue ceiling before the universal 100% ceiling', () => {
     // 85 is under 100 but over StonkFun's 79, and under PumpFun's 99.
-    expect(() =>
-      validateLaunchPlan({ ...stonk, developerBuy: 5, holdersBuy: 80 }),
-    ).toThrow(/79%/);
+    expect(() => save({ ...stonk, developerBuy: 5, holdersBuy: 80 })).toThrow(
+      /79%/,
+    );
     expect(
-      validateLaunchPlan({
+      save({
         ...DEFAULT_LAUNCH_PLAN,
         developerBuy: 5,
         holdersBuy: 80,
@@ -152,19 +158,18 @@ describe('captured venue supply-buy ceiling', () => {
 
   it('counts the developer buy toward the ceiling', () => {
     // 70 holders + 10 dev is 80, one over the ceiling.
-    expect(() =>
-      validateLaunchPlan({ ...stonk, developerBuy: 10, holdersBuy: 70 }),
-    ).toThrow(/79%/);
+    expect(() => save({ ...stonk, developerBuy: 10, holdersBuy: 70 })).toThrow(
+      /79%/,
+    );
     expect(
-      validateLaunchPlan({ ...stonk, developerBuy: 10, holdersBuy: 69 })
-        .holdersBuy,
+      save({ ...stonk, developerBuy: 10, holdersBuy: 69 }).holdersBuy,
     ).toBe(69);
   });
 
   it('does not apply the supply ceiling outside supply mode', () => {
     // Stagger mode buys in quote units, so no supply percentage is asserted.
     expect(
-      validateLaunchPlan({
+      save({
         ...stonk,
         mode: 'Stagger',
         developerBuy: 40,
@@ -183,12 +188,20 @@ describe('captured venue supply-buy ceiling', () => {
       currency: 'ETH',
     };
     expect(
-      validateLaunchPlan({ ...uncaptured, developerBuy: 60, holdersBuy: 39 })
-        .holdersBuy,
+      save({ ...uncaptured, developerBuy: 60, holdersBuy: 39 }).holdersBuy,
     ).toBe(39);
     expect(() =>
-      validateLaunchPlan({ ...uncaptured, developerBuy: 60, holdersBuy: 50 }),
+      save({ ...uncaptured, developerBuy: 60, holdersBuy: 50 }),
     ).toThrow(/Combined allocation/);
+  });
+
+  it('still parses a stored plan above the ceiling so saved projects load', () => {
+    // Reads go through validateLaunchPlan alone; a historical 80% StonkFun
+    // plan must not break the project library.
+    expect(
+      validateLaunchPlan({ ...stonk, developerBuy: 40, holdersBuy: 40 })
+        .holdersBuy,
+    ).toBe(40);
   });
 });
 

@@ -613,6 +613,8 @@ describe('owner-scoped project API on actual local D1', () => {
       launchpad: 'Clanker',
       currency: 'ETH',
       mode: 'Quick',
+      // Default seeds Solana's 800 ms buy delay; Clanker Quick allows only 0.
+      timing: { buyDelayMs: 0, initialBuyDelayMs: 0 },
     };
     const response = await post(payload({ plan }));
     expect(response.status).toBe(200);
@@ -1200,6 +1202,8 @@ describe('owner-scoped project API on actual local D1', () => {
       launchpad: 'StonkFun',
       developerBuy: 50,
       holdersBuy: 29,
+      // Default seeds PumpFun's 800 ms buy delay; keep this test on supply limits.
+      timing: { buyDelayMs: 0, initialBuyDelayMs: 0 },
     };
     const initial = (await read(await post(payload({ plan })))).project;
     const invalid = { ...plan, holdersBuy: 30 };

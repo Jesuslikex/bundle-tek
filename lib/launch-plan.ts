@@ -5,7 +5,6 @@ import {
 import { holdersBuyUnit, parseHoldersQuoteAmount } from './launch-buy';
 import { quoteCatalog, quoteAsset } from './quote-catalog';
 import { parseLaunchTiming, type LaunchTiming } from './launch-timing';
-import { venueCapabilityLimits } from './venue-capabilities';
 export const CHAINS = [
   'Solana',
   'Robinhood',
@@ -382,21 +381,12 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
       launchpad,
       scheduled: body.scheduled === true,
     }) === 'supply';
-  const totalBuyWithDev = developerBuy + holdersBuy;
-  if (supplyBuy && totalBuyWithDev > 100)
+  if (supplyBuy && developerBuy + holdersBuy > 100)
     throw new Error('Combined allocation cannot exceed 100%');
-  // Captured per-venue ceiling. The shipped client rejects a supply buy whose
-  // total including the developer buy exceeds the venue's
-  // max_total_buy_percentage ("Supply Buy % can't exceed N%"). That cap is
-  // below 100 on every captured venue, so it binds before the check above.
-  const supplyBuyCap = venueCapabilityLimits(
-    chain,
-    launchpad,
-  )?.maxTotalBuyPercentage;
-  if (supplyBuy && supplyBuyCap !== undefined && totalBuyWithDev > supplyBuyCap)
-    throw new Error(
-      `${launchpad} supply buy cannot exceed ${supplyBuyCap}% including the developer buy.`,
-    );
+  // The captured per-venue ceiling (max_total_buy_percentage) is a save-time
+  // rule in validateSequencedSupply. Keeping it out of this parser lets saved
+  // historical plans above a newer ceiling still load instead of breaking the
+  // whole project library.
   if (!Number.isInteger(holderCount) || holderCount < 1 || holderCount > 200)
     throw new Error('Holder count must be 1-200');
   if (
