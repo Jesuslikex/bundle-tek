@@ -5,6 +5,7 @@ import {
 import { holdersBuyUnit, parseHoldersQuoteAmount } from './launch-buy';
 import { quoteCatalog, quoteAsset } from './quote-catalog';
 import { parseLaunchTiming, type LaunchTiming } from './launch-timing';
+import { venueCapabilityLimits } from './venue-capabilities';
 export const CHAINS = [
   'Solana',
   'Robinhood',
@@ -361,12 +362,27 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     throw new Error('Developer buy must be 0-100%');
   if (holdersBuy < 0 || holdersBuy > 100)
     throw new Error('Holders buy must be 0-100%');
-  if (
-    holdersBuyUnit({ mode, launchpad, scheduled: body.scheduled === true }) ===
-      'supply' &&
-    developerBuy + holdersBuy > 100
-  )
+  const supplyBuy =
+    holdersBuyUnit({
+      mode,
+      launchpad,
+      scheduled: body.scheduled === true,
+    }) === 'supply';
+  const totalBuyWithDev = developerBuy + holdersBuy;
+  if (supplyBuy && totalBuyWithDev > 100)
     throw new Error('Combined allocation cannot exceed 100%');
+  // Captured per-venue ceiling. The shipped client rejects a supply buy whose
+  // total including the developer buy exceeds the venue's
+  // max_total_buy_percentage ("Supply Buy % can't exceed N%"). That cap is
+  // below 100 on every captured venue, so it binds before the check above.
+  const supplyBuyCap = venueCapabilityLimits(
+    chain,
+    launchpad,
+  )?.maxTotalBuyPercentage;
+  if (supplyBuy && supplyBuyCap !== undefined && totalBuyWithDev > supplyBuyCap)
+    throw new Error(
+      `${launchpad} supply buy cannot exceed ${supplyBuyCap}% including the developer buy.`,
+    );
   if (!Number.isInteger(holderCount) || holderCount < 1 || holderCount > 200)
     throw new Error('Holder count must be 1-200');
   if (
