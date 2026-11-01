@@ -1,0 +1,45 @@
+.page {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 5rem;
+  color: #e4e4e7;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.page nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 3rem;
+}
+
+.page h1,
+.page h2 {
+  color: #fafafa;
+  line-height: 1.25;
+}
+
+.page h1 {
+  font-size: 2.25rem;
+}
+
+.page h2 {
+  margin-top: 2rem;
+  font-size: 1.25rem;
+}
+
+.page p {
+  margin: 1rem 0;
+}
+
+.page a {
+  color: #c4b5fd;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.page a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
