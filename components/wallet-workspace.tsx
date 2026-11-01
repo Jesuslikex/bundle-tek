@@ -55,6 +55,7 @@ import { BrowserWalletVault } from '@/components/browser-wallet-vault';
 import { WalletWarmup } from '@/components/wallet-warmup';
 import { WalletWarmupEntry } from '@/components/wallet-warmup-entry';
 import { WalletTableSettingsDialog } from '@/components/wallet-table-settings';
+import { WalletDeleteDialog } from '@/components/wallet-delete-dialog';
 import {
   DEFAULT_WALLET_TABLE_SETTINGS,
   WALLET_TABLE_SETTINGS_KEY,
@@ -167,6 +168,12 @@ export function WalletWorkspace({
   const [warmupOpen, setWarmupOpen] = useState(false);
   const [initialWarmup, setInitialWarmup] = useState<SavedWarmup | null>(null);
   const [tableSettingsOpen, setTableSettingsOpen] = useState(false);
+  const [deletingWallet, setDeletingWallet] = useState<{
+    address: string;
+    revision: number;
+    label: string;
+  } | null>(null);
+  const walletDeleteFocus = useRef<HTMLButtonElement | null>(null);
   const [tableSettings, setTableSettings] = useState<WalletTableSettings>(
     DEFAULT_WALLET_TABLE_SETTINGS,
   );
@@ -1528,6 +1535,31 @@ export function WalletWorkspace({
             onReset={() => updateTableSettings(DEFAULT_WALLET_TABLE_SETTINGS)}
             onClose={() => setTableSettingsOpen(false)}
           />
+          {deletingWallet && (
+            <WalletDeleteDialog
+              label={deletingWallet.label}
+              count={1}
+              returnFocus={walletDeleteFocus}
+              busy={busy}
+              error={error}
+              onClose={() => setDeletingWallet(null)}
+              onDelete={async () => {
+                const ok = await mutate(
+                  {
+                    action: 'wallet.archive',
+                    wallets: [
+                      {
+                        address: deletingWallet.address,
+                        revision: deletingWallet.revision,
+                      },
+                    ],
+                  },
+                  'Wallet archived.',
+                );
+                return ok;
+              }}
+            />
+          )}
           {warmupOpen &&
             !archived &&
             picks.length > 0 &&
@@ -1972,21 +2004,28 @@ export function WalletWorkspace({
                           className="wallet-row-action wallet-row-action-delete"
                           disabled={busy || loading}
                           aria-label={`${archived ? 'Restore' : 'Delete'} ${w.label || w.address}`}
-                          onClick={() =>
+                          onClick={(event) => {
+                            // Restoring is reversible, so it stays immediate.
+                            // Deleting now confirms first, as the reference does.
+                            if (!archived) {
+                              walletDeleteFocus.current = event.currentTarget;
+                              setDeletingWallet({
+                                address: w.address,
+                                revision: w.revision,
+                                label: w.label || w.address,
+                              });
+                              return;
+                            }
                             void mutate(
                               {
-                                action: archived
-                                  ? 'wallet.restore'
-                                  : 'wallet.archive',
+                                action: 'wallet.restore',
                                 wallets: [
                                   { address: w.address, revision: w.revision },
                                 ],
                               },
-                              archived
-                                ? 'Wallet restored.'
-                                : 'Wallet archived.',
-                            )
-                          }
+                              'Wallet restored.',
+                            );
+                          }}
                         >
                           <Trash2 size={9} aria-hidden />
                           Delete

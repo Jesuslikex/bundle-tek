@@ -6110,6 +6110,16 @@ td.wallet-row-actions-cell {
   color: var(--mute);
 }
 
+.wallet-delete-caution {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-left: 2px solid #ed5b5e;
+  background: rgb(237 91 94 / 8%);
+  color: var(--mute);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .wallet-table-settings-fixed {
   font-size: 0.72rem;
   color: var(--mute);
