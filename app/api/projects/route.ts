@@ -3,6 +3,7 @@ import { validateSequencedSupply } from '@/lib/launch-supply';
 import { validateQuoteSelection } from '@/lib/quote-catalog';
 import { validateLaunchMethod } from '@/lib/launch-methods';
 import { validateLaunchTiming } from '@/lib/launch-timing';
+import { validateLaunchPlan } from '@/lib/launch-plan';
 import {
   assignmentEntries,
   validateLaunchWalletSelection,
@@ -26,7 +27,9 @@ type Row = {
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const parse = (row: Row) => ({
-  ...validateProjectDocument(JSON.parse(row.document)),
+  ...validateProjectDocument(JSON.parse(row.document), {
+    allowHistoricalVenueCap: true,
+  }),
   id: row.id,
   archived: Boolean(row.archived),
   updatedAt: row.updatedAt,
@@ -70,7 +73,9 @@ export async function POST(request: Request) {
     const body = JSON.parse(text);
     if (!projectIdValid(body.id) || typeof body.archived !== 'boolean')
       return json({ error: 'Invalid project.' }, 400);
-    const document = validateProjectDocument(body);
+    const document = validateProjectDocument(body, {
+      allowHistoricalVenueCap: true,
+    });
     if (
       body.expectedUpdatedAt !== null &&
       (typeof body.expectedUpdatedAt !== 'string' ||
@@ -99,7 +104,9 @@ export async function POST(request: Request) {
             .bind(user.userId, body.id)
             .first<{ document: string; archived: number }>();
     const previousDocument = previous
-      ? validateProjectDocument(JSON.parse(previous.document))
+      ? validateProjectDocument(JSON.parse(previous.document), {
+          allowHistoricalVenueCap: true,
+        })
       : null;
     storageStarted = false;
     // Retain readable, archivable legacy drafts. Enforce captured limits when
@@ -108,6 +115,7 @@ export async function POST(request: Request) {
       !previousDocument ||
       JSON.stringify(previousDocument.plan) !== JSON.stringify(document.plan)
     ) {
+      validateLaunchPlan(document.plan);
       validateVenuePlan(document.plan);
       validateSequencedSupply(document.plan);
       validateHoldersQuoteAmount(document.plan);

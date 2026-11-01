@@ -325,7 +325,10 @@ function validateSimulationSafety(value: unknown): SimulationSafetyPolicy {
   };
 }
 
-export function validateLaunchPlan(value: unknown): LaunchPlanInput {
+export function validateLaunchPlan(
+  value: unknown,
+  options?: { allowHistoricalVenueCap?: boolean },
+): LaunchPlanInput {
   if (!value || typeof value !== 'object')
     throw new Error('Invalid launch plan payload');
   const body = value as Record<string, unknown>;
@@ -393,7 +396,12 @@ export function validateLaunchPlan(value: unknown): LaunchPlanInput {
     chain,
     launchpad,
   )?.maxTotalBuyPercentage;
-  if (supplyBuy && supplyBuyCap !== undefined && totalBuyWithDev > supplyBuyCap)
+  if (
+    !options?.allowHistoricalVenueCap &&
+    supplyBuy &&
+    supplyBuyCap !== undefined &&
+    totalBuyWithDev > supplyBuyCap
+  )
     throw new Error(
       `${launchpad} supply buy cannot exceed ${supplyBuyCap}% including the developer buy.`,
     );
