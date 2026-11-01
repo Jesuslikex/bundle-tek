@@ -14,7 +14,7 @@ function matchesProject(value: unknown, mint: string): value is Project {
     typeof project.id === 'string' &&
     project.id.length > 0 &&
     project.id.length <= 128 &&
-    project.archived === false &&
+    typeof project.archived === 'boolean' &&
     project.document?.token?.chain === 'Solana' &&
     project.document?.token?.address === mint
   );
@@ -43,7 +43,9 @@ export async function openLaunchChart(mint: string, signal?: AbortSignal) {
   signal?.throwIfAborted();
   if (!Array.isArray(list.projects))
     throw new Error('Imported projects could not be verified.');
-  let project = list.projects.find((p) => matchesProject(p, mint));
+  let project =
+    list.projects.find((p) => matchesProject(p, mint) && !p.archived) ??
+    list.projects.find((p) => matchesProject(p, mint));
   if (!project) {
     const created = await json(
       await fetch('/api/imported-projects', {
@@ -59,7 +61,7 @@ export async function openLaunchChart(mint: string, signal?: AbortSignal) {
     );
     signal?.throwIfAborted();
     project = created.project;
-    if (!matchesProject(project, mint))
+    if (!matchesProject(project, mint) || project.archived)
       throw new Error('Imported token differs from this launch.');
   }
   signal?.throwIfAborted();
