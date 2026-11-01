@@ -6169,6 +6169,20 @@ td.wallet-row-actions-cell {
   font-weight: 600;
 }
 
+.funding-cex {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.funding-cex-hint {
+  color: var(--mute);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 .wallet-table-settings-fixed {
   font-size: 0.72rem;
   color: var(--mute);

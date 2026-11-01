@@ -4,6 +4,12 @@ import { Archive, Clock3, Plus, Save, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FundingWalletPicker } from './funding-wallet-picker';
+import { CexFundingSourcesDialog } from '@/components/cex-funding-sources';
+import {
+  CEX_FUNDING_FALLBACK_SOURCES,
+  cexIdsFromLabel,
+  cexSourcesLabel,
+} from '@/lib/cex-funding-catalog';
 import { FundingFeeReviewPanel } from './funding-fee-review';
 import { SolanaFundingReview } from './solana-funding-review';
 import { ExchangeFundingReview } from './exchange-funding-review';
@@ -70,6 +76,7 @@ export function FundingPlanner({
   } | null>(null);
   const [handoffBusy, setHandoffBusy] = useState(false);
   const [draftId, setDraftId] = useState(() => crypto.randomUUID());
+  const [cexOpen, setCexOpen] = useState(false);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [stoppedHistory, setStoppedHistory] = useState<{
     id: string;
@@ -402,6 +409,32 @@ export function FundingPlanner({
             onChange={(e) => change({ sourceLabel: e.target.value })}
           />
         </label>
+        {draft.source === 'CEX' && (
+          <div className="funding-wide funding-cex">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              aria-haspopup="dialog"
+              onClick={() => setCexOpen(true)}
+            >
+              Select CEXs
+            </Button>
+            <span className="funding-cex-hint">
+              CEX funding can take up to 20 minutes. A 30-minute funding delay
+              is recommended.
+            </span>
+          </div>
+        )}
+        {cexOpen && (
+          <CexFundingSourcesDialog
+            sources={CEX_FUNDING_FALLBACK_SOURCES}
+            selected={cexIdsFromLabel(draft.sourceLabel)}
+            onClose={() => setCexOpen(false)}
+            onChange={(ids) => change({ sourceLabel: cexSourcesLabel(ids) })}
+            onConfirm={() => setCexOpen(false)}
+          />
+        )}
         <label className="funding-wide" htmlFor="funding-funder">
           Funder public address
           {draft.source === 'CEX'
