@@ -247,8 +247,8 @@ function CartReviewPanel({
           </dl>
           <p>
             Availability was checked against the current catalog. These wallets
-            are not reserved and may be withdrawn. Checkout, payment, signing
-            and secure delivery remain unavailable.
+            are not reserved and may be withdrawn. Review a wallet hold to
+            continue. Payment requires separate approval.
           </p>
           {onReserve && (
             <div className={styles.controls}>

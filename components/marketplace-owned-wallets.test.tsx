@@ -314,7 +314,9 @@ it('pages saved evidence locally without extra API calls', async () => {
 it('switches between catalog and owned inventory without fetching until requested', async () => {
   vi.stubGlobal('fetch', vi.fn());
   await mount(true);
-  expect(host.textContent).toContain('Checkout unavailable');
+  expect(host.textContent).toContain(
+    'Review a wallet hold before proceeding to payment.',
+  );
   await click('My inventory');
   expect(
     host.querySelector('[aria-label="My saved wallet inventory"]'),

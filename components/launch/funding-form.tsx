@@ -24,6 +24,7 @@ export function FundingForm({
   validationError,
   onChange,
   onNext,
+  onOpenLaunchReview,
   launchWallets,
 }: {
   plan: LaunchPlanInput;
@@ -31,6 +32,7 @@ export function FundingForm({
   validationError: string | null;
   onChange: (change: Partial<LaunchPlanInput>) => void;
   onNext: () => void;
+  onOpenLaunchReview?: () => void;
   launchWallets?: LaunchWalletAssignments;
 }) {
   const updateSafety = (change: Partial<SimulationSafetyPolicy>) =>
@@ -103,9 +105,14 @@ export function FundingForm({
     <div className="settings-scroll launch-flow-scroll">
       <div className="page-title">
         <span className="eyebrow">
-          <Landmark /> LAUNCH PLAN / STEP 04
+          <Landmark /> LAUNCH PLAN / FUNDING
         </span>
         <h1>Wallet &amp; funding</h1>
+        {onOpenLaunchReview && (
+          <Button type="button" variant="outline" onClick={onOpenLaunchReview}>
+            Open launch review
+          </Button>
+        )}
         <p>
           {plan.chain === 'Solana'
             ? 'Devnet tools and individually reviewed mainnet funding are available below. Mainnet transfers need a saved plan and separate wallet approval; nothing is sent automatically.'

@@ -1,0 +1,13 @@
+# Launch review return and metadata recovery
+
+Branch codex/signed-in-flow-qa-20261101, based on e10f0be and dbdd18b. User requested launch return, saved metadata recovery and in-app coin link, with no deploy or funded action.
+
+- Launch Settings and Funding offer Open launch review for venues that actually mount the metadata review. The return opens and focuses that disclosure while preserving the draft; no publish or signing action is triggered.
+- A separate Recover published metadata button performs an authenticated no-store GET. It derives the original release ID from owner, project, origin and the seven public identity fields; funding-only changes may differ. It invokes the same artwork bytes, MIME, digest, source and metadata verifier used by venue launch preparation, then rechecks the current saved revision and document after the asynchronous verification. The response contains no signing authority, and client admission checks the expected origin, ID and metadata before restoring the public URL. Consent is not restored.
+- Pump and supported venue live panels already had Open chart in Bundle at the base revision. Their existing imported-project flow is now validated for Solana, mint, active state and ID. The shell's existing unsaved-draft guard now also wraps the chart-open event. The button copy explains that a navigation confirmation may be necessary.
+- The publication digest helper preserves the old preimage; a test compares against the former formula and exercises actual publish followed by recovery.
+- Earlier dbdd18b corrected marketplace payment and delivery availability copy, funding step label and the metadata review name.
+
+Validation: Node 24, nine focused files / 94 tests passed before final documentation; includes a mounted synthetic return-flow harness, mounted chart action, actual Turso-compatible in-memory recovery route and the existing venue/identity tests. Full application shell was not mounted in that harness. Plain TypeScript and scoped lint passed. The original real D1 route suite remains limited by this Windows host's workerd cache access error; this work's recovery integration uses the Turso adapter. Chrome debugging was disconnected in the earlier signed-in QA attempt; no live browser, publication, wallet unlock, signing, payment or funded trade was performed for this patch. No schema or provider changes and no deploy.
+
+Original Desktop/Bundle uncommitted files and Claude's unrelated work were not touched. The user's explicit task requests this return path after identifying the necessary app/page.tsx edit; the change is limited to navigation, existing draft guard and supported-venue gating. User approval is still required for any later deployment.

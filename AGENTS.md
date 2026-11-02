@@ -419,3 +419,8 @@ Claude: no active PR27 claim after merge. Add a new claim before further impleme
 Codex owns only app/privacy/page.tsx, app/privacy/privacy.module.css and docs/CODEX-GOOGLE-CONSENT-20261101.md on codex/google-consent-20261101. Claude Opus notified directly in existing parity thread. Existing Google credentials configured in Vercel Production, no values in Git. Homepage/consent audience and release coordination in progress. No auth rules, account linking, migrations or signing changes. Claude remains sole deploy owner; do not rotate credentials or bundle unreviewed migrations.
 
 `nThe same bounded consent claim also owns app/about/page.tsx as a public OAuth homepage linking the privacy notice. No protected shell or sign-in component edits.
+
+## Signed-in launch and marketplace QA, 1 November 2026
+Codex claims components/marketplace-bundle-catalog.tsx, components/marketplace-cart-review.tsx, components/marketplace-owned-wallets.test.tsx, components/launch/launch-metadata-review.tsx and components/launch/funding-form.tsx on codex/signed-in-flow-qa-20261101. Claude reports no active overlapping claim. No signing, schema or protected shell changes. No deploy or funded actions.
+
+Codex launch return/metadata recovery checkpoint, 1 November 2026: bounded navigation and owner-scoped recovery; see docs/CODEX-LAUNCH-RETURN-RECOVERY-20261101.md. Claim released after verification. No deployment, migration, provider or funded actions.

@@ -176,14 +176,15 @@ export function MarketplaceBundleCatalog() {
       <h1>Wallet marketplace</h1>
       <p>
         Browse listings published by Bundle. Customer accounts cannot sell
-        wallets here. Checkout unavailable.
+        wallets here. Review a wallet hold before proceeding to payment.
       </p>
       <div className={styles.notice}>
         <strong>Recorded history, with its limits</strong>
         <p>
           Recorded activity age is not wallet creation or funding age.
           Historical balances are not current balances or an approved purchase
-          entitlement. Checkout, payment and secure delivery are not connected.
+          entitlement. Payment and key delivery depend on the listing and
+          require a separate review.
         </p>
       </div>
       <div className={styles.controls}>

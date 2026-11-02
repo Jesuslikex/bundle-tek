@@ -18,6 +18,39 @@ const digest = async (bytes: Uint8Array) =>
     (b) => b.toString(16).padStart(2, '0'),
   ).join('');
 
+/** Same deterministic public-identity digest used when a release is published. */
+export async function launchMetadataReleaseId(
+  owner: string,
+  projectId: string,
+  origin: string,
+  project: ReturnType<typeof validateProjectDocument>,
+) {
+  const { tokenName: name, ticker: symbol, description } = project.plan;
+  const { website, twitter, telegram, artworkUrl } = project.identity;
+  if (!isUploadedArtwork(artworkUrl))
+    throw new MetadataReleaseError('Upload and save artwork first.', 400);
+  const fields = {
+    name,
+    symbol,
+    description,
+    ...(website && { website }),
+    ...(twitter && { twitter }),
+    ...(telegram && { telegram }),
+  };
+  return digest(
+    new TextEncoder().encode(
+      JSON.stringify([
+        'launch-metadata-v1',
+        owner,
+        projectId,
+        origin,
+        fields,
+        artworkUrl.split('/').at(-1),
+      ]),
+    ),
+  );
+}
+
 // Only called after explicit consent to publish the saved token identity and image.
 // No signing, mint creation, remote upload or arbitrary URL fetching occurs here.
 export async function releaseLaunchMetadata(
@@ -105,18 +138,7 @@ export async function releaseLaunchMetadata(
   };
   // Include owner/project in the digest to avoid cross-account release collisions.
   // Neither identity is exposed in the public document.
-  const id = await digest(
-    new TextEncoder().encode(
-      JSON.stringify([
-        'launch-metadata-v1',
-        owner,
-        projectId,
-        origin,
-        publicFields,
-        imageId,
-      ]),
-    ),
-  );
+  const id = await launchMetadataReleaseId(owner, projectId, origin, project);
   const url = `${origin}/api/launch/metadata/${id}`;
   if (url.length > 200)
     throw new MetadataReleaseError(
