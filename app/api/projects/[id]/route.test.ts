@@ -96,6 +96,21 @@ it('reads only the requested owner project and omits unrequested columns', async
     'SELECT id,document,archived,updated_at AS updatedAt FROM workspace_projects WHERE owner_id=? AND id=?',
   );
 });
+it('reads a historical over-cap project without changing it', async () => {
+  const historical = document();
+  historical.plan = {
+    ...historical.plan,
+    launchpad: 'StonkFun',
+    developerBuy: 50,
+    holdersBuy: 30,
+  };
+  await add('old-project', 'alice', 0, JSON.stringify(historical));
+  const response = await get();
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { project: WorkspaceProject };
+  expect(body.project.plan.holdersBuy).toBe(30);
+});
+
 it('includes archived rows without restoring or writing them', async () => {
   await add('old-project', 'alice', 1);
   expect(
