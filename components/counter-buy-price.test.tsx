@@ -97,6 +97,9 @@ async function respond(quote = preview()) {
   );
 }
 it('sends only the selected persisted proposal and human swap-input limit on explicit request', async () => {
+  // Keep the synthetic quote fresh regardless of CI scheduling delays. The
+  // separate expiry case advances the clock and checks the actual limit.
+  vi.useFakeTimers({ toFake: ['Date'] });
   await configure();
   expect(fetch).not.toHaveBeenCalled();
   await price();
