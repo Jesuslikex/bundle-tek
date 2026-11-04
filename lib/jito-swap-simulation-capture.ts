@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   simulateImportedSwap,
   type ImportedSwapSimulation,
@@ -139,14 +140,12 @@ export async function captureJitoSwapSimulation(
     const index = reads.length,
       read: Read = {
         requestBody,
-        requestSha256: '',
+        // Hash before dispatch without yielding to a concurrent RPC.
+        requestSha256: createHash('sha256').update(requestBody).digest('hex'),
         rawBody: new Uint8Array(),
         rawSha256: '',
       };
     reads.push(read);
-    read.requestSha256 = await jitoEvidenceSha256(
-      new TextEncoder().encode(requestBody),
-    );
     const pending = Promise.resolve().then(async () => {
       control.throwIfAborted();
       if (stopped) return fail();
