@@ -33,8 +33,7 @@ export function LaunchReviewFocusProvider({ children }: { children: ReactNode })
       if (event.target !== button && event.target !== document.body) cancel();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.repeat || ['Shift', 'Control', 'Alt', 'Meta'].includes(event.key))
-        return;
+      if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
       cancel();
     };
     let sawSaving = false;
@@ -54,9 +53,11 @@ export function LaunchReviewFocusProvider({ children }: { children: ReactNode })
         return;
       }
       const target =
-        panels[0].querySelector<HTMLElement>(
-          '[data-review-save-trigger]:not(:disabled)',
-        ) ?? panels[0].querySelector<HTMLElement>(':scope > summary');
+        (panels[0].open &&
+          panels[0].querySelector<HTMLElement>(
+            '[data-review-save-trigger]:not(:disabled)',
+          )) ||
+        panels[0].querySelector<HTMLElement>(':scope > summary');
       if (!target) return;
       cancel();
       target.focus();

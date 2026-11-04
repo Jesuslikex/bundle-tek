@@ -101,17 +101,23 @@ it('does not restore focus after the user scrolls away', async () => {
   await render('saved', true);
   expect(document.activeElement).toBe(document.body);
 });
-it('does not cancel on a repeated key or a modifier alone', async () => {
+it('does not cancel on a modifier alone', async () => {
   await render('ready', true);
   await beginSave();
-  document.body.dispatchEvent(
-    new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true }),
-  );
   document.body.dispatchEvent(
     new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }),
   );
   await render('saved', true);
   expect(document.activeElement).toBe(container.querySelector('summary'));
+});
+it('cancels when Enter repeats to avoid activating the restored control', async () => {
+  await render('ready', true);
+  await beginSave();
+  document.body.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true }),
+  );
+  await render('saved', true);
+  expect(document.activeElement).toBe(document.body);
 });
 it('does not move focus for a save initiated while another element is focused', async () => {
   await render('ready', true);
