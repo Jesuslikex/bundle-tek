@@ -14,6 +14,7 @@ import { StonkfunLaunchReview } from '@/components/stonkfun-launch-review';
 import { LaunchLabLaunchReview } from '@/components/launchlab-launch-review';
 import { MeteoraDbcLaunchReview } from '@/components/meteora-dbc-launch-review';
 import { isLaunchLabVenue } from '@/lib/launchlab-platform-launch';
+import { useLaunchReviewSaveFocus } from './launch-review-focus';
 
 export type MetadataProject = {
   document?: ProjectDocument;
@@ -46,6 +47,7 @@ function SavedMetadataReview({
   saving,
   onCreateOnly,
 }: Props) {
+  const watchSaveFocus = useLaunchReviewSaveFocus();
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [recovering, setRecovering] = useState(false);
@@ -230,7 +232,10 @@ function SavedMetadataReview({
                 type="button"
                 variant="outline"
                 disabled={saving}
-                onClick={onSave}
+                onClick={(event) => {
+                  watchSaveFocus?.(event.currentTarget);
+                  onSave();
+                }}
               >
                 {saving
                   ? 'Saving project…'
@@ -412,6 +417,7 @@ export function LaunchMetadataReview(props: Props) {
   return (
     <details
       className="metadata-review"
+      data-review-saving={props.saving ? 'true' : 'false'}
       open={props.disclosureOpen}
       onToggle={(event) =>
         props.onDisclosureOpenChange?.(event.currentTarget.open)
