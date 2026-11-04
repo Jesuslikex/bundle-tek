@@ -363,10 +363,17 @@ it('enforces its single30second attempt deadline without waiting for an uncooper
     setTimeout(() => c.abort(), ms);
     return c.signal;
   });
-  const transport = vi.fn(() => new Promise<Response>(() => {}));
+  let markStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  const transport = vi.fn(() => {
+    markStarted();
+    return new Promise<Response>(() => {});
+  });
   try {
     const promise = collectJitoSimulationAttempt(policy(f, transport));
-    await until(() => transport.mock.calls.length === 1);
+    await started;
     expect(timeout).toHaveBeenCalledWith(30000);
     await vi.advanceTimersByTimeAsync(30000);
     const output = await promise;
