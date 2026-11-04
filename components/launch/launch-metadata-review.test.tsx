@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // suite. Keep those independent GETs out of this publisher's consent/retry queue.
 vi.mock('./pump-launch-history', () => ({ PumpLaunchHistory: () => null }));
 import { LaunchMetadataReview } from './launch-metadata-review';
+import { LaunchReviewFocusProvider } from './launch-review-focus';
 import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
 import { EMPTY_IDENTITY } from '@/lib/workspace-project';
 let container: HTMLDivElement, root: Root;
@@ -88,6 +89,73 @@ afterEach(() => {
   container.remove();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+it('returns focus to the real save button when a save fails', async () => {
+  const renderSave = async (saving: boolean) => {
+    await act(async () => {
+      root.render(
+        <LaunchReviewFocusProvider>
+          <LaunchMetadataReview
+            {...props}
+            project={null}
+            saving={saving}
+            disclosureOpen
+          />
+        </LaunchReviewFocusProvider>,
+      );
+    });
+  };
+  await renderSave(false);
+  const initial = container.querySelector<HTMLButtonElement>(
+    '[data-review-save-trigger]',
+  )!;
+  expect(initial).not.toBeNull();
+  initial.focus();
+  await act(async () => initial.click());
+  await renderSave(true);
+  await renderSave(false);
+  const retry = container.querySelector<HTMLButtonElement>(
+    '[data-review-save-trigger]',
+  )!;
+  expect(retry.disabled).toBe(false);
+  expect(document.activeElement).toBe(retry);
+  expect(container.querySelector<HTMLDetailsElement>('details')?.open).toBe(
+    true,
+  );
+  expect(onSave).toHaveBeenCalledOnce();
+});
+it('returns focus to the open real review when a first save remounts it', async () => {
+  const renderSave = async (saved: boolean, saving: boolean) => {
+    await act(async () => {
+      root.render(
+        <LaunchReviewFocusProvider>
+          <LaunchMetadataReview
+            key={saved ? 'saved' : 'draft'}
+            {...props}
+            project={saved ? project : null}
+            saving={saving}
+            disclosureOpen
+          />
+        </LaunchReviewFocusProvider>,
+      );
+    });
+  };
+  await renderSave(false, false);
+  const save = container.querySelector<HTMLButtonElement>(
+    '[data-review-save-trigger]',
+  )!;
+  save.focus();
+  await act(async () => save.click());
+  await renderSave(false, true);
+  await renderSave(true, false);
+  expect(document.activeElement?.tagName).toBe('SUMMARY');
+  expect(container.querySelector<HTMLDetailsElement>('details')?.open).toBe(
+    true,
+  );
+  expect(container.querySelector('[data-review-save-trigger]')).toBeNull();
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked,
+  ).toBe(false);
 });
 it('shows the saved public identity with explicit unchecked consent and makes no publication request', async () => {
   await render();
