@@ -1261,6 +1261,7 @@ export default function Home() {
   };
   const startProject = () =>
     guardDraft(() => {
+      setLaunchReviewOpen(false);
       revision.current.edit();
       setLaunchPlan({ ...DEFAULT_LAUNCH_PLAN });
       setIdentity({ ...EMPTY_IDENTITY });
@@ -1275,6 +1276,7 @@ export default function Home() {
     });
   const startNarrativeProject = (draft: NarrativeDraft, keyword: string) =>
     guardDraft(() => {
+      setLaunchReviewOpen(false);
       revision.current.edit();
       setLaunchPlan({
         ...DEFAULT_LAUNCH_PLAN,
@@ -1296,6 +1298,7 @@ export default function Home() {
     });
   const openProject = (project: WorkspaceProject, duplicate = false) =>
     guardDraft(() => {
+      setLaunchReviewOpen(false);
       revision.current.edit();
       setLaunchPlan(project.plan);
       setIdentity(project.identity);
