@@ -232,6 +232,7 @@ function SavedMetadataReview({
                 type="button"
                 variant="outline"
                 disabled={saving}
+                data-review-save-trigger
                 onClick={(event) => {
                   watchSaveFocus?.(event.currentTarget);
                   onSave();
