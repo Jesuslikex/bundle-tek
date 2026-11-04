@@ -84,6 +84,14 @@ async function waitForState(predicate: () => boolean) {
     });
   }
   expect(predicate(), 'Expected warmup state did not appear').toBe(true);
+  // Allow follow-up updates to settle before callers assert negative states.
+  for (let i = 0; i < 3; i += 1) {
+    await act(async () => {
+      await new Promise<void>((resolve) => realImmediate(resolve));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+  expect(predicate(), 'Expected warmup state did not persist').toBe(true);
 }
 async function check(fragment: string) {
   const label = Array.from(container.querySelectorAll('label')).find((item) =>
@@ -292,18 +300,32 @@ it('explains an unfunded wallet without funding, signing or starting trades', as
   expect(mocks.unlock).not.toHaveBeenCalled();
 });
 it('waits for the real review digest before showing approval', async () => {
+  await mount();
+  await click('Prepare unsigned warmup buy');
   const digest = crypto.subtle.digest.bind(crypto.subtle);
+  let release!: () => void;
+  let markStarted!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
   const delayed = vi.spyOn(crypto.subtle, 'digest').mockImplementation(
     async (...args) => {
-      for (let i = 0; i < 8; i += 1)
-        await new Promise<void>((resolve) => realImmediate(resolve));
+      markStarted();
+      await held;
       return digest(...args);
     },
   );
   try {
-    await mount();
-    await click('Prepare unsigned warmup buy');
     await click('Check eligibility for user approval');
+    await started;
+    expect(container.textContent).not.toContain(
+      'Approve and sign this exact transaction',
+    );
+    expect(mocks.unlock).not.toHaveBeenCalled();
+    release();
     await waitForState(() =>
       Array.from(container.querySelectorAll('button')).some(
         (item) =>
@@ -311,9 +333,11 @@ it('waits for the real review digest before showing approval', async () => {
       ),
     );
     expect(delayed).toHaveBeenCalled();
+    expect(container.textContent).toContain('Exact packet:');
     expect(button('Approve and sign this exact transaction').disabled).toBe(true);
     expect(mocks.unlock).not.toHaveBeenCalled();
   } finally {
+    release();
     delayed.mockRestore();
   }
 });
