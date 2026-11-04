@@ -879,6 +879,7 @@ function PulseInsights({
 export default function Home() {
   const revision = useRef(new DraftRevision());
   const [saveBusy, setSaveBusy] = useState(false);
+  const [launchReviewOpen, setLaunchReviewOpen] = useState(false);
   const [exploringRobinhood, setExploringRobinhood] = useState(false);
   const [robinhoodVenue, setRobinhoodVenue] = useState('hood.fun');
   const [view, setView] = useState<View>('dashboard');
@@ -1260,6 +1261,7 @@ export default function Home() {
   };
   const startProject = () =>
     guardDraft(() => {
+      setLaunchReviewOpen(false);
       revision.current.edit();
       setLaunchPlan({ ...DEFAULT_LAUNCH_PLAN });
       setIdentity({ ...EMPTY_IDENTITY });
@@ -1274,6 +1276,7 @@ export default function Home() {
     });
   const startNarrativeProject = (draft: NarrativeDraft, keyword: string) =>
     guardDraft(() => {
+      setLaunchReviewOpen(false);
       revision.current.edit();
       setLaunchPlan({
         ...DEFAULT_LAUNCH_PLAN,
@@ -1295,6 +1298,7 @@ export default function Home() {
     });
   const openProject = (project: WorkspaceProject, duplicate = false) =>
     guardDraft(() => {
+      setLaunchReviewOpen(false);
       revision.current.edit();
       setLaunchPlan(project.plan);
       setIdentity(project.identity);
@@ -1950,6 +1954,8 @@ export default function Home() {
                     }
                     onSave={() => void saveLaunchPlan()}
                     saving={saveBusy}
+                    reviewOpen={launchReviewOpen}
+                    onReviewOpenChange={setLaunchReviewOpen}
                     identity={identity}
                     onIdentityChange={updateIdentity}
                     plan={launchPlan}

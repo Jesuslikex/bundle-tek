@@ -1,0 +1,26 @@
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -1261,6 +1261,7 @@
+   };
+   const startProject = () =>
+     guardDraft(() => {
++      setLaunchReviewOpen(false);
+       revision.current.edit();
+       setLaunchPlan({ ...DEFAULT_LAUNCH_PLAN });
+       setIdentity({ ...EMPTY_IDENTITY });
+@@ -1275,6 +1276,7 @@
+     });
+   const startNarrativeProject = (draft: NarrativeDraft, keyword: string) =>
+     guardDraft(() => {
++      setLaunchReviewOpen(false);
+       revision.current.edit();
+       setLaunchPlan({
+         ...DEFAULT_LAUNCH_PLAN,
+@@ -1296,6 +1298,7 @@
+     });
+   const openProject = (project: WorkspaceProject, duplicate = false) =>
+     guardDraft(() => {
++      setLaunchReviewOpen(false);
+       revision.current.edit();
+       setLaunchPlan(project.plan);
+       setIdentity(project.identity);
