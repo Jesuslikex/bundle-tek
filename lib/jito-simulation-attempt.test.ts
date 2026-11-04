@@ -357,6 +357,8 @@ it('cleans a response whose body access aborts before its adapter can acquire th
 });
 it('enforces its single30second attempt deadline without waiting for an uncooperative transport', async () => {
   const f = await fixture();
+  const realTimeout = setTimeout;
+  const realClearTimeout = clearTimeout;
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
     const c = new AbortController();
@@ -371,9 +373,21 @@ it('enforces its single30second attempt deadline without waiting for an uncooper
     markStarted();
     return new Promise<Response>(() => {});
   });
+  let startGuard: ReturnType<typeof setTimeout> | undefined;
   try {
     const promise = collectJitoSimulationAttempt(policy(f, transport));
-    await started;
+    await Promise.race([
+      started,
+      new Promise<never>((_resolve, reject) => {
+        startGuard = realTimeout(
+          () =>
+            reject(new Error('The transport did not start within 10 seconds.')),
+          10_000,
+        );
+      }),
+    ]);
+    if (startGuard) realClearTimeout(startGuard);
+    expect(transport).toHaveBeenCalledOnce();
     expect(timeout).toHaveBeenCalledWith(30000);
     await vi.advanceTimersByTimeAsync(30000);
     const output = await promise;
@@ -382,6 +396,7 @@ it('enforces its single30second attempt deadline without waiting for an uncooper
     expect(transport).toHaveBeenCalledOnce();
     falseAuthority(output);
   } finally {
+    if (startGuard) realClearTimeout(startGuard);
     timeout.mockRestore();
     vi.useRealTimers();
   }
