@@ -119,6 +119,29 @@ it('cancels when Enter repeats to avoid activating the restored control', async 
   await render('saved', true);
   expect(document.activeElement).toBe(document.body);
 });
+it('prevents a held Enter from activating a control restored before the first repeat', async () => {
+  await render('ready', true);
+  await beginSave();
+  await render('saved', true);
+  const summary = container.querySelector('summary')!;
+  const repeat = new KeyboardEvent('keydown', {
+    key: 'Enter',
+    repeat: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  summary.dispatchEvent(repeat);
+  expect(repeat.defaultPrevented).toBe(true);
+  summary.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+  const next = new KeyboardEvent('keydown', {
+    key: 'Enter',
+    repeat: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  summary.dispatchEvent(next);
+  expect(next.defaultPrevented).toBe(false);
+});
 it('does not move focus for a save initiated while another element is focused', async () => {
   await render('ready', true);
   const buttons = container.querySelectorAll('button');

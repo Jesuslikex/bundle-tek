@@ -14,10 +14,18 @@ const ReviewSaveFocus = createContext<
 
 export function LaunchReviewFocusProvider({ children }: { children: ReactNode }) {
   const cancelCurrent = useRef<(() => void) | null>(null);
-  useEffect(() => () => cancelCurrent.current?.(), []);
+  const cancelRepeatGuard = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      cancelCurrent.current?.();
+      cancelRepeatGuard.current?.();
+    },
+    [],
+  );
 
   function watchSave(button: HTMLButtonElement) {
     cancelCurrent.current?.();
+    cancelRepeatGuard.current?.();
     if (document.activeElement !== button) return;
 
     const cancel = () => {
@@ -60,6 +68,35 @@ export function LaunchReviewFocusProvider({ children }: { children: ReactNode })
         panels[0].querySelector<HTMLElement>(':scope > summary');
       if (!target) return;
       cancel();
+      // A save can finish before the first repeat of the activating key.
+      // Do not let that repeat activate the newly focused control.
+      const stopGuard = () => {
+        document.removeEventListener('keydown', guardRepeat, true);
+        document.removeEventListener('keyup', onKeyUp, true);
+        document.removeEventListener('pointerdown', stopGuard, true);
+        clearTimeout(guardTimeout);
+        if (cancelRepeatGuard.current === stopGuard)
+          cancelRepeatGuard.current = null;
+      };
+      const onKeyUp = (event: KeyboardEvent) => {
+        if (event.key === 'Enter' || event.key === ' ') stopGuard();
+      };
+      const guardRepeat = (event: KeyboardEvent) => {
+        if (!event.repeat) {
+          stopGuard();
+        } else if (
+          event.target === target &&
+          (event.key === 'Enter' || event.key === ' ')
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      };
+      const guardTimeout = setTimeout(stopGuard, 30_000);
+      cancelRepeatGuard.current = stopGuard;
+      document.addEventListener('keydown', guardRepeat, true);
+      document.addEventListener('keyup', onKeyUp, true);
+      document.addEventListener('pointerdown', stopGuard, true);
       target.focus();
     });
     const timeout = setTimeout(cancel, 30_000);
