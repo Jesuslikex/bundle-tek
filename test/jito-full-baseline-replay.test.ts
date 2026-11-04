@@ -70,7 +70,9 @@ it('replays an actual complete unsigned public swap baseline through the unchang
     expect(raw).toBeDefined();
     // The capture pins the block height at finalized commitment, which the
     // recording predates, so compare the call shape rather than the raw body.
-    const got = JSON.parse(String(init?.body)) as {
+    if (typeof init?.body !== 'string')
+      throw new Error('Expected a JSON request body.');
+    const got = JSON.parse(init.body) as {
       method: string;
       params?: unknown[];
     };
