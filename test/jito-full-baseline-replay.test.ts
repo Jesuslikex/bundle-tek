@@ -40,6 +40,13 @@ it('replays an actual complete unsigned public swap baseline through the unchang
   const network = vi
     .spyOn(globalThis, 'fetch')
     .mockRejectedValue(Error('network forbidden'));
+  const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+  const deadlines: { milliseconds: number; signal: AbortSignal }[] = [];
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+    const signal = originalTimeout(milliseconds);
+    deadlines.push({ milliseconds, signal });
+    return signal;
+  });
   let next = 0;
   const fetcher: typeof fetch = async (_url, init) => {
     const raw = saved.reads[next++];
@@ -64,7 +71,15 @@ it('replays an actual complete unsigned public swap baseline through the unchang
     saved.order,
     new AbortController().signal,
     fetcher,
-  );
+  ).catch((cause: unknown) => {
+    const deadlineExpired = deadlines.some(
+      (deadline) => deadline.milliseconds === 45_000 && deadline.signal.aborted,
+    );
+    throw new Error(
+      `Offline capture refused after ${next}/${saved.reads.length} fixture reads; 45-second deadline expired: ${deadlineExpired}.`,
+      { cause },
+    );
+  });
   expect(next).toBe(saved.reads.length);
   expect(result.simulation.settlementEvidence).not.toBeNull();
   expect(result.simulation.succeeded).toBe(true);
