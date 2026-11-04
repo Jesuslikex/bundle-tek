@@ -304,26 +304,24 @@ it('waits for the real review digest before showing approval', async () => {
   await click('Prepare unsigned warmup buy');
   const digest = crypto.subtle.digest.bind(crypto.subtle);
   let release!: () => void;
-  let markStarted!: () => void;
+  let digestStarted = false;
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const started = new Promise<void>((resolve) => {
-    markStarted = resolve;
-  });
   const delayed = vi.spyOn(crypto.subtle, 'digest').mockImplementation(
     async (...args) => {
-      markStarted();
+      digestStarted = true;
       await held;
       return digest(...args);
     },
   );
   try {
     await click('Check eligibility for user approval');
-    await started;
+    await waitForState(() => digestStarted);
     expect(container.textContent).not.toContain(
       'Approve and sign this exact transaction',
     );
+    expect(container.textContent).not.toContain('Exact packet:');
     expect(mocks.unlock).not.toHaveBeenCalled();
     release();
     await waitForState(() =>
