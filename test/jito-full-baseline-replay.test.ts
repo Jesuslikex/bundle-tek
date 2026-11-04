@@ -47,6 +47,23 @@ it('replays an actual complete unsigned public swap baseline through the unchang
     deadlines.push({ milliseconds, signal });
     return signal;
   });
+  // A sibling RPC can dispatch while a Web Crypto request hash is pending.
+  let releaseBlockHeight!: () => void;
+  const blockHeightGate = new Promise<void>((resolve) => {
+    releaseBlockHeight = resolve;
+  });
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  vi.spyOn(crypto.subtle, 'digest').mockImplementation(
+    async (algorithm, bytes) => {
+      if (
+        ArrayBuffer.isView(bytes) &&
+        new TextDecoder().decode(bytes).includes('"method":"getBlockHeight"')
+      ) {
+        await blockHeightGate;
+      }
+      return digest(algorithm, bytes);
+    },
+  );
   let next = 0;
   const fetcher: typeof fetch = async (_url, init) => {
     const raw = saved.reads[next++];
@@ -57,6 +74,7 @@ it('replays an actual complete unsigned public swap baseline through the unchang
       method: string;
       params?: unknown[];
     };
+    if (got.method === 'getFeeForMessage') releaseBlockHeight();
     const want = JSON.parse(raw.requestBody) as {
       method: string;
       params?: unknown[];
