@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // History intentionally loads three sources on mount and has its own integration
 // suite. Keep those independent GETs out of this publisher's consent/retry queue.
 vi.mock('./pump-launch-history', () => ({ PumpLaunchHistory: () => null }));
 import { LaunchMetadataReview } from './launch-metadata-review';
+import { LaunchReviewFocusProvider } from './launch-review-focus';
 import { DEFAULT_LAUNCH_PLAN } from '@/lib/launch-plan';
 import { EMPTY_IDENTITY } from '@/lib/workspace-project';
 let container: HTMLDivElement, root: Root;
@@ -89,6 +90,73 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
+it('returns focus to the real save button when a save fails', async () => {
+  const renderSave = async (saving: boolean) => {
+    await act(async () => {
+      root.render(
+        <LaunchReviewFocusProvider>
+          <LaunchMetadataReview
+            {...props}
+            project={null}
+            saving={saving}
+            disclosureOpen
+          />
+        </LaunchReviewFocusProvider>,
+      );
+    });
+  };
+  await renderSave(false);
+  const initial = container.querySelector<HTMLButtonElement>(
+    '[data-review-save-trigger]',
+  )!;
+  expect(initial).not.toBeNull();
+  initial.focus();
+  await act(async () => initial.click());
+  await renderSave(true);
+  await renderSave(false);
+  const retry = container.querySelector<HTMLButtonElement>(
+    '[data-review-save-trigger]',
+  )!;
+  expect(retry.disabled).toBe(false);
+  expect(document.activeElement).toBe(retry);
+  expect(container.querySelector<HTMLDetailsElement>('details')?.open).toBe(
+    true,
+  );
+  expect(onSave).toHaveBeenCalledOnce();
+});
+it('returns focus to the open real review when a first save remounts it', async () => {
+  const renderSave = async (saved: boolean, saving: boolean) => {
+    await act(async () => {
+      root.render(
+        <LaunchReviewFocusProvider>
+          <LaunchMetadataReview
+            key={saved ? 'saved' : 'draft'}
+            {...props}
+            project={saved ? project : null}
+            saving={saving}
+            disclosureOpen
+          />
+        </LaunchReviewFocusProvider>,
+      );
+    });
+  };
+  await renderSave(false, false);
+  const save = container.querySelector<HTMLButtonElement>(
+    '[data-review-save-trigger]',
+  )!;
+  save.focus();
+  await act(async () => save.click());
+  await renderSave(false, true);
+  await renderSave(true, false);
+  expect(document.activeElement?.tagName).toBe('SUMMARY');
+  expect(container.querySelector<HTMLDetailsElement>('details')?.open).toBe(
+    true,
+  );
+  expect(container.querySelector('[data-review-save-trigger]')).toBeNull();
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked,
+  ).toBe(false);
+});
 it('shows the saved public identity with explicit unchecked consent and makes no publication request', async () => {
   await render();
   expect(container.textContent).toContain('Reviewed identity');
@@ -118,6 +186,14 @@ it('recovers the exact published metadata after remount without publishing or gr
   expect(
     container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
   ).toBe(false);
+});
+
+it('describes pending recovery as a read, not publication', async () => {
+  recoveryFetcher.mockImplementation(() => new Promise<Response>(() => {}));
+  await render();
+  expect(container.textContent).toContain('Checking for published metadata.');
+  expect(container.textContent).not.toContain('publication may still');
+  expect(recoveryFetcher.mock.calls[0][1].method).toBeUndefined();
 });
 
 it('discards a recovery response after the project changes', async () => {
@@ -183,6 +259,62 @@ it('requires saved clean context and allows an explicit save instead of publicat
   expect(fetcher).not.toHaveBeenCalled();
   await render({ project: null, saving: true });
   expect(container.querySelector('button')!.disabled).toBe(true);
+});
+it('keeps the disclosure open through saving and resets consent', async () => {
+  await render();
+  const disclosure = container.querySelector('details')!;
+  act(() => {
+    disclosure.open = true;
+  });
+  check();
+  expect(button().disabled).toBe(false);
+  await render({ project: null, saving: true });
+  expect(container.querySelector('details')).toBe(disclosure);
+  expect(disclosure.open).toBe(true);
+  await render({
+    project: { ...project, updatedAt: '2026-10-15T00:00:00.000Z' },
+  });
+  expect(container.querySelector('details')).toBe(disclosure);
+  expect(disclosure.open).toBe(true);
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+  expect(button().disabled).toBe(true);
+});
+it('keeps the disclosure open across first save without restoring consent', async () => {
+  function Parent({ saved }: { saved: boolean }) {
+    const [open, setOpen] = useState(false);
+    return (
+      <LaunchMetadataReview
+        key={saved ? project.id : 'new-project'}
+        {...props}
+        project={saved ? project : null}
+        disclosureOpen={open}
+        onDisclosureOpenChange={setOpen}
+      />
+    );
+  }
+  act(() => root.render(<Parent saved={false} />));
+  act(() => {
+    const disclosure = container.querySelector('details')!;
+    disclosure.open = true;
+    disclosure.dispatchEvent(new Event('toggle'));
+  });
+  await act(async () => {
+    root.render(<Parent saved />);
+  });
+  expect(container.querySelector('details')!.open).toBe(true);
+  expect(
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked,
+  ).toBe(false);
+  expect(fetcher).not.toHaveBeenCalled();
+  act(() => {
+    const disclosure = container.querySelector('details')!;
+    disclosure.open = false;
+    disclosure.dispatchEvent(new Event('toggle'));
+  });
+  act(() => root.render(<Parent saved={false} />));
+  expect(container.querySelector('details')!.open).toBe(false);
 });
 it('requires uploaded artwork and hides unsupported venue review', async () => {
   await render({

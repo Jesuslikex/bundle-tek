@@ -1,0 +1,12 @@
+diff --git a/app/page.tsx b/app/page.tsx
+index 3741baf..26a2783 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -1973,6 +1973,7 @@ export default function Home() {
+                   validationError={planValidation.error}
+                   onChange={updateLaunchPlan}
+                   onNext={() => setView('distribution')}
++                  onOpenOperations={() => changeView('live')}
+                   onOpenLaunchReview={
+                     hasLaunchMetadataReview(launchPlan)
+                       ? openLaunchReview

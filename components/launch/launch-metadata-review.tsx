@@ -14,6 +14,7 @@ import { StonkfunLaunchReview } from '@/components/stonkfun-launch-review';
 import { LaunchLabLaunchReview } from '@/components/launchlab-launch-review';
 import { MeteoraDbcLaunchReview } from '@/components/meteora-dbc-launch-review';
 import { isLaunchLabVenue } from '@/lib/launchlab-platform-launch';
+import { useLaunchReviewSaveFocus } from './launch-review-focus';
 
 export type MetadataProject = {
   document?: ProjectDocument;
@@ -28,6 +29,8 @@ type Props = {
   onSave?: () => void;
   saving?: boolean;
   onCreateOnly?: () => void;
+  disclosureOpen?: boolean;
+  onDisclosureOpenChange?: (open: boolean) => void;
 };
 const interrupted =
   'Publication may have completed. Retry this same saved draft to recover its link.';
@@ -44,6 +47,7 @@ function SavedMetadataReview({
   saving,
   onCreateOnly,
 }: Props) {
+  const watchSaveFocus = useLaunchReviewSaveFocus();
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [recovering, setRecovering] = useState(false);
@@ -211,17 +215,7 @@ function SavedMetadataReview({
     }
   }
   return (
-    <details
-      className="metadata-review"
-      style={{
-        borderTop: '1px solid var(--border)',
-        paddingTop: 16,
-        marginTop: 20,
-      }}
-    >
-      <summary style={{ cursor: 'pointer' }}>
-        Publish metadata and review launch
-      </summary>
+    <>
       <div style={{ display: 'grid', gap: 12, paddingTop: 16, minWidth: 0 }}>
         <p className="source-note">
           Prepare the image and details wallets will display. Publishing
@@ -238,7 +232,11 @@ function SavedMetadataReview({
                 type="button"
                 variant="outline"
                 disabled={saving}
-                onClick={onSave}
+                data-review-save-trigger
+                onClick={(event) => {
+                  watchSaveFocus?.(event.currentTarget);
+                  onSave();
+                }}
               >
                 {saving
                   ? 'Saving project…'
@@ -300,7 +298,9 @@ function SavedMetadataReview({
                   disabled={busy || saving}
                   onClick={() => void recover()}
                 >
-                  Recover published metadata
+                  {recovering
+                    ? 'Checking published metadata…'
+                    : 'Recover published metadata'}
                 </Button>
                 <label
                   style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}
@@ -332,12 +332,13 @@ function SavedMetadataReview({
           </>
         )}
         <div aria-live="polite" style={{ overflowWrap: 'anywhere' }}>
-          {busy && (
+          {busy && !recovering && (
             <p>
               Keep this review open. If interrupted, publication may still
               complete.
             </p>
           )}
+          {recovering && <p>Checking for published metadata.</p>}
           {error && (
             <p role="alert" className="inspection-error">
               {error}
@@ -401,7 +402,7 @@ function SavedMetadataReview({
           onCreateOnly={onCreateOnly}
         />
       )}
-    </details>
+    </>
   );
 }
 
@@ -414,5 +415,24 @@ export function LaunchMetadataReview(props: Props) {
     props.plan,
     props.identity,
   ]);
-  return <SavedMetadataReview key={context} {...props} />;
+  return (
+    <details
+      className="metadata-review"
+      data-review-saving={props.saving ? 'true' : 'false'}
+      open={props.disclosureOpen}
+      onToggle={(event) =>
+        props.onDisclosureOpenChange?.(event.currentTarget.open)
+      }
+      style={{
+        borderTop: '1px solid var(--border)',
+        paddingTop: 16,
+        marginTop: 20,
+      }}
+    >
+      <summary style={{ cursor: 'pointer' }}>
+        Publish metadata and review launch
+      </summary>
+      <SavedMetadataReview key={context} {...props} />
+    </details>
+  );
 }
