@@ -42,6 +42,7 @@ export function LaunchReviewFocusProvider({ children }: { children: ReactNode })
     };
     const onKey = (event: KeyboardEvent) => {
       if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
+      if (event.repeat && (event.key === 'Enter' || event.key === ' ')) return;
       cancel();
     };
     let sawSaving = false;
@@ -78,16 +79,18 @@ export function LaunchReviewFocusProvider({ children }: { children: ReactNode })
         if (cancelRepeatGuard.current === stopGuard)
           cancelRepeatGuard.current = null;
       };
+      const repeatedKeys = new Set<string>();
       const onKeyUp = (event: KeyboardEvent) => {
-        if (event.key === 'Enter' || event.key === ' ') stopGuard();
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        repeatedKeys.delete(event.key);
+        if (repeatedKeys.size === 0) stopGuard();
       };
       const guardRepeat = (event: KeyboardEvent) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
         if (!event.repeat) {
           stopGuard();
-        } else if (
-          event.target === target &&
-          (event.key === 'Enter' || event.key === ' ')
-        ) {
+        } else if (event.target === target) {
+          repeatedKeys.add(event.key);
           event.preventDefault();
           event.stopPropagation();
         }

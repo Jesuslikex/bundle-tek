@@ -110,14 +110,14 @@ it('does not cancel on a modifier alone', async () => {
   await render('saved', true);
   expect(document.activeElement).toBe(container.querySelector('summary'));
 });
-it('cancels when Enter repeats to avoid activating the restored control', async () => {
+it('retains focus recovery when Enter repeats during the save', async () => {
   await render('ready', true);
   await beginSave();
   document.body.dispatchEvent(
     new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true }),
   );
   await render('saved', true);
-  expect(document.activeElement).toBe(document.body);
+  expect(document.activeElement).toBe(container.querySelector('summary'));
 });
 it('prevents a held Enter from activating a control restored before the first repeat', async () => {
   await render('ready', true);
@@ -132,7 +132,14 @@ it('prevents a held Enter from activating a control restored before the first re
   });
   summary.dispatchEvent(repeat);
   expect(repeat.defaultPrevented).toBe(true);
+  summary.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }));
+  const space = new KeyboardEvent('keydown', {
+    key: ' ', repeat: true, bubbles: true, cancelable: true,
+  });
+  summary.dispatchEvent(space);
+  expect(space.defaultPrevented).toBe(true);
   summary.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+  summary.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
   const next = new KeyboardEvent('keydown', {
     key: 'Enter',
     repeat: true,
