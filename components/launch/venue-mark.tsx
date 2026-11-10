@@ -1,3 +1,5 @@
+'use client';
+import { useState } from 'react';
 import { TOKEN_LOGOS } from './token-logos';
 
 // Chain and launchpad marks for the launch picker. Logos are the projects'
@@ -49,6 +51,18 @@ const COLORS: Record<string, string> = {
   Bankr: '#ff9a3d',
 };
 
+const SOLANA_MINT = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+/**
+ * Quote tokens without a bundled logo: try DexScreener's public token icon
+ * (like Proxima, which fetches quote logos when no local icon exists). Any
+ * load error falls back to the monogram. Display only.
+ */
+export function remoteTokenLogo(address: string | undefined) {
+  return address && SOLANA_MINT.test(address)
+    ? `https://dd.dexscreener.com/ds-data/tokens/solana/${address}.png`
+    : null;
+}
+
 export function VenueMark({
   name,
   address,
@@ -58,10 +72,14 @@ export function VenueMark({
   address?: string;
   size?: number;
 }) {
-  const logo =
+  // The address whose remote icon failed to load; a new address retries.
+  const [failed, setFailed] = useState<string | null>(null);
+  const local =
     address && TOKEN_LOGOS.has(address)
       ? `/logos/tokens/${address}.png`
       : LOGOS[name];
+  const remote = local || failed === address ? null : remoteTokenLogo(address);
+  const logo = local ?? remote;
   if (logo)
     return (
       // Plain img: tiny static marks, no layout shift, no optimizer needed.
@@ -73,6 +91,13 @@ export function VenueMark({
         aria-hidden="true"
         width={size}
         height={size}
+        {...(remote
+          ? {
+              loading: 'lazy' as const,
+              referrerPolicy: 'no-referrer' as const,
+              onError: () => setFailed(address ?? null),
+            }
+          : {})}
       />
     );
   const color = COLORS[name] ?? '#afb1e7';
