@@ -149,3 +149,72 @@ it('hotkeys without Space do nothing', async () => {
   );
   expect(mocks.execute).not.toHaveBeenCalled();
 });
+const setValue = async (el: HTMLElement, label: string, value: string) => {
+  const input = el.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
+  const select = input.tagName === 'SELECT';
+  await act(async () => {
+    Reflect.set(
+      select ? HTMLSelectElement.prototype : HTMLInputElement.prototype,
+      'value',
+      value,
+      input,
+    );
+    input.dispatchEvent(
+      new Event(select ? 'change' : 'input', { bubbles: true }),
+    );
+  });
+};
+const buyOf = async (el: HTMLElement, amount: string) => {
+  const field = el.querySelector<HTMLInputElement>('input[inputmode=decimal]')!;
+  await act(async () => {
+    Reflect.set(HTMLInputElement.prototype, 'value', amount, field);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => byText(el, 'Buy with').click());
+};
+it('Dispersion with Low Tokens buys only with the emptiest wallet', async () => {
+  const s = defaultUserSettings();
+  s.tradePanel.confirmDevTrades = false;
+  mocks.balance.mockResolvedValue({ [A]: 2000n, [D]: 5n });
+  const el = await setup(s);
+  await setValue(el, 'Dispersion', '1');
+  await setValue(el, 'Wallet Selection', 'Low Tokens');
+  await buyOf(el, '0.1');
+  expect(mocks.balance).toHaveBeenCalled();
+  expect(mocks.execute).toHaveBeenCalledOnce();
+  expect(mocks.execute.mock.calls[0][1].address).toBe(D);
+  expect(mocks.execute.mock.calls[0][3]).toBe(100000000n);
+});
+it('Random distribution keeps the total while varying each wallet', async () => {
+  const s = defaultUserSettings();
+  s.tradePanel.confirmDevTrades = false;
+  const random = vi
+    .spyOn(Math, 'random')
+    .mockReturnValueOnce(0)
+    .mockReturnValue(1);
+  const el = await setup(s);
+  await setValue(el, 'Amount Distribution', 'Random');
+  await setValue(el, 'Deviation percent', '50');
+  await buyOf(el, '0.1');
+  random.mockRestore();
+  const sizes = mocks.execute.mock.calls.map((c) => c[3] as bigint);
+  expect(sizes).toEqual([50000000n, 150000000n]);
+});
+it('Weighted distribution needs saved SOL balances and sends nothing without them', async () => {
+  const s = defaultUserSettings();
+  s.tradePanel.confirmDevTrades = false;
+  const el = await setup(s);
+  await setValue(el, 'Amount Distribution', 'Weighted');
+  await buyOf(el, '0.1');
+  expect(mocks.execute).not.toHaveBeenCalled();
+  expect(el.querySelector('[role=alert]')!.textContent).toMatch(/SOL balances/);
+});
+it('an out-of-range dispersion is refused before any trade', async () => {
+  const s = defaultUserSettings();
+  s.tradePanel.confirmDevTrades = false;
+  const el = await setup(s);
+  await setValue(el, 'Dispersion', '3');
+  await buyOf(el, '0.1');
+  expect(mocks.execute).not.toHaveBeenCalled();
+  expect(el.querySelector('[role=alert]')!.textContent).toMatch(/1 to 2/);
+});

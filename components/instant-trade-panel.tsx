@@ -2,6 +2,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ImportedTokenProject } from '@/lib/imported-token-project';
 import type { WalletFolder, WorkspaceWallet } from '@/lib/wallet-workspace';
+import type { WalletBalance } from '@/lib/wallet-balance-format';
+import {
+  WALLET_SELECTIONS,
+  distributeBuyAmounts,
+  parseDeviationPercent,
+  parseDispersion,
+  pickDispersedWallets,
+  type AmountDistribution,
+  type WalletSelection,
+} from '@/lib/buy-dispersion';
 import {
   unlockVault,
   VAULT_STORAGE_KEY,
@@ -49,11 +59,14 @@ export function InstantTradePanel({
   project,
   wallets,
   folders = [],
+  nativeBalances = [],
   locked,
 }: {
   project: ImportedTokenProject;
   wallets: WorkspaceWallet[];
   folders?: WalletFolder[];
+  /** Saved SOL balances from the wallet workspace, for Weighted buys. */
+  nativeBalances?: WalletBalance[];
   locked: boolean;
 }) {
   const settings = useUserSettings();
@@ -68,6 +81,10 @@ export function InstantTradePanel({
   const [selected, setSelected] = useState<string[]>([]);
   const [mode, setMode] = useState<'Stagger' | 'Parallel'>('Stagger');
   const [delayMs, setDelayMs] = useState('0');
+  const [dispersion, setDispersion] = useState('');
+  const [selection, setSelection] = useState<WalletSelection>('Random');
+  const [distribution, setDistribution] = useState<AmountDistribution>('Equal');
+  const [deviation, setDeviation] = useState('20');
   const [password, setPassword] = useState('');
   const [unlocked, setUnlocked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -199,9 +216,32 @@ export function InstantTradePanel({
       setOutcomes([]);
       try {
         let sizes: Record<string, bigint> = {};
+        let order = scope;
         if (tradeSide === 'Buy') {
           const lamports = warmupAtoms(tradeAmount, 9);
-          sizes = Object.fromEntries(scope.map((w) => [w.address, lamports]));
+          const count = parseDispersion(dispersion, scope.length);
+          order = pickDispersedWallets(
+            scope,
+            count,
+            selection,
+            selection === 'Random' ? {} : await refreshBalances(),
+          );
+          sizes = distributeBuyAmounts(
+            order.map((w) => w.address),
+            lamports,
+            distribution,
+            {
+              deviationPercent:
+                distribution === 'Random'
+                  ? parseDeviationPercent(deviation)
+                  : undefined,
+              nativeBalances: Object.fromEntries(
+                nativeBalances
+                  .filter((b) => b.chain === 'Solana' && /^\d+$/.test(b.raw))
+                  .map((b) => [b.address, BigInt(b.raw)]),
+              ),
+            },
+          );
         } else {
           const fresh = await refreshBalances();
           for (const w of scope) {
@@ -210,7 +250,7 @@ export function InstantTradePanel({
               sizes[w.address] = percentOfBalance(bal, tradeAmount);
           }
         }
-        const targets = scope.filter((w) => (sizes[w.address] ?? 0n) > 0n);
+        const targets = order.filter((w) => (sizes[w.address] ?? 0n) > 0n);
         if (!targets.length)
           throw new Error('No selected wallet has a balance to trade.');
         await executeAcrossWallets(
@@ -231,7 +271,21 @@ export function InstantTradePanel({
         run.current = null;
       }
     },
-    [busy, locked, scope, settings, delayMs, mode, ctx, refreshBalances],
+    [
+      busy,
+      locked,
+      scope,
+      settings,
+      delayMs,
+      mode,
+      ctx,
+      refreshBalances,
+      dispersion,
+      selection,
+      distribution,
+      deviation,
+      nativeBalances,
+    ],
   );
 
   const quick = (index: number, tradeSide: TradeSide) => {
@@ -453,7 +507,9 @@ export function InstantTradePanel({
       </div>
       <label className={styles.field}>
         {side === 'Buy'
-          ? 'Amount (SOL per wallet)'
+          ? distribution === 'Equal'
+            ? 'Amount (SOL per wallet)'
+            : 'Amount (average SOL per wallet)'
           : 'Amount (% of each wallet)'}
         <input
           inputMode="decimal"
@@ -461,6 +517,63 @@ export function InstantTradePanel({
           onChange={(e) => setAmount(e.target.value)}
         />
       </label>
+      {side === 'Buy' && (
+        <details className={styles.look}>
+          <summary>Buy settings</summary>
+          <label>
+            Dispersion (wallets)
+            <input
+              inputMode="numeric"
+              aria-label="Dispersion"
+              placeholder={`All ${scope.length}`}
+              value={dispersion}
+              onChange={(e) => setDispersion(e.target.value)}
+            />
+          </label>
+          <label>
+            Wallet Selection
+            <select
+              aria-label="Wallet Selection"
+              value={selection}
+              onChange={(e) => setSelection(e.target.value as WalletSelection)}
+            >
+              {WALLET_SELECTIONS.map((v) => (
+                <option key={v}>{v}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Amount Distribution
+            <select
+              aria-label="Amount Distribution"
+              value={distribution}
+              onChange={(e) =>
+                setDistribution(e.target.value as AmountDistribution)
+              }
+            >
+              <option value="Equal">Equal</option>
+              <option value="Random">Random with deviation</option>
+              <option value="Weighted">Weighted by SOL balance</option>
+            </select>
+          </label>
+          {distribution === 'Random' && (
+            <label>
+              Deviation (%)
+              <input
+                inputMode="numeric"
+                aria-label="Deviation percent"
+                value={deviation}
+                onChange={(e) => setDeviation(e.target.value)}
+              />
+            </label>
+          )}
+          <small>
+            Dispersion limits how many selected wallets buy. Random and Weighted
+            keep the same total (amount × wallets) and only change each
+            wallet&apos;s share. Weighted uses the saved SOL balances.
+          </small>
+        </details>
+      )}
       <div className={styles.row}>
         <fieldset className={styles.modes} aria-label="Execution">
           {(['Stagger', 'Parallel'] as const).map((m) => (
