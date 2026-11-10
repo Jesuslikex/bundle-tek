@@ -166,6 +166,10 @@ const PROFILES: Record<string, { total: number; developer: number }> = {
     total: 79,
     developer: 79,
   },
+  'Solana/Raydium LaunchLab': {
+    total: 79,
+    developer: 79,
+  },
   'Solana/Stoxes': {
     total: 99,
     developer: 0,

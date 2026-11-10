@@ -47,6 +47,10 @@ const PROFILES: Record<string, MethodProfile> = {
     methods: ['Block-0', 'Stagger', 'Manual'],
     initialBuyDelayMs: null,
   },
+  'Solana/Raydium LaunchLab': {
+    methods: ['Block-0', 'Stagger', 'Manual'],
+    initialBuyDelayMs: null,
+  },
   'Solana/Stoxes': {
     methods: ['Block-0', 'Stagger', 'Manual'],
     initialBuyDelayMs: null,

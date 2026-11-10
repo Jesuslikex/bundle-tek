@@ -289,6 +289,13 @@ const PROFILES: Record<string, VenueLimits> = {
     descriptionOptional: false,
     maxRecipients: 200,
   },
+  'Solana/Raydium LaunchLab': {
+    maxName: 32,
+    maxSymbol: 10,
+    maxCombined: 99999,
+    descriptionOptional: false,
+    maxRecipients: 200,
+  },
   'Solana/Stoxes': {
     maxName: 32,
     maxSymbol: 10,

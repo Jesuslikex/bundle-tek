@@ -5,6 +5,7 @@ import { readBoundedPanelJson } from '@/lib/read-bounded-panel-json';
 import type { MeteoraDbcReview } from '@/lib/meteora-dbc-launch-service';
 import type { StonkLaunchReview } from '@/lib/stonkfun-launch-service';
 import type { LaunchLabReview } from '@/lib/launchlab-launch-service';
+import { isLaunchLabVenue } from '@/lib/launchlab-platform-launch';
 export type VenueReview =
   | MeteoraDbcReview
   | StonkLaunchReview
@@ -138,7 +139,7 @@ function admit<R extends VenueReview>(
     throw Error('Saved launch summary could not be verified.');
   if (
     r.review.format === 'launchlab-launch-review-v1' &&
-    (!['LetsBonk', 'Surge'].includes(r.review.terms.venue) ||
+    (!isLaunchLabVenue(r.review.terms.venue) ||
       r.review.input.venue !== r.review.terms.venue ||
       r.review.summary.venue !== r.review.terms.venue ||
       !raw(r.review.summary.supplyRaw))

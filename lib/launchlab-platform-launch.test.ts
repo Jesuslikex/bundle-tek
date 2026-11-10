@@ -4,6 +4,7 @@ import golden from '@/test/launchlab-platform-sdk-golden.json';
 import {
   LAUNCHLAB_CURVES,
   LAUNCHLAB_PLATFORMS,
+  LAUNCHLAB_VENUES,
   USD1,
   buildLaunchLabMessage,
   type LaunchLabInput,
@@ -57,7 +58,7 @@ const vectors = golden as Record<
 >;
 
 describe('LaunchLab platform packets', () => {
-  for (const venue of ['LetsBonk', 'Surge'] as const)
+  for (const venue of LAUNCHLAB_VENUES)
     for (const quote of [WRAPPED_SOL, USD1])
       it(`matches the Raydium SDK for ${venue} with ${quote.slice(0, 4)}`, async () => {
         const v = vectors[`${venue}/${quote}`];
