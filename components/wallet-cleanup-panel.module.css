@@ -1298,3 +1298,21 @@
   padding: 8px 0;
   color: rgb(var(--text-3, 120 120 120));
 }
+.layoutToggle {
+  display: flex;
+  gap: 6px;
+}
+.layoutToggle > button {
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: var(--bundle-button-radius, 6px);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.layoutToggle > button[aria-pressed='true'] {
+  border-color: var(--primary, #7892ff);
+  box-shadow: 0 0 0 1px var(--primary, #7892ff) inset;
+}

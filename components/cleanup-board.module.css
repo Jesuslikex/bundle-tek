@@ -1,0 +1,121 @@
+.wrap {
+  display: grid;
+  gap: 8px;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.toolbar span {
+  flex: 1 1 140px;
+  opacity: 0.75;
+}
+.toolbar button {
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: var(--bundle-button-radius, 6px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  user-select: none;
+}
+.column {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+  min-height: 180px;
+  padding: 8px;
+  border: 1px dashed var(--border, #22242d);
+  border-radius: 8px;
+}
+.column[data-over='true'] {
+  border-color: var(--primary, #7892ff);
+  background: color-mix(in srgb, var(--primary, #7892ff) 8%, transparent);
+}
+.column header {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+}
+.column header small {
+  opacity: 0.65;
+}
+.cards {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: 6px;
+  background: var(--background, #101114);
+  font-size: 12px;
+  cursor: grab;
+}
+.card[data-selected='true'] {
+  border-color: var(--primary, #7892ff);
+  box-shadow: 0 0 0 1px var(--primary, #7892ff) inset;
+}
+.card em {
+  font-style: normal;
+  opacity: 0.65;
+}
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.amounts {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+.empty {
+  margin: 0;
+  padding: 12px 4px;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.marquee {
+  position: fixed;
+  z-index: 80;
+  border: 1px solid var(--primary, #7892ff);
+  background: color-mix(in srgb, var(--primary, #7892ff) 15%, transparent);
+  pointer-events: none;
+}
+.refused {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bundle-danger, #ed3a7a);
+}
+@media (max-width: 640px) {
+  .board {
+    grid-template-columns: 1fr;
+  }
+  .column {
+    min-height: 0;
+  }
+}
