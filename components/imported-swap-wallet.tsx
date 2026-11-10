@@ -419,6 +419,7 @@ export function ImportedSwapWallet({
           project={project}
           wallets={wallets}
           folders={folders}
+          nativeBalances={balances}
           locked={locked || saving}
         />
       )}

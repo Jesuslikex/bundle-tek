@@ -158,3 +158,20 @@
   gap: 8px;
   align-items: center;
 }
+.look label {
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.panel select {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #22242d);
+  border-radius: 6px;
+  background: var(--background, #101114);
+  color: inherit;
+}
+.look small {
+  display: block;
+  margin-top: 6px;
+  opacity: 0.75;
+}
