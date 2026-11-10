@@ -3,6 +3,7 @@
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { MarketPrice } from '@/app/api/market-prices/route';
+import { MarketOverview } from './market-overview';
 
 const REFRESH_MS = 60_000;
 const usd = new Intl.NumberFormat('en-US', {
@@ -11,7 +12,8 @@ const usd = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
-// SOL, BNB and ETH reference prices in the status bar. Display only.
+// SOL, BNB and ETH reference prices in the status bar, next to the Market
+// Overview button. Display only.
 export function StatusPrices() {
   const [prices, setPrices] = useState<MarketPrice[]>([]);
 
@@ -45,9 +47,9 @@ export function StatusPrices() {
     };
   }, []);
 
-  if (!prices.length) return null;
   return (
     <span className="status-prices" aria-label="Reference prices">
+      <MarketOverview />
       {prices.map((price) => {
         const up = (price.change24h ?? 0) >= 0;
         return (

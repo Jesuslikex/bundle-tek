@@ -45,12 +45,12 @@ it('shows reference prices from the API', async () => {
   expect(eth?.textContent).toContain('$2,451');
 });
 
-it('renders nothing when prices are unavailable', async () => {
+it('shows only the Market button when prices are unavailable', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('', { status: 503 })),
   );
   await act(async () => root.render(<StatusPrices />));
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
-  expect(container.textContent).toBe('');
+  expect(container.textContent).toBe(' Market');
 });
