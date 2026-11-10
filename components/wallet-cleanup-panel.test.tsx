@@ -541,3 +541,72 @@ it('closes the picker on Escape before the dialog', async () => {
   });
   expect(container.textContent).not.toContain('Delay Between Rounds');
 });
+
+it('Cleanup Board moves wallet cards into Sources and Destinations and refuses empty ones', async () => {
+  const { f } = await mount(0, (fx) => [
+    balance(fx.wallet, '0'),
+    balance(fx.destination, '500000000'),
+  ]);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json({
+        mint: f.buy.mint,
+        supplyRaw: '1000000',
+        decimals: 2,
+        balances: { [f.wallet]: '250000' },
+      }),
+    ),
+  );
+  await act(async () => button('Configure').click());
+  await settle();
+  await act(async () => button('Cleanup Board').click());
+  expect(localStorage.getItem('bundle-cleanup-layout-v1')).toBe('board');
+  const card = (label: string) =>
+    container.querySelector<HTMLElement>(`[aria-label="Wallet ${label}"]`)!;
+  const column = (id: string) =>
+    container.querySelector<HTMLElement>(`[data-column="${id}"]`)!;
+  // Ctrl-click both cards, then try to make both sellers: the Funder holds no tokens.
+  await act(async () => card('Launch 1').click());
+  await act(async () =>
+    card('Funder').dispatchEvent(
+      new MouseEvent('click', { bubbles: true, ctrlKey: true }),
+    ),
+  );
+  expect(container.textContent).toContain('2 selected');
+  await act(async () => button('To Sources').click());
+  expect(column('sources').textContent).toContain('Launch 1');
+  expect(column('pool').textContent).toContain('Funder');
+  expect(container.querySelector('[role="alert"]')!.textContent).toContain(
+    'Funder holds no tokens to sell',
+  );
+  // Dropping the Funder card on Destinations makes it the buyer.
+  const data = new Map<string, string>();
+  const transfer = {
+    setData: (k: string, v: string) => data.set(k, v),
+    getData: (k: string) => data.get(k) ?? '',
+    effectAllowed: '',
+  };
+  const drag = (type: string, target: HTMLElement) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', { value: transfer });
+    target.dispatchEvent(event);
+  };
+  await act(async () => drag('dragstart', card('Funder')));
+  await act(async () => drag('drop', column('destinations')));
+  expect(column('destinations').textContent).toContain('Funder');
+  // A seller without SOL cannot become a buyer.
+  await act(async () => card('Launch 1').click());
+  await act(async () => button('To Destinations').click());
+  expect(column('sources').textContent).toContain('Launch 1');
+  expect(container.querySelector('[role="alert"]')!.textContent).toContain(
+    'holds no SOL to buy with',
+  );
+  // The board edits the same lists as the old form.
+  await act(async () => button('Old Layout').click());
+  expect(
+    Array.from(container.querySelectorAll('button')).filter((b) =>
+      b.textContent?.includes('Select (1)'),
+    ),
+  ).toHaveLength(2);
+});

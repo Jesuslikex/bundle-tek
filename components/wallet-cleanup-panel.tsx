@@ -47,6 +47,9 @@ import type { WalletBalance } from '@/lib/wallet-balance-format';
 import type { WalletFolder, WorkspaceWallet } from '@/lib/wallet-workspace';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
 import styles from './wallet-cleanup-panel.module.css';
+import { CleanupBoard } from './cleanup-board';
+
+const LAYOUT_KEY = 'bundle-cleanup-layout-v1';
 
 const SKIP_LABEL: Record<CleanupSkipReason, string> = {
   'holds-tokens': 'holds tokens (sell first)',
@@ -420,6 +423,17 @@ export function WalletCleanupPanel({
     [doubleBuy, setDoubleBuy] = useState(''),
     [altRouting, setAltRouting] = useState(''),
     [advanced, setAdvanced] = useState(false),
+    // The Cleanup Board or the old form: remembered per browser.
+    [layout, setLayout] = useState<'form' | 'board'>(() => {
+      try {
+        return typeof window !== 'undefined' &&
+          localStorage.getItem(LAYOUT_KEY) === 'board'
+          ? 'board'
+          : 'form';
+      } catch {
+        return 'form';
+      }
+    }),
     [picker, setPicker] = useState<'input' | 'output' | null>(null),
     [query, setQuery] = useState(''),
     [folderFilter, setFolderFilter] = useState<string[]>([]),
@@ -484,6 +498,14 @@ export function WalletCleanupPanel({
     };
   }, []);
   const active = wallets.filter((w) => w.chain === 'Solana' && !w.archived);
+  const chooseLayout = (next: 'form' | 'board') => {
+    setLayout(next);
+    try {
+      localStorage.setItem(LAYOUT_KEY, next);
+    } catch {
+      /* not remembered */
+    }
+  };
   const seeded = useRef(false);
   useEffect(() => {
     if (seeded.current) return;
@@ -1320,10 +1342,50 @@ export function WalletCleanupPanel({
                     </p>
                   </div>
                 </div>
-                <div className={styles.mainSection}>
-                  {walletColumn('input', inputs, setInputs)}
-                  {walletColumn('output', outputs, setOutputs)}
+                <div className={styles.layoutToggle}>
+                  {(['board', 'form'] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={layout === value}
+                      onClick={() => chooseLayout(value)}
+                    >
+                      {value === 'board' ? 'Cleanup Board' : 'Old Layout'}
+                    </button>
+                  ))}
                 </div>
+                {layout === 'board' ? (
+                  <CleanupBoard
+                    wallets={active.map((w) => ({
+                      address: w.address,
+                      label: w.label,
+                      role: w.role,
+                      token: tokenBalanceOf(w.address),
+                      native: solBalance(balances, w.address),
+                    }))}
+                    inputs={inputs}
+                    outputs={outputs}
+                    disabled={busy}
+                    facts={{
+                      tokenRaw: supply?.mint ? supply.balances : null,
+                      nativeRaw: balances?.length
+                        ? Object.fromEntries(
+                            balances.map((b) => [b.address, b.raw]),
+                          )
+                        : null,
+                      max: CLEANUP_MAX_WALLETS,
+                    }}
+                    onChange={(next) => {
+                      setInputs(next.inputs);
+                      setOutputs(next.outputs);
+                    }}
+                  />
+                ) : (
+                  <div className={styles.mainSection}>
+                    {walletColumn('input', inputs, setInputs)}
+                    {walletColumn('output', outputs, setOutputs)}
+                  </div>
+                )}
                 <div className={`${styles.section} ${styles.delaySection}`}>
                   <div className={styles.sectionHead}>
                     <div className={styles.title}>
