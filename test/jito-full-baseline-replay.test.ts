@@ -40,16 +40,43 @@ it('replays an actual complete unsigned public swap baseline through the unchang
   const network = vi
     .spyOn(globalThis, 'fetch')
     .mockRejectedValue(Error('network forbidden'));
+  const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+  const deadlines: { milliseconds: number; signal: AbortSignal }[] = [];
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+    const signal = originalTimeout(milliseconds);
+    deadlines.push({ milliseconds, signal });
+    return signal;
+  });
+  // A sibling RPC can dispatch while a Web Crypto request hash is pending.
+  let releaseBlockHeight!: () => void;
+  const blockHeightGate = new Promise<void>((resolve) => {
+    releaseBlockHeight = resolve;
+  });
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  vi.spyOn(crypto.subtle, 'digest').mockImplementation(
+    async (algorithm, bytes) => {
+      if (
+        ArrayBuffer.isView(bytes) &&
+        new TextDecoder().decode(bytes).includes('"method":"getBlockHeight"')
+      ) {
+        await blockHeightGate;
+      }
+      return digest(algorithm, bytes);
+    },
+  );
   let next = 0;
   const fetcher: typeof fetch = async (_url, init) => {
     const raw = saved.reads[next++];
     expect(raw).toBeDefined();
     // The capture pins the block height at finalized commitment, which the
     // recording predates, so compare the call shape rather than the raw body.
-    const got = JSON.parse(String(init?.body)) as {
+    if (typeof init?.body !== 'string')
+      throw new Error('Expected a JSON request body.');
+    const got = JSON.parse(init.body) as {
       method: string;
       params?: unknown[];
     };
+    if (got.method === 'getFeeForMessage') releaseBlockHeight();
     const want = JSON.parse(raw.requestBody) as {
       method: string;
       params?: unknown[];
@@ -64,7 +91,15 @@ it('replays an actual complete unsigned public swap baseline through the unchang
     saved.order,
     new AbortController().signal,
     fetcher,
-  );
+  ).catch((cause: unknown) => {
+    const deadlineExpired = deadlines.some(
+      (deadline) => deadline.milliseconds === 45_000 && deadline.signal.aborted,
+    );
+    throw new Error(
+      `Offline capture refused after ${next}/${saved.reads.length} fixture reads; 45-second deadline expired: ${deadlineExpired}.`,
+      { cause },
+    );
+  });
   expect(next).toBe(saved.reads.length);
   expect(result.simulation.settlementEvidence).not.toBeNull();
   expect(result.simulation.succeeded).toBe(true);
