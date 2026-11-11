@@ -30,6 +30,9 @@ type Share = {
     count: number | null;
   };
   permissions?: { editMetadata: boolean };
+  /** Approval link: opening it files a request the owner must approve. */
+  approval?: boolean;
+  requestedAt?: string | null;
 };
 type SharedProject = SharedProjectSnapshot;
 
@@ -53,6 +56,8 @@ async function call<T>(body: unknown): Promise<T> {
         'This is your own project.',
         'Up to 10 shares per project.',
         'Project changed. Reload saved wallet assignments before creating an invite.',
+        'You already asked for access to this project. Wait for the owner.',
+        'This request could not be approved. It may have expired, been declined or belong to an existing collaborator.',
       ];
       if (typeof value?.error === 'string' && messages.includes(value.error))
         throw new Error(value.error);
@@ -126,6 +131,16 @@ async function fetchShares(projectId: string, signal: AbortSignal) {
     )
       throw new Error('Shares unavailable. Try again later.');
     if (
+      (s.approval !== undefined && typeof s.approval !== 'boolean') ||
+      (s.requestedAt !== undefined &&
+        s.requestedAt !== null &&
+        (typeof s.requestedAt !== 'string' ||
+          s.approval !== true ||
+          s.accepted))
+    )
+      throw new Error('Shares unavailable. Try again later.');
+    readShareExpiry(s.requestedAt ?? null);
+    if (
       s.accepted !== (s.acceptedAt !== null) ||
       (s.expiresAt === null && s.expired)
     )
@@ -158,6 +173,8 @@ function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
   const [duration, setDuration] = useState(86400);
   const [linkExpiry, setLinkExpiry] = useState('');
   const [editMetadata, setEditMetadata] = useState(false);
+  const [approval, setApproval] = useState(false);
+  const [linkApproval, setLinkApproval] = useState(false);
   const [scopeSelection, setScopeSelection] = useState<{
     projectId: string;
     scope: ProjectShareScope | null;
@@ -295,6 +312,16 @@ function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
         launch settings, wallets, publishing, trading and signing stay with the
         owner. To change this permission later, revoke and create a new invite.
       </p>
+      <label className="flex min-h-11 items-start gap-2">
+        <input
+          type="checkbox"
+          disabled={busy}
+          checked={approval}
+          onChange={(event) => setApproval(event.target.checked)}
+        />
+        Approval link: opening it only sends you a request. Nothing about this
+        project is shown until you approve it here.
+      </label>
       <Button
         type="button"
         variant="outline"
@@ -306,12 +333,14 @@ function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
                 token: string;
                 expiresAt: string;
                 permissions?: { editMetadata: boolean };
+                approval?: boolean;
               };
             }>({
               action: 'invite',
               projectId,
               expiresInSeconds: duration,
               permissions: { editMetadata },
+              ...(approval ? { approval: true } : {}),
               ...(walletScope ? { walletScope } : {}),
             });
             let expiry: string | null = null;
@@ -325,6 +354,7 @@ function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
               typeof share.token !== 'string' ||
               !/^[A-Za-z0-9_-]{43}$/.test(share.token) ||
               expiry === null ||
+              (share.approval ?? false) !== approval ||
               (share.permissions === undefined
                 ? editMetadata
                 : !share.permissions ||
@@ -337,18 +367,21 @@ function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
               );
             if (!current()) return;
             setLinkExpiry(expiry);
+            setLinkApproval(approval);
             setLink(
               `${window.location.origin}/?share=${encodeURIComponent(share.token)}`,
             );
           })
         }
       >
-        Create invite link
+        {approval ? 'Create approval link' : 'Create invite link'}
       </Button>
       {link && (
         <p>
-          Send this link to one collaborator. It works once and is shown only
-          now: <code className="break-all">{link}</code> Access ends{' '}
+          {linkApproval
+            ? 'Send this approval link to one person. Opening it sends you a request to approve below. It works once and is shown only now:'
+            : 'Send this link to one collaborator. It works once and is shown only now:'}{' '}
+          <code className="break-all">{link}</code> Access ends{' '}
           <time dateTime={linkExpiry}>
             {new Date(linkExpiry).toLocaleString()}
           </time>
@@ -362,7 +395,9 @@ function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
             <li key={s.id}>
               {s.accepted
                 ? `Collaborator joined ${new Date(s.acceptedAt!).toLocaleString()}`
-                : `Unused invite from ${new Date(s.createdAt).toLocaleString()}`}{' '}
+                : s.requestedAt
+                  ? `Access requested ${new Date(s.requestedAt).toLocaleString()}, waiting for your approval.`
+                  : `Unused ${s.approval ? 'approval link' : 'invite'} from ${new Date(s.createdAt).toLocaleString()}`}{' '}
               {s.expiresAt === null ? (
                 'No expiry (legacy share). Revoke to end access.'
               ) : (
@@ -384,6 +419,21 @@ function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
               {s.permissions?.editMetadata === true
                 ? 'Saved-text editor permission.'
                 : 'View-only permission.'}{' '}
+              {s.requestedAt && !s.accepted && !s.expired && (
+                <Button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(() =>
+                      call({ action: 'approve', id: s.id }).then(
+                        () => undefined,
+                      ),
+                    )
+                  }
+                >
+                  Approve
+                </Button>
+              )}{' '}
               <Button
                 type="button"
                 variant="outline"
@@ -394,7 +444,7 @@ function ProjectShareOwnerPanel({ projectId }: { projectId: string }) {
                   )
                 }
               >
-                Revoke
+                {s.requestedAt && !s.accepted ? 'Decline' : 'Revoke'}
               </Button>
             </li>
           ))}
@@ -410,6 +460,7 @@ export function SharedProjectsPanel() {
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [requested, setRequested] = useState(false);
   const generation = useRef(0);
   const mounted = useRef(false);
   const pending = useRef<AbortController | null>(null);
@@ -490,7 +541,7 @@ export function SharedProjectsPanel() {
       setBusy(false);
     }
   }
-  if (!token && !projects.length && !error)
+  if (!token && !projects.length && !error && !requested)
     return <SharedProjectMetadataRecovery activeShareIds={[]} />;
   return (
     <section aria-label="Shared with you" className="min-w-0 space-y-2">
@@ -511,7 +562,11 @@ export function SharedProjectsPanel() {
             disabled={busy}
             onClick={() =>
               void run(async () => {
-                await call({ action: 'accept', token });
+                const result = await call<{ pending?: unknown }>({
+                  action: 'accept',
+                  token,
+                });
+                setRequested(result?.pending === true);
                 setToken('');
                 const url = new URL(window.location.href);
                 url.searchParams.delete('share');
@@ -521,6 +576,14 @@ export function SharedProjectsPanel() {
           >
             Accept invite
           </Button>
+        </p>
+      )}
+      {requested && (
+        <p>
+          <output>
+            Access requested. The project appears here after the owner approves
+            it. Refresh shared projects to check.
+          </output>
         </p>
       )}
       {error && <p role="alert">{error}</p>}

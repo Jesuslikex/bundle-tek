@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { NativeWithdrawalPanel } from './native-withdrawal-panel';
+import { AirdropTool } from './token-airdrop-tool';
 import { unlockVault, VAULT_STORAGE_KEY } from '@/lib/browser-wallet-vault';
 import type { WorkspaceWallet } from '@/lib/wallet-workspace';
 import { formatNativeBalance } from '@/lib/wallet-balance-format';
@@ -22,7 +23,7 @@ import {
 } from '@/lib/token-supply-action';
 import type { TokenSendSnapshot } from '@/lib/token-send-snapshot-server';
 
-type Tool = 'send' | 'burn' | 'lock';
+type Tool = 'send' | 'burn' | 'lock' | 'airdrop';
 const sumRaw = (values: string[]) =>
   values.reduce((t, v) => t + BigInt(v), 0n).toString();
 const shareOfSupply = (raw: string, supply: string) =>
@@ -53,12 +54,12 @@ export function TokenToolsPanel({
       {open && (
         <>
           <p>
-            Send, burn or lock a share of a token&apos;s total supply. Each
-            transaction is prepared and simulated on mainnet, signed with your
-            key in this browser, and submitted only after a separate approval.
+            Send, burn, lock or airdrop a token. Each transaction is prepared
+            and simulated on mainnet, signed with your key in this browser, and
+            submitted only after a separate approval.
           </p>
           <div className="wallet-roster-actions" role="tablist">
-            {(['send', 'burn', 'lock'] as const).map((t) => (
+            {(['send', 'burn', 'lock', 'airdrop'] as const).map((t) => (
               <Button
                 key={t}
                 role="tab"
@@ -66,7 +67,13 @@ export function TokenToolsPanel({
                 variant={tool === t ? 'default' : 'outline'}
                 onClick={() => setTool(t)}
               >
-                {t === 'send' ? 'Send' : t === 'burn' ? 'Burn' : 'Lock'}
+                {t === 'send'
+                  ? 'Send'
+                  : t === 'burn'
+                    ? 'Burn'
+                    : t === 'lock'
+                      ? 'Lock'
+                      : 'Streamflow Airdrop'}
               </Button>
             ))}
           </div>
@@ -79,6 +86,8 @@ export function TokenToolsPanel({
           />
           {tool === 'send' ? (
             <SendTool key={mint} wallets={choices} all={wallets} mint={mint} />
+          ) : tool === 'airdrop' ? (
+            <AirdropTool key={mint} wallets={choices} mint={mint} />
           ) : (
             <SupplyTool key={tool} kind={tool} wallets={choices} mint={mint} />
           )}

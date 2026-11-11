@@ -46,6 +46,8 @@ type ShareRow = {
   expired: number;
   walletScope: string | null;
   metadataEdit: number;
+  approval: number;
+  requestedAt: string | null;
 };
 type SharedRow = {
   shareId: string;
@@ -80,7 +82,7 @@ export async function GET(request: Request) {
       const result = await db
         .prepare(
           `SELECT id, member_id AS memberId, created_at AS createdAt, accepted_at AS acceptedAt,
-           expires_at AS expiresAt, wallet_scope AS walletScope, metadata_edit AS metadataEdit, (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
+           expires_at AS expiresAt, wallet_scope AS walletScope, metadata_edit AS metadataEdit, approval, requested_at AS requestedAt, (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
            FROM project_shares WHERE owner_id=? AND project_id=? AND revoked_at IS NULL
            ORDER BY created_at DESC LIMIT 10`,
         )
@@ -121,6 +123,8 @@ export async function GET(request: Request) {
           expired: Boolean(s.expired),
           walletScope: ownerScopeSummary(s.walletScope),
           permissions: { editMetadata: s.metadataEdit === 1 },
+          approval: s.approval === 1,
+          requestedAt: s.memberId === null ? s.requestedAt : null,
         })),
       });
     }
@@ -178,6 +182,7 @@ export async function POST(request: Request) {
     expiresInSeconds?: unknown;
     walletScope?: unknown;
     permissions?: unknown;
+    approval?: unknown;
   };
   try {
     const text = await request.text();
@@ -195,6 +200,9 @@ export async function POST(request: Request) {
     if (body.action === 'invite') {
       if (!projectIdValid(body.projectId))
         return json({ error: 'Invalid project.' }, 400);
+      if (body.approval !== undefined && typeof body.approval !== 'boolean')
+        return json({ error: 'Choose an invite or an approval link.' }, 400);
+      const approval = body.approval === true;
       let editMetadata = false;
       if (body.permissions !== undefined) {
         const permission = body.permissions as { editMetadata?: unknown };
@@ -276,7 +284,7 @@ export async function POST(request: Request) {
       try {
         await db
           .prepare(
-            'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at,wallet_scope,metadata_edit) VALUES(?,?,?,?,?,?,?,?)',
+            'INSERT INTO project_shares(id,owner_id,project_id,token_hash,created_at,expires_at,wallet_scope,metadata_edit,approval) VALUES(?,?,?,?,?,?,?,?,?)',
           )
           .bind(
             id,
@@ -287,6 +295,7 @@ export async function POST(request: Request) {
             expiresAt,
             JSON.stringify(walletScope),
             editMetadata ? 1 : 0,
+            approval ? 1 : 0,
           )
           .run();
       } catch (e) {
@@ -309,7 +318,15 @@ export async function POST(request: Request) {
         throw e;
       }
       return json(
-        { share: { id, token, expiresAt, permissions: { editMetadata } } },
+        {
+          share: {
+            id,
+            token,
+            expiresAt,
+            permissions: { editMetadata },
+            approval,
+          },
+        },
         201,
       );
     }
@@ -318,7 +335,7 @@ export async function POST(request: Request) {
         return json({ error: 'Invalid invite link.' }, 400);
       const row = await db
         .prepare(
-          `SELECT id, owner_id AS ownerId, project_id AS projectId, member_id AS memberId FROM project_shares
+          `SELECT id, owner_id AS ownerId, project_id AS projectId, member_id AS memberId, approval, requester_id AS requesterId FROM project_shares
            WHERE token_hash=? AND revoked_at IS NULL
            AND (expires_at IS NULL OR expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
         )
@@ -328,6 +345,8 @@ export async function POST(request: Request) {
           ownerId: string;
           projectId: string;
           memberId: string | null;
+          approval: number;
+          requesterId: string | null;
         }>();
       if (!row)
         return json({ error: 'Invite not found, expired or revoked.' }, 404);
@@ -335,6 +354,10 @@ export async function POST(request: Request) {
         return json({ error: 'This is your own project.' }, 409);
       if (row.memberId === user.userId) return json({ shareId: row.id });
       if (row.memberId !== null)
+        return json({ error: 'This invite was already used.' }, 409);
+      if (row.approval === 1 && row.requesterId === user.userId)
+        return json({ shareId: row.id, pending: true });
+      if (row.approval === 1 && row.requesterId !== null)
         return json({ error: 'This invite was already used.' }, 409);
       const previous = await db
         .prepare(`SELECT (expires_at IS NOT NULL AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired
@@ -350,9 +373,38 @@ export async function POST(request: Request) {
           },
           409,
         );
+      if (row.approval === 1) {
+        // Approval link: record the request only. Nothing about the project
+        // is readable until the owner approves it.
+        const waiting = await db
+          .prepare(
+            'SELECT 1 AS x FROM project_shares WHERE owner_id=? AND project_id=? AND requester_id=? AND member_id IS NULL AND revoked_at IS NULL LIMIT 1',
+          )
+          .bind(row.ownerId, row.projectId, user.userId)
+          .first<{ x: number }>();
+        if (waiting)
+          return json(
+            {
+              error:
+                'You already asked for access to this project. Wait for the owner.',
+            },
+            409,
+          );
+        const requested = await db
+          .prepare(
+            `UPDATE project_shares SET requester_id=?, requested_at=? WHERE id=? AND approval=1 AND requester_id IS NULL AND member_id IS NULL AND revoked_at IS NULL
+             AND (expires_at IS NULL OR expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
+          )
+          .bind(user.userId, now, row.id)
+          .run()
+          .catch(() => null);
+        if (!requested?.meta.changes)
+          return json({ error: 'This invite could not be accepted.' }, 409);
+        return json({ shareId: row.id, pending: true });
+      }
       const result = await db
         .prepare(
-          `UPDATE project_shares SET member_id=?, accepted_at=? WHERE id=? AND member_id IS NULL AND revoked_at IS NULL
+          `UPDATE project_shares SET member_id=?, accepted_at=? WHERE id=? AND approval=0 AND member_id IS NULL AND revoked_at IS NULL
            AND (expires_at IS NULL OR expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
         )
         .bind(user.userId, now, row.id)
@@ -361,6 +413,28 @@ export async function POST(request: Request) {
       if (!result?.meta.changes)
         return json({ error: 'This invite could not be accepted.' }, 409);
       return json({ shareId: row.id });
+    }
+    if (body.action === 'approve') {
+      if (typeof body.id !== 'string' || !SHARE_ID.test(body.id))
+        return json({ error: 'Invalid share.' }, 400);
+      const result = await db
+        .prepare(
+          `UPDATE project_shares SET member_id=requester_id, accepted_at=? WHERE id=? AND owner_id=? AND approval=1
+           AND requester_id IS NOT NULL AND member_id IS NULL AND revoked_at IS NULL
+           AND (expires_at IS NULL OR expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
+        )
+        .bind(now, body.id, user.userId)
+        .run()
+        .catch(() => null);
+      if (!result?.meta.changes)
+        return json(
+          {
+            error:
+              'This request could not be approved. It may have expired, been declined or belong to an existing collaborator.',
+          },
+          409,
+        );
+      return json({ ok: true });
     }
     if (body.action === 'revoke' || body.action === 'leave') {
       if (typeof body.id !== 'string' || !SHARE_ID.test(body.id))
