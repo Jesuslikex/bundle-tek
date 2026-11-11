@@ -157,6 +157,7 @@ beforeAll(async () => {
     '0148_project_share_expiry.sql',
     '0150_project_share_scope.sql',
     '0151_project_collaboration_metadata.sql',
+    '0165_project_share_approval.sql',
   ])
     for (const sql of readFileSync(
       new URL('../../../../drizzle/' + file, import.meta.url),
@@ -370,6 +371,8 @@ it('filters expired members and refuses accepting an expired or exact-boundary i
         expired: true,
         walletScope: expect.objectContaining({ count: 0 }),
         permissions: { editMetadata: false },
+        approval: false,
+        requestedAt: null,
       },
     ]),
   });
@@ -875,4 +878,144 @@ it('keeps legacy omitted permissions off and rejects a foreign owner grant', asy
       })
     ).status,
   ).toBe(404);
+});
+
+it('approval link: opening it only files a request, and nothing is readable until the owner approves', async () => {
+  const invite = await post({
+    action: 'invite',
+    projectId: 'shared-project',
+    approval: true,
+  });
+  expect(invite.status).toBe(201);
+  const { share } = (await invite.json()) as {
+    share: { id: string; token: string; approval: boolean };
+  };
+  expect(share.approval).toBe(true);
+  as('bob');
+  const request = await post({ action: 'accept', token: share.token });
+  expect(request.status).toBe(200);
+  expect(await request.json()).toEqual({ shareId: share.id, pending: true });
+  expect(((await (await get()).json()) as { projects: [] }).projects).toEqual(
+    [],
+  );
+  // Repeating is idempotent; nobody else can take the same link.
+  expect(
+    await (await post({ action: 'accept', token: share.token })).json(),
+  ).toEqual({ shareId: share.id, pending: true });
+  as('carol');
+  expect((await post({ action: 'accept', token: share.token })).status).toBe(
+    409,
+  );
+  // Neither the requester nor a stranger can approve.
+  expect((await post({ action: 'approve', id: share.id })).status).toBe(409);
+  as('bob');
+  expect((await post({ action: 'approve', id: share.id })).status).toBe(409);
+  as('alice');
+  const waiting = (await (await get('?projectId=shared-project')).json()) as {
+    shares: {
+      id: string;
+      accepted: boolean;
+      approval: boolean;
+      requestedAt: string | null;
+    }[];
+  };
+  expect(waiting.shares).toMatchObject([
+    { id: share.id, accepted: false, approval: true },
+  ]);
+  expect(waiting.shares[0].requestedAt).toMatch(/^\d{4}-/);
+  expect((await post({ action: 'approve', id: share.id })).status).toBe(200);
+  expect((await post({ action: 'approve', id: share.id })).status).toBe(409);
+  as('bob');
+  expect(
+    ((await (await get()).json()) as { projects: { id: string }[] }).projects,
+  ).toMatchObject([{ id: 'shared-project', readOnly: true }]);
+});
+
+it('approval link: the owner can decline, an unrequested link cannot be approved, and SQL refuses a bypass', async () => {
+  const make = async () =>
+    (
+      (await (
+        await post({
+          action: 'invite',
+          projectId: 'shared-project',
+          approval: true,
+        })
+      ).json()) as { share: { id: string; token: string } }
+    ).share;
+  const first = await make();
+  // No request yet: nothing to approve.
+  expect((await post({ action: 'approve', id: first.id })).status).toBe(409);
+  // A member cannot be written straight onto an approval link.
+  await expect(
+    mocks.db
+      .prepare(
+        "UPDATE project_shares SET member_id='bob', accepted_at=? WHERE id=?",
+      )
+      .bind(new Date().toISOString(), first.id)
+      .run(),
+  ).rejects.toThrow(/owner approval/);
+  as('bob');
+  expect((await post({ action: 'accept', token: first.token })).status).toBe(
+    200,
+  );
+  // One open request per project.
+  as('alice');
+  const second = await make();
+  as('bob');
+  expect((await post({ action: 'accept', token: second.token })).status).toBe(
+    409,
+  );
+  // The approved member must be the requester, and the request is immutable.
+  await expect(
+    mocks.db
+      .prepare(
+        "UPDATE project_shares SET member_id='carol', accepted_at=? WHERE id=?",
+      )
+      .bind(new Date().toISOString(), first.id)
+      .run(),
+  ).rejects.toThrow(/owner approval/);
+  await expect(
+    mocks.db
+      .prepare("UPDATE project_shares SET requester_id='carol' WHERE id=?")
+      .bind(first.id)
+      .run(),
+  ).rejects.toThrow(/immutable/);
+  as('alice');
+  expect((await post({ action: 'revoke', id: first.id })).status).toBe(200);
+  expect((await post({ action: 'approve', id: first.id })).status).toBe(409);
+  as('bob');
+  expect(((await (await get()).json()) as { projects: [] }).projects).toEqual(
+    [],
+  );
+  expect((await post({ action: 'accept', token: first.token })).status).toBe(
+    404,
+  );
+});
+
+it('ordinary invite links still join at once and cannot carry a request', async () => {
+  const { share } = (await (
+    await post({ action: 'invite', projectId: 'shared-project' })
+  ).json()) as { share: { id: string; token: string; approval: boolean } };
+  expect(share.approval).toBe(false);
+  await expect(
+    mocks.db
+      .prepare(
+        "UPDATE project_shares SET requester_id='bob', requested_at=? WHERE id=?",
+      )
+      .bind(new Date().toISOString(), share.id)
+      .run(),
+  ).rejects.toThrow(/request invalid/);
+  expect(
+    (
+      await post({
+        action: 'invite',
+        projectId: 'shared-project',
+        approval: 'yes',
+      })
+    ).status,
+  ).toBe(400);
+  as('bob');
+  expect(
+    await (await post({ action: 'accept', token: share.token })).json(),
+  ).toEqual({ shareId: share.id });
 });
