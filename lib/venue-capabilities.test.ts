@@ -23,8 +23,8 @@ describe('captured venue capability matrix', () => {
       'Robinhood',
       'Solana',
     ]);
-    expect(VENUE_CAPABILITY_KEYS).toHaveLength(43);
-    expect(solana).toHaveLength(13);
+    expect(VENUE_CAPABILITY_KEYS).toHaveLength(44);
+    expect(solana).toHaveLength(14);
   });
 
   it('agrees with the venue-limits module on every shared detail field', () => {
@@ -154,6 +154,7 @@ describe('captured venue capability matrix', () => {
       'Solana/LetsBonk',
       'Solana/StonkFun',
       'Solana/Surge',
+      'Solana/Raydium LaunchLab',
     ]);
     // `maxFrontMev` is non-zero on nine venues, and mostly on EVM ones, so it
     // is plainly not the Solana front-wallet cap the launch form applies.
@@ -225,7 +226,7 @@ describe('captured venue capability matrix', () => {
     // them from, so exactly 11 Solana venues carry each.
     expect(
       solanaKeys.filter((key) => venueFeatureEnabled(...split(key), 'lock')),
-    ).toHaveLength(11);
+    ).toHaveLength(12);
   });
 
   it('treats an uncaptured venue as supporting nothing', () => {

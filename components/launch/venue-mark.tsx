@@ -32,6 +32,7 @@ const LOGOS: Record<string, string> = {
   Clanker: '/logos/clanker.png',
   Bankr: '/logos/bankr.png',
   Raydium: '/logos/raydium.png',
+  'Raydium LaunchLab': '/logos/raydium.png',
 };
 
 const COLORS: Record<string, string> = {

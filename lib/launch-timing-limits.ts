@@ -68,6 +68,12 @@ export const LAUNCH_TIMING_LIMITS: Record<
     staggerMinMs: 0,
     staggerMaxMs: 60000,
   },
+  'Solana/Raydium LaunchLab': {
+    sequencedMinMs: 0,
+    sequencedMaxMs: 1000,
+    staggerMinMs: 0,
+    staggerMaxMs: 60000,
+  },
   'Solana/Stoxes': {
     sequencedMinMs: 0,
     sequencedMaxMs: 1000,

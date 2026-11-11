@@ -38,6 +38,7 @@ export const VENUES_BY_CHAIN: Record<LaunchChain, readonly string[]> = {
     'Bags',
     'Anoncoin',
     'Surge',
+    'Raydium LaunchLab',
     'Printr',
     'Meteora DBC',
     'StonkFun',

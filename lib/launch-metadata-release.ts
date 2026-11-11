@@ -1,3 +1,4 @@
+import { hasLaunchMetadataReview } from './launch-review-availability';
 import { inspectArtwork, isUploadedArtwork } from './artwork';
 import { validateProjectDocument } from './workspace-project';
 
@@ -84,14 +85,9 @@ export async function releaseLaunchMetadata(
       409,
     );
   const project = validateProjectDocument(JSON.parse(row.document));
-  if (
-    project.plan.chain !== 'Solana' ||
-    !['PumpFun', 'StonkFun', 'LetsBonk', 'Surge', 'Meteora DBC'].includes(
-      project.plan.launchpad,
-    )
-  )
+  if (!hasLaunchMetadataReview(project.plan))
     throw new MetadataReleaseError(
-      'Choose a Solana PumpFun, StonkFun, LetsBonk, Surge or Meteora DBC launch.',
+      'Choose a Solana PumpFun, StonkFun, LetsBonk, Surge, Raydium LaunchLab or Meteora DBC launch.',
       400,
     );
   if (!isUploadedArtwork(project.identity.artworkUrl))

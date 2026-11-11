@@ -34,6 +34,7 @@ import {
   buildLaunchLabMessage,
   LAUNCHLAB_CURVES,
   LAUNCHLAB_PLATFORMS,
+  LAUNCHLAB_VENUES,
   type LaunchLabVenue,
 } from '../lib/launchlab-platform-launch';
 import type { LaunchLabReview } from '../lib/launchlab-launch-service';
@@ -160,7 +161,7 @@ async function buildReviews() {
       pricingObservedAt: '2000-01-01T00:00:00.000Z',
     },
   };
-  for (const venue of ['LetsBonk', 'Surge'] as const) {
+  for (const venue of LAUNCHLAB_VENUES) {
     const curve = LAUNCHLAB_CURVES[WRAPPED_SOL];
     const input = {
       ...commonInput,
@@ -224,6 +225,11 @@ export async function venueRecoveryFixture(
   sqlite.exec(
     readFileSync('drizzle/0146_launchlab_launch_recoveries.sql', 'utf8'),
   );
+  for (const sql of readFileSync(
+    'drizzle/0164_launchlab_raydium_venue.sql',
+    'utf8',
+  ).split('--> statement-breakpoint'))
+    sqlite.exec(sql);
   sqlite
     .prepare('INSERT INTO workspace_projects VALUES(?,?,?,?,0)')
     .run(

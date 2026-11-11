@@ -63,9 +63,9 @@ describe('workspace documents', () => {
 });
 
 describe('reference venue profiles', () => {
-  it('offers 37 current venues over six chains and preserves retired saved profiles', () => {
+  it('offers 38 current venues over six chains and preserves retired saved profiles', () => {
     expect(Object.keys(VENUES_BY_CHAIN)).toHaveLength(6);
-    expect(Object.values(CURRENT_VENUES_BY_CHAIN).flat()).toHaveLength(37);
+    expect(Object.values(CURRENT_VENUES_BY_CHAIN).flat()).toHaveLength(38);
     expect(CURRENT_VENUES_BY_CHAIN.Robinhood).toHaveLength(15);
     expect(VENUES_BY_CHAIN.Robinhood).toContain('long.xyz');
     expect(CURRENT_VENUES_BY_CHAIN.Robinhood).not.toContain('long.xyz');

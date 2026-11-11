@@ -1,3 +1,4 @@
+import { isLaunchLabVenue } from './launchlab-platform-launch';
 import { PANEL_JSON_RESPONSE_BYTES } from './read-bounded-panel-json';
 import {
   validateLaunchRecoveryInspection,
@@ -182,8 +183,7 @@ export async function readLaunchRecoveryInspection(
       if (!Number.isSafeInteger(row.minimum_slot) || row.minimum_slot! < 0)
         return fail();
       if (reference.source === 'launchlab') {
-        if (!['LetsBonk', 'Surge'].includes(terms.venue as string))
-          return fail();
+        if (!isLaunchLabVenue(terms.venue)) return fail();
         same(input.venue, terms.venue);
         same(record(review.summary).venue, terms.venue);
       }

@@ -7,13 +7,14 @@ import {
   readVenueLaunchRecovery as read,
   listVenueLaunchRecoveries as list,
 } from './venue-launch-recovery';
+import { LAUNCHLAB_VENUES } from './launchlab-platform-launch';
 const kept: Awaited<ReturnType<typeof venueRecoveryFixture>>[] = [];
 afterEach(() => {
   vi.restoreAllMocks();
   for (const f of kept.splice(0)) f.dispose();
 });
 const signal = () => new AbortController().signal;
-for (const venue of ['LetsBonk', 'Surge'] as const) {
+for (const venue of LAUNCHLAB_VENUES) {
   async function setup() {
     const f = await venueRecoveryFixture('launchlab', venue);
     kept.push(f);
@@ -319,7 +320,7 @@ for (const venue of ['LetsBonk', 'Surge'] as const) {
   });
 }
 
-for (const venue of ['LetsBonk', 'Surge'] as const)
+for (const venue of LAUNCHLAB_VENUES)
   for (const reason of ['slot', 'source']) {
     it(
       venue +

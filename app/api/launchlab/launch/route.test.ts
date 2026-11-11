@@ -323,6 +323,7 @@ beforeEach(async () => {
   for (const file of [
     '0145_venue_launch_recoveries.sql',
     '0146_launchlab_launch_recoveries.sql',
+    '0164_launchlab_raydium_venue.sql',
   ])
     for (const sql of readFileSync(
       new URL('../../../../drizzle/' + file, import.meta.url),

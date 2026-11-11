@@ -31,15 +31,21 @@ import {
 /**
  * LetsBonk and Surge launches are Raydium LaunchLab pools created under each
  * venue's platform config, as listed in Raydium's public platform registry
- * (https://launch-mint-v1.raydium.io/main/platforms). Tokens are classic SPL
+ * (https://launch-mint-v1.raydium.io/main/platforms). "Raydium LaunchLab" is
+ * the plain launchpad: the same program under Raydium's own default platform. Tokens are classic SPL
  * mints with Metaplex metadata, created by initialize_v2. Layouts follow the
  * official @raydium-io/raydium-sdk-v2 encoders; the golden test pins bytes.
  */
-export const LAUNCHLAB_VENUES = ['LetsBonk', 'Surge'] as const;
+export const LAUNCHLAB_VENUES = [
+  'LetsBonk',
+  'Surge',
+  'Raydium LaunchLab',
+] as const;
 export type LaunchLabVenue = (typeof LAUNCHLAB_VENUES)[number];
 export const LAUNCHLAB_PLATFORMS: Record<LaunchLabVenue, string> = {
   LetsBonk: 'FfYek5vEz23cMkWsdJwG2oa6EphsvXSHrGpdALN4g6W1',
   Surge: 'Dt9xZGWUYyN44Vxfz9qLQGERhtR2taDnLG1B8XbDEWWN',
+  'Raydium LaunchLab': '4Bu96XjU84XjPDSpveTVf6LYGCkfW5FK7SNkREWcEfV4',
 };
 export const USD1 = 'USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB';
 /**

@@ -37,7 +37,7 @@ describe('captured venue launch methods', () => {
       Object.entries(CURRENT_VENUES_BY_CHAIN).flatMap(([chain, venues]) =>
         venues.filter((venue) => venueLaunchMethods(chain, venue).captured),
       ),
-    ).toHaveLength(36);
+    ).toHaveLength(37);
   });
   it('rejects unsupported and legacy modes for new plans while preserving structural reads', () => {
     expect(() =>
