@@ -19,20 +19,6 @@ CREATE UNIQUE INDEX token_airdrop_actions_active ON token_airdrop_actions(owner_
 --> statement-breakpoint
 CREATE TABLE token_airdrop_action_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,owner_id TEXT NOT NULL,intent_id TEXT NOT NULL,wallet_address TEXT NOT NULL,state TEXT NOT NULL,signature TEXT,created_at TEXT NOT NULL);
 --> statement-breakpoint
-DROP VIEW solana_wallet_family_holds;
---> statement-breakpoint
-CREATE VIEW solana_wallet_family_holds AS
- SELECT 'cleanup' AS family,id,owner_id,wallet_address FROM wallet_cleanups
- WHERE state IN ('awaiting_signature','signing','signed','submitted')
- UNION ALL
- SELECT 'supply',id,owner_id,wallet_address FROM token_supply_actions
- WHERE state IN ('awaiting_signature','signing','signed','submitted')
- UNION ALL
- SELECT 'airdrop',id,owner_id,wallet_address FROM token_airdrop_actions
- WHERE state IN ('awaiting_signature','signing','signed','submitted')
- UNION ALL
- SELECT family,id,owner_id,wallet_address FROM solana_scheduled_family_holds;
---> statement-breakpoint
 CREATE TRIGGER token_airdrop_action_insert BEFORE INSERT ON token_airdrop_actions BEGIN
  SELECT CASE WHEN NEW.state<>'awaiting_signature' OR NEW.signature IS NOT NULL OR NEW.receipt IS NOT NULL THEN RAISE(ABORT,'Airdrop action must start unsigned') END;
  SELECT CASE WHEN NEW.kind<>'create' AND NOT EXISTS(SELECT 1 FROM token_airdrop_actions c WHERE c.owner_id=NEW.owner_id AND c.id=NEW.airdrop_id AND c.kind='create' AND c.state='finalized' AND c.mint=NEW.mint AND ((NEW.kind='clawback' AND c.wallet_address=NEW.wallet_address) OR (NEW.kind='claim' AND EXISTS(SELECT 1 FROM json_each(c.document,'$.terms.recipients') r WHERE r.value=NEW.wallet_address)))) THEN RAISE(ABORT,'Airdrop parent unavailable') END;
@@ -60,12 +46,48 @@ CREATE TRIGGER token_airdrop_volume_reservation BEFORE INSERT ON volume_bundle_r
  SELECT CASE WHEN EXISTS(SELECT 1 FROM token_airdrop_actions WHERE owner_id=NEW.owner_id AND wallet_address=NEW.wallet AND state IN ('awaiting_signature','signing','signed','submitted')) THEN RAISE(ABORT,'Volume wallet already reserved by another flow') END;
 END;
 --> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_cleanup_insert BEFORE INSERT ON wallet_cleanups BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM token_airdrop_actions a WHERE a.owner_id=NEW.owner_id AND a.wallet_address=NEW.wallet_address AND a.state IN ('awaiting_signature','signing','signed','submitted'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_cleanup_update BEFORE UPDATE OF state ON wallet_cleanups WHEN NEW.state IN ('signing','submitted') AND NEW.state<>OLD.state BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM token_airdrop_actions a WHERE a.owner_id=NEW.owner_id AND a.wallet_address=NEW.wallet_address AND a.state IN ('awaiting_signature','signing','signed','submitted'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_supply_insert BEFORE INSERT ON token_supply_actions BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM token_airdrop_actions a WHERE a.owner_id=NEW.owner_id AND a.wallet_address=NEW.wallet_address AND a.state IN ('awaiting_signature','signing','signed','submitted'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_supply_update BEFORE UPDATE OF state ON token_supply_actions WHEN NEW.state IN ('signing','submitted') AND NEW.state<>OLD.state BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM token_airdrop_actions a WHERE a.owner_id=NEW.owner_id AND a.wallet_address=NEW.wallet_address AND a.state IN ('awaiting_signature','signing','signed','submitted'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_organic_insert BEFORE INSERT ON pump_organic_sequences BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM token_airdrop_actions a,json_each(NEW.plan,'$.rows') w WHERE a.owner_id=NEW.owner_id AND a.wallet_address=json_extract(w.value,'$.address') AND a.state IN ('awaiting_signature','signing','signed','submitted'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_organic_send BEFORE UPDATE OF state ON pump_organic_buys WHEN NEW.state='submitting' AND OLD.state<>'submitting' BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM token_airdrop_actions a WHERE a.owner_id=NEW.owner_id AND a.wallet_address=NEW.holder AND a.state IN ('awaiting_signature','signing','signed','submitted'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_volume_insert BEFORE INSERT ON volume_bot_sessions BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM token_airdrop_actions a,json_each(NEW.plan,'$.wallets') w WHERE a.owner_id=NEW.owner_id AND a.wallet_address=w.value AND a.state IN ('awaiting_signature','signing','signed','submitted'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_volume_send BEFORE UPDATE OF state ON volume_bot_trades WHEN NEW.state='submitting' AND OLD.state<>'submitting' BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM token_airdrop_actions a WHERE a.owner_id=NEW.owner_id AND a.wallet_address=NEW.wallet AND a.state IN ('awaiting_signature','signing','signed','submitted'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER token_airdrop_blocks_warmup_lease BEFORE INSERT ON wallet_warmup_execution_wallet_leases BEGIN
+ SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(SELECT 1 FROM wallet_warmup_session_reviews r,json_each(r.document,'$.wallets') w JOIN token_airdrop_actions a ON a.owner_id=r.owner_id AND a.wallet_address=json_extract(w.value,'$.wallet') AND a.state IN ('awaiting_signature','signing','signed','submitted') WHERE r.owner_id=NEW.owner_id AND r.id=NEW.review_id);
+END;
+--> statement-breakpoint
 CREATE TRIGGER token_airdrop_action_identity BEFORE UPDATE ON token_airdrop_actions WHEN NEW.id<>OLD.id OR NEW.owner_id<>OLD.owner_id OR NEW.wallet_address<>OLD.wallet_address OR NEW.wallet_revision<>OLD.wallet_revision OR NEW.kind<>OLD.kind OR NEW.airdrop_id<>OLD.airdrop_id OR NEW.mint<>OLD.mint OR NEW.document<>OLD.document OR NEW.created_at<>OLD.created_at OR (OLD.signature IS NOT NULL AND (NEW.signature IS NULL OR NEW.signature<>OLD.signature)) OR (OLD.receipt IS NOT NULL AND (NEW.receipt IS NULL OR NEW.receipt<>OLD.receipt)) BEGIN SELECT RAISE(ABORT,'Airdrop action context is immutable'); END;
 --> statement-breakpoint
 CREATE TRIGGER token_airdrop_action_sign_or_send BEFORE UPDATE OF state ON token_airdrop_actions
 WHEN NEW.state IN ('signing','submitted') AND NEW.state<>OLD.state BEGIN
  SELECT RAISE(ABORT,'Wallet already reserved') WHERE EXISTS(
- SELECT 1 FROM solana_wallet_family_holds h WHERE h.owner_id=NEW.owner_id AND h.wallet_address=NEW.wallet_address AND (h.family<>'airdrop' OR h.id<>NEW.id))
+ SELECT 1 FROM solana_wallet_family_holds h WHERE h.owner_id=NEW.owner_id AND h.wallet_address=NEW.wallet_address)
  OR EXISTS(SELECT 1 FROM solana_execution_reservations WHERE owner_id=NEW.owner_id AND wallet_address=NEW.wallet_address);
  SELECT RAISE(ABORT,'Wallet reserved by same-block Volume') WHERE EXISTS(SELECT 1 FROM volume_bundle_reservations r WHERE r.owner_id=NEW.owner_id AND r.state IN ('held','attempted') AND r.wallet=NEW.wallet_address);
  SELECT RAISE(ABORT,'Wallet held by warmup execution') WHERE EXISTS(SELECT 1 FROM wallet_warmup_execution_held_wallets h WHERE h.owner_id=NEW.owner_id AND h.wallet_address=NEW.wallet_address);

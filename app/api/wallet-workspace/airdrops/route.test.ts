@@ -13,6 +13,7 @@ import {
   solanaFamilyExclusionFixture,
   familyExclusionD1,
   exclusionOwner,
+  reserveFamily,
 } from '../../../../test/solana-family-exclusion-fixture';
 
 const mocks = vi.hoisted(() => ({
@@ -364,13 +365,33 @@ it('keeps one retained approval per wallet and refuses changed packets, late sub
       )
       .run(exclusionOwner, CREATOR),
   ).toThrow();
-  expect(
+  // Burn/lock and cleanup on the same wallet are blocked while the airdrop review is open.
+  expect(() =>
+    reserveFamily(sqlite, 'supply', CREATOR, exclusionOwner),
+  ).toThrow('Wallet already reserved');
+  expect(() =>
+    reserveFamily(sqlite, 'cleanup', CREATOR, exclusionOwner),
+  ).toThrow('Wallet already reserved');
+  // And an open burn on an output wallet blocks its claim review in the database.
+  reserveFamily(sqlite, 'supply', OUT1, exclusionOwner);
+  expect(() =>
     sqlite
       .prepare(
-        'SELECT family FROM solana_wallet_family_holds WHERE owner_id=? AND wallet_address=?',
+        "INSERT INTO token_airdrop_actions(id,owner_id,wallet_address,wallet_revision,kind,airdrop_id,mint,document,state,created_at,updated_at) VALUES('z',?,?,1,'create','z',?,?,'awaiting_signature','t','t')",
       )
-      .all(exclusionOwner, CREATOR),
-  ).toEqual([{ family: 'airdrop' }]);
+      .run(
+        exclusionOwner,
+        OUT1,
+        MINT,
+        JSON.stringify({
+          id: 'z',
+          kind: 'create',
+          mint: MINT,
+          wallet: OUT1,
+          terms: { airdropId: 'z' },
+        }),
+      ),
+  ).toThrow('Wallet already reserved');
   await post({ action: 'begin_signing', id: action.id });
   const signed = await signAirdrop(airdropSession, action.document, () => {});
   const other = Uint8Array.from(atob(signed.transaction), (c) =>
