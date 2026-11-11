@@ -4,6 +4,8 @@ import {
   prepareWalletWarmupV2Attempt as prepare,
   readWalletWarmupV2Attempt as read,
 } from './wallet-warmup-session-v2-attempts';
+import { getSolanaRpcEndpoint } from './solana-rpc';
+import { WRAPPED_SOL } from './warmup-swap-quote';
 import { createWalletWarmupV2Provider } from './wallet-warmup-session-v2-provider';
 // Actual elapsed SQLite time. Never backdate a lease or remove a clock guard.
 it.skipIf(process.env.BUNDLE_WARMUP_DB_CLOCK_QA !== '1')(
@@ -75,12 +77,33 @@ it.skipIf(process.env.BUNDLE_WARMUP_DB_CLOCK_QA !== '1')(
           )
           .run(),
       ).rejects.toThrow('expired or changed');
-      const fetcher = vi.fn(async (url: RequestInfo | URL) => {
+      const { wallet, mint } = f.packets;
+      const requests: string[] = [];
+      const fetcher = vi.fn<typeof fetch>(async (url, init) => {
         const parsed = new URL(url instanceof Request ? url.url : url);
-        expect(parsed.origin + parsed.pathname).toBe(
-          'https://api.jup.ag/swap/v2/order',
-        );
-        return Response.json(f.quote(parsed));
+        if (
+          parsed.origin + parsed.pathname ===
+          'https://api.jup.ag/swap/v2/order'
+        ) {
+          expect(parsed.searchParams.get('inputMint')).toBe(WRAPPED_SOL);
+          expect(parsed.searchParams.get('outputMint')).toBe(mint);
+          expect(parsed.searchParams.get('taker')).toBe(wallet);
+          requests.push('order');
+          return Response.json(f.quote(parsed));
+        }
+        expect(parsed.href).toBe(new URL(getSolanaRpcEndpoint('mainnet')).href);
+        expect(init?.method).toBe('POST');
+        if (typeof init?.body !== 'string')
+          throw Error('Expected JSON-RPC body');
+        const { method, params } = JSON.parse(init.body);
+        expect(params).toEqual([{ commitment: 'finalized' }]);
+        requests.push(method);
+        if (method === 'getLatestBlockhash')
+          return Response.json({
+            result: { value: { blockhash: mint, lastValidBlockHeight: 1000 } },
+          });
+        if (method === 'getBlockHeight') return Response.json({ result: 100 });
+        throw Error('Unexpected synthetic lifetime read');
       });
       vi.stubGlobal('fetch', fetcher);
       const { previewRequested: _nextApproved, ...nextInput } = f.input();
@@ -101,7 +124,12 @@ it.skipIf(process.env.BUNDLE_WARMUP_DB_CLOCK_QA !== '1')(
       expect(saved.lease.previous_id).toBe(input.id);
       expect(saved.lease.expires_at).toBe(finish);
       expect(saved.journal.consent.terms.sessionExpiresAt).toBe(finish);
-      expect(fetcher).toHaveBeenCalledOnce();
+      expect(fetcher).toHaveBeenCalledTimes(3);
+      expect(requests).toEqual([
+        'order',
+        'getLatestBlockhash',
+        'getBlockHeight',
+      ]);
       expect(
         (await read(f.db, 'owner', input.id, new AbortController().signal))
           ?.lease,
